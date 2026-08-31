@@ -106,6 +106,17 @@ public:
     bool removeReturn (const juce::String& returnId);
     bool renameReturn (const juce::String& returnId, const juce::String& name);
     bool setReturnLevel (const juce::String& returnId, float level);
+
+    // -- group buses (Stage 8) ----------------------------------------------------------
+    juce::String addBus (const juce::String& name);
+    bool removeBus (const juce::String& busId);
+    bool renameBus (const juce::String& busId, const juce::String& name);
+    bool setBusLevel (const juce::String& busId, float level);
+    /** Routes a bus into another bus, or into the master when `destinationId` is empty.
+        Refuses a routing that would close a loop. */
+    bool setBusDestination (const juce::String& busId, const juce::String& destinationId);
+    /** Routes a part into a bus, or back to the master when `busId` is empty. */
+    bool setPartDestination (const juce::String& partId, const juce::String& busId);
     /** Sets one part's send level into one return (creating the send on first use). */
     bool setSendLevel (const juce::String& partId, const juce::String& returnId, float level);
 
@@ -165,6 +176,8 @@ public:
     // The graph does not compensate parallel paths (a live rack keeps every path as fast as
     // its plug-ins allow); these make the cost visible instead of pretended away.
     int partLatencySamples (const juce::String& partId) const;
+    /** What a bus adds on the way out, its own destination chain included. */
+    int busLatencySamples (const juce::String& busId) const;
     int masterLatencySamples() const;
 
     // -- the performance engine (Stage 6) -----------------------------------------------
@@ -333,6 +346,7 @@ private:
     std::map<juce::String, LivePart> live;
     std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, every chain kind
     std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> returnLevelNodes;   // per returnId
+    std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> busLevelNodes;   // per busId — a group bus's fader
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode, engineNode;
     juce::AudioProcessorGraph::Node::Ptr masterGainNode;   // the Performance fader (Stage 7)

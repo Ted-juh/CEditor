@@ -50,6 +50,24 @@ struct EffectSlot
 // A shared return chain (Stage 5): every part can tap its post-fader signal into it by send
 // level, the chain's effects process the sum, and the chain's own level rejoins the master
 // path. Effects here follow the insert rules exactly — same identities, same transaction.
+// A group bus (Stage 8, phase 2): several parts join here and the combined signal keeps
+// going through the bus's own inserts. Returns already existed and are a different animal —
+// a part SENDS a copy to a return and still reaches the master itself, while a part ROUTED
+// to a bus goes there and nowhere else, which is what "these two instruments become one
+// thing I then process" means.
+//
+// A bus feeds the master by default, or another bus: sub-buses of sub-buses are how a real
+// desk is laid out. Cycles are refused where they are made, not discovered while the audio
+// thread is walking the graph.
+struct BusChain
+{
+    juce::String busId;
+    juce::String name;
+    juce::Array<EffectSlot> effects;
+    float level = 1.0f;               // linear, 0..2, like part volume
+    juce::String destinationBusId;    // empty = the master chain
+};
+
 struct ReturnChain
 {
     juce::String returnId;
@@ -124,6 +142,10 @@ struct RackPart
     // audio runs the same insert chain and gain as a plug-in's would. The MIDI output is
     // identified by the system's device id; the name is a display cache for the "port is
     // gone" diagnostic, never identity.
+    // Where this part's audio goes: empty is the master path, exactly as it always was, so
+    // a session written before buses existed keeps its routing by saying nothing.
+    juce::String destinationBusId;
+
     bool hardware = false;
     juce::String midiOutputId;
     juce::String midiOutputName;
@@ -218,6 +240,7 @@ struct Performance
     juce::Array<RackPart> parts;
     juce::Array<EffectSlot> masterEffects;   // the master insert chain (Stage 5)
     juce::Array<ReturnChain> returns;        // shared send/return chains (Stage 5)
+    juce::Array<BusChain> buses;             // group buses parts route INTO (Stage 8)
     juce::Array<Macro> macros;
     juce::Array<ControlPage> pages;
 
@@ -268,6 +291,12 @@ struct Performance
 
     ReturnChain* findReturn (const juce::String& returnId);
     const ReturnChain* findReturn (const juce::String& returnId) const;
+    BusChain* findBus (const juce::String& busId);
+    const BusChain* findBus (const juce::String& busId) const;
+    /** True when routing `busId` into `destinationId` would close a loop — including the
+        bus into itself. Checked where the routing is made; the audio graph never discovers
+        a cycle by walking into one. */
+    bool busRoutingWouldLoop (const juce::String& busId, const juce::String& destinationId) const;
 
     /** The slot and (via chainIdOut) whose chain holds it — a partId, "master", or a
         returnId. */

@@ -1377,3 +1377,43 @@ test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes
     'setPartArp lands on the chain, not beside it');
   assert.ok(midiSlotTypes.includes('velocity'), 'every module type the native side offers is listed');
 });
+
+test('group buses: parts join one, removal releases them, loops are refused', () => {
+  const shaped = normalizeHostState({ rack: {
+    buses: [{ busId: 'b1', name: 'Keys', level: 0.5, latencyMs: 12 }],
+    parts: [{ partId: 'p1', destinationBusId: 'b1' }],
+  } });
+  assert.equal(shaped.rack.buses[0].name, 'Keys');
+  assert.equal(shaped.rack.buses[0].latencyMs, 12, 'the latency a bus adds is carried, not hidden');
+  assert.equal(shaped.rack.parts[0].destinationBusId, 'b1');
+  assert.deepEqual(normalizeHostState({}).rack.buses, [], 'absent reads as no buses');
+
+  let state = mockHostState();
+  const a = state.rack.parts[0].partId;
+  const b = state.rack.parts[1].partId;
+  state = applyMockCommand(state, { cmd: 'addBus', name: 'Keys' });
+  state = applyMockCommand(state, { cmd: 'addBus', name: 'Sub' });
+  const [keys, sub] = state.rack.buses.map((x) => x.busId);
+
+  state = applyMockCommand(state, { cmd: 'setPartDestination', partId: a, busId: keys });
+  state = applyMockCommand(state, { cmd: 'setPartDestination', partId: b, busId: keys });
+  assert.equal(state.rack.parts[0].destinationBusId, keys);
+  assert.equal(state.rack.parts[1].destinationBusId, keys, 'two instruments join one bus');
+
+  state = applyMockCommand(state, { cmd: 'setBusDestination', busId: keys, destinationBusId: sub });
+  assert.equal(state.rack.buses[0].destinationBusId, sub, 'a bus can feed another bus');
+
+  state = applyMockCommand(state, { cmd: 'setBusDestination', busId: sub, destinationBusId: keys });
+  assert.equal(state.rack.buses[1].destinationBusId, '', 'closing the loop changes nothing');
+  state = applyMockCommand(state, { cmd: 'setBusDestination', busId: keys, destinationBusId: keys });
+  assert.equal(state.rack.buses[0].destinationBusId, sub, 'and a bus into itself is refused too');
+
+  state = applyMockCommand(state, { cmd: 'setPartDestination', partId: a, busId: 'ghost' });
+  assert.equal(state.rack.parts[0].destinationBusId, keys,
+    'routing into a bus that does not exist leaves the part where it was');
+
+  state = applyMockCommand(state, { cmd: 'removeBus', busId: keys });
+  assert.equal(state.rack.buses.length, 1);
+  assert.equal(state.rack.parts[0].destinationBusId, '',
+    'a removed bus puts its instruments back on the master, never into silence');
+});

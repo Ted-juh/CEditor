@@ -386,7 +386,7 @@ export function emptyHostState() {
     floatingEditorPartIds: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
-    rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [],
+    rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
             macros: [], pages: [], masterLatencyMs: 0 },
     performance: emptyPerformance(),
     product: emptyProduct(),
@@ -818,6 +818,14 @@ export function normalizeHostState(payload) {
       focusedPartId: String(rack.focusedPartId ?? ''),
       masterLatencyMs: Number(rack.masterLatencyMs ?? 0),
       masterEffects: (Array.isArray(rack.masterEffects) ? rack.masterEffects : []).map(normalizeEffectSlot),
+      buses: (Array.isArray(rack.buses) ? rack.buses : []).map((b) => ({
+        busId: String(b?.busId ?? ''),
+        name: String(b?.name ?? ''),
+        level: Number(b?.level ?? 1),
+        destinationBusId: String(b?.destinationBusId ?? ''),
+        latencyMs: Number(b?.latencyMs ?? 0),
+        effects: (Array.isArray(b?.effects) ? b.effects : []).map(normalizeEffectSlot),
+      })),
       returns: (Array.isArray(rack.returns) ? rack.returns : []).map((r) => ({
         returnId: String(r?.returnId ?? ''),
         name: String(r?.name ?? ''),
@@ -866,6 +874,7 @@ export function normalizeHostState(payload) {
         pluginCeId: String(part?.pluginCeId ?? ''),
         pluginName: String(part?.pluginName ?? ''),
         pluginVendor: String(part?.pluginVendor ?? ''),
+        destinationBusId: String(part?.destinationBusId ?? ''),
         presetRecordId: String(part?.presetRecordId ?? ''),
         presetName: String(part?.presetName ?? ''),
         hasInstrument: part?.hasInstrument === true,
@@ -1447,6 +1456,49 @@ export function applyMockCommand(state, payload) {
                                    : (position + delta + sounds.length) % sounds.length;
     target.presetName = sounds[nextIndex];
     target.presetRecordId = `mock-preset-${nextIndex}`;
+    return next;
+  }
+  if (cmd === 'addBus') {
+    next.rack.buses.push(normalizeHostState({ rack: { buses: [{
+      busId: `mock-bus-${Date.now()}-${next.rack.buses.length + 1}`,
+      name: payload.name || `Bus ${next.rack.buses.length + 1}`,
+    }] } }).rack.buses[0]);
+    return next;
+  }
+  if (cmd === 'removeBus') {
+    next.rack.buses = next.rack.buses.filter((b) => b.busId !== payload.busId);
+    // A removed group puts its instruments back on the master, never into silence.
+    for (const p of next.rack.parts)
+      if (p.destinationBusId === payload.busId) p.destinationBusId = '';
+    for (const b of next.rack.buses)
+      if (b.destinationBusId === payload.busId) b.destinationBusId = '';
+    return next;
+  }
+  if (cmd === 'renameBus' || cmd === 'setBusLevel' || cmd === 'setBusDestination') {
+    const bus = next.rack.buses.find((b) => b.busId === payload.busId);
+    if (!bus) return next;
+    if (cmd === 'renameBus') bus.name = String(payload.name ?? bus.name);
+    else if (cmd === 'setBusLevel') bus.level = Math.min(2, Math.max(0, Number(payload.level ?? 1)));
+    else {
+      // Mirrors the native refusal: a loop is rejected where it is made.
+      const destination = String(payload.destinationBusId ?? '');
+      if (destination === bus.busId) return next;
+      let at = destination;
+      for (let hops = 0; at && hops <= next.rack.buses.length; hops++) {
+        const hop = next.rack.buses.find((b) => b.busId === at);
+        if (!hop) break;
+        if (hop.destinationBusId === bus.busId) return next;
+        at = hop.destinationBusId;
+      }
+      bus.destinationBusId = destination;
+    }
+    return next;
+  }
+  if (cmd === 'setPartDestination') {
+    const target = part(payload.partId);
+    const busId = String(payload.busId ?? '');
+    if (!target || (busId && !next.rack.buses.some((b) => b.busId === busId))) return next;
+    target.destinationBusId = busId;
     return next;
   }
   if (cmd === 'removeScanPath') {
@@ -2177,6 +2229,14 @@ export const addReturn = (name) => send(name ? { cmd: 'addReturn', name } : { cm
 export const removeReturn = (returnId) => send({ cmd: 'removeReturn', returnId });
 export const renameReturn = (returnId, name) => send({ cmd: 'renameReturn', returnId, name });
 export const setReturnLevel = (returnId, level) => send({ cmd: 'setReturnLevel', returnId, level });
+export const addBus = (name) => send(name ? { cmd: 'addBus', name } : { cmd: 'addBus' });
+export const removeBus = (busId) => send({ cmd: 'removeBus', busId });
+export const renameBus = (busId, name) => send({ cmd: 'renameBus', busId, name });
+export const setBusLevel = (busId, level) => send({ cmd: 'setBusLevel', busId, level });
+export const setBusDestination = (busId, destinationBusId) =>
+  send({ cmd: 'setBusDestination', busId, destinationBusId });
+export const setPartDestination = (partId, busId) =>
+  send({ cmd: 'setPartDestination', partId, busId });
 export const setSendLevel = (partId, returnId, level) =>
   send({ cmd: 'setSendLevel', partId, returnId, level });
 export const setExtraOut = (partId, pairIndex, gain) =>

@@ -12,10 +12,12 @@
   import {
     hostState, focusRackPart, setPartMixer, setSendLevel, setReturnLevel,
     setMasterLevel, setPartOutputPair,
+    addBus, removeBus, setBusLevel, setBusDestination, setPartDestination,
   } from '../stores/instrumentHost.js';
 
   let parts = $derived($hostState.rack.parts);
   let returns = $derived($hostState.rack.returns);
+  let buses = $derived($hostState.rack.buses);
   let outputPairs = $derived($hostState.product.daw.outputPairs);
 
   function db(gain) {
@@ -48,7 +50,33 @@
                silent row's slider creates the send natively (setSendLevel is create-or-
                update), which is exactly how a desk's aux knobs behave at zero. -->
           <div class="sends">
-            {#each returns as chain (chain.returnId)}
+            {#each buses as bus (bus.busId)}
+      <div class="strip bus" data-testid="bus-strip">
+        <span class="strip-name" title={`Group bus — ${bus.name}`}>{bus.name}</span>
+        <span class="strip-kind">
+          bus{bus.effects.length ? ` · ${bus.effects.length} fx` : ''}
+          {#if bus.latencyMs > 0.05}<br />+{bus.latencyMs.toFixed(1)} ms{/if}
+        </span>
+        <input class="fader" type="range" min="0" max="2" step="0.01" value={bus.level}
+               aria-label={`Bus level — ${bus.name}`}
+               ondblclick={() => setBusLevel(bus.busId, 1)}
+               oninput={(e) => setBusLevel(bus.busId, Number(e.currentTarget.value))} />
+        <span class="db">{db(bus.level)}</span>
+        <!-- A bus can feed another bus; the loop that would close is refused natively and
+             simply never offered here. -->
+        <select class="out" title="Destination" value={bus.destinationBusId}
+                onchange={(e) => setBusDestination(bus.busId, e.currentTarget.value)}>
+          <option value="">Master</option>
+          {#each buses.filter((other) => other.busId !== bus.busId) as other (other.busId)}
+            <option value={other.busId}>{other.name}</option>
+          {/each}
+        </select>
+        <button type="button" class="ghost danger" title="Remove this bus (its parts go back to the master)"
+                onclick={() => removeBus(bus.busId)}>×</button>
+      </div>
+    {/each}
+
+    {#each returns as chain (chain.returnId)}
               <label class="send" title={`Send to ${chain.name}`}>
                 <span>{chain.name.slice(0, 6)}</span>
                 <input type="range" min="0" max="2" step="0.01"
@@ -71,6 +99,18 @@
           <button type="button" class="toggle" class:on={part.enabled} title="Part enabled"
                   onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>On</button>
         </div>
+        {#if buses.length > 0}
+          <!-- Where this part goes. A bus is a destination, not a copy: routed here, the
+               part reaches the master through the bus and its inserts. -->
+          <select class="out" title="Destination" value={part.destinationBusId}
+                  data-testid="strip-destination"
+                  onchange={(e) => setPartDestination(part.partId, e.currentTarget.value)}>
+            <option value="">Master</option>
+            {#each buses as bus (bus.busId)}
+              <option value={bus.busId}>{bus.name}</option>
+            {/each}
+          </select>
+        {/if}
         {#if outputPairs > 1 && !part.hardware}
           <select class="out" title="Output pair" value={part.outputPair}
                   onchange={(e) => setPartOutputPair(part.partId, Number(e.currentTarget.value))}>
@@ -79,6 +119,32 @@
             {/each}
           </select>
         {/if}
+      </div>
+    {/each}
+
+    {#each buses as bus (bus.busId)}
+      <div class="strip bus" data-testid="bus-strip">
+        <span class="strip-name" title={`Group bus — ${bus.name}`}>{bus.name}</span>
+        <span class="strip-kind">
+          bus{bus.effects.length ? ` · ${bus.effects.length} fx` : ''}
+          {#if bus.latencyMs > 0.05}<br />+{bus.latencyMs.toFixed(1)} ms{/if}
+        </span>
+        <input class="fader" type="range" min="0" max="2" step="0.01" value={bus.level}
+               aria-label={`Bus level — ${bus.name}`}
+               ondblclick={() => setBusLevel(bus.busId, 1)}
+               oninput={(e) => setBusLevel(bus.busId, Number(e.currentTarget.value))} />
+        <span class="db">{db(bus.level)}</span>
+        <!-- A bus can feed another bus; the loop that would close is refused natively and
+             simply never offered here. -->
+        <select class="out" title="Destination" value={bus.destinationBusId}
+                onchange={(e) => setBusDestination(bus.busId, e.currentTarget.value)}>
+          <option value="">Master</option>
+          {#each buses.filter((other) => other.busId !== bus.busId) as other (other.busId)}
+            <option value={other.busId}>{other.name}</option>
+          {/each}
+        </select>
+        <button type="button" class="ghost danger" title="Remove this bus (its parts go back to the master)"
+                onclick={() => removeBus(bus.busId)}>×</button>
       </div>
     {/each}
 
@@ -107,6 +173,11 @@
       </span>
     </div>
 
+    <div class="strip add-bus">
+      <button type="button" class="ghost" title="Group several instruments into one bus with its own effects"
+              data-testid="mixer-add-bus" onclick={() => addBus()}>+ Bus</button>
+    </div>
+
     {#if parts.length === 0}
       <div class="empty-hint">Nothing to mix yet — add parts in the rack above.</div>
     {/if}
@@ -123,6 +194,11 @@
   .strip.disabled { opacity: 0.55; }
   .strip.return { background: #142020; }
   .strip.master { background: #1d1a14; border-color: #3a3223; }
+  .strip.bus { background: #171d2a; border-color: #29344a; }
+  .strip.add-bus { justify-content: center; min-width: 60px; background: none; border-style: dashed; }
+  .ghost { background: none; border: 1px solid #2c3742; border-radius: 3px; color: #9aa5b1;
+           cursor: pointer; font-size: 11px; padding: 2px 6px; }
+  .ghost.danger { color: #d68a8a; }
   .strip-name { max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                 font-size: 11px; font-weight: 600; color: #d6dbe0; background: none; border: none;
                 cursor: pointer; padding: 0; }

@@ -2268,6 +2268,101 @@ void testPresetWalking()
 // The MIDI chain through the service: add, reorder, bypass, remove, and the part-level
 // commands still landing on the first slot of their family — which is what keeps the
 // control pages, the surface and every existing panel addressing "this part's arp".
+// Group buses: two instruments join and the combined signal keeps going through the bus's
+// own inserts. What must hold is that a bus is a DESTINATION (unlike a return, which takes a
+// copy), that removing one puts its instruments back on the desk rather than into silence,
+// that a loop is refused where it is made, and that the latency a bus adds is reported on
+// the paths that pass through it — the graph compensates nothing, so it must not pretend.
+void testGroupBuses()
+{
+    std::cout << "\ngroup buses" << std::endl;
+
+    const auto dir = freshDataDir ("buses");
+    seedTwoSynthCatalog (dir);
+    juce::String partA, partB, busId, subBusId;
+
+    auto busesOf = [] (Harness& h)
+    {
+        return h.emits.lastState()->getProperty ("rack", {}).getProperty ("buses", {});
+    };
+    auto partDestination = [] (Harness& h, const juce::String& partId)
+    {
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        for (int i = 0; i < parts.size(); ++i)
+            if (parts[i].getProperty ("partId", {}).toString() == partId)
+                return parts[i].getProperty ("destinationBusId", {}).toString();
+        return juce::String();
+    };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("addPart");
+        partA = h.partIdAt (0);
+        partB = h.partIdAt (1);
+        h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-other-synth" } });
+
+        h.cmd ("addBus", { { "name", "Keys" } });
+        check (busesOf (h).size() == 1
+                 && busesOf (h)[0].getProperty ("name", {}).toString() == "Keys",
+               "a bus is created and named");
+        busId = busesOf (h)[0].getProperty ("busId", {}).toString();
+
+        // Both instruments join it — the ask in one sentence.
+        h.cmd ("setPartDestination", { { "partId", partA }, { "busId", busId } });
+        h.cmd ("setPartDestination", { { "partId", partB }, { "busId", busId } });
+        check (partDestination (h, partA) == busId && partDestination (h, partB) == busId,
+               "two instruments route into the same bus");
+
+        // The bus takes inserts of its own, on the combined signal.
+        h.cmd ("addEffect", { { "chainId", busId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("getState");   // addEffect answers on its own commit, not before
+        check (busesOf (h)[0].getProperty ("effects", {}).size() == 1,
+               "the bus carries its own insert chain");
+
+        // A sub-bus, and the loop that must never be allowed.
+        h.cmd ("addBus", { { "name", "Sub" } });
+        subBusId = busesOf (h)[1].getProperty ("busId", {}).toString();
+        h.cmd ("setBusDestination", { { "busId", busId }, { "destinationBusId", subBusId } });
+        check (busesOf (h)[0].getProperty ("destinationBusId", {}).toString() == subBusId,
+               "a bus can feed another bus");
+
+        h.emits.clear();
+        h.cmd ("setBusDestination", { { "busId", subBusId }, { "destinationBusId", busId } });
+        check (h.emits.lastError().contains ("back into itself"),
+               "closing the loop is refused where it is made, and says why");
+        h.emits.clear();
+        h.cmd ("setBusDestination", { { "busId", busId }, { "destinationBusId", busId } });
+        check (h.emits.lastError().contains ("back into itself"),
+               "and a bus into itself is the same refusal");
+
+        h.cmd ("setBusLevel", { { "busId", busId }, { "level", 0.5 } });
+        h.cmd ("getState");
+        check (juce::approximatelyEqual ((float) (double) busesOf (h)[0].getProperty ("level", 1.0), 0.5f),
+               "the bus fader is part of the manifest");
+    }
+
+    {
+        // Buses are manifest state, and a removed bus never takes its instruments with it.
+        Harness h (dir);
+        h.cmd ("getState");
+        check (busesOf (h).size() == 2, "buses survive restart");
+        check (partDestination (h, partA) == busId, "and so does what routes into them");
+
+        h.cmd ("removeBus", { { "busId", busId } });
+        check (busesOf (h).size() == 1, "removing a bus removes exactly it");
+        check (partDestination (h, partA).isEmpty() && partDestination (h, partB).isEmpty(),
+               "and puts its instruments back on the master rather than into silence");
+
+        h.emits.clear();
+        h.cmd ("setPartDestination", { { "partId", partA }, { "busId", "gone" } });
+        check (h.emits.lastError().contains ("Unknown"),
+               "routing into a bus that does not exist refuses rather than silencing a part");
+    }
+}
+
 void testMidiChainCommands()
 {
     std::cout << "\nMIDI insert chain commands" << std::endl;
@@ -4599,6 +4694,7 @@ int main (int argc, char* argv[])
     testFloatingEditors();
     testChordLearn();
     testMidiChainCommands();
+    testGroupBuses();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();

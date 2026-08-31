@@ -180,6 +180,44 @@ const ReturnChain* Performance::findReturn (const juce::String& returnId) const
     return const_cast<Performance*> (this)->findReturn (returnId);
 }
 
+BusChain* Performance::findBus (const juce::String& busId)
+{
+    for (auto& bus : buses)
+        if (bus.busId == busId)
+            return &bus;
+    return nullptr;
+}
+
+const BusChain* Performance::findBus (const juce::String& busId) const
+{
+    return const_cast<Performance*> (this)->findBus (busId);
+}
+
+bool Performance::busRoutingWouldLoop (const juce::String& busId,
+                                       const juce::String& destinationId) const
+{
+    if (destinationId.isEmpty())
+        return false;                 // the master is nobody's upstream
+    if (destinationId == busId)
+        return true;                  // a bus into itself is the shortest loop there is
+
+    // Walk the destination chain as it would be, bounded by the number of buses: a longer
+    // walk than that has already revisited something.
+    auto at = destinationId;
+    for (int hops = 0; hops <= buses.size(); ++hops)
+    {
+        const auto* bus = findBus (at);
+        if (bus == nullptr)
+            return false;             // runs into the master, or into nothing
+        if (bus->destinationBusId == busId)
+            return true;
+        at = bus->destinationBusId;
+        if (at.isEmpty())
+            return false;
+    }
+    return true;
+}
+
 EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String* chainIdOut)
 {
     for (auto& part : parts)
@@ -301,6 +339,7 @@ juce::var Performance::toVar() const
         p->setProperty ("volume",           part.volume);
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
+        p->setProperty ("destinationBusId", part.destinationBusId);
         p->setProperty ("lastPresetRecordId", part.lastPresetRecordId);
         p->setProperty ("lastPresetName",     part.lastPresetName);
         p->setProperty ("outputPair",       part.outputPair);
@@ -436,6 +475,18 @@ juce::var Performance::toVar() const
         returnVars.add (juce::var (r));
     }
 
+    juce::Array<juce::var> busVars;
+    for (const auto& bus : buses)
+    {
+        auto* b = new juce::DynamicObject();
+        b->setProperty ("busId",            bus.busId);
+        b->setProperty ("name",             bus.name);
+        b->setProperty ("level",            bus.level);
+        b->setProperty ("destinationBusId", bus.destinationBusId);
+        b->setProperty ("effects",          effectsToVar (bus.effects));
+        busVars.add (juce::var (b));
+    }
+
     juce::Array<juce::var> patternVars;
     for (const auto& pattern : patterns)
         patternVars.add (perf::patternToVar (pattern));
@@ -454,6 +505,7 @@ juce::var Performance::toVar() const
     root->setProperty ("parts",         partVars);
     root->setProperty ("masterEffects", effectsToVar (masterEffects));
     root->setProperty ("returns",       returnVars);
+    root->setProperty ("buses",         busVars);
     root->setProperty ("macros",        macroVars);
     root->setProperty ("pages",         pageVars);
     root->setProperty ("transport",     perf::transportSettingsToVar (transport));
@@ -550,6 +602,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.volume     = floatOf (p, "volume", 1.0f, 0.0f, 2.0f);
         part.pan        = floatOf (p, "pan", 0.0f, -1.0f, 1.0f);
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
+        part.destinationBusId = p.getProperty ("destinationBusId", {}).toString();
         part.lastPresetRecordId = p.getProperty ("lastPresetRecordId", {}).toString();
         part.lastPresetName     = p.getProperty ("lastPresetName", {}).toString();
         part.outputPair = intOf (p, "outputPair", 0, 0, 7);
@@ -617,6 +670,42 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             parsed.returns.add (std::move (chain));
         }
     }
+
+    // Group buses share the one effect-id namespace with every other insert chain.
+    if (const auto* busArray = stored.getProperty ("buses", {}).getArray())
+    {
+        juce::StringArray seenBusIds;
+        for (const auto& b : *busArray)
+        {
+            BusChain bus;
+            bus.busId = b.getProperty ("busId", {}).toString();
+            if (bus.busId.isEmpty() || seenBusIds.contains (bus.busId))
+                return false;
+            seenBusIds.add (bus.busId);
+
+            bus.name  = b.getProperty ("name", {}).toString();
+            bus.level = floatOf (b, "level", 1.0f, 0.0f, 2.0f);
+            bus.destinationBusId = b.getProperty ("destinationBusId", {}).toString();
+            if (! effectsFromVar (b.getProperty ("effects", {}), bus.effects, seenEffectIds))
+                return false;
+
+            parsed.buses.add (std::move (bus));
+        }
+
+        // A destination naming a bus that is not here, or one that closes a loop, falls back
+        // to the master: a damaged routing plays through the desk rather than refusing to
+        // load, and it says so by being visibly plain.
+        for (auto& bus : parsed.buses)
+            if (bus.destinationBusId.isNotEmpty()
+                && (parsed.findBus (bus.destinationBusId) == nullptr
+                    || parsed.busRoutingWouldLoop (bus.busId, bus.destinationBusId)))
+                bus.destinationBusId.clear();
+    }
+
+    // A part routed into a bus that did not survive goes back to the master, same rule.
+    for (auto& part : parsed.parts)
+        if (part.destinationBusId.isNotEmpty() && parsed.findBus (part.destinationBusId) == nullptr)
+            part.destinationBusId.clear();
 
     // Sends parse after returns so a send into a return that no longer exists can be dropped
     // (a stranded send is the damaged nit; the rig still loads).

@@ -180,6 +180,8 @@ juce::Array<EffectSlot>* InstrumentRackHost::chainFor (const juce::String& chain
         return &part->effects;
     if (auto* ret = model.findReturn (chainId))
         return &ret->effects;
+    if (auto* bus = model.findBus (chainId))
+        return &bus->effects;
     return nullptr;
 }
 
@@ -391,6 +393,97 @@ juce::AudioProcessor* InstrumentRackHost::getEffect (const juce::String& effectI
 bool InstrumentRackHost::effectHasProcessor (const juce::String& effectId) const
 {
     return getEffect (effectId) != nullptr;
+}
+
+juce::String InstrumentRackHost::addBus (const juce::String& name)
+{
+    BusChain bus;
+    bus.busId = juce::Uuid().toDashedString();
+    bus.name = name;
+    const auto busId = bus.busId;
+    model.buses.add (std::move (bus));
+    rewireAudio();
+    return busId;
+}
+
+bool InstrumentRackHost::removeBus (const juce::String& busId)
+{
+    auto* bus = model.findBus (busId);
+    if (bus == nullptr)
+        return false;
+
+    for (const auto& slot : juce::Array<EffectSlot> (bus->effects))
+        destroyEffectNode (slot.effectId);
+
+    for (int i = 0; i < model.buses.size(); ++i)
+        if (model.buses.getReference (i).busId == busId)
+        {
+            model.buses.remove (i);
+            break;
+        }
+
+    // Anything routed into a gone bus goes back to the master rather than to silence: a
+    // removed group must never take its instruments off the desk with it.
+    for (auto& part : model.parts)
+        if (part.destinationBusId == busId)
+            part.destinationBusId.clear();
+    for (auto& other : model.buses)
+        if (other.destinationBusId == busId)
+            other.destinationBusId.clear();
+
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::renameBus (const juce::String& busId, const juce::String& name)
+{
+    auto* bus = model.findBus (busId);
+    if (bus == nullptr)
+        return false;
+    bus->name = name;
+    return true;
+}
+
+bool InstrumentRackHost::setBusLevel (const juce::String& busId, float level)
+{
+    auto* bus = model.findBus (busId);
+    if (bus == nullptr)
+        return false;
+
+    bus->level = juce::jlimit (0.0f, 2.0f, level);
+    if (const auto it = busLevelNodes.find (busId); it != busLevelNodes.end() && it->second != nullptr)
+        static_cast<GainPanProcessor*> (it->second->getProcessor())
+            ->setVolumePan (bus->level, 0.0f, true);
+    return true;
+}
+
+bool InstrumentRackHost::setBusDestination (const juce::String& busId,
+                                            const juce::String& destinationId)
+{
+    auto* bus = model.findBus (busId);
+    if (bus == nullptr)
+        return false;
+    if (destinationId.isNotEmpty() && model.findBus (destinationId) == nullptr)
+        return false;
+    if (model.busRoutingWouldLoop (busId, destinationId))
+        return false;
+
+    bus->destinationBusId = destinationId;
+    rewireAudio();
+    return true;
+}
+
+bool InstrumentRackHost::setPartDestination (const juce::String& partId, const juce::String& busId)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    if (busId.isNotEmpty() && model.findBus (busId) == nullptr)
+        return false;
+
+    part->destinationBusId = busId;
+    rewireAudio();
+    return true;
 }
 
 juce::String InstrumentRackHost::addReturn (const juce::String& name)
@@ -628,6 +721,41 @@ int InstrumentRackHost::partLatencySamples (const juce::String& partId) const
     for (const auto& slot : part->effects)
         if (auto* fx = getEffect (slot.effectId))
             total += fx->getLatencySamples();
+
+    // Everything the part's signal passes on the way to the master counts, buses included.
+    // The graph deliberately does not compensate parallel paths — a live rig stays as fast
+    // as its plug-ins allow — so two parts joining one bus through unequal inserts really
+    // do flam, and the honest answer is to REPORT it rather than delay the whole rig. This
+    // is the number the mixer shows.
+    auto at = part->destinationBusId;
+    for (int hops = 0; at.isNotEmpty() && hops <= model.buses.size(); ++hops)
+    {
+        const auto* bus = model.findBus (at);
+        if (bus == nullptr)
+            break;
+        for (const auto& slot : bus->effects)
+            if (auto* fx = getEffect (slot.effectId))
+                total += fx->getLatencySamples();
+        at = bus->destinationBusId;
+    }
+
+    return total;
+}
+
+int InstrumentRackHost::busLatencySamples (const juce::String& busId) const
+{
+    int total = 0;
+    auto at = busId;
+    for (int hops = 0; at.isNotEmpty() && hops <= model.buses.size(); ++hops)
+    {
+        const auto* bus = model.findBus (at);
+        if (bus == nullptr)
+            break;
+        for (const auto& slot : bus->effects)
+            if (auto* fx = getEffect (slot.effectId))
+                total += fx->getLatencySamples();
+        at = bus->destinationBusId;
+    }
     return total;
 }
 
@@ -1176,6 +1304,26 @@ void InstrumentRackHost::syncAuxNodes()
             ->setVolumePan (chain.level, 0.0f, true);
     }
 
+    // Bus faders: the same life cycle, one per group bus.
+    for (auto it = busLevelNodes.begin(); it != busLevelNodes.end();)
+    {
+        if (model.findBus (it->first) == nullptr)
+        {
+            graph.removeNode (it->second->nodeID);
+            it = busLevelNodes.erase (it);
+        }
+        else
+            ++it;
+    }
+    for (const auto& bus : model.buses)
+    {
+        auto& node = busLevelNodes[bus.busId];
+        if (node == nullptr)
+            node = graph.addNode (std::make_unique<GainPanProcessor>());
+        static_cast<GainPanProcessor*> (node->getProcessor())
+            ->setVolumePan (bus.level, 0.0f, true);
+    }
+
     for (auto& [partId, lp] : live)
     {
         const auto* part = model.findPart (partId);
@@ -1271,6 +1419,49 @@ void InstrumentRackHost::rewireAudio()
         ->setVolumePan (model.masterLevel, 0.0f, true);
     auto* masterSink = masterNodes.isEmpty() ? masterGainNode.get() : masterNodes.getFirst();
 
+    // Group buses: every head exists before anything connects, so a bus feeding another bus
+    // needs no ordering pass — the destinations are resolved once all the nodes are there.
+    std::map<juce::String, juce::AudioProcessorGraph::Node*> busHeads;
+    std::map<juce::String, juce::AudioProcessorGraph::Node*> busTails;
+    for (const auto& bus : model.buses)
+    {
+        auto* levelNode = busLevelNodes[bus.busId].get();
+        if (levelNode == nullptr)
+            continue;
+
+        juce::Array<juce::AudioProcessorGraph::Node*> fx;
+        for (const auto& slot : bus.effects)
+            if (const auto it = liveEffects.find (slot.effectId);
+                it != liveEffects.end() && it->second.node != nullptr)
+                fx.add (it->second.node.get());
+
+        busHeads[bus.busId] = fx.isEmpty() ? levelNode : fx.getFirst();
+        busTails[bus.busId] = levelNode;
+
+        for (int i = 0; i + 1 < fx.size(); ++i)
+            connectAudio (fx[i], fx[i + 1]);
+        if (! fx.isEmpty())
+            connectAudio (fx.getLast(), levelNode);
+    }
+
+    // Where each bus lands: another bus's head, or the master. The model refuses cycles when
+    // the routing is made, and this refuses them again — a manifest edited by hand must not
+    // be able to build a feedback loop in an audio graph.
+    for (const auto& bus : model.buses)
+    {
+        const auto tail = busTails.find (bus.busId);
+        if (tail == busTails.end())
+            continue;
+
+        auto* destination = masterSink;
+        if (bus.destinationBusId.isNotEmpty()
+            && ! model.busRoutingWouldLoop (bus.busId, bus.destinationBusId))
+            if (const auto head = busHeads.find (bus.destinationBusId); head != busHeads.end())
+                destination = head->second;
+
+        connectAudio (tail->second, destination);
+    }
+
     // Return chains: sends sum into the chain's head (its first loaded effect, else its
     // level gain), run the effects in order, and the level gain rejoins the master path.
     std::map<juce::String, juce::AudioProcessorGraph::Node*> returnHeads;
@@ -1345,12 +1536,22 @@ void InstrumentRackHost::rewireAudio()
         }
 
         // Pair 0 is the master path; any other pair leaves straight through the output node,
-        // unprocessed by the master chain and untouched by the Performance fader.
+        // unprocessed by the master chain and untouched by the Performance fader. On the
+        // main pair a part joins its group bus when it names one — that is the whole of
+        // "these two instruments become one thing I then process".
         const auto pair = juce::jlimit (0, juce::jmax (0, model.outputPairs - 1), part->outputPair);
         if (pair == 0)
-            connectAudio (lp.gainNode.get(), masterSink);
+        {
+            auto* destination = masterSink;
+            if (part->destinationBusId.isNotEmpty())
+                if (const auto head = busHeads.find (part->destinationBusId); head != busHeads.end())
+                    destination = head->second;
+            connectAudio (lp.gainNode.get(), destination);
+        }
         else
+        {
             connectAudioToOutputPair (lp.gainNode.get(), pair);
+        }
 
         // Post-fader sends: the part's gain output, scaled per send, into each return head.
         for (const auto& send : part->sends)

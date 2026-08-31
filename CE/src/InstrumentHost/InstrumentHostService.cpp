@@ -1180,6 +1180,90 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "addBus")
+    {
+        // Buses are routing, and routing is the advanced tier — the same gate the returns
+        // and the multi-output pairs already sit behind.
+        if (! requireFeature (licensing::Feature::advancedRouting))
+            return;
+
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        rack.addBus (name.isNotEmpty() ? name
+                                       : "Bus " + juce::String (rack.getPerformance().buses.size() + 1));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "removeBus")
+    {
+        if (! rack.removeBus (payload.getProperty ("busId", {}).toString()))
+        {
+            emitError ("Unknown bus.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "renameBus")
+    {
+        if (! rack.renameBus (payload.getProperty ("busId", {}).toString(),
+                              payload.getProperty ("name", {}).toString().trim()))
+        {
+            emitError ("Unknown bus.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setBusLevel")
+    {
+        if (! rack.setBusLevel (payload.getProperty ("busId", {}).toString(),
+                                (float) (double) payload.getProperty ("level", 1.0)))
+        {
+            emitError ("Unknown bus.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setBusDestination")
+    {
+        const auto busId = payload.getProperty ("busId", {}).toString();
+        const auto destination = payload.getProperty ("destinationBusId", {}).toString();
+        if (! rack.setBusDestination (busId, destination))
+        {
+            // The refusal a person can act on: a loop is the interesting failure here, and
+            // saying "unknown bus" for it would send them looking for the wrong thing.
+            emitError (rack.getPerformance().findBus (busId) == nullptr
+                         ? juce::String ("Unknown bus.")
+                         : "That would feed a bus back into itself.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setPartDestination")
+    {
+        if (! rack.setPartDestination (payload.getProperty ("partId", {}).toString(),
+                                       payload.getProperty ("busId", {}).toString()))
+        {
+            emitError ("Unknown rack part or bus.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "addReturn")
     {
         if (! requireFeature (licensing::Feature::advancedRouting))
@@ -4888,6 +4972,7 @@ juce::var InstrumentHostService::buildStatePayload()
         obj->setProperty ("pluginCeId",    part.pluginCeId);
         obj->setProperty ("pluginName",    part.pluginName);
         obj->setProperty ("pluginVendor",  part.pluginVendor);
+        obj->setProperty ("destinationBusId", part.destinationBusId);
         obj->setProperty ("presetRecordId", part.lastPresetRecordId);
         obj->setProperty ("presetName",     part.lastPresetName);
         obj->setProperty ("hasInstrument", rack.partHasInstrument (part.partId));
@@ -5025,6 +5110,22 @@ juce::var InstrumentHostService::buildStatePayload()
         macros.add (juce::var (m));
     }
 
+    juce::Array<juce::var> buses;
+    for (const auto& bus : performance.buses)
+    {
+        auto* b = new juce::DynamicObject();
+        b->setProperty ("busId",            bus.busId);
+        b->setProperty ("name",             bus.name);
+        b->setProperty ("level",            bus.level);
+        b->setProperty ("destinationBusId", bus.destinationBusId);
+        b->setProperty ("effects",          effectsProjection (bus.effects));
+        // What this bus adds on the way out, its own destination included: the graph does
+        // not compensate parallel paths, so the number is shown rather than hidden.
+        b->setProperty ("latencyMs", rack.busLatencySamples (bus.busId)
+                                       / rack.getSampleRate() * 1000.0);
+        buses.add (juce::var (b));
+    }
+
     juce::Array<juce::var> returns;
     for (const auto& chain : performance.returns)
     {
@@ -5042,6 +5143,7 @@ juce::var InstrumentHostService::buildStatePayload()
     rackObj->setProperty ("parts", parts);
     rackObj->setProperty ("masterEffects", effectsProjection (performance.masterEffects));
     rackObj->setProperty ("returns", returns);
+    rackObj->setProperty ("buses", buses);
     rackObj->setProperty ("macros", macros);
     rackObj->setProperty ("pages", pages);
     rackObj->setProperty ("masterLatencyMs", rack.masterLatencySamples()
