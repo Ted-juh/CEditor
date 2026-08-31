@@ -134,10 +134,27 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    in `InstrumentHostView` left behind when those editors moved to `MidiChainPanel`, matching the
    dead CSS removed the same day. An extraction is not finished until the markup, the styles *and*
    the script have gone.
-2. **The canvas as a read-only picture.** Draw the existing graph with auto-layout (columns by
-   depth: instruments, then buses, then master), wires as SVG under the nodes. Nothing is
-   draggable yet. This is where we find out whether the metaphor actually reads before investing in
-   interaction.
+2. ~~**The canvas as a read-only picture.**~~ **BUILT, 2026-08-31.** A List/Canvas switch on the
+   rack column. Canvas draws the graph the document already holds: instruments as sources on the
+   left, each bus one column past the deepest thing feeding it, the master last, returns in a band
+   of their own because they take a *copy* rather than carrying the signal. Solid wires for the
+   path, dashed for sends. Clicking a part focuses it, which is what clicking its row does, so the
+   dock follows; nothing else is clickable and every other node says where it *is* edited.
+
+   The layout is a pure function (`rackCanvasLayout` in the store) rather than a component
+   measuring the DOM, so the arithmetic is tested in node: columns, which wires exist, and the two
+   cases a picture can get actively wrong.
+
+   The first of those was worth building it to find. A wire that skips a column was drawn straight
+   **through** whatever occupied the column it skipped — a part going direct to the master crossed
+   a bus's box, which reads as "it goes in there", the one question the picture exists to answer.
+   Long runs now drop into a lane under the nodes and come back up, the way a schematic routes
+   around a part rather than over it. The second: a hand-edited manifest carrying a routing cycle
+   must not hang the layout, so depth resolution is guarded and a bus pointed at itself falls back
+   to the master exactly as the loader does.
+
+   The List view stays and stays first. It is keyboard-navigable and carries the per-part mixer;
+   the canvas is neither, and neither one gets to be the only way in.
 3. **Make it interactive.** Drag to reorder within a lane; drag a lane's output onto a bus; drag
    from the browser onto a lane to load. Every drop goes through the commands that already exist
    (`moveMidiSlot`, `setPartDestination`, `loadInstrument`, `addEffect`) — the canvas issues them,

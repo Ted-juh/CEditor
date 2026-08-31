@@ -770,6 +770,182 @@ const normalizeEffectSlot = (e) => ({
 
 /** Shapes whatever arrived into the exact structure the view renders — absent fields become
  *  defaults rather than undefined holes. */
+// --- the rack canvas ----------------------------------------------------------------------------
+
+// Signal flow as geometry. Pure on purpose: the picture is a second view of the graph the
+// document already holds, so the arithmetic that places it belongs where it can be tested
+// without a browser, and the component only draws what comes back.
+//
+// Columns are depth from a source: parts are sources, a bus sits one past the furthest thing
+// feeding it, and the master sits past everything. That is why two instruments joining a bus
+// line up, and why a sub-bus lands between its bus and the master instead of beside it.
+export const CANVAS_NODE_W = 176;
+export const CANVAS_NODE_H = 54;
+const CANVAS_GAP_X = 64;
+const CANVAS_GAP_Y = 14;
+const CANVAS_PAD = 12;
+const CANVAS_BAND_GAP = 26;
+const CANVAS_LANE_H = 7;
+
+export function rackCanvasLayout(rack) {
+  const parts = Array.isArray(rack?.parts) ? rack.parts : [];
+  const buses = Array.isArray(rack?.buses) ? rack.buses : [];
+  const returns = Array.isArray(rack?.returns) ? rack.returns : [];
+  const busById = new Map(buses.map((b) => [b.busId, b]));
+
+  // Depth of a bus = one past the deepest thing that feeds it. The `seen` set is not
+  // decoration: the model refuses routing cycles, but a hand-edited manifest can still carry
+  // one, and a picture must not hang trying to draw it.
+  const busDepth = new Map();
+  const depthOfBus = (busId, seen = new Set()) => {
+    if (busDepth.has(busId)) return busDepth.get(busId);
+    if (seen.has(busId)) return 1;
+    seen.add(busId);
+    let deepest = 0;
+    for (const part of parts) if (part.destinationBusId === busId) deepest = Math.max(deepest, 1);
+    for (const other of buses)
+      if (other.destinationBusId === busId && other.busId !== busId)
+        deepest = Math.max(deepest, depthOfBus(other.busId, seen) + 1);
+    const depth = Math.max(1, deepest);
+    busDepth.set(busId, depth);
+    return depth;
+  };
+  for (const bus of buses) depthOfBus(bus.busId);
+
+  let masterColumn = 1;
+  for (const depth of busDepth.values()) masterColumn = Math.max(masterColumn, depth + 1);
+
+  const columnOf = (node) => (node.kind === 'part' ? 0
+                              : node.kind === 'master' ? masterColumn
+                              : node.kind === 'return' ? Math.max(1, masterColumn - 1)
+                              : busDepth.get(node.id) ?? 1);
+  const columnX = (column) => CANVAS_PAD + column * (CANVAS_NODE_W + CANVAS_GAP_X);
+
+  const effectCount = (chain) => (Array.isArray(chain) ? chain.length : 0);
+  const nodes = [
+    ...parts.map((part) => ({
+      id: part.partId,
+      kind: 'part',
+      title: part.pluginName || (part.hardware ? 'External' : 'Empty part'),
+      // An unresolved part HAS an instrument named in the manifest — the machine just cannot
+      // find it. Saying "no instrument" there would send you looking for the wrong problem.
+      subtitle: part.unresolved ? 'missing'
+                : part.pluginVendor || (part.hasInstrument ? '' : 'no instrument'),
+      midi: effectCount(part.midiChain),
+      inserts: effectCount(part.effects),
+      unresolved: part.unresolved === true,
+      muted: part.mute === true || part.enabled === false,
+      focused: part.partId === rack?.focusedPartId,
+    })),
+    ...buses.map((bus) => ({
+      id: bus.busId, kind: 'bus', title: bus.name || 'Bus', subtitle: 'group',
+      midi: 0, inserts: effectCount(bus.effects), unresolved: false, muted: false, focused: false,
+    })),
+    ...returns.map((ret) => ({
+      id: ret.returnId, kind: 'return', title: ret.name || 'Return', subtitle: 'send return',
+      midi: 0, inserts: effectCount(ret.effects), unresolved: false, muted: false, focused: false,
+    })),
+    { id: '@master', kind: 'master', title: 'Master', subtitle: 'output 1/2',
+      midi: 0, inserts: effectCount(rack?.masterEffects), unresolved: false, muted: false,
+      focused: false },
+  ];
+
+  // Returns sit in a band of their own under the main flow: they take a COPY of a part rather
+  // than carrying it, and drawing them in line would say the signal goes through them.
+  const columnFill = new Map();
+  const mainRows = [];
+  for (const node of nodes) {
+    if (node.kind === 'return') continue;
+    const column = columnOf(node);
+    const row = columnFill.get(column) ?? 0;
+    columnFill.set(column, row + 1);
+    node.column = column;
+    node.x = columnX(column);
+    node.y = CANVAS_PAD + row * (CANVAS_NODE_H + CANVAS_GAP_Y);
+    mainRows.push(row);
+  }
+  const mainBottom = CANVAS_PAD + (Math.max(0, ...mainRows, 0) + 1) * (CANVAS_NODE_H + CANVAS_GAP_Y);
+
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+  // A wire that skips a column would otherwise be drawn straight THROUGH whatever sits in the
+  // column it skips, which reads as "the signal goes in there" — the one thing the picture
+  // exists to answer, answered wrongly. Long runs drop into a channel under the nodes, one
+  // lane each, the way a schematic routes around a part rather than over it.
+  const channelOf = new Map();
+  const longRun = (from, to) => from.kind !== 'return' && to.column - from.column > 1;
+  const laneY = (key) => mainBottom + 6 + (channelOf.get(key) ?? 0) * CANVAS_LANE_H;
+  const path = (from, to, key) => {
+    const x1 = from.x + CANVAS_NODE_W;
+    const y1 = from.y + CANVAS_NODE_H / 2;
+    const x2 = to.x;
+    const y2 = to.y + CANVAS_NODE_H / 2;
+    if (longRun(from, to)) {
+      const out = x1 + CANVAS_GAP_X / 2;
+      const back = x2 - CANVAS_GAP_X / 2;
+      const lane = laneY(key);
+      return `M ${x1} ${y1} H ${out} V ${lane} H ${back} V ${y2} H ${x2}`;
+    }
+    // Horizontal out, vertical across, horizontal in — the shape the eye follows without
+    // having to trace a curve, and the one a rack's cabling actually looks like.
+    const mid = x2 > x1 ? x1 + (x2 - x1) / 2 : x1 + CANVAS_GAP_X / 2;
+    return `M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`;
+  };
+
+  // Two passes, because a wire's shape depends on how many long runs there are: collect what
+  // connects to what, give every long run its own lane, then draw.
+  const links = [];
+  const destinationFor = (busId) => (busId && busById.has(busId) ? busId : '@master');
+  for (const part of parts) {
+    const to = destinationFor(part.destinationBusId);
+    if (nodeById.has(part.partId) && nodeById.has(to))
+      links.push({ from: part.partId, to, kind: 'audio' });
+    for (const send of Array.isArray(part.sends) ? part.sends : [])
+      if (nodeById.has(send.returnId) && send.level > 0)
+        links.push({ from: part.partId, to: send.returnId, kind: 'send' });
+  }
+  for (const bus of buses) {
+    const to = destinationFor(bus.destinationBusId === bus.busId ? '' : bus.destinationBusId);
+    if (nodeById.has(bus.busId) && nodeById.has(to) && to !== bus.busId)
+      links.push({ from: bus.busId, to, kind: 'audio' });
+  }
+  for (const ret of returns)
+    if (nodeById.has(ret.returnId)) links.push({ from: ret.returnId, to: '@master', kind: 'send' });
+
+  // Returns have no column yet — they are placed under the channel band, so a lane can never
+  // be drawn across one.
+  for (const ret of returns) {
+    const node = nodeById.get(ret.returnId);
+    node.column = columnOf(node);
+  }
+
+  let lanes = 0;
+  for (const link of links) {
+    const from = nodeById.get(link.from);
+    const to = nodeById.get(link.to);
+    if (from.kind !== 'return' && to.column - from.column > 1) {
+      channelOf.set(link.from + '>' + link.to, lanes);
+      lanes += 1;
+    }
+  }
+
+  const channelBottom = mainBottom + (lanes > 0 ? 6 + lanes * CANVAS_LANE_H : 0);
+  returns.forEach((ret, index) => {
+    const node = nodeById.get(ret.returnId);
+    node.x = columnX(node.column);
+    node.y = channelBottom + CANVAS_BAND_GAP + index * (CANVAS_NODE_H + CANVAS_GAP_Y);
+  });
+
+  const wires = links.map((link) => ({
+    ...link,
+    d: path(nodeById.get(link.from), nodeById.get(link.to), link.from + '>' + link.to),
+  }));
+
+  const width = Math.max(...nodes.map((n) => n.x + CANVAS_NODE_W), 0) + CANVAS_PAD;
+  const height = Math.max(...nodes.map((n) => n.y + CANVAS_NODE_H), channelBottom, 0) + CANVAS_PAD;
+  return { nodes, wires, width, height };
+}
+
 export function normalizeHostState(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const rack = p.rack && typeof p.rack === 'object' ? p.rack : {};

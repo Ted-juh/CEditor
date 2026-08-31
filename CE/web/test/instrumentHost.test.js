@@ -36,6 +36,7 @@ import {
   requestLibrary,
   saveUserPreset,
   saveChainToLibrary,
+  rackCanvasLayout,
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
@@ -440,6 +441,92 @@ test('mock reducer: a chain record captures a whole voice and lands as one', () 
   loadLibraryRecord('lib-5', 'add');
   assert.equal(get(hostStateStore).rack.parts.length, partsBefore + 1,
     'and it can arrive as a new part instead');
+});
+
+// --- the rack canvas -----------------------------------------------------------------------------
+
+const canvasRack = () => ({
+  focusedPartId: 'p1',
+  parts: [
+    { partId: 'p1', pluginName: 'Keys', destinationBusId: '', midiChain: [1, 2], effects: [1],
+      sends: [{ returnId: 'r1', level: 0.4 }, { returnId: 'r2', level: 0 }] },
+    { partId: 'p2', pluginName: 'Bass', destinationBusId: 'b1', midiChain: [], effects: [], sends: [] },
+  ],
+  buses: [{ busId: 'b1', name: 'Keys bus', destinationBusId: 'b2', effects: [1] },
+          { busId: 'b2', name: 'Sub', destinationBusId: '', effects: [] }],
+  returns: [{ returnId: 'r1', name: 'Verb', effects: [1] }, { returnId: 'r2', name: 'Delay', effects: [] }],
+  masterEffects: [1],
+});
+const nodeOf = (layout, id) => layout.nodes.find((n) => n.id === id);
+const wireOf = (layout, from, to) => layout.wires.find((w) => w.from === from && w.to === to);
+
+test('rackCanvasLayout puts columns in signal order, sources first', () => {
+  const layout = rackCanvasLayout(canvasRack());
+  assert.equal(nodeOf(layout, 'p1').column, 0, 'instruments are the sources');
+  assert.equal(nodeOf(layout, 'p2').column, 0);
+  assert.equal(nodeOf(layout, 'b1').column, 1, 'a bus sits one past what feeds it');
+  assert.equal(nodeOf(layout, 'b2').column, 2, 'and a sub-bus one past that');
+  assert.equal(nodeOf(layout, '@master').column, 3, 'the master is last, always');
+  assert.ok(nodeOf(layout, 'p1').x < nodeOf(layout, 'b1').x, 'columns turn into left-to-right x');
+  assert.equal(nodeOf(layout, 'p1').focused, true, 'the focused part is marked for the drawing');
+  assert.equal(nodeOf(layout, 'p1').midi, 2, 'the node counts what is on the part');
+  assert.equal(nodeOf(layout, 'p1').inserts, 1);
+});
+
+test('rackCanvasLayout draws where the signal actually goes', () => {
+  const layout = rackCanvasLayout(canvasRack());
+  assert.ok(wireOf(layout, 'p1', '@master'), 'a part naming no bus reaches the master itself');
+  assert.ok(wireOf(layout, 'p2', 'b1'), 'a part naming a bus goes there and nowhere else');
+  assert.equal(wireOf(layout, 'p2', '@master'), undefined, 'and not also to the master');
+  assert.equal(wireOf(layout, 'b1', 'b2').kind, 'audio');
+  assert.ok(wireOf(layout, 'r1', '@master'), 'a return rejoins the master path');
+
+  assert.equal(wireOf(layout, 'p1', 'r1').kind, 'send', 'a send is drawn as a copy, not a path');
+  assert.equal(wireOf(layout, 'p1', 'r2'), undefined, 'a send at zero is not a connection');
+});
+
+test('rackCanvasLayout routes a skipping wire below the nodes, never through them', () => {
+  const layout = rackCanvasLayout(canvasRack());
+  // Two columns skipped: the wire must leave the row, run under everything, and come back up.
+  const long = wireOf(layout, 'p1', '@master').d;
+  assert.equal((long.match(/V/g) ?? []).length, 2, 'a long run has two vertical moves');
+  const lane = Number(long.match(/V (\d+(?:\.\d+)?)/)[1]);
+  const deepest = Math.max(...layout.nodes.filter((n) => n.kind !== 'return').map((n) => n.y + 54));
+  assert.ok(lane > deepest, 'and its lane sits below every node it passes');
+
+  // One column across: the gap between the two is empty, so the direct shape is honest.
+  const short = wireOf(layout, 'p2', 'b1').d;
+  assert.equal((short.match(/V/g) ?? []).length, 1, 'an adjacent hop stays a simple jog');
+
+  const verb = nodeOf(layout, 'r1');
+  assert.ok(verb.y > lane, 'returns sit below the lanes, so no wire crosses one');
+  assert.ok(layout.height >= verb.y + 54, 'and the canvas is tall enough to hold them');
+});
+
+test('rackCanvasLayout survives a hand-edited manifest that loops', () => {
+  // The model refuses routing cycles where they are made; a file edited by hand can still
+  // carry one, and a picture that hangs drawing it is worse than a wrong picture.
+  const rack = canvasRack();
+  rack.buses = [{ busId: 'b1', name: 'A', destinationBusId: 'b2', effects: [] },
+                { busId: 'b2', name: 'B', destinationBusId: 'b1', effects: [] }];
+  const layout = rackCanvasLayout(rack);
+  assert.equal(layout.nodes.length, 7, 'every node is still drawn');   // 2 parts, 2 buses, 2 returns, master
+  assert.ok(layout.wires.length > 0);
+  assert.ok(Number.isFinite(layout.width) && Number.isFinite(layout.height));
+
+  // A bus pointed at itself is dropped rather than drawn as a wire to nowhere.
+  const selfRack = canvasRack();
+  selfRack.buses = [{ busId: 'b1', name: 'A', destinationBusId: 'b1', effects: [] }];
+  const selfLayout = rackCanvasLayout(selfRack);
+  assert.equal(wireOf(selfLayout, 'b1', 'b1'), undefined);
+  assert.ok(wireOf(selfLayout, 'b1', '@master'), 'it falls back to the master, as the loader does');
+});
+
+test('rackCanvasLayout draws an empty rack without inventing anything', () => {
+  const layout = rackCanvasLayout({});
+  assert.equal(layout.nodes.length, 1, 'the master is the only thing a rack always has');
+  assert.equal(layout.nodes[0].kind, 'master');
+  assert.equal(layout.wires.length, 0);
 });
 
 // --- Stage 5: effect chains and macros -----------------------------------------------------------

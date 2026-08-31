@@ -46,6 +46,7 @@
   import HostMixerPanel from './HostMixerPanel.svelte';
   import HostSplitEditor from './HostSplitEditor.svelte';
   import MidiChainPanel from './MidiChainPanel.svelte';
+  import HostRackCanvas from './HostRackCanvas.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -70,6 +71,12 @@
   let productOpen = $state(false);
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
+
+  // The rack column has two readings of the same thing: the list you edit from, and the
+  // picture of where the sound goes. A toggle rather than a replacement — the list is
+  // keyboard-navigable and carries the per-part mixer, the canvas does neither, so neither
+  // one gets to be the only way in.
+  let rackView = $state('list');
 
   // --- the dock ---------------------------------------------------------------------------
   // One strip along the bottom showing whatever you selected, instead of every editor stacked
@@ -615,6 +622,13 @@
     <section class="rack-column" aria-label="Instrument rack">
       <div class="column-head">
         <strong>Rack</strong>
+        <span class="view-switch">
+          {#each [['list', 'List'], ['canvas', 'Canvas']] as [value, label] (value)}
+            <button type="button" class="toggle" class:on={rackView === value}
+                    data-testid={`rack-view-${value}`}
+                    onclick={() => (rackView = value)}>{label}</button>
+          {/each}
+        </span>
         <button type="button" onclick={() => addRackPart()} data-testid="host-add-part">+ Add part</button>
       </div>
 
@@ -622,7 +636,11 @@
         <div class="empty-hint">No parts yet. Add one, then load an instrument from the right.</div>
       {/if}
 
-      {#each parts as part (part.partId)}
+      {#if rackView === 'canvas'}
+        <HostRackCanvas />
+      {/if}
+
+      {#each rackView === 'list' ? parts : [] as part (part.partId)}
         <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}>
           <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
             <span class="part-name">{partTitle(part)}</span>
@@ -678,9 +696,9 @@
         </div>
       {/each}
 
-      {#if parts.length > 0}
+      {#if parts.length > 0 && rackView === 'list'}
         <!-- Splits and layers as a picture: every part's key range on one keyboard, edges
-             draggable. The numeric zone fields below stay — the picture and the digits
+             draggable. The numeric zone fields in the dock stay — the picture and the digits
              drive the same command. -->
         <HostSplitEditor />
       {/if}
@@ -1502,6 +1520,8 @@
     background: #171a1d;
     padding: 10px;
   }
+
+  .view-switch { display: flex; gap: 4px; margin-left: auto; }
 
   .column-head {
     display: flex;
