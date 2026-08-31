@@ -792,6 +792,60 @@ const CANVAS_PAD = 12;
 const CANVAS_BAND_GAP = 26;
 const CANVAS_LANE_H = 7;
 
+// --- plug-in tiles ------------------------------------------------------------------------------
+
+// VST3 ships no icon and there is nothing on disk to read, so a plug-in's tile is DERIVED from
+// the one thing that is stable about it: the catalogue's class identity. Same ceId, same tile,
+// on every machine and after every rescan — which is what makes it usable as recognition
+// rather than decoration.
+//
+// Colour alone would fail anyone who cannot separate two hues, so the hash also picks a
+// pattern. Two channels, one hash, no images.
+export const TILE_PATTERNS = ['plain', 'stripe', 'dots', 'corner'];
+
+function tileHash(text) {
+  // FNV-1a, 32-bit. Chosen over anything cleverer because it has to give the same answer in
+  // this file for ever: a tile that changes when the hash changes is a tile nobody learns.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/** Two letters that stand for a plug-in: initials of its first two words, or the first two
+    letters of a single-word name. Falls back to the vendor, then to a dash — never empty, so
+    a tile never renders as a blank square. */
+export function pluginInitials(name, vendor = '') {
+  const words = String(name ?? '').trim().split(/[\s\-_/]+/).filter(Boolean)
+    // "The", "A" and a bare number tell you nothing; the next word does.
+    .filter((word) => !/^(the|a|an|vst|vsti)$/i.test(word));
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  const fallback = String(vendor ?? '').trim();
+  return fallback ? fallback.slice(0, 2).toUpperCase() : '–';
+}
+
+/** The tile for a plug-in class: a hue, a pattern and its initials, all derived from ceId. */
+export function pluginTile(ceId, name = '', vendor = '') {
+  const key = String(ceId || name || vendor || '');
+  const hash = tileHash(key);
+  // 360 degrees in 24 steps: far enough apart to tell two neighbours in a list apart, and
+  // quantised so the palette reads as a set rather than as noise.
+  const hue = (hash % 24) * 15;
+  return {
+    hue,
+    pattern: TILE_PATTERNS[(hash >>> 5) % TILE_PATTERNS.length],
+    initials: pluginInitials(name, vendor),
+    // Fixed saturation and lightness, so every tile carries the same weight on a dark panel
+    // and the ink on top is legible whatever the hue turns out to be.
+    background: `hsl(${hue} 42% 30%)`,
+    edge: `hsl(${hue} 46% 46%)`,
+    ink: `hsl(${hue} 60% 88%)`,
+  };
+}
+
 // Which destinations a bus may actually take. The model refuses a routing that would close a
 // loop, and a UI that offers one anyway is just a refusal waiting to happen — so the same rule
 // lives here, in front of the drop targets AND the mixer's dropdowns.
@@ -881,6 +935,8 @@ export function rackCanvasLayout(rack) {
     ...parts.map((part) => ({
       id: part.partId,
       kind: 'part',
+      ceId: part.pluginCeId,
+      hasInstrument: part.hasInstrument === true,
       title: part.pluginName || (part.hardware ? 'External' : 'Empty part'),
       // An unresolved part HAS an instrument named in the manifest — the machine just cannot
       // find it. Saying "no instrument" there would send you looking for the wrong problem.

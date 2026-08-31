@@ -48,6 +48,7 @@
   import HostSplitEditor from './HostSplitEditor.svelte';
   import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
+  import PluginTile from './PluginTile.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -535,6 +536,10 @@
                     onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>
               {record.favourite ? '★' : '☆'}
             </button>
+            {#if record.type !== 'rack'}
+              <PluginTile ceId={record.targetCeId} name={record.instrument || record.name}
+                          vendor={record.manufacturer} size={22} />
+            {/if}
             <div class="library-id" class:clickable={record.type !== 'rack' && record.available}
                  role="button" tabindex="-1" data-testid="library-row-body"
                  title={record.type === 'rack' ? undefined
@@ -644,6 +649,9 @@
       {#each rackView === 'list' ? parts : [] as part (part.partId)}
         <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}>
           <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
+            {#if part.hasInstrument || part.unresolved}
+              <PluginTile ceId={part.pluginCeId} name={part.pluginName} vendor={part.pluginVendor} size={24} />
+            {/if}
             <span class="part-name">{partTitle(part)}</span>
             <span class="part-vendor">{part.pluginVendor}</span>
           </button>
@@ -731,6 +739,7 @@
                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
                }}
                ondragend={() => hostCanvasDrag.set({ kind: '', id: '', label: '' })}>
+            <PluginTile ceId={instrument.ceId} name={instrument.name} vendor={instrument.vendor} size={30} />
             <div class="instrument-id">
               <span class="instrument-name">{instrument.name}</span>
               <span class="instrument-vendor">{instrument.vendor} {instrument.version}</span>
@@ -1561,6 +1570,7 @@
 
   .part-main {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
     background: none;
@@ -1571,7 +1581,7 @@
     padding: 0;
     font: inherit;
   }
-  .part-name { font-weight: 600; }
+  .part-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .preset-walk { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; }
   .preset-walk .ghost { padding: 0 6px; font-size: 13px; line-height: 1.2; }
   .preset-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1609,7 +1619,7 @@
     padding: 6px 8px;
     background: #1c2126;
   }
-  .instrument-id { display: flex; flex-direction: column; min-width: 0; }
+  .instrument-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .instrument-name { font-weight: 600; }
   .instrument-vendor { color: #7d8894; font-size: 11px; }
 

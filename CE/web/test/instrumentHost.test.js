@@ -39,6 +39,9 @@ import {
   rackCanvasLayout,
   canvasDropTargets,
   busDestinationWouldLoop,
+  pluginTile,
+  pluginInitials,
+  TILE_PATTERNS,
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
@@ -566,6 +569,51 @@ test('canvasDropTargets offers only what the engine would accept', () => {
   assert.deepEqual(canvasDropTargets(rack, {}), [], 'nothing in flight, nothing lit');
   assert.deepEqual(canvasDropTargets(rack, { kind: 'part', id: 'gone' }), [],
     'a stale payload lights nothing rather than everything');
+});
+
+// --- plug-in tiles -------------------------------------------------------------------------------
+
+test('pluginInitials picks the letters a person would', () => {
+  assert.equal(pluginInitials('Stage Keys'), 'SK');
+  assert.equal(pluginInitials('Nice Reverb', 'Test Audio'), 'NR');
+  assert.equal(pluginInitials('Serum'), 'SE', 'one word gives its first two letters');
+  assert.equal(pluginInitials('The Legend'), 'LE', 'a leading article says nothing, so it is skipped');
+  assert.equal(pluginInitials('VST Machine Two'), 'MT', 'and neither does the format');
+  assert.equal(pluginInitials('Pro-53'), 'P5', 'punctuation splits words too');
+  assert.equal(pluginInitials('', 'Waves'), 'WA', 'a nameless class falls back to its vendor');
+  assert.equal(pluginInitials('', ''), '–', 'and never to an empty square');
+});
+
+test('pluginTile is derived from identity, so it never moves under you', () => {
+  const a = pluginTile('VST3-good-synth', 'Stage Keys', 'Mock Audio');
+  const b = pluginTile('VST3-good-synth', 'Stage Keys', 'Mock Audio');
+  assert.deepEqual(a, b, 'the same class gives the same tile, every time');
+
+  // A rename is a display change; the identity did not move, so the tile must not either.
+  const renamed = pluginTile('VST3-good-synth', 'Stage Keys mk2', 'Mock Audio');
+  assert.equal(renamed.hue, a.hue, 'the colour follows the ceId, not the name');
+  assert.equal(renamed.pattern, a.pattern);
+  assert.equal(renamed.initials, 'SK', 'only the letters follow the name');
+
+  const other = pluginTile('VST3-other-synth', 'Analog One', 'Mock Audio');
+  assert.notEqual(other.hue, a.hue, 'two classes in the same list are told apart');
+
+  assert.ok(TILE_PATTERNS.includes(a.pattern), 'the pattern is one of the known set');
+  assert.ok(a.hue >= 0 && a.hue < 360 && a.hue % 15 === 0, 'hues are quantised, so they read as a set');
+});
+
+test('pluginTile carries a second channel besides colour', () => {
+  // Colour alone excludes anyone who cannot separate two hues, so the hash has to spread the
+  // patterns as well — a set of classes that all came out "plain" would be colour-only.
+  const patterns = new Set();
+  for (let i = 0; i < 40; i += 1) patterns.add(pluginTile(`VST3-class-${i}`, `Plug ${i}`).pattern);
+  assert.ok(patterns.size >= 3, `patterns actually vary (got ${[...patterns].join(', ')})`);
+});
+
+test('pluginTile still answers for a class with nothing to go on', () => {
+  const blank = pluginTile('', '', '');
+  assert.equal(blank.initials, '–');
+  assert.ok(blank.background.startsWith('hsl('), 'and still renders as a tile, not a gap');
 });
 
 // --- Stage 5: effect chains and macros -----------------------------------------------------------

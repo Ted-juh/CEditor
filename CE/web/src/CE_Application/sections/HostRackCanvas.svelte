@@ -20,6 +20,7 @@
     hostState, focusRackPart, loadInstrument, setPartDestination, setBusDestination,
     rackCanvasLayout, canvasDropTargets, hostCanvasDrag, CANVAS_NODE_W, CANVAS_NODE_H,
   } from '../stores/instrumentHost.js';
+  import PluginTile from './PluginTile.svelte';
 
   let layout = $derived(rackCanvasLayout($hostState.rack));
 
@@ -109,7 +110,12 @@
                       ondragover={(e) => dragOver(e, node)}
                       ondrop={(e) => drop(e, node)}
                       onclick={node.kind === 'part' ? () => focusRackPart(node.id) : undefined}>
-        <span class="node-title">{node.title}</span>
+        <span class="node-head">
+          {#if node.kind === 'part' && (node.hasInstrument || node.unresolved)}
+            <PluginTile ceId={node.ceId} name={node.title} vendor={node.subtitle} size={20} />
+          {/if}
+          <span class="node-title">{node.title}</span>
+        </span>
         <span class="node-meta">
           {#if node.midi > 0}<span class="badge midi" title={`${node.midi} MIDI modules`}>♪{node.midi}</span>{/if}
           {#if node.inserts > 0}<span class="badge fx" title={`${node.inserts} inserts`}>fx{node.inserts}</span>{/if}
@@ -171,6 +177,7 @@
   .node.return { background: #1f2630; }
   .node.master { background: #2a2620; }
 
+  .node-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .node-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .node-meta { display: flex; align-items: center; gap: 4px; min-width: 0; }
   .node-sub {

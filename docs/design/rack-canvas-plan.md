@@ -189,7 +189,27 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load
    button — which is why the List view stays first.
-4. **Thumbnails**, in the order above.
+4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**; snapshots and overrides still to
+   come.
+
+   A tile is *derived*, not found: a hue, a pattern and two letters, all from the catalogue's
+   stable `ceId`. Same class, same tile, on every machine and after every rescan — which is what
+   makes it recognition rather than decoration, and why a rename moves the letters but not the
+   colour. They are on the browser rows, the rack rows, the library rows and the canvas nodes.
+
+   The pattern is not ornament. Colour alone excludes anyone who cannot separate two hues, so the
+   same hash picks a second, non-colour channel, and a test asserts the patterns actually spread
+   rather than all landing on "plain".
+
+   **Still to build: the real snapshot.** Capture the plug-in's own editor the first time it
+   opens (`Component::createComponentSnapshot`), downscale it, and cache it under the data
+   directory keyed by `ceId` + plug-in version. Two things decide the design and neither is the
+   drawing: it must never happen at *scan* time, because snapshotting a library of several
+   hundred plug-ins means instantiating several hundred plug-ins, which is the whole reason the
+   scanner is a separate process; and the WebView needs a path to the cached file, so this is
+   native work — a virtual-host mapping or a per-thumbnail event, not another field on every
+   state push. The generated tile stays as the fallback whenever no snapshot exists, the same
+   pattern as auto-layout versus saved positions.
 5. **Persisted positions**, optional: `x`/`y` per node in the manifest, with auto-layout as the
    fallback when they are absent, so an older session and a hand-written manifest both still open.
    The repo's existing habit — migrate by construction, never refuse a file for a missing field.
