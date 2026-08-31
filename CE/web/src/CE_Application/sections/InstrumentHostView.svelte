@@ -1633,11 +1633,7 @@
     font-variant-numeric: tabular-nums;
   }
   button.toggle.warn { color: #e4b3b3; border-color: #7a4a4a; }
-  .arp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .arpeggiator .zone-grid label { justify-content: flex-start; }
-  .arpeggiator .zone-grid input[type='range'] { margin-top: 4px; }
-
-  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config, .event-chain, .arpeggiator {
+  .fx-chain, .macros, .sends, .outputs, .returns, .hw-config {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1696,35 +1692,6 @@
   .page-tab.on { border-color: #5b9bd5; background: #24313d; }
   .page-name { background: none; border: none; padding: 3px 6px; }
   .slot-list { display: flex; flex-direction: column; gap: 4px; }
-  .arp-grid-row { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
-  .arp-note-grid { flex: 1; display: flex; gap: 1px; height: 150px; background: #10161c;
-                   border: 1px solid #232c36; border-radius: 4px; padding: 2px;
-                   cursor: crosshair; touch-action: none; }
-  .arp-note-grid.ghost { opacity: 0.45; }
-  .note-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 4px; }
-  .note-col.playing { background: #24384c; border-radius: 1px; }
-  .note-cell { flex: 1; background: #161e27; border-radius: 1px; }
-  .note-cell.octave { background: #131a22; }
-  .note-cell.on { background: #4aa88c; }
-  .note-col.playing .note-cell.on { background: #7fd4b8; }
-  .note-cell.ground { background: #1f2a36; }
-  .note-cell.octline { background: #1a222c; }
-  .row-mode { display: flex; gap: 2px; }
-  .row-mode button { flex: 1; font-size: 10px; padding: 2px 4px; background: #1c2630;
-                     color: #9aa5b1; border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
-  .row-mode button.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
-  .arp-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
-              border: 1px solid #232c36; border-radius: 4px; padding: 2px;
-              cursor: crosshair; touch-action: none; }
-  .arp-grid.ghost { opacity: 0.45; }
-  .arp-col { flex: 1; display: flex; align-items: flex-end; background: #161e27;
-             border-radius: 1px; min-width: 4px; }
-  .arp-col.playing { background: #24384c; }
-  .arp-col.rest { background: #12181f; }
-  .arp-bar { width: 100%; background: #3d81c4; border-radius: 1px 1px 0 0; }
-  .arp-col.playing .arp-bar { background: #7fb4e0; }
-  .arp-grid-side { display: flex; flex-direction: column; gap: 4px; justify-content: flex-start; }
-  .arp-hint { color: #66707b; font-size: 10px; max-width: 110px; }
   .slot-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .slot-id { flex: 0 0 20px; color: #7d8894; font-size: 11px; }
   .slot-name { flex: 0 0 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1736,8 +1703,6 @@
   .midi-learn { font-size: 10px; color: #9aa5b1; }
   .midi-learn.armed { color: #d9a13c; border-color: #d9a13c; animation: midi-learn-pulse 1s ease-in-out infinite; }
   @keyframes midi-learn-pulse { 50% { opacity: 0.45; } }
-  .key-chords { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; grid-column: 1 / -1; }
-  .chord-hint { color: #66707b; font-size: 10px; grid-column: 1 / -1; }
   .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
              background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
 

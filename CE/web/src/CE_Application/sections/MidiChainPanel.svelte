@@ -305,7 +305,7 @@
               <!-- Draw the melody: a column is a step, the lit row is which note plays. -->
               <div class="grid-row">
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="note-grid" class:ghost={notePattern.length === 0}
+                <div class="note-grid" class:empty={notePattern.length === 0}
                      data-testid="arp-note-grid" bind:this={noteEl}
                      onpointerdown={noteDown} onpointermove={noteMove}
                      onpointerup={noteUp} onpointercancel={noteUp}>
@@ -352,7 +352,7 @@
               <!-- Dynamics per step; a bar on the floor is a rest the engine skips. -->
               <div class="grid-row">
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="vel-grid" class:ghost={velPattern.length === 0}
+                <div class="vel-grid" class:empty={velPattern.length === 0}
                      data-testid="arp-grid" bind:this={velEl}
                      onpointerdown={velDown} onpointermove={velMove}
                      onpointerup={velUp} onpointercancel={velUp}>
@@ -411,7 +411,9 @@
   .vel-grid { flex: 1; display: flex; gap: 1px; height: 72px; background: #10161c;
               border: 1px solid #232c36; border-radius: 4px; padding: 2px;
               cursor: crosshair; touch-action: none; }
-  .note-grid.ghost, .vel-grid.ghost { opacity: 0.45; }
+  /* "nothing drawn yet". NOT .ghost — that is the button utility below, same specificity
+     and declared later, so it would take the grid's own background and border with it. */
+  .note-grid.empty, .vel-grid.empty { opacity: 0.45; }
   .note-col { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 4px; }
   .note-col.playing { background: #24384c; border-radius: 1px; }
   .note-cell { flex: 1; background: #161e27; border-radius: 1px; }
