@@ -118,11 +118,22 @@ VST3 ships no icon. There is nothing to read off disk. So:
 
 Ordered so that each stage is useful shipped alone, and none of them requires the next one.
 
-1. **Selection + the bottom dock.** A `selectedNode` store; the existing editors — the arp and step
-   grids in `MidiChainPanel`, `HostMixerPanel`, `HostSplitEditor`, the parameter list — render into
-   one docked panel instead of being stacked inline. No new concepts, no model change, and it
-   removes most of the vertical scrolling that makes the current UI feel like a form. **Biggest
-   perceived win for the least risk; do this first.**
+1. ~~**Selection + the bottom dock.**~~ **BUILT, 2026-08-31.** The focused part's editors — zone,
+   MIDI modules, inserts, routing — plus the parameter view and the rack-wide chains moved out of
+   the rack column into a resizable, collapsible strip along the bottom, tabbed and driven by what
+   is focused. No model change and no new commands: the same components, in one place, addressed
+   by a tab instead of by scrolling.
+
+   Two things it turned out to be worth beyond tidiness. The editors are now **as wide as the
+   window** rather than as wide as a column, which is the difference between an arpeggiator grid
+   you can draw on and one you cannot. And the tab list is **derived from what applies** — with no
+   part focused only the rack-wide chains are offered, and the parameter tab appears when there is
+   something to inspect — so the dock cannot show you a pane for something that is not there.
+
+   The stack also had a **second dead layer** in it: 124 lines of arpeggiator and step-grid script
+   in `InstrumentHostView` left behind when those editors moved to `MidiChainPanel`, matching the
+   dead CSS removed the same day. An extraction is not finished until the markup, the styles *and*
+   the script have gone.
 2. **The canvas as a read-only picture.** Draw the existing graph with auto-layout (columns by
    depth: instruments, then buses, then master), wires as SVG under the nodes. Nothing is
    draggable yet. This is where we find out whether the metaphor actually reads before investing in

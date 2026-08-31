@@ -71,130 +71,37 @@
   let reliabilityOpen = $state(false);
   let licenceOpen = $state(false);
 
-  const CHORD_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const chordKeyName = (n) => `${CHORD_NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
+  // --- the dock ---------------------------------------------------------------------------
+  // One strip along the bottom showing whatever you selected, instead of every editor stacked
+  // down the rack column. The tab list is derived, not fixed: with no part focused only the
+  // rack-wide chains apply, and the parameter view appears once something is inspectable.
+  let dockOpen = $state(true);
+  let dockTab = $state('midi');
+  let dockHeight = $state(340);   // enough for the arp's two grids without a scrollbar
+  let gripping = $state(false);
+  let gripStartY = 0;
+  let gripStartHeight = 0;
 
-  // --- the arp step grid -------------------------------------------------------------
-  // Draft while dragging, committed on release: one setPartArp per gesture, not per pixel.
-  let arpDraft = $state(null);
-  let arpGridEl = $state(null);
-  let arpDragging = $state(false);
-  // The grids edit whichever arp slot is open, not "the part's arp" — a part can carry
-  // several arpeggiators now, and each draws its own pattern.
-  let openSlotId = $state('');
-  let openSlot = $derived(focusedPart?.midiChain.find((slot) => slot.slotId === openSlotId) ?? null);
-  let arpPattern = $derived(arpDraft ?? openSlot?.arp.velocityPattern ?? []);
+  function gripDown(event) {
+    gripping = true;
+    gripStartY = event.clientY;
+    gripStartHeight = dockHeight;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function gripMove(event) {
+    if (!gripping) return;
+    // Dragging up grows the dock, which is why the delta is inverted.
+    dockHeight = Math.max(140, Math.min(720, gripStartHeight + (gripStartY - event.clientY)));
+  }
+  function gripUp() { gripping = false; }
 
-  function arpCellFromEvent(event) {
-    const rect = arpGridEl.getBoundingClientRect();
-    const count = Math.max(1, arpPattern.length);
-    const step = Math.max(0, Math.min(count - 1,
-      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
-    // Top = 127; the bottom edge snaps to 0, which IS the rest — no separate gesture.
-    // The snap zone is real (a few percent), because nobody can hit a one-pixel floor.
-    const raw = Math.max(0, Math.min(127,
-      Math.round((1 - (event.clientY - rect.top) / rect.height) * 127)));
-    return { step, velocity: raw < 7 ? 0 : raw };
+  function selectDockTab(id) {
+    // Clicking the tab you are on collapses the dock — the same gesture that opened it.
+    if (dockOpen && dockTab === id) { dockOpen = false; return; }
+    dockTab = id;
+    dockOpen = true;
   }
 
-  function arpGridDown(event) {
-    if (!focusedPart) return;
-    event.preventDefault();
-    // First touch of an empty grid materializes the drawable pattern.
-    arpDraft = arpPattern.length > 0 ? [...arpPattern] : Array.from({ length: 16 }, () => 100);
-    arpDragging = true;
-    arpGridEl.setPointerCapture?.(event.pointerId);
-    const { step, velocity } = arpCellFromEvent(event);
-    arpDraft[step] = velocity;
-  }
-
-  function arpGridMove(event) {
-    if (!arpDragging || arpDraft === null) return;
-    const { step, velocity } = arpCellFromEvent(event);
-    arpDraft[step] = velocity;
-  }
-
-  function arpGridUp() {
-    if (!arpDragging) return;
-    arpDragging = false;
-    if (arpDraft !== null && focusedPart)
-      setPartArp(focusedPart.partId, { velocityPattern: [...arpDraft] });
-    arpDraft = null;
-  }
-
-  function resizeArpPattern(length) {
-    if (!focusedPart) return;
-    const current = focusedPart.arp.velocityPattern;
-    const next = Array.from({ length }, (_, i) => current[i] ?? 100);
-    setPartArp(focusedPart.partId, { velocityPattern: next });
-  }
-
-  // --- the note grid (pattern mode): X is the step, Y is WHICH held note plays -----------
-  // Rows are chord degrees — bottom row is the lowest note you are holding, upward through
-  // the held chord and its octave extension. A cell click places the note, clicking the
-  // placed cell again rests the step, dragging paints. -1 in the model is a rest.
-  // Degree rows re-voice with the held chord (8 rows); semitone rows are offsets around
-  // the ground note, an octave each way (25 rows, row 12 = the ground itself).
-  let noteRows = $derived(focusedPart?.arp.patternSemitones ? 25 : 8);
-  let noteDraft = $state(null);
-  let noteGridEl = $state(null);
-  let noteDragging = $state(false);
-  let notePainting = $state(false);
-  let notePattern = $derived(noteDraft ?? focusedPart?.arp.degreePattern ?? []);
-
-  function noteCellFromEvent(event) {
-    const rect = noteGridEl.getBoundingClientRect();
-    const count = Math.max(1, notePattern.length || 16);
-    const step = Math.max(0, Math.min(count - 1,
-      Math.floor(((event.clientX - rect.left) / rect.width) * count)));
-    const row = Math.max(0, Math.min(noteRows - 1,
-      noteRows - 1 - Math.floor(((event.clientY - rect.top) / rect.height) * noteRows)));
-    return { step, row };
-  }
-
-  function noteGridDown(event) {
-    if (!focusedPart) return;
-    event.preventDefault();
-    noteDraft = notePattern.length > 0 ? [...notePattern] : Array.from({ length: 16 }, () => -1);
-    noteDragging = true;
-    noteGridEl.setPointerCapture?.(event.pointerId);
-    const { step, row } = noteCellFromEvent(event);
-    if (noteDraft[step] === row) {
-      noteDraft[step] = -1;      // the placed note, clicked again, is a rest
-      notePainting = false;
-    } else {
-      noteDraft[step] = row;
-      notePainting = true;
-    }
-  }
-
-  function noteGridMove(event) {
-    if (!noteDragging || !notePainting || noteDraft === null) return;
-    const { step, row } = noteCellFromEvent(event);
-    noteDraft[step] = row;
-  }
-
-  function noteGridUp() {
-    if (!noteDragging) return;
-    noteDragging = false;
-    if (noteDraft !== null && focusedPart)
-      setPartArp(focusedPart.partId, { degreePattern: [...noteDraft] });
-    noteDraft = null;
-  }
-
-  function resizeNotePattern(length) {
-    if (!focusedPart) return;
-    // One length for melody and dynamics together — new steps arrive as rests at full
-    // velocity, so extending never changes what already plays.
-    const degrees = focusedPart.arp.degreePattern;
-    const velocities = focusedPart.arp.velocityPattern;
-    setPartArp(focusedPart.partId, {
-      degreePattern: Array.from({ length }, (_, i) => degrees[i] ?? -1),
-      velocityPattern: velocities.length > 0
-        ? Array.from({ length }, (_, i) => velocities[i] ?? 100)
-        : [],
-    });
-  }
 
   function playAuditionNote() {
     // A note the focused part will actually voice: the centre of its key zone, clamped —
@@ -355,6 +262,31 @@
   );
 
   const latencySuffix = (ms) => (ms >= 0.05 ? ` · ${ms.toFixed(1)} ms` : '');
+
+  // Tabs a part actually has. Routing stays offered whenever a part is focused — hardware,
+  // sends and extra outs all live there and any of them can appear at any moment — but the
+  // parameter view only exists once something is inspectable, so it comes and goes.
+  let dockTabs = $derived([
+    ...(focusedPart
+          ? [{ id: 'zone', label: 'Zone' }, { id: 'midi', label: 'MIDI' },
+             { id: 'inserts', label: 'Inserts' }, { id: 'routing', label: 'Routing' }]
+          : []),
+    ...(paramTargetId ? [{ id: 'params', label: 'Params' }] : []),
+    { id: 'rack', label: 'Rack' },
+  ]);
+
+  // What the dock is editing, on the tab bar, so the answer is in one fixed place however far
+  // the body has been scrolled.
+  let dockSubject = $derived(dockTab === 'rack' ? 'Master, returns and macros'
+                             : dockTab === 'params' ? (paramTargetName || 'Parameters')
+                             : focusedPart ? partTitle(focusedPart) : 'Nothing focused');
+
+  // A tab that stops applying must not leave the dock showing nothing — unloading the part
+  // whose parameters you were reading is the ordinary way to get here.
+  $effect(() => {
+    if (!dockTabs.some((tab) => tab.id === dockTab))
+      dockTab = dockTabs[0]?.id ?? 'rack';
+  });
 
   function toggleEditor(part) {
     if ($hostState.editorOpenPartId === part.partId) closeEditor();
@@ -753,380 +685,6 @@
         <HostSplitEditor />
       {/if}
 
-      {#if focusedPart}
-        <div class="midi-zone">
-          <strong>MIDI zone — {partTitle(focusedPart)}</strong>
-          <div class="zone-grid">
-            <label>Channel
-              <select value={focusedPart.channel}
-                      onchange={(e) => setPartMidiRules(focusedPart.partId, { channel: Number(e.currentTarget.value) })}>
-                <option value={0}>Omni</option>
-                {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
-                  <option value={ch}>{ch}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Key low
-              <input type="number" min="0" max="127" value={focusedPart.keyLow}
-                     onchange={(e) => setPartMidiRules(focusedPart.partId, { keyLow: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Key high
-              <input type="number" min="0" max="127" value={focusedPart.keyHigh}
-                     onchange={(e) => setPartMidiRules(focusedPart.partId, { keyHigh: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Vel low
-              <input type="number" min="1" max="127" value={focusedPart.velocityLow}
-                     onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityLow: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Vel high
-              <input type="number" min="1" max="127" value={focusedPart.velocityHigh}
-                     onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityHigh: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Transpose
-              <input type="number" min="-60" max="60" value={focusedPart.transpose}
-                     onchange={(e) => setPartMidiRules(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
-            </label>
-          </div>
-        </div>
-      {/if}
-
-      {#snippet effectChain(chain, chainId, title, testId)}
-        <div class="fx-chain" data-testid={testId ?? (chainId === 'master' ? 'host-master-fx' : 'host-part-fx')}>
-          <div class="fx-head">
-            <strong>{title}</strong>
-            <select value="" aria-label={`Add an effect to ${title}`}
-                    onchange={(e) => { if (e.currentTarget.value) addEffect(chainId, e.currentTarget.value); e.currentTarget.value = ''; }}>
-              <option value="" disabled>+ Add effect…</option>
-              {#each $hostState.effectClasses as effectClass (effectClass.ceId)}
-                <option value={effectClass.ceId}>{effectClass.name} — {effectClass.vendor}</option>
-              {/each}
-            </select>
-          </div>
-          {#each chain as effect (effect.effectId)}
-            <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}>
-              <span class="fx-name" title={effect.pluginVendor}>
-                {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
-              </span>
-              <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
-                              onchange={(on) => setEffectBypassed(effect.effectId, on)} />
-              <button type="button" class="toggle" disabled={!effect.hasProcessor}
-                      class:on={$hostState.editorOpenPartId === effect.effectId}
-                      title="Show the effect's own interface"
-                      onclick={() => openEffectEditor(effect.effectId)}>Editor</button>
-              <button type="button" class="toggle"
-                      class:on={$hostState.floatingEditorPartIds.includes(effect.effectId)}
-                      disabled={!effect.hasProcessor}
-                      title="Pop this effect's interface out into its own window"
-                      onclick={() => ($hostState.floatingEditorPartIds.includes(effect.effectId)
-                                        ? closeEditorWindow(effect.effectId)
-                                        : floatEditor(effect.effectId))}>⧉</button>
-              <button type="button" class="toggle" disabled={!effect.hasProcessor}
-                      class:on={paramTargetId === effect.effectId}
-                      title="Inspect this effect's parameters"
-                      onclick={() => (paramTargetId = effect.effectId)}>P</button>
-              <button type="button" class="ghost danger" title="Remove this effect"
-                      onclick={() => removeEffect(effect.effectId)}>×</button>
-            </div>
-          {/each}
-        </div>
-      {/snippet}
-
-      {#if focusedPart}
-        <!-- The part's Stage 6 event chain: what shapes what arrives, and what replays it.
-             Both are modes over the shared transport, which is why they live beside the zone
-             rules rather than in a panel of their own. -->
-        <!-- The part's MIDI inserts. What used to be a fixed row of note-shaping fields
-             plus one arpeggiator is a chain you compose — see MidiChainPanel. -->
-        <MidiChainPanel part={focusedPart} />
-      {/if}
-
-      {#if focusedPart?.hardware}
-        <!-- Hardware-instrument parts (Stage 5): the part reaches an external synth over
-             MIDI and can return audio through the interface — same zones, fader, inserts
-             and sends as any part. A gone port is a diagnostic, never silence. -->
-        <div class="hw-config" data-testid="host-hardware">
-          <div class="fx-head">
-            <strong>External hardware — {partTitle(focusedPart)}</strong>
-            <button type="button" class="ghost" title="Back to a software part (identity and zones stay)"
-                    onclick={() => clearHardware(focusedPart.partId)}>Make software part</button>
-          </div>
-          {#if focusedPart.midiOutError}
-            <div class="hw-error" role="alert">{focusedPart.midiOutError}</div>
-          {/if}
-          <div class="zone-grid">
-            <label>MIDI output
-              <select value={focusedPart.midiOutputId}
-                      onchange={(e) => {
-                        const id = e.currentTarget.value;
-                        const name = $hostAudioDevices.midiOutputs.find((m) => m.id === id)?.name ?? '';
-                        setHardwareConfig(focusedPart.partId, { midiOutputId: id, midiOutputName: name });
-                      }}>
-                <option value="">(no port)</option>
-                {#if focusedPart.midiOutputId
-                     && !$hostAudioDevices.midiOutputs.some((m) => m.id === focusedPart.midiOutputId)}
-                  <option value={focusedPart.midiOutputId}>{focusedPart.midiOutputName || focusedPart.midiOutputId} (gone)</option>
-                {/if}
-                {#each $hostAudioDevices.midiOutputs as out (out.id)}
-                  <option value={out.id}>{out.name}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Channel
-              <select value={focusedPart.midiOutChannel}
-                      onchange={(e) => setHardwareConfig(focusedPart.partId, { midiOutChannel: Number(e.currentTarget.value) })}>
-                {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
-                  <option value={ch}>{ch}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Audio return
-              <select value={focusedPart.audioReturnChannel}
-                      onchange={(e) => setHardwareConfig(focusedPart.partId, { audioReturnChannel: Number(e.currentTarget.value) })}>
-                <option value={-1}>None</option>
-                {#each Array.from({ length: Math.max($hostAudioDevices.inputChannels, 8) / 2 }, (_, i) => i * 2) as ch}
-                  <option value={ch}>Inputs {ch + 1}/{ch + 2}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Bank (-1 = none)
-              <input type="number" min="-1" max="16383" value={focusedPart.programBank}
-                     onchange={(e) => setHardwareConfig(focusedPart.partId, { programBank: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Program (-1 = none)
-              <input type="number" min="-1" max="127" value={focusedPart.programNumber}
-                     onchange={(e) => setHardwareConfig(focusedPart.partId, { programNumber: Number(e.currentTarget.value) })} />
-            </label>
-            <span class="hw-send">
-              <button type="button" disabled={focusedPart.programBank < 0 && focusedPart.programNumber < 0}
-                      title="Send the bank select / program change now"
-                      onclick={() => sendHardwareProgram(focusedPart.partId)}>Send program</button>
-            </span>
-          </div>
-        </div>
-      {:else if focusedPart && !focusedPart.hasInstrument && !focusedPart.unresolved}
-        <div class="hw-config" data-testid="host-hardware-offer">
-          <button type="button" title="Use this part for an external synth: MIDI out, optional audio return"
-                  onclick={() => setHardwareConfig(focusedPart.partId, {})}>Use external hardware…</button>
-        </div>
-      {/if}
-
-      {#if focusedPart}
-        {@render effectChain(focusedPart.effects, focusedPart.partId,
-                             `Inserts — ${partTitle(focusedPart)}${latencySuffix(focusedPart.latencyMs)}`)}
-      {/if}
-
-      {#if focusedPart && $hostState.rack.returns.length > 0}
-        <div class="sends" data-testid="host-sends">
-          <strong>Sends — {partTitle(focusedPart)}</strong>
-          {#each $hostState.rack.returns as ret (ret.returnId)}
-            <div class="send-row">
-              <span class="send-name">{ret.name}</span>
-              <input type="range" min="0" max="2" step="0.01"
-                     value={focusedPart.sends.find((s) => s.returnId === ret.returnId)?.level ?? 0}
-                     aria-label={`Send to ${ret.name}`}
-                     oninput={(e) => setSendLevel(focusedPart.partId, ret.returnId, Number(e.currentTarget.value))} />
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      {#if focusedPart && !focusedPart.hardware && focusedPart.outputChannels > 2}
-        <!-- Explicit multi-output routing: extra pairs to the mix at their own gain; the
-             main pair 1/2 keeps the inserts and the fader. -->
-        <div class="outputs" data-testid="host-outputs">
-          <strong>Outputs — {partTitle(focusedPart)}</strong>
-          {#each Array.from({ length: Math.floor(focusedPart.outputChannels / 2) - 1 }, (_, i) => i + 1) as pairIndex (pairIndex)}
-            {@const route = focusedPart.extraOuts.find((o) => o.pairIndex === pairIndex)}
-            <div class="send-row">
-              <PropertyToggle compact label={`${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`} value={!!route}
-                              ariaLabel={`Route output pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`}
-                              onchange={(on) => on ? setExtraOut(focusedPart.partId, pairIndex, 1)
-                                                   : removeExtraOut(focusedPart.partId, pairIndex)} />
-              {#if route}
-                <input type="range" min="0" max="2" step="0.01" value={route.gain}
-                       aria-label={`Pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2} gain`}
-                       oninput={(e) => setExtraOut(focusedPart.partId, pairIndex, Number(e.currentTarget.value))} />
-              {:else}
-                <span class="slot-empty">not routed</span>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      {@render effectChain($hostState.rack.masterEffects, 'master',
-                           `Master effects${latencySuffix($hostState.rack.masterLatencyMs)}`)}
-
-      <!-- Shared send/return buses (Stage 5): each return is one more effect chain, fed by
-           the per-part send sliders above, rejoining ahead of the master inserts. -->
-      <div class="returns" data-testid="host-returns">
-        <div class="fx-head">
-          <strong>Returns</strong>
-          <button type="button" onclick={() => addReturn()} data-testid="host-add-return">+ Return</button>
-        </div>
-        {#each $hostState.rack.returns as ret (ret.returnId)}
-          <div class="return-block">
-            <div class="fx-head">
-              <span class="send-name">{ret.name}</span>
-              <label class="mini return-level" title="Return level">
-                <input type="range" min="0" max="2" step="0.01" value={ret.level}
-                       aria-label={`${ret.name} level`}
-                       oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
-              </label>
-              <button type="button" class="ghost danger" title="Remove this return (its sends go with it)"
-                      onclick={() => removeReturn(ret.returnId)}>×</button>
-            </div>
-            {@render effectChain(ret.effects, ret.returnId, `${ret.name} effects`, 'host-return-fx')}
-          </div>
-        {/each}
-      </div>
-
-      <!-- Stage 5 macros: one value fanning across parts and effects, always through the
-           central parameter path. Select a macro, then add targets from the parameter view. -->
-      <div class="macros" data-testid="host-macros">
-        <div class="fx-head">
-          <strong>Macros</strong>
-          <button type="button" onclick={() => addMacro()} data-testid="host-add-macro">+ Macro</button>
-        </div>
-        {#each $hostState.rack.macros as macro (macro.macroId)}
-          <div class="macro-row" class:on={selectedMacro?.macroId === macro.macroId}>
-            <button type="button" class="ghost macro-name" title="Select for target assignment"
-                    onclick={() => (selectedMacroId = macro.macroId)}>{macro.name}</button>
-            <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
-                   oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
-                   onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
-            <button type="button" class="ghost danger" title="Remove this macro"
-                    onclick={() => removeMacro(macro.macroId)}>×</button>
-          </div>
-          {#if macro.targets.length > 0}
-            <div class="macro-targets">
-              {#each macro.targets as target (target.targetId + target.parameterId)}
-                <span class="macro-target" class:unresolved={!target.resolved}
-                      title={target.resolved ? `${target.displayName} on ${target.targetName}`
-                                             : 'unresolved — the target no longer carries this plug-in'}>
-                  {target.displayName}{target.inverted ? ' ⇄' : ''} — {target.targetName || 'missing'}
-                  <button type="button" class="ghost danger"
-                          onclick={() => removeMacroTarget(macro.macroId, target.targetId, target.parameterId)}>×</button>
-                </span>
-              {/each}
-            </div>
-          {/if}
-        {/each}
-      </div>
-
-      <!-- The Stage 2 generic parameter view: the common, inspectable control surface the
-           vendor editor is not — and the same registry hardware pages and macros will use. -->
-      {#if paramTargetId && $hostParameters.partId === paramTargetId}
-        <div class="param-view" data-testid="host-parameters">
-          <div class="param-head">
-            <strong>Parameters — {paramTargetName}</strong>
-            <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
-            <button type="button" class="toggle" class:on={paramAssignedOnly}
-                    title="Only parameters already on a knob slot or macro"
-                    data-testid="param-assigned-filter"
-                    onclick={() => (paramAssignedOnly = !paramAssignedOnly)}>assigned</button>
-            <button type="button" class="toggle" class:on={paramDiagnostics}
-                    title="Show native IDs and indices"
-                    onclick={() => (paramDiagnostics = !paramDiagnostics)}>ID</button>
-          </div>
-          {#each $hostParameters.warnings as warning (warning)}
-            <div class="param-warning">{warning}</div>
-          {/each}
-          {#if visibleParameters.length === 0}
-            <div class="empty-hint">
-              {$hostParameters.parameters.length === 0
-                ? 'This instrument exposes no host-visible parameters.'
-                : 'Nothing matches the search.'}
-            </div>
-          {/if}
-          <div class="param-list">
-            {#each parameterGroups as group (group.name)}
-              {#if parameterGroups.length > 1}
-                <button type="button" class="param-group"
-                        aria-expanded={groupsForcedOpen || openGroups[group.name] === true}
-                        onclick={() => (openGroups[group.name] = !openGroups[group.name])}>
-                  <span class="param-group-arrow">{groupsForcedOpen || openGroups[group.name] ? '▾' : '▸'}</span>
-                  {group.name}
-                  <span class="param-group-count">{group.parameters.length}{
-                    group.parameters.some((p) => assignedIds.has(p.id)) ? ' · assigned' : ''}</span>
-                </button>
-              {/if}
-              {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
-              {#each group.parameters as parameter (parameter.id)}
-              <div class="param-row" class:assigned={assignedIds.has(parameter.id)}>
-                <span class="param-name" title={parameter.name}>{parameter.name}</span>
-                {#if parameterControlKind(parameter) === 'toggle'}
-                  <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
-                                  onchange={(on) => setParameter(paramTargetId, parameter.id, on ? 1 : 0)} />
-                {:else if parameterControlKind(parameter) === 'segments'}
-                  <!-- Every value is one button — no slider travel, no dead zones. -->
-                  <span class="param-segments" role="group" aria-label={parameter.name}>
-                    {#each parameter.valueTexts as choice, i (i)}
-                      <button type="button" class:on={stepIndexOf(parameter) === i} title={choice}
-                              onclick={() => setParameter(paramTargetId, parameter.id,
-                                                          i / (parameter.numSteps - 1))}>{choice}</button>
-                    {/each}
-                  </span>
-                {:else if parameterControlKind(parameter) === 'stepper'}
-                  <!-- A countable set steps exactly; the value text between the arrows IS
-                       the control, so what you read is what is selected. -->
-                  <span class="param-stepper">
-                    <button type="button" aria-label={`${parameter.name} previous value`}
-                            disabled={stepIndexOf(parameter) <= 0}
-                            onclick={() => nudgeParameterStep(parameter, -1)}>‹</button>
-                    <button type="button" aria-label={`${parameter.name} next value`}
-                            disabled={stepIndexOf(parameter) >= parameter.numSteps - 1}
-                            onclick={() => nudgeParameterStep(parameter, 1)}>›</button>
-                  </span>
-                {:else}
-                  <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
-                         aria-label={parameter.name}
-                         onpointerdown={() => beginParameterGesture(paramTargetId, parameter.id)}
-                         onpointerup={() => endParameterGesture(paramTargetId, parameter.id)}
-                         oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
-                {/if}
-                {#if editingParamId === parameter.id}
-                  <!-- svelte-ignore a11y_autofocus -->
-                  <input class="param-edit" type="text" bind:value={editingParamText} autofocus
-                         aria-label={`Type a value for ${parameter.name}`}
-                         onkeydown={(e) => {
-                           if (e.key === 'Enter') commitParamEdit(parameter);
-                           if (e.key === 'Escape') editingParamId = null;
-                         }}
-                         onblur={() => (editingParamId = null)} />
-                {:else}
-                  <span class="param-value" role="button" tabindex="-1"
-                        title="Double-click to type a value"
-                        ondblclick={() => beginParamEdit(parameter)}
-                        onkeydown={(e) => e.key === 'Enter' && beginParamEdit(parameter)}>
-                    {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
-                {/if}
-                <button type="button" class="ghost" title="Reset to the plug-in's default"
-                        onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
-                <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
-                        title={selectedPage
-                                 ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
-                                                   : 'The selected page has no empty slot')
-                                 : 'Create a control page first'}
-                        onclick={() => assignToSelectedPage(parameter)}>→</button>
-                <button type="button" class="ghost" disabled={!selectedMacro}
-                        title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
-                        onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
-                <button type="button" class="ghost quick-learn"
-                        class:armed={armedParameterId === parameter.id}
-                        data-testid="param-quick-learn"
-                        title="Put this on a knob: click, then move a control on your MIDI keyboard"
-                        onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
-              </div>
-              {#if paramDiagnostics}
-                <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
-              {/if}
-              {/each}
-              {/if}
-            {/each}
-          </div>
-        </div>
-      {/if}
     </section>
 
     <section class="browser-column" aria-label="Instrument browser">
@@ -1297,6 +855,422 @@
       {/if}
     </section>
   </div>
+
+  <!-- The dock. Everything that edits ONE THING lives here rather than stacked down the
+       rack column: the part's zone, its MIDI modules, its inserts, its routing, the
+       parameter view, and the rack-wide chains. The column above is a list of parts you
+       pick from; this is what you picked. Tabs, not scrolling, is the whole point. -->
+  <div class="host-dock" class:collapsed={!dockOpen} data-testid="host-dock"
+       style={dockOpen ? `height:${dockHeight}px` : null} aria-label="Editor dock">
+    {#if dockOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="dock-grip" role="separator" aria-label="Resize the dock"
+           onpointerdown={gripDown} onpointermove={gripMove}
+           onpointerup={gripUp} onpointercancel={gripUp}></div>
+    {/if}
+
+    <div class="dock-tabs">
+      {#each dockTabs as tab (tab.id)}
+        <button type="button" class="dock-tab" class:on={dockOpen && dockTab === tab.id}
+                data-testid={`dock-tab-${tab.id}`}
+                onclick={() => selectDockTab(tab.id)}>{tab.label}</button>
+      {/each}
+      <span class="dock-subject">{dockSubject}</span>
+      <button type="button" class="ghost dock-collapse" data-testid="dock-collapse"
+              title={dockOpen ? 'Collapse the dock' : 'Open the dock'}
+              onclick={() => (dockOpen = !dockOpen)}>{dockOpen ? '▾' : '▴'}</button>
+    </div>
+
+    {#if dockOpen}
+      <div class="dock-body" data-testid="dock-body">
+        <!-- Declared before anything renders it: the insert chain is drawn three times
+             here (a part, the master, each return) and it is one shape. -->
+          {#snippet effectChain(chain, chainId, title, testId)}
+            <div class="fx-chain" data-testid={testId ?? (chainId === 'master' ? 'host-master-fx' : 'host-part-fx')}>
+              <div class="fx-head">
+                <strong>{title}</strong>
+                <select value="" aria-label={`Add an effect to ${title}`}
+                        onchange={(e) => { if (e.currentTarget.value) addEffect(chainId, e.currentTarget.value); e.currentTarget.value = ''; }}>
+                  <option value="" disabled>+ Add effect…</option>
+                  {#each $hostState.effectClasses as effectClass (effectClass.ceId)}
+                    <option value={effectClass.ceId}>{effectClass.name} — {effectClass.vendor}</option>
+                  {/each}
+                </select>
+              </div>
+              {#each chain as effect (effect.effectId)}
+                <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}>
+                  <span class="fx-name" title={effect.pluginVendor}>
+                    {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
+                  </span>
+                  <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
+                                  onchange={(on) => setEffectBypassed(effect.effectId, on)} />
+                  <button type="button" class="toggle" disabled={!effect.hasProcessor}
+                          class:on={$hostState.editorOpenPartId === effect.effectId}
+                          title="Show the effect's own interface"
+                          onclick={() => openEffectEditor(effect.effectId)}>Editor</button>
+                  <button type="button" class="toggle"
+                          class:on={$hostState.floatingEditorPartIds.includes(effect.effectId)}
+                          disabled={!effect.hasProcessor}
+                          title="Pop this effect's interface out into its own window"
+                          onclick={() => ($hostState.floatingEditorPartIds.includes(effect.effectId)
+                                            ? closeEditorWindow(effect.effectId)
+                                            : floatEditor(effect.effectId))}>⧉</button>
+                  <button type="button" class="toggle" disabled={!effect.hasProcessor}
+                          class:on={paramTargetId === effect.effectId}
+                          title="Inspect this effect's parameters"
+                          onclick={() => { paramTargetId = effect.effectId; selectDockTab('params'); }}>P</button>
+                  <button type="button" class="ghost danger" title="Remove this effect"
+                          onclick={() => removeEffect(effect.effectId)}>×</button>
+                </div>
+              {/each}
+            </div>
+          {/snippet}
+
+        {#if !focusedPart && dockTab !== 'rack'}
+          <div class="empty-hint">Focus a rack part to edit it.</div>
+        {/if}
+
+        {#if dockTab === 'zone'}
+        {#if focusedPart}
+          <div class="midi-zone">
+            <strong>MIDI zone — {partTitle(focusedPart)}</strong>
+            <div class="zone-grid">
+              <label>Channel
+                <select value={focusedPart.channel}
+                        onchange={(e) => setPartMidiRules(focusedPart.partId, { channel: Number(e.currentTarget.value) })}>
+                  <option value={0}>Omni</option>
+                  {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
+                    <option value={ch}>{ch}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>Key low
+                <input type="number" min="0" max="127" value={focusedPart.keyLow}
+                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyLow: Number(e.currentTarget.value) })} />
+              </label>
+              <label>Key high
+                <input type="number" min="0" max="127" value={focusedPart.keyHigh}
+                       onchange={(e) => setPartMidiRules(focusedPart.partId, { keyHigh: Number(e.currentTarget.value) })} />
+              </label>
+              <label>Vel low
+                <input type="number" min="1" max="127" value={focusedPart.velocityLow}
+                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityLow: Number(e.currentTarget.value) })} />
+              </label>
+              <label>Vel high
+                <input type="number" min="1" max="127" value={focusedPart.velocityHigh}
+                       onchange={(e) => setPartMidiRules(focusedPart.partId, { velocityHigh: Number(e.currentTarget.value) })} />
+              </label>
+              <label>Transpose
+                <input type="number" min="-60" max="60" value={focusedPart.transpose}
+                       onchange={(e) => setPartMidiRules(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
+              </label>
+            </div>
+          </div>
+        {/if}
+        {:else if dockTab === 'midi'}
+        {#if focusedPart}
+          <!-- The part's Stage 6 event chain: what shapes what arrives, and what replays it.
+               Both are modes over the shared transport, which is why they live beside the zone
+               rules rather than in a panel of their own. -->
+          <!-- The part's MIDI inserts. What used to be a fixed row of note-shaping fields
+               plus one arpeggiator is a chain you compose — see MidiChainPanel. -->
+          <MidiChainPanel part={focusedPart} />
+        {/if}
+        {:else if dockTab === 'inserts'}
+        {#if focusedPart}
+          {@render effectChain(focusedPart.effects, focusedPart.partId,
+                               `Inserts — ${partTitle(focusedPart)}${latencySuffix(focusedPart.latencyMs)}`)}
+        {/if}
+        {:else if dockTab === 'routing'}
+        {#if focusedPart?.hardware}
+          <!-- Hardware-instrument parts (Stage 5): the part reaches an external synth over
+               MIDI and can return audio through the interface — same zones, fader, inserts
+               and sends as any part. A gone port is a diagnostic, never silence. -->
+          <div class="hw-config" data-testid="host-hardware">
+            <div class="fx-head">
+              <strong>External hardware — {partTitle(focusedPart)}</strong>
+              <button type="button" class="ghost" title="Back to a software part (identity and zones stay)"
+                      onclick={() => clearHardware(focusedPart.partId)}>Make software part</button>
+            </div>
+            {#if focusedPart.midiOutError}
+              <div class="hw-error" role="alert">{focusedPart.midiOutError}</div>
+            {/if}
+            <div class="zone-grid">
+              <label>MIDI output
+                <select value={focusedPart.midiOutputId}
+                        onchange={(e) => {
+                          const id = e.currentTarget.value;
+                          const name = $hostAudioDevices.midiOutputs.find((m) => m.id === id)?.name ?? '';
+                          setHardwareConfig(focusedPart.partId, { midiOutputId: id, midiOutputName: name });
+                        }}>
+                  <option value="">(no port)</option>
+                  {#if focusedPart.midiOutputId
+                       && !$hostAudioDevices.midiOutputs.some((m) => m.id === focusedPart.midiOutputId)}
+                    <option value={focusedPart.midiOutputId}>{focusedPart.midiOutputName || focusedPart.midiOutputId} (gone)</option>
+                  {/if}
+                  {#each $hostAudioDevices.midiOutputs as out (out.id)}
+                    <option value={out.id}>{out.name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>Channel
+                <select value={focusedPart.midiOutChannel}
+                        onchange={(e) => setHardwareConfig(focusedPart.partId, { midiOutChannel: Number(e.currentTarget.value) })}>
+                  {#each Array.from({ length: 16 }, (_, i) => i + 1) as ch}
+                    <option value={ch}>{ch}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>Audio return
+                <select value={focusedPart.audioReturnChannel}
+                        onchange={(e) => setHardwareConfig(focusedPart.partId, { audioReturnChannel: Number(e.currentTarget.value) })}>
+                  <option value={-1}>None</option>
+                  {#each Array.from({ length: Math.max($hostAudioDevices.inputChannels, 8) / 2 }, (_, i) => i * 2) as ch}
+                    <option value={ch}>Inputs {ch + 1}/{ch + 2}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>Bank (-1 = none)
+                <input type="number" min="-1" max="16383" value={focusedPart.programBank}
+                       onchange={(e) => setHardwareConfig(focusedPart.partId, { programBank: Number(e.currentTarget.value) })} />
+              </label>
+              <label>Program (-1 = none)
+                <input type="number" min="-1" max="127" value={focusedPart.programNumber}
+                       onchange={(e) => setHardwareConfig(focusedPart.partId, { programNumber: Number(e.currentTarget.value) })} />
+              </label>
+              <span class="hw-send">
+                <button type="button" disabled={focusedPart.programBank < 0 && focusedPart.programNumber < 0}
+                        title="Send the bank select / program change now"
+                        onclick={() => sendHardwareProgram(focusedPart.partId)}>Send program</button>
+              </span>
+            </div>
+          </div>
+        {:else if focusedPart && !focusedPart.hasInstrument && !focusedPart.unresolved}
+          <div class="hw-config" data-testid="host-hardware-offer">
+            <button type="button" title="Use this part for an external synth: MIDI out, optional audio return"
+                    onclick={() => setHardwareConfig(focusedPart.partId, {})}>Use external hardware…</button>
+          </div>
+        {/if}
+        {#if focusedPart && $hostState.rack.returns.length > 0}
+          <div class="sends" data-testid="host-sends">
+            <strong>Sends — {partTitle(focusedPart)}</strong>
+            {#each $hostState.rack.returns as ret (ret.returnId)}
+              <div class="send-row">
+                <span class="send-name">{ret.name}</span>
+                <input type="range" min="0" max="2" step="0.01"
+                       value={focusedPart.sends.find((s) => s.returnId === ret.returnId)?.level ?? 0}
+                       aria-label={`Send to ${ret.name}`}
+                       oninput={(e) => setSendLevel(focusedPart.partId, ret.returnId, Number(e.currentTarget.value))} />
+              </div>
+            {/each}
+          </div>
+        {/if}
+        {#if focusedPart && !focusedPart.hardware && focusedPart.outputChannels > 2}
+          <!-- Explicit multi-output routing: extra pairs to the mix at their own gain; the
+               main pair 1/2 keeps the inserts and the fader. -->
+          <div class="outputs" data-testid="host-outputs">
+            <strong>Outputs — {partTitle(focusedPart)}</strong>
+            {#each Array.from({ length: Math.floor(focusedPart.outputChannels / 2) - 1 }, (_, i) => i + 1) as pairIndex (pairIndex)}
+              {@const route = focusedPart.extraOuts.find((o) => o.pairIndex === pairIndex)}
+              <div class="send-row">
+                <PropertyToggle compact label={`${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`} value={!!route}
+                                ariaLabel={`Route output pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2}`}
+                                onchange={(on) => on ? setExtraOut(focusedPart.partId, pairIndex, 1)
+                                                     : removeExtraOut(focusedPart.partId, pairIndex)} />
+                {#if route}
+                  <input type="range" min="0" max="2" step="0.01" value={route.gain}
+                         aria-label={`Pair ${pairIndex * 2 + 1}/${pairIndex * 2 + 2} gain`}
+                         oninput={(e) => setExtraOut(focusedPart.partId, pairIndex, Number(e.currentTarget.value))} />
+                {:else}
+                  <span class="slot-empty">not routed</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+          {#if focusedPart && !focusedPart.hardware && $hostState.rack.returns.length === 0
+               && focusedPart.outputChannels <= 2}
+            <div class="empty-hint">
+              Nothing to route yet — add a return for sends, or use a multi-output instrument
+              for extra pairs. Group buses live in the Mixer.
+            </div>
+          {/if}
+        {:else if dockTab === 'params'}
+        <!-- The Stage 2 generic parameter view: the common, inspectable control surface the
+             vendor editor is not — and the same registry hardware pages and macros will use. -->
+        {#if paramTargetId && $hostParameters.partId === paramTargetId}
+          <div class="param-view" data-testid="host-parameters">
+            <div class="param-head">
+              <strong>Parameters — {paramTargetName}</strong>
+              <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
+              <button type="button" class="toggle" class:on={paramAssignedOnly}
+                      title="Only parameters already on a knob slot or macro"
+                      data-testid="param-assigned-filter"
+                      onclick={() => (paramAssignedOnly = !paramAssignedOnly)}>assigned</button>
+              <button type="button" class="toggle" class:on={paramDiagnostics}
+                      title="Show native IDs and indices"
+                      onclick={() => (paramDiagnostics = !paramDiagnostics)}>ID</button>
+            </div>
+            {#each $hostParameters.warnings as warning (warning)}
+              <div class="param-warning">{warning}</div>
+            {/each}
+            {#if visibleParameters.length === 0}
+              <div class="empty-hint">
+                {$hostParameters.parameters.length === 0
+                  ? 'This instrument exposes no host-visible parameters.'
+                  : 'Nothing matches the search.'}
+              </div>
+            {/if}
+            <div class="param-list">
+              {#each parameterGroups as group (group.name)}
+                {#if parameterGroups.length > 1}
+                  <button type="button" class="param-group"
+                          aria-expanded={groupsForcedOpen || openGroups[group.name] === true}
+                          onclick={() => (openGroups[group.name] = !openGroups[group.name])}>
+                    <span class="param-group-arrow">{groupsForcedOpen || openGroups[group.name] ? '▾' : '▸'}</span>
+                    {group.name}
+                    <span class="param-group-count">{group.parameters.length}{
+                      group.parameters.some((p) => assignedIds.has(p.id)) ? ' · assigned' : ''}</span>
+                  </button>
+                {/if}
+                {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
+                {#each group.parameters as parameter (parameter.id)}
+                <div class="param-row" class:assigned={assignedIds.has(parameter.id)}>
+                  <span class="param-name" title={parameter.name}>{parameter.name}</span>
+                  {#if parameterControlKind(parameter) === 'toggle'}
+                    <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
+                                    onchange={(on) => setParameter(paramTargetId, parameter.id, on ? 1 : 0)} />
+                  {:else if parameterControlKind(parameter) === 'segments'}
+                    <!-- Every value is one button — no slider travel, no dead zones. -->
+                    <span class="param-segments" role="group" aria-label={parameter.name}>
+                      {#each parameter.valueTexts as choice, i (i)}
+                        <button type="button" class:on={stepIndexOf(parameter) === i} title={choice}
+                                onclick={() => setParameter(paramTargetId, parameter.id,
+                                                            i / (parameter.numSteps - 1))}>{choice}</button>
+                      {/each}
+                    </span>
+                  {:else if parameterControlKind(parameter) === 'stepper'}
+                    <!-- A countable set steps exactly; the value text between the arrows IS
+                         the control, so what you read is what is selected. -->
+                    <span class="param-stepper">
+                      <button type="button" aria-label={`${parameter.name} previous value`}
+                              disabled={stepIndexOf(parameter) <= 0}
+                              onclick={() => nudgeParameterStep(parameter, -1)}>‹</button>
+                      <button type="button" aria-label={`${parameter.name} next value`}
+                              disabled={stepIndexOf(parameter) >= parameter.numSteps - 1}
+                              onclick={() => nudgeParameterStep(parameter, 1)}>›</button>
+                    </span>
+                  {:else}
+                    <input type="range" min="0" max="1" step={stepFor(parameter)} value={parameter.value}
+                           aria-label={parameter.name}
+                           onpointerdown={() => beginParameterGesture(paramTargetId, parameter.id)}
+                           onpointerup={() => endParameterGesture(paramTargetId, parameter.id)}
+                           oninput={(e) => setParameter(paramTargetId, parameter.id, Number(e.currentTarget.value))} />
+                  {/if}
+                  {#if editingParamId === parameter.id}
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <input class="param-edit" type="text" bind:value={editingParamText} autofocus
+                           aria-label={`Type a value for ${parameter.name}`}
+                           onkeydown={(e) => {
+                             if (e.key === 'Enter') commitParamEdit(parameter);
+                             if (e.key === 'Escape') editingParamId = null;
+                           }}
+                           onblur={() => (editingParamId = null)} />
+                  {:else}
+                    <span class="param-value" role="button" tabindex="-1"
+                          title="Double-click to type a value"
+                          ondblclick={() => beginParamEdit(parameter)}
+                          onkeydown={(e) => e.key === 'Enter' && beginParamEdit(parameter)}>
+                      {parameter.text}{parameter.label ? ` ${parameter.label}` : ''}</span>
+                  {/if}
+                  <button type="button" class="ghost" title="Reset to the plug-in's default"
+                          onclick={() => resetParameter(paramTargetId, parameter.id)}>↺</button>
+                  <button type="button" class="ghost" disabled={!selectedPage || !firstEmptySlot}
+                          title={selectedPage
+                                   ? (firstEmptySlot ? `Assign to ${selectedPage.name}, slot ${firstEmptySlot.slotId}`
+                                                     : 'The selected page has no empty slot')
+                                   : 'Create a control page first'}
+                          onclick={() => assignToSelectedPage(parameter)}>→</button>
+                  <button type="button" class="ghost" disabled={!selectedMacro}
+                          title={selectedMacro ? `Add to macro ${selectedMacro.name}` : 'Create a macro first'}
+                          onclick={() => selectedMacro && addMacroTarget(selectedMacro.macroId, paramTargetId, parameter.id)}>M+</button>
+                  <button type="button" class="ghost quick-learn"
+                          class:armed={armedParameterId === parameter.id}
+                          data-testid="param-quick-learn"
+                          title="Put this on a knob: click, then move a control on your MIDI keyboard"
+                          onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
+                </div>
+                {#if paramDiagnostics}
+                  <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
+                {/if}
+                {/each}
+                {/if}
+              {/each}
+            </div>
+          </div>
+        {/if}
+        {:else if dockTab === 'rack'}
+        {@render effectChain($hostState.rack.masterEffects, 'master',
+                             `Master effects${latencySuffix($hostState.rack.masterLatencyMs)}`)}
+        <!-- Shared send/return buses (Stage 5): each return is one more effect chain, fed by
+             the per-part send sliders above, rejoining ahead of the master inserts. -->
+        <div class="returns" data-testid="host-returns">
+          <div class="fx-head">
+            <strong>Returns</strong>
+            <button type="button" onclick={() => addReturn()} data-testid="host-add-return">+ Return</button>
+          </div>
+          {#each $hostState.rack.returns as ret (ret.returnId)}
+            <div class="return-block">
+              <div class="fx-head">
+                <span class="send-name">{ret.name}</span>
+                <label class="mini return-level" title="Return level">
+                  <input type="range" min="0" max="2" step="0.01" value={ret.level}
+                         aria-label={`${ret.name} level`}
+                         oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
+                </label>
+                <button type="button" class="ghost danger" title="Remove this return (its sends go with it)"
+                        onclick={() => removeReturn(ret.returnId)}>×</button>
+              </div>
+              {@render effectChain(ret.effects, ret.returnId, `${ret.name} effects`, 'host-return-fx')}
+            </div>
+          {/each}
+        </div>
+        <!-- Stage 5 macros: one value fanning across parts and effects, always through the
+             central parameter path. Select a macro, then add targets from the parameter view. -->
+        <div class="macros" data-testid="host-macros">
+          <div class="fx-head">
+            <strong>Macros</strong>
+            <button type="button" onclick={() => addMacro()} data-testid="host-add-macro">+ Macro</button>
+          </div>
+          {#each $hostState.rack.macros as macro (macro.macroId)}
+            <div class="macro-row" class:on={selectedMacro?.macroId === macro.macroId}>
+              <button type="button" class="ghost macro-name" title="Select for target assignment"
+                      onclick={() => (selectedMacroId = macro.macroId)}>{macro.name}</button>
+              <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
+                     oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
+                     onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
+              <button type="button" class="ghost danger" title="Remove this macro"
+                      onclick={() => removeMacro(macro.macroId)}>×</button>
+            </div>
+            {#if macro.targets.length > 0}
+              <div class="macro-targets">
+                {#each macro.targets as target (target.targetId + target.parameterId)}
+                  <span class="macro-target" class:unresolved={!target.resolved}
+                        title={target.resolved ? `${target.displayName} on ${target.targetName}`
+                                               : 'unresolved — the target no longer carries this plug-in'}>
+                    {target.displayName}{target.inverted ? ' ⇄' : ''} — {target.targetName || 'missing'}
+                    <button type="button" class="ghost danger"
+                            onclick={() => removeMacroTarget(macro.macroId, target.targetId, target.parameterId)}>×</button>
+                  </span>
+                {/each}
+              </div>
+            {/if}
+          {/each}
+        </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -1450,6 +1424,70 @@
     min-height: 0;
     padding: 12px 14px;
   }
+
+  /* The dock: a strip of its own, never part of the columns' scroll. Collapsed it is just
+     the tab bar, so the gesture that opened it is the gesture that gets the space back. */
+  .host-dock {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-top: 1px solid #3b4652;
+    background: #171a1d;
+  }
+  .host-dock.collapsed { height: auto; }
+  .dock-grip {
+    height: 6px;
+    margin-top: -3px;
+    cursor: ns-resize;
+    touch-action: none;
+    background: transparent;
+  }
+  .dock-grip:hover { background: #2c6ca8; }
+  .dock-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 14px;
+    border-bottom: 1px solid #2c343d;
+  }
+  .dock-tab {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px 4px 0 0;
+    color: #9aa5b1;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .dock-tab:hover { color: #d6dbe0; }
+  .dock-tab.on { color: #fff; background: #24313d; border-color: #5b9bd5; }
+  .dock-subject {
+    flex: 1;
+    text-align: right;
+    color: #7d8894;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dock-collapse { padding: 2px 8px; }
+  .dock-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px 12px;
+  }
+  /* Inside the dock these blocks are the content, not one more section in a stack: the rule
+     that separated them from what came above has nothing above it any more. */
+  .dock-body > .fx-chain:first-of-type,
+  .dock-body > .macros:first-of-type,
+  .dock-body > .returns:first-of-type,
+  .dock-body > .sends:first-of-type,
+  .dock-body > .outputs:first-of-type,
+  .dock-body > .hw-config:first-of-type { border-top: none; padding-top: 0; }
 
   .rack-column, .browser-column {
     flex: 1;
