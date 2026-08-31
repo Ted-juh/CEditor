@@ -4329,6 +4329,14 @@ void testGeneratedProduct()
             complained = complained || failure.contains ("promises 6");
         check (complained, "a drawing that addresses more than the profile promises is refused");
 
+        auto stacked = *profile;
+        stacked.layout.controls.getReference (1).x = stacked.layout.controls.getReference (0).x;
+        stacked.layout.controls.getReference (1).y = stacked.layout.controls.getReference (0).y;
+        bool collided = false;
+        for (const auto& failure : ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (stacked))
+            collided = collided || failure.contains ("same place");
+        check (collided, "two controls in the same place is a tracing error, and is caught");
+
         auto offBox = *profile;
         offBox.layout.controls.getReference (0).x = 0.98f;
         bool escaped = false;

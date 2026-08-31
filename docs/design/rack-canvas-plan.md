@@ -307,5 +307,17 @@ New ideas go here with a date, so nothing gets lost between sessions.
   `profileId` stays `akai-ctrl49`, because it is identity and sessions already name it — the same
   trade this repo refuses everywhere else.
 
+  **What rendering it found, that the numbers could not.** Every control was inside the unit,
+  every index was right and every count agreed — and the drawing still had a Page button sitting
+  on top of Preset, Main on the D-pad, favourite 4 under the first pad column, and the encoder
+  bank row drawn straight through the encoders above it. Ten overlapping pairs, invisible in a
+  list of coordinates and obvious the moment it was on screen. Conformance now refuses
+  overlapping controls, which is the check that makes a traced layout maintainable rather than
+  a thing nobody dares touch.
+
+  Long labels were the other half: a 0.02-wide box clipped "Master volume" to "ster volu", which
+  reads as damage. Labels are now short enough for their boxes and the tooltip carries the
+  sentence.
+
   Still not built: live feedback (the encoder you are turning lighting up), and assigning by
   dragging a parameter onto a knob.

@@ -101,6 +101,27 @@ juce::StringArray SurfaceProfileRegistry::checkLayout (const SurfaceProfile& pro
                           + " for another " + control.kind + " — two controls cannot be the same one");
     }
 
+    // Two controls cannot occupy the same place on a keyboard, so two boxes overlapping is a
+    // typo in the tracing. This is the check that a list of coordinates cannot be eyeballed:
+    // every number was inside the unit and every count agreed, and the drawing still had a
+    // Page button sitting on top of Preset.
+    const auto& controls = profile.layout.controls;
+    for (int a = 0; a < controls.size(); ++a)
+        for (int b = a + 1; b < controls.size(); ++b)
+        {
+            const auto& first = controls.getReference (a);
+            const auto& second = controls.getReference (b);
+            const auto overlapX = juce::jmin (first.x + first.w, second.x + second.w)
+                                - juce::jmax (first.x, second.x);
+            const auto overlapY = juce::jmin (first.y + first.h, second.y + second.h)
+                                - juce::jmax (first.y, second.y);
+            // A shared edge is not an overlap: controls sit flush against each other all the
+            // time, and floats traced by eye land a hair either side of touching.
+            if (overlapX > 0.001f && overlapY > 0.001f)
+                failures.add (first.controlId + " overlaps " + second.controlId
+                              + " — two controls cannot be in the same place");
+        }
+
     // The capability counts and the drawing have to agree about what is DRIVEABLE, never about
     // what exists. A surface may carry nine faders and let us map none of them; what must not
     // happen is a layout claiming to address eight encoders while the profile promises six,
@@ -155,7 +176,7 @@ SurfaceLayout buildCtrl49Layout()
 
     // --- the Mackie device-control section: one master and eight channel faders, the bank
     //     buttons beside them, and the eight assignable buttons underneath.
-    add ("fader-master", "fader", "Master volume", 0.122f, 0.085f, 0.024f, 0.175f);
+    add ("fader-master", "fader", "Vol", 0.122f, 0.085f, 0.024f, 0.175f);
     for (int i = 0; i < 8; ++i)
     {
         const auto x = 0.186f + (float) i * 0.0345f - 0.012f;
@@ -164,19 +185,19 @@ SurfaceLayout buildCtrl49Layout()
         layout.controls.add ({ "button-b" + juce::String (i + 1), "button",
                                "B" + juce::String (i + 1), x, 0.384f, 0.024f, 0.040f, -1 });
     }
-    add ("button-bank-left",  "button", "Bank left",  0.122f, 0.370f, 0.016f, 0.045f);
-    add ("button-bank-right", "button", "Bank right", 0.142f, 0.370f, 0.016f, 0.045f);
-    add ("button-button-mode", "button", "Button mode", 0.437f, 0.384f, 0.026f, 0.040f);
+    add ("button-bank-left",  "button", "◀", 0.122f, 0.370f, 0.016f, 0.045f);
+    add ("button-bank-right", "button", "▶", 0.142f, 0.370f, 0.016f, 0.045f);
+    add ("button-button-mode", "button", "Mode", 0.442f, 0.384f, 0.021f, 0.040f);
 
     // --- the screen, and the navigation cluster under it.
     add ("display", "display", "Screen", 0.463f, 0.058f, 0.128f, 0.204f);
     add ("button-page-left",  "button", "Page ◀", 0.466f, 0.291f, 0.037f, 0.033f);
     add ("button-page-right", "button", "Page ▶", 0.553f, 0.291f, 0.037f, 0.033f);
-    add ("button-main",    "button", "Main",    0.466f, 0.342f, 0.035f, 0.033f);
+    add ("button-main",    "button", "Main",    0.466f, 0.342f, 0.032f, 0.033f);
     add ("button-browse",  "button", "Browse",  0.466f, 0.400f, 0.035f, 0.033f);
-    add ("button-preset",  "button", "Preset",  0.555f, 0.313f, 0.037f, 0.031f);
-    add ("button-control", "button", "Control", 0.555f, 0.362f, 0.037f, 0.031f);
-    add ("button-multi",   "button", "Multi",   0.555f, 0.411f, 0.037f, 0.031f);
+    add ("button-preset",  "button", "Preset",  0.562f, 0.330f, 0.037f, 0.030f);
+    add ("button-control", "button", "Control", 0.562f, 0.371f, 0.037f, 0.030f);
+    add ("button-multi",   "button", "Multi",   0.562f, 0.412f, 0.037f, 0.030f);
     add ("button-nav-up",     "button", "▲", 0.520f, 0.296f, 0.020f, 0.050f);
     add ("button-nav-left",   "button", "◀", 0.500f, 0.348f, 0.020f, 0.050f);
     add ("button-nav-enter",  "button", "•", 0.520f, 0.348f, 0.020f, 0.050f);
@@ -196,8 +217,8 @@ SurfaceLayout buildCtrl49Layout()
         layout.controls.add ({ juce::String ("button-") + arpIds[i], "button", arpRow[i],
                                x, 0.147f, 0.030f, 0.036f, -1 });
     }
-    add ("button-tap-tempo",     "button", "Tap tempo",     0.629f, 0.213f, 0.030f, 0.036f);
-    add ("button-time-division", "button", "Time division", 0.664f, 0.213f, 0.030f, 0.036f);
+    add ("button-tap-tempo",     "button", "Tap",   0.629f, 0.213f, 0.030f, 0.036f);
+    add ("button-time-division", "button", "Div",   0.664f, 0.213f, 0.030f, 0.036f);
     add ("button-shift",         "button", "Shift",         0.700f, 0.213f, 0.030f, 0.036f);
     for (int i = 0; i < 4; ++i)
         layout.controls.add ({ "button-pad-bank-" + juce::String ((char) ('a' + i)), "button",
@@ -205,7 +226,7 @@ SurfaceLayout buildCtrl49Layout()
                                0.632f + (float) i * 0.0337f, 0.298f, 0.019f, 0.035f, -1 });
     for (int i = 0; i < 5; ++i)
         layout.controls.add ({ "button-favourite-" + juce::String (i), "button",
-                               juce::String (i), 0.634f + (float) i * 0.033f, 0.356f,
+                               juce::String (i), 0.632f + (float) i * 0.030f, 0.356f,
                                0.024f, 0.031f, -1 });
     const char* transport[] = { "◀◀", "▶▶", "■", "▶", "●" };
     const char* transportIds[] = { "rewind", "forward", "stop", "play", "record" };
@@ -227,7 +248,7 @@ SurfaceLayout buildCtrl49Layout()
     // would be worse than four blanks.
     for (int i = 0; i < 4; ++i)
         layout.controls.add ({ "button-encoder-bank-" + juce::String (i + 1), "button", "",
-                               0.794f + (float) i * 0.044f, 0.218f, 0.022f, 0.033f, -1 });
+                               0.794f + (float) i * 0.044f, 0.238f, 0.022f, 0.030f, -1 });
 
     for (int i = 0; i < 8; ++i)
     {
@@ -242,8 +263,8 @@ SurfaceLayout buildCtrl49Layout()
     }
 
     // --- what your left hand does, and the keys.
-    add ("button-octave-down", "button", "Octave −", 0.034f, 0.502f, 0.026f, 0.040f);
-    add ("button-octave-up",   "button", "Octave +", 0.063f, 0.502f, 0.031f, 0.040f);
+    add ("button-octave-down", "button", "Oct −", 0.034f, 0.502f, 0.026f, 0.040f);
+    add ("button-octave-up",   "button", "Oct +", 0.063f, 0.502f, 0.031f, 0.040f);
     add ("wheel-pitch", "wheel", "Pitch", 0.024f, 0.629f, 0.031f, 0.184f);
     add ("wheel-mod",   "wheel", "Mod",   0.063f, 0.629f, 0.030f, 0.184f);
     add ("keys", "keys", "49 keys", 0.109f, 0.511f, 0.879f, 0.462f);
