@@ -45,6 +45,65 @@ InstrumentHostService::~InstrumentHostService()
         scanThread.join();
 }
 
+namespace
+{
+    /** Merges the arp fields a payload names into `arp`; absent fields keep their value.
+        Shared by the part-level command and the per-slot one so "gate" can never come to
+        mean two different things depending on which door it came through. */
+    void applyArpFields (perf::ArpSettings& arp, const juce::var& payload,
+                         const juce::DynamicObject& fields)
+    {
+        if (fields.hasProperty ("enabled"))      arp.enabled = (bool) payload["enabled"];
+        if (fields.hasProperty ("mode"))         arp.mode = perf::ArpSettings::modeFromName (payload["mode"].toString());
+        if (fields.hasProperty ("stepsPerBeat")) arp.stepsPerBeat = juce::jlimit (1, 16, (int) payload["stepsPerBeat"]);
+        if (fields.hasProperty ("gate"))         arp.gate = juce::jlimit (0.05f, 1.0f, (float) (double) payload["gate"]);
+        if (fields.hasProperty ("swing"))        arp.swing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["swing"]);
+        if (fields.hasProperty ("octaves"))      arp.octaves = juce::jlimit (1, 4, (int) payload["octaves"]);
+        if (fields.hasProperty ("latch"))        arp.latch = (bool) payload["latch"];
+        if (fields.hasProperty ("constrainToScale")) arp.constrainToScale = (bool) payload["constrainToScale"];
+        if (fields.hasProperty ("patternSemitones")) arp.patternSemitones = (bool) payload["patternSemitones"];
+
+        if (fields.hasProperty ("velocityPattern"))
+        {
+            arp.velocityPattern.clear();
+            if (const auto* velocities = payload["velocityPattern"].getArray())
+                for (const auto& velocity : *velocities)
+                {
+                    if (arp.velocityPattern.size() >= perf::ArpEngine::maxPatternSteps)
+                        break;
+                    // 0 is a rest, drawable from the grid; the engine skips it.
+                    arp.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
+                }
+        }
+
+        if (fields.hasProperty ("degreePattern"))
+        {
+            arp.degreePattern.clear();
+            if (const auto* degrees = payload["degreePattern"].getArray())
+                for (const auto& degree : *degrees)
+                {
+                    if (arp.degreePattern.size() >= perf::ArpEngine::maxPatternSteps)
+                        break;
+                    // -1 is a drawn rest; anything else picks a held-pool degree.
+                    arp.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
+                }
+        }
+    }
+
+    /** The note-shaping fields, same contract. */
+    void applyMidiFxFields (perf::MidiFxSettings& fx, const juce::var& payload,
+                            const juce::DynamicObject& fields)
+    {
+        if (fields.hasProperty ("transpose"))        fx.transpose = juce::jlimit (-48, 48, (int) payload["transpose"]);
+        if (fields.hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
+        if (fields.hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
+        if (fields.hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
+        if (fields.hasProperty ("chord"))            fx.chord = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
+        if (fields.hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
+        if (fields.hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
+    }
+} // namespace
+
 void InstrumentHostService::handleCommand (const juce::var& payload)
 {
     const auto cmd = payload.getProperty ("cmd", {}).toString();
@@ -1880,6 +1939,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "setPartArp" || cmd == "setPartMidiFx")
     {
+        // The part-level doors onto the chain: they write the first slot of their family,
+        // minting one when the chain has none. Every existing caller — the control pages,
+        // the surface, the panels — keeps addressing "this part's arp" and means it.
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto* part = rack.getPerformance().findPart (partId);
         if (part == nullptr)
@@ -1894,60 +1956,97 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             auto arp = part->arp;   // absent fields keep their value, like setPartMixer
             if (fields != nullptr)
-            {
-                if (fields->hasProperty ("enabled"))      arp.enabled = (bool) payload["enabled"];
-                if (fields->hasProperty ("mode"))         arp.mode = perf::ArpSettings::modeFromName (payload["mode"].toString());
-                if (fields->hasProperty ("stepsPerBeat")) arp.stepsPerBeat = juce::jlimit (1, 16, (int) payload["stepsPerBeat"]);
-                if (fields->hasProperty ("gate"))         arp.gate = juce::jlimit (0.05f, 1.0f, (float) (double) payload["gate"]);
-                if (fields->hasProperty ("swing"))        arp.swing = juce::jlimit (0.0f, 0.75f, (float) (double) payload["swing"]);
-                if (fields->hasProperty ("octaves"))      arp.octaves = juce::jlimit (1, 4, (int) payload["octaves"]);
-                if (fields->hasProperty ("latch"))        arp.latch = (bool) payload["latch"];
-                if (fields->hasProperty ("constrainToScale")) arp.constrainToScale = (bool) payload["constrainToScale"];
-                if (fields->hasProperty ("velocityPattern"))
-                {
-                    arp.velocityPattern.clear();
-                    if (const auto* velocities = payload["velocityPattern"].getArray())
-                        for (const auto& velocity : *velocities)
-                        {
-                            if (arp.velocityPattern.size() >= perf::ArpEngine::maxPatternSteps)
-                                break;
-                            // 0 is a rest, drawable from the grid; the engine skips it.
-                            arp.velocityPattern.add (juce::jlimit (0, 127, (int) velocity));
-                        }
-                }
-                if (fields->hasProperty ("patternSemitones"))
-                    arp.patternSemitones = (bool) payload["patternSemitones"];
-                if (fields->hasProperty ("degreePattern"))
-                {
-                    arp.degreePattern.clear();
-                    if (const auto* degrees = payload["degreePattern"].getArray())
-                        for (const auto& degree : *degrees)
-                        {
-                            if (arp.degreePattern.size() >= perf::ArpEngine::maxPatternSteps)
-                                break;
-                            // -1 is a drawn rest; anything else picks a held-pool degree.
-                            arp.degreePattern.add (juce::jlimit (-1, 63, (int) degree));
-                        }
-                }
-            }
+                applyArpFields (arp, payload, *fields);
             rack.setPartArp (partId, arp);
         }
         else
         {
             auto fx = part->midiFx;
             if (fields != nullptr)
-            {
-                if (fields->hasProperty ("transpose"))        fx.transpose = juce::jlimit (-48, 48, (int) payload["transpose"]);
-                if (fields->hasProperty ("constrainToScale")) fx.constrainToScale = (bool) payload["constrainToScale"];
-                if (fields->hasProperty ("scaleRoot"))        fx.scaleRoot = juce::jlimit (0, 11, (int) payload["scaleRoot"]);
-                if (fields->hasProperty ("scaleType"))        fx.scaleType = payload["scaleType"].toString();
-                if (fields->hasProperty ("chord"))            fx.chord = perf::MidiFxSettings::chordTypeFromName (payload["chord"].toString());
-                if (fields->hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
-                if (fields->hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
-            }
+                applyMidiFxFields (fx, payload, *fields);
             rack.setPartMidiFx (partId, fx);
         }
 
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "addMidiSlot" || cmd == "removeMidiSlot" || cmd == "moveMidiSlot"
+        || cmd == "setMidiSlotBypassed" || cmd == "setMidiSlotOptions")
+    {
+        // The chain's own commands: everything addresses (partId, slotId) except add, which
+        // names a module type. The same shape the audio insert chain already uses, because
+        // a MIDI insert IS an insert — that was the whole point of unwelding it.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        auto chain = part->midiChain;
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        int index = -1;
+        for (int i = 0; i < chain.size(); ++i)
+            if (chain.getReference (i).slotId == slotId)
+                index = i;
+
+        if (cmd == "addMidiSlot")
+        {
+            const auto type = payload.getProperty ("type", {}).toString();
+            if (! perf::MidiSlot::types().contains (type))
+            {
+                emitError ("Unknown MIDI module: " + type);
+                return;
+            }
+            if (chain.size() >= perf::MidiInsertRack::maxSlots)
+            {
+                emitError ("This part already has " + juce::String (perf::MidiInsertRack::maxSlots)
+                           + " MIDI modules — remove one before adding another.");
+                return;
+            }
+
+            auto minted = perf::MidiSlot::create (type, juce::Uuid().toDashedString());
+            // A fresh module reads the part's current scale, exactly as the welded chain's
+            // arpeggiator and chorder always did.
+            minted.fx.scaleType = part->midiFx.scaleType;
+            minted.fx.scaleRoot = part->midiFx.scaleRoot;
+            chain.add (std::move (minted));
+        }
+        else if (index < 0)
+        {
+            emitError ("Unknown MIDI module.");
+            return;
+        }
+        else if (cmd == "removeMidiSlot")
+        {
+            chain.remove (index);
+        }
+        else if (cmd == "moveMidiSlot")
+        {
+            const auto to = juce::jlimit (0, juce::jmax (0, chain.size() - 1),
+                                          (int) payload.getProperty ("index", index));
+            chain.move (index, to);
+        }
+        else if (cmd == "setMidiSlotBypassed")
+        {
+            chain.getReference (index).bypassed = (bool) payload.getProperty ("bypassed", false);
+        }
+        else
+        {
+            auto& slot = chain.getReference (index);
+            if (const auto* fields = payload.getDynamicObject())
+            {
+                if (slot.type == "arp")
+                    applyArpFields (slot.arp, payload, *fields);
+                else
+                    applyMidiFxFields (slot.fx, payload, *fields);
+            }
+        }
+
+        rack.setPartMidiChain (partId, std::move (chain));
         savePerformance();
         emitState();
         return;
@@ -4850,6 +4949,15 @@ juce::var InstrumentHostService::buildStatePayload()
                                          / rack.getSampleRate() * 1000.0);
         obj->setProperty ("arp",    perf::arpToVar (part.arp));
         obj->setProperty ("midiFx", perf::midiFxToVar (part.midiFx));
+        {
+            // The chain the UI actually edits. The legacy blocks above stay in the payload
+            // because the part-level controls still read them — they are the first slot of
+            // each family, projected where every existing panel already looks.
+            juce::Array<juce::var> midiChain;
+            for (const auto& slot : part.midiChain)
+                midiChain.add (perf::midiSlotToVar (slot));
+            obj->setProperty ("midiChain", midiChain);
+        }
         parts.add (juce::var (obj));
     }
 

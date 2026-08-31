@@ -633,6 +633,26 @@ const normalizeArp = (a) => ({
   patternSemitones: a?.patternSemitones === true,
 });
 
+// One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
+// the same shape the native side keeps, so the UI never has to guess which half is live.
+export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx'];
+
+export const midiSlotLabels = {
+  arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chorder',
+  velocity: 'Velocity', fx: 'Note shaping',
+};
+
+export function normalizeMidiSlot(slot) {
+  const type = String(slot?.type ?? '');
+  return {
+    slotId: String(slot?.slotId ?? ''),
+    type: midiSlotTypes.includes(type) ? type : 'arp',
+    bypassed: slot?.bypassed === true,
+    arp: normalizeArp(slot?.arp),
+    fx: normalizeMidiFx(slot?.fx),
+  };
+}
+
 const normalizeMidiFx = (f) => ({
   transpose: Number(f?.transpose ?? 0),
   constrainToScale: f?.constrainToScale === true,
@@ -879,6 +899,7 @@ export function normalizeHostState(payload) {
         midiOutError: String(part?.midiOutError ?? ''),
         arp: normalizeArp(part?.arp),
         midiFx: normalizeMidiFx(part?.midiFx),
+        midiChain: (Array.isArray(part?.midiChain) ? part.midiChain : []).map(normalizeMidiSlot),
         enabled: part?.enabled !== false,
         mute: part?.mute === true,
         solo: part?.solo === true,
@@ -921,7 +942,9 @@ export function mockHostState() {
       performanceId: 'mock-performance',
       focusedPartId: 'mock-part-1',
       parts: [
-        { partId: 'mock-part-1', pluginCeId: 'mock-keys', pluginName: 'Stage Keys', pluginVendor: 'Mock Audio', hasInstrument: true },
+        { partId: 'mock-part-1', pluginCeId: 'mock-keys', pluginName: 'Stage Keys', pluginVendor: 'Mock Audio', hasInstrument: true,
+          // The two modules a migrated part carries, so the demo shows a real chain.
+          midiChain: [{ slotId: 'mock-slot-fx', type: 'fx' }, { slotId: 'mock-slot-arp', type: 'arp' }] },
         { partId: 'mock-part-2', pluginCeId: '', pluginName: '' },
       ],
     },
@@ -1030,7 +1053,10 @@ export function applyMockCommand(state, payload) {
 
   if (cmd === 'addPart') {
     const partId = `mock-part-${Date.now()}-${next.rack.parts.length + 1}`;
-    next.rack.parts.push(normalizeHostState({ rack: { parts: [{ partId }] } }).rack.parts[0]);
+    // A new part starts with the same two modules the native side mints, both idle.
+    next.rack.parts.push(normalizeHostState({ rack: { parts: [{ partId, midiChain: [
+      { slotId: `${partId}-fx`, type: 'fx' }, { slotId: `${partId}-arp`, type: 'arp' },
+    ] }] } }).rack.parts[0]);
     if (!next.rack.focusedPartId) next.rack.focusedPartId = partId;
     return next;
   }
@@ -1787,6 +1813,39 @@ export function applyMockCommand(state, payload) {
     next.reliability.damagedState = [];
     return next;
   }
+  if (cmd === 'addMidiSlot' || cmd === 'removeMidiSlot' || cmd === 'moveMidiSlot'
+      || cmd === 'setMidiSlotBypassed' || cmd === 'setMidiSlotOptions') {
+    const target = part(payload.partId);
+    if (!target) return next;
+    const chain = target.midiChain;
+    const index = chain.findIndex((s) => s.slotId === payload.slotId);
+
+    if (cmd === 'addMidiSlot') {
+      if (!midiSlotTypes.includes(payload.type) || chain.length >= 8) return next;
+      chain.push(normalizeMidiSlot({ slotId: `mock-slot-${Date.now()}-${chain.length}`,
+                                     type: payload.type }));
+      return next;
+    }
+    if (index < 0) return next;
+    if (cmd === 'removeMidiSlot') {
+      chain.splice(index, 1);
+    } else if (cmd === 'moveMidiSlot') {
+      const to = Math.max(0, Math.min(chain.length - 1, Number(payload.index ?? index)));
+      chain.splice(to, 0, ...chain.splice(index, 1));
+    } else if (cmd === 'setMidiSlotBypassed') {
+      chain[index].bypassed = payload.bypassed === true;
+    } else {
+      const block = chain[index].type === 'arp' ? chain[index].arp : chain[index].fx;
+      for (const [key, value] of Object.entries(payload)) {
+        if (['cmd', 'partId', 'slotId'].includes(key) || !(key in block)) continue;
+        block[key] = typeof block[key] === 'boolean' ? value === true
+          : typeof block[key] === 'number' ? Number(value)
+          : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
+          : String(value);
+      }
+    }
+    return next;
+  }
   if (cmd === 'setPartArp' || cmd === 'setPartMidiFx') {
     const target = part(payload.partId);
     if (!target) return next;
@@ -1798,6 +1857,16 @@ export function applyMockCommand(state, payload) {
         : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
         : String(value);
     }
+    // The part-level setters are doors onto the chain's first slot of that family, exactly
+    // as the native side treats them — mirroring here keeps one truth on screen.
+    const wantsArp = cmd === 'setPartArp';
+    let slot = target.midiChain.find((s) => (s.type === 'arp') === wantsArp);
+    if (!slot) {
+      slot = normalizeMidiSlot({ slotId: `mock-slot-${Date.now()}`, type: wantsArp ? 'arp' : 'fx' });
+      target.midiChain[wantsArp ? 'push' : 'unshift'](slot);
+    }
+    if (wantsArp) slot.arp = { ...block };
+    else slot.fx = { ...block };
     return next;
   }
 
@@ -2216,6 +2285,14 @@ export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
 export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
 export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });
+export const addMidiSlot = (partId, type) => send({ cmd: 'addMidiSlot', partId, type });
+export const removeMidiSlot = (partId, slotId) => send({ cmd: 'removeMidiSlot', partId, slotId });
+export const moveMidiSlot = (partId, slotId, index) =>
+  send({ cmd: 'moveMidiSlot', partId, slotId, index });
+export const setMidiSlotBypassed = (partId, slotId, bypassed) =>
+  send({ cmd: 'setMidiSlotBypassed', partId, slotId, bypassed });
+export const setMidiSlotOptions = (partId, slotId, fields) =>
+  send({ cmd: 'setMidiSlotOptions', partId, slotId, ...fields });
 export const setPartMidiFx = (partId, fields) => send({ cmd: 'setPartMidiFx', partId, ...fields });
 
 // --- Stage 7: the mature generated product --------------------------------------------------

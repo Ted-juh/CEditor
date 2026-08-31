@@ -37,11 +37,14 @@
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
     transportPlay, transportStop, setTempo, setTimeSignature, setExternalClock,
     setPartArp, setPartMidiFx,
+    midiSlotTypes, midiSlotLabels,
+    addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
   import HostSplitEditor from './HostSplitEditor.svelte';
+  import MidiChainPanel from './MidiChainPanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -75,7 +78,11 @@
   let arpDraft = $state(null);
   let arpGridEl = $state(null);
   let arpDragging = $state(false);
-  let arpPattern = $derived(arpDraft ?? focusedPart?.arp.velocityPattern ?? []);
+  // The grids edit whichever arp slot is open, not "the part's arp" — a part can carry
+  // several arpeggiators now, and each draws its own pattern.
+  let openSlotId = $state('');
+  let openSlot = $derived(focusedPart?.midiChain.find((slot) => slot.slotId === openSlotId) ?? null);
+  let arpPattern = $derived(arpDraft ?? openSlot?.arp.velocityPattern ?? []);
 
   function arpCellFromEvent(event) {
     const rect = arpGridEl.getBoundingClientRect();
@@ -817,230 +824,9 @@
         <!-- The part's Stage 6 event chain: what shapes what arrives, and what replays it.
              Both are modes over the shared transport, which is why they live beside the zone
              rules rather than in a panel of their own. -->
-        <div class="event-chain" data-testid="host-event-chain">
-          <strong>Event chain — {partTitle(focusedPart)}</strong>
-          <div class="zone-grid">
-            <label>Transpose
-              <input type="number" min="-48" max="48" value={focusedPart.midiFx.transpose}
-                     onchange={(e) => setPartMidiFx(focusedPart.partId, { transpose: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Scale
-              <select value={focusedPart.midiFx.constrainToScale ? focusedPart.midiFx.scaleType : ''}
-                      onchange={(e) => setPartMidiFx(focusedPart.partId, e.currentTarget.value
-                                                       ? { constrainToScale: true, scaleType: e.currentTarget.value }
-                                                       : { constrainToScale: false })}>
-                <option value="">off</option>
-                {#each scales as scale (scale)}
-                  <option value={scale}>{scale}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Root
-              <select value={focusedPart.midiFx.scaleRoot}
-                      onchange={(e) => setPartMidiFx(focusedPart.partId, { scaleRoot: Number(e.currentTarget.value) })}>
-                {#each ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as name, i (name)}
-                  <option value={i}>{name}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Chord
-              <select value={focusedPart.midiFx.chord}
-                      onchange={(e) => setPartMidiFx(focusedPart.partId, { chord: e.currentTarget.value })}>
-                {#each ['off', 'power fifth', 'triad', 'triad (1st inv)', 'seventh', 'octave', 'diatonic', 'diatonic 7th', 'custom keys'] as type (type)}
-                  <option value={type}>{type}</option>
-                {/each}
-              </select>
-            </label>
-            {#if focusedPart.midiFx.chord === 'diatonic' || focusedPart.midiFx.chord === 'diatonic 7th'}
-              <span class="chord-hint">plays the chord OF each scale degree — pick a scale above for real harmony</span>
-            {/if}
-            {#if focusedPart.midiFx.chord === 'custom keys'}
-              <div class="key-chords" data-testid="key-chords">
-                {#if $hostChordLearn.armed && $hostChordLearn.partId === focusedPart.partId}
-                  <button type="button" class="ghost midi-learn armed" data-testid="chord-learn-armed"
-                          onclick={() => cancelKeyChordLearn()}>
-                    {$hostChordLearn.stage === 'chord'
-                      ? `now play the chord for ${chordKeyName($hostChordLearn.key)}…`
-                      : 'tap the target key…'}</button>
-                {:else}
-                  <button type="button" class="ghost midi-learn" data-testid="chord-learn"
-                          title="Capture a chord onto a key: click, tap the target key, then play the chord"
-                          onclick={() => learnKeyChord(focusedPart.partId)}>+ learn chord</button>
-                {/if}
-                {#each focusedPart.midiFx.keyChords as keyChord (keyChord.key)}
-                  <span class="midi-cc" title={`${chordKeyName(keyChord.key)} plays ${keyChord.offsets.length} notes`}>
-                    {chordKeyName(keyChord.key)} · {keyChord.offsets.length}
-                    <button type="button" class="ghost danger" title="Remove this key's chord"
-                            onclick={() => clearKeyChord(focusedPart.partId, keyChord.key)}>×</button>
-                  </span>
-                {/each}
-                {#if focusedPart.midiFx.keyChords.length === 0
-                     && !($hostChordLearn.armed && $hostChordLearn.partId === focusedPart.partId)}
-                  <span class="arp-hint">no keys mapped — unmapped keys play plain</span>
-                {/if}
-              </div>
-            {/if}
-            <label>Vel scale
-              <input type="number" min="0.1" max="2" step="0.05" value={focusedPart.midiFx.velocityScale}
-                     onchange={(e) => setPartMidiFx(focusedPart.partId, { velocityScale: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Fixed vel (0 = off)
-              <input type="number" min="0" max="127" value={focusedPart.midiFx.velocityFixed}
-                     onchange={(e) => setPartMidiFx(focusedPart.partId, { velocityFixed: Number(e.currentTarget.value) })} />
-            </label>
-          </div>
-
-        </div>
-
-        <!-- The arpeggiator gets its own titled section. It used to be an unnamed row of
-             widgets at the foot of the event chain — a dim toggle, two bare sliders, three
-             unlabelled selects — and the owner's verdict on it was "where did the
-             arpeggiator go?", which is the only review a hidden feature ever needs. It is
-             still a mode over the shared transport (that is why it sits beside the MIDI FX
-             rather than in a panel of its own), it just says its own name now. -->
-        <div class="arpeggiator" data-testid="host-arpeggiator">
-          <div class="fx-head">
-            <strong>Arpeggiator — {partTitle(focusedPart)}</strong>
-            <PropertyToggle compact label={focusedPart.arp.enabled ? 'On' : 'Off'}
-                            value={focusedPart.arp.enabled} ariaLabel="Arpeggiator"
-                            onchange={(on) => setPartArp(focusedPart.partId, { enabled: on })} />
-          </div>
-          <div class="zone-grid">
-            <label>Mode
-              <select value={focusedPart.arp.mode} aria-label="Arpeggiator mode"
-                      onchange={(e) => setPartArp(focusedPart.partId, { mode: e.currentTarget.value })}>
-                {#each ['up', 'down', 'up-down', 'down-up', 'order', 'random', 'chord', 'pattern'] as mode (mode)}
-                  <option value={mode}>{mode}</option>
-                {/each}
-              </select>
-            </label>
-            <label>Rate
-              <select value={focusedPart.arp.stepsPerBeat} aria-label="Arpeggiator rate"
-                      onchange={(e) => setPartArp(focusedPart.partId, { stepsPerBeat: Number(e.currentTarget.value) })}>
-                {#each [1, 2, 3, 4, 6, 8, 12, 16] as rate (rate)}
-                  <option value={rate}>{rate}/beat</option>
-                {/each}
-              </select>
-            </label>
-            <label>Octaves
-              <select value={focusedPart.arp.octaves} aria-label="Arpeggiator octaves"
-                      onchange={(e) => setPartArp(focusedPart.partId, { octaves: Number(e.currentTarget.value) })}>
-                {#each [1, 2, 3, 4] as octaves (octaves)}
-                  <option value={octaves}>{octaves} octave{octaves === 1 ? '' : 's'}</option>
-                {/each}
-              </select>
-            </label>
-            <!-- Sliders say what they are worth: a bare handle is a value nobody can read
-                 back, let alone dial in twice. -->
-            <label>Gate — {Math.round(focusedPart.arp.gate * 100)}%
-              <input type="range" min="0.05" max="1" step="0.05" value={focusedPart.arp.gate}
-                     aria-label="Arpeggiator gate"
-                     oninput={(e) => setPartArp(focusedPart.partId, { gate: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Swing — {Math.round(focusedPart.arp.swing * 100)}%
-              <input type="range" min="0" max="0.75" step="0.01" value={focusedPart.arp.swing}
-                     aria-label="Arpeggiator swing"
-                     oninput={(e) => setPartArp(focusedPart.partId, { swing: Number(e.currentTarget.value) })} />
-            </label>
-            <label>Latch
-              <PropertyToggle compact label={focusedPart.arp.latch ? 'Held' : 'Off'}
-                              value={focusedPart.arp.latch} ariaLabel="Latch the held chord"
-                              onchange={(on) => setPartArp(focusedPart.partId, { latch: on })} />
-            </label>
-          </div>
-          {#if !focusedPart.arp.enabled}
-            <span class="arp-hint">switch it on to play — the walk modes need no setup, and
-              "pattern" opens a grid where you draw the notes yourself</span>
-          {/if}
-          {#if focusedPart.arp.enabled && focusedPart.arp.mode === 'pattern'}
-            <!-- Pattern mode: draw the MELODY. Each column is a step; the row you light is
-                 which of your held notes plays there (bottom = lowest, octaves upward);
-                 an unlit column is a rest. The engine walks nothing — it plays this. -->
-            <div class="arp-grid-row">
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div class="arp-note-grid" class:ghost={notePattern.length === 0}
-                   data-testid="arp-note-grid" bind:this={noteGridEl}
-                   onpointerdown={noteGridDown} onpointermove={noteGridMove}
-                   onpointerup={noteGridUp} onpointercancel={noteGridUp}>
-                {#each (notePattern.length > 0 ? notePattern : Array.from({ length: 16 }, () => -1)) as degree, i (i)}
-                  <div class="note-col"
-                       class:playing={notePattern.length > 0
-                                      && $hostArpStep[focusedPart.partId] === i}>
-                    {#each Array.from({ length: noteRows }, (_, r) => noteRows - 1 - r) as row (row)}
-                      <div class="note-cell" class:on={degree === row}
-                           class:octave={!focusedPart.arp.patternSemitones && row >= 4 && degree !== row}
-                           class:ground={focusedPart.arp.patternSemitones && row === 12 && degree !== row}
-                           class:octline={focusedPart.arp.patternSemitones && (row === 0 || row === 24) && degree !== row}></div>
-                    {/each}
-                  </div>
-                {/each}
-              </div>
-              <div class="arp-grid-side">
-                {#if notePattern.length > 0}
-                  <select value={notePattern.length} aria-label="Melody length"
-                          onchange={(e) => resizeNotePattern(Number(e.currentTarget.value))}>
-                    {#each [4, 8, 12, 16, 24, 32] as length (length)}
-                      <option value={length}>{length} steps</option>
-                    {/each}
-                  </select>
-                  <button type="button" class="ghost" title="Clear the melody (an empty drawing walks up)"
-                          onclick={() => setPartArp(focusedPart.partId, { degreePattern: [] })}>clear</button>
-                {:else}
-                  <span class="arp-hint">{focusedPart.arp.patternSemitones
-                    ? 'draw the riff — rows are semitones around your lowest key, middle row = that key'
-                    : 'draw the melody — a row is a note of your held chord, bottom = lowest'}</span>
-                {/if}
-                <!-- What a row MEANS: chord = the Nth held note (re-voices with what you
-                     hold); free = a semitone offset from your lowest key (the riff
-                     transposes with one finger and may leave the chord). -->
-                <span class="row-mode" role="group" aria-label="Row meaning">
-                  <button type="button" class:on={!focusedPart.arp.patternSemitones}
-                          title="Rows are chord degrees — the drawing re-voices with what you hold"
-                          onclick={() => setPartArp(focusedPart.partId, { patternSemitones: false })}>chord</button>
-                  <button type="button" class:on={focusedPart.arp.patternSemitones}
-                          data-testid="arp-rows-free"
-                          title="Rows are semitones around your lowest key — the drawing transposes with one finger"
-                          onclick={() => setPartArp(focusedPart.partId, { patternSemitones: true })}>free</button>
-                </span>
-              </div>
-            </div>
-          {/if}
-          {#if focusedPart.arp.enabled}
-            <!-- The drawable half of the arp: one bar per step, height is velocity, a bar
-                 dragged to the floor is a rest the engine skips. Empty pattern = the arp
-                 plays what was played; the first touch draws it into existence. -->
-            <div class="arp-grid-row">
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div class="arp-grid" class:ghost={arpPattern.length === 0}
-                   data-testid="arp-grid" bind:this={arpGridEl}
-                   onpointerdown={arpGridDown} onpointermove={arpGridMove}
-                   onpointerup={arpGridUp} onpointercancel={arpGridUp}>
-                {#each (arpPattern.length > 0 ? arpPattern : Array.from({ length: 16 }, () => 100)) as velocity, i (i)}
-                  <div class="arp-col"
-                       class:playing={arpPattern.length > 0
-                                      && $hostArpStep[focusedPart.partId] === i}
-                       class:rest={arpPattern.length > 0 && velocity === 0}>
-                    <div class="arp-bar" style={`height: ${Math.max(velocity / 127 * 100, velocity === 0 ? 0 : 4)}%`}></div>
-                  </div>
-                {/each}
-              </div>
-              <div class="arp-grid-side">
-                {#if arpPattern.length > 0}
-                  <select value={arpPattern.length} aria-label="Pattern length"
-                          onchange={(e) => resizeArpPattern(Number(e.currentTarget.value))}>
-                    {#each [4, 8, 12, 16, 24, 32] as length (length)}
-                      <option value={length}>{length} steps</option>
-                    {/each}
-                  </select>
-                  <button type="button" class="ghost" title="Back to playing held velocities as played"
-                          onclick={() => setPartArp(focusedPart.partId, { velocityPattern: [] })}>as played</button>
-                {:else}
-                  <span class="arp-hint">as played — draw on the grid to shape it</span>
-                {/if}
-              </div>
-            </div>
-          {/if}
-        </div>
+        <!-- The part's MIDI inserts. What used to be a fixed row of note-shaping fields
+             plus one arpeggiator is a chain you compose — see MidiChainPanel. -->
+        <MidiChainPanel part={focusedPart} />
       {/if}
 
       {#if focusedPart?.hardware}

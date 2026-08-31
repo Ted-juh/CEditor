@@ -47,6 +47,8 @@ import {
   normalizeHostSurface,
   normalizeMidiLearn,
   parameterControlKind,
+  normalizeMidiSlot,
+  midiSlotTypes,
   groupParameters,
   assignedParameterIds,
   emptyLicence,
@@ -1331,4 +1333,47 @@ test('the chorder: key maps normalize, and the mock learns and clears', () => {
     'the mock hears a triad onto middle C at once');
   state = applyMockCommand(state, { cmd: 'clearKeyChord', partId, key: 60 });
   assert.deepEqual(state.rack.parts[0].midiFx.keyChords, [], 'clear takes it away');
+});
+
+test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes', () => {
+  const shaped = normalizeMidiSlot({ slotId: 's1', type: 'chord', bypassed: true,
+                                     fx: { chord: 'diatonic' } });
+  assert.equal(shaped.type, 'chord');
+  assert.equal(shaped.bypassed, true);
+  assert.equal(shaped.fx.chord, 'diatonic');
+  assert.equal(shaped.arp.mode, 'up', 'the unused block is present and defaulted, never undefined');
+  assert.equal(normalizeMidiSlot({ type: 'wobble' }).type, 'arp',
+    'an unknown module type falls back rather than rendering as nothing');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  const chain = () => state.rack.parts.find((p) => p.partId === partId).midiChain;
+  assert.deepEqual(chain().map((s) => s.type), ['fx', 'arp'],
+    'a migrated part is note shaping into the arpeggiator');
+
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'chord' });
+  assert.deepEqual(chain().map((s) => s.type), ['fx', 'arp', 'chord']);
+
+  const chordId = chain()[2].slotId;
+  state = applyMockCommand(state, { cmd: 'moveMidiSlot', partId, slotId: chordId, index: 1 });
+  assert.deepEqual(chain().map((s) => s.type), ['fx', 'chord', 'arp'],
+    'chord ahead of arp — the arrangement the welded chain could not express');
+
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: chordId,
+                                    chord: 'diatonic' });
+  assert.equal(chain()[1].fx.chord, 'diatonic', 'options reach the slot they name');
+
+  state = applyMockCommand(state, { cmd: 'setMidiSlotBypassed', partId, slotId: chordId,
+                                    bypassed: true });
+  assert.equal(chain()[1].bypassed, true);
+  assert.equal(chain()[1].fx.chord, 'diatonic', 'bypass keeps the settings — that is not remove');
+
+  state = applyMockCommand(state, { cmd: 'removeMidiSlot', partId, slotId: chordId });
+  assert.deepEqual(chain().map((s) => s.type), ['fx', 'arp'], 'remove closes the gap');
+
+  // The part-level setters are doors onto the chain, so one truth reaches the screen.
+  state = applyMockCommand(state, { cmd: 'setPartArp', partId, mode: 'down' });
+  assert.equal(chain()[1].arp.mode, 'down',
+    'setPartArp lands on the chain, not beside it');
+  assert.ok(midiSlotTypes.includes('velocity'), 'every module type the native side offers is listed');
 });

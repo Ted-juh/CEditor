@@ -2265,6 +2265,102 @@ void testPresetWalking()
 // The chorder's learn flow: arm, tap the target key, play the chord, released = captured.
 // Grouping is "pressed together until released together", the same way a person plays a
 // chord; the capture lands in the part's MIDI FX and persists with the Performance.
+// The MIDI chain through the service: add, reorder, bypass, remove, and the part-level
+// commands still landing on the first slot of their family — which is what keeps the
+// control pages, the surface and every existing panel addressing "this part's arp".
+void testMidiChainCommands()
+{
+    std::cout << "\nMIDI insert chain commands" << std::endl;
+
+    const auto dir = freshDataDir ("midichain");
+    seedTwoSynthCatalog (dir);
+    juce::String partId;
+
+    auto chainOf = [] (Harness& h)
+    {
+        return h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                   .getProperty ("midiChain", {});
+    };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+
+        // A new part opens with the two modules the welded chain always had.
+        check (chainOf (h).size() == 2
+                 && chainOf (h)[0].getProperty ("type", {}).toString() == "fx"
+                 && chainOf (h)[1].getProperty ("type", {}).toString() == "arp",
+               "a new part starts as note shaping into the arpeggiator");
+
+        // The part-level command still means "this part's arp".
+        h.cmd ("setPartArp", { { "partId", partId }, { "enabled", true },
+                               { "mode", "down" } });
+        check (chainOf (h)[1].getProperty ("arp", {}).getProperty ("mode", {}).toString() == "down",
+               "setPartArp lands on the chain's first arp slot");
+
+        // Add a chorder and put it in front of the arp: the reason the chain exists.
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "chord" } });
+        check (chainOf (h).size() == 3
+                 && chainOf (h)[2].getProperty ("type", {}).toString() == "chord",
+               "a module is added at the end of the chain");
+        const auto chordId = chainOf (h)[2].getProperty ("slotId", {}).toString();
+
+        h.cmd ("moveMidiSlot", { { "partId", partId }, { "slotId", chordId }, { "index", 1 } });
+        check (chainOf (h)[1].getProperty ("type", {}).toString() == "chord"
+                 && chainOf (h)[2].getProperty ("type", {}).toString() == "arp",
+               "and moved ahead of the arpeggiator — chord into arp, which the old chain could not express");
+
+        // Per-slot options reach that slot and nothing else.
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", chordId },
+                                       { "chord", "diatonic" } });
+        check (chainOf (h)[1].getProperty ("fx", {}).getProperty ("chord", {}).toString() == "diatonic",
+               "slot options configure the slot they name");
+
+        h.cmd ("setMidiSlotBypassed", { { "partId", partId }, { "slotId", chordId },
+                                        { "bypassed", true } });
+        check ((bool) chainOf (h)[1].getProperty ("bypassed", false),
+               "a module can be bypassed without losing its settings");
+        check (chainOf (h)[1].getProperty ("fx", {}).getProperty ("chord", {}).toString() == "diatonic",
+               "which is the difference between bypass and remove");
+
+        // Several of a kind, up to the cap, and the cap refuses aloud.
+        for (int i = 0; i < 8; ++i)
+            h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "transpose" } });
+        check (chainOf (h).size() == 8, "the chain fills to its cap");
+        h.emits.clear();
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "transpose" } });
+        check (h.emits.lastError().contains ("remove one"), "and refuses the ninth aloud");
+
+        h.emits.clear();
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "wobble" } });
+        check (h.emits.lastError().contains ("Unknown MIDI module"),
+               "an unknown module type refuses rather than landing as something else");
+    }
+
+    {
+        // The chain is manifest state: it survives restart, in order.
+        Harness h (dir);
+        h.cmd ("getState");
+        check (chainOf (h).size() == 8
+                 && chainOf (h)[1].getProperty ("type", {}).toString() == "chord"
+                 && (bool) chainOf (h)[1].getProperty ("bypassed", false),
+               "the chain survives restart with its order and its bypasses");
+
+        const auto chordId = chainOf (h)[1].getProperty ("slotId", {}).toString();
+        h.cmd ("removeMidiSlot", { { "partId", partId }, { "slotId", chordId } });
+        check (chainOf (h).size() == 7
+                 && chainOf (h)[1].getProperty ("type", {}).toString() == "arp",
+               "removing a module closes the gap");
+
+        h.emits.clear();
+        h.cmd ("removeMidiSlot", { { "partId", partId }, { "slotId", "gone" } });
+        check (h.emits.lastError().contains ("Unknown MIDI module"),
+               "a stale slot id refuses instead of removing somebody else");
+    }
+}
+
 void testChordLearn()
 {
     std::cout << "\nchord learn (the chorder's capture)" << std::endl;
@@ -4502,6 +4598,7 @@ int main (int argc, char* argv[])
     testPresetWalking();
     testFloatingEditors();
     testChordLearn();
+    testMidiChainCommands();
     testCtrl49Broker();
     testSessionSurvivesProcess();
     testUnresolvedAndFailures();
