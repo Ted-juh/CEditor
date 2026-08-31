@@ -15,7 +15,7 @@
     hostState, hostSupportBundle,
     setSafeMode, clearSafeModeSuspect, clearAllSafeModeSuspects,
     acknowledgeRecovery, restoreLastKnownGood,
-    previewSupportBundle, exportSupportBundle,
+    previewSupportBundle, exportSupportBundle, clearQuarantine,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -24,12 +24,22 @@
   let recovery = $derived(reliability.recovery);
   let bundle = $derived($hostSupportBundle);
 
-  // Modules the catalogue is refusing for a reason that is not the plug-in's fault — the
-  // wrong architecture, mostly. They belong here rather than in the browser, which is exactly
-  // the list they are absent from.
-  let unavailableModules = $derived(
-    $hostState.modules.filter((m) => m.unavailableReason && !m.missing)
-  );
+  // Every module the scan touched that produced nothing loadable, and why. This is the whole
+  // of what the browser used to show, minus the healthy rows — a module that yielded classes
+  // needs no row anywhere, because its classes ARE the row, and they are in the instrument and
+  // effect lists. What is left is the question only this panel answers: I pointed the scanner
+  // at a folder, and something in it is not here. Why?
+  let troubledModules = $derived($hostState.modules.filter(
+    (m) => m.quarantined || m.missing || m.unavailableReason || m.failureCount > 0));
+
+  function moduleReason(module) {
+    if (module.quarantined) return `quarantined — ${module.lastFailureReason || 'failed to scan'}`;
+    if (module.missing) return 'missing — the file is gone from where it was scanned';
+    // The wrong architecture, mostly. Without this the row fell through to "no instruments",
+    // which reads as a plug-in with nothing in it rather than one this machine cannot load.
+    if (module.unavailableReason) return module.unavailableReason;
+    return `scan failed — ${module.lastFailureReason || 'no reason reported'}`;
+  }
 
   let includeStateBlobs = $state(false);
   let includeCrashStates = $state(true);
@@ -150,22 +160,30 @@
 
     <section class="block">
       <strong>What could not be offered</strong>
-      {#if unavailableModules.length === 0 && reliability.damagedState.length === 0}
-        <p class="note">Every catalogued plug-in is loadable on this machine.</p>
+      {#if troubledModules.length === 0 && reliability.damagedState.length === 0}
+        <p class="note">
+          Every catalogued plug-in is loadable on this machine
+          ({$hostState.modules.length} {$hostState.modules.length === 1 ? 'module' : 'modules'} scanned).
+        </p>
       {/if}
 
-      {#if unavailableModules.length > 0}
+      {#if troubledModules.length > 0}
         <div class="matrix tight" data-testid="reliability-unavailable">
-          {#each unavailableModules as module (module.path)}
+          {#each troubledModules as module (module.path)}
             <div class="matrix-row">
-              <span class="label">{module.path.split(/[\\/]/).pop()}</span>
-              <span class="detail">{module.unavailableReason}</span>
+              <span class="label" title={module.path}>{module.path.split(/[\\/]/).pop()}</span>
+              <span class="detail">{moduleReason(module)}</span>
+              {#if module.quarantined}
+                <button type="button" class="ghost" data-testid="reliability-retry"
+                        onclick={() => clearQuarantine(module.path)}>Retry</button>
+              {/if}
             </div>
           {/each}
         </div>
         <p class="note quiet">
           These stay in the catalogue with their reason rather than disappearing — a plug-in
-          missing from the browser with nothing explaining it is unanswerable.
+          missing from the browser with nothing explaining it is unanswerable. Modules that
+          scanned cleanly are not listed: their instruments and effects are the answer.
         </p>
       {/if}
 

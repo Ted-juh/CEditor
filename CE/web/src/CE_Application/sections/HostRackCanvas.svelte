@@ -17,7 +17,7 @@
    * into a routing the service would turn down.
    */
   import {
-    hostState, focusRackPart, loadInstrument, setPartDestination, setBusDestination,
+    hostState, focusRackPart, loadInstrument, addEffect, setPartDestination, setBusDestination,
     rackCanvasLayout, canvasDropTargets, hostCanvasDrag, CANVAS_NODE_W, CANVAS_NODE_H,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
@@ -29,11 +29,13 @@
   let targets = $derived(new Set(canvasDropTargets($hostState.rack, $hostCanvasDrag)));
   let hovered = $state('');
 
+  const fromCatalogue = (kind) => kind === 'instrument' || kind === 'effect';
+
   const editedIn = {
-    part: 'Drag onto a bus or the master to route it · click to focus and edit below',
-    bus: 'Group bus — drag it onto another bus or the master · its inserts live in the Mixer',
-    return: 'Send return — its chain lives in the dock’s Rack tab',
-    master: 'Master chain — the dock’s Rack tab',
+    part: 'Drag onto a bus or the master to route it · drop an effect here to insert it',
+    bus: 'Group bus — drag it onto another bus or the master · drop an effect here to insert it',
+    return: 'Send return — drop an effect here; its chain lives in the dock’s Rack tab',
+    master: 'Master chain — drop an effect here; it also lives in the dock’s Rack tab',
   };
 
   function dragStart(event, node) {
@@ -54,10 +56,12 @@
     if (!targets.has(node.id)) return;      // no preventDefault = not a drop target at all
     event.preventDefault();
     // The effect has to MATCH what the source allowed or the browser cancels the drop
-    // outright, silently: an instrument is copied onto a part, a node is moved to a new
-    // destination, and saying "move" over a copy source loses the drop with no error.
+    // outright, silently. Anything dragged in from the CATALOGUE is a copy — an instrument or
+    // an effect class is used, never consumed — while a node dragged inside the canvas is
+    // moved to a new destination. Getting this wrong loses the drop with no error anywhere,
+    // which is exactly how the effect drag failed the first time it was tried.
     if (event.dataTransfer)
-      event.dataTransfer.dropEffect = $hostCanvasDrag.kind === 'instrument' ? 'copy' : 'move';
+      event.dataTransfer.dropEffect = fromCatalogue($hostCanvasDrag.kind) ? 'copy' : 'move';
     hovered = node.id;
   }
 
@@ -77,6 +81,9 @@
     if (drag.kind === 'part') setPartDestination(drag.id, node.id === '@master' ? '' : node.id);
     else if (drag.kind === 'bus') setBusDestination(drag.id, node.id === '@master' ? '' : node.id);
     else if (drag.kind === 'instrument' && node.kind === 'part') loadInstrument(node.id, drag.id);
+    // The master's chain is addressed by name, not by a node id — the one place where what
+    // the drawing calls a box and what the service calls a chain differ.
+    else if (drag.kind === 'effect') addEffect(node.id === '@master' ? 'master' : node.id, drag.id);
     dragEnd();
   }
 </script>
@@ -132,7 +139,7 @@
       {#if $hostCanvasDrag.kind}
         Dropping <strong>{$hostCanvasDrag.label}</strong> — only the lit boxes will take it.
       {:else}
-        Drag a part or bus onto its destination · drag an instrument here from the right.
+        Drag a part or bus onto its destination · drag an instrument or effect here from the right.
       {/if}
     </span>
   </div>

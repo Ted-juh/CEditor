@@ -968,6 +968,17 @@ export function canvasDropTargets(rack, drag) {
   // want it is the fix for a Load button that silently targeted whatever was focused.
   if (drag.kind === 'instrument') return parts.map((part) => part.partId);
 
+  // An effect lands on anything that HAS a chain, which is everything with a box on the
+  // canvas: a part's inserts, a bus's, a return's, and the master. The service takes exactly
+  // these four as a chain id, so the drawing offers exactly these four.
+  if (drag.kind === 'effect')
+    return [
+      ...parts.map((part) => part.partId),
+      ...buses.map((bus) => bus.busId),
+      ...(Array.isArray(rack?.returns) ? rack.returns : []).map((ret) => ret.returnId),
+      '@master',
+    ];
+
   // A part goes to one destination: a bus, or the master. Its current one is not offered
   // again — a drop that changes nothing reads as a drop that failed.
   if (drag.kind === 'part') {
@@ -1302,12 +1313,23 @@ export function normalizeHostState(payload) {
 }
 
 /** Case-insensitive name/vendor filter for the browser column. */
-export function filterInstruments(instruments, query) {
+// Instruments and effects are the same shape — a catalogue class with a name and a vendor —
+// so they filter the same way. Two names for one rule, because "filterInstruments(effects)"
+// would read as a mistake at every call site.
+function filterPluginClasses(classes, query) {
   const q = String(query ?? '').trim().toLowerCase();
-  if (!q) return instruments;
-  return instruments.filter(
+  if (!q) return classes;
+  return classes.filter(
     (i) => i.name.toLowerCase().includes(q) || i.vendor.toLowerCase().includes(q)
   );
+}
+
+export function filterInstruments(instruments, query) {
+  return filterPluginClasses(instruments, query);
+}
+
+export function filterEffects(effects, query) {
+  return filterPluginClasses(effects, query);
 }
 
 /** The browser-only demo catalogue and rack. */

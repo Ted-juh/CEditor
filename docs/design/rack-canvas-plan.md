@@ -180,11 +180,25 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    it" — the highlight switched off while you were still over the box you were aiming at.
    `dragover` owns the highlight now and the end of the drag clears it.
 
+   **Effects joined it, 2026-08-31.** The browser listed instruments only, so an effect could
+   not be dragged anywhere — the only way to reach one was a dropdown on whichever chain you
+   happened to be looking at, with no search, no vendor and no tile, while effects are
+   first-class in every chain the model has. They now have the same list, tile and drag, and
+   an effect drops onto anything that HAS a chain: a part, a bus, a return, the master — which
+   is exactly the four ids `chainFor` accepts, so the drawing offers precisely what the service
+   takes.
+
+   The `dropEffect` trap bit a **second** time here, which is the interesting part. The rule
+   had been written down after the instrument drag, and the code still keyed on
+   `kind === 'instrument'` — so an effect got "move" over a "copy" source and the drop vanished
+   silently again. The durable fix is not the value but the category: anything dragged from the
+   CATALOGUE is a copy, anything dragged INSIDE the canvas is a move. A rule about a kind
+   breaks when a kind is added; a rule about a category does not.
+
    **Not built:** dragging to reorder a chain (inserts and MIDI modules still reorder with ▲▼ in
-   the dock), dragging effects from the browser (the browser lists instruments only), and
-   dropping an instrument on empty canvas to make a new part — that last one needs a native
-   add-and-load transaction, since add and load are two commands and the new part's id only
-   arrives on the next state push.
+   the dock), and dropping an instrument on empty canvas to make a new part — that one needs a
+   native add-and-load transaction, since add and load are two commands and the new part's id
+   only arrives on the next state push.
 
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load

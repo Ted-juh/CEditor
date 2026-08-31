@@ -14,7 +14,7 @@
   import {
     hostState,
     hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
-    filterInstruments, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
+    filterInstruments, filterEffects, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
@@ -154,6 +154,12 @@
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
+  let effects = $derived(filterEffects($hostState.effectClasses, search));
+  // A module needs attention when it produced nothing loadable and there is a reason for it:
+  // quarantined, gone, the wrong architecture, or a scan that failed. A module that yielded
+  // classes needs no row anywhere — its classes are the row.
+  let troubledModules = $derived($hostState.modules.filter(
+    (m) => m.quarantined || m.missing || m.unavailableReason || m.failureCount > 0).length);
   let assignedIds = $derived(assignedParameterIds($hostState, paramTargetId));
   let paramAssignedOnly = $state(false);
   let visibleParameters = $derived(
@@ -758,6 +764,44 @@
         {/each}
       </div>
 
+      <!-- Effects, which had no browser at all until now: the only way to reach one was a
+           dropdown on whichever chain you happened to be looking at. They are first-class
+           everywhere else, so they get the same list, the same tile and the same drag. -->
+      <div class="column-head">
+        <strong>Effects</strong>
+        <span class="dim">{effects.length} of {$hostState.effectClasses.length}</span>
+      </div>
+      {#if $hostState.effectClasses.length === 0}
+        <div class="empty-hint">No effects catalogued yet — scan for plug-ins.</div>
+      {:else if effects.length === 0}
+        <div class="empty-hint">No effect matches the search.</div>
+      {/if}
+      <div class="instrument-list">
+        {#each effects as effect (effect.ceId)}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="instrument" draggable="true"
+               ondragstart={(e) => {
+                 hostCanvasDrag.set({ kind: 'effect', id: effect.ceId, label: effect.name });
+                 e.dataTransfer?.setData('text/plain', effect.name);
+                 if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+               }}
+               ondragend={() => hostCanvasDrag.set({ kind: '', id: '', label: '' })}>
+            <PluginTile ceId={effect.ceId} name={effect.name} vendor={effect.vendor} size={30} />
+            <div class="instrument-id">
+              <span class="instrument-name">{effect.name}</span>
+              <span class="instrument-vendor">{effect.vendor} {effect.version}</span>
+            </div>
+            <button type="button" disabled={!focusedPart}
+                    title={focusedPart
+                             ? `Insert into ${partTitle(focusedPart)} — or drag it onto any box in the rack canvas`
+                             : 'Focus a rack part first, or drag this onto a box in the rack canvas'}
+                    onclick={() => addEffect(focusedPart?.partId ?? '', effect.ceId)}>
+              Insert
+            </button>
+          </div>
+        {/each}
+      </div>
+
       <div class="scan-paths">
         <strong>Extra scan folders</strong>
         <div class="scan-path-add">
@@ -853,46 +897,20 @@
         {/if}
       </div>
 
-      <!-- Every module the scan touched, whatever came of it. The browser above lists
-           instruments only, so without this a folder full of effects reads as "the scan
-           found things and shows nothing" — undiagnosable from the UI. -->
-      {#if $hostState.modules.length > 0}
-        <div class="modules" data-testid="host-modules">
-          <strong>Scanned modules</strong>
-          {#each $hostState.modules as module (module.path)}
-            <div class="module-row"
-                 class:trouble={module.quarantined || module.failureCount > 0 || module.missing
-                                || module.unavailableReason}
-                 title={module.path}>
-              <div class="module-id">
-                <span class="module-name">{module.path.split('\\').pop().split('/').pop()}</span>
-                <span class="module-detail">
-                  {#if module.quarantined}
-                    quarantined — {module.lastFailureReason || 'failed to scan'}
-                  {:else if module.missing}
-                    missing — the file is gone from where it was scanned
-                  {:else if module.unavailableReason}
-                    <!-- The wrong architecture, mostly. Without this branch it fell through to
-                         "no instruments", which reads as a plug-in with nothing in it rather
-                         than one this machine cannot load — the exact confusion the native
-                         check exists to end. -->
-                    {module.unavailableReason}
-                  {:else if module.failureCount > 0}
-                    scan failed — {module.lastFailureReason || 'no reason reported'}
-                  {:else if module.numInstruments === 0}
-                    {module.numClasses} {module.numClasses === 1 ? 'class' : 'classes'}, no instruments — effects are not shown in the browser
-                  {:else}
-                    {module.numInstruments} of {module.numClasses} {module.numClasses === 1 ? 'class is an instrument' : 'classes are instruments'}
-                  {/if}
-                </span>
-              </div>
-              {#if module.quarantined}
-                <button type="button" onclick={() => clearQuarantine(module.path)}>Retry</button>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
+      <!-- The module list moved to Health. It answers "what happened to the files I asked you
+           to scan?", which is a diagnostic question rather than a browsing one — and every
+           module that produced something loadable is now represented by its classes in the
+           two lists above. What stays here is the count, so a scan that found nothing still
+           says so, and a way to reach the ones that need looking at. -->
+      <div class="module-summary" data-testid="host-module-summary">
+        {$hostState.modules.length}
+        {$hostState.modules.length === 1 ? 'module scanned' : 'modules scanned'}
+        {#if troubledModules > 0}
+          · <button type="button" class="ghost warn" onclick={() => (reliabilityOpen = true)}>
+              {troubledModules} need{troubledModules === 1 ? 's' : ''} attention
+            </button>
+        {/if}
+      </div>
     </section>
   </div>
 
@@ -1628,7 +1646,7 @@
   .instrument-name { font-weight: 600; }
   .instrument-vendor { color: #7d8894; font-size: 11px; }
 
-  .scan-paths, .modules {
+  .scan-paths {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1646,17 +1664,17 @@
     font-size: 12px;
     overflow-wrap: anywhere;
   }
-  .module-row {
+  .module-summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 12px;
+    gap: 4px;
+    border-top: 1px solid #2c343d;
+    padding-top: 8px;
+    color: #7d8894;
+    font-size: 11px;
   }
-  .module-id { display: flex; flex-direction: column; min-width: 0; }
-  .module-name { color: #d6dbe0; overflow-wrap: anywhere; }
-  .module-detail { color: #7d8894; font-size: 11px; }
-  .module-row.trouble .module-detail { color: #d6a3a3; }
+  .module-summary .warn { color: #d6a3a3; font-size: 11px; padding: 0 4px; }
+  .dim { color: #7d8894; font-size: 11px; }
 
   .param-view {
     display: flex;

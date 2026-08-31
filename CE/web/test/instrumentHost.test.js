@@ -43,6 +43,7 @@ import {
   pluginInitials,
   TILE_PATTERNS,
   normalizeSurfaceLayout,
+  filterEffects,
   mockSurfaceLayout,
   emptySurfaceLayout,
   setLibraryUserMetadata,
@@ -617,6 +618,30 @@ test('pluginTile still answers for a class with nothing to go on', () => {
   const blank = pluginTile('', '', '');
   assert.equal(blank.initials, '–');
   assert.ok(blank.background.startsWith('hsl('), 'and still renders as a tile, not a gap');
+});
+
+test('effects browse and drop like instruments, onto anything with a chain', () => {
+  const classes = [
+    { ceId: 'fx-verb', name: 'Nice Reverb', vendor: 'Test Audio' },
+    { ceId: 'fx-comp', name: 'Bus Comp', vendor: 'Other Labs' },
+  ];
+  assert.equal(filterEffects(classes, '').length, 2, 'no query, no filtering');
+  assert.equal(filterEffects(classes, 'verb')[0].ceId, 'fx-verb', 'by name');
+  assert.equal(filterEffects(classes, 'other')[0].ceId, 'fx-comp', 'and by vendor');
+
+  const rack = {
+    parts: [{ partId: 'p1', destinationBusId: '' }],
+    buses: [{ busId: 'b1', destinationBusId: '' }],
+    returns: [{ returnId: 'r1' }],
+  };
+  const targets = canvasDropTargets(rack, { kind: 'effect', id: 'fx-verb' });
+  assert.deepEqual(targets, ['p1', 'b1', 'r1', '@master'],
+    'an effect goes anywhere that HAS a chain — a part, a bus, a return, the master');
+
+  // A part is a target for both, and they mean different things; the drop handler decides by
+  // what is in flight, so the two must not be conflated here.
+  assert.deepEqual(canvasDropTargets(rack, { kind: 'instrument', id: 'x' }), ['p1'],
+    'an instrument still only lands on a part');
 });
 
 // --- the surface as a picture --------------------------------------------------------------------
