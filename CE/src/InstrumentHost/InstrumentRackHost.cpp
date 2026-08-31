@@ -74,46 +74,102 @@ void InstrumentRackHost::syncEngineBindings()
         if (auto* lp = findLive (part.partId))
         {
             lp->filter->setEngine (&engine, i < perf::PerformanceEngine::maxParts ? i : -1);
-            lp->filter->getMidiFx().setSettings (part.midiFx);
-            lp->filter->getArp().setSettings (part.arp);
-            lp->filter->getArp().setScaleMask (perf::scaleMask (part.midiFx.scaleType,
-                                                                part.midiFx.scaleRoot));
-            lp->filter->getArp().setConstrainToScale (part.arp.constrainToScale);
+            lp->filter->getMidiInserts().setSlots (part.midiChain);
         }
     }
 }
 
-bool InstrumentRackHost::setPartMidiFx (const juce::String& partId,
-                                        const perf::MidiFxSettings& settings)
+bool InstrumentRackHost::setPartMidiChain (const juce::String& partId,
+                                           juce::Array<perf::MidiSlot> chain)
 {
     auto* part = model.findPart (partId);
     auto* lp = findLive (partId);
     if (part == nullptr || lp == nullptr)
         return false;
 
-    part->midiFx = settings;
-    lp->filter->getMidiFx().setSettings (settings);
-    lp->filter->getArp().setScaleMask (perf::scaleMask (settings.scaleType, settings.scaleRoot));
+    while (chain.size() > perf::MidiInsertRack::maxSlots)
+        chain.removeLast();
+
+    part->midiChain = std::move (chain);
+    lp->filter->getMidiInserts().setSlots (part->midiChain);
     return true;
+}
+
+// The two legacy setters stay, and they are not deprecation theatre: the control pages,
+// MIDI learn and every existing caller address "the part's arp" and "the part's note
+// shaping", which in a chain means the first slot of that family. They write there, minting
+// the slot when a chain does not carry one yet.
+bool InstrumentRackHost::setPartMidiFx (const juce::String& partId,
+                                        const perf::MidiFxSettings& settings)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->midiFx = settings;
+
+    auto chain = part->midiChain;
+    int target = -1;
+    for (int i = 0; i < chain.size(); ++i)
+        if (chain.getReference (i).type != "arp")
+        {
+            target = i;
+            break;
+        }
+
+    if (target < 0)
+    {
+        chain.insert (0, perf::MidiSlot::create ("fx", juce::Uuid().toDashedString()));
+        target = 0;
+    }
+    chain.getReference (target).fx = settings;
+
+    // The arp always took its scale from this block, so the mirror keeps that true: a scale
+    // chosen here still folds the arpeggio, chain or no chain.
+    for (auto& slot : chain)
+        if (slot.type == "arp")
+        {
+            slot.fx.scaleType = settings.scaleType;
+            slot.fx.scaleRoot = settings.scaleRoot;
+        }
+
+    return setPartMidiChain (partId, std::move (chain));
 }
 
 int InstrumentRackHost::arpLiveStep (const juce::String& partId) const
 {
     const auto* lp = findLive (partId);
-    return lp != nullptr ? lp->filter->getArp().patternStep() : -1;
+    return lp != nullptr ? lp->filter->getMidiInserts().arpPatternStep() : -1;
 }
 
 bool InstrumentRackHost::setPartArp (const juce::String& partId, const perf::ArpSettings& settings)
 {
     auto* part = model.findPart (partId);
-    auto* lp = findLive (partId);
-    if (part == nullptr || lp == nullptr)
+    if (part == nullptr)
         return false;
 
     part->arp = settings;
-    lp->filter->getArp().setSettings (settings);
-    lp->filter->getArp().setConstrainToScale (settings.constrainToScale);
-    return true;
+
+    auto chain = part->midiChain;
+    int target = -1;
+    for (int i = 0; i < chain.size(); ++i)
+        if (chain.getReference (i).type == "arp")
+        {
+            target = i;
+            break;
+        }
+
+    if (target < 0)
+    {
+        auto minted = perf::MidiSlot::create ("arp", juce::Uuid().toDashedString());
+        minted.fx.scaleType = part->midiFx.scaleType;
+        minted.fx.scaleRoot = part->midiFx.scaleRoot;
+        chain.add (std::move (minted));
+        target = chain.size() - 1;
+    }
+    chain.getReference (target).arp = settings;
+
+    return setPartMidiChain (partId, std::move (chain));
 }
 
 juce::Array<EffectSlot>* InstrumentRackHost::chainFor (const juce::String& chainId)

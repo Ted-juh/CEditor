@@ -4,6 +4,7 @@
 #include "PartMidiFilterCore.h"
 #include "Performance/PerformanceEngine.h"
 #include "Performance/ArpEngine.h"
+#include "Performance/MidiInsertRack.h"
 #include "Performance/MidiFxChain.h"
 
 // RackProcessors — the two per-part graph nodes around an instrument (VIP-successor Stage 1).
@@ -38,8 +39,7 @@ public:
     PartMidiFilterProcessor() = default;
 
     PartMidiFilterCore& getCore()                             { return core; }
-    perf::MidiFxChain& getMidiFx()                            { return midiFx; }
-    perf::ArpEngine& getArp()                                 { return arp; }
+    perf::MidiInsertRack& getMidiInserts()                    { return inserts; }
 
     /** Where this part's sequenced events come from. Null (the default) is a part with no
         engine behind it, which is exactly how the Stage 1 tests still drive this. */
@@ -55,6 +55,7 @@ public:
         scratch.ensureSize (size);
         merged.ensureSize (size);
         afterFx.ensureSize (size);
+        inserts.prepare (maximumExpectedSamplesPerBlock);
     }
 
     void releaseResources() override {}
@@ -75,25 +76,18 @@ public:
             scratch.swapWith (merged);
         }
 
-        midiFx.process (scratch, afterFx);
-
-        if (arp.isEnabled())
-        {
-            const auto block = engine != nullptr ? engine->lastBlockTime()
-                                                 : perf::Transport::BlockTime();
-            arp.process (afterFx, scratch, block, juce::jmax (1, numSamples));
-            midi.swapWith (scratch);
-            return;
-        }
-
+        // The part's MIDI inserts, in the order the player put them: what used to be one
+        // welded block plus one arpeggiator is a chain now, and the chain decides.
+        const auto block = engine != nullptr ? engine->lastBlockTime()
+                                             : perf::Transport::BlockTime();
+        inserts.process (scratch, afterFx, block, numSamples);
         midi.swapWith (afterFx);
     }
 
-    /** Releases everything the chain is holding — the panic path reaches all three stages. */
+    /** Releases everything the chain is holding — the panic path reaches every module. */
     void flushEventChain (juce::MidiBuffer& out, int position)
     {
-        midiFx.allNotesOff (out, position);
-        arp.allNotesOff (out, position);
+        inserts.allNotesOff (out, position);
     }
 
     const juce::String getName() const override               { return "CEditor Part MIDI Filter"; }
@@ -113,8 +107,7 @@ public:
 
 private:
     PartMidiFilterCore core;
-    perf::MidiFxChain midiFx;
-    perf::ArpEngine arp;
+    perf::MidiInsertRack inserts;
     perf::PerformanceEngine* engine = nullptr;
     int partIndex = -1;
     juce::MidiBuffer scratch, merged, afterFx;

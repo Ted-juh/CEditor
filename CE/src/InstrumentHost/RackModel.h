@@ -97,8 +97,15 @@ struct RackPart
     // The Stage 6 event chain for this part: the MIDI FX that shape what arrives and the
     // arpeggiator that may replay it. Both are modes over the shared transport, so they live
     // beside the zone rules rather than in a document of their own.
+    // LEGACY, kept for migration only: a session written before the chain existed carries
+    // its event chain in these two blocks, and they are mirrored on save so an older build
+    // can still open the file. The runtime reads `midiChain` and nothing else.
     perf::MidiFxSettings midiFx;
     perf::ArpSettings arp;
+    // The part's MIDI inserts, in order: what used to be a fixed chain is now a list you
+    // compose (see perf::MidiSlot). A part loaded from a pre-chain session gets the two
+    // slots its old settings describe, so it opens sounding identical.
+    juce::Array<perf::MidiSlot> midiChain;
     bool enabled = true;
     bool mute = false;
     bool solo = false;

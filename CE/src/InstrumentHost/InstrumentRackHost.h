@@ -182,6 +182,8 @@ public:
     /** Pushes a part's Stage 6 event-chain settings into its live processors. */
     bool setPartMidiFx (const juce::String& partId, const perf::MidiFxSettings& settings);
     bool setPartArp (const juce::String& partId, const perf::ArpSettings& settings);
+    /** Replaces the part's MIDI insert chain (capped at MidiInsertRack::maxSlots). */
+    bool setPartMidiChain (const juce::String& partId, juce::Array<perf::MidiSlot> chain);
     /** The arp's live pattern step for the UI playhead; -1 when idle or the part isn't live. */
     int arpLiveStep (const juce::String& partId) const;
 

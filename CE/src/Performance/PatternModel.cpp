@@ -655,6 +655,68 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
         }
 }
 
+juce::StringArray MidiSlot::types()
+{
+    return { "arp", "transpose", "scale", "chord", "velocity", "fx" };
+}
+
+MidiSlot MidiSlot::create (const juce::String& type, const juce::String& slotId)
+{
+    MidiSlot slot;
+    slot.slotId = slotId;
+    slot.type = types().contains (type) ? type : "arp";
+    // Defaults are already transparent: ArpSettings starts disabled, MidiFxSettings starts
+    // at no transpose, no scale, no chord, unity velocity. An inserted module must not
+    // change the sound by existing — it changes it when you set it up.
+    return slot;
+}
+
+juce::var midiSlotToVar (const MidiSlot& slot)
+{
+    auto* s = new juce::DynamicObject();
+    s->setProperty ("slotId",   slot.slotId);
+    s->setProperty ("type",     slot.type);
+    s->setProperty ("bypassed", slot.bypassed);
+    s->setProperty ("arp",      arpToVar (slot.arp));
+    s->setProperty ("fx",       midiFxToVar (slot.fx));
+    return juce::var (s);
+}
+
+void midiSlotFromVar (const juce::var& stored, MidiSlot& out)
+{
+    out = MidiSlot();
+    if (! stored.isObject())
+        return;
+
+    out.slotId   = stored.getProperty ("slotId", {}).toString();
+    const auto type = stored.getProperty ("type", {}).toString();
+    out.type     = MidiSlot::types().contains (type) ? type : juce::String ("arp");
+    out.bypassed = (bool) stored.getProperty ("bypassed", false);
+    arpFromVar (stored.getProperty ("arp", {}), out.arp);
+    midiFxFromVar (stored.getProperty ("fx", {}), out.fx);
+}
+
+juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp)
+{
+    // Both slots always, even when neither does anything: the chain a person opens should
+    // show what their rig actually contains, and an idle module is transparent. Order is
+    // the order the welded chain ran in, which is what makes the migration inaudible.
+    juce::Array<MidiSlot> chain;
+
+    auto shaping = MidiSlot::create ("fx", juce::Uuid().toDashedString());
+    shaping.fx = fx;
+    chain.add (std::move (shaping));
+
+    auto arpSlot = MidiSlot::create ("arp", juce::Uuid().toDashedString());
+    arpSlot.arp = arp;
+    // The old arp took its scale from the shared note-shaping block, so the slot carries a
+    // copy: constrain-to-scale keeps folding into the same scale it always did.
+    arpSlot.fx = fx;
+    chain.add (std::move (arpSlot));
+
+    return chain;
+}
+
 juce::var transportSettingsToVar (const TransportSettings& settings)
 {
     auto* t = new juce::DynamicObject();

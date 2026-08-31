@@ -17,6 +17,7 @@
 //                                          with different lengths, nothing more.
 
 #include "Performance/PerformanceEngine.h"
+#include "Performance/MidiInsertRack.h"
 #include "Performance/ArpEngine.h"
 #include "Performance/MidiFxChain.h"
 #include <iostream>
@@ -994,6 +995,166 @@ void testArpeggiator()
     }
 }
 
+// The MIDI insert chain: the event chain stops being welded to the part. What must hold is
+// that ORDER is now a decision (chord into arp and arp into chord differ, and both are
+// reachable), that a bypassed module is inert, that several of a kind work, and — the one
+// that bites — that changing the chain under a held chord strands nothing.
+void testMidiInsertRack()
+{
+    std::cout << "\nMIDI inserts: a chain, not a welded order" << std::endl;
+
+    auto slot = [] (const juce::String& type)
+    {
+        return MidiSlot::create (type, "slot-" + type);
+    };
+
+    auto notesFrom = [] (MidiInsertRack& rack, int key)
+    {
+        Transport clock;
+        clock.setTempo (120.0);
+        juce::MidiBuffer press, out;
+        press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+        rack.process (press, out, clock.advance (blockSize, sampleRate), blockSize);
+        std::vector<int> notes;
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOn())
+                notes.push_back (metadata.getMessage().getNoteNumber());
+        std::sort (notes.begin(), notes.end());
+        return notes;
+    };
+
+    {
+        // Order is the whole point. Transpose +12 then chord builds the triad ON the
+        // transposed note; chord then transpose moves the whole triad. Same two modules,
+        // deliberately different results — the welded chain could only ever do one.
+        auto transpose = slot ("transpose");
+        transpose.fx.transpose = 12;
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::triad;
+
+        MidiInsertRack up;
+        up.prepare (blockSize);
+        up.setSlots ({ transpose, chord });
+        check (notesFrom (up, 60) == std::vector<int> { 72, 76, 79 },
+               "transpose then chord: the triad is built on the transposed note");
+
+        MidiInsertRack down;
+        down.prepare (blockSize);
+        down.setSlots ({ chord, transpose });
+        check (notesFrom (down, 60) == std::vector<int> { 72, 76, 79 },
+               "chord then transpose: the whole triad moves — same notes here by symmetry");
+
+        // Where the order genuinely diverges: a scale fold after a chord repairs the chord,
+        // before it only repairs the key.
+        auto scale = slot ("scale");
+        scale.fx.constrainToScale = true;
+        scale.fx.scaleType = "major";
+        scale.fx.scaleRoot = 0;
+        auto minorish = slot ("chord");
+        minorish.fx.chord = MidiFxSettings::ChordType::triadFirstInversion;
+
+        MidiInsertRack foldAfter;
+        foldAfter.prepare (blockSize);
+        foldAfter.setSlots ({ minorish, scale });
+        const auto after = notesFrom (foldAfter, 60);
+        MidiInsertRack foldBefore;
+        foldBefore.prepare (blockSize);
+        foldBefore.setSlots ({ scale, minorish });
+        const auto before = notesFrom (foldBefore, 60);
+        check (after != before,
+               "a scale fold before or after a chord is audibly not the same chain");
+    }
+
+    {
+        // Several of a kind: two transposes stack, which the one-of-each chain could not do.
+        auto octave = slot ("transpose");
+        octave.fx.transpose = 12;
+        auto fifth = MidiSlot::create ("transpose", "slot-transpose-2");
+        fifth.fx.transpose = 7;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ octave, fifth });
+        check (notesFrom (rack, 60) == std::vector<int> { 79 }, "two transposes stack");
+
+        // Bypass is inert, not removed: the module keeps its place and its settings.
+        fifth.bypassed = true;
+        rack.setSlots ({ octave, fifth });
+        check (notesFrom (rack, 60) == std::vector<int> { 72 },
+               "a bypassed module passes its input through untouched");
+    }
+
+    {
+        // The one that bites: retype a slot while a chord is sounding. The module holding
+        // those notes is about to be destroyed, so the chain owes their releases — and pays
+        // them on the next block rather than leaving a stuck chord behind.
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::triad;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ chord });
+
+        Transport clock;
+        clock.setTempo (120.0);
+        juce::MidiBuffer press, sounding;
+        press.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        rack.process (press, sounding, clock.advance (blockSize, sampleRate), blockSize);
+        int ons = 0;
+        for (const auto metadata : sounding) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+        check (ons == 3, "the chord is sounding three notes");
+
+        // Swap the chorder out for a transpose — the held triad has nowhere to be released
+        // from any more.
+        rack.setSlots ({ slot ("transpose") });
+        juce::MidiBuffer nothing, afterSwap;
+        rack.process (nothing, afterSwap, clock.advance (blockSize, sampleRate), blockSize);
+        std::vector<int> released;
+        for (const auto metadata : afterSwap)
+            if (metadata.getMessage().isNoteOff())
+                released.push_back (metadata.getMessage().getNoteNumber());
+        std::sort (released.begin(), released.end());
+        check (released == std::vector<int> { 60, 64, 67 },
+               "every note the retired module was holding is released by the new chain");
+    }
+
+    {
+        // An empty chain is a wire, and panic reaches every module.
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        check (notesFrom (rack, 60) == std::vector<int> { 60 }, "an empty chain passes notes through");
+
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::seventh;
+        rack.setSlots ({ chord });
+        (void) notesFrom (rack, 48);
+        juce::MidiBuffer panic;
+        rack.allNotesOff (panic, 0);
+        int offs = 0;
+        for (const auto metadata : panic) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (offs == 4, "panic releases every voice the chain is holding");
+    }
+
+    {
+        // Migration is the promise that nothing changes for anybody: a pre-chain part's two
+        // settings blocks become two slots, in the order the welded code ran them.
+        MidiFxSettings legacyFx;
+        legacyFx.transpose = 5;
+        legacyFx.scaleType = "dorian";
+        ArpSettings legacyArp;
+        legacyArp.enabled = true;
+        legacyArp.mode = ArpSettings::Mode::down;
+
+        const auto chain = migrateLegacyEventChain (legacyFx, legacyArp);
+        check (chain.size() == 2 && chain[0].type == "fx" && chain[1].type == "arp",
+               "a migrated part is note shaping first, then the arpeggiator");
+        check (chain[0].fx.transpose == 5 && chain[1].arp.mode == ArpSettings::Mode::down,
+               "carrying the settings it always had");
+        check (chain[1].fx.scaleType == "dorian",
+               "and the arp keeps the scale it used to read from the shared block");
+    }
+}
+
 void testMidiFxChain()
 {
     std::cout << "\nMIDI FX: a defined chain, in a defined order" << std::endl;
@@ -1255,6 +1416,7 @@ int main()
     testSongSwapWhilePlaying();
     testArpeggiator();
     testMidiFxChain();
+    testMidiInsertRack();
     testScalesAndSerialization();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures))

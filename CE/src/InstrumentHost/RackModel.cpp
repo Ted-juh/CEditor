@@ -99,6 +99,9 @@ juce::String Performance::addPart()
 {
     RackPart part;
     part.partId = juce::Uuid().toDashedString();
+    // A new part starts with the same two modules a migrated one gets, both idle: the
+    // chain is what a person edits, so it should never start as an empty mystery.
+    part.midiChain = perf::migrateLegacyEventChain (part.midiFx, part.arp);
     parts.add (part);
 
     if (focusedPartId.isEmpty())
@@ -302,8 +305,25 @@ juce::var Performance::toVar() const
         p->setProperty ("lastPresetName",     part.lastPresetName);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
-        p->setProperty ("midiFx",           perf::midiFxToVar (part.midiFx));
-        p->setProperty ("arp",              perf::arpToVar (part.arp));
+        // The legacy blocks are mirrors now, not the source of truth: they carry the first
+        // slot of each family so a build older than the chain still opens the file with the
+        // event chain it understands.
+        {
+            auto legacyFx = part.midiFx;
+            auto legacyArp = part.arp;
+            for (const auto& slot : part.midiChain)
+            {
+                if (slot.type == "arp")            legacyArp = slot.arp;
+                else if (slot.type != "arp")       legacyFx  = slot.fx;
+            }
+            p->setProperty ("midiFx", perf::midiFxToVar (legacyFx));
+            p->setProperty ("arp",    perf::arpToVar (legacyArp));
+        }
+
+        juce::Array<juce::var> midiChain;
+        for (const auto& slot : part.midiChain)
+            midiChain.add (perf::midiSlotToVar (slot));
+        p->setProperty ("midiChain", midiChain);
 
         if (! part.sends.isEmpty())
         {
@@ -502,6 +522,27 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
 
         perf::midiFxFromVar (p.getProperty ("midiFx", {}), part.midiFx);
         perf::arpFromVar    (p.getProperty ("arp", {}), part.arp);
+
+        if (const auto* chain = p.getProperty ("midiChain", {}).getArray())
+        {
+            for (const auto& stored : *chain)
+            {
+                if (part.midiChain.size() >= 8)
+                    break;
+                perf::MidiSlot slot;
+                perf::midiSlotFromVar (stored, slot);
+                if (slot.slotId.isEmpty())
+                    slot.slotId = juce::Uuid().toDashedString();
+                part.midiChain.add (std::move (slot));
+            }
+        }
+        else
+        {
+            // MIGRATION, and the rule is that it is inaudible: a pre-chain session becomes
+            // the two slots its old settings describe, in the order the old code ran them —
+            // the combined note-shaping block first, the arpeggiator after it.
+            part.midiChain = perf::migrateLegacyEventChain (part.midiFx, part.arp);
+        }
 
         part.enabled    = (bool) p.getProperty ("enabled", true);
         part.mute       = (bool) p.getProperty ("mute", false);

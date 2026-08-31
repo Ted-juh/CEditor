@@ -221,6 +221,40 @@ struct MidiFxSettings
     static ChordType chordTypeFromName (const juce::String& name) noexcept;
 };
 
+// One insert in a part's MIDI chain (the Stage 8 decoupling). The event chain used to be
+// welded to the part — zone filter, then transpose, scale, chorder and velocity in that
+// fixed order, then exactly one arpeggiator — so chord-before-arp was a decision the code
+// had made for every rig ever built. A chain of slots hands that decision back: modules in
+// any order, several of a kind, each bypassable, exactly as the audio inserts already work.
+//
+// A slot carries BOTH settings blocks and uses the one its type needs; the note-shaping
+// types are configurations of the same proven MidiFxChain (transpose sets only transpose,
+// chord only the chorder), which is why every module inherits its note-off bookkeeping
+// instead of re-implementing the invariant per type.
+struct MidiSlot
+{
+    juce::String slotId;
+    /** "arp" | "transpose" | "scale" | "chord" | "velocity" | "fx" (the combined legacy
+        block, which is what a pre-chain session migrates into). */
+    juce::String type { "arp" };
+    bool bypassed = false;
+    ArpSettings arp;
+    MidiFxSettings fx;
+
+    /** The module kinds this build understands, in the order the UI offers them. */
+    static juce::StringArray types();
+    /** A slot of `type` with its settings defaulted so it is audibly transparent until
+        configured — an inserted module must never change the sound by existing. */
+    static MidiSlot create (const juce::String& type, const juce::String& slotId);
+};
+
+/** The two slots a pre-chain part's welded settings describe, in the order the old code
+    ran them. Public because the migration is a fact worth testing directly. */
+juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp);
+
+juce::var midiSlotToVar (const MidiSlot& slot);
+void midiSlotFromVar (const juce::var& stored, MidiSlot& out);
+
 /** Transport defaults saved with the Performance (§18.8.12). */
 struct TransportSettings
 {

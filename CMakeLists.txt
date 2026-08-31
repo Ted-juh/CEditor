@@ -225,6 +225,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -528,6 +529,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -998,6 +1000,7 @@ if(WIN32)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -1212,6 +1215,7 @@ add_executable(CEditorPerformanceEngineTests
     "${CE_ROOT}/src/Performance/PatternModel.cpp"
     "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
     "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/tests/PerformanceEngineTests.cpp"
 )
 target_compile_features(CEditorPerformanceEngineTests PRIVATE cxx_std_23)
@@ -1229,6 +1233,7 @@ add_executable(CEditorRackHostTests
     "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/tests/RackHostTests.cpp"
 )
 target_compile_features(CEditorRackHostTests PRIVATE cxx_std_23)
@@ -1251,6 +1256,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
     "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
     "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
