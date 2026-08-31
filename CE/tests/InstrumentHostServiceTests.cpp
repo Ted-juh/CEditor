@@ -2456,6 +2456,170 @@ void testMidiChainCommands()
     }
 }
 
+// A chain preset is the whole voice as one library record: the instrument and its state, the
+// MIDI modules ahead of it, the inserts after it. What must hold is that dropping one onto a
+// part replaces the VOICE and nothing else — the part keeps its identity, its place and its
+// fader — and that a chain missing an effect loads loudly rather than half-silently.
+void testChainPresets()
+{
+    std::cout << "\nchain presets (instrument + MIDI chain + inserts as one record)" << std::endl;
+
+    const auto dir = freshDataDir ("chainpresets");
+    seedTwoSynthCatalog (dir);
+    juce::String partA, partB, chainId;
+
+    auto partAt = [] (Harness& h, int index)
+    {
+        return h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[index];
+    };
+    auto partById = [] (Harness& h, const juce::String& id)
+    {
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        for (int i = 0; i < parts.size(); ++i)
+            if (parts[i].getProperty ("partId", {}).toString() == id)
+                return parts[i];
+        return juce::var();
+    };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partA = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partA }, { "ceId", "VST3-good-synth" } });
+        h.lastStub->patch = 7;
+
+        // A voice worth keeping: a chorder in front of the arp, an insert behind, and a split.
+        h.cmd ("addMidiSlot", { { "partId", partA }, { "type", "chord" } });
+        const auto chordSlot = partById (h, partA).getProperty ("midiChain", {})[2]
+                                   .getProperty ("slotId", {}).toString();
+        h.cmd ("moveMidiSlot", { { "partId", partA }, { "slotId", chordSlot }, { "index", 0 } });
+        h.cmd ("setMidiSlotOptions", { { "partId", partA }, { "slotId", chordSlot },
+                                       { "chord", "diatonic" } });
+        h.cmd ("setPartArp", { { "partId", partA }, { "enabled", true }, { "mode", "down" } });
+        h.cmd ("setPartMidiRules", { { "partId", partA }, { "keyLow", 48 }, { "keyHigh", 72 } });
+        h.cmd ("addEffect", { { "chainId", partA }, { "ceId", "VST3-nice-reverb" } });
+        h.cmd ("getState");
+
+        h.emits.clear();
+        h.cmd ("saveChainToLibrary", { { "partId", partA }, { "name", "Big Lead" } });
+        for (const auto& r : *h.emits.entries.back().payload.getProperty ("records", {}).getArray())
+            if (r.getProperty ("type", {}).toString() == "chain")
+            {
+                chainId = r.getProperty ("recordId", {}).toString();
+                check (r.getProperty ("sourceType", {}).toString() == "chainCapture"
+                         && r.getProperty ("instrument", {}).toString() == "Good Synth"
+                         && (bool) r.getProperty ("available", false),
+                       "a chain captures with its instrument's identity and reads as loadable");
+            }
+        check (chainId.isNotEmpty(), "the whole voice captures as one record");
+
+        h.emits.clear();
+        h.cmd ("saveChainToLibrary", { { "partId", "nope" } });
+        check (h.emits.lastError().contains ("Unknown rack part"),
+               "capturing a part that is not there refuses aloud");
+
+        // The second part: a different instrument, its own fader, its own insert.
+        h.cmd ("addPart");
+        partB = h.partIdAt (1);
+        h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-other-synth" } });
+        h.cmd ("setPartMixer", { { "partId", partB }, { "volume", 0.25 } });
+        h.cmd ("addEffect", { { "chainId", partB }, { "ceId", "VST3-nice-reverb" } });
+        h.cmd ("getState");
+        check (partById (h, partB).getProperty ("effects", {}).size() == 1,
+               "the second part starts with an insert of its own");
+
+        h.cmd ("loadLibraryRecord", { { "recordId", chainId }, { "action", "replace" },
+                                      { "partId", partB } });
+        h.cmd ("getState");
+        const auto landed = partById (h, partB);
+        check (landed.getProperty ("pluginName", {}).toString() == "Good Synth",
+               "loading a chain onto a part brings its instrument");
+        check (landed.getProperty ("midiChain", {})[0].getProperty ("type", {}).toString() == "chord"
+                 && landed.getProperty ("midiChain", {})[0].getProperty ("fx", {})
+                          .getProperty ("chord", {}).toString() == "diatonic",
+               "and the MIDI modules ahead of it, in order and configured");
+        check (landed.getProperty ("keyLow", 0).equals (48)
+                 && landed.getProperty ("keyHigh", 127).equals (72),
+               "and the zone the voice was captured playing in");
+        check (landed.getProperty ("effects", {}).size() == 1
+                 && landed.getProperty ("effects", {})[0].getProperty ("pluginName", {}).toString()
+                      == "Nice Reverb",
+               "and exactly the captured inserts — the old chain is replaced, not appended to");
+        check (juce::approximatelyEqual ((float) (double) landed.getProperty ("volume", 1.0), 0.25f),
+               "while the part keeps its own fader: a chain is a voice, not a mixer scene");
+        check (landed.getProperty ("partId", {}).toString() == partB,
+               "and its identity, so pages and bindings still address it");
+
+        auto* stub = dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (partB));
+        check (stub != nullptr && stub->patch == 7, "the captured sound arrives with the chain");
+    }
+
+    {
+        // Chain records are library state, and "add" builds the voice on a new part.
+        Harness h (dir);
+        h.cmd ("getState");
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "type", "chain" } });
+        check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 1
+                 && h.emits.entries.back().payload.getProperty ("counts", {})
+                        .getProperty ("chains", 0).equals (1),
+               "the chain survives its process and filters as its own type");
+
+        h.cmd ("loadLibraryRecord", { { "recordId", chainId }, { "action", "add" } });
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        const auto fresh = partAt (h, parts.size() - 1);
+        check (fresh.getProperty ("pluginName", {}).toString() == "Good Synth"
+                 && fresh.getProperty ("effects", {}).size() == 1
+                 && fresh.getProperty ("midiChain", {})[0].getProperty ("type", {}).toString() == "chord",
+               "action add builds the whole voice on a new part");
+    }
+
+    {
+        // Degraded, not silent: an effect this machine no longer has is named, and the rest of
+        // the voice still plays. Surgery on the record's own manifest is the honest way to get
+        // here — it is exactly what moving the library to another machine does.
+        const auto libraryFile = dir.getChildFile ("library.json");
+        libraryFile.replaceWithText (libraryFile.loadFileAsString()
+                                         .replace ("VST3-nice-reverb", "VST3-gone-reverb"));
+
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partC = h.partIdAt (h.emits.lastState()->getProperty ("rack", {})
+                                          .getProperty ("parts", {}).size() - 1);
+        h.emits.clear();
+        h.cmd ("loadLibraryRecord", { { "recordId", chainId }, { "action", "replace" },
+                                      { "partId", partC } });
+        check (h.emits.lastError().contains ("Missing effect")
+                 && h.emits.lastError().contains ("Nice Reverb"),
+               "a chain missing an effect names it rather than dropping it quietly");
+        h.cmd ("getState");
+        check (partById (h, partC).getProperty ("pluginName", {}).toString() == "Good Synth"
+                 && partById (h, partC).getProperty ("effects", {}).size() == 0,
+               "and the instrument and the rest of the voice still load");
+
+        // The instrument itself missing is a different answer: refuse, and change nothing.
+        libraryFile.replaceWithText (libraryFile.loadFileAsString()
+                                         .replace ("VST3-good-synth", "VST3-gone-synth"));
+        Harness h2 (dir);
+        h2.cmd ("getState");
+        h2.cmd ("addPart");
+        const auto partD = h2.partIdAt (h2.emits.lastState()->getProperty ("rack", {})
+                                            .getProperty ("parts", {}).size() - 1);
+        h2.cmd ("loadInstrument", { { "partId", partD }, { "ceId", "VST3-other-synth" } });
+        h2.emits.clear();
+        h2.cmd ("loadLibraryRecord", { { "recordId", chainId }, { "action", "replace" },
+                                       { "partId", partD } });
+        check (h2.emits.lastError().contains ("not in the catalogue"),
+               "a chain whose instrument is gone refuses");
+        h2.cmd ("getState");
+        check (partById (h2, partD).getProperty ("pluginName", {}).toString() == "Other Synth",
+               "and leaves the part exactly as it was — half a chain would look like it worked");
+    }
+}
+
 void testChordLearn()
 {
     std::cout << "\nchord learn (the chorder's capture)" << std::endl;
@@ -4694,6 +4858,7 @@ int main (int argc, char* argv[])
     testFloatingEditors();
     testChordLearn();
     testMidiChainCommands();
+    testChainPresets();
     testGroupBuses();
     testCtrl49Broker();
     testSessionSurvivesProcess();

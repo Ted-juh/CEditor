@@ -2435,6 +2435,50 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "saveChainToLibrary")
+    {
+        // The whole voice, not just the sound: the instrument and its state, the MIDI
+        // modules ahead of it, and the insert chain after it — one record you drop onto any
+        // part. The manifest is a Performance carrying exactly one part, so it reuses the
+        // proven serialization instead of inventing a second document format.
+        ensureLibrary();
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto captured = rack.captureState();
+        const auto* part = captured.findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        if (part->pluginCeId.isEmpty())
+        {
+            emitError ("That part has no instrument to capture.");
+            return;
+        }
+
+        Performance one = Performance::create();
+        one.parts.add (*part);
+        one.focusedPartId = part->partId;
+
+        LibraryRecord record;
+        record.type = "chain";
+        record.sourceType = "chainCapture";
+        record.targetCeId = part->pluginCeId;
+        record.instrument = part->pluginName;
+        record.manufacturer = part->pluginVendor;
+        record.name = payload.getProperty ("name", {}).toString().trim();
+        if (record.name.isEmpty())
+            record.name = (part->pluginName.isNotEmpty() ? part->pluginName
+                                                         : juce::String ("Chain")) + " chain";
+        record.rackManifestJson = juce::JSON::toString (one.toVar());
+        record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
+
+        library.addCapturedRecord (std::move (record));
+        library.saveTo (libraryFile());
+        emitLibrary ({}, {});
+        return;
+    }
+
     if (cmd == "saveRackToLibrary")
     {
         ensureLibrary();
@@ -2528,7 +2572,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         if (const auto reason = recordUnavailableReason (*record); reason.isNotEmpty()
-            && record->type != "rack")   // a rack loads degraded-but-loud; presets refuse
+            && record->type != "rack"     // a rack loads degraded-but-loud; presets refuse
+            && record->type != "chain")   // a chain reports its missing effects and loads
         {
             emitError (reason);
             return;
@@ -2539,6 +2584,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             loadRackRecord (*record);
             return;
         }
+
+        // A chain lands on a part like a preset does — same target resolution below — but it
+        // brings the MIDI modules and the inserts with it, which is the whole point.
 
         // Resolve the target part per §18.6.7: focused, replace a named part, or add new.
         const auto action = payload.getProperty ("action", "focused").toString();
@@ -2557,7 +2605,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        loadPresetRecord (*record, partId);
+        if (record->type == "chain")
+            loadChainRecord (*record, partId);
+        else
+            loadPresetRecord (*record, partId);
         return;
     }
 
@@ -3724,6 +3775,33 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
                                  : "Missing instruments: " + missing.joinIntoString (", ");
     }
 
+    if (record.type == "chain")
+    {
+        // What makes a chain unloadable is its instrument, not its effects: a missing insert
+        // is named at load time and the rest still plays, so flagging the whole record
+        // unavailable for one absent reverb would be a lie the library tells before you ask.
+        Performance manifest;
+        if (! Performance::fromVar (juce::JSON::parse (record.rackManifestJson), manifest)
+            || manifest.parts.isEmpty())
+            return "The captured chain is damaged.";
+
+        const auto& source = manifest.parts.getReference (0);
+        if (source.pluginCeId.isEmpty())
+            return "This chain has no instrument.";
+
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        if (findClass (source.pluginCeId, &module) == nullptr)
+            return "Requires " + (source.pluginName.isNotEmpty() ? source.pluginName
+                                                                 : source.pluginCeId)
+                 + ", which is not in the catalogue.";
+        if (module != nullptr)
+            if (const auto why = module->unavailableReason(); why.isNotEmpty())
+                return "Requires " + source.pluginName + ", whose module is " + why + ".";
+
+        return {};
+    }
+
     if (record.targetCeId.isEmpty())
         return "No installed instrument matches this preset — scan for instruments, then "
                "rescan the library.";
@@ -3746,7 +3824,7 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
 void InstrumentHostService::emitLibrary (const juce::String& query, const juce::String& type)
 {
     juce::Array<juce::var> recordVars;
-    int presets = 0, racks = 0, missing = 0;
+    int presets = 0, racks = 0, chains = 0, missing = 0;
 
     for (const auto* record : searchLibrary (library, query, type))
     {
@@ -3776,7 +3854,9 @@ void InstrumentHostService::emitLibrary (const juce::String& query, const juce::
 
     for (const auto& record : library.allRecords())
     {
-        if (record.type == "preset") ++presets; else ++racks;
+        if (record.type == "preset")     ++presets;
+        else if (record.type == "chain") ++chains;
+        else                             ++racks;
         if (record.missing) ++missing;
     }
 
@@ -3784,6 +3864,7 @@ void InstrumentHostService::emitLibrary (const juce::String& query, const juce::
     counts->setProperty ("total",   library.allRecords().size());
     counts->setProperty ("presets", presets);
     counts->setProperty ("racks",   racks);
+    counts->setProperty ("chains",  chains);
     counts->setProperty ("missing", missing);
 
     auto* root = new juce::DynamicObject();
@@ -4018,6 +4099,103 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const
                            });
     else
         requestInstrument (partId, record.targetCeId);
+}
+
+void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const juce::String& partId)
+{
+    Performance captured;
+    if (! Performance::fromVar (juce::JSON::parse (record.rackManifestJson), captured)
+        || captured.parts.isEmpty())
+    {
+        emitError ("The captured chain for " + record.name + " is damaged.");
+        return;
+    }
+
+    const auto& source = captured.parts.getReference (0);
+
+    if (rack.getPerformance().findPart (partId) == nullptr)
+    {
+        emitError ("Unknown rack part.");
+        return;
+    }
+
+    // The instrument is resolved BEFORE anything is torn down. A chain whose instrument is
+    // gone must leave the part exactly as it was — half a chain over the previous sound is
+    // worse than a refusal, because it looks like it worked.
+    ClassInfoForCommit instrumentInfo;
+    if (source.pluginCeId.isNotEmpty())
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        const auto* classRecord = findClass (source.pluginCeId, &module);
+        if (classRecord == nullptr || module == nullptr)
+        {
+            emitError ("Requires " + (source.pluginName.isNotEmpty() ? source.pluginName
+                                                                     : source.pluginCeId)
+                       + ", which is not in the catalogue.");
+            return;
+        }
+        instrumentInfo = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
+    }
+
+    // The part's own identity, place and mix stay: dropping a chain onto part 3 must not
+    // move it, rename it, or take its fader with it. Everything that describes the VOICE
+    // travels — the zone rules included, because where a sound sits on the keyboard is part
+    // of how the chain plays.
+    //
+    // Old inserts go first, through the same removal every other path uses (their editors
+    // and nodes die with them); then the captured ones are minted and loaded.
+    if (const auto* target = rack.getPerformance().findPart (partId))
+        for (const auto& slot : juce::Array<EffectSlot> (target->effects))
+            rack.removeEffectSlot (slot.effectId);
+
+    rack.setPartMidiChain (partId, source.midiChain);
+    rack.setMidiRules (partId, source.midi);
+
+    for (const auto& slot : source.effects)
+    {
+        ClassInfoForCommit info;
+        {
+            const std::scoped_lock lock (catalogLock);
+            const ModuleRecord* module = nullptr;
+            const auto* classRecord = findClass (slot.pluginCeId, &module);
+            if (classRecord == nullptr || module == nullptr)
+            {
+                // Degraded, not silent: an effect the machine does not have is named, and the
+                // rest of the chain still loads — the same honesty a restored session has.
+                emitError ("Missing effect in " + record.name + ": "
+                           + (slot.pluginName.isNotEmpty() ? slot.pluginName : slot.pluginCeId));
+                continue;
+            }
+            info = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
+        }
+
+        const auto effectId = rack.addEffectSlot (partId);
+        if (effectId.isEmpty())
+        {
+            // Only reachable if the part went away underneath us, which the check above makes
+            // very unlikely — but "loaded without its effects" must never pass silently.
+            emitError ("The rack part went away while " + record.name + " was loading.");
+            break;
+        }
+
+        rack.primeEffectSlot (effectId, { info.ceId, info.modulePath, info.name, info.vendor },
+                              slot.stateBlobBase64);
+        requestEffect (effectId, slot.pluginCeId);
+    }
+
+    // The instrument last, through the one load transaction: its commit restores the primed
+    // blob, so the captured sound arrives with the captured chain already around it.
+    if (source.pluginCeId.isNotEmpty())
+    {
+        rack.primePartState (partId, { instrumentInfo.ceId, instrumentInfo.modulePath,
+                                       instrumentInfo.name, instrumentInfo.vendor },
+                             source.stateBlobBase64);
+        requestInstrument (partId, source.pluginCeId);
+    }
+
+    savePerformance();
+    emitState();
 }
 
 void InstrumentHostService::loadRackRecord (const LibraryRecord& record)

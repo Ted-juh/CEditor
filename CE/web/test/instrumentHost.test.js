@@ -35,6 +35,7 @@ import {
   hostLibrary,
   requestLibrary,
   saveUserPreset,
+  saveChainToLibrary,
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
@@ -384,7 +385,7 @@ test('normalizeHostLibrary shapes records with availability and user metadata', 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 4);
+  assert.equal(get(hostLibrary).records.length, 5);
 
   requestLibrary('warm', '');
   assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
@@ -393,7 +394,7 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 5, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 6, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -411,6 +412,34 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
   removeLibraryRecord('lib-1');
   assert.equal(get(hostLibrary).records.some((r) => r.recordId === 'lib-1'), true,
     'factory records refuse removal in the mock too');
+});
+
+test('mock reducer: a chain record captures a whole voice and lands as one', () => {
+  hostStateStore.set(mockHostState());
+  requestLibrary('', 'chain');
+  const chains = get(hostLibrary).records;
+  assert.equal(chains.length, 1, 'chains filter as their own type');
+  assert.equal(chains[0].sourceType, 'chainCapture');
+
+  requestLibrary('', '');
+  const before = get(hostLibrary).counts.chains;
+  saveChainToLibrary('mock-part-1', 'My Voice');
+  const saved = get(hostLibrary).records.at(-1);
+  assert.equal(saved.type, 'chain', 'saving a chain writes a chain record');
+  assert.equal(saved.name, 'My Voice');
+  assert.equal(get(hostLibrary).counts.chains, before + 1, 'and the chain count follows');
+
+  // Landing it: the part keeps its identity, and the instrument the chain names arrives.
+  const target = get(hostStateStore).rack.parts[0];
+  loadLibraryRecord('lib-5', 'focused', target.partId);
+  const landed = get(hostStateStore).rack.parts.find((p) => p.partId === target.partId);
+  assert.equal(landed.pluginName, 'Analog One', 'the chain brings its instrument');
+  assert.equal(landed.presetName, 'Big Lead', 'and the cursor names the chain that is loaded');
+
+  const partsBefore = get(hostStateStore).rack.parts.length;
+  loadLibraryRecord('lib-5', 'add');
+  assert.equal(get(hostStateStore).rack.parts.length, partsBefore + 1,
+    'and it can arrive as a new part instead');
 });
 
 // --- Stage 5: effect chains and macros -----------------------------------------------------------

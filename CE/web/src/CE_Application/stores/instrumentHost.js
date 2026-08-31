@@ -110,7 +110,7 @@ export function normalizeSupportBundle(payload) {
 export function emptyHostLibrary() {
   return {
     records: [],
-    counts: { total: 0, presets: 0, racks: 0, missing: 0 },
+    counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0 },
     paths: [],
     query: '',
     type: '',
@@ -142,6 +142,7 @@ export function normalizeHostLibrary(payload) {
       total: Number(p.counts?.total ?? 0),
       presets: Number(p.counts?.presets ?? 0),
       racks: Number(p.counts?.racks ?? 0),
+      chains: Number(p.counts?.chains ?? 0),
       missing: Number(p.counts?.missing ?? 0),
     },
     paths: (Array.isArray(p.paths) ? p.paths : []).map(String),
@@ -160,6 +161,8 @@ export function mockHostLibrary(query = '', type = '') {
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', factory: true,
       available: false, reason: 'Requires Uninstalled Synth, which is not in the catalogue.' },
     { recordId: 'lib-4', type: 'rack', sourceType: 'rackCapture', name: 'Live Rig', available: true },
+    { recordId: 'lib-5', type: 'chain', sourceType: 'chainCapture', name: 'Big Lead',
+      manufacturer: 'Mock Audio', instrument: 'Analog One', available: true },
   ];
   const q = query.trim().toLowerCase();
   const records = all.filter((r) =>
@@ -168,7 +171,7 @@ export function mockHostLibrary(query = '', type = '') {
         || (r.manufacturer ?? '').toLowerCase().includes(q)));
   return normalizeHostLibrary({
     records,
-    counts: { total: all.length, presets: 3, racks: 1, missing: 0 },
+    counts: { total: all.length, presets: 3, racks: 1, chains: 1, missing: 0 },
     paths: [],
     query,
     type,
@@ -2100,20 +2103,29 @@ function send(payload) {
       hostLibrary.set(mockHostLibrary(payload.query ?? '', payload.type ?? ''));
       return;
     }
-    if (payload?.cmd === 'saveUserPreset' || payload?.cmd === 'saveRackToLibrary') {
-      const isRack = payload.cmd === 'saveRackToLibrary';
+    if (payload?.cmd === 'saveUserPreset' || payload?.cmd === 'saveRackToLibrary'
+        || payload?.cmd === 'saveChainToLibrary') {
+      const kind = payload.cmd === 'saveRackToLibrary' ? 'rack'
+                 : payload.cmd === 'saveChainToLibrary' ? 'chain' : 'preset';
       const part = get(hostState).rack.parts.find((p) => p.partId === payload.partId);
+      const fallbackName = { rack: 'Rack capture', chain: `${part?.pluginName ?? 'Chain'} chain`,
+                             preset: `${part?.pluginName ?? 'Instrument'} preset` }[kind];
       hostLibrary.update((lib) => normalizeHostLibrary({
         ...lib,
         records: [...lib.records, {
           recordId: `lib-user-${Date.now()}`,
-          type: isRack ? 'rack' : 'preset',
-          sourceType: isRack ? 'rackCapture' : 'userState',
-          name: payload.name || (isRack ? 'Rack capture' : `${part?.pluginName ?? 'Instrument'} preset`),
+          type: kind,
+          sourceType: { rack: 'rackCapture', chain: 'chainCapture', preset: 'userState' }[kind],
+          name: payload.name || fallbackName,
           instrument: part?.pluginName ?? '',
           available: true,
         }],
-        counts: { ...lib.counts, total: lib.counts.total + 1 },
+        counts: {
+          ...lib.counts,
+          total: lib.counts.total + 1,
+          [kind === 'preset' ? 'presets' : kind === 'chain' ? 'chains' : 'racks']:
+            Number(lib.counts[kind === 'preset' ? 'presets' : kind === 'chain' ? 'chains' : 'racks'] ?? 0) + 1,
+        },
       }));
       return;
     }
@@ -2140,13 +2152,34 @@ function send(payload) {
       // Mirrors the visible half: an added part appears; a focused load leaves structure alone.
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record?.available) return;
-      if (record.type === 'preset' && payload.action === 'add') {
+      if ((record.type === 'preset' || record.type === 'chain') && payload.action === 'add') {
         const next = applyMockCommand(get(hostState), { cmd: 'addPart' });
         const added = next.rack.parts.at(-1);
-        added.pluginName = record.name;
+        added.pluginName = record.type === 'chain' ? (record.instrument || record.name) : record.name;
         added.pluginVendor = record.manufacturer;
         added.hasInstrument = true;
+        if (record.type === 'chain') {
+          added.presetRecordId = record.recordId;
+          added.presetName = record.name;
+        }
         hostState.set(next);
+        return;
+      }
+      if (record.type === 'chain') {
+        // A chain replaces the voice: the instrument the record names, and the cursor moves
+        // to the chain — the mock shows the visible half, as the preset path does.
+        hostState.update((st) => {
+          const target = st.rack.parts.find(
+            (p) => p.partId === (payload.partId || st.rack.focusedPartId));
+          if (target) {
+            target.pluginName = record.instrument || record.name;
+            target.pluginVendor = record.manufacturer;
+            target.hasInstrument = true;
+            target.presetRecordId = record.recordId;
+            target.presetName = record.name;
+          }
+          return { ...st };
+        });
         return;
       }
       if (record.type === 'preset') {
@@ -2289,6 +2322,8 @@ export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
+export const saveChainToLibrary = (partId, name) =>
+  send({ cmd: 'saveChainToLibrary', partId, name });
 export const setLibraryUserMetadata = (recordId, fields) =>
   send({ cmd: 'setLibraryUserMetadata', recordId, ...fields });
 export const removeLibraryRecord = (recordId) => send({ cmd: 'removeLibraryRecord', recordId });

@@ -30,7 +30,8 @@
     walkPartPreset,
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
-    saveUserPreset, saveRackToLibrary, setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
+    saveUserPreset, saveRackToLibrary, saveChainToLibrary,
+    setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     addEffect, removeEffect, setEffectBypassed, openEffectEditor,
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
@@ -536,10 +537,10 @@
   {#if libraryOpen}
     <div class="library-panel" data-testid="host-library-panel" aria-label="Library">
       <div class="library-head">
-        <input type="search" placeholder="Search sounds and racks…" value={libraryQuery}
+        <input type="search" placeholder="Search sounds, chains and racks…" value={libraryQuery}
                oninput={(e) => setLibraryFilter(e.currentTarget.value, libraryType)} />
         <span class="library-filters">
-          {#each [['', 'All'], ['preset', 'Presets'], ['rack', 'Racks']] as [value, label] (value)}
+          {#each [['', 'All'], ['preset', 'Presets'], ['chain', 'Chains'], ['rack', 'Racks']] as [value, label] (value)}
             <button type="button" class="toggle" class:on={libraryType === value}
                     onclick={() => setLibraryFilter(libraryQuery, value)}>{label}</button>
           {/each}
@@ -549,7 +550,7 @@
                 onclick={() => (auditionOn = !auditionOn)}>♪ Audition</button>
         <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
         <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
-        <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.racks} racks</span>
+        <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.chains} chains · {$hostLibrary.counts.racks} racks</span>
       </div>
 
       <div class="library-capture">
@@ -558,6 +559,12 @@
                                                   : 'Focus a part with an instrument first'}
                 onclick={() => saveUserPreset(focusedPart.partId)}
                 data-testid="host-save-preset">Save preset of focused part</button>
+        <button type="button" disabled={!focusedPart?.hasInstrument}
+                title={focusedPart?.hasInstrument
+                       ? `Capture ${partTitle(focusedPart)} whole: the instrument and its state, the MIDI modules ahead of it and the inserts behind it`
+                       : 'Focus a part with an instrument first'}
+                onclick={() => saveChainToLibrary(focusedPart.partId)}
+                data-testid="host-save-chain">Save chain of focused part</button>
         <button type="button" onclick={() => saveRackToLibrary()} data-testid="host-save-rack">
           Save rack to library
         </button>
@@ -591,15 +598,19 @@
             <div class="library-id" class:clickable={record.type !== 'rack' && record.available}
                  role="button" tabindex="-1" data-testid="library-row-body"
                  title={record.type === 'rack' ? undefined
-                        : auditionOn ? 'Click: load into the focused part and audition'
-                                     : 'Click: load into the focused part'}
+                        : record.type === 'chain'
+                          ? 'Click: load the whole chain into the focused part'
+                          : auditionOn ? 'Click: load into the focused part and audition'
+                                       : 'Click: load into the focused part'}
                  onclick={() => clickLibraryRow(record)}
                  onkeydown={(e) => e.key === 'Enter' && clickLibraryRow(record)}>
               <span class="library-name">{record.name}</span>
               <span class="library-detail">
                 {record.type === 'rack' ? 'Rack'
-                  : [record.instrument, record.manufacturer].filter(Boolean).join(' · ') || 'Preset'}
-                {#if record.sourceType === 'userState' || record.sourceType === 'rackCapture'} · yours{/if}
+                  : [record.type === 'chain' ? 'Chain' : null, record.instrument, record.manufacturer]
+                      .filter(Boolean).join(' · ') || 'Preset'}
+                {#if record.sourceType === 'userState' || record.sourceType === 'rackCapture'
+                     || record.sourceType === 'chainCapture'} · yours{/if}
                 {#if record.tags.length > 0} · {record.tags.join(', ')}{/if}
               </span>
               {#if !record.available}

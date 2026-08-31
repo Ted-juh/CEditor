@@ -25,8 +25,8 @@ namespace ceditor::host
 struct LibraryRecord
 {
     juce::String recordId;        // stable, minted once
-    juce::String type;            // "preset" | "rack"
-    juce::String sourceType;      // "vstpreset" | "userState" | "rackCapture"
+    juce::String type;            // "preset" | "rack" | "chain"
+    juce::String sourceType;      // "vstpreset" | "userState" | "rackCapture" | "chainCapture"
     juce::String sourceLocator;   // file path for vendor sources; empty for captured state
     juce::String name;
     juce::String manufacturer;
@@ -34,7 +34,8 @@ struct LibraryRecord
     juce::String targetCeId;      // the catalogue's stable class identity (presets)
     juce::String category;
     juce::String stateBlobBase64; // captured processor state (userState) — the payload itself
-    juce::String rackManifestJson;// captured Performance manifest (rackCapture)
+    juce::String rackManifestJson;// captured Performance manifest (rackCapture, chainCapture:
+                                  // a chain is a one-part Performance, so it reuses this)
     juce::String classIdHex;      // the .vstpreset's own 32-hex VST3 class id, when known
     juce::String fingerprint;     // content identity for change detection and matching
     bool factory = false;         // vendor-derived (true) vs CEditor-captured (false)

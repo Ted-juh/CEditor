@@ -1103,6 +1103,10 @@ Performance InstrumentRackHost::captureState()
     refreshEffectBlobs (model.masterEffects);
     for (auto& chain : model.returns)
         refreshEffectBlobs (chain.effects);
+    // Group buses carry inserts like everything else, and a capture that skipped them would
+    // save a bus chain that comes back empty — found while building chain presets on top.
+    for (auto& bus : model.buses)
+        refreshEffectBlobs (bus.effects);
     return model;
 }
 

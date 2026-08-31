@@ -612,6 +612,11 @@ private:
         catalogLock itself): empty = loadable, else the actionable reason. */
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
     void loadPresetRecord (const LibraryRecord& record, const juce::String& partId);
+    /** A chain capture applied onto one part: the instrument, its MIDI modules and its
+        insert chain, all at once. The instrument and every effect load through the same
+        transactions a plain load uses — a capture is a shortcut for the player, never a
+        second path into the rack. */
+    void loadChainRecord (const LibraryRecord& record, const juce::String& partId);
     /** Layer B of the preset engine: enumerates the live instrument's program list into
         the library as vendor records, scoped to its class. No-op below two programs. */
     void ingestProgramList (const juce::String& partId);
