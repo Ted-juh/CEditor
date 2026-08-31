@@ -42,6 +42,9 @@ import {
   pluginTile,
   pluginInitials,
   TILE_PATTERNS,
+  normalizeSurfaceLayout,
+  mockSurfaceLayout,
+  emptySurfaceLayout,
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
@@ -614,6 +617,52 @@ test('pluginTile still answers for a class with nothing to go on', () => {
   const blank = pluginTile('', '', '');
   assert.equal(blank.initials, '–');
   assert.ok(blank.background.startsWith('hsl('), 'and still renders as a tile, not a gap');
+});
+
+// --- the surface as a picture --------------------------------------------------------------------
+
+test('normalizeSurfaceLayout keeps "cannot reach this" as a distinct answer', () => {
+  const shaped = normalizeSurfaceLayout({
+    profileId: 'akai-ctrl49', displayName: 'M-Audio CTRL49', aspect: '2.31',
+    controls: [
+      { controlId: 'encoder-1', kind: 'encoder', label: '1', x: 0.1, y: 0.1, w: 0.05, h: 0.1, index: 0 },
+      { controlId: 'fader-1', kind: 'fader', label: 'F1', x: 0.2, y: 0.1, w: 0.02, h: 0.2 },
+      { controlId: 'pad-1', kind: 'pad', label: '1', x: 0.8, y: 0.4, w: 0.04, h: 0.08, index: 1 },
+    ],
+  });
+  assert.equal(shaped.aspect, 2.31);
+  assert.equal(shaped.controls[0].index, 0, 'encoder 0 is a real index, not "missing"');
+  assert.equal(shaped.controls[1].index, -1,
+    'a control with no index reads as unmapped, never as index 0 — that would claim the first one');
+  assert.equal(shaped.controls[2].index, 1);
+});
+
+test('normalizeSurfaceLayout groups controls into the regions a person thinks in', () => {
+  const shaped = normalizeSurfaceLayout(mockSurfaceLayout());
+  const byId = Object.fromEntries(shaped.regions.map((r) => [r.id, r]));
+
+  assert.equal(byId.encoders.count, 8);
+  assert.equal(byId.encoders.addressable, 8, 'every encoder can be reached');
+  assert.equal(byId.pads.addressable, 8, 'and every pad');
+  assert.equal(byId.faders.count, 9, 'all nine faders are drawn');
+  assert.equal(byId.faders.addressable, 0, 'and none of them is ours to drive');
+
+  // A region's box has to actually contain its controls, or zooming to it shows the wrong thing.
+  const pads = shaped.controls.filter((c) => c.kind === 'pad');
+  for (const pad of pads) {
+    assert.ok(pad.x >= byId.pads.x && pad.x + pad.w <= byId.pads.x + byId.pads.w,
+      `${pad.controlId} is inside the pads region horizontally`);
+    assert.ok(pad.y >= byId.pads.y && pad.y + pad.h <= byId.pads.y + byId.pads.h,
+      `${pad.controlId} is inside the pads region vertically`);
+  }
+  assert.ok(byId.pads.w < 1 && byId.pads.h < 1, 'and the region is a crop, not the whole unit');
+});
+
+test('normalizeSurfaceLayout survives a profile that has no drawing', () => {
+  const empty = normalizeSurfaceLayout({});
+  assert.deepEqual(empty, emptySurfaceLayout(),
+    'no layout is a legal answer — the UI says so rather than drawing nothing');
+  assert.deepEqual(normalizeSurfaceLayout(null).regions, [], 'and null is not a crash');
 });
 
 // --- Stage 5: effect chains and macros -----------------------------------------------------------

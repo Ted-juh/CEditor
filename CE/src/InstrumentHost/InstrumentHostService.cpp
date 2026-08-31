@@ -116,6 +116,55 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "getSurfaceLayout")
+    {
+        // The layout is static per profile, so it is asked for rather than pushed: sixty-odd
+        // controls have no business riding along on every status change. A profile without one
+        // answers with an empty layout and the UI draws generically from the counts.
+        const auto requested = payload.getProperty ("profileId", {}).toString();
+        const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
+        const ctrl49::SurfaceProfile* profile = requested.isNotEmpty() ? registry.find (requested)
+                                                                      : nullptr;
+        if (profile == nullptr)
+            // No profile named: the first one that has a drawing. There is one controller
+            // family today; when there are several this becomes "the connected one", which is
+            // a question the broker answers, not this command.
+            for (const auto& id : registry.profileIds())
+                if (const auto* candidate = registry.find (id);
+                    candidate != nullptr && ! candidate->layout.isEmpty())
+                {
+                    profile = candidate;
+                    break;
+                }
+
+        auto* root = new juce::DynamicObject();
+        if (profile != nullptr)
+        {
+            root->setProperty ("profileId",   profile->profileId);
+            root->setProperty ("displayName", profile->displayName);
+            root->setProperty ("vendor",      profile->vendor);
+            root->setProperty ("aspect",      profile->layout.aspect);
+            juce::Array<juce::var> controls;
+            for (const auto& control : profile->layout.controls)
+            {
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("controlId", control.controlId);
+                obj->setProperty ("kind",      control.kind);
+                obj->setProperty ("label",     control.label);
+                obj->setProperty ("x",         control.x);
+                obj->setProperty ("y",         control.y);
+                obj->setProperty ("w",         control.w);
+                obj->setProperty ("h",         control.h);
+                obj->setProperty ("index",     control.index);
+                controls.add (juce::var (obj));
+            }
+            root->setProperty ("controls", controls);
+        }
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostSurfaceLayout", juce::var (root));
+        return;
+    }
+
     if (cmd == "scan")
     {
         if (scanBusy.exchange (true))

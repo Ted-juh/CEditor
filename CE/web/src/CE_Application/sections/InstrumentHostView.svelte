@@ -49,6 +49,7 @@
   import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
+  import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
@@ -282,11 +283,13 @@
           : []),
     ...(paramTargetId ? [{ id: 'params', label: 'Params' }] : []),
     { id: 'rack', label: 'Rack' },
+    { id: 'surface', label: 'Surface' },
   ]);
 
   // What the dock is editing, on the tab bar, so the answer is in one fixed place however far
   // the body has been scrolled.
-  let dockSubject = $derived(dockTab === 'rack' ? 'Master, returns and macros'
+  let dockSubject = $derived(dockTab === 'surface' ? 'The controller'
+                             : dockTab === 'rack' ? 'Master, returns and macros'
                              : dockTab === 'params' ? (paramTargetName || 'Parameters')
                              : focusedPart ? partTitle(focusedPart) : 'Nothing focused');
 
@@ -963,7 +966,7 @@
             </div>
           {/snippet}
 
-        {#if !focusedPart && dockTab !== 'rack'}
+        {#if !focusedPart && dockTab !== 'rack' && dockTab !== 'surface'}
           <div class="empty-hint">Focus a rack part to edit it.</div>
         {/if}
 
@@ -1246,6 +1249,8 @@
             </div>
           </div>
         {/if}
+        {:else if dockTab === 'surface'}
+          <HostSurfacePanel />
         {:else if dockTab === 'rack'}
         {@render effectChain($hostState.rack.masterEffects, 'master',
                              `Master effects${latencySuffix($hostState.rack.masterLatencyMs)}`)}

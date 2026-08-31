@@ -4265,6 +4265,83 @@ void testGeneratedProduct()
             reported = reported || failure.contains ("unverified");
         check (reported, "and a profile with no checks is unverified, not supported");
     }
+
+    // -- the surface as a picture: a layout is data, and it has to agree with the counts ------
+    {
+        ceditor::ctrl49::registerCtrl49Profile();
+        auto& registry = ceditor::ctrl49::SurfaceProfileRegistry::instance();
+        const auto* profile = registry.find ("akai-ctrl49");
+
+        check (profile->displayName == "M-Audio CTRL49" && profile->vendor == "M-Audio",
+               "the CTRL49 is an M-Audio keyboard, and says so");
+        check (profile->profileId == "akai-ctrl49",
+               "while the id stays put — it is identity, and sessions already name it");
+
+        const auto& layout = profile->layout;
+        check (! layout.isEmpty() && layout.aspect > 1.0f,
+               "it carries a drawing of itself, in proportion");
+        check (ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (*profile).isEmpty(),
+               "which passes the structural checks");
+
+        // The point of the whole exercise: the drawing shows the INSTRUMENT, the capabilities
+        // say what we can DRIVE, and only the second one is a promise.
+        int faders = 0, encoders = 0, pads = 0, keys = 0;
+        for (const auto& control : layout.controls)
+        {
+            faders   += control.kind == "fader"   ? 1 : 0;
+            encoders += control.kind == "encoder" ? 1 : 0;
+            pads     += control.kind == "pad"     ? 1 : 0;
+            keys     += control.kind == "keys"    ? 1 : 0;
+        }
+        check (faders == 9, "all nine faders are drawn — they are on the box");
+        check (layout.addressableCount ("fader") == 0 && profile->capabilities.faders == 0,
+               "and none is addressable, which is what faders = 0 has always meant");
+        check (encoders == 8 && layout.addressableCount ("encoder") == 8,
+               "every encoder is drawn and every one can be reached");
+        check (pads == 8 && layout.addressableCount ("pad") == 8, "and so is every pad");
+        check (keys == 1, "the keybed is drawn too, as one region");
+
+        // Indices are the runtime's, not the drawing's: encoders 0..7 as the reducer reports
+        // them, pads 1..8 as the protocol addresses them. Getting these wrong would mean
+        // clicking one knob and moving another, which looks like it works.
+        int encoderLow = 99, encoderHigh = -1, padLow = 99, padHigh = -1;
+        for (const auto& control : layout.controls)
+        {
+            if (control.kind == "encoder")
+            {
+                encoderLow = juce::jmin (encoderLow, control.index);
+                encoderHigh = juce::jmax (encoderHigh, control.index);
+            }
+            if (control.kind == "pad")
+            {
+                padLow = juce::jmin (padLow, control.index);
+                padHigh = juce::jmax (padHigh, control.index);
+            }
+        }
+        check (encoderLow == 0 && encoderHigh == 7, "encoders are numbered as the reducer reports them");
+        check (padLow == 1 && padHigh == 8, "and pads as the protocol addresses them");
+
+        // A layout that drifts from the counts is caught rather than drawn.
+        auto broken = *profile;
+        broken.capabilities.encoders = 6;
+        bool complained = false;
+        for (const auto& failure : ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (broken))
+            complained = complained || failure.contains ("promises 6");
+        check (complained, "a drawing that addresses more than the profile promises is refused");
+
+        auto offBox = *profile;
+        offBox.layout.controls.getReference (0).x = 0.98f;
+        bool escaped = false;
+        for (const auto& failure : ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (offBox))
+            escaped = escaped || failure.contains ("off the box");
+        check (escaped, "and a control that would draw outside the unit is a typo, not a feature");
+
+        // No layout is legal: the UI then draws generically from the counts.
+        ceditor::ctrl49::SurfaceProfile plain;
+        plain.profileId = "test-no-layout";
+        check (ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (plain).isEmpty(),
+               "a profile without a drawing is not a broken profile");
+    }
 }
 
 // The Stage 4 library: one index, explicit provenance, loading only ever through Stage 1's

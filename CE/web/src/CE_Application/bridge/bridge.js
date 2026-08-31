@@ -1032,6 +1032,12 @@ export function onInstrumentHostSurface(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function onInstrumentHostSurfaceLayout(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSurfaceLayout', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostMidiLearn(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostMidiLearn', callback);

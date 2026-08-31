@@ -27,6 +27,7 @@ import {
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
   onInstrumentHostSurface,
+  onInstrumentHostSurfaceLayout,
   onInstrumentHostMidiLearn,
   onInstrumentHostArpStep,
   onInstrumentHostChordLearn,
@@ -84,6 +85,97 @@ export function normalizeHostSurface(payload) {
     detail: String(payload?.detail ?? ''),
     device: String(payload?.device ?? ''),
   };
+}
+
+// --- the surface as a picture --------------------------------------------------------------------
+
+export function emptySurfaceLayout() {
+  return { profileId: '', displayName: '', vendor: '', aspect: 0, controls: [], regions: [] };
+}
+
+// The regions a person actually thinks in — "the encoders", "the pads", "the keys" — rather
+// than sixty individual controls. Clicking one zooms the drawing to it; the back button
+// returns to the whole instrument.
+const SURFACE_REGIONS = [
+  { id: 'encoders',  label: 'Encoders',  kinds: ['encoder'] },
+  { id: 'pads',      label: 'Pads',      kinds: ['pad'] },
+  { id: 'faders',    label: 'Faders',    kinds: ['fader'] },
+  { id: 'buttons',   label: 'Buttons',   kinds: ['button'] },
+  { id: 'keys',      label: 'Keys',      kinds: ['keys', 'wheel'] },
+];
+
+export function normalizeSurfaceLayout(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const controls = (Array.isArray(p.controls) ? p.controls : []).map((c) => ({
+    controlId: String(c?.controlId ?? ''),
+    kind: String(c?.kind ?? ''),
+    label: String(c?.label ?? ''),
+    x: Number(c?.x ?? 0),
+    y: Number(c?.y ?? 0),
+    w: Number(c?.w ?? 0),
+    h: Number(c?.h ?? 0),
+    // -1 is the honest answer for a control CEditor cannot reach, and the drawing has to keep
+    // saying so rather than rounding it to 0 and implying "the first one".
+    index: Number.isFinite(Number(c?.index)) ? Number(c.index) : -1,
+  }));
+
+  const regions = SURFACE_REGIONS
+    .map((region) => {
+      const members = controls.filter((c) => region.kinds.includes(c.kind));
+      if (members.length === 0) return null;
+      // The box that holds them, with a little air so a zoomed region does not sit against
+      // the edges of its own frame.
+      const pad = 0.015;
+      const x = Math.max(0, Math.min(...members.map((c) => c.x)) - pad);
+      const y = Math.max(0, Math.min(...members.map((c) => c.y)) - pad);
+      const right = Math.min(1, Math.max(...members.map((c) => c.x + c.w)) + pad);
+      const bottom = Math.min(1, Math.max(...members.map((c) => c.y + c.h)) + pad);
+      return {
+        id: region.id,
+        label: region.label,
+        count: members.length,
+        addressable: members.filter((c) => c.index >= 0).length,
+        x, y, w: right - x, h: bottom - y,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    profileId: String(p.profileId ?? ''),
+    displayName: String(p.displayName ?? ''),
+    vendor: String(p.vendor ?? ''),
+    aspect: Number(p.aspect ?? 0) || 0,
+    controls,
+    regions,
+  };
+}
+
+export const hostSurfaceLayout = writable(emptySurfaceLayout());
+
+// The browser preview has no hardware and no native profile registry, so it gets a stand-in
+// with the same SHAPE — a couple of controls of each kind, including one nobody can address —
+// so the drawing, the regions and the "not mapped" wording are all exercisable off Windows.
+export function mockSurfaceLayout() {
+  const controls = [
+    { controlId: 'display', kind: 'display', label: 'Screen', x: 0.46, y: 0.06, w: 0.13, h: 0.2, index: -1 },
+    { controlId: 'fader-master', kind: 'fader', label: 'Master volume', x: 0.12, y: 0.09, w: 0.02, h: 0.18, index: -1 },
+    { controlId: 'keys', kind: 'keys', label: '49 keys', x: 0.11, y: 0.51, w: 0.88, h: 0.46, index: -1 },
+    { controlId: 'wheel-pitch', kind: 'wheel', label: 'Pitch', x: 0.02, y: 0.63, w: 0.03, h: 0.18, index: -1 },
+  ];
+  for (let i = 0; i < 8; i += 1) {
+    controls.push({ controlId: `fader-${i + 1}`, kind: 'fader', label: `F${i + 1}`,
+                    x: 0.174 + i * 0.0345, y: 0.09, w: 0.024, h: 0.18, index: -1 });
+    controls.push({ controlId: `encoder-${i + 1}`, kind: 'encoder', label: `${i + 1}`,
+                    x: 0.788 + (i % 4) * 0.044, y: 0.062 + Math.floor(i / 4) * 0.089,
+                    w: 0.035, h: 0.08, index: i });
+    controls.push({ controlId: `pad-${i + 1}`, kind: 'pad', label: `${i + 1}`,
+                    x: 0.787 + (i % 4) * 0.044, y: i >= 4 ? 0.289 : 0.38,
+                    w: 0.037, h: 0.08, index: i + 1 });
+    controls.push({ controlId: `button-b${i + 1}`, kind: 'button', label: `B${i + 1}`,
+                    x: 0.174 + i * 0.0345, y: 0.384, w: 0.024, h: 0.04, index: -1 });
+  }
+  return { profileId: 'akai-ctrl49', displayName: 'M-Audio CTRL49', vendor: 'M-Audio',
+           aspect: 2.31, controls };
 }
 
 // --- §17.7: the support bundle ------------------------------------------------------------------
@@ -2244,6 +2336,7 @@ export function initInstrumentHostBridge() {
     seq: a.seq + 1,
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
+  onInstrumentHostSurfaceLayout((payload) => hostSurfaceLayout.set(normalizeSurfaceLayout(payload)));
   onInstrumentHostMidiLearn((payload) => hostMidiLearn.set(normalizeMidiLearn(payload)));
   onInstrumentHostArpStep((payload) => hostArpStep.update((steps) => ({
     ...steps,
@@ -2386,6 +2479,10 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
+    if (payload?.cmd === 'getSurfaceLayout') {
+      hostSurfaceLayout.set(normalizeSurfaceLayout(mockSurfaceLayout()));
+      return;
+    }
     if (payload?.cmd === 'getLibrary' || payload?.cmd === 'scanLibrary') {
       hostLibrary.set(mockHostLibrary(payload.query ?? '', payload.type ?? ''));
       return;
@@ -2609,6 +2706,8 @@ export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });
 export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', partId, name });
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
+export const requestSurfaceLayout = (profileId) =>
+  send(profileId ? { cmd: 'getSurfaceLayout', profileId } : { cmd: 'getSurfaceLayout' });
 export const saveChainToLibrary = (partId, name) =>
   send({ cmd: 'saveChainToLibrary', partId, name });
 export const setLibraryUserMetadata = (recordId, fields) =>

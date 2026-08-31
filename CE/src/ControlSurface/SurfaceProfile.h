@@ -38,6 +38,43 @@ struct SurfaceCapabilities
     bool relativeEncoders = true;   // absolute-only surfaces need value feedback to avoid jumps
 };
 
+/** One physical control, where it sits on the box and whether the runtime can address it.
+
+    Positions are normalised 0..1 against the unit's own bounding box, so the drawing scales to
+    whatever space it is given and no pixel size is ever baked in.
+
+    `index` is the load-bearing field. A surface has controls CEditor cannot map — faders that
+    speak a protocol we do not, buttons the firmware keeps for itself — and drawing them is
+    still right, because the picture is of the instrument in front of you, not of the subset we
+    happen to drive. -1 means exactly that: drawn, labelled, and honestly inert. Anything else
+    is what the runtime calls this control (encoders 0..7 as Ctrl49Reducer reports them, pads
+    1..8 as buildPadRgb addresses them), which is what makes clicking the picture reach the
+    right knob rather than the one that looks right. */
+struct SurfaceControl
+{
+    juce::String controlId;   // stable within the profile: "encoder-1", "pad-3", "fader-master"
+    juce::String kind;        // "encoder" | "pad" | "fader" | "button" | "wheel" | "keys" | "display"
+    juce::String label;
+    float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;   // 0..1 of the unit's bounding box
+    int index = -1;           // what the runtime calls it; -1 = drawn but not addressable
+};
+
+/** Where everything is. Optional: a profile without one still works, and the UI falls back to
+    a generic drawing built from the capability counts — a row of N encoders, a grid of N pads.
+    That fallback is the point. A picture hardcoded to one controller in the UI would undo the
+    reason this registry exists, so the layout is DATA a profile supplies, or nothing. */
+struct SurfaceLayout
+{
+    float aspect = 0.0f;      // width / height of the unit, so proportions survive any size
+    juce::Array<SurfaceControl> controls;
+
+    bool isEmpty() const      { return controls.isEmpty(); }
+
+    /** Controls of one kind that the runtime can actually address. The capability counts must
+        agree with this, never with the raw control count — see the conformance check. */
+    int addressableCount (const juce::String& kind) const;
+};
+
 /** The two payloads a surface needs to show a page, built from views the host already has.
     A profile that cannot display anything leaves both null and still works. */
 struct SurfaceRenderers
@@ -58,6 +95,7 @@ struct SurfaceProfile
     juce::String displayName;
     juce::String vendor;
     SurfaceCapabilities capabilities;
+    SurfaceLayout layout;        // optional; empty means "draw it generically from the counts"
     SurfaceRenderers renderers;
     /** Conformance: the checks this profile must pass before support is CLAIMED (§18.9.5's
         step 4, and §18.9.10's refusal to promise controllers on paper). Returns the failures;
@@ -81,6 +119,12 @@ public:
         profile. A profile with no conformance function is reported as unverified rather than
         as passing — "it compiles" is not support (§18.9.7's phrasing, applied to hardware). */
     juce::StringArray runConformance() const;
+
+    /** Structural checks on a profile's layout, if it has one: ids unique, every control
+        inside the unit box, no two controls of a kind claiming the same runtime index, and the
+        capability counts agreeing with what the drawing says it can ADDRESS. Public and static
+        so a profile can be checked before it is ever registered. */
+    static juce::StringArray checkLayout (const SurfaceProfile& profile);
 
 private:
     SurfaceProfileRegistry() = default;

@@ -281,3 +281,31 @@ New ideas go here with a date, so nothing gets lost between sessions.
   lights up, an unassigned control is visibly empty, a pad shows what it fires — and dragging a
   parameter from the list onto a knob to assign it. That is the version that beats a list rather
   than merely replacing it.
+
+  **BUILT, 2026-08-31 — the drawing.** `SurfaceControl` and `SurfaceLayout` are now an optional
+  block on `SurfaceProfile`: normalised positions, a kind, a label, and an `index`. A dock tab
+  draws it, region chips zoom to the encoders, pads, faders, buttons or keys, and a back button
+  returns to the whole instrument. The CTRL49's layout is authored from a straight-on product
+  photo — traced into coordinates rather than shipped as an image, because a product photograph
+  belongs to its maker and this repository is AGPLv3.
+
+  `index` turned out to be the field the whole thing rests on. -1 means *drawn, labelled and
+  honestly inert*; anything else is what the runtime calls the control — encoders 0..7 as
+  `Ctrl49Reducer` reports them, pads 1..8 as `buildPadRgb` addresses them. Without it, clicking a
+  picture would reach whichever control looks right rather than the one that is.
+
+  That distinction resolved a discrepancy the photo exposed. The profile declares `faders = 0`
+  and the keyboard plainly has nine. Both are true and they answer different questions:
+  capabilities say what CEditor can **drive**, the layout says what is **there**. Conformance now
+  ties them together by checking the *addressable* count of each kind against the capability, so
+  nine drawn faders and zero mapped ones is a statement the tests enforce rather than an omission
+  nobody noticed. A layout that claimed eight encoders while the profile promised six would fail.
+
+  The photo also corrected the profile's own label: it registers as "Akai Advance CTRL49", vendor
+  "Akai", and the hardware is an **M-Audio CTRL49**. Sibling inMusic keyboards that both drive
+  VIP, which is presumably how they got merged. The display name and vendor are fixed; the
+  `profileId` stays `akai-ctrl49`, because it is identity and sessions already name it — the same
+  trade this repo refuses everywhere else.
+
+  Still not built: live feedback (the encoder you are turning lighting up), and assigning by
+  dragging a parameter onto a knob.
