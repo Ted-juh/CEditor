@@ -81,6 +81,7 @@ written to be argued with before anybody builds one. The overview is
 
 | Document | What it is |
 |---|---|
+| [The rack canvas](rack-canvas-plan.md) | *Nothing built.* Why the instrument host reads as a form rather than an instrument, and the proposal it deserves: thumbnail nodes on a canvas, wired the way Reason cables devices, with one bottom dock showing whichever node is selected. Names the tension that decides it — Reason's wires imply arbitrary routing and this engine's topology is deliberately constrained — and carries a running idea log. |
 | [Tier 3 moonshots](tier-3-moonshots.md) | The post-beta bets, ranked, and the Tier 1 story in plain English. |
 | [Capture Session](capture-session-plan.md) | Learning a synth from the synth: turn its knobs, watch what it sends, write the profile. |
 | [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |
