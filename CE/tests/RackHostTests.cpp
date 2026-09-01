@@ -433,6 +433,114 @@ void testUnloadAndRemove()
 }
 } // namespace
 
+// Plug-in delay compensation: it happens, and it is not this code that does it.
+//
+// This file used to carry a comment saying the opposite — "the graph does not compensate
+// parallel paths (a live rack keeps every path as fast as its plug-ins allow)" — and a
+// compensation pass was written against it before anyone checked. juce::AudioProcessorGraph
+// has done PDC all along: RenderSequenceBuilder::createRenderingOpsForNode takes
+// getInputLatencyForNode over every node's inputs and inserts DelayChannelOps for the shorter
+// ones (juce_AudioProcessorGraph.cpp, JUCE 8.0.7, around lines 1136-1258). Adding a second
+// pass on top made the FAST path arrive 128 samples LATE — compensated twice.
+//
+// So this test exists to stop the claim coming back. It is not testing our code; it is
+// pinning a behaviour of JUCE's that the rack depends on and that nothing else here would
+// notice losing.
+//
+// The stub effect it uses reports its latency AND incurs it. Against one that reports without
+// delaying — StubEffectProcessor, which is right for the amplitude tests it serves — the graph
+// would align paths that were never misaligned and this test would pass while proving nothing.
+void testLatencyCompensation()
+{
+    std::cout << "\nplug-in delay compensation" << std::endl;
+
+    constexpr int lateBy = 128;
+
+    Rig rig;
+    const auto fast = rig.host.addPart();
+    const auto slow = rig.host.addPart();
+    rig.load (fast);
+    rig.load (slow);
+
+    const auto busId = rig.host.addBus ("Layer");
+    rig.host.setPartDestination (fast, busId);
+    rig.host.setPartDestination (slow, busId);
+
+    // One insert on the slow part, which really does hold its signal back.
+    const auto effectId = rig.host.addEffectSlot (slow);
+    const auto generation = rig.host.beginEffectLoad (effectId);
+    rig.host.commitEffectLoad (effectId, generation,
+                               std::make_unique<ceditor::test::DelayingEffectProcessor> (lateBy),
+                               { "stub-delay", {}, "Delay", "Test" });
+
+    check (rig.host.partLatencySamples (slow) == lateBy,
+           "the reported cost of a part is what its plug-ins cost");
+    check (rig.host.partLatencySamples (fast) == 0, "and a part with no inserts costs nothing");
+
+    // Where the sound starts, in samples from the note. Both parts hold a DC level while a
+    // note is down, so the summed output is a staircase: one step per part arriving. One step
+    // means they arrived together; two means a flam.
+    const auto firstAbove = [&rig] (float threshold)
+    {
+        rig.noteOn (1, 60);
+        for (int block = 0, offset = 0; block < 16; ++block, offset += rig.buffer.getNumSamples())
+        {
+            rig.process();
+            const auto* samples = rig.buffer.getReadPointer (0);
+            for (int i = 0; i < rig.buffer.getNumSamples(); ++i)
+                if (std::abs (samples[i]) > threshold)
+                    return offset + i;
+        }
+        return -1;
+    };
+
+    const auto reset = [&rig]
+    {
+        rig.noteOff (1, 60);
+        for (int i = 0; i < 12; ++i)
+            rig.process();
+    };
+
+    const auto anything = firstAbove (0.01f);
+    reset();
+    const auto both = firstAbove (0.3f);          // one part alone is 0.25
+    reset();
+
+    check (anything >= 0 && both >= 0, "the rack makes sound at all");
+    check (anything == both,
+           "the layered parts start together — one step in the output, not two");
+    check (anything == lateBy,
+           "and both arrive when the slower one does, which is the whole of compensation");
+
+    // The graph's own number, which is the one worth reporting anywhere. It is not a sum this
+    // file computes; it is what the render sequence actually costs.
+    check (rig.host.getGraph().getLatencySamples() == lateBy,
+           "the graph reports the same latency it is compensating for");
+    check (rig.host.graphLatencySamples() == lateBy, "and the rack passes that number on");
+
+    // A return chain is on the master path too, and a sum walked over PARTS cannot see it.
+    // This is the case that made the hand-rolled report wrong rather than merely redundant:
+    // the DAW is told one number for the whole instance, and a short one puts every note
+    // early against every other track in the project.
+    constexpr int wetLatency = 512;
+    const auto returnId = rig.host.addReturn ("Verb");
+    rig.host.setSendLevel (fast, returnId, 1.0f);
+    const auto wetEffect = rig.host.addEffectSlot (returnId);
+    const auto wetGeneration = rig.host.beginEffectLoad (wetEffect);
+    rig.host.commitEffectLoad (wetEffect, wetGeneration,
+                               std::make_unique<ceditor::test::DelayingEffectProcessor> (wetLatency),
+                               { "stub-delay", {}, "Delay", "Test" });
+
+    check (rig.host.graphLatencySamples() == wetLatency,
+           "a laggy return is the longest path, and the graph knows it");
+    int worstPart = 0;
+    for (const auto& part : rig.host.getPerformance().parts)
+        worstPart = juce::jmax (worstPart, rig.host.partLatencySamples (part.partId));
+    check (worstPart + rig.host.masterLatencySamples() < rig.host.graphLatencySamples(),
+           "while a sum walked over parts and the master chain comes out SHORT — which is "
+           "exactly what the product used to hand the DAW");
+}
+
 int main()
 {
     std::cout << "RackHost tests" << std::endl;
@@ -444,6 +552,7 @@ int main()
     testStateCaptureRestore();
     testWillBeRemovedHook();
     testUnloadAndRemove();
+    testLatencyCompensation();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

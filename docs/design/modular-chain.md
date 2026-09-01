@@ -54,8 +54,27 @@ ancestor is an error with a sentence in it. A manifest that arrives with a dangl
 destination — a hand-edited file, a bus deleted elsewhere — falls back to the master rather than
 refusing to load.
 
-Bus latency is reported, not compensated. `busLatencySamples` tells the truth about what the
-longest path costs; making the shorter paths wait for it is not built.
+**Bus latency is compensated, and this document used to say it was not.** Corrected on
+2026-09-01, after the compensation pass this note called for was written, measured, and found
+to be a second one: `juce::AudioProcessorGraph` has done plug-in delay compensation all along.
+`RenderSequenceBuilder::createRenderingOpsForNode` takes `getInputLatencyForNode` over each
+node's inputs and inserts `DelayChannelOp`s for the shorter ones
+(`juce_AudioProcessorGraph.cpp`, JUCE 8.0.7, lines 1136-1258). Two parts layered into a bus
+through unequal inserts have always arrived together; adding a pass on top made the fast one
+arrive *late*, compensated twice.
+
+The evidence is a test rather than a reading of the source:
+`RackHostTests::testLatencyCompensation` plays a note through two parts of different latency
+into one bus and asserts the summed output has ONE step in it, not two. It uses an effect stub
+that reports its latency *and* incurs it — against one that only reports, the graph would
+align paths that were never misaligned and the test would prove nothing.
+
+The lesson is the one this repo keeps relearning: the premise was never written down, only the
+conclusion, so nobody could check it. Hence the line numbers above.
+
+`busLatencySamples` and `partLatencySamples` still exist and still report what the PLUG-INS
+cost, which is what the mixer wants to show — they name the thing to blame. What the rig costs
+end to end is `InstrumentRackHost::graphLatencySamples()`, the graph's own number.
 
 **Phase 3 — chain presets.** `saveChainToLibrary` captures one part as a `LibraryRecord` of type
 `chain`: the instrument and its state blob, the MIDI modules ahead of it, the inserts behind it,
@@ -81,7 +100,8 @@ flagging the whole record for one absent reverb would be a lie told before you a
 
 - **No MIDI routing between parts.** A part's MIDI chain feeds that part's instrument. One part
   driving another's is not built.
-- **No latency compensation on buses.** Reported, as above, not corrected.
+- ~~**No latency compensation on buses.**~~ Wrong when written; the graph always did it. See
+  above, and the test that pins it.
 - **A chain preset is a voice, not a mixer scene.** It does not carry the part's fader, pan, sends,
   name or output routing, and dropping one never moves a part.
 - **Chains are per-part.** Capturing several parts and their bus as one record is what a rack

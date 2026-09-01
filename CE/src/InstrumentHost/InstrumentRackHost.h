@@ -173,12 +173,35 @@ public:
     double tailLengthSeconds() const;
 
     // -- latency reporting (Stage 5) ----------------------------------------------------
-    // The graph does not compensate parallel paths (a live rack keeps every path as fast as
-    // its plug-ins allow); these make the cost visible instead of pretended away.
+    //
+    // This block used to open "the graph does not compensate parallel paths (a live rack keeps
+    // every path as fast as its plug-ins allow)". That was wrong, and a compensation pass was
+    // written against it before anybody checked. juce::AudioProcessorGraph has done PDC all
+    // along: RenderSequenceBuilder::createRenderingOpsForNode takes getInputLatencyForNode
+    // over each node's inputs and inserts DelayChannelOps for the shorter ones
+    // (juce_AudioProcessorGraph.cpp, JUCE 8.0.7, lines 1136-1258). Two parts layered into a
+    // bus through unequal inserts have always arrived together; a second pass on top made the
+    // fast one arrive LATE. RackHostTests::testLatencyCompensation pins the behaviour so the
+    // claim cannot come back.
+    //
+    // These per-element numbers are what the PLUG-INS cost, which is what the mixer wants to
+    // show — they name the thing to blame. What the RIG costs, compensation and all, is
+    // graphLatencySamples() below, and that is the only number worth handing anyone else.
     int partLatencySamples (const juce::String& partId) const;
     /** What a bus adds on the way out, its own destination chain included. */
     int busLatencySamples (const juce::String& busId) const;
     int masterLatencySamples() const;
+
+    /** What the render sequence actually costs, the graph's own compensation included.
+
+        The authority, and not the same thing as the sums above: those walk parts, buses and
+        the master chain, and cannot see a return chain, which is on the master path like
+        anything else. A rack whose reverb return carries a 512-sample lookahead limiter costs
+        512 samples even when every part chain is empty.
+
+        Zero until the rack is prepared — there is no render sequence before that, so there is
+        nothing to measure. */
+    int graphLatencySamples() const;
 
     // -- the performance engine (Stage 6) -----------------------------------------------
     // One transport and one scheduler for the whole rack, living in a graph node ahead of

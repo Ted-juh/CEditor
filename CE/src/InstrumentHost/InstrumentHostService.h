@@ -475,8 +475,13 @@ public:
     float masterLevel() const;
     void setMasterLevel (float level);
 
-    /** What the DAW should be told about this instance: the worst-case chain latency in
-        samples, and the longest tail anything loaded claims. */
+    /** What the DAW should be told about this instance: what the render sequence actually
+        costs, and the longest tail anything loaded claims.
+
+        The latency comes from the graph rather than from a sum computed beside it, because
+        the graph is what builds the sequence and inserts the compensation delays. A sum over
+        parts and the master chain misses a return chain entirely, and a short latency report
+        puts the whole instance early against every other track in the project. */
     int reportedLatencySamples() const;
     double tailLengthSeconds() const;
 

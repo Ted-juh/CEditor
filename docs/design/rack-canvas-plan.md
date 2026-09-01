@@ -351,8 +351,11 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
   The dock is for *our* editors; a plug-in's own window still floats.
 - **The CTRL49 pages.** Control pages address parameters by identity and are unaffected by any of
   this. If anything the canvas should make page assignment more obvious, not compete with it.
-- **Honesty about latency.** Bus latency is reported and not compensated. If wires are drawn, the
-  slow path should be visible on the wire rather than buried in a number.
+- **Honesty about latency.** Bus latency is compensated by the graph (see
+  [modular-chain.md](modular-chain.md), which used to say the opposite and now carries the
+  correction). What each element COSTS is still worth showing, because it names the path
+  everything else is waiting for — and if wires are drawn, that belongs on the wire rather
+  than buried in a number.
 
 ## Open questions
 

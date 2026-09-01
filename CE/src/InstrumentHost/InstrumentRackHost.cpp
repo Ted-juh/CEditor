@@ -752,10 +752,12 @@ int InstrumentRackHost::partLatencySamples (const juce::String& partId) const
             total += fx->getLatencySamples();
 
     // Everything the part's signal passes on the way to the master counts, buses included.
-    // The graph deliberately does not compensate parallel paths — a live rig stays as fast
-    // as its plug-ins allow — so two parts joining one bus through unequal inserts really
-    // do flam, and the honest answer is to REPORT it rather than delay the whole rig. This
-    // is the number the mixer shows.
+    //
+    // This is what the PART costs, not what the rig costs. The graph compensates — two parts
+    // joining one bus through unequal inserts arrive together, and always have (the header
+    // carries the correction and the evidence). So this number does not say "you are early or
+    // late"; it says "this is the path everything else is waiting for", which is what the
+    // mixer wants to show. The rig's own figure is graphLatencySamples().
     auto at = part->destinationBusId;
     for (int hops = 0; at.isNotEmpty() && hops <= model.buses.size(); ++hops)
     {
@@ -795,6 +797,11 @@ int InstrumentRackHost::masterLatencySamples() const
         if (auto* fx = getEffect (slot.effectId))
             total += fx->getLatencySamples();
     return total;
+}
+
+int InstrumentRackHost::graphLatencySamples() const
+{
+    return graph.getLatencySamples();
 }
 
 bool InstrumentRackHost::primePartState (const juce::String& partId, const ClassInfo& info,

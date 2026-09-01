@@ -5481,8 +5481,9 @@ juce::var InstrumentHostService::buildStatePayload()
                                                 ? errorIt->second : juce::String());
         }
 
-        // Chain latency, visible rather than pretended away — the graph does not compensate
-        // parallel paths (a live rack keeps every path as fast as its plug-ins allow).
+        // What this part's own plug-ins cost. Shown because it names the thing to blame:
+        // the graph compensates for it (JUCE's own PDC — see InstrumentRackHost.h), so the
+        // part is not out of time, it is simply the reason everything else is waiting.
         obj->setProperty ("latencyMs", rack.partLatencySamples (part.partId)
                                          / rack.getSampleRate() * 1000.0);
         obj->setProperty ("arp",    perf::arpToVar (part.arp));
@@ -5572,8 +5573,8 @@ juce::var InstrumentHostService::buildStatePayload()
         b->setProperty ("level",            bus.level);
         b->setProperty ("destinationBusId", bus.destinationBusId);
         b->setProperty ("effects",          effectsProjection (bus.effects));
-        // What this bus adds on the way out, its own destination included: the graph does
-        // not compensate parallel paths, so the number is shown rather than hidden.
+        // What this bus adds on the way out, its own destination included. Compensated by
+        // the graph, shown here because it is still what the bus costs the rig.
         b->setProperty ("latencyMs", rack.busLatencySamples (bus.busId)
                                        / rack.getSampleRate() * 1000.0);
         buses.add (juce::var (b));
@@ -6283,8 +6284,22 @@ void InstrumentHostService::setMasterLevel (float level)
 
 int InstrumentHostService::reportedLatencySamples() const
 {
-    // The DAW compensates one number for the whole instance, so it has to be the worst path
-    // through the rack: the slowest part chain, plus whatever the master chain adds after it.
+    // The DAW compensates one number for the whole instance, and the graph is the only thing
+    // that knows what that number is: it builds the render sequence, it inserts the
+    // compensation delays, and it costs what it costs.
+    //
+    // This used to be a sum walked over the parts and the master chain, which is short
+    // whenever a RETURN carries the longest path — a reverb return with a lookahead limiter
+    // on it costs its samples even when every part chain is empty. The DAW was then told a
+    // number smaller than the truth, which puts the whole instance early against every other
+    // track in the project: not a subtle bug, and invisible from inside the app.
+    if (const auto measured = rack.graphLatencySamples(); measured > 0)
+        return measured;
+
+    // Nothing prepared yet — the editor before an audio device opens, or a fresh instance
+    // being asked what it will report. There is no render sequence to measure, so fall back
+    // to the sum. It is right whenever no return is the longest path, and it is only ever
+    // read for display: the wrapper asks again once the DAW has prepared it.
     int worst = 0;
     for (const auto& part : rack.getPerformance().parts)
         worst = juce::jmax (worst, rack.partLatencySamples (part.partId));

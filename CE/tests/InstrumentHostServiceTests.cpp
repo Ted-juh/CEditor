@@ -3553,7 +3553,8 @@ void testRevisionsAndEngine()
     h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.7 } });
     check (revisions().size() == 12, "the revision trail prunes to its cap, oldest first");
 
-    // Latency is visible, not compensated: the stub effect reports 441 samples = 10ms.
+    // What the part costs is visible in the mixer, whether or not the graph compensates for
+    // it: the stub effect reports 441 samples = 10ms.
     h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
     const auto* state = h.emits.lastState();
     check (std::abs ((double) state->getProperty ("rack", {}).getProperty ("parts", {})[0]
@@ -4108,10 +4109,30 @@ void testGeneratedProduct()
                "and an index past the end is refused, not guessed at");
 
         // -- latency and tail --------------------------------------------------------------
+        // What the DAW is told, and it comes from the graph rather than from a sum computed
+        // beside it: the graph builds the render sequence and inserts the compensation
+        // delays, so it is the only thing that knows what the instance really costs.
         check (h.service->reportedLatencySamples() == 0, "an empty chain reports no latency");
         h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
         check (h.service->reportedLatencySamples() == 441,
                "an insert's latency reaches the host as one number for the instance");
+
+        // The case that made the old hand-rolled sum wrong rather than merely redundant. A
+        // return chain is on the master path like anything else, and a sum walked over PARTS
+        // cannot see it — the DAW was told a number short of the truth, which puts the whole
+        // instance early against every other track in the project.
+        h.cmd ("addReturn", { { "name", "Verb" } });
+        const auto verbId = h.emits.lastState()->getProperty ("rack", {})
+                              .getProperty ("returns", {})[0].getProperty ("returnId", {}).toString();
+        h.cmd ("addEffect", { { "chainId", verbId }, { "ceId", "VST3-nice-reverb" } });
+        h.cmd ("setSendLevel", { { "partId", partId }, { "returnId", verbId }, { "level", 1.0 } });
+        check (h.service->reportedLatencySamples() >= 441 * 2,
+               "a laggy return counts towards what the instance costs, which a sum over parts missed");
+        // Put the rack back: a send outlives the routing checks further down, because a
+        // part's send keeps feeding the main pair even after the part leaves it.
+        h.cmd ("removeReturn", { { "returnId", verbId } });
+        check (h.service->reportedLatencySamples() == 441, "and stops counting once it is gone");
+
         check (h.service->tailLengthSeconds() >= 0.0, "and the tail is reported too");
 
         // -- offline render ------------------------------------------------------------------

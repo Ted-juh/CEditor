@@ -183,4 +183,84 @@ struct StubEffectProcessor : juce::AudioProcessor
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StubEffectProcessor)
 };
 
+/** An effect that both REPORTS a latency and actually incurs it.
+
+    StubEffectProcessor above reports 441 samples and delays by nothing, which is right for the
+    tests it serves — they assert on amplitude and would be harder to read with the signal
+    moving. It is exactly wrong for compensation: against an effect that lies about its
+    latency, aligning the paths would CREATE the flam it exists to remove, and the test would
+    pass while the feature was backwards.
+
+    So this one tells the truth in both directions, and the alignment test uses it. */
+struct DelayingEffectProcessor : juce::AudioProcessor
+{
+    explicit DelayingEffectProcessor (int delaySamples)
+        : juce::AudioProcessor (BusesProperties()
+                                    .withInput ("In", juce::AudioChannelSet::stereo(), true)
+                                    .withOutput ("Out", juce::AudioChannelSet::stereo(), true)),
+          delay (delaySamples)
+    {
+        setLatencySamples (delay);
+    }
+
+    void prepareToPlay (double, int) override
+    {
+        ring.setSize (2, juce::jmax (1, delay + 1), false, true, true);
+        ring.clear();
+        writeIndex = 0;
+    }
+
+    void releaseResources() override {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer&) override
+    {
+        if (delay <= 0)
+            return;
+
+        const auto length = ring.getNumSamples();
+        for (int channel = 0; channel < juce::jmin (audio.getNumChannels(), 2); ++channel)
+        {
+            auto* samples = audio.getWritePointer (channel);
+            auto* stored = ring.getWritePointer (channel);
+            auto write = writeIndex;
+
+            for (int i = 0; i < audio.getNumSamples(); ++i)
+            {
+                auto read = write - delay;
+                if (read < 0)
+                    read += length;
+
+                const auto out = stored[read];
+                stored[write] = samples[i];
+                samples[i] = out;
+
+                if (++write >= length)
+                    write = 0;
+            }
+        }
+
+        writeIndex = (writeIndex + audio.getNumSamples()) % length;
+    }
+
+    const juce::String getName() const override               { return "Delaying Effect"; }
+    bool acceptsMidi() const override                         { return false; }
+    bool producesMidi() const override                        { return false; }
+    double getTailLengthSeconds() const override              { return 0.0; }
+    juce::AudioProcessorEditor* createEditor() override       { return nullptr; }
+    bool hasEditor() const override                           { return false; }
+    int getNumPrograms() override                             { return 1; }
+    int getCurrentProgram() override                          { return 0; }
+    void setCurrentProgram (int) override                     {}
+    const juce::String getProgramName (int) override          { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override    {}
+    void setStateInformation (const void*, int) override      {}
+
+    int delay = 0;
+    juce::AudioBuffer<float> ring;
+    int writeIndex = 0;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DelayingEffectProcessor)
+};
+
 } // namespace ceditor::test
