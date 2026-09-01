@@ -21,6 +21,7 @@
     hostSurface, hostSurfaceLayout, requestSurfaceLayout, hostState, hostMidiActivity,
     hostParamDrag, assignControlSlot, clearControlSlot, hostParameters, requestParameters,
     filterParameters, surfaceControlSlot,
+    setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
   } from '../stores/instrumentHost.js';
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
@@ -37,6 +38,29 @@
   $effect(() => {
     // Ask once, the first time anybody looks. The layout is static per profile.
     if (!asked) { asked = true; requestSurfaceLayout(); }
+  });
+
+  // --- describing a controller nobody wrote a profile for ---------------------------------
+  //
+  // Control never needed one. MIDI learn binds whatever moves, from any device, so every
+  // keyboard already drives the slots — a profile only ever added the picture, the page size,
+  // and the device's own screen. Two of those come from three numbers, which is all this asks
+  // for; the third is the only thing an authored profile is still needed for.
+  let describing = $state(false);
+  let ownName = $state('');
+  let ownEncoders = $state(8);
+  let ownFaders = $state(0);
+  let ownPads = $state(0);
+
+  $effect(() => {
+    // Prefill from whatever is already described, so opening the form is never a blank slate
+    // that silently discards what you told it last time.
+    if (layout.userSurface) {
+      ownName = layout.userSurface;
+      ownEncoders = layout.userEncoders;
+      ownFaders = layout.userFaders;
+      ownPads = layout.userPads;
+    }
   });
 
   const kindLabel = {
@@ -146,6 +170,9 @@
     {/if}
     <strong>{layout.displayName || 'No controller profile'}</strong>
     {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
+    <button type="button" class="ghost" data-testid="surface-describe"
+            title="Any controller works — CEditor just needs to know what is on yours"
+            onclick={() => (describing = !describing)}>{layout.userSurface ? 'Edit controller' : 'Describe controller'}</button>
     {#if pages.length > 0}
       <!-- Which page the drawing is showing. Eight knobs mean eight assignments, and which
            eight depends entirely on the page — a drawing that did not say which would be
@@ -170,10 +197,54 @@
         : $hostSurface.state}</span>
   </div>
 
+  {#if describing}
+    <div class="describe" data-testid="surface-describe-form">
+      <p class="dim">
+        Every controller already works: MIDI learn binds whatever you move, whatever sent it.
+        This is only so the drawing knows what is on yours.
+      </p>
+      <div class="describe-row">
+        <label>Name <input type="text" bind:value={ownName} placeholder="Advance 49" /></label>
+        <label>Knobs <input type="number" min="0" max="64" bind:value={ownEncoders} /></label>
+        <label>Faders <input type="number" min="0" max="64" bind:value={ownFaders} /></label>
+        <label>Pads <input type="number" min="0" max="64" bind:value={ownPads} /></label>
+      </div>
+      <div class="describe-row">
+        <button type="button" data-testid="surface-describe-save"
+                onclick={() => { setUserSurface(ownName, ownEncoders, ownFaders, ownPads);
+                                 describing = false; }}>Use this</button>
+        {#if layout.learning}
+          <button type="button" class="toggle on" data-testid="surface-sweep-finish"
+                  title="Stop counting and use what was heard"
+                  onclick={() => finishUserSurfaceLearn(ownName)}>
+            Heard {layout.heard} — finish
+          </button>
+        {:else}
+          <button type="button" class="toggle" data-testid="surface-sweep"
+                  title="Sweep every knob and fader you want to use, then finish"
+                  onclick={() => learnUserSurface()}>Count them for me</button>
+        {/if}
+        {#if layout.userSurface}
+          <button type="button" class="ghost danger" data-testid="surface-describe-clear"
+                  title="Go back to the built-in profile for a connected controller"
+                  onclick={() => { clearUserSurface(); describing = false; }}>Forget it</button>
+        {/if}
+      </div>
+      {#if layout.learning}
+        <!-- Said out loud rather than guessed: a knob and a fader are the same thing on the
+             wire, so the count is of continuous controls and the split is the owner's to make. -->
+        <p class="dim">
+          Counting distinct controls. Knobs and faders look identical over MIDI, so they all
+          come back as knobs — move them to the Faders box yourself if the picture matters.
+        </p>
+      {/if}
+    </div>
+  {/if}
+
   {#if layout.controls.length === 0}
     <div class="empty-hint">
-      No layout for this controller. Pages and MIDI learn still work — this drawing is the only
-      thing missing, and it comes from the surface profile.
+      No drawing yet — CEditor has no built-in profile for what is connected. Pages and MIDI
+      learn already work; press <strong>Describe controller</strong> and the picture follows.
     </div>
   {:else}
     <div class="surface-body">
@@ -269,6 +340,13 @@
   .surface-head { display: flex; align-items: center; gap: 8px; }
   .dim { color: #7d8894; font-size: 11px; }
   .surface-state { margin-left: auto; white-space: nowrap; }
+
+  .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;
+              border: 1px solid #3b4652; border-radius: 6px; background: #1a1f25; }
+  .describe p { margin: 0; }
+  .describe-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+  .describe label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #a8b4c0; }
+  .describe input[type='number'] { width: 62px; }
 
   .surface-body {
     flex: 1;

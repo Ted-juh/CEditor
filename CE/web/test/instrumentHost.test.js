@@ -923,6 +923,34 @@ test('normalizeSurfaceLayout groups controls into the regions a person thinks in
   assert.ok(byId.pads.w < 1 && byId.pads.h < 1, 'and the region is a crop, not the whole unit');
 });
 
+test('a described controller answers with everything the form needs', () => {
+  // The point of the whole feature, asserted where it is cheapest: an unknown controller is
+  // not unsupported, it is undrawn. Control already worked — MIDI learn binds whatever moves.
+  const shaped = normalizeSurfaceLayout({
+    profileId: 'user', displayName: 'Advance 49', vendor: 'Described by you', aspect: 2.3,
+    controls: [
+      { controlId: 'encoder-1', kind: 'encoder', label: '1', x: 0.4, y: 0.1, w: 0.05, h: 0.08, index: 0 },
+      { controlId: 'keys', kind: 'keys', label: 'Keys', x: 0, y: 0.6, w: 1, h: 0.35, index: -1 },
+    ],
+    userSurface: 'Advance 49', userEncoders: 8, userFaders: 4, userPads: 16,
+    learning: true, heard: 5,
+  });
+
+  assert.equal(shaped.userSurface, 'Advance 49', 'the form can prefill from the answer');
+  assert.deepEqual([shaped.userEncoders, shaped.userFaders, shaped.userPads], [8, 4, 16]);
+  assert.equal(shaped.learning, true, 'and a running count says it is running');
+  assert.equal(shaped.heard, 5, 'with how many it has heard so far');
+
+  // The indices are the whole reason a described controller is not a second-class one: they
+  // are what assignment on the drawing and live feedback key off.
+  assert.equal(shaped.controls[0].index, 0, 'its knobs address page slots like any other');
+  assert.equal(shaped.controls[1].index, -1, 'and its keys are drawn but honestly inert');
+
+  const none = normalizeSurfaceLayout({ controls: [] });
+  assert.equal(none.userSurface, '', 'nothing described reads as nothing, not as undefined');
+  assert.equal(none.learning, false);
+});
+
 test('normalizeSurfaceLayout survives a profile that has no drawing', () => {
   const empty = normalizeSurfaceLayout({});
   assert.deepEqual(empty, emptySurfaceLayout(),

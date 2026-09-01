@@ -150,6 +150,59 @@ int SurfaceLayout::addressableCount (const juce::String& kind) const
     return count;
 }
 
+SurfaceLayout buildGenericLayout (const SurfaceCapabilities& capabilities)
+{
+    SurfaceLayout layout;
+    layout.aspect = 2.3f;      // a 49-key box, near enough for a schematic
+
+    // Each family gets its own band, and every item is sized from the count so a row always
+    // fits inside it. That is what makes this safe for any number the owner claims: nothing is
+    // positioned by hand, so nothing can overlap or run off the edge, and the conformance
+    // check that refuses both is the same one an authored layout has to pass.
+    const auto place = [&layout] (const juce::String& kind, const juce::String& prefix, int count,
+                                  int perRow, float left, float right, float top, float bottom,
+                                  bool addressable)
+    {
+        if (count <= 0)
+            return;
+
+        const auto columns = juce::jmax (1, juce::jmin (perRow, count));
+        const auto rows = (count + columns - 1) / columns;
+        const auto cellW = (right - left) / (float) columns;
+        const auto cellH = (bottom - top) / (float) rows;
+
+        // Seven tenths of the cell, centred: the gap is what stops two neighbours touching,
+        // and touching is what the overlap check refuses.
+        const auto w = cellW * 0.7f;
+        const auto h = cellH * 0.7f;
+
+        for (int i = 0; i < count; ++i)
+        {
+            const auto column = i % columns;
+            const auto row = i / columns;
+            layout.controls.add ({ prefix + juce::String (i + 1), kind,
+                                   juce::String (i + 1),
+                                   left + column * cellW + (cellW - w) / 2.0f,
+                                   top + row * cellH + (cellH - h) / 2.0f,
+                                   w, h,
+                                   addressable ? i : -1 });
+        }
+    };
+
+    // Faders on the left, encoders on the right, pads under the encoders — the arrangement
+    // nearly every controller of this shape actually has, so the map reads like the desk even
+    // though none of it was measured.
+    place ("fader",   "fader-",   capabilities.faders,   9, 0.03f, 0.34f, 0.07f, 0.31f, true);
+    place ("encoder", "encoder-", capabilities.encoders, 8, 0.40f, 0.97f, 0.07f, 0.31f, true);
+    place ("pad",     "pad-",     capabilities.pads,     8, 0.40f, 0.97f, 0.35f, 0.53f, true);
+
+    // The keys, drawn and honestly inert: they are why the box is on the desk, and leaving
+    // them out would make the map read as a control panel rather than as an instrument.
+    layout.controls.add ({ "keys", "keys", "Keys", 0.02f, 0.57f, 0.96f, 0.40f, -1 });
+
+    return layout;
+}
+
 namespace
 {
 

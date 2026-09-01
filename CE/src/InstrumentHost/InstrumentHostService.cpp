@@ -117,52 +117,100 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // Describe the controller on your desk. Three numbers and a name is the whole of it,
+    // because control already works — see SurfaceProfile.h, buildGenericLayout.
+    if (cmd == "setUserSurface")
+    {
+        loadUserSurface();
+        const auto name = payload.getProperty ("name", {}).toString().trim();
+        if (name.isEmpty())
+        {
+            emitError ("Give the controller a name.");
+            return;
+        }
+
+        const auto count = [&payload] (const char* key)
+        {
+            return juce::jlimit (0, 64, (int) payload.getProperty (key, 0));
+        };
+
+        userSurfaceName = name;
+        userSurfaceCapabilities = {};
+        userSurfaceCapabilities.encoders = count ("encoders");
+        userSurfaceCapabilities.faders   = count ("faders");
+        userSurfaceCapabilities.pads     = count ("pads");
+
+        if (userSurfaceCapabilities.encoders + userSurfaceCapabilities.faders
+              + userSurfaceCapabilities.pads == 0)
+        {
+            emitError ("A controller with nothing on it has nothing to draw.");
+            userSurfaceName = {};
+            return;
+        }
+
+        userSurfaceLearning = false;
+        saveUserSurface();
+        emitSurfaceLayout();
+        return;
+    }
+
+    if (cmd == "clearUserSurface")
+    {
+        loadUserSurface();
+        userSurfaceName = {};
+        userSurfaceCapabilities = {};
+        userSurfaceLearning = false;
+        saveUserSurface();
+        emitSurfaceLayout();
+        return;
+    }
+
+    // Counting instead of asking: sweep every knob and fader you want to use, and CEditor
+    // counts the distinct controllers it hears. It cannot tell a knob from a fader — both are
+    // continuous controllers on the wire — so it calls them all encoders and the owner can
+    // split them afterwards if the picture matters to them. Saying that plainly beats
+    // guessing, and guessing is what would make the drawing a lie.
+    if (cmd == "learnUserSurface")
+    {
+        userSurfaceLearning = true;
+        userSurfaceHeard.clear();
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            pendingCcs.clear();     // only what moves from NOW counts
+        }
+        emitSurfaceLayout();
+        return;
+    }
+
+    if (cmd == "finishUserSurfaceLearn")
+    {
+        if (! userSurfaceLearning)
+            return;
+
+        userSurfaceLearning = false;
+        const auto heard = userSurfaceHeard.size();
+        if (heard == 0)
+        {
+            emitError ("Nothing moved — sweep the knobs and faders you want to use, then finish.");
+            emitSurfaceLayout();
+            return;
+        }
+
+        loadUserSurface();
+        if (userSurfaceName.isEmpty())
+            userSurfaceName = payload.getProperty ("name", {}).toString().trim();
+        if (userSurfaceName.isEmpty())
+            userSurfaceName = "My controller";
+
+        userSurfaceCapabilities.encoders = juce::jlimit (0, 64, heard);
+        saveUserSurface();
+        emitSurfaceLayout();
+        return;
+    }
+
     if (cmd == "getSurfaceLayout")
     {
-        // The layout is static per profile, so it is asked for rather than pushed: sixty-odd
-        // controls have no business riding along on every status change. A profile without one
-        // answers with an empty layout and the UI draws generically from the counts.
-        const auto requested = payload.getProperty ("profileId", {}).toString();
-        const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
-        const ctrl49::SurfaceProfile* profile = requested.isNotEmpty() ? registry.find (requested)
-                                                                      : nullptr;
-        if (profile == nullptr)
-            // No profile named: the first one that has a drawing. There is one controller
-            // family today; when there are several this becomes "the connected one", which is
-            // a question the broker answers, not this command.
-            for (const auto& id : registry.profileIds())
-                if (const auto* candidate = registry.find (id);
-                    candidate != nullptr && ! candidate->layout.isEmpty())
-                {
-                    profile = candidate;
-                    break;
-                }
-
-        auto* root = new juce::DynamicObject();
-        if (profile != nullptr)
-        {
-            root->setProperty ("profileId",   profile->profileId);
-            root->setProperty ("displayName", profile->displayName);
-            root->setProperty ("vendor",      profile->vendor);
-            root->setProperty ("aspect",      profile->layout.aspect);
-            juce::Array<juce::var> controls;
-            for (const auto& control : profile->layout.controls)
-            {
-                auto* obj = new juce::DynamicObject();
-                obj->setProperty ("controlId", control.controlId);
-                obj->setProperty ("kind",      control.kind);
-                obj->setProperty ("label",     control.label);
-                obj->setProperty ("x",         control.x);
-                obj->setProperty ("y",         control.y);
-                obj->setProperty ("w",         control.w);
-                obj->setProperty ("h",         control.h);
-                obj->setProperty ("index",     control.index);
-                controls.add (juce::var (obj));
-            }
-            root->setProperty ("controls", controls);
-        }
-        if (options.emit != nullptr)
-            options.emit ("instrumentHostSurfaceLayout", juce::var (root));
+        emitSurfaceLayout (payload.getProperty ("profileId", {}).toString());
         return;
     }
 
@@ -4916,6 +4964,112 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     }
 }
 
+void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProfileId)
+{
+    // The layout is static per profile, so it is asked for rather than pushed: sixty-odd
+    // controls have no business riding along on every status change.
+    const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
+    const ctrl49::SurfaceProfile* profile = requestedProfileId.isNotEmpty()
+                                              ? registry.find (requestedProfileId) : nullptr;
+
+    if (profile == nullptr && requestedProfileId.isEmpty())
+        for (const auto& id : registry.profileIds())
+            if (const auto* candidate = registry.find (id);
+                candidate != nullptr && ! candidate->layout.isEmpty())
+            {
+                profile = candidate;
+                break;
+            }
+
+    // The owner's own controller wins over an authored profile, and that is deliberate:
+    // describing one is something you only do when the authored profile is not your device.
+    // Clearing it hands the drawing straight back.
+    loadUserSurface();
+    const auto useOwn = userSurfaceName.isNotEmpty() && requestedProfileId.isEmpty();
+
+    const auto layout = useOwn ? ctrl49::buildGenericLayout (userSurfaceCapabilities)
+                               : (profile != nullptr ? profile->layout : ctrl49::SurfaceLayout());
+
+    auto* root = new juce::DynamicObject();
+    if (useOwn || profile != nullptr)
+    {
+        root->setProperty ("profileId",   useOwn ? juce::String ("user") : profile->profileId);
+        root->setProperty ("displayName", useOwn ? userSurfaceName : profile->displayName);
+        root->setProperty ("vendor",      useOwn ? juce::String ("Described by you")
+                                                 : profile->vendor);
+        root->setProperty ("aspect",      layout.aspect);
+        juce::Array<juce::var> controls;
+        for (const auto& control : layout.controls)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("controlId", control.controlId);
+            obj->setProperty ("kind",      control.kind);
+            obj->setProperty ("label",     control.label);
+            obj->setProperty ("x",         control.x);
+            obj->setProperty ("y",         control.y);
+            obj->setProperty ("w",         control.w);
+            obj->setProperty ("h",         control.h);
+            obj->setProperty ("index",     control.index);
+            controls.add (juce::var (obj));
+        }
+        root->setProperty ("controls", controls);
+    }
+
+    // What the panel needs to offer "describe your controller" without a second round trip:
+    // whether one is described, and whether a count is running.
+    root->setProperty ("userSurface",  userSurfaceName);
+    root->setProperty ("userEncoders", userSurfaceCapabilities.encoders);
+    root->setProperty ("userFaders",   userSurfaceCapabilities.faders);
+    root->setProperty ("userPads",     userSurfaceCapabilities.pads);
+    root->setProperty ("learning",     userSurfaceLearning);
+    root->setProperty ("heard",        userSurfaceHeard.size());
+
+    if (options.emit != nullptr)
+        options.emit ("instrumentHostSurfaceLayout", juce::var (root));
+}
+
+void InstrumentHostService::loadUserSurface()
+{
+    if (userSurfaceLoaded)
+        return;
+
+    userSurfaceLoaded = true;
+    if (options.dataDirectory == juce::File())
+        return;
+
+    const auto stored = juce::JSON::parse (userSurfaceFile().loadFileAsString());
+    if (! stored.isObject())
+        return;
+
+    userSurfaceName = stored.getProperty ("name", {}).toString();
+    // Clamped rather than trusted: these numbers come from a text field, and a layout is built
+    // from them. Sixty-four of anything is already past any controller ever made.
+    userSurfaceCapabilities.encoders = juce::jlimit (0, 64, (int) stored.getProperty ("encoders", 0));
+    userSurfaceCapabilities.faders   = juce::jlimit (0, 64, (int) stored.getProperty ("faders", 0));
+    userSurfaceCapabilities.pads     = juce::jlimit (0, 64, (int) stored.getProperty ("pads", 0));
+}
+
+void InstrumentHostService::saveUserSurface() const
+{
+    if (options.dataDirectory == juce::File())
+        return;
+
+    if (userSurfaceName.isEmpty())
+    {
+        userSurfaceFile().deleteFile();      // cleared means gone, not an empty record
+        return;
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("name",     userSurfaceName);
+    root->setProperty ("encoders", userSurfaceCapabilities.encoders);
+    root->setProperty ("faders",   userSurfaceCapabilities.faders);
+    root->setProperty ("pads",     userSurfaceCapabilities.pads);
+
+    userSurfaceFile().getParentDirectory().createDirectory();
+    userSurfaceFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+}
+
 void InstrumentHostService::loadParameterFavourites()
 {
     if (parameterFavouritesLoaded)
@@ -4999,6 +5153,18 @@ void InstrumentHostService::drainControllerEvents()
     }
     if (events.empty())
         return;
+
+    // Counting the owner's controls, when they are sweeping them. Distinct (channel, cc) pairs
+    // only: one knob swept through its range is one control, not a hundred.
+    if (userSurfaceLearning)
+    {
+        const auto before = userSurfaceHeard.size();
+        for (const auto& event : events)
+            userSurfaceHeard.add (event.channel * 128 + event.cc);
+
+        if (userSurfaceHeard.size() != before)
+            emitSurfaceLayout();     // the running count, so the sweep can be watched
+    }
 
     // Learn first: the armed slot takes the first controller heard since arming.
     if (midiLearnPageId.isNotEmpty())

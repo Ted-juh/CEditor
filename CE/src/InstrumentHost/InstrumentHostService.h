@@ -720,6 +720,30 @@ private:
     {
         return options.dataDirectory.getChildFile ("parameter-favourites.json");
     }
+    // -- the owner's own controller --------------------------------------------------------
+    // Everything CEditor drives, it drives over MIDI learn, which never cared what device sent
+    // the message. So a controller nobody authored a profile for is not unsupported — it is
+    // undrawn, and the only thing missing is how many of each control it has. The owner can
+    // say, or CEditor can count while they sweep. Stored per user beside the catalogue: it is
+    // a fact about their desk, not about a song.
+    juce::File userSurfaceFile() const
+    {
+        return options.dataDirectory.getChildFile ("surface-profile.json");
+    }
+    /** Answers instrumentHostSurfaceLayout with the drawing in force: the profile named, the
+        owner's own controller when they described one, else the first authored profile that
+        has a layout. */
+    void emitSurfaceLayout (const juce::String& requestedProfileId = {});
+    void loadUserSurface();
+    void saveUserSurface() const;
+    /** Empty name = the owner has not described a controller, and authored profiles decide. */
+    juce::String userSurfaceName;
+    ctrl49::SurfaceCapabilities userSurfaceCapabilities;
+    bool userSurfaceLoaded = false;
+    /** Counting distinct controllers while the owner sweeps everything they want to use. */
+    bool userSurfaceLearning = false;
+    juce::SortedSet<int> userSurfaceHeard;
+
     void loadParameterFavourites();
     void saveParameterFavourites() const;
     /** ceId -> the parameter ids marked on that class. Loaded once, on first use. */

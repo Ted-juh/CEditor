@@ -399,6 +399,41 @@ lives, and it is tested against the orders a person would expect rather than aga
 folded, so four hundred parameters read as a dozen headings. Checked before building anything
 on top of it.
 
+## A controller nobody wrote a profile for
+
+Added 2026-09-01, and the reasoning is worth more than the code.
+
+**Control was never what a profile unlocked.** MIDI learn binds whatever controller moves, from
+whatever device sent it, and always has — so every keyboard on earth could already drive
+CEditor's control slots. What an authored `SurfaceProfile` adds is three things: a picture, a
+page size, and the device's own screen and LEDs. Only the last genuinely needs per-device work,
+and most controllers have nothing to talk to anyway.
+
+So an unknown controller was never unsupported. It was **undrawn** — and the one missing fact
+was how many of each control it has. The owner can simply say ("8 knobs, 4 faders, 16 pads"),
+or CEditor can count while they sweep everything they want to use. `buildGenericLayout` turns
+those counts into a schematic: families in their own bands, every item sized from the count so
+a row always fits. Nothing is positioned by hand, so nothing can overlap or run off the edge —
+and it passes the same conformance check an authored layout has to, which is what makes
+accepting arbitrary numbers safe.
+
+Controls are indexed 0..n-1 per family, so everything downstream works unchanged: assignment by
+dropping a parameter on a knob, the live highlight, page generation. A described controller is
+not a second-class one.
+
+*Said out loud rather than guessed:* a knob and a fader are the same thing on the wire, so the
+sweep counts continuous controls and calls them all knobs. The owner splits them if the picture
+matters. Guessing would make the drawing a lie.
+
+Stored per user beside the catalogue, not in the Performance — it is a fact about the desk, not
+about a song.
+
+**Why this shape rather than a device catalogue.** The product this succeeds shipped a curated
+list of supported controllers, and that list is exactly its cage: your keyboard works properly
+or it does not, and you cannot fix it. Adding profiles one at a time would have copied the
+cage. Authored profiles now do only what they alone can — an accurate picture, and the
+screen/LED path for the few devices that have one.
+
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.

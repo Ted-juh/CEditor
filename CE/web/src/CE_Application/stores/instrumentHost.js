@@ -101,7 +101,11 @@ export function normalizeHostSurface(payload) {
 // --- the surface as a picture --------------------------------------------------------------------
 
 export function emptySurfaceLayout() {
-  return { profileId: '', displayName: '', vendor: '', aspect: 0, controls: [], regions: [] };
+  return { profileId: '', displayName: '', vendor: '', aspect: 0, controls: [], regions: [],
+           // The owner's own controller, when they described one: what to prefill the form
+           // with, and whether a count is running.
+           userSurface: '', userEncoders: 0, userFaders: 0, userPads: 0,
+           learning: false, heard: 0 };
 }
 
 // The regions a person actually thinks in — "the encoders", "the pads", "the keys" — rather
@@ -158,6 +162,14 @@ export function normalizeSurfaceLayout(payload) {
     aspect: Number(p.aspect ?? 0) || 0,
     controls,
     regions,
+    // The owner's own controller, when they described one: enough to prefill the form and to
+    // show a running count, without a second round trip for either.
+    userSurface: String(p.userSurface ?? ''),
+    userEncoders: Number(p.userEncoders ?? 0),
+    userFaders: Number(p.userFaders ?? 0),
+    userPads: Number(p.userPads ?? 0),
+    learning: p.learning === true,
+    heard: Number(p.heard ?? 0),
   };
 }
 
@@ -2636,6 +2648,51 @@ export function initInstrumentHostBridge() {
 // the pinning and the ordering without pretending to persist anything.
 const mockFavourites = new Set();
 
+// The controller the owner described, in the browser preview only. Native keeps it in the
+// data directory; here it lasts the session, which is all a preview needs.
+let mockOwnSurface = null;
+let mockSurfaceLearning = false;
+let mockSurfaceHeard = 0;
+
+const mockOwnSurfaceFields = () => ({
+  userSurface: mockOwnSurface?.name ?? '',
+  userEncoders: mockOwnSurface?.encoders ?? 0,
+  userFaders: mockOwnSurface?.faders ?? 0,
+  userPads: mockOwnSurface?.pads ?? 0,
+  learning: mockSurfaceLearning,
+  heard: mockSurfaceHeard,
+});
+
+/** The same schematic buildGenericLayout draws natively: families in their own bands, sized
+    from the count so a row always fits and nothing can overlap. */
+function mockGenericLayout(own) {
+  const controls = [];
+  const place = (kind, prefix, count, perRow, left, right, top, bottom, addressable) => {
+    if (count <= 0) return;
+    const columns = Math.max(1, Math.min(perRow, count));
+    const rows = Math.ceil(count / columns);
+    const cellW = (right - left) / columns;
+    const cellH = (bottom - top) / rows;
+    const w = cellW * 0.7;
+    const h = cellH * 0.7;
+    for (let i = 0; i < count; i += 1) {
+      const column = i % columns;
+      const row = Math.floor(i / columns);
+      controls.push({ controlId: `${prefix}${i + 1}`, kind, label: String(i + 1),
+                      x: left + column * cellW + (cellW - w) / 2,
+                      y: top + row * cellH + (cellH - h) / 2,
+                      w, h, index: addressable ? i : -1 });
+    }
+  };
+  place('fader', 'fader-', own.faders, 9, 0.03, 0.34, 0.07, 0.31, true);
+  place('encoder', 'encoder-', own.encoders, 8, 0.40, 0.97, 0.07, 0.31, true);
+  place('pad', 'pad-', own.pads, 8, 0.40, 0.97, 0.35, 0.53, true);
+  controls.push({ controlId: 'keys', kind: 'keys', label: 'Keys',
+                  x: 0.02, y: 0.57, w: 0.96, h: 0.40, index: -1 });
+  return { profileId: 'user', displayName: own.name, vendor: 'Described by you',
+           aspect: 2.3, controls };
+}
+
 function send(payload) {
   if (!isJuceAvailable()) {
     // Device commands mutate the device store, everything else the host state.
@@ -2766,7 +2823,47 @@ function send(payload) {
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
     if (payload?.cmd === 'getSurfaceLayout') {
-      hostSurfaceLayout.set(normalizeSurfaceLayout(mockSurfaceLayout()));
+      hostSurfaceLayout.set(normalizeSurfaceLayout(mockOwnSurface
+        ? { ...mockGenericLayout(mockOwnSurface), ...mockOwnSurfaceFields() }
+        : { ...mockSurfaceLayout(), ...mockOwnSurfaceFields() }));
+      return;
+    }
+    // Describing a controller: the browser preview has no hardware and no data directory, so
+    // it keeps the description for the session and builds the same generic drawing the native
+    // side does — enough to exercise the form, the counts and the picture.
+    if (payload?.cmd === 'setUserSurface') {
+      mockOwnSurface = { name: String(payload.name ?? '').trim(),
+                         encoders: Number(payload.encoders) || 0,
+                         faders: Number(payload.faders) || 0,
+                         pads: Number(payload.pads) || 0 };
+      if (!mockOwnSurface.name
+          || mockOwnSurface.encoders + mockOwnSurface.faders + mockOwnSurface.pads === 0) {
+        mockOwnSurface = null;
+        hostLastError.set('Describe a controller with a name and at least one control.');
+        return;
+      }
+      mockSurfaceLearning = false;
+      send({ cmd: 'getSurfaceLayout' });
+      return;
+    }
+    if (payload?.cmd === 'clearUserSurface') {
+      mockOwnSurface = null;
+      mockSurfaceLearning = false;
+      send({ cmd: 'getSurfaceLayout' });
+      return;
+    }
+    if (payload?.cmd === 'learnUserSurface') {
+      // Nothing to sweep in a browser, so the mock 'hears' eight at once.
+      mockSurfaceLearning = true;
+      mockSurfaceHeard = 8;
+      send({ cmd: 'getSurfaceLayout' });
+      return;
+    }
+    if (payload?.cmd === 'finishUserSurfaceLearn') {
+      mockSurfaceLearning = false;
+      mockOwnSurface = { name: String(payload.name ?? '').trim() || 'My controller',
+                         encoders: mockSurfaceHeard, faders: 0, pads: 0 };
+      send({ cmd: 'getSurfaceLayout' });
       return;
     }
     if (payload?.cmd === 'getLibrary' || payload?.cmd === 'scanLibrary') {
@@ -3006,6 +3103,14 @@ export const saveUserPreset = (partId, name) => send({ cmd: 'saveUserPreset', pa
 export const saveRackToLibrary = (name) => send({ cmd: 'saveRackToLibrary', name });
 export const requestSurfaceLayout = (profileId) =>
   send(profileId ? { cmd: 'getSurfaceLayout', profileId } : { cmd: 'getSurfaceLayout' });
+/** Describe the controller on your desk — three numbers and a name. Any controller already
+    WORKS; this is only so the drawing knows what is on yours. */
+export const setUserSurface = (name, encoders, faders, pads) =>
+  send({ cmd: 'setUserSurface', name, encoders, faders, pads });
+export const clearUserSurface = () => send({ cmd: 'clearUserSurface' });
+/** Or sweep everything you want to use and let it count. */
+export const learnUserSurface = () => send({ cmd: 'learnUserSurface' });
+export const finishUserSurfaceLearn = (name) => send({ cmd: 'finishUserSurfaceLearn', name });
 export const saveChainToLibrary = (partId, name) =>
   send({ cmd: 'saveChainToLibrary', partId, name });
 export const setLibraryUserMetadata = (recordId, fields) =>

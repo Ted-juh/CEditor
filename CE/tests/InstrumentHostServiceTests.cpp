@@ -5522,6 +5522,144 @@ void testParameterLearnAndFavourites()
     dir.deleteRecursively();
 }
 
+// A controller nobody wrote a profile for.
+//
+// The thing worth stating, because the whole feature falls out of it: CONTROL was never what a
+// profile unlocked. MIDI learn binds whatever moves, from any device, and always has. An
+// authored profile adds a picture, a page size, and the device's own screen — and only the
+// last of those genuinely needs per-device work.
+//
+// So an unknown controller is not unsupported, it is undrawn, and the only missing fact is how
+// many of each control it has. The owner says, or CEditor counts while they sweep. Everything
+// downstream — the drawing, assignment on it, live feedback, page generation — then works
+// exactly as it does for the CTRL49, because it all keys off the same indices.
+void testUserDescribedSurface()
+{
+    std::cout << "\na controller nobody profiled" << std::endl;
+
+    const auto dir = freshDataDir ("user-surface");
+
+    const auto layoutOf = [] (Harness& h)
+    {
+        for (auto it = h.emits.entries.rbegin(); it != h.emits.entries.rend(); ++it)
+            if (it->name == "instrumentHostSurfaceLayout")
+                return it->payload;
+        return juce::var();
+    };
+    const auto countOfKind = [] (const juce::var& layout, const juce::String& kind)
+    {
+        int count = 0;
+        if (const auto* controls = layout.getProperty ("controls", {}).getArray())
+            for (const auto& control : *controls)
+                if (control.getProperty ("kind", {}).toString() == kind
+                      && (int) control.getProperty ("index", -1) >= 0)
+                    ++count;
+        return count;
+    };
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+
+        // Before anything is described, the authored profile answers, as it always did.
+        h.cmd ("getSurfaceLayout");
+        check (layoutOf (h).getProperty ("profileId", {}).toString() == "akai-ctrl49",
+               "with nothing described, the authored profile still answers");
+        check (layoutOf (h).getProperty ("userSurface", {}).toString().isEmpty(),
+               "and says no controller has been described");
+
+        // Describe one.
+        h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 },
+                                   { "faders", 4 }, { "pads", 16 } });
+        auto layout = layoutOf (h);
+        check (layout.getProperty ("displayName", {}).toString() == "Advance 49",
+               "a described controller becomes the drawing");
+        check (countOfKind (layout, "encoder") == 8, "with the knobs it was told about");
+        check (countOfKind (layout, "fader") == 4, "and the faders");
+        check (countOfKind (layout, "pad") == 16, "and the pads");
+        check ((double) layout.getProperty ("aspect", 0.0) > 0.0,
+               "and proportions the drawing can use");
+
+        // The indices are what makes everything downstream work unchanged.
+        juce::SortedSet<int> encoderIndices;
+        for (const auto& control : *layout.getProperty ("controls", {}).getArray())
+            if (control.getProperty ("kind", {}).toString() == "encoder")
+                encoderIndices.add ((int) control.getProperty ("index", -1));
+        check (encoderIndices.size() == 8 && encoderIndices[0] == 0 && encoderIndices[7] == 7,
+               "encoders are indexed 0..7, so page slots reach them exactly as on an authored one");
+
+        // Nothing overlaps and nothing runs off the box — the same conformance an authored
+        // layout has to pass, which is the only reason arbitrary counts are safe to accept.
+        ceditor::ctrl49::SurfaceProfile probe;
+        probe.profileId = "probe";
+        probe.capabilities.encoders = 8;
+        probe.capabilities.faders = 4;
+        probe.capabilities.pads = 16;
+        probe.layout = ceditor::ctrl49::buildGenericLayout (probe.capabilities);
+        check (ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (probe).isEmpty(),
+               "the generated drawing passes the layout conformance check");
+
+        // Absurd counts must not produce an unusable or overlapping picture either.
+        ceditor::ctrl49::SurfaceProfile big;
+        big.profileId = "big";
+        big.capabilities.encoders = 64;
+        big.capabilities.faders = 64;
+        big.capabilities.pads = 64;
+        big.layout = ceditor::ctrl49::buildGenericLayout (big.capabilities);
+        check (ceditor::ctrl49::SurfaceProfileRegistry::checkLayout (big).isEmpty(),
+               "and so does one for a controller with sixty-four of everything");
+
+        // Refusals.
+        h.emits.clear();
+        h.cmd ("setUserSurface", { { "name", "" }, { "encoders", 8 } });
+        check (h.emits.lastError().isNotEmpty(), "a nameless controller is refused");
+        h.emits.clear();
+        h.cmd ("setUserSurface", { { "name", "Empty box" } });
+        check (h.emits.lastError().isNotEmpty(), "and so is one with nothing on it");
+
+        // Counting instead of asking.
+        h.cmd ("clearUserSurface");
+        check (layoutOf (h).getProperty ("profileId", {}).toString() == "akai-ctrl49",
+               "clearing hands the drawing back to the authored profile");
+
+        h.cmd ("learnUserSurface");
+        check ((bool) layoutOf (h).getProperty ("learning", false), "arming says so");
+
+        // Three knobs swept, one of them twice: distinct controllers, not messages.
+        for (int value : { 10, 60, 127 })
+            h.service->noteMidiActivity ("Advance 49",
+                juce::MidiMessage::controllerEvent (1, 21, value));
+        h.service->noteMidiActivity ("Advance 49", juce::MidiMessage::controllerEvent (1, 22, 64));
+        h.service->noteMidiActivity ("Advance 49", juce::MidiMessage::controllerEvent (1, 23, 64));
+        h.service->noteMidiActivity ("Advance 49", juce::MidiMessage::controllerEvent (1, 21, 5));
+        h.service->drainParameterEvents();
+        check ((int) layoutOf (h).getProperty ("heard", 0) == 3,
+               "one knob swept through its range counts once, not a hundred times");
+
+        h.cmd ("finishUserSurfaceLearn", { { "name", "Swept" } });
+        check (countOfKind (layoutOf (h), "encoder") == 3,
+               "and the count becomes the drawing");
+        check (! (bool) layoutOf (h).getProperty ("learning", true), "arming is spent");
+
+        h.emits.clear();
+        h.cmd ("learnUserSurface");
+        h.cmd ("finishUserSurfaceLearn");
+        check (h.emits.lastError().isNotEmpty(),
+               "finishing without moving anything says so rather than describing a controller with no controls");
+    }
+
+    // It is a fact about the desk, so it outlives the session.
+    {
+        Harness restarted (dir);
+        restarted.cmd ("getState");
+        restarted.cmd ("getSurfaceLayout");
+        check (layoutOf (restarted).getProperty ("displayName", {}).toString() == "Swept",
+               "the described controller is still the drawing after a restart");
+    }
+
+    dir.deleteRecursively();
+}
+
 void testScanFolderBrowseAndModuleProjection()
 {
     std::cout << "\nscan-folder browse and module projection" << std::endl;
@@ -5712,6 +5850,7 @@ int main (int argc, char* argv[])
     testCanvasPositions();
     testCustomArtwork();
     testParameterLearnAndFavourites();
+    testUserDescribedSurface();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

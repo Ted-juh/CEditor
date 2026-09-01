@@ -89,6 +89,27 @@ struct SurfaceRenderers
                                              const juce::Array<bool>& lit)> renderState;
 };
 
+/** A drawing for a controller nobody authored a profile for.
+
+    THE POINT, because it is easy to miss: control was never the thing a profile unlocked. MIDI
+    learn binds whatever controller moves, from any device, and always has — so every keyboard
+    on earth could already drive CEditor's slots. What an authored profile adds is a picture, a
+    page size, and the device's own screen and LEDs. Only the last of those genuinely needs
+    per-device work, and most controllers have nothing to talk to anyway.
+
+    So a controller CEditor has never heard of does not need somebody to author it. It needs
+    counts — eight knobs, nine faders, sixteen pads — and those the owner can simply say, or
+    CEditor can count while they sweep everything they want to use. This builds the rest.
+
+    The result is deliberately schematic and does not pretend to be a photograph of anything.
+    It is a map of what you have and what each one currently does, which is the job. Controls
+    are indexed 0..n-1 per family, so everything downstream — assignment on the drawing, live
+    feedback, page generation — works exactly as it does for an authored profile.
+
+    A curated list of supported devices is the cage the product this succeeds was locked in.
+    This is the way out of it. */
+SurfaceLayout buildGenericLayout (const SurfaceCapabilities& capabilities);
+
 struct SurfaceProfile
 {
     juce::String profileId;      // stable identity, e.g. "akai-ctrl49"
