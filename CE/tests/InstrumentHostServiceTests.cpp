@@ -23,6 +23,7 @@
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
 #include <cstring>
+#include <map>
 #include <iostream>
 #include <vector>
 
@@ -3419,6 +3420,116 @@ void testHardwareParts()
            "the audio return restores through fader and inserts");
 }
 
+// A MIDI module, added the way a person adds one, heard the way a person hears one.
+//
+// The six note modules are covered thoroughly in PerformanceEngineTests, which drives the
+// real MidiInsertRack through the same setSlots() the service uses. What was never asserted
+// in one place is the seam between them: that "add an echo in the UI" ends with four notes
+// arriving at the instrument. Both halves were proven and the join was inferred, which is
+// exactly the shape of a feature that is wired to nothing and passes its tests.
+void testMidiModulesThroughTheGraph()
+{
+    std::cout << "\nmidi modules through the graph" << std::endl;
+
+    const auto dir = freshDataDir ("midi-modules-graph");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* synth = h.lastStub;
+    check (synth != nullptr, "the part has an instrument to play to");
+    if (synth == nullptr)
+        return;
+
+    const auto chainOf = [] (Harness& harness)
+    {
+        return harness.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                   .getProperty ("midiChain", {});
+    };
+
+    h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "echo" } });
+    const auto chain = chainOf (h);
+    const auto echoId = chain[chain.size() - 1].getProperty ("slotId", {}).toString();
+    check (chain[chain.size() - 1].getProperty ("type", {}).toString() == "echo",
+           "an echo is on the end of the chain");
+
+    // 44.1k, 512-sample blocks, 120bpm: a quarter of a beat is 5512 samples, near enough
+    // eleven blocks. Sixty blocks is room for three repeats and their note-offs.
+    h.service->prepareRuntime (44100.0, 512, 2);
+
+    const auto play = [&h, synth]
+    {
+        synth->received.clear();
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        midi.addEvent (juce::MidiMessage::noteOff (1, 60), 200);
+        for (int b = 0; b < 60; ++b)
+        {
+            buffer.clear();
+            h.service->getGraph().processBlock (buffer, midi);
+            midi.clear();
+        }
+
+        std::vector<juce::MidiMessage> notes;
+        for (const auto& message : synth->received)
+            if (message.isNoteOnOrOff())
+                notes.push_back (message);
+        return notes;
+    };
+
+    // Transparent until configured — the rule the whole chain is built on, asserted here at
+    // the far end of it rather than only at the engine.
+    {
+        const auto notes = play();
+        int ons = 0;
+        for (const auto& message : notes)
+            if (message.isNoteOn())
+                ++ons;
+        check (ons == 1, "a fresh echo passes one key press through as one note");
+    }
+
+    h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", echoId },
+                                   { "echoRepeats", 3 }, { "echoStepBeats", 0.25 },
+                                   { "echoFeedback", 0.6 }, { "echoTranspose", 12 } });
+
+    const auto notes = play();
+
+    std::vector<int> pitches, velocities;
+    std::map<int, int> sounding;
+    for (const auto& message : notes)
+    {
+        sounding[message.getNoteNumber()] += message.isNoteOn() ? 1 : -1;
+        if (message.isNoteOn())
+        {
+            pitches.push_back (message.getNoteNumber());
+            velocities.push_back (message.getVelocity());
+        }
+    }
+
+    check (pitches == std::vector<int> ({ 60, 72, 84, 96 }),
+           "one key press reaches the instrument as the note and three repeats, an octave apart");
+    check (velocities.size() == 4 && velocities[1] < velocities[0]
+             && velocities[2] < velocities[1] && velocities[3] < velocities[2],
+           "each repeat quieter than the last");
+
+    bool balanced = true;
+    for (const auto& [note, count] : sounding)
+        balanced = balanced && count == 0;
+    check (balanced, "and every one of them stops — a repeat the instrument never hears end is a stuck note");
+
+    // Bypass is the same seam in reverse: the module stays configured and stops acting.
+    h.cmd ("setMidiSlotBypassed", { { "partId", partId }, { "slotId", echoId },
+                                    { "bypassed", true } });
+    int bypassedOns = 0;
+    for (const auto& message : play())
+        if (message.isNoteOn())
+            ++bypassedOns;
+    check (bypassedOns == 1, "bypassing it at the command level silences the repeats");
+}
+
 // Hardware total recall: the patch comes back with the session.
 //
 // A hardware part already remembered its port, its channel, its audio return and its program
@@ -6052,6 +6163,7 @@ int main (int argc, char* argv[])
     testMultiOutputRouting();
     testHardwareParts();
     testHardwareTotalRecall();
+    testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
     testLibrary();
