@@ -940,10 +940,10 @@
                 </select>
               </div>
               {#each chain as effect (effect.effectId)}
+                <!-- Controls first, name after. The buttons are what you came to press and
+                     they are in the same place on every row, so the mouse travels a fixed
+                     short distance instead of chasing however long a plug-in's name is. -->
                 <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}>
-                  <span class="fx-name" title={effect.pluginVendor}>
-                    {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
-                  </span>
                   <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
                                   onchange={(on) => setEffectBypassed(effect.effectId, on)} />
                   <button type="button" class="toggle" disabled={!effect.hasProcessor}
@@ -963,6 +963,9 @@
                           onclick={() => { paramTargetId = effect.effectId; selectDockTab('params'); }}>P</button>
                   <button type="button" class="ghost danger" title="Remove this effect"
                           onclick={() => removeEffect(effect.effectId)}>×</button>
+                  <span class="fx-name" title={effect.pluginVendor}>
+                    {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
+                  </span>
                 </div>
               {/each}
             </div>
@@ -1732,9 +1735,11 @@
   .hw-send { display: flex; align-items: flex-end; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .fx-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-  .fx-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fx-row.bypassed .fx-name { color: #7d8894; text-decoration: line-through; }
-  .fx-row.unresolved .fx-name { color: #d6a3a3; }
+  /* Running is green, bypassed is red. Struck-through text said "deleted" — the one state
+     this row can never be in — and it took reading the Byp button to find out otherwise. */
+  .fx-name { flex: 1; color: #8fc4a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fx-row.bypassed .fx-name { color: #d68a8a; }
+  .fx-row.unresolved .fx-name { color: #d6a3a3; font-style: italic; }
   .macro-row { display: flex; align-items: center; gap: 8px; }
   .macro-row.on .macro-name { color: #d6dbe0; border-color: #5b9bd5; }
   .macro-name { font-size: 12px; }

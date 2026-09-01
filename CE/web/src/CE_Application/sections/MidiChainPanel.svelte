@@ -386,12 +386,18 @@
                 padding-top: 8px; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .slot { border: 1px solid #2c343d; border-radius: 5px; background: #1c2126; }
-  .slot.bypassed { opacity: 0.55; }
   .slot.open { border-color: #3d81c4; }
   .slot-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
   .slot-index { color: #66707b; font-size: 10px; width: 12px; }
+  /* Green runs, red is bypassed — the same language as the insert rows.
+     The selector carries .slot-head for weight, not for reach: this name is also a .ghost
+     button, and .ghost sets a colour of its own at equal specificity further down, so a plain
+     .slot-name rule loses to it on source order. That is the third colour in this file to be
+     eaten by .ghost; a semantic colour on a utility-classed element has to out-specify it. */
   .slot-name { flex: 1; text-align: left; display: flex; align-items: baseline; gap: 8px;
-               font-size: 12px; color: #d6dbe0; }
+               font-size: 12px; }
+  .slot-head .slot-name { color: #8fc4a8; }
+  .slot.bypassed .slot-name { color: #d68a8a; }
   .slot-summary { color: #7d8894; font-size: 10px; }
   .slot-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 8px; }
   .mini-field { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
