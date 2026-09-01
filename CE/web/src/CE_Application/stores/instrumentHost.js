@@ -45,7 +45,7 @@ export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
  *  so the view can flash on every arrival even when two identical notes repeat. */
-export const hostMidiActivity = writable({ device: '', text: '', seq: 0 });
+export const hostMidiActivity = writable({ device: '', text: '', cc: -1, channel: 0, value: 0, seq: 0 });
 // The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
@@ -68,6 +68,14 @@ export const hostChordLearn = writable({ armed: false, partId: '', stage: '', ke
     a store rather than the drag event's own payload: dataTransfer is deliberately unreadable
     during dragover — the moment when the answer is needed. Cleared on dragend, always. */
 export const hostCanvasDrag = writable({ kind: '', id: '', label: '' });
+
+/** The parameter being dragged onto the controller drawing, if any.
+
+    A store rather than a dataTransfer payload for the same reason the canvas drag is one: a
+    dragover handler cannot READ dataTransfer's data (the browser withholds it until the drop),
+    so the only way to decide whether a target should light up is to have put the answer
+    somewhere both ends can see. */
+export const hostParamDrag = writable({ partId: '', parameterId: '', name: '' });
 
 export function normalizeMidiLearn(payload) {
   return {
@@ -148,6 +156,20 @@ export function normalizeSurfaceLayout(payload) {
     controls,
     regions,
   };
+}
+
+/** The control-page slot a physical control drives, or null for one the runtime cannot reach.
+
+    One number joins the drawing to the assignments. A control page has eight slots; the
+    profile gives its encoders index 0..7 (SurfaceProfile.cpp, "Ctrl49Reducer: encoderSlot
+    0..7"), and the runtime addresses slot N with encoder N. Only encoders address slots
+    today: a fader or a pad is drawn, labelled and inert, which is the truth about them rather
+    than a gap in this function. */
+export function surfaceControlSlot(page, control) {
+  if (!page || !control || control.kind !== 'encoder') return null;
+  const index = Number(control.index);
+  if (!Number.isInteger(index) || index < 0) return null;
+  return (Array.isArray(page.slots) ? page.slots : [])[index] ?? null;
 }
 
 export const hostSurfaceLayout = writable(emptySurfaceLayout());
@@ -2473,6 +2495,11 @@ export function initInstrumentHostBridge() {
   onInstrumentHostMidiActivity((payload) => hostMidiActivity.update((a) => ({
     device: String(payload?.device ?? ''),
     text: String(payload?.text ?? ''),
+    // -1 for anything that was not a controller, so the surface drawing cannot light a knob
+    // because a note-on happened to arrive.
+    cc: Number.isInteger(payload?.cc) ? payload.cc : -1,
+    channel: Number(payload?.channel ?? 0),
+    value: Number(payload?.value ?? 0),
     seq: a.seq + 1,
   })));
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));

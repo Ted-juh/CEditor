@@ -874,6 +874,11 @@ private:
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
     juce::String midiActivityDevice, midiActivityText;
+    // The controller behind the readout, when the message was one. The surface drawing lights
+    // the knob you are turning, and it can only find it by matching the controller against
+    // what the control slots are bound to — which the frontend already has. So the event
+    // carries the numbers rather than a second lookup living here.
+    int midiActivityCc = -1, midiActivityChannel = 0, midiActivityValue = 0;
     juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
 
     // Controller changes captured by the same observer, coalesced per (channel, cc) so a

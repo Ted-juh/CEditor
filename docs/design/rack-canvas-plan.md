@@ -450,5 +450,38 @@ New ideas go here with a date, so nothing gets lost between sessions.
   reads as damage. Labels are now short enough for their boxes and the tooltip carries the
   sentence.
 
-  Still not built: live feedback (the encoder you are turning lighting up), and assigning by
-  dragging a parameter onto a knob.
+  **Assignment moved onto the drawing, 2026-09-01.** The picture showed which knobs exist and
+  which ones CEditor can reach, and left you to work out what any of them DO from eight text
+  rows somewhere else — the list it was drawn to replace. Each addressable knob now carries
+  its assignment, a page picker says which eight you are looking at, dragging a parameter onto
+  a knob assigns it, and clicking an assigned knob clears it.
+
+  The join is one number: a control page has eight slots, the profile gives its encoders index
+  0..7, and the runtime addresses slot N with encoder N. Nothing in the drawing has to know
+  anything else about the hardware, and `surfaceControlSlot` is the whole of it.
+
+  **Live feedback** arrived with it: the knob you are turning outlines itself. The frontend
+  does the matching, because it already holds what every slot is bound to — the native side
+  only had to say which controller moved, so `instrumentHostMidiActivity` gained cc, channel
+  and value. It carries -1 for anything that was not a controller, so a note-on cannot light
+  controller 0 by arithmetic accident.
+
+  **Three things only rendering found.**
+
+  *The gesture was impossible.* Params and Surface are both dock tabs, so only one is ever on
+  screen: a drag starting in the parameter list and ending on a knob could never happen. The
+  code was correct and unusable. The parameters now live in a slim column beside the drawing.
+
+  *The panel moved out from under the pointer.* The drop hint under the plate wrapped to a
+  different number of lines once a drag started, which resized everything above it and slid
+  the knob away mid-drag. It lives in the header now — one flex row, fixed height. Same lesson
+  as the canvas reserving its empty slot: anything that changes size when a drag starts is a
+  target that runs away.
+
+  *The assigned colour never appeared.* `.ctl.mapped` sets a background at equal specificity
+  further down the file, so a plain `.ctl.assigned` rule lost on source order and every
+  assigned knob stayed the unassigned blue. Out-specified rather than reordered. Fourth colour
+  in this project eaten that way; the first three were `.ghost`.
+
+  Still not built: assigning a pad or a fader — the runtime addresses encoders only, and the
+  drawing says so rather than offering a drop that cannot be honoured.

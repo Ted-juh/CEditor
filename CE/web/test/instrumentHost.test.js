@@ -23,6 +23,7 @@ import {
   filterParameters,
   mockHostParameters,
   hostState as hostStateStore,
+  hostMidiActivity,
   hostParameters,
   requestParameters,
   setParameter,
@@ -47,6 +48,7 @@ import {
   customArtworkIds,
   TILE_PATTERNS,
   normalizeSurfaceLayout,
+  surfaceControlSlot,
   filterEffects,
   mockSurfaceLayout,
   emptySurfaceLayout,
@@ -504,6 +506,48 @@ test('reorderIndexForDrop lands a row where it was dropped, in both directions',
 
   assert.equal(drop(-1, 0, false), -1, 'garbage in, no command out');
   assert.equal(drop(0, 'x', false), -1);
+});
+
+test('the drawing knows which knob drives which slot', () => {
+  // One number joins the picture to the assignments: encoder index N is page slot N. Getting
+  // it wrong would label every knob with its neighbour's parameter, which reads as working.
+  const page = { pageId: 'p1', slots: [
+    { slotId: 's1', assigned: true, displayName: 'Cutoff' },
+    { slotId: 's2', assigned: false, displayName: '' },
+    { slotId: 's3', assigned: true, displayName: 'Resonance' },
+  ] };
+  const encoder = (index) => ({ controlId: `encoder-${index + 1}`, kind: 'encoder', index });
+
+  assert.equal(surfaceControlSlot(page, encoder(0)).slotId, 's1');
+  assert.equal(surfaceControlSlot(page, encoder(2)).slotId, 's3', 'the third knob is the third slot');
+  assert.equal(surfaceControlSlot(page, encoder(7)), null,
+    'a knob past the end of the page drives nothing, rather than wrapping onto slot one');
+
+  // Everything that is drawn but cannot be reached. Offering these would promise assignment
+  // the runtime cannot honour — the panel draws them precisely so it can say they are inert.
+  assert.equal(surfaceControlSlot(page, { kind: 'fader', index: 0 }), null, 'faders address no slot');
+  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 1 }), null, 'nor pads');
+  assert.equal(surfaceControlSlot(page, { kind: 'encoder', index: -1 }), null,
+    'nor an encoder the profile says CEditor cannot address');
+
+  assert.equal(surfaceControlSlot(null, encoder(0)), null, 'with no page there is nothing to drive');
+  assert.equal(surfaceControlSlot(page, null), null);
+  assert.equal(surfaceControlSlot({ pageId: 'p2' }, encoder(0)), null, 'a page with no slots is safe');
+});
+
+test('a controller move carries which controller it was', () => {
+  // The drawing lights the knob you are turning by matching the controller against what the
+  // slots are bound to, so the event has to carry the numbers. A note-on must NOT be able to
+  // light controller 0 by arithmetic accident, which is what the -1 is for.
+  let seen = null;
+  const unsub = hostMidiActivity.subscribe((a) => (seen = a));
+  hostMidiActivity.set({ device: 'CTRL49', text: 'Controller 22: 64', cc: 22, channel: 1, value: 64, seq: 1 });
+  assert.equal(seen.cc, 22);
+  assert.equal(seen.channel, 1);
+  assert.equal(seen.value, 64);
+  hostMidiActivity.set({ device: 'CTRL49', text: 'C4 on, velocity 100', cc: -1, channel: 1, value: 0, seq: 2 });
+  assert.equal(seen.cc, -1, 'a note is not a controller and says so');
+  unsub();
 });
 
 test('rackCanvasLayout puts columns in signal order, sources first', () => {

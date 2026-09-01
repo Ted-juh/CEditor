@@ -4789,6 +4789,9 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     const std::scoped_lock lock (midiActivityLock);
     midiActivityDevice = deviceName;
     midiActivityText = text;
+    midiActivityCc = message.isController() ? message.getControllerNumber() : -1;
+    midiActivityChannel = message.getChannel();
+    midiActivityValue = message.isController() ? message.getControllerValue() : 0;
     ++midiActivitySeq;
 
     // While a chord capture is armed, raw note on/offs feed it — the drain groups them
@@ -5002,6 +5005,7 @@ void InstrumentHostService::drainParameterEvents()
     // a UI light needs "something arrived, this is what", not a message log.
     {
         juce::String device, text;
+        int cc = -1, channel = 0, value = 0;
         bool changed = false;
         {
             const std::scoped_lock lock (midiActivityLock);
@@ -5010,6 +5014,9 @@ void InstrumentHostService::drainParameterEvents()
                 midiActivityEmittedSeq = midiActivitySeq;
                 device = midiActivityDevice;
                 text = midiActivityText;
+                cc = midiActivityCc;
+                channel = midiActivityChannel;
+                value = midiActivityValue;
                 changed = true;
             }
         }
@@ -5018,6 +5025,11 @@ void InstrumentHostService::drainParameterEvents()
             auto* obj = new juce::DynamicObject();
             obj->setProperty ("device", device);
             obj->setProperty ("text", text);
+            // -1 for anything that was not a controller: the drawing lights knobs, and a
+            // note-on must not be allowed to match controller 0 by arithmetic accident.
+            obj->setProperty ("cc", cc);
+            obj->setProperty ("channel", channel);
+            obj->setProperty ("value", value);
             options.emit ("instrumentHostMidiActivity", juce::var (obj));
         }
     }

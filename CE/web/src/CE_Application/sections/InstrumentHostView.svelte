@@ -35,6 +35,7 @@
     setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     addEffect, removeEffect, moveEffect, setEffectBypassed, openEffectEditor,
     reorderIndexForDrop, setPluginArtwork, clearPluginArtwork, customArtworkIds,
+    hostParamDrag,
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
@@ -1276,8 +1277,19 @@
                 {/if}
                 {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
                 {#each group.parameters as parameter (parameter.id)}
-                <div class="param-row" class:assigned={assignedIds.has(parameter.id)}>
-                  <span class="param-name" title={parameter.name}>{parameter.name}</span>
+                <!-- Draggable onto the controller drawing in the Surface tab: assigning
+                     hardware is spatial work, and "this knob" is a position rather than a row
+                     in a list. The row keeps working exactly as it did for everything else. -->
+                <div class="param-row" class:assigned={assignedIds.has(parameter.id)}
+                     draggable="true"
+                     ondragstart={(e) => {
+                       hostParamDrag.set({ partId: paramTargetId, parameterId: parameter.id,
+                                           name: parameter.name });
+                       e.dataTransfer?.setData('text/plain', parameter.name);
+                       if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+                     }}
+                     ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
+                  <span class="param-name" title={`${parameter.name} — drag onto a knob in the Surface tab`}>{parameter.name}</span>
                   {#if parameterControlKind(parameter) === 'toggle'}
                     <PropertyToggle compact value={parameter.value >= 0.5} ariaLabel={parameter.name}
                                     onchange={(on) => setParameter(paramTargetId, parameter.id, on ? 1 : 0)} />
