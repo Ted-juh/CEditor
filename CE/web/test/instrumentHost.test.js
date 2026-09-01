@@ -38,6 +38,7 @@ import {
   saveChainToLibrary,
   rackCanvasLayout,
   CANVAS_NODE_H,
+  reorderIndexForDrop,
   canvasDropTargets,
   busDestinationWouldLoop,
   pluginTile,
@@ -470,6 +471,39 @@ const canvasRack = () => ({
 });
 const nodeOf = (layout, id) => layout.nodes.find((n) => n.id === id);
 const wireOf = (layout, from, to) => layout.wires.find((w) => w.from === from && w.to === to);
+
+test('reorderIndexForDrop lands a row where it was dropped, in both directions', () => {
+  // The list is [0,1,2,3]. `apply` is exactly what the service and the mock do with the
+  // index, so the assertions can talk about the resulting ORDER rather than about an index —
+  // which is the only way to notice an off-by-one that is right in one direction.
+  const apply = (from, index) => {
+    const list = ['a', 'b', 'c', 'd'];
+    const [row] = list.splice(from, 1);
+    list.splice(index, 0, row);
+    return list.join('');
+  };
+  const drop = (from, over, after) => reorderIndexForDrop(from, over, after);
+
+  // Downwards. This is where lifting the row out shifts everything below it up by one, and
+  // where a naive "use the index you dropped on" lands the row one place short.
+  assert.equal(apply(0, drop(0, 2, true)), 'bcad', 'below the third row puts it third');
+  assert.equal(apply(0, drop(0, 3, true)), 'bcda', 'below the last row puts it last');
+  assert.equal(apply(0, drop(0, 2, false)), 'bacd', 'above the third row puts it second');
+
+  // Upwards. No shift, so the index is the one the pointer named.
+  assert.equal(apply(3, drop(3, 0, false)), 'dabc', 'above the first row puts it first');
+  assert.equal(apply(3, drop(3, 1, true)), 'abdc', 'below the second row puts it third');
+  assert.equal(apply(2, drop(2, 0, false)), 'cabd');
+
+  // Non-moves send no command at all: a no-op still costs a state push and a save.
+  assert.equal(drop(1, 1, false), -1, 'dropping a row on its own top half changes nothing');
+  assert.equal(drop(1, 1, true), -1, 'nor its own bottom half');
+  assert.equal(drop(1, 0, true), -1, 'below the row above it is where it already is');
+  assert.equal(drop(1, 2, false), -1, 'and above the row below it likewise');
+
+  assert.equal(drop(-1, 0, false), -1, 'garbage in, no command out');
+  assert.equal(drop(0, 'x', false), -1);
+});
 
 test('rackCanvasLayout puts columns in signal order, sources first', () => {
   const layout = rackCanvasLayout(canvasRack());

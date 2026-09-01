@@ -33,7 +33,8 @@
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
     saveUserPreset, saveRackToLibrary, saveChainToLibrary,
     setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
-    addEffect, removeEffect, setEffectBypassed, openEffectEditor,
+    addEffect, removeEffect, moveEffect, setEffectBypassed, openEffectEditor,
+    reorderIndexForDrop,
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
@@ -320,6 +321,51 @@
     addScanPath(path);
     newScanPath = '';
   }
+
+  // --- dragging an insert to reorder the chain ---------------------------------------------
+  //
+  // The chain's order IS the signal's order, and until now there was no way to change it at
+  // all: no arrows, no drag, nothing. The only fix for putting the compressor after the
+  // reverb was to delete both and add them back the other way round.
+  //
+  // The grip is what is draggable, not the whole row: a row full of buttons that also drags
+  // makes every button press feel like it might do something else. reorderIndexForDrop owns
+  // the one piece of arithmetic worth a test — the off-by-one when a row travels downwards.
+  let fxDrag = $state({ id: '', overId: '', after: false });
+
+  function fxDragStart(event, effectId) {
+    fxDrag = { id: effectId, overId: '', after: false };
+    event.dataTransfer?.setData('text/plain', effectId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function fxDragEnd() { fxDrag = { id: '', overId: '', after: false }; }
+
+  /** Which half of the row the pointer is in — the difference between "before this" and
+      "after this", which is the whole vocabulary of a reorder. */
+  const inLowerHalf = (event) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return event.clientY > box.top + box.height / 2;
+  };
+
+  function fxDragOver(event, chain, overId) {
+    if (!fxDrag.id || !chain.some((e) => e.effectId === fxDrag.id)) return;   // not this chain
+    event.preventDefault();
+    // Must match the source's effectAllowed or the browser cancels the drop in silence.
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    fxDrag = { ...fxDrag, overId, after: inLowerHalf(event) };
+  }
+
+  function fxDrop(event, chain, overId) {
+    if (!fxDrag.id || !chain.some((e) => e.effectId === fxDrag.id)) return;
+    event.preventDefault();
+    const index = reorderIndexForDrop(chain.findIndex((e) => e.effectId === fxDrag.id),
+                                      chain.findIndex((e) => e.effectId === overId),
+                                      inLowerHalf(event));
+    if (index >= 0) moveEffect(fxDrag.id, index);
+    fxDragEnd();
+  }
+
 </script>
 
 <div class="host-workspace" data-testid="instrument-host-workspace">
@@ -939,11 +985,33 @@
                   {/each}
                 </select>
               </div>
-              {#each chain as effect (effect.effectId)}
+              {#each chain as effect, index (effect.effectId)}
                 <!-- Controls first, name after. The buttons are what you came to press and
                      they are in the same place on every row, so the mouse travels a fixed
                      short distance instead of chasing however long a plug-in's name is. -->
-                <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}>
+                <div class="fx-row" class:bypassed={effect.bypassed} class:unresolved={effect.unresolved}
+                     class:drop-before={fxDrag.overId === effect.effectId && !fxDrag.after}
+                     class:drop-after={fxDrag.overId === effect.effectId && fxDrag.after}
+                     class:lifted={fxDrag.id === effect.effectId}
+                     data-testid="fx-row"
+                     role="presentation"
+                     ondragover={(e) => fxDragOver(e, chain, effect.effectId)}
+                     ondrop={(e) => fxDrop(e, chain, effect.effectId)}>
+                  <!-- The order of an insert chain is the order of the signal, and until now
+                       it could only be set by removing everything after the mistake and
+                       adding it again. Drag the grip, or use the arrows — the arrows are not
+                       a leftover, they are the keyboard's version of the same move. -->
+                  <span class="fx-grip" draggable="true" title="Drag to reorder" aria-hidden="true"
+                        ondragstart={(e) => fxDragStart(e, effect.effectId)}
+                        ondragend={fxDragEnd}>⠿</span>
+                  <button type="button" class="ghost" disabled={index === 0}
+                          aria-label={`Move ${effect.pluginName} earlier in the chain`}
+                          title="Move earlier in the chain"
+                          onclick={() => moveEffect(effect.effectId, index - 1)}>▲</button>
+                  <button type="button" class="ghost" disabled={index === chain.length - 1}
+                          aria-label={`Move ${effect.pluginName} later in the chain`}
+                          title="Move later in the chain"
+                          onclick={() => moveEffect(effect.effectId, index + 1)}>▼</button>
                   <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
                                   onchange={(on) => setEffectBypassed(effect.effectId, on)} />
                   <button type="button" class="toggle" disabled={!effect.hasProcessor}
@@ -1735,6 +1803,22 @@
   .hw-send { display: flex; align-items: flex-end; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .fx-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  /* The insertion line is drawn on the row the pointer is over, on the side it will land —
+     an inset shadow rather than a real element, so the rows never shift while you aim. */
+  .fx-row.drop-before { box-shadow: inset 0 2px 0 0 #5b9bd5; }
+  .fx-row.drop-after  { box-shadow: inset 0 -2px 0 0 #5b9bd5; }
+  .fx-row.lifted { opacity: 0.45; }
+  .fx-grip {
+    flex: none;
+    cursor: grab;
+    padding: 0 2px;
+    color: #6d7883;
+    font-size: 13px;
+    line-height: 1;
+    user-select: none;
+  }
+  .fx-grip:hover { color: #d6dbe0; }
+  .fx-row .ghost { flex: none; padding: 0 4px; font-size: 10px; line-height: 16px; }
   /* Running is green, bypassed is red. Struck-through text said "deleted" — the one state
      this row can never be in — and it took reading the Byp button to find out otherwise. */
   .fx-name { flex: 1; color: #8fc4a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

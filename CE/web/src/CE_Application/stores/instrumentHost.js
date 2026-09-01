@@ -978,6 +978,30 @@ export function busDestinationWouldLoop(rack, busId, destinationBusId) {
 // What a thing being dragged may be dropped onto. Legal targets light up and illegal ones do
 // not accept the drop at all, so the canvas can never be drawn into a shape the engine would
 // refuse — the whole reason the picture is constrained rather than a free patchbay.
+// --- dragging a row to reorder a chain -----------------------------------------------------
+
+/** The index a chain command should be given when the row at `fromIndex` is dropped against
+    the row at `overIndex`, on its lower half (`dropAfter`) or its upper half.
+
+    Both the service and the mock take "move to this position in the list AFTER the row has
+    been lifted out", which is the same semantics as juce::Array::move and Array#splice — and
+    it is exactly one off from what the pointer is saying whenever the row is travelling
+    DOWNWARDS, because lifting it out shifts everything below it up by one. Getting that
+    wrong lands the row one place short of where it was dropped, every time, in one direction
+    only: the kind of bug that survives a demo and a screenshot.
+
+    Returns -1 when the drop would change nothing, so the caller can send no command at all
+    rather than a no-op that still costs a state push and a save. */
+export function reorderIndexForDrop(fromIndex, overIndex, dropAfter) {
+  const from = Number(fromIndex);
+  const over = Number(overIndex);
+  if (!Number.isInteger(from) || !Number.isInteger(over) || from < 0 || over < 0) return -1;
+
+  let target = dropAfter ? over + 1 : over;
+  if (from < target) target -= 1;
+  return target === from ? -1 : target;
+}
+
 export function canvasDropTargets(rack, drag) {
   const buses = Array.isArray(rack?.buses) ? rack.buses : [];
   const parts = Array.isArray(rack?.parts) ? rack.parts : [];

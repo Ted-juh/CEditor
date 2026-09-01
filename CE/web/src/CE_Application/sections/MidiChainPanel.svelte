@@ -18,6 +18,7 @@
     hostState, hostArpStep, hostChordLearn,
     midiSlotTypes, midiSlotLabels,
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
+    reorderIndexForDrop,
     learnKeyChord, cancelKeyChordLearn, clearKeyChord,
   } from '../stores/instrumentHost.js';
 
@@ -143,6 +144,46 @@
         : [],
     });
   }
+
+  // --- dragging a module to reorder the chain ----------------------------------------------
+  //
+  // The arrows still work and are still the keyboard's way to do this; the grip is the one
+  // that reads as an order you can rearrange. Same shape as the insert chain in
+  // InstrumentHostView, same shared arithmetic — reorderIndexForDrop owns the off-by-one when
+  // a row travels downwards, which is the only part of this that can be quietly wrong.
+  let slotDrag = $state({ id: '', overId: '', after: false });
+
+  function slotDragStart(event, slotId) {
+    slotDrag = { id: slotId, overId: '', after: false };
+    event.dataTransfer?.setData('text/plain', slotId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function slotDragEnd() { slotDrag = { id: '', overId: '', after: false }; }
+
+  const inLowerHalf = (event) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return event.clientY > box.top + box.height / 2;
+  };
+
+  function slotDragOver(event, overId) {
+    if (!slotDrag.id) return;
+    event.preventDefault();
+    // Must match the source's effectAllowed, or the browser cancels the drop silently.
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    slotDrag = { ...slotDrag, overId, after: inLowerHalf(event) };
+  }
+
+  function slotDrop(event, overId) {
+    if (!slotDrag.id) return;
+    event.preventDefault();
+    const index = reorderIndexForDrop(chain.findIndex((s) => s.slotId === slotDrag.id),
+                                      chain.findIndex((s) => s.slotId === overId),
+                                      inLowerHalf(event));
+    if (index >= 0) moveMidiSlot(part.partId, slotDrag.id, index);
+    slotDragEnd();
+  }
+
 </script>
 
 <div class="midi-chain" data-testid="host-midi-chain">
@@ -163,8 +204,18 @@
   {/if}
 
   {#each chain as slot, index (slot.slotId)}
-    <div class="slot" class:bypassed={slot.bypassed} class:open={openSlotId === slot.slotId}>
+    <div class="slot" class:bypassed={slot.bypassed} class:open={openSlotId === slot.slotId}
+         class:drop-before={slotDrag.overId === slot.slotId && !slotDrag.after}
+         class:drop-after={slotDrag.overId === slot.slotId && slotDrag.after}
+         class:lifted={slotDrag.id === slot.slotId}
+         data-testid="midi-slot"
+         role="presentation"
+         ondragover={(e) => slotDragOver(e, slot.slotId)}
+         ondrop={(e) => slotDrop(e, slot.slotId)}>
       <div class="slot-head">
+        <span class="slot-grip" draggable="true" title="Drag to reorder" aria-hidden="true"
+              ondragstart={(e) => slotDragStart(e, slot.slotId)}
+              ondragend={slotDragEnd}>⠿</span>
         <span class="slot-index">{index + 1}</span>
         <button type="button" class="ghost slot-name"
                 onclick={() => (openSlotId = openSlotId === slot.slotId ? '' : slot.slotId)}>
@@ -387,6 +438,13 @@
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .slot { border: 1px solid #2c343d; border-radius: 5px; background: #1c2126; }
   .slot.open { border-color: #3d81c4; }
+  /* The insertion line, drawn on the side the module will land. An inset shadow rather than a
+     real element, so nothing shifts under the pointer while you are aiming at it. */
+  .slot.drop-before { box-shadow: inset 0 2px 0 0 #5b9bd5; }
+  .slot.drop-after  { box-shadow: inset 0 -2px 0 0 #5b9bd5; }
+  .slot.lifted { opacity: 0.45; }
+  .slot-grip { flex: none; cursor: grab; color: #66707b; font-size: 13px; line-height: 1; user-select: none; }
+  .slot-grip:hover { color: #d6dbe0; }
   .slot-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
   .slot-index { color: #66707b; font-size: 10px; width: 12px; }
   /* Green runs, red is bypassed — the same language as the insert rows.
