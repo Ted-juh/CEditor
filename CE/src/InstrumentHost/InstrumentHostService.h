@@ -939,17 +939,24 @@ private:
     // what the control slots are bound to — which the frontend already has. So the event
     // carries the numbers rather than a second lookup living here.
     int midiActivityCc = -1, midiActivityChannel = 0, midiActivityValue = 0;
+    int midiActivityNote = -1;   // the drawing lights a pad the same way it lights a knob
     juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
 
     // Controller changes captured by the same observer, coalesced per (channel, cc) so a
     // knob sweep costs one entry however fast it turns. Guarded by midiActivityLock; drained
     // on the controlling thread, where MIDI learn and the bound-slot writes actually happen.
-    struct PendingCc { int channel = 0; int cc = 0; int value = 0; };
+    // A note rides the same queue with cc = -1: a pad that sends notes is a controller too,
+    // and a key is a pad if you say so. Notes are never coalesced — each press counts.
+    struct PendingCc { int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false; };
     std::vector<PendingCc> pendingCcs;
 
     // MIDI-learn armed target — controlling thread only, like every other piece of service
     // state. Empty page id = not armed.
     juce::String midiLearnPageId, midiLearnSlotId;
+    /** Gates the observer's note queue: true while learn is armed or any slot is bound to a
+        note, false the rest of the time so ordinary playing costs the MIDI thread nothing. */
+    std::atomic<bool> slotNotesWanted { false };
+    void refreshSlotNoteListening();
 
     // Last arp playhead step announced per part, so the drain only speaks on change.
     std::map<juce::String, int> lastArpStepByPart;
@@ -1022,7 +1029,7 @@ private:
     static std::vector<juce::MidiMessage> splitSysexBlob (const juce::MemoryBlock& blob);
     void drainControllerEvents();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
-                        int cc, int channel);
+                        int cc, int channel, int note = -1);
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this

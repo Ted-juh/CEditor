@@ -3612,6 +3612,236 @@ void testHardwarePatchesInTheLibrary()
     }
 }
 
+// Pads and faders on the surface: a slot for every control the layout can address, minted
+// the first time something lands on it, bound by controller or by note.
+void testPadsAndFaders()
+{
+    std::cout << "\npads and faders on the surface" << std::endl;
+
+    // Every page saved before this existed: slots with no kind and no index. They must read
+    // back as encoders 0..N-1, and a fader slot among them must not shift the encoders.
+    {
+        auto document = ceditor::host::Performance::create().toVar();
+        auto* page = new juce::DynamicObject();
+        page->setProperty ("pageId", "legacy");
+        page->setProperty ("name", "Old page");
+        juce::Array<juce::var> slots;
+        for (const auto* id : { "s1", "s2" })
+        {
+            auto* slot = new juce::DynamicObject();
+            slot->setProperty ("slotId", id);
+            slots.add (juce::var (slot));
+        }
+        auto* fader = new juce::DynamicObject();
+        fader->setProperty ("slotId", "fader-3");
+        fader->setProperty ("kind", "fader");
+        fader->setProperty ("index", 2);
+        slots.insert (1, juce::var (fader));
+        auto* third = new juce::DynamicObject();
+        third->setProperty ("slotId", "s3");
+        slots.add (juce::var (third));
+        page->setProperty ("slots", slots);
+        document.getDynamicObject()->setProperty ("pages", juce::Array<juce::var> { juce::var (page) });
+
+        ceditor::host::Performance parsed;
+        check (ceditor::host::Performance::fromVar (document, parsed) && parsed.pages.size() == 1
+                 && parsed.pages[0].slots.size() == 4,
+               "a page written before slots had kinds still loads");
+        const auto& loaded = parsed.pages[0].slots;
+        check (loaded[0].kind == "encoder" && loaded[0].index == 0
+                 && loaded[2].kind == "encoder" && loaded[2].index == 1
+                 && loaded[3].kind == "encoder" && loaded[3].index == 2,
+               "its kindless slots are encoders at their place among the encoders");
+        check (loaded[1].kind == "fader" && loaded[1].index == 2,
+               "and a fader slot between them keeps its own address without shifting theirs");
+    }
+
+    const auto dir = freshDataDir ("pads-faders");
+    seedTwoSynthCatalog (dir);
+
+    juce::String pageId, faderSlot, padSlot;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("setUserSurface", { { "name", "Desk" }, { "encoders", 8 }, { "faders", 4 }, { "pads", 8 } });
+        h.cmd ("addControlPage", { { "name", "Live" } });
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("name", {}).toString() == "Live")
+                pageId = pg.getProperty ("pageId", {}).toString();
+        check (pageId.isNotEmpty(), "a page to put things on");
+
+        const auto slotsOf = [&h, &pageId]
+        {
+            for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+                if (pg.getProperty ("pageId", {}).toString() == pageId)
+                    return pg.getProperty ("slots", {});
+            return juce::var();
+        };
+        const auto slotAt = [&slotsOf] (const juce::String& kind, int index) -> juce::var
+        {
+            for (const auto& s : *slotsOf().getArray())
+                if (s.getProperty ("kind", {}).toString() == kind && (int) s.getProperty ("index", -2) == index)
+                    return s;
+            return {};
+        };
+        const auto cc = [] (int channel, int number, int value)
+        { return juce::MidiMessage::controllerEvent (channel, number, value); };
+        const auto value = [&h] () { return h.lastStub->getParameters()[0]->getValue(); };
+
+        const auto slotsBefore = slotsOf().size();
+        check (slotsBefore == 8, "a fresh page is eight encoder slots");
+        check ((int) slotAt ("encoder", 3).getProperty ("index", -1) == 3,
+               "each carrying its own encoder index");
+
+        // Drop onto a fader: the slot is minted and assigned in one command.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 2 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (slotsOf().size() == slotsBefore + 1, "dropping on a fader mints its slot");
+        const auto fader = slotAt ("fader", 2);
+        faderSlot = fader.getProperty ("slotId", {}).toString();
+        check ((bool) fader.getProperty ("assigned", false)
+                 && fader.getProperty ("parameterId", {}).toString() == "cutoff",
+               "and the drop landed on it");
+
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 2 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (slotsOf().size() == slotsBefore + 1, "a second drop reuses the slot");
+
+        // Learn on it: the fader is a controller like any other.
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", 2 } });
+        h.service->noteMidiActivity ("Desk", cc (1, 7, 100));
+        h.service->drainParameterEvents();
+        check ((int) slotAt ("fader", 2).getProperty ("midiCc", -1) == 7, "the fader learns its controller");
+        h.service->noteMidiActivity ("Desk", cc (1, 7, 0));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 0.0f) < 0.01f, "and drives the parameter to its position");
+        h.service->noteMidiActivity ("Desk", cc (1, 7, 127));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 1.0f) < 0.01f, "all the way up");
+
+        // A pad: assigned, then learned from a NOTE, then pressed and released.
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 5 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        padSlot = slotAt ("pad", 5).getProperty ("slotId", {}).toString();
+        check (padSlot.isNotEmpty(), "dropping on a pad mints its slot");
+
+        h.cmd ("learnSurfaceControl", { { "pageId", pageId }, { "kind", "pad" }, { "index", 5 } });
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOff (1, 36));
+        h.service->drainParameterEvents();
+        check ((int) slotAt ("pad", 5).getProperty ("midiNote", -1) == -1,
+               "a note-off cannot arm — releasing something is not a press");
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOn (1, 36, (juce::uint8) 110));
+        h.service->drainParameterEvents();
+        const auto pad = slotAt ("pad", 5);
+        check ((int) pad.getProperty ("midiNote", -1) == 36 && (int) pad.getProperty ("midiCc", 0) == -1,
+               "a pad learns the note it sends, and a note is not a controller");
+        const auto* learned = h.emits.last ("instrumentHostMidiLearn");
+        check (learned != nullptr && (int) learned->getProperty ("note", -1) == 36,
+               "and the learn event says which note");
+
+        // Momentary: down is the top of the range, up is the bottom.
+        check (std::abs (value() - 1.0f) < 0.01f, "the press that learned it also pressed it");
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOff (1, 36));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 0.0f) < 0.01f, "release lets go");
+
+        // Toggle: each press flips, releases are ignored, the state is remembered.
+        h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", padSlot }, { "toggle", true } });
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOn (1, 36, (juce::uint8) 90));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 1.0f) < 0.01f && (bool) slotAt ("pad", 5).getProperty ("latched", false),
+               "a toggle press latches on");
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOff (1, 36));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 1.0f) < 0.01f, "and the release changes nothing");
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOn (1, 36, (juce::uint8) 90));
+        h.service->drainParameterEvents();
+        check (std::abs (value() - 0.0f) < 0.01f && ! (bool) slotAt ("pad", 5).getProperty ("latched", true),
+               "the next press latches off");
+
+        // The drawing's readout carries the note, so a pad can light like a knob.
+        h.emits.clear();
+        h.service->noteMidiActivity ("Desk", juce::MidiMessage::noteOn (1, 36, (juce::uint8) 90));
+        h.service->drainParameterEvents();
+        const auto* activity = h.emits.last ("instrumentHostMidiActivity");
+        check (activity != nullptr && (int) activity->getProperty ("note", -1) == 36
+                 && (int) activity->getProperty ("cc", 0) == -1,
+               "the activity readout names the note and no controller");
+
+        // A control the surface does not address mints nothing and says so.
+        h.emits.clear();
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "button" }, { "index", 0 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (h.emits.lastError().contains ("does not address"), "a button is refused aloud");
+        h.emits.clear();
+        h.cmd ("assignSurfaceControl", { { "pageId", pageId }, { "kind", "fader" }, { "index", -1 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        check (h.emits.lastError().contains ("does not address"), "and so is an unaddressable index");
+    }
+
+    // With no page at all, the first drop on the drawing mints one, so the surface works
+    // before anybody has been to the pages list. Its own harness, sequentially: two live
+    // services in one scope is not a shape any other test has, and not one to start here.
+    {
+        const auto bare = freshDataDir ("pads-no-page");
+        seedTwoSynthCatalog (bare);
+        Harness h (bare);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        for (int i = 0; i < 16; ++i)   // whatever pages the instrument generated, gone
+        {
+            const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+            if (pages.size() == 0)
+                break;
+            h.cmd ("removeControlPage", { { "pageId", pages[0].getProperty ("pageId", {}) } });
+        }
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).size() == 0,
+               "a rack with no pages at all");
+        h.cmd ("assignSurfaceControl", { { "pageId", "" }, { "kind", "pad" }, { "index", 0 },
+                                         { "partId", partId }, { "parameterId", "cutoff" } });
+        const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+        check (pages.size() == 1 && pages[0].getProperty ("name", {}).toString() == "Surface",
+               "the first drop on the drawing mints a page named for it");
+        bool landed = false;
+        if (pages.size() == 1)
+            for (const auto& s : *pages[0].getProperty ("slots", {}).getArray())
+                landed = landed || (s.getProperty ("kind", {}).toString() == "pad"
+                                    && (bool) s.getProperty ("assigned", false));
+        check (landed, "and the drop landed on the page it minted");
+    }
+
+    // Everything survives the process: the minted slots, what they ride, the note, the latch.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        juce::var page;
+        for (const auto& pg : *h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {}).getArray())
+            if (pg.getProperty ("pageId", {}).toString() == pageId)
+                page = pg;
+        bool faderBack = false, padBack = false;
+        for (const auto& s : *page.getProperty ("slots", {}).getArray())
+        {
+            if (s.getProperty ("slotId", {}).toString() == faderSlot)
+                faderBack = s.getProperty ("kind", {}).toString() == "fader"
+                         && (int) s.getProperty ("index", -1) == 2
+                         && (int) s.getProperty ("midiCc", -1) == 7;
+            if (s.getProperty ("slotId", {}).toString() == padSlot)
+                padBack = s.getProperty ("kind", {}).toString() == "pad"
+                       && (int) s.getProperty ("index", -1) == 5
+                       && (int) s.getProperty ("midiNote", -1) == 36
+                       && (bool) s.getProperty ("toggle", false)
+                       && (bool) s.getProperty ("latched", false);
+        }
+        check (faderBack, "the fader slot comes back with its address and controller");
+        check (padBack, "the pad slot comes back with its note, its toggle and its latch");
+    }
+}
+
 // A MIDI module, added the way a person adds one, heard the way a person hears one.
 //
 // The six note modules are covered thoroughly in PerformanceEngineTests, which drives the
@@ -6356,6 +6586,7 @@ int main (int argc, char* argv[])
     testHardwareParts();
     testHardwareTotalRecall();
     testHardwarePatchesInTheLibrary();
+    testPadsAndFaders();
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();

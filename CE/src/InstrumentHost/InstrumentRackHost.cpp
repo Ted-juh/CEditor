@@ -944,7 +944,60 @@ bool InstrumentRackHost::setSlotMidi (const juce::String& pageId, const juce::St
 
     slot->midiCc = juce::jlimit (-1, 127, cc);
     slot->midiChannel = juce::jlimit (0, 16, channel);
+    if (slot->midiCc >= 0)
+        slot->midiNote = -1;   // one controller per slot
     return true;
+}
+
+bool InstrumentRackHost::setSlotMidiNote (const juce::String& pageId, const juce::String& slotId,
+                                          int note, int channel)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr)
+        return false;
+
+    slot->midiNote = juce::jlimit (-1, 127, note);
+    slot->midiChannel = juce::jlimit (0, 16, channel);
+    if (slot->midiNote >= 0)
+        slot->midiCc = -1;
+    return true;
+}
+
+bool InstrumentRackHost::setSlotLatched (const juce::String& pageId, const juce::String& slotId,
+                                         bool latched)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr)
+        return false;
+
+    slot->latched = latched;
+    return true;
+}
+
+juce::String InstrumentRackHost::ensureSurfaceSlot (const juce::String& pageId,
+                                                    const juce::String& kind, int index)
+{
+    auto* page = model.findPage (pageId);
+    if (page == nullptr || index < 0 || index > 127)
+        return {};
+    if (kind != "encoder" && kind != "fader" && kind != "pad")
+        return {};
+
+    if (auto* existing = page->findSurfaceSlot (kind, index))
+        return existing->slotId;
+    if (page->slots.size() >= ControlPage::maxSlots)
+        return {};
+
+    ControlSlot slot;
+    slot.kind = kind;
+    slot.index = index;
+    slot.slotId = kind + "-" + juce::String (index + 1);
+    if (page->findSlot (slot.slotId) != nullptr)     // a hand-edited manifest got there first
+        slot.slotId += "-" + juce::Uuid().toDashedString();
+    page->slots.add (slot);
+    return slot.slotId;
 }
 
 bool InstrumentRackHost::removePart (const juce::String& partId)

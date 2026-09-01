@@ -1012,6 +1012,50 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "assignSurfaceControl" || cmd == "learnSurfaceControl")
+    {
+        // The drawing's own commands: name the control, not the slot. A fader or a pad gets
+        // its slot minted here the first time; from then on it is an ordinary slot and
+        // everything that works on one — options, clear, learn, value — works on it.
+        auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto kind = payload.getProperty ("kind", {}).toString();
+        const auto index = (int) payload.getProperty ("index", -1);
+
+        // No page yet is not a reason to refuse a drop on the drawing: the first thing put
+        // on the surface mints the page it lands on, as quickLearnParameter mints one when
+        // every slot is taken. Named for where it came from, so it reads as what it is.
+        if (pageId.isEmpty() && rack.getPerformance().pages.isEmpty())
+        {
+            auto* mint = new juce::DynamicObject();
+            mint->setProperty ("cmd", "addControlPage");
+            mint->setProperty ("name", "Surface");
+            handleCommand (juce::var (mint));
+        }
+        if (pageId.isEmpty() && ! rack.getPerformance().pages.isEmpty())
+            pageId = rack.getPerformance().pages.getReference (0).pageId;
+
+        const auto slotId = rack.ensureSurfaceSlot (pageId, kind, index);
+        if (slotId.isEmpty())
+        {
+            emitError (rack.getPerformance().findPage (pageId) == nullptr
+                         ? "Unknown control page."
+                         : "CEditor does not address that control (" + kind + " "
+                             + juce::String (index) + ").");
+            return;
+        }
+
+        auto* forwarded = new juce::DynamicObject();
+        forwarded->setProperty ("cmd", cmd == "assignSurfaceControl" ? "assignControlSlot"
+                                                                      : "learnControlSlotMidi");
+        forwarded->setProperty ("pageId", pageId);
+        forwarded->setProperty ("slotId", slotId);
+        forwarded->setProperty ("partId", payload.getProperty ("partId", {}));
+        forwarded->setProperty ("parameterId", payload.getProperty ("parameterId", {}));
+        handleCommand (juce::var (forwarded));
+        refreshSlotNoteListening();
+        return;
+    }
+
     if (cmd == "quickLearnParameter")
     {
         // The two-click knob: find this parameter a slot (first empty anywhere, or a fresh
@@ -1134,6 +1178,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("rangeMax")) binding.rangeMax = juce::jlimit (0.0f, 1.0f, (float) (double) payload["rangeMax"]);
             if (fields->hasProperty ("inverted")) binding.inverted = (bool) payload["inverted"];
             if (fields->hasProperty ("bipolar"))  binding.bipolar  = (bool) payload["bipolar"];
+            if (fields->hasProperty ("toggle"))   binding.toggle   = (bool) payload["toggle"];
             if (fields->hasProperty ("label"))    binding.label    = payload["label"].toString().trim();
         }
 
@@ -5256,9 +5301,21 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityDevice = deviceName;
     midiActivityText = text;
     midiActivityCc = message.isController() ? message.getControllerNumber() : -1;
+    midiActivityNote = message.isNoteOnOrOff() ? message.getNoteNumber() : -1;
     midiActivityChannel = message.getChannel();
-    midiActivityValue = message.isController() ? message.getControllerValue() : 0;
+    midiActivityValue = message.isController() ? message.getControllerValue()
+                      : message.isNoteOn()     ? message.getVelocity() : 0;
     ++midiActivitySeq;
+
+    // Notes for the slots — a pad, or a key standing in for one — only while something is
+    // listening for them; the rest of the time playing the keyboard costs this nothing.
+    if (slotNotesWanted.load() && message.isNoteOnOrOff())
+    {
+        if (pendingCcs.size() < 64)
+            pendingCcs.push_back ({ message.getChannel(), -1,
+                                    message.isNoteOn() ? (int) message.getVelocity() : 0,
+                                    message.getNoteNumber(), message.isNoteOn() });
+    }
 
     // While a chord capture is armed, raw note on/offs feed it — the drain groups them
     // into "everything pressed until everything released", which is what a played chord is.
@@ -5453,7 +5510,8 @@ void InstrumentHostService::emitParameterLearn (bool armed, const juce::String& 
 }
 
 void InstrumentHostService::emitMidiLearn (bool armed, const juce::String& pageId,
-                                           const juce::String& slotId, int cc, int channel)
+                                           const juce::String& slotId, int cc, int channel,
+                                           int note)
 {
     if (options.emit == nullptr)
         return;
@@ -5463,12 +5521,32 @@ void InstrumentHostService::emitMidiLearn (bool armed, const juce::String& pageI
     obj->setProperty ("pageId",  pageId);
     obj->setProperty ("slotId",  slotId);
     obj->setProperty ("cc",      cc);
+    obj->setProperty ("note",    note);   // -1 unless a pad's note was what bound
     obj->setProperty ("channel", channel);
     options.emit ("instrumentHostMidiLearn", juce::var (obj));
 }
 
+void InstrumentHostService::refreshSlotNoteListening()
+{
+    bool wanted = midiLearnPageId.isNotEmpty();
+    if (! wanted)
+        for (const auto& page : rack.getPerformance().pages)
+            for (const auto& slot : page.slots)
+                if (slot.midiNote >= 0)
+                {
+                    wanted = true;
+                    break;
+                }
+    slotNotesWanted.store (wanted);
+}
+
 void InstrumentHostService::drainControllerEvents()
 {
+    // Recomputed here, at the rate everything else is drained, so every path that binds or
+    // unbinds a note — learn, clear, a page removed, a session restored — is covered by one
+    // line rather than remembered at each of them.
+    refreshSlotNoteListening();
+
     std::vector<PendingCc> events;
     {
         const std::scoped_lock lock (midiActivityLock);
@@ -5489,56 +5567,106 @@ void InstrumentHostService::drainControllerEvents()
             emitSurfaceLayout();     // the running count, so the sweep can be watched
     }
 
-    // Learn first: the armed slot takes the first controller heard since arming.
+    // Learn first: the armed slot takes the first controller heard since arming — or the
+    // first note, which is what a pad sends. A note-off is not a press and cannot arm.
     if (midiLearnPageId.isNotEmpty())
     {
-        const auto pageId = std::exchange (midiLearnPageId, {});
-        const auto slotId = std::exchange (midiLearnSlotId, {});
-        const auto& first = events.front();
-
-        // One controller drives one slot: learning a controller that is already bound
-        // elsewhere moves it, because two slots silently riding one knob is a support call.
-        for (const auto& page : rack.getPerformance().pages)
-            for (const auto& other : page.slots)
-                if (other.midiCc == first.cc && other.midiChannel == first.channel
-                      && ! (page.pageId == pageId && other.slotId == slotId))
-                    rack.setSlotMidi (page.pageId, other.slotId, -1, 0);
-
-        if (rack.setSlotMidi (pageId, slotId, first.cc, first.channel))
+        const auto* firstPress = [&events]() -> const PendingCc*
         {
-            savePerformance();
-            emitState();
-            emitMidiLearn (false, pageId, slotId, first.cc, first.channel);
-        }
-        else
+            for (const auto& event : events)
+                if (event.note < 0 || event.on)
+                    return &event;
+            return nullptr;
+        }();
+
+        if (firstPress != nullptr)
         {
-            // The slot vanished while armed (its page was removed): disarm out loud.
-            emitMidiLearn (false, {}, {}, -1, 0);
+            const auto pageId = std::exchange (midiLearnPageId, {});
+            const auto slotId = std::exchange (midiLearnSlotId, {});
+            const auto first = *firstPress;
+            const auto isNote = first.note >= 0;
+
+            // One controller drives one slot: learning a controller that is already bound
+            // elsewhere moves it, because two slots silently riding one knob is a support call.
+            for (const auto& page : rack.getPerformance().pages)
+                for (const auto& other : page.slots)
+                {
+                    if (page.pageId == pageId && other.slotId == slotId)
+                        continue;
+                    if (other.midiChannel != first.channel)
+                        continue;
+                    if (isNote ? other.midiNote == first.note : other.midiCc == first.cc)
+                    {
+                        rack.setSlotMidi (page.pageId, other.slotId, -1, 0);
+                        rack.setSlotMidiNote (page.pageId, other.slotId, -1, 0);
+                    }
+                }
+
+            const auto bound = isNote ? rack.setSlotMidiNote (pageId, slotId, first.note, first.channel)
+                                      : rack.setSlotMidi (pageId, slotId, first.cc, first.channel);
+            if (bound)
+            {
+                savePerformance();
+                emitState();
+                emitMidiLearn (false, pageId, slotId, first.cc, first.channel, first.note);
+            }
+            else
+            {
+                // The slot vanished while armed (its page was removed): disarm out loud.
+                emitMidiLearn (false, {}, {}, -1, 0);
+            }
+            refreshSlotNoteListening();
         }
     }
 
     // Every event lands on every slot bound to it — absolute position, the controller value
     // scaling the slot's mapped range exactly as the on-screen knob does. The freshly
     // learned slot is caught here too, so the knob takes effect the moment it binds.
+    //
+    // A pad is a press, not a position. Momentary (the default): down is the top of the
+    // range, up is the bottom — hold for a filter sweep, let go and it closes. Toggle: each
+    // press flips, the release is ignored, and the state is kept on the slot so a session
+    // comes back with the pad where it was left. A controller-sending pad (127 down, 0 up)
+    // gets the same treatment through the toggle flag; without it, 127/0 already IS
+    // momentary through the ordinary write.
     bool virtualWritten = false;
+    bool latchChanged = false;
     for (const auto& event : events)
         for (const auto& page : rack.getPerformance().pages)
             for (const auto& slot : page.slots)
             {
-                if (slot.midiCc != event.cc)
+                const auto isNote = event.note >= 0;
+                if (isNote ? slot.midiNote != event.note : slot.midiCc != event.cc)
                     continue;
                 if (slot.midiChannel != 0 && slot.midiChannel != event.channel)
                     continue;
                 if (slot.binding.isEmpty() || ! bindingResolves (slot.binding))
                     continue;
 
-                writeMappedBinding (slot.binding, (float) event.value / 127.0f);
+                float normalised = (float) event.value / 127.0f;
+                if (slot.binding.toggle)
+                {
+                    const auto pressed = isNote ? event.on : event.value >= 64;
+                    if (! pressed)
+                        continue;
+                    const auto latched = ! slot.latched;
+                    rack.setSlotLatched (page.pageId, slot.slotId, latched);
+                    latchChanged = true;
+                    normalised = latched ? 1.0f : 0.0f;
+                }
+                else if (isNote)
+                {
+                    normalised = event.on ? 1.0f : 0.0f;
+                }
+
+                writeMappedBinding (slot.binding, normalised);
                 virtualWritten = virtualWritten || isVirtualParameterId (slot.binding.parameterId);
             }
 
     // A virtual write changed the manifest (fader, send, macro): one save and one announce
-    // per drain however many controllers moved — the contract the CTRL49 encoders set.
-    if (virtualWritten)
+    // per drain however many controllers moved — the contract the CTRL49 encoders set. A
+    // latch flip is manifest too, and the drawing shows it.
+    if (virtualWritten || latchChanged)
     {
         savePerformance();
         emitState();
@@ -5794,7 +5922,7 @@ void InstrumentHostService::drainParameterEvents()
     // a UI light needs "something arrived, this is what", not a message log.
     {
         juce::String device, text;
-        int cc = -1, channel = 0, value = 0;
+        int cc = -1, note = -1, channel = 0, value = 0;
         bool changed = false;
         {
             const std::scoped_lock lock (midiActivityLock);
@@ -5804,6 +5932,7 @@ void InstrumentHostService::drainParameterEvents()
                 device = midiActivityDevice;
                 text = midiActivityText;
                 cc = midiActivityCc;
+                note = midiActivityNote;
                 channel = midiActivityChannel;
                 value = midiActivityValue;
                 changed = true;
@@ -5817,6 +5946,7 @@ void InstrumentHostService::drainParameterEvents()
             // -1 for anything that was not a controller: the drawing lights knobs, and a
             // note-on must not be allowed to match controller 0 by arithmetic accident.
             obj->setProperty ("cc", cc);
+            obj->setProperty ("note", note);
             obj->setProperty ("channel", channel);
             obj->setProperty ("value", value);
             options.emit ("instrumentHostMidiActivity", juce::var (obj));
@@ -6384,6 +6514,11 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("resolved",    resolved);
             s->setProperty ("midiCc",      slot.midiCc);
             s->setProperty ("midiChannel", slot.midiChannel);
+            s->setProperty ("midiNote",    slot.midiNote);
+            s->setProperty ("kind",        slot.kind);
+            s->setProperty ("index",       slot.index);
+            s->setProperty ("toggle",      b.toggle);
+            s->setProperty ("latched",     slot.latched);
             slots.add (juce::var (s));
         }
 

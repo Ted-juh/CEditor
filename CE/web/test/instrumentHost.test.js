@@ -528,16 +528,77 @@ test('the drawing knows which knob drives which slot', () => {
   assert.equal(surfaceControlSlot(page, encoder(7)), null,
     'a knob past the end of the page drives nothing, rather than wrapping onto slot one');
 
-  // Everything that is drawn but cannot be reached. Offering these would promise assignment
-  // the runtime cannot honour — the panel draws them precisely so it can say they are inert.
-  assert.equal(surfaceControlSlot(page, { kind: 'fader', index: 0 }), null, 'faders address no slot');
-  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 1 }), null, 'nor pads');
+  // A fader or a pad has no slot until something is dropped on it — so nothing yet — and an
+  // encoder the profile says CEditor cannot address never has one.
+  assert.equal(surfaceControlSlot(page, { kind: 'fader', index: 0 }), null, 'no fader slot minted yet');
+  assert.equal(surfaceControlSlot(page, { kind: 'pad', index: 1 }), null, 'nor a pad slot');
   assert.equal(surfaceControlSlot(page, { kind: 'encoder', index: -1 }), null,
     'nor an encoder the profile says CEditor cannot address');
+
+  // Once minted, a fader's or a pad's slot is found by what it rides, not by its position:
+  // the fader slot sits between two encoders in the array and must not shift them.
+  const mixed = { pageId: 'p3', slots: [
+    { slotId: 's1', kind: 'encoder', index: 0, assigned: true, displayName: 'Cutoff' },
+    { slotId: 'fader-3', kind: 'fader', index: 2, assigned: true, displayName: 'Level' },
+    { slotId: 's2', kind: 'encoder', index: 1, assigned: false, displayName: '' },
+    { slotId: 'pad-2', kind: 'pad', index: 1, assigned: true, displayName: 'Hold' },
+  ] };
+  assert.equal(surfaceControlSlot(mixed, { kind: 'fader', index: 2 }).slotId, 'fader-3');
+  assert.equal(surfaceControlSlot(mixed, { kind: 'pad', index: 1 }).slotId, 'pad-2');
+  assert.equal(surfaceControlSlot(mixed, encoder(1)).slotId, 's2',
+    'the second encoder is still the second encoder with a fader slot ahead of it');
+  assert.equal(surfaceControlSlot(mixed, { kind: 'fader', index: 0 }), null, 'an unminted fader is still nothing');
+  assert.equal(surfaceControlSlot(mixed, { kind: 'button', index: 0 }), null, 'a button is not a slot kind');
 
   assert.equal(surfaceControlSlot(null, encoder(0)), null, 'with no page there is nothing to drive');
   assert.equal(surfaceControlSlot(page, null), null);
   assert.equal(surfaceControlSlot({ pageId: 'p2' }, encoder(0)), null, 'a page with no slots is safe');
+});
+
+test('slots without a kind read as encoders at their place among the encoders', () => {
+  // Every page saved before faders and pads had slots: kind and index absent, join by
+  // position. A fader slot in the array must not push the encoders' indices along.
+  const state = normalizeHostState({ rack: { pages: [{ pageId: 'p', slots: [
+    { slotId: 'a' }, { slotId: 'f', kind: 'fader', index: 4 }, { slotId: 'b' }, { slotId: 'p', kind: 'pad' },
+  ] }] } });
+  const slots = state.rack.pages[0].slots;
+  assert.deepEqual(slots.map((s) => [s.kind, s.index]),
+    [['encoder', 0], ['fader', 4], ['encoder', 1], ['pad', -1]]);
+  assert.equal(slots[0].midiNote, -1);
+  assert.equal(slots[0].toggle, false);
+  assert.equal(slots[0].latched, false);
+});
+
+test('mock reducer: dropping on a fader or a pad mints its slot, then it is an ordinary slot', () => {
+  let state = applyMockCommand(mockHostState(), { cmd: 'addControlPage', name: 'Live' });
+  const pageId = state.rack.pages.at(-1).pageId;
+  const before = state.rack.pages.at(-1).slots.length;
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'fader', index: 2,
+                                    partId: 'mock-part-1', parameterId: 'cutoff' });
+  const page = state.rack.pages.find((p) => p.pageId === pageId);
+  assert.equal(page.slots.length, before + 1, 'a fader slot was minted');
+  const fader = surfaceControlSlot(page, { kind: 'fader', index: 2 });
+  assert.ok(fader, 'and it is found by what it rides');
+  assert.equal(fader.assigned, true);
+
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'fader', index: 2,
+                                    partId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(state.rack.pages.find((p) => p.pageId === pageId).slots.length, before + 1,
+    'a second drop reuses the slot rather than minting another');
+
+  state = applyMockCommand(state, { cmd: 'learnSurfaceControl', pageId, kind: 'pad', index: 5 });
+  const pad = surfaceControlSlot(state.rack.pages.find((p) => p.pageId === pageId), { kind: 'pad', index: 5 });
+  assert.ok(pad, 'learning on a pad mints its slot too');
+  assert.ok(pad.midiCc >= 0, 'and the mock binds it at once');
+
+  state = applyMockCommand(state, { cmd: 'setControlSlotOptions', pageId, slotId: pad.slotId, toggle: true });
+  assert.equal(surfaceControlSlot(state.rack.pages.find((p) => p.pageId === pageId), { kind: 'pad', index: 5 }).toggle, true,
+    'toggle is a slot option like any other');
+
+  state = applyMockCommand(state, { cmd: 'assignSurfaceControl', pageId, kind: 'button', index: 0,
+                                    partId: 'mock-part-1', parameterId: 'cutoff' });
+  assert.equal(state.rack.pages.find((p) => p.pageId === pageId).slots.length, before + 2,
+    'a kind the surface does not address mints nothing');
 });
 
 test('a controller move carries which controller it was', () => {
@@ -1799,9 +1860,13 @@ test('slots normalize their MIDI-learn binding and default to unbound', () => {
 
 test('normalizeMidiLearn shapes the arming event and fails safe', () => {
   assert.deepEqual(normalizeMidiLearn({ armed: true, pageId: 'p', slotId: 's1' }),
-                   { armed: true, pageId: 'p', slotId: 's1' });
-  assert.deepEqual(normalizeMidiLearn(null), { armed: false, pageId: '', slotId: '' });
-  assert.deepEqual(normalizeMidiLearn({ armed: 'yes' }), { armed: false, pageId: '', slotId: '' });
+                   { armed: true, pageId: 'p', slotId: 's1', cc: -1, note: -1 });
+  assert.deepEqual(normalizeMidiLearn(null), { armed: false, pageId: '', slotId: '', cc: -1, note: -1 });
+  assert.deepEqual(normalizeMidiLearn({ armed: 'yes' }), { armed: false, pageId: '', slotId: '', cc: -1, note: -1 });
+  // What bound: a controller, or a pad's note — never both, and -1 for whichever it was not.
+  assert.deepEqual(normalizeMidiLearn({ armed: false, pageId: 'p', slotId: 'pad-6', cc: -1, note: 36 }),
+                   { armed: false, pageId: 'p', slotId: 'pad-6', cc: -1, note: 36 });
+  assert.equal(normalizeMidiLearn({ note: 'C2' }).note, -1, 'a note that is not a number is no note');
 });
 
 test('mock reducer: MIDI learn binds a controller, steals it on re-learn, clear unbinds', () => {

@@ -194,6 +194,10 @@ struct ControlBinding
     float rangeMax = 1.0f;
     bool inverted = false;
     bool bipolar = false;
+    /** A press flips the parameter between the two ends of the range instead of following
+        the control's position. What a pad wants for "filter open" or "reverb on": momentary
+        by default (down is the top of the range, up is the bottom), latching with this. */
+    bool toggle = false;
 
     bool isEmpty() const          { return parameterId.isEmpty(); }
 };
@@ -203,6 +207,15 @@ struct ControlSlot
     juce::String slotId;          // stable within its page ("s1".."s8")
     ControlBinding binding;       // empty binding = unassigned slot
 
+    // Which physical control on the surface this slot rides, in the surface layout's own
+    // terms (SurfaceControl::kind and ::index). A page began as eight encoder slots and the
+    // join was their position — encoder N is slot N — and that is still what an old manifest
+    // reads back as: a slot with no kind is an encoder, and its index is its place among the
+    // encoders. Faders and pads get slots of their own, minted the first time something is
+    // dropped on one, which is why a page is no longer exactly eight of anything.
+    juce::String kind { "encoder" };   // "encoder" | "fader" | "pad"
+    int index = -1;
+
     // MIDI learn: a controller number bound to this slot drives it from any enabled MIDI
     // input, absolute 0..127 onto the slot's mapped range. Learn always stores the concrete
     // channel it heard (1..16) so two keyboards on different channels stay two controllers;
@@ -210,6 +223,12 @@ struct ControlSlot
     // manifests simply lack the fields and read back unbound — no schema bump needed.
     int midiCc = -1;
     int midiChannel = 0;
+    // Or a note: most pads send one, and a key on the keyboard is a pad if you say so. One
+    // controller per slot — binding a note clears the controller and the other way round.
+    int midiNote = -1;
+    // The toggle's own memory, kept with the slot so a latched pad is still latched when the
+    // session comes back rather than silently reset under a lit LED.
+    bool latched = false;
 };
 
 // The neutral page: named control slots over parameter addresses, no hardware bytes anywhere.
@@ -225,11 +244,20 @@ struct ControlPage
     bool generated = false;
     juce::String generatedForPartId;
 
-    /** Mints a page with a fresh stable id and `numSlots` empty slots ("s1".."sN"). */
+    /** Mints a page with a fresh stable id and `numSlots` empty encoder slots ("s1".."sN",
+        indexed 0..N-1). */
     static ControlPage create (const juce::String& name, int numSlots = 8);
 
     ControlSlot* findSlot (const juce::String& slotId);
     const ControlSlot* findSlot (const juce::String& slotId) const;
+
+    /** The slot riding one physical control, or null when nothing has been put there yet. */
+    ControlSlot* findSurfaceSlot (const juce::String& kind, int index);
+    const ControlSlot* findSurfaceSlot (const juce::String& kind, int index) const;
+
+    /** Encoders, faders and pads of a big desk, with room to spare; a bound on hand-edited
+        manifests rather than a number anybody should reach. */
+    static constexpr int maxSlots = 256;
 };
 
 // A Performance macro (Stage 5, baseline §18.7.8): one 0..1 control fanning into several

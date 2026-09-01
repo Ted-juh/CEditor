@@ -20,7 +20,8 @@
   import {
     hostSurface, hostSurfaceLayout, requestSurfaceLayout, hostState, hostMidiActivity,
     hostParamDrag, assignControlSlot, clearControlSlot, hostParameters, requestParameters,
-    filterParameters, surfaceControlSlot,
+    filterParameters, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
+    setControlSlotOptions,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
   } from '../stores/instrumentHost.js';
 
@@ -86,15 +87,23 @@
 
   const slotFor = (control) => surfaceControlSlot(page, control);
 
-  // The knob you are turning, lit. The frontend does the matching because it already holds
-  // what every slot is bound to; the native side just says which controller moved.
+  // A control the runtime can reach: an encoder, a fader or a pad the layout gave an index.
+  // Encoders have a slot from the day the page was made; a fader or a pad gets one minted
+  // the first time something lands on it, so "no slot yet" is not "cannot be assigned".
+  const addressable = (control) =>
+    control.index >= 0 && ['encoder', 'fader', 'pad'].includes(control.kind);
+
+  // The knob you are turning, lit — or the pad you are hitting. The frontend does the
+  // matching because it already holds what every slot is bound to; the native side just
+  // says which controller (or note) moved.
   let litSlotId = $state('');
   let litAt = 0;
   $effect(() => {
     const activity = $hostMidiActivity;
-    if (activity.cc < 0 || !page) return;
-    const hit = page.slots.find((s) => s.midiCc === activity.cc
-                                       && (s.midiChannel === 0 || s.midiChannel === activity.channel));
+    if ((activity.cc < 0 && activity.note < 0) || !page) return;
+    const hit = page.slots.find((s) => (s.midiChannel === 0 || s.midiChannel === activity.channel)
+                                       && ((activity.cc >= 0 && s.midiCc === activity.cc)
+                                           || (activity.note >= 0 && s.midiNote === activity.note)));
     if (!hit) return;
     litSlotId = hit.slotId;
     litAt = activity.seq;
@@ -110,12 +119,15 @@
     if (control.index < 0) return `${named} — on the keyboard, but CEditor does not map it`;
 
     const slot = slotFor(control);
+    const bound = slot?.midiNote >= 0 ? ` · note ${slot.midiNote}` : slot?.midiCc >= 0 ? ` · CC ${slot.midiCc}` : '';
     if (slot?.assigned)
-      return `${named} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}`
+      return `${named} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
              + (slot.resolved ? '' : ' — the part no longer has this parameter')
-             + '\nDrop a parameter here to reassign it, or click to clear it';
-    if (slot)
-      return `${named} — unassigned. Drag a parameter from the Params tab onto it.`;
+             + (slot.toggle ? (slot.latched ? ' — latching, ON' : ' — latching, off') : '')
+             + '\nDrop a parameter here to reassign it, click to clear it, Alt-click to MIDI-learn it'
+             + (control.kind === 'pad' ? `, right-click to make it ${slot.toggle ? 'momentary' : 'latching'}` : '');
+    if (addressable(control))
+      return `${named} — unassigned. Drag a parameter from the Params tab onto it, or Alt-click to MIDI-learn it.`;
     return `${named} — CEditor addresses this as ${control.kind} ${control.index}`;
   }
 
@@ -124,15 +136,18 @@
   let hoveredId = $state('');
 
   function dropOn(event, control) {
-    const slot = slotFor(control);
-    if (!slot || !$hostParamDrag.parameterId) return;
+    if (!addressable(control) || !$hostParamDrag.parameterId) return;
     event.preventDefault();
-    assignControlSlot(page.pageId, slot.slotId, $hostParamDrag.partId, $hostParamDrag.parameterId);
+    // By control, not by slot: a fader or a pad has no slot until this very drop. And by
+    // page if there is one — with none, the drop mints it, so the drawing works from the
+    // first minute rather than after a trip to the pages list.
+    assignSurfaceControl(page?.pageId ?? '', control.kind, control.index,
+                         $hostParamDrag.partId, $hostParamDrag.parameterId);
     hostParamDrag.set({ partId: '', parameterId: '', name: '' });
   }
 
   function dragOver(event, control) {
-    if (!slotFor(control) || !$hostParamDrag.parameterId) return;
+    if (!addressable(control) || !$hostParamDrag.parameterId) return;
     event.preventDefault();
     // Must match the source's effectAllowed or the browser cancels the drop in silence.
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
@@ -295,9 +310,27 @@
                   data-testid={`surface-${control.controlId}`}
                   title={title(control)}
                   aria-label={title(control)}
+                  class:latched={slot?.toggle && slot?.latched}
                   ondragover={(e) => dragOver(e, control)}
                   ondrop={(e) => dropOn(e, control)}
-                  onclick={() => { if (slot?.assigned) clearControlSlot(page.pageId, slot.slotId); }}
+                  onclick={(e) => {
+                    // Alt-click learns; a plain click clears. Not double-click for learn:
+                    // a double-click is two clicks first, and the first of them cleared the
+                    // assignment before the learn ever armed.
+                    if (e.altKey) {
+                      if (addressable(control)) learnSurfaceControl(page?.pageId ?? '', control.kind, control.index);
+                      return;
+                    }
+                    if (slot?.assigned) clearControlSlot(page.pageId, slot.slotId);
+                  }}
+                  oncontextmenu={(e) => {
+                    // A pad is momentary or latching; the right button is where that lives,
+                    // because the left one is already taken by clear and the drawing has no
+                    // room for a checkbox per pad.
+                    if (control.kind !== 'pad' || !slot?.assigned) return;
+                    e.preventDefault();
+                    setControlSlotOptions(page.pageId, slot.slotId, { toggle: !slot.toggle });
+                  }}
                   style={`left:${((control.x - view.x) / view.w) * 100}%;
                           top:${((control.y - view.y) / view.h) * 100}%;
                           width:${(control.w / view.w) * 100}%;
@@ -439,6 +472,9 @@
   .ctl.encoder { border-radius: 50%; }
   .ctl.pad { border-radius: 3px; }
   .ctl.fader { border-radius: 1px; background: #171c21; }
+  /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
+     the real one does. Out-specified like .assigned, for the same source-order reason. */
+  .surface-plate .ctl.mapped.assigned.latched { background: #d8a24a; color: #1a1408; }
   .ctl.wheel { border-radius: 40%; background: #171c21; }
   .ctl.keys { background: #2a2f34; border-color: #3b4652; }
   .ctl.display { background: #16202a; border-color: #3f5162; }

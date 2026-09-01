@@ -49,7 +49,7 @@ export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
  *  so the view can flash on every arrival even when two identical notes repeat. */
-export const hostMidiActivity = writable({ device: '', text: '', cc: -1, channel: 0, value: 0, seq: 0 });
+export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -1, channel: 0, value: 0, seq: 0 });
 // The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
@@ -101,6 +101,9 @@ export function normalizeMidiLearn(payload) {
     armed: payload?.armed === true,
     pageId: String(payload?.pageId ?? ''),
     slotId: String(payload?.slotId ?? ''),
+    // What bound, when something did: a controller, or a pad's note. -1 for the other.
+    cc: Number.isInteger(payload?.cc) ? payload.cc : -1,
+    note: Number.isInteger(payload?.note) ? payload.note : -1,
   };
 }
 
@@ -197,10 +200,22 @@ export function normalizeSurfaceLayout(payload) {
     today: a fader or a pad is drawn, labelled and inert, which is the truth about them rather
     than a gap in this function. */
 export function surfaceControlSlot(page, control) {
-  if (!page || !control || control.kind !== 'encoder') return null;
+  if (!page || !control) return null;
+  const kind = String(control.kind ?? '');
+  if (kind !== 'encoder' && kind !== 'fader' && kind !== 'pad') return null;
   const index = Number(control.index);
   if (!Number.isInteger(index) || index < 0) return null;
-  return (Array.isArray(page.slots) ? page.slots : [])[index] ?? null;
+  // A slot says which physical control it rides. One that says nothing is from before slots
+  // could — an encoder, at its place among the encoders — which is the join the drawing has
+  // always used and must keep using for every page saved before faders and pads had slots.
+  let legacyEncoders = 0;
+  for (const slot of (Array.isArray(page.slots) ? page.slots : [])) {
+    const slotKind = slot?.kind ?? 'encoder';
+    const slotIndex = Number.isInteger(slot?.index) && slot.index >= 0
+      ? slot.index : (slotKind === 'encoder' ? legacyEncoders++ : -1);
+    if (slotKind === kind && slotIndex === index) return slot;
+  }
+  return null;
 }
 
 export const hostSurfaceLayout = writable(emptySurfaceLayout());
@@ -1502,8 +1517,15 @@ export function normalizeHostState(payload) {
         name: String(page?.name ?? ''),
         generated: page?.generated === true,
         generatedForPartId: String(page?.generatedForPartId ?? ''),
-        slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot) => ({
+        slots: (Array.isArray(page?.slots) ? page.slots : []).map((slot, position, all) => ({
           slotId: String(slot?.slotId ?? ''),
+          // Which control on the surface: kind and index in the layout's own terms. Absent
+          // means an encoder at its place among the encoders, which is what every page
+          // saved before faders and pads had slots of their own means by "slot N".
+          kind: ['encoder', 'fader', 'pad'].includes(slot?.kind) ? slot.kind : 'encoder',
+          index: Number.isInteger(slot?.index) && slot.index >= 0 ? slot.index
+            : (['fader', 'pad'].includes(slot?.kind) ? -1
+               : all.slice(0, position).filter((s) => !['fader', 'pad'].includes(s?.kind)).length),
           assigned: slot?.assigned === true,
           partId: String(slot?.partId ?? ''),
           parameterId: String(slot?.parameterId ?? ''),
@@ -1517,6 +1539,9 @@ export function normalizeHostState(payload) {
           resolved: slot?.resolved === true,
           midiCc: Number.isInteger(slot?.midiCc) ? Math.max(-1, Math.min(127, slot.midiCc)) : -1,
           midiChannel: Number.isInteger(slot?.midiChannel) ? Math.max(0, Math.min(16, slot.midiChannel)) : 0,
+          midiNote: Number.isInteger(slot?.midiNote) ? Math.max(-1, Math.min(127, slot.midiNote)) : -1,
+          toggle: slot?.toggle === true,
+          latched: slot?.latched === true,
         })),
       })),
       parts: (Array.isArray(rack.parts) ? rack.parts : []).map((part) => ({
@@ -2094,7 +2119,7 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'label'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label'])
         if (payload[key] !== undefined) slot[key] = payload[key];
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
     }
@@ -2122,6 +2147,35 @@ export function applyMockCommand(state, payload) {
       midiCc: 20 + index, midiChannel: 1,
     });
     return working;
+  }
+  if (cmd === 'assignSurfaceControl' || cmd === 'learnSurfaceControl') {
+    // The drawing names the control; the slot is minted here the first time, then the
+    // ordinary slot command does the rest — exactly the native shape.
+    const kind = String(payload.kind ?? '');
+    const index = Number(payload.index);
+    if (!['encoder', 'fader', 'pad'].includes(kind) || !Number.isInteger(index) || index < 0)
+      return next;
+    // No page named and none to land on: the first drop mints one, as native does. The
+    // page-add returns a NEW state, so everything after works on whichever holds the page.
+    let working = next;
+    if (!payload.pageId && working.rack.pages.length === 0)
+      working = applyMockCommand(working, { cmd: 'addControlPage', name: 'Surface' });
+    const page = working.rack.pages.find((p) => p.pageId === payload.pageId)
+      ?? (payload.pageId ? null : working.rack.pages[0]);
+    if (!page) return working;
+    let slot = surfaceControlSlot(page, { kind, index });
+    if (!slot) {
+      slot = normalizeHostState({ rack: { pages: [{ pageId: 'x', slots: [
+        { slotId: `${kind}-${index + 1}`, kind, index },
+      ] }] } }).rack.pages[0].slots[0];
+      page.slots.push(slot);
+    }
+    return applyMockCommand(working, {
+      ...payload,
+      pageId: page.pageId,
+      cmd: cmd === 'assignSurfaceControl' ? 'assignControlSlot' : 'learnControlSlotMidi',
+      slotId: slot.slotId,
+    });
   }
   if (cmd === 'learnControlSlotMidi' || cmd === 'clearControlSlotMidi') {
     const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
@@ -2688,6 +2742,8 @@ export function initInstrumentHostBridge() {
     // -1 for anything that was not a controller, so the surface drawing cannot light a knob
     // because a note-on happened to arrive.
     cc: Number.isInteger(payload?.cc) ? payload.cc : -1,
+    // -1 unless a note: the drawing lights a pad the same way it lights a knob.
+    note: Number.isInteger(payload?.note) ? payload.note : -1,
     channel: Number(payload?.channel ?? 0),
     value: Number(payload?.value ?? 0),
     seq: a.seq + 1,
@@ -3243,6 +3299,16 @@ export const removeControlPage = (pageId) => send({ cmd: 'removeControlPage', pa
 export const renameControlPage = (pageId, name) => send({ cmd: 'renameControlPage', pageId, name });
 export const assignControlSlot = (pageId, slotId, partId, parameterId) =>
   send({ cmd: 'assignControlSlot', pageId, slotId, partId, parameterId });
+/** Assign straight onto a physical control — a fader or a pad gets a slot minted for it the
+    first time something is dropped there; an encoder's slot already exists. */
+export const assignSurfaceControl = (pageId, kind, index, partId, parameterId) =>
+  send({ cmd: 'assignSurfaceControl', pageId, kind, index, partId, parameterId });
+/** Arm MIDI learn on a physical control's slot, minting the slot if it has none yet. */
+export const learnSurfaceControl = (pageId, kind, index) => {
+  if (!isJuceAvailable()) hostMidiLearn.set({ armed: false, pageId: '', slotId: '' });
+  else hostMidiLearn.set({ armed: true, pageId, slotId: `${kind}-${index + 1}` });
+  send({ cmd: 'learnSurfaceControl', pageId, kind, index });
+};
 export const clearControlSlot = (pageId, slotId) => send({ cmd: 'clearControlSlot', pageId, slotId });
 export const setControlSlotOptions = (pageId, slotId, fields) =>
   send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });

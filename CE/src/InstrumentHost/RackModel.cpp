@@ -23,8 +23,29 @@ ControlPage ControlPage::create (const juce::String& name, int numSlots)
     page.pageId = juce::Uuid().toDashedString();
     page.name = name;
     for (int i = 1; i <= juce::jmax (1, numSlots); ++i)
-        page.slots.add ({ "s" + juce::String (i), {} });
+    {
+        ControlSlot slot;
+        slot.slotId = "s" + juce::String (i);
+        slot.kind = "encoder";
+        slot.index = i - 1;
+        page.slots.add (std::move (slot));
+    }
     return page;
+}
+
+ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index)
+{
+    if (index < 0)
+        return nullptr;
+    for (auto& slot : slots)
+        if (slot.kind == kind && slot.index == index)
+            return &slot;
+    return nullptr;
+}
+
+const ControlSlot* ControlPage::findSurfaceSlot (const juce::String& kind, int index) const
+{
+    return const_cast<ControlPage*> (this)->findSurfaceSlot (kind, index);
 }
 
 ControlSlot* ControlPage::findSlot (const juce::String& slotId)
@@ -425,8 +446,13 @@ juce::var Performance::toVar() const
             s->setProperty ("rangeMax",    slot.binding.rangeMax);
             s->setProperty ("inverted",    slot.binding.inverted);
             s->setProperty ("bipolar",     slot.binding.bipolar);
+            s->setProperty ("toggle",      slot.binding.toggle);
+            s->setProperty ("kind",        slot.kind);
+            s->setProperty ("index",       slot.index);
             s->setProperty ("midiCc",      slot.midiCc);
             s->setProperty ("midiChannel", slot.midiChannel);
+            s->setProperty ("midiNote",    slot.midiNote);
+            s->setProperty ("latched",     slot.latched);
             slotVars.add (juce::var (s));
         }
 
@@ -812,6 +838,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             page.generatedForPartId = pg.getProperty ("generatedForPartId", {}).toString();
 
             juce::StringArray seenSlotIds;
+            int legacyEncoders = 0;   // a slot with no kind is an encoder at its place among them
             if (const auto* slotArray = pg.getProperty ("slots", {}).getArray())
                 for (const auto& s : *slotArray)
                 {
@@ -821,6 +848,23 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                         return false;
                     seenSlotIds.add (slot.slotId);
 
+                    // Which control the slot rides. Absent — every manifest written before
+                    // faders and pads had slots — means encoder N for the Nth such slot,
+                    // which is the join those pages were built on and must keep.
+                    {
+                        const auto kind = s.getProperty ("kind", {}).toString();
+                        slot.kind = (kind == "fader" || kind == "pad") ? kind : juce::String ("encoder");
+                        const auto index = (int) s.getProperty ("index", -1);
+                        if (index >= 0)
+                            slot.index = juce::jmin (127, index);
+                        else if (slot.kind == "encoder" && ! s.hasProperty ("index"))
+                            slot.index = legacyEncoders;
+                        else
+                            slot.index = -1;
+                        if (slot.kind == "encoder")
+                            ++legacyEncoders;
+                    }
+
                     slot.binding.partId      = s.getProperty ("partId", {}).toString();
                     slot.binding.pluginCeId  = s.getProperty ("pluginCeId", {}).toString();
                     slot.binding.parameterId = s.getProperty ("parameterId", {}).toString();
@@ -829,8 +873,11 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.binding.rangeMax    = floatOf (s, "rangeMax", 1.0f, 0.0f, 1.0f);
                     slot.binding.inverted    = (bool) s.getProperty ("inverted", false);
                     slot.binding.bipolar     = (bool) s.getProperty ("bipolar", false);
+                    slot.binding.toggle      = (bool) s.getProperty ("toggle", false);
                     slot.midiCc      = juce::jlimit (-1, 127, (int) s.getProperty ("midiCc", -1));
                     slot.midiChannel = juce::jlimit (0, 16, (int) s.getProperty ("midiChannel", 0));
+                    slot.midiNote    = juce::jlimit (-1, 127, (int) s.getProperty ("midiNote", -1));
+                    slot.latched     = (bool) s.getProperty ("latched", false);
                     page.slots.add (std::move (slot));
                 }
 

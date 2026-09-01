@@ -552,5 +552,15 @@ New ideas go here with a date, so nothing gets lost between sessions.
   assigned knob stayed the unassigned blue. Out-specified rather than reordered. Fourth colour
   in this project eaten that way; the first three were `.ghost`.
 
-  Still not built: assigning a pad or a fader — the runtime addresses encoders only, and the
-  drawing says so rather than offering a drop that cannot be honoured.
+  ~~Still not built: assigning a pad or a fader — the runtime addresses encoders only, and the
+  drawing says so rather than offering a drop that cannot be honoured.~~ **Built, 2026-09-01.**
+  A slot now says which physical control it rides — `kind` and `index` in the layout's own
+  terms — and a fader or a pad gets a slot minted the first time something is dropped on it
+  (`assignSurfaceControl`, `learnSurfaceControl`). A page began as eight encoder slots joined by
+  position, and that is exactly what an old manifest still reads back as: a slot with no kind
+  is an encoder at its place among the encoders. Pads bind to a note as readily as to a
+  controller — most send one, and a key is a pad if you say so — and press momentarily by
+  default (down is the top of the range, up the bottom) or latch with the slot's `toggle`,
+  whose state is kept with the slot so a latched pad survives a restart rather than resetting
+  under a lit LED. The CTRL49's own pads keep their performance role; this is the generic
+  path, which is the one the drawing above exists for.
