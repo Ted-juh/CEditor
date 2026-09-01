@@ -39,6 +39,7 @@ namespace licensing = ceditor::licensing;
 using ceditor::host::PluginCatalog;
 using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
+using ceditor::host::PluginSnapshotRegistry;
 using ceditor::test::StubSynthProcessor;
 
 juce::File freshDataDir (const juce::String& name)
@@ -4789,6 +4790,76 @@ void testFactoryPerformance()
 // The browse dialog behind "Add scan folder", and the module projection the browser column
 // cannot explain scans without. A cancelled picker changes nothing; a module full of effects
 // says so through numInstruments instead of silently showing nothing.
+// Vendor artwork reaches the frontend as a route, and only as a route.
+//
+// Two things are being checked and the second is the one that matters. That a class which
+// shipped a snapshot arrives with a URL is the feature. That the URL contains no trace of
+// where the file is — and that the file is nonetheless reachable through it — is the reason
+// the registry exists: the WebView is a browser, and a payload carrying absolute paths is a
+// payload inviting the resource provider to serve any of them.
+void testPluginSnapshots()
+{
+    std::cout << "\nplug-in snapshots" << std::endl;
+
+    const auto dir = freshDataDir ("snapshots");
+    const auto png = dir.getChildFile ("good-synth.png");
+    png.replaceWithText ("stand-in for the vendor's PNG");
+
+    // Two instruments; only one of them shipped a picture.
+    {
+        PluginCatalog catalog;
+        for (const auto* name : { "Good", "Other" })
+        {
+            ModuleScanResult module;
+            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.fingerprint = juce::String ("fp-") + name;
+            PluginClassRecord synth;
+            synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
+            synth.name = juce::String (name) + " Synth";
+            synth.vendor = "Test Audio";
+            synth.isInstrument = true;
+            synth.descriptionXml = "<PLUGIN name=\"" + synth.name + "\"/>";
+            if (juce::String (name) == "Good")
+                synth.snapshotPath = png.getFullPathName();
+            module.classes.add (synth);
+            catalog.commitScanResult (module);
+        }
+        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    }
+
+    Harness h (dir);
+    h.cmd ("getState");
+
+    const auto* state = h.emits.lastState();
+    const auto instruments = state->getProperty ("instruments", {});
+    check (instruments.size() == 2, "both instruments reach the browser");
+
+    juce::String url;
+    for (int i = 0; i < instruments.size(); ++i)
+    {
+        const auto entry = instruments[i];
+        const auto ceId = entry.getProperty ("ceId", {}).toString();
+        const auto shot = entry.getProperty ("snapshotUrl", {}).toString();
+
+        if (ceId == "VST3-good-synth")
+            url = shot;
+        else
+            check (shot.isEmpty(), "a class with no artwork carries no snapshotUrl at all");
+    }
+
+    check (url.startsWith ("/plugin-snapshot/"), "the class with artwork carries a route, not a path");
+    check (! url.containsIgnoreCase (dir.getFullPathName()) && ! url.contains ("good-synth.png"),
+           "and the route says nothing about where the file is");
+
+    const auto token = url.fromLastOccurrenceOf ("/", false, false);
+    check (PluginSnapshotRegistry::instance().resolve (token) == png,
+           "the route resolves back to the file the catalogue published");
+    check (! PluginSnapshotRegistry::instance().resolve (png.getFullPathName()).existsAsFile(),
+           "and nothing else does — a path is not a token");
+
+    dir.deleteRecursively();
+}
+
 void testScanFolderBrowseAndModuleProjection()
 {
     std::cout << "\nscan-folder browse and module projection" << std::endl;
@@ -4974,6 +5045,7 @@ int main (int argc, char* argv[])
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
+    testPluginSnapshots();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

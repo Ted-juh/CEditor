@@ -16,6 +16,7 @@ namespace
         obj->setProperty ("isInstrument",   c.isInstrument);
         obj->setProperty ("formatName",     c.formatName);
         obj->setProperty ("descriptionXml", c.descriptionXml);
+        obj->setProperty ("snapshotPath", c.snapshotPath);
         return juce::var (obj);
     }
 
@@ -31,6 +32,7 @@ namespace
         // Absent = a catalogue written before formats were named, and everything in one is VST3.
         c.formatName     = v.getProperty ("formatName", "VST3").toString();
         c.descriptionXml = v.getProperty ("descriptionXml", {}).toString();
+        c.snapshotPath   = v.getProperty ("snapshotPath", {}).toString();
         return c;
     }
 
@@ -133,6 +135,31 @@ namespace
 
         return {};
     }
+}
+
+PluginSnapshotRegistry& PluginSnapshotRegistry::instance()
+{
+    static PluginSnapshotRegistry registry;
+    return registry;
+}
+
+juce::String PluginSnapshotRegistry::publish (const juce::String& ceId, const juce::File& snapshot)
+{
+    if (ceId.isEmpty() || ! snapshot.existsAsFile())
+        return {};
+
+    // Derived from the class identity, so the same plug-in keeps the same URL across restarts
+    // and the frontend can cache it. Opaque on purpose: it names nothing about the filesystem.
+    const auto token = juce::String::toHexString (ceId.hashCode64());
+    const juce::ScopedLock guard (lock);
+    pathsByToken.set (token, snapshot.getFullPathName());
+    return token;
+}
+
+juce::File PluginSnapshotRegistry::resolve (const juce::String& token) const
+{
+    const juce::ScopedLock guard (lock);
+    return pathsByToken.contains (token) ? juce::File (pathsByToken[token]) : juce::File();
 }
 
 bool ModuleRecord::architectureSupported() const

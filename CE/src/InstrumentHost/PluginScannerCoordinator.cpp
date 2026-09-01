@@ -14,6 +14,7 @@ namespace
         c.version      = e.getStringAttribute ("version");
         c.category     = e.getStringAttribute ("category");
         c.isInstrument = e.getBoolAttribute ("isInstrument");
+        c.snapshotPath = e.getStringAttribute ("ceSnapshot");
         c.descriptionXml = e.toString (juce::XmlElement::TextFormat().singleLine());
         return c;
     }

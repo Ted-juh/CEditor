@@ -44,6 +44,32 @@
 namespace ceditor::host
 {
 
+/** Where the WebView is allowed to read plug-in artwork from.
+
+    A snapshot lives wherever the vendor installed the plug-in, which is an arbitrary absolute
+    path, and the frontend is a browser: handing it a path to fetch would mean a resource
+    provider that serves any file it is asked for. So it does not get a path. The service
+    registers the files it has decided are serveable and hands out an opaque token; the
+    provider serves a token or nothing. The set of readable files is exactly the set the
+    catalogue put here, which is the property that makes this safe rather than the string
+    checks a path-based version would need. */
+class PluginSnapshotRegistry
+{
+public:
+    static PluginSnapshotRegistry& instance();
+
+    /** Registers a file and returns its token, or an empty string if the file is not there.
+        Registering the same class twice is a no-op that returns the same token. */
+    juce::String publish (const juce::String& ceId, const juce::File& snapshot);
+
+    /** The file for a token, or a file that does not exist for anything unregistered. */
+    juce::File resolve (const juce::String& token) const;
+
+private:
+    mutable juce::CriticalSection lock;
+    juce::HashMap<juce::String, juce::String> pathsByToken;
+};
+
 struct PluginClassRecord
 {
     juce::String ceId;             // stable CEditor identity: the JUCE plugin identifier string
@@ -59,6 +85,11 @@ struct PluginClassRecord
         which is what every pre-Stage-7 catalogue on disk contains. */
     juce::String formatName { "VST3" };
     juce::String descriptionXml;   // lossless JUCE PluginDescription XML, opaque at this layer
+    /** The vendor's own picture of this plug-in, if it shipped one: VST3 defines
+        Contents/Resources/Snapshots as PNGs named by class UID, and the scan worker reads that
+        folder while it is there. An absolute path at scan time, empty when the vendor shipped
+        nothing — which is most of them, and why the UI still needs a generated fallback. */
+    juce::String snapshotPath;
 };
 
 struct ModuleRecord

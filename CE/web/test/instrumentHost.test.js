@@ -41,6 +41,7 @@ import {
   busDestinationWouldLoop,
   pluginTile,
   pluginInitials,
+  pluginSnapshots,
   TILE_PATTERNS,
   normalizeSurfaceLayout,
   filterEffects,
@@ -604,6 +605,31 @@ test('pluginTile is derived from identity, so it never moves under you', () => {
 
   assert.ok(TILE_PATTERNS.includes(a.pattern), 'the pattern is one of the known set');
   assert.ok(a.hue >= 0 && a.hue < 360 && a.hue % 15 === 0, 'hues are quantised, so they read as a set');
+});
+
+test('a class that shipped artwork carries a route, and the rest carry nothing', () => {
+  // The native side publishes a token; a path would mean the resource provider had to serve
+  // arbitrary files. So the store passes the route through untouched and invents nothing.
+  const shaped = normalizeHostState({
+    instruments: [
+      { ceId: 'VST3-art', name: 'Arty', snapshotUrl: '/plugin-snapshot/abc123' },
+      { ceId: 'VST3-plain', name: 'Plain' },
+    ],
+    effectClasses: [{ ceId: 'VST3-fx-art', name: 'Verb', snapshotUrl: '/plugin-snapshot/def456' }],
+  });
+  assert.equal(shaped.instruments[0].snapshotUrl, '/plugin-snapshot/abc123');
+  assert.equal(shaped.instruments[1].snapshotUrl, '', 'no artwork is an empty string, not undefined');
+  assert.equal(shaped.effectClasses[0].snapshotUrl, '/plugin-snapshot/def456', 'effects too');
+
+  // The lookup a tile reads: parts and canvas nodes know a ceId and nothing else.
+  hostStateStore.set(shaped);
+  const byCeId = get(pluginSnapshots);
+  assert.equal(byCeId['VST3-art'], '/plugin-snapshot/abc123');
+  assert.equal(byCeId['VST3-fx-art'], '/plugin-snapshot/def456', 'instruments and effects share one map');
+  assert.ok(!('VST3-plain' in byCeId), 'a class with no artwork is absent, so the tile falls back');
+
+  hostStateStore.set(emptyHostState());
+  assert.deepEqual(get(pluginSnapshots), {}, 'and the map empties when the catalogue does');
 });
 
 test('pluginTile carries a second channel besides colour', () => {

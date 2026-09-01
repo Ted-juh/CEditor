@@ -10,7 +10,7 @@
  * without the JUCE backend must still show a working workspace, so the mock reducer applies
  * the same commands to a local state instead of dropping them on the floor.
  */
-import { writable, get } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import {
   isJuceAvailable,
   sendInstrumentHostCommand,
@@ -886,13 +886,16 @@ const CANVAS_LANE_H = 7;
 
 // --- plug-in tiles ------------------------------------------------------------------------------
 
-// VST3 ships no icon and there is nothing on disk to read, so a plug-in's tile is DERIVED from
-// the one thing that is stable about it: the catalogue's class identity. Same ceId, same tile,
-// on every machine and after every rescan — which is what makes it usable as recognition
-// rather than decoration.
+// Most plug-ins ship no artwork, so a tile is DERIVED from the one thing that is stable about
+// a plug-in: the catalogue's class identity. Same ceId, same tile, on every machine and after
+// every rescan — which is what makes it usable as recognition rather than decoration.
 //
 // Colour alone would fail anyone who cannot separate two hues, so the hash also picks a
 // pattern. Two channels, one hash, no images.
+//
+// The ones that DO ship artwork get it instead: VST3 defines Contents/Resources/Snapshots and
+// the scan reads that folder, so those classes arrive with a snapshotUrl. The generated tile
+// stays as the fallback for everything else and for an image that fails to load.
 export const TILE_PATTERNS = ['plain', 'stripe', 'dots', 'corner'];
 
 function tileHash(text) {
@@ -918,6 +921,22 @@ export function pluginInitials(name, vendor = '') {
   const fallback = String(vendor ?? '').trim();
   return fallback ? fallback.slice(0, 2).toUpperCase() : '–';
 }
+
+/** ceId -> artwork URL, for the catalogue classes that shipped a snapshot.
+
+    Derived once and read by the tile itself rather than passed in, because the places that
+    draw a tile mostly do not have the catalogue record: a rack part and a canvas node know
+    their ceId and their name and nothing else. Threading a URL through each of those call
+    sites would mean every one somebody forgot silently falls back to a generated tile, which
+    is the failure you cannot see. */
+export const pluginSnapshots = derived(hostState, ($state) => {
+  const byCeId = {};
+  for (const list of [$state?.instruments, $state?.effectClasses])
+    for (const record of Array.isArray(list) ? list : [])
+      if (record?.ceId && record?.snapshotUrl)
+        byCeId[record.ceId] = record.snapshotUrl;
+  return byCeId;
+});
 
 /** The tile for a plug-in class: a hue, a pattern and its initials, all derived from ceId. */
 export function pluginTile(ceId, name = '', vendor = '') {
@@ -1160,23 +1179,27 @@ export function rackCanvasLayout(rack) {
   return { nodes, wires, width, height };
 }
 
+/** One catalogue class as the browser reads it. `snapshotUrl` is a route the native side
+    serves, never a filesystem path — the WebView is handed a token and can fetch nothing the
+    catalogue did not publish (PluginCatalog.h documents why). Empty for the majority of
+    plug-ins, which ship no artwork at all. */
+function normalizePluginClass(i) {
+  return {
+    ceId: String(i?.ceId ?? ''),
+    name: String(i?.name ?? ''),
+    vendor: String(i?.vendor ?? ''),
+    version: String(i?.version ?? ''),
+    snapshotUrl: String(i?.snapshotUrl ?? ''),
+  };
+}
+
 export function normalizeHostState(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const rack = p.rack && typeof p.rack === 'object' ? p.rack : {};
 
   return {
-    instruments: (Array.isArray(p.instruments) ? p.instruments : []).map((i) => ({
-      ceId: String(i?.ceId ?? ''),
-      name: String(i?.name ?? ''),
-      vendor: String(i?.vendor ?? ''),
-      version: String(i?.version ?? ''),
-    })),
-    effectClasses: (Array.isArray(p.effectClasses) ? p.effectClasses : []).map((i) => ({
-      ceId: String(i?.ceId ?? ''),
-      name: String(i?.name ?? ''),
-      vendor: String(i?.vendor ?? ''),
-      version: String(i?.version ?? ''),
-    })),
+    instruments: (Array.isArray(p.instruments) ? p.instruments : []).map(normalizePluginClass),
+    effectClasses: (Array.isArray(p.effectClasses) ? p.effectClasses : []).map(normalizePluginClass),
     modules: (Array.isArray(p.modules) ? p.modules : []).map((m) => ({
       path: String(m?.path ?? ''),
       quarantined: m?.quarantined === true,

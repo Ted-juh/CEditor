@@ -67,6 +67,12 @@ void testJobOutcomes (const juce::File& stub)
              && ok.result.classes[0].isInstrument
              && ok.result.classes[0].vendor == "Stub Audio",
            "class records read identity, vendor and kind from the worker document");
+    // Artwork is optional and per class, so both halves matter: the one that has it keeps it,
+    // and the one that does not stays empty rather than borrowing its neighbour's picture.
+    check (ok.result.classes[0].snapshotPath.endsWith ("Snapshots/synth.png"),
+           "and the vendor's snapshot path when the worker found one");
+    check (ok.result.classes[1].snapshotPath.isEmpty(),
+           "a class the worker found no artwork for has none");
 
     const auto hung = coordinator.runOneJob (makeModule ("hang.vst3"));
     check (hung.status == Status::timedOut, "a hanging worker is killed and reported as timeout");

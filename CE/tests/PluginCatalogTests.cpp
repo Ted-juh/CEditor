@@ -29,6 +29,7 @@ void check (bool cond, const juce::String& label)
 using ceditor::host::PluginCatalog;
 using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
+using ceditor::host::PluginSnapshotRegistry;
 
 juce::File makeTempDir (const juce::String& name)
 {
@@ -265,6 +266,57 @@ juce::File makeBundle (const juce::File& parent, const juce::String& name,
     return bundle;
 }
 
+// Vendor artwork: the path is catalogue data, and the WebView never sees it.
+//
+// The failure this is guarding is not a missing picture. It is a resource provider that will
+// read any absolute path the frontend asks for, which is what a naive "just serve the
+// snapshotPath" would be — so the registry is the only way a file becomes readable, and a
+// token that was never published resolves to nothing.
+void testSnapshots()
+{
+    std::cout << "\nvendor snapshots" << std::endl;
+
+    auto dir = makeTempDir ("snapshots");
+    auto png = dir.getChildFile ("Sample.png");
+    png.replaceWithText ("not really a png, but it exists");
+
+    // The path survives a save/load, or every start would show artwork only after a rescan.
+    auto result = sampleResult ("/plugins/Art.vst3");
+    result.classes.getReference (0).snapshotPath = png.getFullPathName();
+    PluginCatalog catalog;
+    catalog.commitScanResult (result);
+
+    const auto file = dir.getChildFile ("catalog.json");
+    check (catalog.saveTo (file), "the catalogue saves");
+    PluginCatalog reloaded;
+    check (reloaded.loadFrom (file), "and reloads");
+    check (reloaded.findModule ("/plugins/Art.vst3")->classes.getReference (0).snapshotPath
+             == png.getFullPathName(),
+           "a class's snapshot path survives the round trip");
+    check (reloaded.findModule ("/plugins/Art.vst3")->classes.getReference (1).snapshotPath.isEmpty(),
+           "and a class with no artwork stays empty rather than inheriting its neighbour's");
+
+    auto& registry = PluginSnapshotRegistry::instance();
+    const auto token = registry.publish ("VST3-sample-synth", png);
+    check (token.isNotEmpty(), "publishing a file that exists yields a token");
+    check (! token.contains (dir.getFullPathName()) && ! token.contains ("Sample.png"),
+           "and the token does not carry the path it stands for");
+    check (registry.resolve (token) == png, "the token resolves back to the file");
+    check (registry.publish ("VST3-sample-synth", png) == token,
+           "publishing the same class twice is the same token");
+
+    check (registry.publish ("VST3-ghost", dir.getChildFile ("nothing.png")).isEmpty(),
+           "a file that is not there publishes nothing");
+
+    // The whole point: anything not published is unreachable, however it is spelled.
+    check (! registry.resolve ("").existsAsFile(), "an empty token resolves to nothing");
+    check (! registry.resolve ("deadbeef").existsAsFile(), "an unknown token resolves to nothing");
+    check (! registry.resolve (png.getFullPathName()).existsAsFile(),
+           "and the path itself is not a token — asking for a file by name gets nothing");
+
+    dir.deleteRecursively();
+}
+
 void testArchitectureReading()
 {
     auto dir = makeTempDir ("architecture");
@@ -404,6 +456,7 @@ int main()
     testFingerprint();
     testArchitectureReading();
     testArchitectureGating();
+    testSnapshots();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

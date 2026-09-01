@@ -5119,25 +5119,27 @@ juce::var InstrumentHostService::buildStatePayload()
     {
         const std::scoped_lock lock (catalogLock);
 
-        for (const auto& record : catalog.instrumentClasses())
+        // The vendor's own artwork, when the plug-in shipped some. Published rather than
+        // pathed: the frontend gets a token it can fetch and nothing about where the file is.
+        const auto classToVar = [] (const PluginClassRecord& record)
         {
             auto* obj = new juce::DynamicObject();
             obj->setProperty ("ceId",    record.ceId);
             obj->setProperty ("name",    record.name);
             obj->setProperty ("vendor",  record.vendor);
             obj->setProperty ("version", record.version);
-            instruments.add (juce::var (obj));
-        }
+            if (const auto token = PluginSnapshotRegistry::instance()
+                                     .publish (record.ceId, juce::File (record.snapshotPath));
+                token.isNotEmpty())
+                obj->setProperty ("snapshotUrl", "/plugin-snapshot/" + token);
+            return juce::var (obj);
+        };
+
+        for (const auto& record : catalog.instrumentClasses())
+            instruments.add (classToVar (record));
 
         for (const auto& record : catalog.effectClasses())
-        {
-            auto* obj = new juce::DynamicObject();
-            obj->setProperty ("ceId",    record.ceId);
-            obj->setProperty ("name",    record.name);
-            obj->setProperty ("vendor",  record.vendor);
-            obj->setProperty ("version", record.version);
-            effectClasses.add (juce::var (obj));
-        }
+            effectClasses.add (classToVar (record));
 
         for (const auto& module : catalog.allModules())
         {

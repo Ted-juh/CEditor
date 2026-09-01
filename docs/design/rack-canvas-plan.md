@@ -101,12 +101,21 @@ distinct. Trying to draw them as one undifferentiated flow will read as clear an
 
 ## Thumbnails: what is actually possible
 
-VST3 ships no icon. There is nothing to read off disk. So:
+An earlier version of this section opened "VST3 ships no icon, there is nothing to read off
+disk", and that was wrong — checked against the vendored SDK on 2026-09-01. VST3 defines
+`Contents/Resources/Snapshots`: one PNG per class named by class UID, `_2.0x` variants for
+hi-DPI, and `Contents/Resources/moduleinfo.json` naming each class beside its snapshot. It is a
+directory listing, not an instantiation. Recording the mistake because the conclusion drawn from
+it — generated tiles are all that is possible — outlived the premise by a whole increment.
 
-- **Generated tiles, immediately.** A colour and a mark derived from the class identity (`ceId`),
-  with the vendor's initial and the plug-in name. Deterministic, instant, needs nothing loaded, and
-  makes the browser scannable by shape and colour rather than by reading. This alone fixes most of
-  complaint 4.
+In order of preference:
+
+- **The vendor's own snapshot**, when the bundle ships one. Read during the scan that already
+  runs, so it costs nothing extra, and it is the real artwork rather than something derived.
+- **Generated tiles** for everything else, which is most plug-ins. A colour and a mark derived
+  from the class identity (`ceId`), with the vendor's initial and the plug-in name.
+  Deterministic, instant, needs nothing loaded, and makes the browser scannable by shape and
+  colour rather than by reading. This alone fixes most of complaint 4.
 - **Cached editor snapshots, opportunistically.** The first time a plug-in's editor opens, capture
   it, downscale it, and cache it under the data directory keyed by `ceId` + plug-in version. From
   then on the node shows the real thing. This must never happen at scan time — snapshotting a
@@ -203,8 +212,8 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load
    button — which is why the List view stays first.
-4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**; snapshots and overrides still to
-   come.
+4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**. ~~Vendor snapshots~~ **BUILT,
+   2026-09-01**. Editor capture and user overrides still to come.
 
    A tile is *derived*, not found: a hue, a pattern and two letters, all from the catalogue's
    stable `ceId`. Same class, same tile, on every machine and after every rescan — which is what
@@ -215,15 +224,38 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    same hash picks a second, non-colour channel, and a test asserts the patterns actually spread
    rather than all landing on "plain".
 
-   **Still to build: the real snapshot.** Capture the plug-in's own editor the first time it
-   opens (`Component::createComponentSnapshot`), downscale it, and cache it under the data
-   directory keyed by `ceId` + plug-in version. Two things decide the design and neither is the
-   drawing: it must never happen at *scan* time, because snapshotting a library of several
-   hundred plug-ins means instantiating several hundred plug-ins, which is the whole reason the
-   scanner is a separate process; and the WebView needs a path to the cached file, so this is
-   native work — a virtual-host mapping or a per-thumbnail event, not another field on every
-   state push. The generated tile stays as the fallback whenever no snapshot exists, the same
-   pattern as auto-layout versus saved positions.
+   **Vendor snapshots, 2026-09-01.** The scan worker now lists
+   `Contents/Resources/Snapshots` while it has the module open and records a path per class;
+   classes that shipped artwork arrive in the browser with a `snapshotUrl` and the tile draws
+   the picture instead of the letters. Three decisions are worth keeping:
+
+   *Attribution is exact or absent.* `moduleinfo.json` names each class beside its snapshot, so
+   that is used when it is there; failing that, the only safe case is a module exposing a single
+   class, where there is nothing to confuse. A multi-class module with no manifest gets no
+   artwork on purpose — the wrong picture on a plug-in is worse than no picture.
+
+   *The frontend never sees a path.* A snapshot lives wherever the vendor installed the plug-in,
+   which is an arbitrary absolute path, and the WebView is a browser: handing it a path to fetch
+   means a resource provider that serves any file it is asked for. So `PluginSnapshotRegistry`
+   holds token → file, the state payload carries `/plugin-snapshot/<token>`, and the provider
+   serves a token or nothing. The set of readable files is exactly the set the catalogue put
+   there, which is the property that makes it safe rather than the string checks a path-based
+   version would need.
+
+   *The tile looks the URL up, it is not passed one.* A rack part and a canvas node know a
+   `ceId` and a name and nothing else, so threading a URL through every call site would mean
+   each one somebody forgot silently falls back to a generated tile — the failure you cannot
+   see. One derived `ceId → url` map, read by the tile itself.
+
+   In dev mode the page is served by Vite, so the relative URL goes to the dev server and 404s;
+   the tile falls back, and a dev run looks like a machine whose plug-ins ship no snapshots.
+
+   **Still to build: editor capture.** For the plug-ins that ship nothing, capture the editor the
+   first time it opens (`Component::createComponentSnapshot`), downscale it, and cache it under
+   the data directory keyed by `ceId` + plug-in version. It must never happen at *scan* time, for
+   the reason above; the serving half is now solved — the registry publishes a cached file the
+   same way it publishes a vendor one. The generated tile stays as the fallback whenever neither
+   exists, the same pattern as auto-layout versus saved positions.
 5. **Persisted positions**, optional: `x`/`y` per node in the manifest, with auto-layout as the
    fallback when they are absent, so an older session and a hand-written manifest both still open.
    The repo's existing habit — migrate by construction, never refuse a file for a missing field.
