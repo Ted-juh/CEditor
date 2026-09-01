@@ -50,6 +50,7 @@
   function dragEnd() {
     hostCanvasDrag.set({ kind: '', id: '', label: '' });
     hovered = '';
+    newPartHot = false;
   }
 
   function dragOver(event, node) {
@@ -70,7 +71,35 @@
   // box" from "moved within it" — either way the highlight switched off while you were still
   // over the box you were aiming at. dragover fires continuously on whatever is under the
   // pointer, so it owns the highlight, and the end of the drag clears it.
-  $effect(() => { if (!$hostCanvasDrag.kind) hovered = ''; });
+  $effect(() => { if (!$hostCanvasDrag.kind) { hovered = ''; newPartHot = false; } });
+
+  // Dropping an instrument where there is no box: the rack gains a part and the instrument
+  // goes into it. The gesture was the obvious one and did nothing at all until now — the
+  // canvas invited it and swallowed it, which is worse than not offering it.
+  //
+  // No new command was needed. `loadInstrument` with no part named already means "into a new
+  // part", because the first thing anyone does with an empty rack is press Load and the old
+  // contract made that click silently do nothing. One service call, so there is no window in
+  // which a part exists with nothing in it.
+  let newPartHot = $state(false);
+  const draggingInstrument = $derived($hostCanvasDrag.kind === 'instrument');
+
+  function newPartOver(event) {
+    if (!draggingInstrument) return;
+    // A node under the pointer owns the drop. Without this the empty-canvas zone would
+    // compete with the box you were actually aiming at, since the boxes sit inside it.
+    if (event.target.closest?.('.node')) { newPartHot = false; return; }
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    newPartHot = true;
+  }
+
+  function newPartDrop(event) {
+    if (!draggingInstrument || event.target.closest?.('.node')) return;
+    event.preventDefault();
+    loadInstrument('', $hostCanvasDrag.id);
+    dragEnd();
+  }
 
   function drop(event, node) {
     if (!targets.has(node.id)) return;
@@ -89,7 +118,10 @@
 </script>
 
 <div class="canvas-scroll" data-testid="host-rack-canvas">
-  <div class="canvas" style={`width:${layout.width}px;height:${layout.height}px`}>
+  <div class="canvas" style={`width:${layout.width}px;height:${layout.height}px`}
+       role="presentation"
+       ondragover={newPartOver}
+       ondrop={newPartDrop}>
     <svg class="wires" width={layout.width} height={layout.height} aria-hidden="true">
       {#each layout.wires as wire (wire.kind + wire.from + wire.to)}
         <path d={wire.d} class={wire.kind} data-from={wire.from} data-to={wire.to} />
@@ -130,13 +162,28 @@
         </span>
       </svelte:element>
     {/each}
+
+    <!-- Where the new part will appear, shown only while an instrument is in flight. The
+         slot is the target, but so is the rest of the empty canvas: this says WHERE it will
+         land, it does not demand you hit it. -->
+    {#if draggingInstrument}
+      <div class="node new-part" class:hovered={newPartHot}
+           data-testid="canvas-new-part"
+           style={`left:${layout.newPartSlot.x}px;top:${layout.newPartSlot.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}>
+        <span class="node-title">＋ New part</span>
+        <span class="node-sub">drop here, or anywhere empty</span>
+      </div>
+    {/if}
   </div>
 
   <div class="canvas-key">
     <span><i class="swatch audio"></i>signal</span>
     <span><i class="swatch send"></i>send (a copy)</span>
     <span class="canvas-note">
-      {#if $hostCanvasDrag.kind}
+      {#if draggingInstrument}
+        Dropping <strong>{$hostCanvasDrag.label}</strong> — onto a part to replace it, or anywhere
+        empty for a new one.
+      {:else if $hostCanvasDrag.kind}
         Dropping <strong>{$hostCanvasDrag.label}</strong> — only the lit boxes will take it.
       {:else}
         Drag a part or bus onto its destination · drag an instrument or effect here from the right.
@@ -169,6 +216,15 @@
     text-align: left;
     overflow: hidden;
   }
+  .node.new-part {
+    border-style: dashed;
+    border-color: #4a5a6a;
+    background: rgba(91, 155, 213, 0.05);
+    color: #8fa4b8;
+    pointer-events: none;   /* the canvas underneath owns the drop, not this hint */
+  }
+  .node.new-part.hovered { border-color: #5b9bd5; background: rgba(91, 155, 213, 0.16); color: #d6dbe0; }
+
   button.node { cursor: pointer; font-family: inherit; }
   button.node:hover { border-color: #5b9bd5; }
   .node.focused { border-color: #5b9bd5; background: #24313d; }

@@ -1174,9 +1174,23 @@ export function rackCanvasLayout(rack) {
     d: path(nodeById.get(link.from), nodeById.get(link.to), link.from + '>' + link.to),
   }));
 
+  // Where a part added right now would land: the instrument column, one row past the last
+  // part. Returned by the layout rather than worked out in the view, because the row height,
+  // the padding and the column position are all this function's business and a second copy of
+  // them drifts the first time one changes.
+  const newPartSlot = {
+    x: columnX(0),
+    y: CANVAS_PAD + parts.length * (CANVAS_NODE_H + CANVAS_GAP_Y),
+  };
+
   const width = Math.max(...nodes.map((n) => n.x + CANVAS_NODE_W), 0) + CANVAS_PAD;
-  const height = Math.max(...nodes.map((n) => n.y + CANVAS_NODE_H), channelBottom, 0) + CANVAS_PAD;
-  return { nodes, wires, width, height };
+  // The empty slot counts towards the height even when nothing is being dragged. It reads as
+  // room for another instrument, which is what it is — and more importantly the canvas then
+  // does not grow the moment a drag starts, which would slide the target out from under the
+  // pointer that was aiming at it.
+  const height = Math.max(...nodes.map((n) => n.y + CANVAS_NODE_H),
+                          newPartSlot.y + CANVAS_NODE_H, channelBottom, 0) + CANVAS_PAD;
+  return { nodes, wires, width, height, newPartSlot };
 }
 
 /** One catalogue class as the browser reads it. `snapshotUrl` is a route the native side

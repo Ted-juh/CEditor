@@ -37,6 +37,7 @@ import {
   saveUserPreset,
   saveChainToLibrary,
   rackCanvasLayout,
+  CANVAS_NODE_H,
   canvasDropTargets,
   busDestinationWouldLoop,
   pluginTile,
@@ -481,6 +482,24 @@ test('rackCanvasLayout puts columns in signal order, sources first', () => {
   assert.equal(nodeOf(layout, 'p1').focused, true, 'the focused part is marked for the drawing');
   assert.equal(nodeOf(layout, 'p1').midi, 2, 'the node counts what is on the part');
   assert.equal(nodeOf(layout, 'p1').inserts, 1);
+});
+
+test('rackCanvasLayout reserves the slot a new part would land in', () => {
+  const layout = rackCanvasLayout(canvasRack());
+  const p1 = nodeOf(layout, 'p1');
+  const p2 = nodeOf(layout, 'p2');
+
+  assert.equal(layout.newPartSlot.x, p1.x, 'a new part joins the instrument column');
+  assert.equal(layout.newPartSlot.y, p2.y + (p2.y - p1.y),
+    'one row below the last part, on the same pitch as the rows above it');
+  assert.ok(layout.height >= layout.newPartSlot.y + CANVAS_NODE_H,
+    'the canvas already has room for it, so it does not grow the moment a drag starts');
+
+  // An empty rack still offers somewhere to drop, which is the case that matters most: it is
+  // the only way to get a first instrument onto the canvas.
+  const empty = rackCanvasLayout({ parts: [], buses: [], returns: [] });
+  assert.equal(empty.newPartSlot.y, nodeOf(empty, '@master').y,
+    'with nothing in the rack the slot sits on the top row, level with the master');
 });
 
 test('rackCanvasLayout draws where the signal actually goes', () => {
