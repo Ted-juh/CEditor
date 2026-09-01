@@ -221,6 +221,49 @@ struct MidiFxSettings
     static ChordType chordTypeFromName (const juce::String& name) noexcept;
 };
 
+/** What the six later MIDI modules need, all in one block for the same reason MidiFxSettings
+    is one: a slot carries one settings object per family, and a struct per module would mean
+    six more fields on every slot, six more serializers, and six more things to forget.
+
+    EVERY TIME HERE IS IN BEATS, not milliseconds. The obvious alternative needs a sample rate
+    this layer does not have, and would make a strum that is right at 90bpm wrong at 160 —
+    while beats put every module on the same grid the arpeggiator and the pattern lanes already
+    share, which is the one timing authority the baseline insists on. */
+struct NoteModuleSettings
+{
+    // EVERY DEFAULT HERE IS TRANSPARENT, which is a rule this file already had and these
+    // modules nearly broke: an inserted module must not change the sound by existing. So a
+    // fresh echo repeats nothing, a fresh strum spreads nothing, a fresh latch latches
+    // nothing. They change the sound when you set them up, which is when you meant to.
+
+    // Echo: each note repeats, quieter each time, optionally climbing. 0 repeats = off.
+    int echoRepeats = 0;             // 0..8 repeats after the original
+    double echoStepBeats = 0.5;      // 1/32 note .. 4 beats
+    float echoFeedback = 0.7f;       // velocity multiplier per repeat, 0.1..1
+    int echoTranspose = 0;           // semitones added per repeat, -12..12
+
+    // Strum: a chord spread in pitch order. 0 = off, and off means the collection window is
+    // skipped too — a strum of nothing must not cost the latency of one.
+    double strumBeats = 0.0;         // total spread, 0 .. one beat
+    bool strumDown = false;          // false = low note first
+
+    // Humanize: bounded jitter. Notes move LATER only — earlier would need the future.
+    double humanizeTimingBeats = 0.0;
+    int humanizeVelocity = 0;        // +/- this much, 0..64
+
+    // Chance: the probability a note passes at all. 1 = everything does.
+    float chance = 1.0f;
+
+    // Length: a fixed note length, or hold each note until the next arrives. 0 and no legato
+    // leaves the length you played alone.
+    double lengthBeats = 0.0;
+    bool legato = false;
+
+    // Latch: the only module that cannot be transparent by doing its job, so it has a switch
+    // of its own and starts off.
+    bool latchOn = false;
+};
+
 // One insert in a part's MIDI chain (the Stage 8 decoupling). The event chain used to be
 // welded to the part — zone filter, then transpose, scale, chorder and velocity in that
 // fixed order, then exactly one arpeggiator — so chord-before-arp was a decision the code
@@ -235,11 +278,13 @@ struct MidiSlot
 {
     juce::String slotId;
     /** "arp" | "transpose" | "scale" | "chord" | "velocity" | "fx" (the combined legacy
-        block, which is what a pre-chain session migrates into). */
+        block, which is what a pre-chain session migrates into) | "echo" | "strum" |
+        "humanize" | "chance" | "length" | "latch". */
     juce::String type { "arp" };
     bool bypassed = false;
     ArpSettings arp;
     MidiFxSettings fx;
+    NoteModuleSettings mod;
 
     /** The module kinds this build understands, in the order the UI offers them. */
     static juce::StringArray types();
@@ -251,6 +296,9 @@ struct MidiSlot
 /** The two slots a pre-chain part's welded settings describe, in the order the old code
     ran them. Public because the migration is a fact worth testing directly. */
 juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp);
+
+juce::var noteModuleToVar (const NoteModuleSettings& settings);
+void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out);
 
 juce::var midiSlotToVar (const MidiSlot& slot);
 void midiSlotFromVar (const juce::var& stored, MidiSlot& out);

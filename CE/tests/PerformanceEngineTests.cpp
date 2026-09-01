@@ -18,6 +18,8 @@
 
 #include "Performance/PerformanceEngine.h"
 #include "Performance/MidiInsertRack.h"
+#include <map>
+#include <set>
 #include "Performance/ArpEngine.h"
 #include "Performance/MidiFxChain.h"
 #include <iostream>
@@ -1398,6 +1400,410 @@ void testScalesAndSerialization()
 
 } // namespace
 
+// The six later MIDI modules. What each one must do, and — the half that matters more —
+// what none of them may do: leave a note sounding.
+//
+// Every module here either invents notes or swallows the note-off for one it passed on, so
+// every one of them owns something. A module that emits and forgets is a stuck note, which on
+// stage is the only bug that matters.
+void testNoteModules()
+{
+    std::cout << "\nthe six later MIDI modules" << std::endl;
+
+    const auto slot = [] (const juce::String& type)
+    {
+        return MidiSlot::create (type, "slot-" + type);
+    };
+
+    // Runs a press-and-release through a rack and collects everything, block by block, with
+    // the sample offset each event landed on.
+    struct Event { int block; int sample; bool on; int note; int velocity; };
+    const auto run = [] (MidiInsertRack& rack, juce::MidiBuffer input, int blocks)
+    {
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < blocks; ++block)
+        {
+            juce::MidiBuffer out;
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            input.clear();
+            for (const auto metadata : out)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                        message.getNoteNumber(), (int) message.getVelocity() });
+            }
+        }
+        return events;
+    };
+    const auto onsOf = [] (const std::vector<Event>& events)
+    {
+        int count = 0;
+        for (const auto& event : events)
+            if (event.on) ++count;
+        return count;
+    };
+    const auto balanced = [] (const std::vector<Event>& events)
+    {
+        std::map<int, int> sounding;
+        for (const auto& event : events)
+            sounding[event.note] += event.on ? 1 : -1;
+        for (const auto& [note, count] : sounding)
+            if (count != 0)
+                return false;
+        return true;
+    };
+
+    // Every module is transparent until it is set up. This is a rule the file already had and
+    // these six nearly broke — an inserted module must not change the sound by existing.
+    for (const auto* type : { "echo", "strum", "humanize", "chance", "length", "latch" })
+    {
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ slot (type) });
+
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 40);
+        const auto events = run (rack, input, 4);
+        check (events.size() == 2 && events[0].on && ! events[1].on
+                 && events[0].note == 60 && events[0].velocity == 100,
+               juce::String ("a fresh ") + type + " passes the note through untouched");
+    }
+
+    // -- echo ---------------------------------------------------------------------------
+    {
+        auto echo = slot ("echo");
+        echo.mod.echoRepeats = 3;
+        echo.mod.echoStepBeats = 0.25;
+        echo.mod.echoFeedback = 0.6f;
+        echo.mod.echoTranspose = 12;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ echo });
+
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        const auto events = run (rack, input, 200);
+
+        check (onsOf (events) == 4, "the note plus three repeats");
+        check (balanced (events), "and every one of them ends — nothing is left sounding");
+
+        std::vector<int> notes, velocities;
+        for (const auto& event : events)
+            if (event.on) { notes.push_back (event.note); velocities.push_back (event.velocity); }
+        check (notes == std::vector<int> ({ 60, 72, 84, 96 }), "each repeat climbs an octave");
+        check (velocities[1] < velocities[0] && velocities[2] < velocities[1]
+                 && velocities[3] < velocities[2],
+               "and each is quieter than the one before");
+
+        // Off the top of the keyboard the chain stops rather than wrapping to a bass note.
+        auto high = echo;
+        high.mod.echoTranspose = 24;
+        MidiInsertRack ceiling;
+        ceiling.prepare (blockSize);
+        ceiling.setSlots ({ high });
+        juce::MidiBuffer top;
+        top.addEvent (juce::MidiMessage::noteOn (1, 100, (juce::uint8) 100), 0);
+        top.addEvent (juce::MidiMessage::noteOff (1, 100), 20);
+        const auto ceilingEvents = run (ceiling, top, 200);
+        bool wrapped = false;
+        for (const auto& event : ceilingEvents)
+            wrapped = wrapped || event.note < 100;
+        check (! wrapped, "a repeat past the top of the keyboard is dropped, never wrapped");
+        check (balanced (ceilingEvents), "and what did sound still stops");
+    }
+
+    // -- strum --------------------------------------------------------------------------
+    {
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.25;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ strum });
+
+        // A chord arriving together, deliberately out of pitch order.
+        juce::MidiBuffer chord;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 1);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 2);
+        const auto events = run (rack, chord, 200);
+
+        std::vector<int> order;
+        for (const auto& event : events)
+            if (event.on) order.push_back (event.note);
+        check (order == std::vector<int> ({ 60, 64, 67 }),
+               "the chord comes out low to high, whatever order the keys were hit in");
+
+        // Spread means spread: the last note is genuinely later than the first.
+        int firstBlock = -1, lastBlock = -1;
+        for (const auto& event : events)
+            if (event.on) { if (firstBlock < 0) firstBlock = event.block; lastBlock = event.block; }
+        check (lastBlock > firstBlock, "and they are spread over time rather than stacked");
+
+        // Downwards is the same notes, the other way round — the case arrival order alone
+        // could never do, which is why the module collects before it deals.
+        auto down = strum;
+        down.mod.strumDown = true;
+        MidiInsertRack downwards;
+        downwards.prepare (blockSize);
+        downwards.setSlots ({ down });
+        juce::MidiBuffer again;
+        again.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        again.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 1);
+        again.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 2);
+        std::vector<int> downOrder;
+        for (const auto& event : run (downwards, again, 200))
+            if (event.on) downOrder.push_back (event.note);
+        check (downOrder == std::vector<int> ({ 67, 64, 60 }), "downwards strums high to low");
+    }
+
+    // -- humanize -----------------------------------------------------------------------
+    {
+        auto humanize = slot ("humanize");
+        humanize.mod.humanizeTimingBeats = 0.05;
+        humanize.mod.humanizeVelocity = 20;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ humanize });
+
+        // The same note, over and over: the point is that it does NOT come out identical.
+        std::vector<int> velocities;
+        std::vector<int> positions;
+        Transport clock;
+        clock.setTempo (120.0);
+        for (int i = 0; i < 24; ++i)
+        {
+            juce::MidiBuffer input, out;
+            input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 64), 0);
+            input.addEvent (juce::MidiMessage::noteOff (1, 60), 30);
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            const auto collect = [&velocities, &positions] (const juce::MidiBuffer& buffer)
+            {
+                for (const auto metadata : buffer)
+                    if (metadata.getMessage().isNoteOn())
+                    {
+                        velocities.push_back ((int) metadata.getMessage().getVelocity());
+                        positions.push_back (metadata.samplePosition);
+                    }
+            };
+            collect (out);
+            // The settle blocks count too. Humanize can only push a note LATER, so most of
+            // them land in a block after the one they arrived in — reading only the first
+            // block would measure the module's latency rather than its output.
+            for (int settle = 0; settle < 3; ++settle)
+            {
+                juce::MidiBuffer none, tail;
+                rack.process (none, tail, clock.advance (blockSize, sampleRate), blockSize);
+                collect (tail);
+            }
+        }
+        check (velocities.size() > 12, "the notes come through");
+        check (std::set<int> (velocities.begin(), velocities.end()).size() > 3,
+               "velocity varies rather than repeating one value");
+        check (std::set<int> (positions.begin(), positions.end()).size() > 1,
+               "and so does when they land");
+        bool outOfBounds = false;
+        for (const auto velocity : velocities)
+            outOfBounds = outOfBounds || velocity < 44 || velocity > 84;
+        check (! outOfBounds, "within the bounds asked for, never outside");
+    }
+
+    // -- chance -------------------------------------------------------------------------
+    {
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        MidiInsertRack none;
+        none.prepare (blockSize);
+        none.setSlots ({ chance });
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        const auto silent = run (none, input, 4);
+        check (silent.empty(), "at zero chance nothing gets through — the note AND its note-off");
+
+        chance.mod.chance = 1.0f;
+        MidiInsertRack all;
+        all.prepare (blockSize);
+        all.setSlots ({ chance });
+        juce::MidiBuffer again;
+        again.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        again.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        check (run (all, again, 4).size() == 2, "and at full chance everything does");
+
+        // The half that is easy to get wrong: rolling again on the note-off would let a
+        // dropped note's OFF through, or a passed note's off be swallowed. Either is a stuck
+        // note or a phantom one, so the decision is remembered, not repeated.
+        chance.mod.chance = 0.5f;
+        MidiInsertRack half;
+        half.prepare (blockSize);
+        half.setSlots ({ chance });
+        std::vector<Event> everything;
+        Transport clock;
+        clock.setTempo (120.0);
+        for (int i = 0; i < 200; ++i)
+        {
+            juce::MidiBuffer press, out;
+            press.addEvent (juce::MidiMessage::noteOn (1, 60 + (i % 5), (juce::uint8) 100), 0);
+            press.addEvent (juce::MidiMessage::noteOff (1, 60 + (i % 5)), 30);
+            half.process (press, out, clock.advance (blockSize, sampleRate), blockSize);
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    everything.push_back ({ i, metadata.samplePosition,
+                                            metadata.getMessage().isNoteOn(),
+                                            metadata.getMessage().getNoteNumber(), 0 });
+        }
+        check (! everything.empty() && (int) everything.size() < 400,
+               "at half chance some get through and some do not");
+        check (balanced (everything),
+               "and every note that sounded stopped — the decision is remembered, not re-rolled");
+    }
+
+    // -- length -------------------------------------------------------------------------
+    {
+        auto length = slot ("length");
+        length.mod.lengthBeats = 0.25;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ length });
+
+        // Held far longer than the fixed length: the module's own note-off must win.
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < 200; ++block)
+        {
+            juce::MidiBuffer out;
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            input.clear();
+            if (block == 150)
+                input.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition,
+                                        metadata.getMessage().isNoteOn(),
+                                        metadata.getMessage().getNoteNumber(), 0 });
+        }
+        check (onsOf (events) == 1 && balanced (events), "one note, ended once");
+        int offBlock = -1;
+        for (const auto& event : events)
+            if (! event.on) offBlock = event.block;
+        check (offBlock >= 0 && offBlock < 150,
+               "and it ended at the length asked for, not when the key came up");
+
+        // Legato: a new note releases the last one, so only one thing sounds at a time.
+        auto joined = slot ("length");
+        joined.mod.legato = true;
+        MidiInsertRack legato;
+        legato.prepare (blockSize);
+        legato.setSlots ({ joined });
+        juce::MidiBuffer first;
+        first.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        first.addEvent (juce::MidiMessage::noteOff (1, 60), 10);
+        std::vector<Event> legatoEvents;
+        Transport legatoClock;
+        legatoClock.setTempo (120.0);
+        for (int block = 0; block < 8; ++block)
+        {
+            juce::MidiBuffer out;
+            legato.process (first, out, legatoClock.advance (blockSize, sampleRate), blockSize);
+            first.clear();
+            if (block == 2)
+            {
+                first.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+                first.addEvent (juce::MidiMessage::noteOff (1, 64), 10);
+            }
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    legatoEvents.push_back ({ block, metadata.samplePosition,
+                                              metadata.getMessage().isNoteOn(),
+                                              metadata.getMessage().getNoteNumber(), 0 });
+        }
+        int soundingAtOnce = 0, peak = 0;
+        for (const auto& event : legatoEvents)
+        {
+            soundingAtOnce += event.on ? 1 : -1;
+            peak = juce::jmax (peak, soundingAtOnce);
+        }
+        check (peak == 1, "legato joins notes rather than stacking them");
+
+        juce::MidiBuffer panic;
+        legato.allNotesOff (panic, 0);
+        check (! panic.isEmpty(), "and what it is holding is released on panic");
+    }
+
+    // -- latch --------------------------------------------------------------------------
+    {
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ latch });
+
+        juce::MidiBuffer chord;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 1);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 60), 30);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 64), 31);
+        const auto held = run (rack, chord, 4);
+        check (onsOf (held) == 2, "the chord sounds");
+        check (! balanced (held), "and keeps sounding after the keys came up — that is the feature");
+
+        // A new phrase replaces it wholesale, which is what every hardware latch means.
+        juce::MidiBuffer next;
+        next.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+        juce::MidiBuffer out;
+        Transport clock;
+        clock.setTempo (120.0);
+        rack.process (next, out, clock.advance (blockSize, sampleRate), blockSize);
+        int offs = 0;
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOff())
+                ++offs;
+        check (offs == 2, "and the next phrase releases the whole of the last one first");
+
+        juce::MidiBuffer panic;
+        rack.allNotesOff (panic, 0);
+        check (! panic.isEmpty(), "panic reaches what a latch is holding");
+    }
+
+    // Retyping a slot must release what the old module was holding — the same rule the arp
+    // and the chorder already answer to, now with six more ways to break it.
+    {
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ latch });
+
+        juce::MidiBuffer chord, out;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        Transport clock;
+        clock.setTempo (120.0);
+        rack.process (chord, out, clock.advance (blockSize, sampleRate), blockSize);
+
+        rack.setSlots ({ slot ("chance") });      // same id, different type
+        juce::MidiBuffer after, flushed;
+        rack.process (after, flushed, clock.advance (blockSize, sampleRate), blockSize);
+        bool released = false;
+        for (const auto metadata : flushed)
+            if (metadata.getMessage().isNoteOff() && metadata.getMessage().getNoteNumber() == 60)
+                released = true;
+        check (released, "retyping a slot releases what the old module was holding");
+    }
+}
+
 int main()
 {
     std::cout << "Performance engine tests" << std::endl;
@@ -1417,6 +1823,7 @@ int main()
     testArpeggiator();
     testMidiFxChain();
     testMidiInsertRack();
+    testNoteModules();
     testScalesAndSerialization();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures))

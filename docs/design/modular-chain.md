@@ -96,6 +96,47 @@ purpose:
 For the same reason the library marks a chain unavailable only when its *instrument* is gone:
 flagging the whole record for one absent reverb would be a lie told before you asked.
 
+## Six more MIDI modules
+
+Added 2026-09-01. The chain had modules that transform or reorder what you play — transpose,
+scale, chorder, velocity, and the arpeggiator. It had nothing that puts a note somewhere the
+keyboard did not.
+
+| Module | What it does |
+| --- | --- |
+| Echo | each note repeats, quieter each time, optionally climbing |
+| Strum | a chord spread in pitch order, up or down |
+| Humanize | bounded jitter on when a note lands and how hard |
+| Chance | a note passes, or it does not |
+| Note length | every note the same length, or held until the next |
+| Latch | the chord keeps sounding after you let go |
+
+**Echo is not the arpeggiator.** The arp reorders notes you are *holding*; echo repeats *each*
+note through time. Nothing here did that, which is why it was the first one built.
+
+**Everything is timed in beats, never milliseconds.** Milliseconds would need a sample rate
+this layer does not have, and would make a strum that is right at 90bpm wrong at 160. Beats put
+every module on the same grid the arp and the pattern lanes already share — the one timing
+authority — and they free-count from the same tempo when the transport is parked, exactly as
+the arp does, so a rig that is not running still plays.
+
+**Every default is transparent**, which is a rule this chain already had and these six nearly
+broke: *an inserted module must not change the sound by existing*. A fresh echo repeats
+nothing, a fresh strum spreads nothing. Latch is the one that cannot be transparent while doing
+its job, so it has a switch of its own and starts off.
+
+**Strum collects before it deals, and that costs a sixty-fourth note.** You cannot strum a
+chord you have not finished hearing: the notes arrive over a few milliseconds, so emitting each
+as it lands can only ever strum in *arrival* order — which is not pitch order and cannot go
+downwards at all. The collection window is what buys pitch order and both directions, it is
+deliberately small, and it is skipped entirely when the spread is zero.
+
+**What every one of them owns.** Each either invents notes or swallows the note-off for one it
+passed on, so each owns something that must be releasable: panic reaches all six, and so does
+retyping or removing a slot. A module that emits and forgets is a stuck note, which on stage is
+the only bug that matters — so the tests assert note-on/note-off balance on every path,
+including the half-chance one where which notes sound is random.
+
 ## What this deliberately does not do
 
 - **No MIDI routing between parts.** A part's MIDI chain feeds that part's instrument. One part

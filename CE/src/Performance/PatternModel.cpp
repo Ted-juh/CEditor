@@ -657,7 +657,10 @@ void midiFxFromVar (const juce::var& stored, MidiFxSettings& out)
 
 juce::StringArray MidiSlot::types()
 {
-    return { "arp", "transpose", "scale", "chord", "velocity", "fx" };
+    // Order is the order the UI offers them: the two that reorder or repeat what you play,
+    // then the shapers, then the six later ones in the order somebody reaches for them.
+    return { "arp", "transpose", "scale", "chord", "velocity", "fx",
+             "echo", "strum", "humanize", "chance", "length", "latch" };
 }
 
 MidiSlot MidiSlot::create (const juce::String& type, const juce::String& slotId)
@@ -671,6 +674,55 @@ MidiSlot MidiSlot::create (const juce::String& type, const juce::String& slotId)
     return slot;
 }
 
+juce::var noteModuleToVar (const NoteModuleSettings& settings)
+{
+    auto* m = new juce::DynamicObject();
+    m->setProperty ("echoRepeats",     settings.echoRepeats);
+    m->setProperty ("echoStepBeats",   settings.echoStepBeats);
+    m->setProperty ("echoFeedback",    settings.echoFeedback);
+    m->setProperty ("echoTranspose",   settings.echoTranspose);
+    m->setProperty ("strumBeats",      settings.strumBeats);
+    m->setProperty ("strumDown",       settings.strumDown);
+    m->setProperty ("humanizeTimingBeats", settings.humanizeTimingBeats);
+    m->setProperty ("humanizeVelocity",    settings.humanizeVelocity);
+    m->setProperty ("chance",          settings.chance);
+    m->setProperty ("lengthBeats",     settings.lengthBeats);
+    m->setProperty ("legato",          settings.legato);
+    m->setProperty ("latchOn",         settings.latchOn);
+    return juce::var (m);
+}
+
+void noteModuleFromVar (const juce::var& stored, NoteModuleSettings& out)
+{
+    // Absent reads as the defaults, which is how a session written before these modules
+    // existed opens: it has no "mod" block and gains one that changes nothing.
+    out = NoteModuleSettings();
+    if (! stored.isObject())
+        return;
+
+    const auto intOf = [&stored] (const char* key, int fallback, int low, int high)
+    {
+        return juce::jlimit (low, high, (int) stored.getProperty (key, fallback));
+    };
+    const auto doubleOf = [&stored] (const char* key, double fallback, double low, double high)
+    {
+        return juce::jlimit (low, high, (double) stored.getProperty (key, fallback));
+    };
+
+    out.echoRepeats   = intOf ("echoRepeats", 0, 0, 8);
+    out.echoStepBeats = doubleOf ("echoStepBeats", 0.5, 0.03125, 4.0);
+    out.echoFeedback  = (float) doubleOf ("echoFeedback", 0.7, 0.1, 1.0);
+    out.echoTranspose = intOf ("echoTranspose", 0, -12, 12);
+    out.strumBeats    = doubleOf ("strumBeats", 0.0, 0.0, 1.0);
+    out.strumDown     = (bool) stored.getProperty ("strumDown", false);
+    out.humanizeTimingBeats = doubleOf ("humanizeTimingBeats", 0.0, 0.0, 0.25);
+    out.humanizeVelocity    = intOf ("humanizeVelocity", 0, 0, 64);
+    out.chance        = (float) doubleOf ("chance", 1.0, 0.0, 1.0);
+    out.lengthBeats   = doubleOf ("lengthBeats", 0.0, 0.0, 8.0);
+    out.legato        = (bool) stored.getProperty ("legato", false);
+    out.latchOn       = (bool) stored.getProperty ("latchOn", false);
+}
+
 juce::var midiSlotToVar (const MidiSlot& slot)
 {
     auto* s = new juce::DynamicObject();
@@ -679,6 +731,7 @@ juce::var midiSlotToVar (const MidiSlot& slot)
     s->setProperty ("bypassed", slot.bypassed);
     s->setProperty ("arp",      arpToVar (slot.arp));
     s->setProperty ("fx",       midiFxToVar (slot.fx));
+    s->setProperty ("mod",      noteModuleToVar (slot.mod));
     return juce::var (s);
 }
 
@@ -694,6 +747,7 @@ void midiSlotFromVar (const juce::var& stored, MidiSlot& out)
     out.bypassed = (bool) stored.getProperty ("bypassed", false);
     arpFromVar (stored.getProperty ("arp", {}), out.arp);
     midiFxFromVar (stored.getProperty ("fx", {}), out.fx);
+    noteModuleFromVar (stored.getProperty ("mod", {}), out.mod);
 }
 
 juce::Array<MidiSlot> migrateLegacyEventChain (const MidiFxSettings& fx, const ArpSettings& arp)

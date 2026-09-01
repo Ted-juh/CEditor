@@ -103,6 +103,26 @@ namespace
         if (fields.hasProperty ("velocityFixed"))    fx.velocityFixed = juce::jlimit (0, 127, (int) payload["velocityFixed"]);
         if (fields.hasProperty ("velocityScale"))    fx.velocityScale = juce::jlimit (0.1f, 2.0f, (float) (double) payload["velocityScale"]);
     }
+
+    /** The six later modules' fields. Clamped here as well as in the codec because a command
+        arrives from a WebView and a codec only sees what was written to disk — an echo asked
+        for four hundred repeats has to be refused at the door, not on the next load. */
+    void applyNoteModuleFields (perf::NoteModuleSettings& mod, const juce::var& payload,
+                                const juce::DynamicObject& fields)
+    {
+        if (fields.hasProperty ("echoRepeats"))    mod.echoRepeats = juce::jlimit (0, 8, (int) payload["echoRepeats"]);
+        if (fields.hasProperty ("echoStepBeats"))  mod.echoStepBeats = juce::jlimit (0.03125, 4.0, (double) payload["echoStepBeats"]);
+        if (fields.hasProperty ("echoFeedback"))   mod.echoFeedback = juce::jlimit (0.1f, 1.0f, (float) (double) payload["echoFeedback"]);
+        if (fields.hasProperty ("echoTranspose"))  mod.echoTranspose = juce::jlimit (-12, 12, (int) payload["echoTranspose"]);
+        if (fields.hasProperty ("strumBeats"))     mod.strumBeats = juce::jlimit (0.0, 1.0, (double) payload["strumBeats"]);
+        if (fields.hasProperty ("strumDown"))      mod.strumDown = (bool) payload["strumDown"];
+        if (fields.hasProperty ("humanizeTimingBeats")) mod.humanizeTimingBeats = juce::jlimit (0.0, 0.25, (double) payload["humanizeTimingBeats"]);
+        if (fields.hasProperty ("humanizeVelocity"))    mod.humanizeVelocity = juce::jlimit (0, 64, (int) payload["humanizeVelocity"]);
+        if (fields.hasProperty ("chance"))         mod.chance = juce::jlimit (0.0f, 1.0f, (float) (double) payload["chance"]);
+        if (fields.hasProperty ("lengthBeats"))    mod.lengthBeats = juce::jlimit (0.0, 8.0, (double) payload["lengthBeats"]);
+        if (fields.hasProperty ("legato"))         mod.legato = (bool) payload["legato"];
+        if (fields.hasProperty ("latchOn"))        mod.latchOn = (bool) payload["latchOn"];
+    }
 } // namespace
 
 void InstrumentHostService::handleCommand (const juce::var& payload)
@@ -2446,6 +2466,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             {
                 if (slot.type == "arp")
                     applyArpFields (slot.arp, payload, *fields);
+                else if (perf::MidiSlot::types().indexOf (slot.type) >= 6)
+                    applyNoteModuleFields (slot.mod, payload, *fields);
                 else
                     applyMidiFxFields (slot.fx, payload, *fields);
             }

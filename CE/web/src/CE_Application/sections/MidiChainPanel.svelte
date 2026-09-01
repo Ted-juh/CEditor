@@ -51,8 +51,38 @@
         : slot.fx.chord;
     if (slot.type === 'velocity')
       return slot.fx.velocityFixed > 0 ? `fixed ${slot.fx.velocityFixed}` : `× ${slot.fx.velocityScale}`;
+    // The six later modules. Each says "off" in the state that changes nothing, because a
+    // module that is doing nothing should say so rather than look configured.
+    if (slot.type === 'echo')
+      return slot.mod.echoRepeats === 0 ? 'off'
+        : `${slot.mod.echoRepeats}× · ${beatLabel(slot.mod.echoStepBeats)}`
+          + (slot.mod.echoTranspose ? ` · ${slot.mod.echoTranspose > 0 ? '+' : ''}${slot.mod.echoTranspose}st` : '');
+    if (slot.type === 'strum')
+      return slot.mod.strumBeats === 0 ? 'off'
+        : `${beatLabel(slot.mod.strumBeats)} ${slot.mod.strumDown ? 'down' : 'up'}`;
+    if (slot.type === 'humanize')
+      return slot.mod.humanizeTimingBeats === 0 && slot.mod.humanizeVelocity === 0 ? 'off'
+        : `${beatLabel(slot.mod.humanizeTimingBeats)} · ±${slot.mod.humanizeVelocity} vel`;
+    if (slot.type === 'chance')
+      return slot.mod.chance >= 1 ? 'every note' : `${Math.round(slot.mod.chance * 100)}%`;
+    if (slot.type === 'length')
+      return slot.mod.legato ? 'legato'
+        : slot.mod.lengthBeats === 0 ? 'as played' : beatLabel(slot.mod.lengthBeats);
+    if (slot.type === 'latch')
+      return slot.mod.latchOn ? 'holding' : 'off';
     return 'transpose · scale · chord · velocity';
   }
+
+  /** Beats as a musician reads them. Everything in these modules is timed in beats rather
+      than milliseconds — a strum that is right at 90bpm is wrong at 160 — so the labels have
+      to be musical too, or the numbers mean nothing on the way in. */
+  const BEAT_CHOICES = [
+    [0.0625, '1/64'], [0.125, '1/32'], [0.25, '1/16'], [0.375, '1/16.'],
+    [0.5, '1/8'], [0.75, '1/8.'], [1, '1/4'], [1.5, '1/4.'], [2, '1/2'], [4, 'bar'],
+  ];
+  const beatLabel = (beats) =>
+    BEAT_CHOICES.find(([value]) => Math.abs(value - beats) < 1e-6)?.[1]
+      ?? `${Number(beats).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')} beats`;
 
   // --- the arp grids, per slot ---------------------------------------------------------
   const NOTE_ROWS_DEGREE = 8;
@@ -308,6 +338,102 @@
               <input type="number" min="0" max="127" value={slot.fx.velocityFixed}
                      onchange={(e) => set(slot, { velocityFixed: Number(e.currentTarget.value) })} />
             </label>
+          {/if}
+
+          {#if slot.type === 'echo'}
+            <label class="mini-field">Repeats
+              <input type="number" min="0" max="8" value={slot.mod.echoRepeats}
+                     onchange={(e) => set(slot, { echoRepeats: Number(e.currentTarget.value) })} />
+            </label>
+            <label class="mini-field">Every
+              <select value={slot.mod.echoStepBeats}
+                      onchange={(e) => set(slot, { echoStepBeats: Number(e.currentTarget.value) })}>
+                {#each BEAT_CHOICES as [value, label] (value)}
+                  <option value={value}>{label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="mini-field">Decay
+              <input type="range" min="0.1" max="1" step="0.05" value={slot.mod.echoFeedback}
+                     aria-label="Echo decay"
+                     oninput={(e) => set(slot, { echoFeedback: Number(e.currentTarget.value) })} />
+            </label>
+            <label class="mini-field">Climb
+              <input type="number" min="-12" max="12" value={slot.mod.echoTranspose}
+                     title="Semitones added to each repeat"
+                     onchange={(e) => set(slot, { echoTranspose: Number(e.currentTarget.value) })} />
+            </label>
+          {/if}
+
+          {#if slot.type === 'strum'}
+            <label class="mini-field">Spread
+              <select value={slot.mod.strumBeats}
+                      onchange={(e) => set(slot, { strumBeats: Number(e.currentTarget.value) })}>
+                <option value={0}>off</option>
+                {#each BEAT_CHOICES.slice(0, 6) as [value, label] (value)}
+                  <option value={value}>{label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="mini-field">Direction
+              <select value={slot.mod.strumDown ? 'down' : 'up'}
+                      onchange={(e) => set(slot, { strumDown: e.currentTarget.value === 'down' })}>
+                <option value="up">low to high</option>
+                <option value="down">high to low</option>
+              </select>
+            </label>
+          {/if}
+
+          {#if slot.type === 'humanize'}
+            <label class="mini-field">Timing
+              <select value={slot.mod.humanizeTimingBeats}
+                      title="Notes are pushed later by up to this much — earlier would need the future"
+                      onchange={(e) => set(slot, { humanizeTimingBeats: Number(e.currentTarget.value) })}>
+                <option value={0}>off</option>
+                <option value={0.01}>tight</option>
+                <option value={0.03}>loose</option>
+                <option value={0.08}>sloppy</option>
+              </select>
+            </label>
+            <label class="mini-field">Velocity ±
+              <input type="number" min="0" max="64" value={slot.mod.humanizeVelocity}
+                     onchange={(e) => set(slot, { humanizeVelocity: Number(e.currentTarget.value) })} />
+            </label>
+          {/if}
+
+          {#if slot.type === 'chance'}
+            <label class="mini-field">Notes played
+              <input type="range" min="0" max="1" step="0.05" value={slot.mod.chance}
+                     aria-label="Chance a note plays"
+                     oninput={(e) => set(slot, { chance: Number(e.currentTarget.value) })} />
+            </label>
+            <span class="dim">{Math.round(slot.mod.chance * 100)}% of them</span>
+          {/if}
+
+          {#if slot.type === 'length'}
+            <label class="mini-field">Length
+              <select value={slot.mod.lengthBeats} disabled={slot.mod.legato}
+                      onchange={(e) => set(slot, { lengthBeats: Number(e.currentTarget.value) })}>
+                <option value={0}>as played</option>
+                {#each BEAT_CHOICES as [value, label] (value)}
+                  <option value={value}>{label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="mini-field">Legato
+              <PropertyToggle compact label="Hold to the next note" value={slot.mod.legato}
+                              ariaLabel="Hold each note until the next"
+                              onchange={(on) => set(slot, { legato: on })} />
+            </label>
+          {/if}
+
+          {#if slot.type === 'latch'}
+            <label class="mini-field">Latch
+              <PropertyToggle compact label="Keep the chord sounding" value={slot.mod.latchOn}
+                              ariaLabel="Latch held notes"
+                              onchange={(on) => set(slot, { latchOn: on })} />
+            </label>
+            <span class="dim">Play another chord to replace it.</span>
           {/if}
 
           {#if slot.type === 'arp'}

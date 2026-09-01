@@ -606,6 +606,41 @@ test('the shortlist is what you pinned and what you last touched, without repeat
   assert.deepEqual(parameterShortlist(null, null, null), { pinned: [], recent: [] });
 });
 
+test('the six later MIDI modules arrive transparent', () => {
+  // The rule this nearly broke and that the native side keeps too: an inserted module must
+  // not change the sound by existing. A fresh echo repeats nothing, a fresh strum spreads
+  // nothing, a fresh latch latches nothing.
+  for (const type of ['echo', 'strum', 'humanize', 'chance', 'length', 'latch']) {
+    const slot = normalizeMidiSlot({ slotId: 's', type });
+    assert.equal(slot.type, type, `${type} is a module the UI knows`);
+    assert.equal(slot.mod.echoRepeats, 0, `${type}: no repeats by default`);
+    assert.equal(slot.mod.strumBeats, 0, `${type}: no spread by default`);
+    assert.equal(slot.mod.humanizeTimingBeats, 0);
+    assert.equal(slot.mod.humanizeVelocity, 0);
+    assert.equal(slot.mod.chance, 1, `${type}: every note passes by default`);
+    assert.equal(slot.mod.lengthBeats, 0);
+    assert.equal(slot.mod.legato, false);
+    assert.equal(slot.mod.latchOn, false, `${type}: latch starts off`);
+  }
+
+  // Out-of-range values are clamped rather than believed: these arrive from a text field.
+  const wild = normalizeMidiSlot({ slotId: 's', type: 'echo', mod: {
+    echoRepeats: 900, echoStepBeats: 1e6, echoFeedback: -3, echoTranspose: 99,
+    chance: 5, humanizeVelocity: 'lots', lengthBeats: -2,
+  } });
+  assert.equal(wild.mod.echoRepeats, 8, 'four hundred repeats is eight');
+  assert.equal(wild.mod.echoStepBeats, 4);
+  assert.equal(wild.mod.echoFeedback, 0.1);
+  assert.equal(wild.mod.echoTranspose, 12);
+  assert.equal(wild.mod.chance, 1);
+  assert.equal(wild.mod.humanizeVelocity, 0, 'and nonsense falls back rather than becoming NaN');
+  assert.equal(wild.mod.lengthBeats, 0);
+
+  // A slot written before these existed has no mod block at all, and gains a transparent one.
+  const old = normalizeMidiSlot({ slotId: 's', type: 'arp' });
+  assert.equal(old.mod.echoRepeats, 0, 'an older session migrates by construction');
+});
+
 test('rackCanvasLayout puts columns in signal order, sources first', () => {
   const layout = rackCanvasLayout(canvasRack());
   assert.equal(nodeOf(layout, 'p1').column, 0, 'instruments are the sources');

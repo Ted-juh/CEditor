@@ -47,16 +47,33 @@ namespace
 MidiInsertRack::MidiInsertRack() = default;
 MidiInsertRack::~MidiInsertRack() = default;
 
+/** Every later module lets go, whichever one this is. Written once because there are two
+    paths that must reach all of them — panic, and a slot being retyped or removed — and a
+    module missed by either leaves a note sounding with nothing left to end it. */
+void MidiInsertRack::releaseNoteModules (Module& module, juce::MidiBuffer& out, int position)
+{
+    if (module.echo != nullptr)     module.echo->allNotesOff (out, position);
+    if (module.strum != nullptr)    module.strum->allNotesOff (out, position);
+    if (module.humanize != nullptr) module.humanize->allNotesOff (out, position);
+    if (module.chance != nullptr)   module.chance->allNotesOff (out, position);
+    if (module.length != nullptr)   module.length->allNotesOff (out, position);
+    if (module.latch != nullptr)    module.latch->allNotesOff (out, position);
+}
+
 std::unique_ptr<MidiInsertRack::Module> MidiInsertRack::build (const MidiSlot& slot)
 {
     auto module = std::make_unique<Module>();
     module->slotId = slot.slotId;
     module->type = slot.type;
 
-    if (slot.type == "arp")
-        module->arp = std::make_unique<ArpEngine>();
-    else
-        module->fx = std::make_unique<MidiFxChain>();
+    if (slot.type == "arp")            module->arp      = std::make_unique<ArpEngine>();
+    else if (slot.type == "echo")      module->echo     = std::make_unique<NoteEchoEngine>();
+    else if (slot.type == "strum")     module->strum    = std::make_unique<StrumEngine>();
+    else if (slot.type == "humanize")  module->humanize = std::make_unique<HumanizeEngine>();
+    else if (slot.type == "chance")    module->chance   = std::make_unique<ChanceEngine>();
+    else if (slot.type == "length")    module->length   = std::make_unique<NoteLengthEngine>();
+    else if (slot.type == "latch")     module->latch    = std::make_unique<LatchEngine>();
+    else                               module->fx       = std::make_unique<MidiFxChain>();
 
     configure (*module, slot);
     return module;
@@ -75,6 +92,15 @@ void MidiInsertRack::configure (Module& module, const MidiSlot& slot)
     else if (module.fx != nullptr)
     {
         module.fx->setSettings (settingsFor (slot));
+    }
+    else
+    {
+        if (module.echo != nullptr)     module.echo->setSettings (slot.mod);
+        if (module.strum != nullptr)    module.strum->setSettings (slot.mod);
+        if (module.humanize != nullptr) module.humanize->setSettings (slot.mod);
+        if (module.chance != nullptr)   module.chance->setSettings (slot.mod);
+        if (module.length != nullptr)   module.length->setSettings (slot.mod);
+        if (module.latch != nullptr)    module.latch->setSettings (slot.mod);
     }
 }
 
@@ -123,6 +149,7 @@ void MidiInsertRack::setSlots (const juce::Array<MidiSlot>& slots)
                 continue;
             if (module->fx != nullptr)  module->fx->allNotesOff (stranded, 0);
             if (module->arp != nullptr) module->arp->allNotesOff (stranded, 0);
+            releaseNoteModules (*module, stranded, 0);
             retired.push_back (std::move (module));
         }
         modules.clear();
@@ -179,6 +206,21 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
                 continue;
             module->fx->process (front, back);
         }
+        // The six later modules. Every one of them stays in the chain even when it is doing
+        // nothing, for the arp's reason: each owns notes it emitted or note-offs it swallowed,
+        // and a module skipped mid-phrase is a module that never gets to let go.
+        else if (module->echo != nullptr)
+            module->echo->process (front, back, block, juce::jmax (1, numSamples));
+        else if (module->strum != nullptr)
+            module->strum->process (front, back, block, juce::jmax (1, numSamples));
+        else if (module->humanize != nullptr)
+            module->humanize->process (front, back, block, juce::jmax (1, numSamples));
+        else if (module->length != nullptr)
+            module->length->process (front, back, block, juce::jmax (1, numSamples));
+        else if (module->chance != nullptr)
+            module->chance->process (front, back);
+        else if (module->latch != nullptr)
+            module->latch->process (front, back);
         else
         {
             continue;
@@ -211,6 +253,7 @@ void MidiInsertRack::allNotesOff (juce::MidiBuffer& out, int position)
             continue;
         if (module->fx != nullptr)  module->fx->allNotesOff (out, position);
         if (module->arp != nullptr) module->arp->allNotesOff (out, position);
+        releaseNoteModules (*module, out, position);
     }
 
     for (const auto metadata : pendingFlush)

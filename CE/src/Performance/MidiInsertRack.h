@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ArpEngine.h"
+#include "NoteModules.h"
 #include "MidiFxChain.h"
 #include "PatternModel.h"
 
@@ -73,10 +74,19 @@ private:
         juce::String slotId;
         juce::String type;
         bool bypassed = false;
-        std::unique_ptr<MidiFxChain> fx;    // every type but "arp"
+        std::unique_ptr<MidiFxChain> fx;    // transpose / scale / chord / velocity / fx
         std::unique_ptr<ArpEngine> arp;     // "arp"
+        // The six later modules. One pointer each rather than a variant: each is a small
+        // object, only one is ever non-null, and a chain of ifs beats a visitor for six.
+        std::unique_ptr<NoteEchoEngine> echo;
+        std::unique_ptr<StrumEngine> strum;
+        std::unique_ptr<HumanizeEngine> humanize;
+        std::unique_ptr<ChanceEngine> chance;
+        std::unique_ptr<NoteLengthEngine> length;
+        std::unique_ptr<LatchEngine> latch;
     };
 
+    static void releaseNoteModules (Module& module, juce::MidiBuffer& out, int position);
     static std::unique_ptr<Module> build (const MidiSlot& slot);
     static void configure (Module& module, const MidiSlot& slot);
 

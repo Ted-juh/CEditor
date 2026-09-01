@@ -854,11 +854,14 @@ const normalizeArp = (a) => ({
 
 // One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
 // the same shape the native side keeps, so the UI never has to guess which half is live.
-export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx'];
+export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx',
+                              'echo', 'strum', 'humanize', 'chance', 'length', 'latch'];
 
 export const midiSlotLabels = {
   arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chorder',
   velocity: 'Velocity', fx: 'Note shaping',
+  echo: 'Echo', strum: 'Strum', humanize: 'Humanize', chance: 'Chance',
+  length: 'Note length', latch: 'Latch',
 };
 
 export function normalizeMidiSlot(slot) {
@@ -869,8 +872,31 @@ export function normalizeMidiSlot(slot) {
     bypassed: slot?.bypassed === true,
     arp: normalizeArp(slot?.arp),
     fx: normalizeMidiFx(slot?.fx),
+    mod: normalizeNoteModule(slot?.mod),
   };
 }
+
+/** The six later modules' settings. Every default is transparent, which is the same rule the
+    native side keeps: an inserted module must not change the sound by existing. */
+const normalizeNoteModule = (m) => ({
+  echoRepeats: clampInt(m?.echoRepeats, 0, 8, 0),
+  echoStepBeats: clampNumber(m?.echoStepBeats, 0.03125, 4, 0.5),
+  echoFeedback: clampNumber(m?.echoFeedback, 0.1, 1, 0.7),
+  echoTranspose: clampInt(m?.echoTranspose, -12, 12, 0),
+  strumBeats: clampNumber(m?.strumBeats, 0, 1, 0),
+  strumDown: m?.strumDown === true,
+  humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
+  humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
+  chance: clampNumber(m?.chance, 0, 1, 1),
+  lengthBeats: clampNumber(m?.lengthBeats, 0, 8, 0),
+  legato: m?.legato === true,
+  latchOn: m?.latchOn === true,
+});
+
+const clampInt = (value, low, high, fallback) =>
+  (Number.isFinite(Number(value)) ? Math.min(high, Math.max(low, Math.round(Number(value)))) : fallback);
+const clampNumber = (value, low, high, fallback) =>
+  (Number.isFinite(Number(value)) ? Math.min(high, Math.max(low, Number(value))) : fallback);
 
 const normalizeMidiFx = (f) => ({
   transpose: Number(f?.transpose ?? 0),
@@ -2542,7 +2568,13 @@ export function applyMockCommand(state, payload) {
     } else if (cmd === 'setMidiSlotBypassed') {
       chain[index].bypassed = payload.bypassed === true;
     } else {
-      const block = chain[index].type === 'arp' ? chain[index].arp : chain[index].fx;
+      // Which settings block a module edits follows its type, exactly as the native side
+      // decides it: the arp has its own, the six later ones share `mod`, everything else is
+      // a note shaper.
+      const laterModules = ['echo', 'strum', 'humanize', 'chance', 'length', 'latch'];
+      const block = chain[index].type === 'arp' ? chain[index].arp
+        : laterModules.includes(chain[index].type) ? chain[index].mod
+        : chain[index].fx;
       for (const [key, value] of Object.entries(payload)) {
         if (['cmd', 'partId', 'slotId'].includes(key) || !(key in block)) continue;
         block[key] = typeof block[key] === 'boolean' ? value === true
