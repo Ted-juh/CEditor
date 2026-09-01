@@ -5420,15 +5420,26 @@ void testCustomArtwork()
 
     // A real picture on disk, in a format that is not PNG — the copy normalises it, so every
     // source format ends up the same shape and the frontend only ever fetches one thing.
+    //
+    // THE GRAPHICS CONTEXT MUST BE CLOSED BEFORE THE IMAGE IS READ, and the inner scope is
+    // the whole reason this is written in two steps rather than one. JUCE's rule is that only
+    // one Graphics context or BitmapData may be active on an Image at a time
+    // (juce_Direct2DImage_windows.cpp:560). Break it on the software renderer and nothing
+    // happens, because drawing goes straight into the pixels this test then reads. Break it
+    // on Windows, where NativeImageType hands back a Direct2D image, and the read returns the
+    // stale main-memory copy — every pixel still the transparent black it was cleared to. So
+    // writePng saw a blank image, refused it exactly as designed, and eight assertions failed
+    // on a picture that had been drawn perfectly well. Green here, red on the runner, and the
+    // assert that says so is compiled out of a Release build.
     const auto chosen = dir.getChildFile ("chosen.png");
+    juce::Image art (juce::Image::ARGB, 400, 260, true);
     {
-        juce::Image art (juce::Image::ARGB, 400, 260, true);
         juce::Graphics g (art);
         g.fillAll (juce::Colour (0xff402030));
         g.setColour (juce::Colours::orange);
         g.fillEllipse (40.0f, 40.0f, 180.0f, 180.0f);
-        check (editorSnapshot::writePng (art, chosen), "a picture to choose exists");
     }
+    check (editorSnapshot::writePng (art, chosen), "a picture to choose exists");
 
     Harness h (dir);
     h.cmd ("getState");
