@@ -29,6 +29,7 @@ import {
   onInstrumentHostSurface,
   onInstrumentHostSurfaceLayout,
   onInstrumentHostMidiLearn,
+  onInstrumentHostParamLearn,
   onInstrumentHostArpStep,
   onInstrumentHostChordLearn,
 } from '../bridge/bridge.js';
@@ -54,6 +55,8 @@ export const hostSurface = writable({ state: 'searching', detail: '', device: ''
 // MIDI learn: which slot is armed and listening right now. The bind itself lands in the
 // state (each slot's midiCc/midiChannel); this store only tracks the transient arming.
 export const hostMidiLearn = writable({ armed: false, pageId: '', slotId: '' });
+/** Parameter learn: which slot is waiting for you to move something in the plug-in. */
+export const hostParamLearn = writable({ armed: false, pageId: '', slotId: '', parameterId: '' });
 
 // The arp playhead per part: partId -> live pattern step (-1 while idle). Fed by tiny
 // change-driven events from the engine; the grid only lights the column it names.
@@ -336,13 +339,17 @@ export function emptyHostBuild() {
 // --- the Stage 2 parameter view -----------------------------------------------------------------
 
 export function emptyHostParameters() {
-  return { partId: '', parameters: [], warnings: [] };
+  // `touched` is the parameter ids the user last reached for in the plug-in's OWN window,
+  // newest first — the answer to a plug-in with five hundred parameters and a search box.
+  return { partId: '', parameters: [], warnings: [], touched: [], favourites: [] };
 }
 
 export function normalizeHostParameters(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   return {
     partId: String(p.partId ?? ''),
+    touched: (Array.isArray(p.touched) ? p.touched : []).map(String),
+    favourites: (Array.isArray(p.favourites) ? p.favourites : []).map(String),
     parameters: (Array.isArray(p.parameters) ? p.parameters : []).map((d) => ({
       id: String(d?.id ?? ''),
       index: Number(d?.index ?? 0),
@@ -379,6 +386,27 @@ export function parameterControlKind(parameter) {
 
 /** Registry rows folded into their plug-in-declared groups, order preserved. Ungrouped
  *  rows share one 'General' bucket so a collapsed list never hides orphans invisibly. */
+/** The two short lists that go above the groups: the ones you pinned, and the ones you last
+    reached for in the plug-in's own window.
+
+    Both answer the same question — "the handful I actually use on this synth" — from opposite
+    directions. Pinned is deliberate and permanent; recent is automatic and disposable. A
+    parameter in both appears once, under Pinned, because a pin is the stronger statement and
+    two copies of one row in a list about finding things is a joke.
+
+    Order is the caller's, not this function's: favourites keep the order they were marked in,
+    recents keep newest-first. Both are already meaningful and re-sorting would destroy them. */
+export function parameterShortlist(parameters, favourites, touched) {
+  const byId = new Map((Array.isArray(parameters) ? parameters : []).map((d) => [d.id, d]));
+  const pinnedIds = (Array.isArray(favourites) ? favourites : []).filter((id) => byId.has(id));
+  const pinned = pinnedIds.map((id) => byId.get(id));
+  const seen = new Set(pinnedIds);
+  const recent = (Array.isArray(touched) ? touched : [])
+    .filter((id) => byId.has(id) && !seen.has(id))
+    .map((id) => byId.get(id));
+  return { pinned, recent };
+}
+
 export function groupParameters(parameters) {
   const groups = [];
   for (const parameter of Array.isArray(parameters) ? parameters : []) {
@@ -409,10 +437,14 @@ export function assignedParameterIds(state, targetId) {
 export function applyParamValues(registry, payload) {
   if (!payload || String(payload.partId ?? '') !== registry.partId) return registry;
   const changes = Array.isArray(payload.changes) ? payload.changes : [];
-  if (changes.length === 0) return registry;
+  const touched = Array.isArray(payload.touched) ? payload.touched.map(String) : registry.touched;
+  // Favourites never travel on a value change; keeping the old list is the difference between
+  // a shortlist that survives a knob move and one that empties every time you turn something.
+  if (changes.length === 0) return { ...registry, touched };
   const byId = new Map(changes.map((c) => [String(c?.id ?? ''), c]));
   return {
     ...registry,
+    touched,
     parameters: registry.parameters.map((d) => {
       const change = byId.get(d.id);
       return change
@@ -422,14 +454,67 @@ export function applyParamValues(registry, payload) {
   };
 }
 
-/** Case-insensitive name/group/id filter for the parameter list. */
+/** How well `query` matches `text`, or -1 for no match at all.
+
+    Subsequence rather than substring, because the names in a five-hundred-parameter plug-in
+    are long and compound: "Filter 1 Cutoff" answers to "cut" under either rule, but only this
+    one answers to "f1cut" or "fcut", which is what somebody actually types when they know
+    what they want and not what the vendor called it.
+
+    The score exists so the ranking is defensible rather than incidental. A match that starts
+    at a word beats one buried mid-word ("Cutoff" over "Sub Cutoff Trim"), a tight run of
+    characters beats a scattered one, and a shorter name beats a longer one when all else is
+    equal — which is how a person reads a list of candidates. */
+export function fuzzyScore(text, query) {
+  const haystack = String(text ?? '').toLowerCase();
+  const needle = String(query ?? '').toLowerCase();
+  if (!needle) return 0;
+  if (!haystack) return -1;
+
+  let score = 0;
+  let at = 0;
+  let previous = -2;
+
+  for (const character of needle) {
+    const found = haystack.indexOf(character, at);
+    if (found < 0) return -1;
+
+    // A word start is what the eye looks for, so it is worth the most.
+    const isWordStart = found === 0 || /[\s\-_/.()]/.test(haystack[found - 1]);
+    if (isWordStart) score += 8;
+    // Consecutive characters mean the query is really a fragment of this name.
+    if (found === previous + 1) score += 5;
+    else score += 1;
+
+    previous = found;
+    at = found + 1;
+  }
+
+  // Shorter names win ties: "Cutoff" before "Cutoff Modulation Depth" for the query "cut".
+  return score - Math.min(haystack.length, 40) / 40;
+}
+
+/** The parameters matching `query`, best first. An empty query keeps the plug-in's own
+    order, which is the order its groups were authored in and the only one that means
+    anything before somebody has typed. */
 export function filterParameters(parameters, query) {
-  const q = String(query ?? '').trim().toLowerCase();
-  if (!q) return parameters;
-  return parameters.filter(
-    (d) => d.name.toLowerCase().includes(q) || d.group.toLowerCase().includes(q)
-        || d.id.toLowerCase().includes(q)
-  );
+  const list = Array.isArray(parameters) ? parameters : [];
+  const q = String(query ?? '').trim();
+  if (!q) return list;
+
+  return list
+    .map((d) => {
+      // The name is what people search; the group and the id are fallbacks for when they
+      // remember where it lived or what the plug-in calls it, and they score lower so a name
+      // match is never buried under them.
+      const best = Math.max(fuzzyScore(d.name, q),
+                            fuzzyScore(d.group, q) - 4,
+                            fuzzyScore(d.id, q) - 6);
+      return { d, best };
+    })
+    .filter((entry) => entry.best >= 0)
+    .sort((a, b) => b.best - a.best)
+    .map((entry) => entry.d);
 }
 
 const MOCK_WAVES = ['Saw', 'Square', 'Sine'];
@@ -1971,6 +2056,20 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'learnControlSlotParameter' || cmd === 'cancelLearnControlSlotParameter') {
+    // No plug-in window to wiggle in the browser, so the mock 'hears' the first parameter of
+    // the focused part at once — enough to exercise the arming, the assignment and the badge.
+    if (cmd === 'cancelLearnControlSlotParameter') return next;
+    const page = next.rack.pages.find((p) => p.pageId === payload.pageId);
+    const slot = page?.slots.find((s) => s.slotId === payload.slotId);
+    const part = next.rack.parts.find((p) => p.partId === next.rack.focusedPartId);
+    if (!slot || !part?.hasInstrument) return next;
+    const first = mockHostParameters(part.partId).parameters[0];
+    if (!first) return next;
+    Object.assign(slot, { assigned: true, partId: part.partId, parameterId: first.id,
+                          displayName: first.name, partName: part.pluginName, resolved: true });
+    return next;
+  }
   if (cmd === 'learnKeyChord') {
     // No keys to hear in the browser: the mock captures a C-major triad onto middle C at
     // once, enough to demo the map, the badge, and the clear.
@@ -2505,6 +2604,12 @@ export function initInstrumentHostBridge() {
   onInstrumentHostSurface((payload) => hostSurface.set(normalizeHostSurface(payload)));
   onInstrumentHostSurfaceLayout((payload) => hostSurfaceLayout.set(normalizeSurfaceLayout(payload)));
   onInstrumentHostMidiLearn((payload) => hostMidiLearn.set(normalizeMidiLearn(payload)));
+  onInstrumentHostParamLearn((payload) => hostParamLearn.set({
+    armed: payload?.armed === true,
+    pageId: String(payload?.pageId ?? ''),
+    slotId: String(payload?.slotId ?? ''),
+    parameterId: String(payload?.parameterId ?? ''),
+  }));
   onInstrumentHostArpStep((payload) => hostArpStep.update((steps) => ({
     ...steps,
     [String(payload?.partId ?? '')]: Number.isInteger(payload?.step) ? payload.step : -1,
@@ -2525,6 +2630,11 @@ export function initInstrumentHostBridge() {
   onInstrumentHostError((payload) => hostLastError.set(String(payload?.message ?? '')));
   send({ cmd: 'getState' });
 }
+
+// Favourites live in the host's own folder natively, keyed by plug-in class. The browser
+// preview has neither, so it keeps them here for the session — enough to exercise the star,
+// the pinning and the ordering without pretending to persist anything.
+const mockFavourites = new Set();
 
 function send(payload) {
   if (!isJuceAvailable()) {
@@ -2562,6 +2672,12 @@ function send(payload) {
       hostBuild.update((b) => applyBuildProgress(b, { line: 'Staged mock product folder.', done: true, ok: true }));
       return;
     }
+    if (payload?.cmd === 'toggleParameterFavourite') {
+      if (mockFavourites.has(payload.parameterId)) mockFavourites.delete(payload.parameterId);
+      else mockFavourites.add(payload.parameterId);
+      send({ cmd: 'getParameters', partId: payload.partId });
+      return;
+    }
     if (payload?.cmd === 'getParameters') {
       const state = get(hostState);
       const part = state.rack.parts.find((p) => p.partId === payload.partId);
@@ -2581,8 +2697,11 @@ function send(payload) {
             defaultValue: 0,
           })),
         ];
-        hostParameters.set(normalizeHostParameters({ partId: payload.partId,
-                                                     parameters: [...base, ...mixer] }));
+        hostParameters.set(normalizeHostParameters({
+          partId: payload.partId,
+          parameters: [...base, ...mixer],
+          favourites: [...mockFavourites],
+        }));
         return;
       }
       const effect = [...state.rack.masterEffects, ...state.rack.parts.flatMap((p) => p.effects),
@@ -2869,6 +2988,12 @@ export const cancelMidiLearn = () => {
   send({ cmd: 'cancelMidiLearn' });
 };
 export const clearControlSlotMidi = (pageId, slotId) => send({ cmd: 'clearControlSlotMidi', pageId, slotId });
+/** Arm a slot, then move the control in the plug-in's own window. */
+export const learnControlSlotParameter = (pageId, slotId) =>
+  send({ cmd: 'learnControlSlotParameter', pageId, slotId });
+export const cancelLearnControlSlotParameter = () => send({ cmd: 'cancelLearnControlSlotParameter' });
+export const toggleParameterFavourite = (partId, parameterId) =>
+  send({ cmd: 'toggleParameterFavourite', partId, parameterId });
 export const walkPartPreset = (partId, delta = 1) => send({ cmd: 'walkPartPreset', partId, delta });
 export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });

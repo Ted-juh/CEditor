@@ -741,10 +741,27 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             for (const auto& w : it->second.inventory.warnings)
                 warnings.add (w);
 
+        loadParameterFavourites();
+        juce::Array<juce::var> favourites;
+        if (const auto found = parameterFavourites.find (targetClassCeId (partId));
+            found != parameterFavourites.end())
+            for (const auto& id : found->second)
+                favourites.add (id);
+
         auto* root = new juce::DynamicObject();
         root->setProperty ("partId", partId);
         root->setProperty ("parameters", parameters);
         root->setProperty ("warnings", warnings);
+        root->setProperty ("favourites", favourites);
+        // What was last reached for in the plug-in's own window, so the list can offer it
+        // before anybody types. Carried here as well as on the change events, because opening
+        // the list is exactly when you want yesterday's shortlist.
+        juce::Array<juce::var> touchedVars;
+        if (const auto found = touchedParametersByTarget.find (partId);
+            found != touchedParametersByTarget.end())
+            for (const auto& id : found->second)
+                touchedVars.add (id);
+        root->setProperty ("touched", touchedVars);
         if (options.emit != nullptr)
             options.emit ("instrumentHostParameters", juce::var (root));
         return;
@@ -755,6 +772,13 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto id = payload.getProperty ("id", {}).toString();
+
+        // Remembered so the drain can tell OUR write from the user's hand on the plug-in's own
+        // knob. Both arrive as the same change event; only one of them answers "which
+        // parameter did you just reach for", and a list full of whatever you last dragged in
+        // CEditor is a list nobody needs.
+        if (cmd == "setParameter" || cmd == "resetParameter")
+            parametersWrittenByUs.addIfNotAlreadyThere (id);
 
         if (isVirtualParameterId (id))
         {
@@ -1061,6 +1085,77 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             savePerformance();
             emitState();
         }
+        return;
+    }
+
+    // Learn a PARAMETER rather than a controller: arm a slot, then move the control in the
+    // plug-in's own window. Deliberately the same shape as learnControlSlotMidi below, because
+    // it is the same idea pointed at the other side of the binding — and a user who has met
+    // one should not have to learn the other.
+    // The dozen you reach for on this synth every time, marked once and remembered per CLASS.
+    // Not per part and not per session: it is a fact about the plug-in, not about today's rack.
+    if (cmd == "toggleParameterFavourite")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto parameterId = payload.getProperty ("parameterId", {}).toString();
+        const auto ceId = targetClassCeId (partId);
+
+        if (ceId.isEmpty() || ! targetParameterExists (partId, parameterId))
+        {
+            emitError ("Unknown parameter " + parameterId + " on that target.");
+            return;
+        }
+
+        loadParameterFavourites();
+        auto& ids = parameterFavourites[ceId];
+        if (ids.contains (parameterId))
+            ids.removeString (parameterId);
+        else
+            ids.add (parameterId);
+
+        saveParameterFavourites();
+
+        // Re-answer with the registry rather than emitting a favourites-only event: the list
+        // is rendered from one payload, and a second source for one field is a second thing
+        // to keep in step.
+        auto* again = new juce::DynamicObject();
+        again->setProperty ("cmd", "getParameters");
+        again->setProperty ("partId", partId);
+        handleCommand (juce::var (again));
+        return;
+    }
+
+    if (cmd == "learnControlSlotParameter")
+    {
+        const auto pageId = payload.getProperty ("pageId", {}).toString();
+        const auto slotId = payload.getProperty ("slotId", {}).toString();
+        const auto* page = rack.getPerformance().findPage (pageId);
+        if (page == nullptr || page->findSlot (slotId) == nullptr)
+        {
+            emitError ("Unknown control slot.");
+            return;
+        }
+
+        parameterLearnPageId = pageId;
+        parameterLearnSlotId = slotId;
+        // Armed means the NEXT movement binds. Anything already queued was moved before the
+        // click and is not what was meant by it.
+        for (auto& [targetId, sync] : partParameters)
+        {
+            juce::SortedSet<int> stale;
+            juce::Array<PartParameterSync::Gesture> staleGestures;
+            if (sync.sync != nullptr)
+                sync.sync->drain (stale, staleGestures);
+        }
+        emitParameterLearn (true, pageId, slotId, {});
+        return;
+    }
+
+    if (cmd == "cancelLearnControlSlotParameter")
+    {
+        const auto pageId = std::exchange (parameterLearnPageId, {});
+        const auto slotId = std::exchange (parameterLearnSlotId, {});
+        emitParameterLearn (false, pageId, slotId, {});
         return;
     }
 
@@ -4821,6 +4916,65 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     }
 }
 
+void InstrumentHostService::loadParameterFavourites()
+{
+    if (parameterFavouritesLoaded)
+        return;
+
+    parameterFavouritesLoaded = true;
+    if (options.dataDirectory == juce::File())
+        return;
+
+    const auto stored = juce::JSON::parse (parameterFavouritesFile().loadFileAsString());
+    if (auto* object = stored.getDynamicObject())
+        for (const auto& property : object->getProperties())
+        {
+            juce::StringArray ids;
+            if (const auto* array = property.value.getArray())
+                for (const auto& id : *array)
+                    ids.addIfNotAlreadyThere (id.toString());
+
+            if (! ids.isEmpty())
+                parameterFavourites[property.name.toString()] = ids;
+        }
+}
+
+void InstrumentHostService::saveParameterFavourites() const
+{
+    if (options.dataDirectory == juce::File())
+        return;
+
+    auto* root = new juce::DynamicObject();
+    for (const auto& [ceId, ids] : parameterFavourites)
+    {
+        if (ids.isEmpty())
+            continue;      // a class with nothing marked is absent, not an empty list
+
+        juce::Array<juce::var> values;
+        for (const auto& id : ids)
+            values.add (id);
+        root->setProperty (ceId, values);
+    }
+
+    parameterFavouritesFile().getParentDirectory().createDirectory();
+    parameterFavouritesFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+}
+
+void InstrumentHostService::emitParameterLearn (bool armed, const juce::String& pageId,
+                                                const juce::String& slotId,
+                                                const juce::String& parameterId)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("armed",       armed);
+    obj->setProperty ("pageId",      pageId);
+    obj->setProperty ("slotId",      slotId);
+    obj->setProperty ("parameterId", parameterId);
+    options.emit ("instrumentHostParamLearn", juce::var (obj));
+}
+
 void InstrumentHostService::emitMidiLearn (bool armed, const juce::String& pageId,
                                            const juce::String& slotId, int cc, int channel)
 {
@@ -5131,16 +5285,62 @@ void InstrumentHostService::drainParameterEvents()
             gestureEvents.add (juce::var (obj));
         }
 
+        // What the user reached for in the plug-in's OWN window, newest first. Our own writes
+        // are excluded — they arrive as the same event and answer a different question.
+        auto& touched = touchedParametersByTarget[partId];
+        for (const auto index : changed)
+        {
+            const auto id = idFor (index);
+            if (id.isEmpty() || parametersWrittenByUs.contains (id))
+                continue;
+
+            touched.removeString (id);
+            touched.insert (0, id);
+
+            // Armed: the first thing they moved is the thing they meant.
+            if (parameterLearnPageId.isNotEmpty())
+            {
+                const auto pageId = std::exchange (parameterLearnPageId, {});
+                const auto slotId = std::exchange (parameterLearnSlotId, {});
+
+                // The same binding assignControlSlot builds, through the same call: a learned
+                // assignment must be indistinguishable from a dragged one, class identity
+                // included, or the two would resolve differently later.
+                ControlBinding binding;
+                binding.partId = partId;
+                binding.pluginCeId = targetClassCeId (partId);
+                binding.parameterId = id;
+
+                if (rack.setSlotBinding (pageId, slotId, std::move (binding)))
+                {
+                    savePerformance();
+                    emitState();
+                }
+                emitParameterLearn (false, pageId, slotId, id);
+            }
+        }
+        while (touched.size() > maxTouchedParameters)
+            touched.remove (touched.size() - 1);
+
         if (changes.isEmpty() && gestureEvents.isEmpty())
             continue;
+
+        juce::Array<juce::var> touchedVars;
+        for (const auto& id : touched)
+            touchedVars.add (id);
 
         auto* root = new juce::DynamicObject();
         root->setProperty ("partId",   partId);
         root->setProperty ("changes",  changes);
         root->setProperty ("gestures", gestureEvents);
+        root->setProperty ("touched",  touchedVars);
         if (options.emit != nullptr)
             options.emit ("instrumentHostParamValues", juce::var (root));
     }
+
+    // Cleared at the END of the drain: a write made during this cycle is answered by a change
+    // event in this cycle, and clearing earlier would let it through as a touch.
+    parametersWrittenByUs.clear();
 }
 
 void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)

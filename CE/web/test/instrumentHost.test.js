@@ -21,6 +21,8 @@ import {
   normalizeHostParameters,
   applyParamValues,
   filterParameters,
+  fuzzyScore,
+  parameterShortlist,
   mockHostParameters,
   hostState as hostStateStore,
   hostMidiActivity,
@@ -548,6 +550,60 @@ test('a controller move carries which controller it was', () => {
   hostMidiActivity.set({ device: 'CTRL49', text: 'C4 on, velocity 100', cc: -1, channel: 1, value: 0, seq: 2 });
   assert.equal(seen.cc, -1, 'a note is not a controller and says so');
   unsub();
+});
+
+// --- five hundred parameters -----------------------------------------------------------------
+
+test('search finds a parameter from the letters somebody would actually type', () => {
+  const params = [
+    { id: 'p1', name: 'Filter 1 Cutoff', group: 'Filter' },
+    { id: 'p2', name: 'Sub Cutoff Trim', group: 'Osc' },
+    { id: 'p3', name: 'Cutoff', group: 'Filter' },
+    { id: 'p4', name: 'Reverb Mix', group: 'FX' },
+  ];
+  const names = (q) => filterParameters(params, q).map((p) => p.name);
+
+  // Substring search — what this used to be — finds nothing for either of these.
+  assert.deepEqual(names('f1cut'), ['Filter 1 Cutoff'],
+    'initials and fragments across words, which is how a long name is remembered');
+  assert.ok(names('fcut').includes('Filter 1 Cutoff'));
+
+  // Ranking is the other half: three matches, and the one you meant first.
+  assert.equal(names('cut')[0], 'Cutoff', 'the shortest exact-ish name wins');
+  assert.equal(names('cut').length, 3, 'without hiding the others');
+  assert.ok(names('cut').indexOf('Filter 1 Cutoff') < names('cut').indexOf('Sub Cutoff Trim'),
+    'a match at a word start beats one buried mid-name');
+
+  assert.deepEqual(names(''), params.map((p) => p.name),
+    'an empty search keeps the plug-in\'s own order');
+  assert.deepEqual(names('zzzz'), [], 'and nonsense matches nothing rather than everything');
+
+  // The scorer itself, at the edges.
+  assert.equal(fuzzyScore('Cutoff', ''), 0, 'an empty query matches anything, neutrally');
+  assert.equal(fuzzyScore('', 'cut'), -1, 'an empty name matches nothing');
+  assert.equal(fuzzyScore('Cutoff', 'ffotuc'), -1, 'order matters — it is a subsequence, not a bag');
+});
+
+test('the shortlist is what you pinned and what you last touched, without repeats', () => {
+  const params = [
+    { id: 'a', name: 'Cutoff' }, { id: 'b', name: 'Resonance' },
+    { id: 'c', name: 'Drive' },  { id: 'd', name: 'Mix' },
+  ];
+  const { pinned, recent } = parameterShortlist(params, ['c', 'a'], ['a', 'd', 'b']);
+
+  assert.deepEqual(pinned.map((p) => p.id), ['c', 'a'],
+    'pinned keeps the order they were marked in, not the registry order');
+  assert.deepEqual(recent.map((p) => p.id), ['d', 'b'],
+    'recent keeps newest-first, minus anything already pinned');
+  assert.ok(!recent.some((p) => p.id === 'a'),
+    'a parameter in both appears once — a pin is the stronger statement');
+
+  // Ids that no longer exist: a plug-in swapped for another, or a version that renamed things.
+  const stale = parameterShortlist(params, ['gone'], ['also-gone', 'b']);
+  assert.deepEqual(stale.pinned, [], 'a pin for a parameter this plug-in does not have is skipped');
+  assert.deepEqual(stale.recent.map((p) => p.id), ['b'], 'and so is a stale recent');
+
+  assert.deepEqual(parameterShortlist(null, null, null), { pinned: [], recent: [] });
 });
 
 test('rackCanvasLayout puts columns in signal order, sources first', () => {

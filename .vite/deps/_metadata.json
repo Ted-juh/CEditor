@@ -1,0 +1,70 @@
+{
+  "hash": "4c19402b",
+  "configHash": "17bc6f7c",
+  "lockfileHash": "e3b0c442",
+  "browserHash": "c3f0f3d3",
+  "optimized": {
+    "lucide-svelte/icons/eraser": {
+      "src": "../../CE/web/node_modules/lucide-svelte/dist/icons/eraser.js",
+      "file": "lucide-svelte_icons_eraser.js",
+      "fileHash": "d71f303b",
+      "needsInterop": false
+    },
+    "lucide-svelte/icons/plug": {
+      "src": "../../CE/web/node_modules/lucide-svelte/dist/icons/plug.js",
+      "file": "lucide-svelte_icons_plug.js",
+      "fileHash": "70d3504e",
+      "needsInterop": false
+    },
+    "lucide-svelte/icons/radio": {
+      "src": "../../CE/web/node_modules/lucide-svelte/dist/icons/radio.js",
+      "file": "lucide-svelte_icons_radio.js",
+      "fileHash": "0f1cf8bb",
+      "needsInterop": false
+    },
+    "lucide-svelte/icons/refresh-cw": {
+      "src": "../../CE/web/node_modules/lucide-svelte/dist/icons/refresh-cw.js",
+      "file": "lucide-svelte_icons_refresh-cw.js",
+      "fileHash": "ba26d9a4",
+      "needsInterop": false
+    },
+    "svelte": {
+      "src": "../../CE/web/node_modules/svelte/src/index-client.js",
+      "file": "svelte.js",
+      "fileHash": "eb458375",
+      "needsInterop": false
+    },
+    "svelte/store": {
+      "src": "../../CE/web/node_modules/svelte/src/store/index-client.js",
+      "file": "svelte_store.js",
+      "fileHash": "ef7d3ec7",
+      "needsInterop": false
+    },
+    "typescript": {
+      "src": "../../CE/web/node_modules/typescript/lib/typescript.js",
+      "file": "typescript.js",
+      "fileHash": "b2671ec0",
+      "needsInterop": true
+    },
+    "wasmoon": {
+      "src": "../../CE/web/node_modules/wasmoon/dist/index.js",
+      "file": "wasmoon.js",
+      "fileHash": "62dc4a0f",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "browser-external_module-Ca5SjB1x": {
+      "file": "browser-external_module-Ca5SjB1x.js",
+      "isDynamicEntry": true
+    },
+    "rolldown-runtime-DUp30N8C": {
+      "file": "rolldown-runtime-DUp30N8C.js",
+      "isDynamicEntry": false
+    },
+    "runtime-BHv2h3MP": {
+      "file": "runtime-BHv2h3MP.js",
+      "isDynamicEntry": false
+    }
+  }
+}

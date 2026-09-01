@@ -24,6 +24,8 @@
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
     addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
+    hostParamLearn, learnControlSlotParameter, cancelLearnControlSlotParameter,
+    toggleParameterFavourite, parameterShortlist,
     hostArpStep,
     hostCanvasDrag,
     hostChordLearn, learnKeyChord, cancelKeyChordLearn, clearKeyChord,
@@ -168,6 +170,9 @@
   // a closed group is worse than a long list — and a single-group registry never collapses,
   // because a closed list with one heading is just an empty panel with extra steps.
   let parameterGroups = $derived(groupParameters(visibleParameters));
+  let shortlist = $derived(parameterShortlist($hostParameters.parameters,
+                                              $hostParameters.favourites,
+                                              $hostParameters.touched));
   let openGroups = $state({});
   let groupsForcedOpen = $derived(
     paramSearch.trim() !== '' || paramAssignedOnly || parameterGroups.length <= 1);
@@ -958,6 +963,20 @@
                     <button type="button" class="ghost midi-learn"
                             title="Bind a hardware control: click, then move a knob or fader on your MIDI keyboard"
                             onclick={() => learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>learn</button>
+                    <!-- The answer to a plug-in with five hundred parameters: don't find it,
+                         point at it. Click, then move the control in the plug-in's OWN window
+                         and whatever moved lands here — no name to know, no list to scroll. -->
+                    {#if $hostParamLearn.armed && $hostParamLearn.slotId === slot.slotId}
+                      <button type="button" class="ghost midi-learn armed"
+                              data-testid="param-learn-armed"
+                              title="Move the control you want in the plug-in's own window — or click to cancel"
+                              onclick={() => cancelLearnControlSlotParameter()}>watching…</button>
+                    {:else}
+                      <button type="button" class="ghost midi-learn"
+                              data-testid="param-learn"
+                              title="Pick a parameter by moving it: click, then move the control in the plug-in's own window"
+                              onclick={() => learnControlSlotParameter(selectedPage.pageId, slot.slotId)}>grab</button>
+                    {/if}
                   {/if}
                 </div>
               {/each}
@@ -1263,20 +1282,7 @@
                   : 'Nothing matches the search.'}
               </div>
             {/if}
-            <div class="param-list">
-              {#each parameterGroups as group (group.name)}
-                {#if parameterGroups.length > 1}
-                  <button type="button" class="param-group"
-                          aria-expanded={groupsForcedOpen || openGroups[group.name] === true}
-                          onclick={() => (openGroups[group.name] = !openGroups[group.name])}>
-                    <span class="param-group-arrow">{groupsForcedOpen || openGroups[group.name] ? '▾' : '▸'}</span>
-                    {group.name}
-                    <span class="param-group-count">{group.parameters.length}{
-                      group.parameters.some((p) => assignedIds.has(p.id)) ? ' · assigned' : ''}</span>
-                  </button>
-                {/if}
-                {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
-                {#each group.parameters as parameter (parameter.id)}
+            {#snippet paramRow(parameter)}
                 <!-- Draggable onto the controller drawing in the Surface tab: assigning
                      hardware is spatial work, and "this knob" is a position rather than a row
                      in a list. The row keeps working exactly as it did for everything else. -->
@@ -1352,10 +1358,53 @@
                           data-testid="param-quick-learn"
                           title="Put this on a knob: click, then move a control on your MIDI keyboard"
                           onclick={() => quickLearnParameter(paramTargetId, parameter.id)}>⚡</button>
+                  <!-- Pinned per plug-in CLASS, not per part: you reach for the same dozen on
+                       the same synth whichever rack it is in today. -->
+                  <button type="button" class="ghost param-pin"
+                          class:on={$hostParameters.favourites.includes(parameter.id)}
+                          data-testid="param-pin"
+                          title={$hostParameters.favourites.includes(parameter.id)
+                                   ? 'Unpin — stop keeping this at the top for this plug-in'
+                                   : 'Pin to the top for this plug-in, in every session'}
+                          onclick={() => toggleParameterFavourite(paramTargetId, parameter.id)}
+                          >{$hostParameters.favourites.includes(parameter.id) ? '★' : '☆'}</button>
                 </div>
                 {#if paramDiagnostics}
                   <div class="param-diag">{parameter.id} · index {parameter.index}{parameter.automatable ? '' : ' · not automatable'}{parameter.meta ? ' · meta' : ''}</div>
                 {/if}
+            {/snippet}
+
+            <div class="param-list">
+              <!-- Two short lists before the four hundred rows. Pinned is what you said you
+                   use on this plug-in; Recent is what you last reached for in its own window,
+                   which the host notices without being asked. Hidden while searching: you are
+                   already telling it what you want. -->
+              {#if !paramSearch.trim() && !paramAssignedOnly}
+                {#each [['Pinned', shortlist.pinned], ['Recent', shortlist.recent]] as [heading, rows] (heading)}
+                  {#if rows.length > 0}
+                    <div class="param-shortlist" data-testid={`param-${heading.toLowerCase()}`}>
+                      <span class="param-shortlist-head">{heading}</span>
+                      {#each rows as parameter (parameter.id)}
+                        {@render paramRow(parameter)}
+                      {/each}
+                    </div>
+                  {/if}
+                {/each}
+              {/if}
+              {#each parameterGroups as group (group.name)}
+                {#if parameterGroups.length > 1}
+                  <button type="button" class="param-group"
+                          aria-expanded={groupsForcedOpen || openGroups[group.name] === true}
+                          onclick={() => (openGroups[group.name] = !openGroups[group.name])}>
+                    <span class="param-group-arrow">{groupsForcedOpen || openGroups[group.name] ? '▾' : '▸'}</span>
+                    {group.name}
+                    <span class="param-group-count">{group.parameters.length}{
+                      group.parameters.some((p) => assignedIds.has(p.id)) ? ' · assigned' : ''}</span>
+                  </button>
+                {/if}
+                {#if groupsForcedOpen || openGroups[group.name] || parameterGroups.length <= 1}
+                {#each group.parameters as parameter (parameter.id)}
+                {@render paramRow(parameter)}
                 {/each}
                 {/if}
               {/each}
@@ -1785,6 +1834,15 @@
                  color: #9aa5b1; font-size: 11px; font-weight: 600; padding: 4px 8px;
                  cursor: pointer; }
   .param-row { display: flex; align-items: center; gap: 8px; }
+  .param-pin { flex: none; padding: 0 3px; color: #6d7883; font-size: 12px; line-height: 16px; }
+  .param-pin.on { color: #e0c060; }
+  /* The two short lists sit above the groups and read as a landing strip rather than as more
+     of the same list — a rule under each, and a heading small enough not to compete with the
+     group headings below. */
+  .param-shortlist { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px;
+                     margin-bottom: 4px; border-bottom: 1px solid #2c343d; }
+  .param-shortlist-head { color: #7d8894; font-size: 10px; text-transform: uppercase;
+                          letter-spacing: 0.06em; }
   .param-segments { display: inline-flex; gap: 2px; flex: 1; min-width: 0; }
   .param-segments button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
                            white-space: nowrap; font-size: 10px; padding: 2px 4px;

@@ -712,6 +712,20 @@ private:
         nothing. Order matters — the vendor's picture is of the plug-in, ours is of whatever
         preset happened to be open. */
     juce::File artworkFor (const PluginClassRecord& record) const;
+    /** Favourite parameters, per plug-in CLASS rather than per part or per session: you reach
+        for the same dozen on the same synth every time, whichever rack it happens to be in
+        today. A per-user preference about a plug-in, so it lives beside the catalogue and the
+        thumbnails rather than in the Performance. */
+    juce::File parameterFavouritesFile() const
+    {
+        return options.dataDirectory.getChildFile ("parameter-favourites.json");
+    }
+    void loadParameterFavourites();
+    void saveParameterFavourites() const;
+    /** ceId -> the parameter ids marked on that class. Loaded once, on first use. */
+    std::map<juce::String, juce::StringArray> parameterFavourites;
+    bool parameterFavouritesLoaded = false;
+
     juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
@@ -873,6 +887,27 @@ private:
     // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
+    // -- parameter learn -------------------------------------------------------------------
+    // The answer to a plug-in with five hundred parameters, which is a list nobody can search
+    // and a name nobody knows. Arm a slot, then move the control in the plug-in's OWN window:
+    // the parameter that moved is the one you meant, and it never had to be named.
+    //
+    // The events were already flowing — PartParameterSync has always reported every change,
+    // because that is what drives the live readouts. All that was missing was remembering
+    // which ones moved and why.
+    juce::String parameterLearnPageId, parameterLearnSlotId;
+    /** Parameters CEditor itself wrote since the last drain. Excluded from "touched", because
+        a list of what you just dragged in CEditor answers a question nobody asked — the point
+        is what moved in the VENDOR's window. */
+    juce::StringArray parametersWrittenByUs;
+    /** Most recently touched first, per target. Capped: this is a shortcut to the handful you
+        were just working on, and a hundred of them is the list it exists to replace. */
+    std::map<juce::String, juce::StringArray> touchedParametersByTarget;
+    static constexpr int maxTouchedParameters = 12;
+
+    void emitParameterLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
+                             const juce::String& parameterId);
+
     juce::String midiActivityDevice, midiActivityText;
     // The controller behind the readout, when the message was one. The surface drawing lights
     // the knob you are turning, and it can only find it by matching the controller against

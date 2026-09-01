@@ -5339,6 +5339,189 @@ void testCustomArtwork()
     dir.deleteRecursively();
 }
 
+// Finding a parameter in a plug-in that has five hundred of them.
+//
+// A search box is the wrong shape for the problem: it asks you to know the name, and the
+// names in a big synth are long, compound and the vendor's. Two answers here, and both work
+// by NOT asking.
+//
+//   Learn.        Arm a slot, then move the control in the plug-in's own window. Whatever
+//                 moved is what you meant. The events were always flowing — PartParameterSync
+//                 reports every change because that is what drives the live readouts — so all
+//                 that was missing was noticing which ones were the user's hand.
+//   Favourites.   The dozen you reach for on this synth every time, marked once and kept per
+//                 CLASS, so they are there on the next part, the next session, the next rig.
+//
+// The refusal that makes learn trustworthy: CEditor's own writes must never count as a touch.
+// They arrive as exactly the same change event, and a shortlist full of whatever you last
+// dragged in CEditor answers a question nobody asked.
+void testParameterLearnAndFavourites()
+{
+    std::cout << "\nfinding a parameter without naming it" << std::endl;
+
+    const auto dir = freshDataDir ("param-learn");
+    seedTwoSynthCatalog (dir);
+
+    juce::String pageId, slotId, partId;
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+        auto* stub = h.lastStub;
+        h.cmd ("addControlPage", { { "name", "Learned" } });
+
+        const auto pages = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+        pageId = pages[0].getProperty ("pageId", {}).toString();
+        slotId = pages[0].getProperty ("slots", {})[0].getProperty ("slotId", {}).toString();
+
+        const auto slotBinding = [&h, &pageId] (const juce::String& wantedSlotId)
+        {
+            const auto pagesNow = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {});
+            for (int p = 0; p < pagesNow.size(); ++p)
+            {
+                if (pagesNow[p].getProperty ("pageId", {}).toString() != pageId)
+                    continue;
+                const auto slots = pagesNow[p].getProperty ("slots", {});
+                for (int i = 0; i < slots.size(); ++i)
+                    if (slots[i].getProperty ("slotId", {}).toString() == wantedSlotId)
+                        return slots[i].getProperty ("parameterId", {}).toString();
+            }
+            return juce::String();
+        };
+
+        check (slotBinding (slotId).isEmpty(), "the slot starts empty");
+
+        // Not armed: moving a control in the plug-in changes nothing about the slot.
+        stub->cutoff->setValueNotifyingHost (0.3f);
+        h.service->drainParameterEvents();
+        check (slotBinding (slotId).isEmpty(), "an unarmed slot ignores what the plug-in reports");
+
+        // Armed: the next thing that moves lands here, and it is the parameter that moved.
+        h.cmd ("learnControlSlotParameter", { { "pageId", pageId }, { "slotId", slotId } });
+        stub->wave->setValueNotifyingHost (1.0f);
+        h.service->drainParameterEvents();
+        check (slotBinding (slotId) == "wave",
+               "arming, then moving a control in the plug-in, binds THAT parameter");
+
+        // And it disarms: a second movement must not keep rewriting the slot.
+        stub->cutoff->setValueNotifyingHost (0.9f);
+        h.service->drainParameterEvents();
+        check (slotBinding (slotId) == "wave", "one movement, one binding — arming is spent");
+
+        // Cancelling.
+        const auto secondSlotId = h.emits.lastState()->getProperty ("rack", {})
+                                    .getProperty ("pages", {})[0].getProperty ("slots", {})[1]
+                                    .getProperty ("slotId", {}).toString();
+        h.cmd ("learnControlSlotParameter", { { "pageId", pageId }, { "slotId", secondSlotId } });
+        h.cmd ("cancelLearnControlSlotParameter");
+        stub->drive->setValueNotifyingHost (1.0f);
+        h.service->drainParameterEvents();
+        check (slotBinding (secondSlotId).isEmpty(), "a cancelled arm binds nothing");
+
+        h.emits.clear();
+        h.cmd ("learnControlSlotParameter", { { "pageId", pageId }, { "slotId", "no-such-slot" } });
+        check (h.emits.lastError().isNotEmpty(), "and an unknown slot is refused aloud");
+
+        // -- what the user last reached for --------------------------------------------------
+        const auto touchedIds = [&h, &partId]
+        {
+            juce::StringArray ids;
+            for (auto it = h.emits.entries.rbegin(); it != h.emits.entries.rend(); ++it)
+                if (it->name == "instrumentHostParamValues"
+                      && it->payload.getProperty ("partId", {}).toString() == partId)
+                {
+                    if (const auto* array = it->payload.getProperty ("touched", {}).getArray())
+                        for (const auto& id : *array)
+                            ids.add (id.toString());
+                    break;
+                }
+            return ids;
+        };
+
+        h.emits.clear();
+        stub->cutoff->setValueNotifyingHost (0.42f);
+        h.service->drainParameterEvents();
+        check (touchedIds()[0] == "cutoff", "the last thing moved in the plug-in is first");
+
+        h.emits.clear();
+        stub->drive->setValueNotifyingHost (0.0f);
+        h.service->drainParameterEvents();
+        check (touchedIds()[0] == "drive" && touchedIds().contains ("cutoff"),
+               "newest first, with what came before it still there");
+
+        // The refusal. A write CEditor made is not something the user reached for — so the
+        // list must come back completely unchanged, not merely in the same order. (`wave` is
+        // already on it, legitimately, from the learn above: asserting it is ABSENT would
+        // pass for the wrong reason on a fresh list and fail here for the right one.)
+        const auto before = touchedIds();
+        h.emits.clear();
+        h.cmd ("setParameter", { { "partId", partId }, { "id", "wave" }, { "value", 0.5 } });
+        h.service->drainParameterEvents();
+        check (touchedIds() == before,
+               "a parameter CEditor itself wrote does not disturb the list at all");
+        check (touchedIds()[0] == "drive", "what the user last reached for is still first");
+
+        // -- favourites -----------------------------------------------------------------------
+        const auto favourites = [&h]
+        {
+            juce::StringArray ids;
+            for (auto it = h.emits.entries.rbegin(); it != h.emits.entries.rend(); ++it)
+                if (it->name == "instrumentHostParameters")
+                {
+                    if (const auto* array = it->payload.getProperty ("favourites", {}).getArray())
+                        for (const auto& id : *array)
+                            ids.add (id.toString());
+                    break;
+                }
+            return ids;
+        };
+
+        h.cmd ("getParameters", { { "partId", partId } });
+        check (favourites().isEmpty(), "nothing is pinned until somebody pins it");
+
+        h.cmd ("toggleParameterFavourite", { { "partId", partId }, { "parameterId", "cutoff" } });
+        check (favourites() == juce::StringArray { "cutoff" }, "pinning one answers with it");
+        h.cmd ("toggleParameterFavourite", { { "partId", partId }, { "parameterId", "drive" } });
+        check (favourites() == juce::StringArray ({ "cutoff", "drive" }),
+               "and pinning keeps the order they were marked in");
+        h.cmd ("toggleParameterFavourite", { { "partId", partId }, { "parameterId", "cutoff" } });
+        check (favourites() == juce::StringArray { "drive" }, "the same click unpins");
+
+        h.emits.clear();
+        h.cmd ("toggleParameterFavourite", { { "partId", partId }, { "parameterId", "nonsense" } });
+        check (h.emits.lastError().isNotEmpty(), "a parameter this plug-in does not have is refused");
+    }
+
+    // Kept per CLASS, so they follow the plug-in rather than the part or the session. A fresh
+    // rack, a new part, the same synth: still pinned.
+    {
+        Harness restarted (dir);
+        restarted.cmd ("getState");
+        restarted.cmd ("addPart");
+        const auto freshPart = restarted.partIdAt (restarted.emits.lastState()
+                                 ->getProperty ("rack", {}).getProperty ("parts", {}).size() - 1);
+        restarted.cmd ("loadInstrument", { { "partId", freshPart }, { "ceId", "VST3-good-synth" } });
+        restarted.cmd ("getParameters", { { "partId", freshPart } });
+
+        juce::StringArray ids;
+        for (auto it = restarted.emits.entries.rbegin(); it != restarted.emits.entries.rend(); ++it)
+            if (it->name == "instrumentHostParameters")
+            {
+                if (const auto* array = it->payload.getProperty ("favourites", {}).getArray())
+                    for (const auto& id : *array)
+                        ids.add (id.toString());
+                break;
+            }
+        check (ids == juce::StringArray { "drive" },
+               "a pin survives a restart and follows the plug-in onto a different part");
+    }
+
+    dir.deleteRecursively();
+}
+
 void testScanFolderBrowseAndModuleProjection()
 {
     std::cout << "\nscan-folder browse and module projection" << std::endl;
@@ -5528,6 +5711,7 @@ int main (int argc, char* argv[])
     testEditorThumbnails();
     testCanvasPositions();
     testCustomArtwork();
+    testParameterLearnAndFavourites();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

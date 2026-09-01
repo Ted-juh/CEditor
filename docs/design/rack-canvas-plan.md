@@ -365,6 +365,40 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
 - Where do the control pages live in this picture — a node type, a dock tab, or unchanged?
 - How much of the CEditor panel-designer machinery can the dock reuse? The two problems rhyme.
 
+## Five hundred parameters
+
+A plug-in that exposes four or five hundred parameters breaks the parameter list in a way no
+amount of styling fixes: the search box asks you to know a name, and the names in a big synth
+are long, compound and the vendor's. Four attacks, added 2026-09-01, in the order they matter.
+
+**Point, don't type.** Arm a control slot with `grab`, then move the control you want in the
+plug-in's OWN window. Whatever moved is what you meant. It never had to be named, found or
+scrolled to. The events were already flowing — `PartParameterSync` reports every change
+because that is what drives the live readouts — so the only new thing is noticing which of
+them were the user's hand.
+
+*The refusal that makes it trustworthy:* a write CEditor itself made is never counted. It
+arrives as exactly the same change event, and a shortlist full of whatever you last dragged in
+CEditor answers a question nobody asked.
+
+**The shortlist, unasked for.** The same signal, without arming: the parameters last touched in
+the plug-in's window sit under RECENT above the groups. Tweak five things in the vendor GUI,
+switch to CEditor, and there they are.
+
+**Pinned, per plug-in CLASS.** You reach for the same dozen on the same synth whichever rack
+it is in today, so a pin lives beside the catalogue rather than in the Performance, and
+follows the plug-in onto the next part and the next session. A parameter that is both pinned
+and recent shows once, under PINNED — a pin is the stronger statement.
+
+**Fuzzy search.** It was substring, so "Filter 1 Cutoff" answered to "cut" and to nothing else.
+It is now a ranked subsequence match: "f1cut" and "fcut" both find it, a match at a word start
+beats one buried mid-name, and a shorter name wins a tie. `fuzzyScore` is where the ranking
+lives, and it is tested against the orders a person would expect rather than against itself.
+
+**Collapsed groups were already there** and are the fourth attack: the plug-in's own hierarchy,
+folded, so four hundred parameters read as a dozen headings. Checked before building anything
+on top of it.
+
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.

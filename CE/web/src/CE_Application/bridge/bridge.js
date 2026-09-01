@@ -1044,6 +1044,12 @@ export function onInstrumentHostMidiLearn(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function onInstrumentHostParamLearn(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParamLearn', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostArpStep(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostArpStep', callback);
