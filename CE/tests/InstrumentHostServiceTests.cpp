@@ -3842,6 +3842,57 @@ void testPadsAndFaders()
     }
 }
 
+// The command surface for one part driving another; the graph half lives in RackHostTests.
+void testMidiSourceCommands()
+{
+    std::cout << "\nmidi source commands" << std::endl;
+
+    const auto dir = freshDataDir ("midi-source");
+    seedTwoSynthCatalog (dir);
+    juce::String a, b;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("addPart");
+        a = h.firstPartId();
+        b = h.partIdAt (1);
+
+        const auto sourceOf = [&h] (int index)
+        {
+            return h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[index]
+                       .getProperty ("midiSourcePartId", "x").toString();
+        };
+        check (sourceOf (0).isEmpty() && sourceOf (1).isEmpty(), "parts start on the keyboard");
+
+        h.cmd ("setPartMidiSource", { { "partId", b }, { "sourcePartId", a } });
+        check (sourceOf (1) == a, "B takes its MIDI from A, and the state says so");
+
+        h.emits.clear();
+        h.cmd ("setPartMidiSource", { { "partId", a }, { "sourcePartId", b } });
+        check (h.emits.lastError().contains ("would loop"), "A from B is refused aloud");
+        h.emits.clear();
+        h.cmd ("setPartMidiSource", { { "partId", a }, { "sourcePartId", a } });
+        check (h.emits.lastError().contains ("from itself"), "and so is a part from itself");
+        h.emits.clear();
+        h.cmd ("setPartMidiSource", { { "partId", b }, { "sourcePartId", "ghost" } });
+        check (h.emits.lastError().contains ("Unknown rack part"), "and a source that does not exist");
+        h.cmd ("getState");
+        check (sourceOf (1) == a && sourceOf (0).isEmpty(), "none of which changed anything");
+    }
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        check (parts[1].getProperty ("midiSourcePartId", {}).toString() == a,
+               "who drives whom survives the process");
+        h.cmd ("setPartMidiSource", { { "partId", b }, { "sourcePartId", "" } });
+        check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[1]
+                   .getProperty ("midiSourcePartId", "x").toString().isEmpty(),
+               "and an empty source is the keyboard again");
+    }
+}
+
 // A MIDI module, added the way a person adds one, heard the way a person hears one.
 //
 // The six note modules are covered thoroughly in PerformanceEngineTests, which drives the
@@ -6587,6 +6638,7 @@ int main (int argc, char* argv[])
     testHardwareTotalRecall();
     testHardwarePatchesInTheLibrary();
     testPadsAndFaders();
+    testMidiSourceCommands();
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();

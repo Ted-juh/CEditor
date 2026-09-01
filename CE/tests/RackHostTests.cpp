@@ -450,6 +450,109 @@ void testUnloadAndRemove()
 // The stub effect it uses reports its latency AND incurs it. Against one that reports without
 // delaying — StubEffectProcessor, which is right for the amplitude tests it serves — the graph
 // would align paths that were never misaligned and this test would pass while proving nothing.
+// One part driving another: the destination takes the source's chain OUTPUT — after its
+// zone and its modules — and the source keeps playing its own instrument too.
+void testMidiRouting()
+{
+    std::cout << "\none part driving another" << std::endl;
+
+    Rig rig;
+    const auto a = rig.host.addPart();
+    const auto b = rig.host.addPart();
+    auto* stubA = rig.load (a);
+    auto* stubB = rig.load (b);
+
+    // A transposes up an octave. Routed through A, B must hear the SHIFTED note: that is the
+    // difference between "after A's chain" and "a copy of the keyboard".
+    PartMidiRules up;
+    up.transpose = 12;
+    rig.host.setMidiRules (a, up);
+
+    check (rig.host.setPartMidiSource (b, a), "B takes its MIDI from A");
+    check (rig.host.getPerformance().findPart (b)->midiSourcePartId == a, "and the document says so");
+
+    stubA->received.clear();
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubA->received.empty() && stubA->received.front().getNoteNumber() == 72,
+           "A still plays its own instrument, transposed");
+    check (! stubB->received.empty() && stubB->received.front().isNoteOn()
+             && stubB->received.front().getNoteNumber() == 72,
+           "and B hears A's output — the transposed note, not the keyboard's");
+    rig.noteOff (1, 60);
+    rig.process();
+    check (stubA->activeNotes == 0 && stubB->activeNotes == 0, "the release reaches both");
+
+    // B's own zone still applies to what arrives: one rule for notes, however they came.
+    PartMidiRules bass;
+    bass.keyHigh = 48;
+    rig.host.setMidiRules (b, bass);
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (stubB->received.empty(), "B's zone filters the routed note like a keyboard note");
+    rig.noteOff (1, 60);
+    rig.process();
+    rig.host.setMidiRules (b, {});
+
+    // Loops are refused at the model: A from B while B is from A, and a part from itself.
+    check (! rig.host.setPartMidiSource (a, b), "A from B would loop and is refused");
+    check (! rig.host.setPartMidiSource (a, a), "a part cannot take its MIDI from itself");
+    check (! rig.host.setPartMidiSource (b, "no-such-part"), "an unknown source is refused");
+    check (rig.host.getPerformance().findPart (a)->midiSourcePartId.isEmpty(), "and nothing changed");
+
+    // A chain of three: C from B from A. The keyboard reaches C through both.
+    const auto c = rig.host.addPart();
+    auto* stubC = rig.load (c);
+    check (rig.host.setPartMidiSource (c, b), "C from B");
+    check (! rig.host.setPartMidiSource (a, c), "A from C would close the loop through B");
+    stubC->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubC->received.empty() && stubC->received.front().getNoteNumber() == 72,
+           "C hears the note through B and A");
+    rig.noteOff (1, 60);
+    rig.process();
+
+    // Back to the keyboard: an empty source is the default feed again.
+    check (rig.host.setPartMidiSource (b, {}), "B back to the keyboard");
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubB->received.empty() && stubB->received.front().getNoteNumber() == 60,
+           "and hears the keyboard's note untransposed");
+    rig.noteOff (1, 60);
+    rig.process();
+
+    // Removing a source hands its dependents back to the keyboard, never wires them to nothing.
+    rig.host.setPartMidiSource (c, a);
+    rig.host.removePart (a);
+    check (rig.host.getPerformance().findPart (c)->midiSourcePartId.isEmpty(),
+           "C is back on the keyboard once A is gone");
+    stubC->received.clear();
+    rig.noteOn (1, 62);
+    rig.process();
+    check (! stubC->received.empty() && stubC->received.front().getNoteNumber() == 62,
+           "and plays");
+    rig.noteOff (1, 62);
+    rig.process();
+
+    // The routing survives a save and a load.
+    rig.host.setPartMidiSource (c, b);
+    const auto saved = rig.host.captureState().toVar();
+    Rig rig2;
+    const auto unresolved = rig2.host.loadModel ([&saved]
+    {
+        Performance restored;
+        Performance::fromVar (saved, restored);
+        return restored;
+    }());
+    check (rig2.host.getPerformance().findPart (c) != nullptr
+             && rig2.host.getPerformance().findPart (c)->midiSourcePartId == b,
+           "a restored rack keeps who drives whom");
+}
+
 void testLatencyCompensation()
 {
     std::cout << "\nplug-in delay compensation" << std::endl;
@@ -552,6 +655,7 @@ int main()
     testStateCaptureRestore();
     testWillBeRemovedHook();
     testUnloadAndRemove();
+    testMidiRouting();
     testLatencyCompensation();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;

@@ -146,6 +146,14 @@ struct RackPart
     // a session written before buses existed keeps its routing by saying nothing.
     juce::String destinationBusId;
 
+    // Where this part's MIDI comes from: empty is the keyboard, through the engine, exactly
+    // as it always was. Naming another part takes that part's chain OUTPUT instead — after
+    // its zone, its arpeggiator, its echo — so an arp on part 1 can play the Juno on part 3,
+    // and part 1 can keep playing its own instrument at the same time (the output fans out).
+    // The routed notes then go through THIS part's zone and chain like keyboard notes would:
+    // one rule for what arrives, whichever way it arrived. Loops are refused at the model.
+    juce::String midiSourcePartId;
+
     bool hardware = false;
     juce::String midiOutputId;
     juce::String midiOutputName;
@@ -364,6 +372,9 @@ struct Performance
     /** True when routing `busId` into `destinationId` would close a loop — including the
         bus into itself. Checked where the routing is made; the audio graph never discovers
         a cycle by walking into one. */
+    /** True when sourcing `partId` from `sourcePartId` would close a loop — the source is the
+        part itself, or already takes its MIDI, however indirectly, from the part. */
+    bool midiRoutingWouldLoop (const juce::String& partId, const juce::String& sourcePartId) const;
     bool busRoutingWouldLoop (const juce::String& busId, const juce::String& destinationId) const;
 
     /** The slot and (via chainIdOut) whose chain holds it — a partId, "master", or a

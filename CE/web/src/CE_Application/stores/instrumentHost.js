@@ -1146,6 +1146,24 @@ export function pluginTile(ceId, name = '', vendor = '') {
 // Which destinations a bus may actually take. The model refuses a routing that would close a
 // loop, and a UI that offers one anyway is just a refusal waiting to happen — so the same rule
 // lives here, in front of the drop targets AND the mixer's dropdowns.
+/** Would sourcing `partId` from `sourcePartId` close a loop — itself, or a part that already
+    takes its MIDI, however indirectly, from it? Mirrors Performance::midiRoutingWouldLoop, so
+    the picker can refuse the option before the native side has to. */
+export function midiSourceWouldLoop(rack, partId, sourcePartId) {
+  if (!partId || !sourcePartId) return false;              // the keyboard ends every chain
+  if (partId === sourcePartId) return true;
+  const byId = new Map((rack?.parts ?? []).map((p) => [p.partId, p]));
+  let at = sourcePartId;
+  for (let hops = 0; hops <= byId.size; hops += 1) {
+    const part = byId.get(at);
+    if (!part) return false;
+    if (part.midiSourcePartId === partId) return true;
+    at = part.midiSourcePartId ?? '';
+    if (!at) return false;
+  }
+  return true;
+}
+
 export function busDestinationWouldLoop(rack, busId, destinationBusId) {
   if (!busId || !destinationBusId) return false;          // the master ends every chain
   if (busId === destinationBusId) return true;
@@ -1581,6 +1599,8 @@ export function normalizeHostState(payload) {
         programBank: Number(part?.programBank ?? -1),
         programNumber: Number(part?.programNumber ?? -1),
         midiOutError: String(part?.midiOutError ?? ''),
+        // Where the part's MIDI comes from: '' is the keyboard, else another part's chain.
+        midiSourcePartId: String(part?.midiSourcePartId ?? ''),
         deviceProfileId: String(part?.deviceProfileId ?? ''),
         // Total recall: the name and size of the captured patch, never the patch. The bytes
         // are opaque manufacturer data of unbounded length — nothing here can read them, and
@@ -1787,6 +1807,9 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'removePart') {
     next.rack.parts = next.rack.parts.filter((p) => p.partId !== payload.partId);
+    // Dependents go back to the keyboard rather than staying wired to nothing.
+    for (const p of next.rack.parts)
+      if (p.midiSourcePartId === payload.partId) p.midiSourcePartId = '';
     if (next.rack.focusedPartId === payload.partId)
       next.rack.focusedPartId = next.rack.parts[0]?.partId ?? '';
     if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
@@ -2274,6 +2297,19 @@ export function applyMockCommand(state, payload) {
       }
       bus.destinationBusId = destination;
     }
+    return next;
+  }
+  if (cmd === 'setPartMidiSource') {
+    const target = part(payload.partId);
+    const sourceId = String(payload.sourcePartId ?? '');
+    if (!target || (sourceId && !part(sourceId))) return next;
+    if (midiSourceWouldLoop(next.rack, payload.partId, sourceId)) {
+      hostLastError.set(sourceId === payload.partId
+        ? 'A part cannot take its MIDI from itself.'
+        : 'That would loop — the source already takes its MIDI from this part.');
+      return next;
+    }
+    target.midiSourcePartId = sourceId;
     return next;
   }
   if (cmd === 'setPartDestination') {
@@ -3252,6 +3288,9 @@ export const renameBus = (busId, name) => send({ cmd: 'renameBus', busId, name }
 export const setBusLevel = (busId, level) => send({ cmd: 'setBusLevel', busId, level });
 export const setBusDestination = (busId, destinationBusId) =>
   send({ cmd: 'setBusDestination', busId, destinationBusId });
+/** One part driving another: '' hands the part back to the keyboard. */
+export const setPartMidiSource = (partId, sourcePartId) =>
+  send({ cmd: 'setPartMidiSource', partId, sourcePartId: sourcePartId ?? '' });
 export const setPartDestination = (partId, busId) =>
   send({ cmd: 'setPartDestination', partId, busId });
 export const setSendLevel = (partId, returnId, level) =>

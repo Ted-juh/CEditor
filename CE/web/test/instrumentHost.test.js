@@ -76,6 +76,7 @@ import {
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import {
   setHardwareConfig, captureHardwarePatch, finishHardwarePatchCapture, hostLastError,
+  midiSourceWouldLoop,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { get } from 'svelte/store';
 import {
@@ -1290,6 +1291,36 @@ test('hardware patches save to the library, load onto hardware parts and refuse 
   assert.equal(added.hardware, true, 'the new part is hardware');
   assert.equal(added.hardwarePatchName, 'Brass Pad');
   assert.equal(added.hasInstrument, false);
+});
+
+test('one part driving another: the source is a field, loops are refused, removal resets', () => {
+  let state = mockHostState();
+  const [a, b] = state.rack.parts.map((p) => p.partId);
+  assert.equal(state.rack.parts[0].midiSourcePartId, '', 'parts start on the keyboard');
+
+  state = applyMockCommand(state, { cmd: 'setPartMidiSource', partId: b, sourcePartId: a });
+  assert.equal(state.rack.parts[1].midiSourcePartId, a, 'B takes its MIDI from A');
+
+  assert.equal(midiSourceWouldLoop(state.rack, a, b), true, 'A from B would loop');
+  assert.equal(midiSourceWouldLoop(state.rack, a, a), true, 'a part from itself is the shortest loop');
+  assert.equal(midiSourceWouldLoop(state.rack, b, ''), false, 'the keyboard ends every chain');
+  hostLastError.set('');
+  state = applyMockCommand(state, { cmd: 'setPartMidiSource', partId: a, sourcePartId: b });
+  assert.equal(state.rack.parts[0].midiSourcePartId, '', 'and the loop is refused');
+  assert.match(get(hostLastError), /would loop/);
+
+  state = applyMockCommand(state, { cmd: 'addPart' });
+  const c = state.rack.parts[2].partId;
+  state = applyMockCommand(state, { cmd: 'setPartMidiSource', partId: c, sourcePartId: b });
+  assert.equal(midiSourceWouldLoop(state.rack, a, c), true, 'A from C loops through B');
+
+  state = applyMockCommand(state, { cmd: 'removePart', partId: a });
+  assert.equal(state.rack.parts.find((p) => p.partId === b).midiSourcePartId, '',
+    'removing A hands B back to the keyboard');
+  assert.equal(state.rack.parts.find((p) => p.partId === c).midiSourcePartId, b, 'and leaves C on B');
+
+  const normalized = normalizeHostState({ rack: { parts: [{ partId: 'x', midiSourcePartId: 'y' }] } });
+  assert.equal(normalized.rack.parts[0].midiSourcePartId, 'y', 'the field normalizes through');
 });
 
 test('mock reducer: explicit multi-output routes add, retune and remove', () => {

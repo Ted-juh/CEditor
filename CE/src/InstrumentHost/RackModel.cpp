@@ -239,6 +239,30 @@ bool Performance::busRoutingWouldLoop (const juce::String& busId,
     return true;
 }
 
+bool Performance::midiRoutingWouldLoop (const juce::String& partId, const juce::String& sourcePartId) const
+{
+    if (sourcePartId.isEmpty())
+        return false;                 // the keyboard ends every chain
+    if (sourcePartId == partId)
+        return true;                  // a part driving itself is the shortest loop there is
+
+    // Walk upstream from the proposed source, bounded by the number of parts: a longer walk
+    // than that has already revisited something.
+    auto at = sourcePartId;
+    for (int hops = 0; hops <= parts.size(); ++hops)
+    {
+        const auto* part = findPart (at);
+        if (part == nullptr)
+            return false;             // runs into a part that is gone, which is not a loop
+        if (part->midiSourcePartId == partId)
+            return true;
+        at = part->midiSourcePartId;
+        if (at.isEmpty())
+            return false;             // reached the keyboard
+    }
+    return true;
+}
+
 EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String* chainIdOut)
 {
     for (auto& part : parts)
@@ -361,6 +385,7 @@ juce::var Performance::toVar() const
         p->setProperty ("pan",              part.pan);
         p->setProperty ("editorOpen",       part.editorOpen);
         p->setProperty ("destinationBusId", part.destinationBusId);
+        p->setProperty ("midiSourcePartId", part.midiSourcePartId);
         p->setProperty ("lastPresetRecordId", part.lastPresetRecordId);
         p->setProperty ("lastPresetName",     part.lastPresetName);
         p->setProperty ("outputPair",       part.outputPair);
@@ -654,6 +679,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.pan        = floatOf (p, "pan", 0.0f, -1.0f, 1.0f);
         part.editorOpen = (bool) p.getProperty ("editorOpen", false);
         part.destinationBusId = p.getProperty ("destinationBusId", {}).toString();
+        part.midiSourcePartId = p.getProperty ("midiSourcePartId", {}).toString();
         part.lastPresetRecordId = p.getProperty ("lastPresetRecordId", {}).toString();
         part.lastPresetName     = p.getProperty ("lastPresetName", {}).toString();
         part.outputPair = intOf (p, "outputPair", 0, 0, 7);

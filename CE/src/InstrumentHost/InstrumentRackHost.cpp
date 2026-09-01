@@ -702,6 +702,21 @@ bool InstrumentRackHost::clearHardware (const juce::String& partId)
     return true;
 }
 
+bool InstrumentRackHost::setPartMidiSource (const juce::String& partId, const juce::String& sourcePartId)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+    if (sourcePartId.isNotEmpty() && model.findPart (sourcePartId) == nullptr)
+        return false;
+    if (model.midiRoutingWouldLoop (partId, sourcePartId))
+        return false;
+
+    part->midiSourcePartId = sourcePartId;
+    rewireAudio();
+    return true;
+}
+
 bool InstrumentRackHost::setHardwareMidiSink (const juce::String& partId, MidiSendProcessor::Sink sink)
 {
     auto* lp = findLive (partId);
@@ -1027,6 +1042,9 @@ bool InstrumentRackHost::removePart (const juce::String& partId)
 
     live.erase (partId);
     model.removePart (partId);
+    for (auto& other : model.parts)
+        if (other.midiSourcePartId == partId)
+            other.midiSourcePartId.clear();   // back to the keyboard, never wired to nothing
     applyMixerState();
     syncEngineBindings();   // slots follow document order, so removing one re-binds the rest
     rewireAudio();
@@ -1625,6 +1643,30 @@ void InstrumentRackHost::rewireAudio()
         const auto* part = model.findPart (partId);
         if (part == nullptr)
             continue;
+
+        // What feeds the part's filter: the keyboard through the engine, or another part's
+        // chain output. MIDI wires survive the audio drop-and-rebuild above, so this one is
+        // swapped by hand — every candidate feed removed, then the one that applies added.
+        // A source that is not live (its part gone mid-rebuild) or would loop falls back to
+        // the keyboard, which is the only feed that is always there.
+        graph.removeConnection ({ { engineNode->nodeID, midiChannel },
+                                  { lp.filterNode->nodeID, midiChannel } });
+        for (const auto& [otherId, other] : live)
+            if (otherId != partId)
+                graph.removeConnection ({ { other.filterNode->nodeID, midiChannel },
+                                          { lp.filterNode->nodeID, midiChannel } });
+
+        const LivePart* source = nullptr;
+        if (part->midiSourcePartId.isNotEmpty()
+            && ! model.midiRoutingWouldLoop (partId, part->midiSourcePartId))
+            source = findLive (part->midiSourcePartId);
+
+        if (source != nullptr && source->filterNode != nullptr)
+            graph.addConnection ({ { source->filterNode->nodeID, midiChannel },
+                                   { lp.filterNode->nodeID, midiChannel } });
+        else
+            graph.addConnection ({ { engineNode->nodeID, midiChannel },
+                                   { lp.filterNode->nodeID, midiChannel } });
 
         if (part->hardware)
         {

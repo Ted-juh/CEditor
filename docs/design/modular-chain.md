@@ -139,8 +139,17 @@ including the half-chance one where which notes sound is random.
 
 ## What this deliberately does not do
 
-- **No MIDI routing between parts.** A part's MIDI chain feeds that part's instrument. One part
-  driving another's is not built.
+- ~~**No MIDI routing between parts.** A part's MIDI chain feeds that part's instrument. One part
+  driving another's is not built.~~ **Built, 2026-09-01.** A part can take its MIDI from another
+  part's chain output instead of the keyboard (`midiSourcePartId`, `setPartMidiSource`): after
+  the source's zone, its arpeggiator, its echo — so an arp on part 1 plays the Juno on part 3,
+  and part 1 keeps playing its own instrument at the same time, because the output fans out.
+  The routed notes then go through the destination's own zone and chain exactly like keyboard
+  notes would: one rule for what arrives, whichever way it arrived. In the graph it is one
+  connection swapped — the destination's filter is fed by the source's filter instead of the
+  engine node — and the engine's staging for the destination is untouched, so its own clips
+  still play. Loops are refused at the model, the way bus loops are, and removing a source part
+  hands its dependents back to the keyboard rather than leaving them wired to nothing.
 - ~~**No latency compensation on buses.**~~ Wrong when written; the graph always did it. See
   above, and the test that pins it.
 - **A chain preset is a voice, not a mixer scene.** It does not carry the part's fader, pan, sends,

@@ -41,6 +41,7 @@
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
+    setPartMidiSource, midiSourceWouldLoop,
     captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
     clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
     hostPatchCapture, hostPatchSends, hostPatchPrompt,
@@ -1174,6 +1175,28 @@
         {/if}
         {:else if dockTab === 'midi'}
         {#if focusedPart}
+          <!-- Where the part's MIDI comes from. The keyboard, or another part's chain output
+               — after that part's zone, its arpeggiator, its echo — so an arp on one part can
+               play the synth on another, and the source keeps playing its own instrument
+               too. What arrives then goes through THIS part's zone and chain like keyboard
+               notes would. Loops are refused before they are offered. -->
+          <div class="midi-source" data-testid="host-midi-source">
+            <label>MIDI from
+              <select value={focusedPart.midiSourcePartId}
+                      onchange={(e) => setPartMidiSource(focusedPart.partId, e.currentTarget.value)}>
+                <option value="">Keyboard</option>
+                {#each parts.filter((p) => p.partId !== focusedPart.partId) as source (source.partId)}
+                  <option value={source.partId}
+                          disabled={midiSourceWouldLoop($hostState.rack, focusedPart.partId, source.partId)}>
+                    {partTitle(source)}{midiSourceWouldLoop($hostState.rack, focusedPart.partId, source.partId) ? ' (would loop)' : ''}
+                  </option>
+                {/each}
+              </select>
+            </label>
+            {#if focusedPart.midiSourcePartId}
+              <span class="dim">after that part's chain, then through this part's zone and chain</span>
+            {/if}
+          </div>
           <!-- The part's Stage 6 event chain: what shapes what arrives, and what replays it.
                Both are modes over the shared transport, which is why they live beside the zone
                rules rather than in a panel of their own. -->
@@ -2002,6 +2025,8 @@
     font-size: 11px;
   }
   .hw-send { display: flex; align-items: flex-end; }
+  .midi-source { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; padding-bottom: 6px; }
+  .midi-source label { display: flex; align-items: center; gap: 6px; }
   .hw-recall {
     display: flex;
     flex-direction: column;

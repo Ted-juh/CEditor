@@ -1821,6 +1821,32 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "setPartMidiSource")
+    {
+        // One part driving another: the destination takes the source's chain output instead
+        // of the keyboard. Refusals are the model's — a loop, or a part that is not there.
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto sourcePartId = payload.getProperty ("sourcePartId", {}).toString();
+        const auto& performance = rack.getPerformance();
+        if (performance.findPart (partId) == nullptr
+            || (sourcePartId.isNotEmpty() && performance.findPart (sourcePartId) == nullptr))
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        if (performance.midiRoutingWouldLoop (partId, sourcePartId))
+        {
+            emitError (sourcePartId == partId
+                         ? "A part cannot take its MIDI from itself."
+                         : "That would loop — the source already takes its MIDI from this part.");
+            return;
+        }
+        rack.setPartMidiSource (partId, sourcePartId);
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "sendHardwareProgram")
     {
         if (! rack.sendHardwareProgram (payload.getProperty ("partId", {}).toString()))
@@ -6444,6 +6470,7 @@ juce::var InstrumentHostService::buildStatePayload()
         obj->setProperty ("outputChannels", rack.instrumentOutputChannels (part.partId));
         obj->setProperty ("outputPair",     part.outputPair);
 
+        obj->setProperty ("midiSourcePartId", part.midiSourcePartId);
         obj->setProperty ("hardware", part.hardware);
         if (part.hardware)
         {

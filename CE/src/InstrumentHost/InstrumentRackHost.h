@@ -152,6 +152,10 @@ public:
     bool setHardwareConfig (const juce::String& partId, const HardwareConfig& config);
     /** Back to a software part: the sender and return wiring go; identity and zones stay. */
     bool clearHardware (const juce::String& partId);
+    /** Where the part's MIDI comes from: empty is the keyboard through the engine; another
+        part's id takes that part's chain output. Refused when it would loop, or names a part
+        that does not exist. */
+    bool setPartMidiSource (const juce::String& partId, const juce::String& sourcePartId);
     /** Hands the part's sender its device sink — empty disconnects. */
     bool setHardwareMidiSink (const juce::String& partId, MidiSendProcessor::Sink sink);
     /** Sends the configured bank select / program change through the sink, now. False when
