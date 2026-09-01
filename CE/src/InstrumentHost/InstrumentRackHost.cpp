@@ -250,6 +250,35 @@ bool InstrumentRackHost::moveEffectSlot (const juce::String& effectId, int newIn
     return true;
 }
 
+bool InstrumentRackHost::setCanvasPosition (const juce::String& nodeId, int x, int y)
+{
+    const auto isNode = nodeId == "@master"
+                          || model.findPart (nodeId) != nullptr
+                          || model.findBus (nodeId) != nullptr
+                          || model.findReturn (nodeId) != nullptr;
+    if (! isNode)
+        return false;
+
+    const auto clampedX = juce::jlimit (0, 100000, x);
+    const auto clampedY = juce::jlimit (0, 100000, y);
+
+    for (auto& position : model.canvasPositions)
+        if (position.nodeId == nodeId)
+        {
+            position.x = clampedX;
+            position.y = clampedY;
+            return true;
+        }
+
+    model.canvasPositions.add ({ nodeId, clampedX, clampedY });
+    return true;
+}
+
+void InstrumentRackHost::clearCanvasPositions()
+{
+    model.canvasPositions.clear();
+}
+
 bool InstrumentRackHost::setMasterLevel (float level)
 {
     model.masterLevel = juce::jlimit (0.0f, 2.0f, level);

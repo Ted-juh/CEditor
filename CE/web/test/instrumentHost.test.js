@@ -536,6 +536,39 @@ test('rackCanvasLayout reserves the slot a new part would land in', () => {
     'with nothing in the rack the slot sits on the top row, level with the master');
 });
 
+test('rackCanvasLayout keeps a box where it was put, and lays out the rest', () => {
+  const rack = canvasRack();
+  rack.canvasPositions = [{ nodeId: 'p2', x: 640, y: 410 }];
+  const layout = rackCanvasLayout(rack);
+
+  const p2 = nodeOf(layout, 'p2');
+  assert.equal(p2.x, 640, 'a placed box sits exactly where it was dropped');
+  assert.equal(p2.y, 410);
+  assert.equal(p2.placed, true, 'and is marked so, which is what offers the reset');
+
+  // The column is a fact about the SIGNAL, not about the picture, so moving a box must not
+  // change it — a wire's shape and whether it counts as a skipping run both read it, and
+  // taking it from the hand position would redraw the cabling every time a box was nudged.
+  assert.equal(p2.column, 0, 'the column still follows the routing, not the position');
+  assert.equal(nodeOf(layout, 'p1').placed, false, 'an untouched box is still laid out');
+  assert.equal(nodeOf(layout, 'p1').x, rackCanvasLayout(canvasRack()).nodes[0].x,
+    'and lands exactly where it did before anything was moved');
+
+  // Returns are placed from the same list, band or no band.
+  rack.canvasPositions = [{ nodeId: 'r1', x: 12, y: 900 }];
+  const withReturn = rackCanvasLayout(rack);
+  assert.equal(nodeOf(withReturn, 'r1').x, 12, 'a return honours a hand position too');
+  assert.equal(nodeOf(withReturn, 'r1').y, 900);
+
+  // Garbage in the list is ignored rather than believed: a session is worth more than a box.
+  const junk = rackCanvasLayout({ ...canvasRack(), canvasPositions: [{ nodeId: '', x: 1, y: 2 }, null] });
+  assert.equal(nodeOf(junk, 'p1').placed, false, 'a nameless position places nothing');
+
+  // A position for something that no longer exists is simply never applied.
+  const stale = rackCanvasLayout({ ...canvasRack(), canvasPositions: [{ nodeId: 'gone', x: 5, y: 5 }] });
+  assert.ok(stale.nodes.every((n) => !n.placed), 'a stale position moves nothing');
+});
+
 test('rackCanvasLayout draws where the signal actually goes', () => {
   const layout = rackCanvasLayout(canvasRack());
   assert.ok(wireOf(layout, 'p1', '@master'), 'a part naming no bus reaches the master itself');

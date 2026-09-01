@@ -226,6 +226,24 @@ struct Macro
     juce::Array<ControlBinding> targets;
 };
 
+/** Where the user dragged one box on the rack canvas.
+
+    A side table on the Performance rather than an x/y on RackPart, BusChain and ReturnChain,
+    because a canvas node is not a model object: the master has a box and no struct, and every
+    one of those three would otherwise carry two fields that the engine, the exporter and the
+    parameter model all have to ignore. One list, one node-id vocabulary — the same ids the
+    canvas already uses for routing drops ("@master" included).
+
+    Positions are a preference, never a requirement. A node with no entry is auto-laid-out, so
+    a session written before this existed opens exactly as it did, and clearing the list is a
+    complete undo. Entries for nodes that no longer exist are dropped on save. */
+struct CanvasNodePosition
+{
+    juce::String nodeId;              // partId, busId, returnId, or "@master"
+    int x = 0;
+    int y = 0;
+};
+
 struct Performance
 {
     /** The manifest's own version (Stage 6, §18.8.12). 1 is everything up to Stage 5, which
@@ -243,6 +261,9 @@ struct Performance
     juce::Array<BusChain> buses;             // group buses parts route INTO (Stage 8)
     juce::Array<Macro> macros;
     juce::Array<ControlPage> pages;
+    /** Hand-placed canvas boxes; anything absent is laid out automatically (Stage 5 of the
+        rack-canvas plan). Purely a drawing concern — nothing downstream reads it. */
+    juce::Array<CanvasNodePosition> canvasPositions;
 
     // -- the Stage 6 performance system -------------------------------------------------
     /** Master level, 0..2 linear (Stage 7): the one Performance-wide control the generated

@@ -5027,6 +5027,138 @@ void testEditorThumbnails()
     dir.deleteRecursively();
 }
 
+// Hand-placed canvas boxes: a preference that survives a restart and never costs a session.
+//
+// The three failures worth guarding. A position that does not survive the save is a feature
+// the user does once and never again. A position for a node that has gone sits in the file
+// for ever and eventually lands on whatever inherits the id — a brand-new part appearing
+// somewhere nobody put it. And a malformed position must never refuse the session: losing a
+// rig because a coordinate was a string would be an absurd trade for a drawing preference.
+void testCanvasPositions()
+{
+    std::cout << "\ncanvas positions" << std::endl;
+
+    const auto dir = freshDataDir ("canvas-positions");
+    seedTwoSynthCatalog (dir);
+
+    juce::String keptPartId, doomedPartId;
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("addPart");
+        keptPartId   = h.partIdAt (0);
+        doomedPartId = h.partIdAt (1);
+
+        const auto positionsOf = [] (const juce::var* state)
+        {
+            return state->getProperty ("rack", {}).getProperty ("canvasPositions", {});
+        };
+
+        check (positionsOf (h.emits.lastState()).size() == 0,
+               "nothing is placed until somebody places it — the canvas lays itself out");
+
+        h.cmd ("setCanvasPosition", { { "nodeId", keptPartId }, { "x", 640 }, { "y", 410 } });
+        auto placed = positionsOf (h.emits.lastState());
+        check (placed.size() == 1
+                 && placed[0].getProperty ("nodeId", {}).toString() == keptPartId
+                 && (int) placed[0].getProperty ("x", 0) == 640
+                 && (int) placed[0].getProperty ("y", 0) == 410,
+               "a placed box is in the state the drawing reads");
+
+        h.cmd ("setCanvasPosition", { { "nodeId", keptPartId }, { "x", 12 }, { "y", 34 } });
+        placed = positionsOf (h.emits.lastState());
+        check (placed.size() == 1 && (int) placed[0].getProperty ("x", 0) == 12,
+               "moving it again replaces its position rather than adding a second one");
+
+        // Every kind of node has a box, including the one with no struct of its own.
+        h.cmd ("setCanvasPosition", { { "nodeId", "@master" }, { "x", 900 }, { "y", 20 } });
+        h.cmd ("addReturn");
+        const auto returnId = h.emits.lastState()->getProperty ("rack", {})
+                                .getProperty ("returns", {})[0].getProperty ("returnId", {}).toString();
+        h.cmd ("setCanvasPosition", { { "nodeId", returnId }, { "x", 40 }, { "y", 700 } });
+        check (positionsOf (h.emits.lastState()).size() == 3,
+               "the master and a return are boxes too, and place like any other");
+
+        h.cmd ("setCanvasPosition", { { "nodeId", doomedPartId }, { "x", 200 }, { "y", 200 } });
+        check (positionsOf (h.emits.lastState()).size() == 4, "and the second part");
+
+        // Refusals: an id that is not a node would be a position for something undrawable.
+        h.emits.clear();
+        h.cmd ("setCanvasPosition", { { "nodeId", "no-such-node" }, { "x", 1 }, { "y", 1 } });
+        check (h.emits.lastError().isNotEmpty(), "an id that is not a node is refused aloud");
+
+        // A negative coordinate draws the box outside its own container, where it can never
+        // be reached again — clamped rather than refused, because it is still an intention.
+        h.cmd ("setCanvasPosition", { { "nodeId", keptPartId }, { "x", -500 }, { "y", -500 } });
+        for (const auto& entry : *positionsOf (h.emits.lastState()).getArray())
+            if (entry.getProperty ("nodeId", {}).toString() == keptPartId)
+                check ((int) entry.getProperty ("x", -1) == 0 && (int) entry.getProperty ("y", -1) == 0,
+                       "a negative position is clamped to the canvas rather than lost off it");
+
+        h.cmd ("setCanvasPosition", { { "nodeId", keptPartId }, { "x", 12 }, { "y", 34 } });
+        h.cmd ("removePart", { { "partId", doomedPartId } });
+    }
+
+    // The restart is the whole point: a layout you have to redo every session is not a layout.
+    {
+        Harness restarted (dir);
+        restarted.cmd ("getState");
+        const auto placed = restarted.emits.lastState()->getProperty ("rack", {})
+                              .getProperty ("canvasPositions", {});
+
+        juce::StringArray survivors;
+        for (int i = 0; i < placed.size(); ++i)
+            survivors.add (placed[i].getProperty ("nodeId", {}).toString());
+
+        check (survivors.contains (keptPartId), "a placed box is where you left it after a restart");
+        check (survivors.contains ("@master"), "and so is the master");
+        check (! survivors.contains (doomedPartId),
+               "but the removed part's position is gone, not waiting to land on its successor");
+
+        for (int i = 0; i < placed.size(); ++i)
+            if (placed[i].getProperty ("nodeId", {}).toString() == keptPartId)
+                check ((int) placed[i].getProperty ("x", 0) == 12
+                         && (int) placed[i].getProperty ("y", 0) == 34,
+                       "with the coordinates it was given");
+
+        restarted.cmd ("clearCanvasPositions");
+        check (restarted.emits.lastState()->getProperty ("rack", {})
+                 .getProperty ("canvasPositions", {}).size() == 0,
+               "and one command puts every box back to being laid out for you");
+    }
+
+    // A malformed position is skipped; the session it is in still opens.
+    {
+        const auto file = dir.getChildFile ("session-performance.json");
+        auto stored = juce::JSON::parse (file.loadFileAsString());
+        juce::Array<juce::var> junk;
+        auto* bad = new juce::DynamicObject();
+        bad->setProperty ("nodeId", "");
+        bad->setProperty ("x", "not a number");
+        junk.add (juce::var (bad));
+        auto* good = new juce::DynamicObject();
+        good->setProperty ("nodeId", keptPartId);
+        good->setProperty ("x", 77);
+        good->setProperty ("y", 88);
+        junk.add (juce::var (good));
+        stored.getDynamicObject()->setProperty ("canvasPositions", junk);
+        file.replaceWithText (juce::JSON::toString (stored));
+
+        Harness recovered (dir);
+        recovered.cmd ("getState");
+        const auto* state = recovered.emits.lastState();
+        check (state->getProperty ("rack", {}).getProperty ("parts", {}).size() > 0,
+               "a session with a broken position still opens, rack and all");
+        const auto placed = state->getProperty ("rack", {}).getProperty ("canvasPositions", {});
+        check (placed.size() == 1 && (int) placed[0].getProperty ("x", 0) == 77,
+               "the broken entry is dropped and the good one beside it is kept");
+    }
+
+    dir.deleteRecursively();
+}
+
 void testScanFolderBrowseAndModuleProjection()
 {
     std::cout << "\nscan-folder browse and module projection" << std::endl;
@@ -5214,6 +5346,7 @@ int main (int argc, char* argv[])
     testScanFolderBrowseAndModuleProjection();
     testPluginSnapshots();
     testEditorThumbnails();
+    testCanvasPositions();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

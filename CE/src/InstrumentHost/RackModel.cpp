@@ -499,6 +499,28 @@ juce::var Performance::toVar() const
     for (const auto& scene : scenes)
         sceneVars.add (perf::sceneToVar (scene));
 
+    // Written last of the lists so the prune below can see every live id. A position whose
+    // node has gone is dropped rather than kept: a stale entry is invisible until the id is
+    // reused, at which point a brand-new part appears somewhere the user never put it.
+    juce::Array<juce::var> positionVars;
+    {
+        juce::StringArray liveIds { "@master" };
+        for (const auto& part : parts)     liveIds.add (part.partId);
+        for (const auto& bus : buses)      liveIds.add (bus.busId);
+        for (const auto& chain : returns)  liveIds.add (chain.returnId);
+
+        for (const auto& position : canvasPositions)
+            if (liveIds.contains (position.nodeId))
+            {
+                auto* c = new juce::DynamicObject();
+                c->setProperty ("nodeId", position.nodeId);
+                c->setProperty ("x",      position.x);
+                c->setProperty ("y",      position.y);
+                positionVars.add (juce::var (c));
+            }
+    }
+
+    root->setProperty ("canvasPositions", positionVars);
     root->setProperty ("schemaVersion", currentSchemaVersion);
     root->setProperty ("masterLevel",   masterLevel);
     root->setProperty ("outputPairs",   outputPairs);
@@ -849,6 +871,28 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
 
     if (! perf::setlistFromVar (stored.getProperty ("setlist", {}), parsed.setlist))
         return false;
+
+    // Canvas positions are a preference, so a malformed one is skipped rather than refusing
+    // the whole session: losing a rig because a box's coordinate was a string would be an
+    // absurd trade. An absent list is the pre-Stage-5 document, which auto-lays-out as it
+    // always did — the repo's habit of migrating by construction rather than by version.
+    if (const auto* positionArray = stored.getProperty ("canvasPositions", {}).getArray())
+    {
+        juce::StringArray seenNodeIds;
+        for (const auto& c : *positionArray)
+        {
+            CanvasNodePosition position;
+            position.nodeId = c.getProperty ("nodeId", {}).toString();
+
+            if (position.nodeId.isEmpty() || seenNodeIds.contains (position.nodeId))
+                continue;
+
+            seenNodeIds.add (position.nodeId);
+            position.x = intOf (c, "x", 0, 0, 100000);
+            position.y = intOf (c, "y", 0, 0, 100000);
+            parsed.canvasPositions.add (position);
+        }
+    }
 
     out = std::move (parsed);
     return true;

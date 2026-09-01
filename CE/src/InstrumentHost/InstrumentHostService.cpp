@@ -258,6 +258,34 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // Where the user put a box on the rack canvas. Refused for an id that is not a node: an
+    // unknown id would be a position for something that cannot be drawn, kept in the session
+    // for ever, and eventually applied to whatever inherits the id.
+    if (cmd == "setCanvasPosition")
+    {
+        if (! rack.setCanvasPosition (payload.getProperty ("nodeId", {}).toString(),
+                                      (int) payload.getProperty ("x", 0),
+                                      (int) payload.getProperty ("y", 0)))
+        {
+            emitError ("Unknown canvas node.");
+            return;
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    // The complete undo: every box goes back to being laid out for you. One command rather
+    // than a position-per-node reset, because "put it back the way it was" is one intention.
+    if (cmd == "clearCanvasPositions")
+    {
+        rack.clearCanvasPositions();
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "movePart")
     {
         if (! rack.movePart (payload.getProperty ("partId", {}).toString(),
@@ -5442,6 +5470,18 @@ juce::var InstrumentHostService::buildStatePayload()
     rackObj->setProperty ("buses", buses);
     rackObj->setProperty ("macros", macros);
     rackObj->setProperty ("pages", pages);
+    {
+        juce::Array<juce::var> canvasPositions;
+        for (const auto& position : performance.canvasPositions)
+        {
+            auto* c = new juce::DynamicObject();
+            c->setProperty ("nodeId", position.nodeId);
+            c->setProperty ("x",      position.x);
+            c->setProperty ("y",      position.y);
+            canvasPositions.add (juce::var (c));
+        }
+        rackObj->setProperty ("canvasPositions", canvasPositions);
+    }
     rackObj->setProperty ("masterLatencyMs", rack.masterLatencySamples()
                                                / rack.getSampleRate() * 1000.0);
 

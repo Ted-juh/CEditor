@@ -19,6 +19,7 @@
   import {
     hostState, focusRackPart, loadInstrument, addEffect, setPartDestination, setBusDestination,
     rackCanvasLayout, canvasDropTargets, hostCanvasDrag, CANVAS_NODE_W, CANVAS_NODE_H,
+    setCanvasPosition, clearCanvasPositions,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
 
@@ -28,8 +29,18 @@
   // every dragover: the answer only changes when the payload does.
   let targets = $derived(new Set(canvasDropTargets($hostState.rack, $hostCanvasDrag)));
   let hovered = $state('');
+  // Offered only when there is something to undo — a button that always says "reset" invites
+  // the question of what it would reset when nothing has been moved.
+  let placedCount = $derived(layout.nodes.filter((n) => n.placed).length);
 
   const fromCatalogue = (kind) => kind === 'instrument' || kind === 'effect';
+  // Every box can be picked up and put somewhere, which is why they are all draggable now.
+  // Only a part or a bus has a DESTINATION to change, and that is what lets the two gestures
+  // share one drag with no modifier key: a drop on another box is routing, a drop on empty
+  // canvas is placing. A return or the master has no destination, so for those the drag only
+  // ever means "put it here" — canvasDropTargets returns nothing for them and no box lights.
+  const isNodeDrag = (kind) => kind === 'part' || kind === 'bus'
+                               || kind === 'return' || kind === 'master';
 
   const editedIn = {
     part: 'Drag onto a bus or the master to route it · drop an effect here to insert it',
@@ -38,8 +49,13 @@
     master: 'Master chain — drop an effect here; it also lives in the dock’s Rack tab',
   };
 
+  // Where inside the box the drag started. Without it the box jumps so its top-left corner
+  // lands under the pointer, which looks like the drop went somewhere you did not aim.
+  let grabOffset = { x: 0, y: 0 };
+
   function dragStart(event, node) {
-    if (node.kind !== 'part' && node.kind !== 'bus') return;
+    const box = event.currentTarget.getBoundingClientRect();
+    grabOffset = { x: event.clientX - box.left, y: event.clientY - box.top };
     hostCanvasDrag.set({ kind: node.kind, id: node.id, label: node.title });
     // A payload is still set for anything outside this component that may want it; the store
     // above is what THIS component reads, for the dragover reason.
@@ -84,20 +100,37 @@
   let newPartHot = $state(false);
   const draggingInstrument = $derived($hostCanvasDrag.kind === 'instrument');
 
-  function newPartOver(event) {
-    if (!draggingInstrument) return;
+  // Empty canvas takes two different drops, told apart by what is in flight rather than by a
+  // modifier key: an instrument from the browser becomes a new part, and a box already on the
+  // canvas is simply placed where you let go of it.
+  function canvasOver(event) {
+    const kind = $hostCanvasDrag.kind;
+    if (!draggingInstrument && !isNodeDrag(kind)) return;
     // A node under the pointer owns the drop. Without this the empty-canvas zone would
     // compete with the box you were actually aiming at, since the boxes sit inside it.
     if (event.target.closest?.('.node')) { newPartHot = false; return; }
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    newPartHot = true;
+    if (event.dataTransfer) event.dataTransfer.dropEffect = draggingInstrument ? 'copy' : 'move';
+    newPartHot = draggingInstrument;
   }
 
-  function newPartDrop(event) {
-    if (!draggingInstrument || event.target.closest?.('.node')) return;
+  function canvasDrop(event) {
+    const drag = $hostCanvasDrag;
+    if (event.target.closest?.('.node')) return;
+    if (!draggingInstrument && !isNodeDrag(drag.kind)) return;
     event.preventDefault();
-    loadInstrument('', $hostCanvasDrag.id);
+
+    if (draggingInstrument) {
+      loadInstrument('', drag.id);
+    } else {
+      // The canvas scrolls, so the drop point is measured against the canvas element itself,
+      // never the viewport. Clamped at zero because a box at a negative coordinate is drawn
+      // outside its own container and cannot be reached again.
+      const box = event.currentTarget.getBoundingClientRect();
+      setCanvasPosition(drag.id,
+                        Math.max(0, event.clientX - box.left - grabOffset.x),
+                        Math.max(0, event.clientY - box.top - grabOffset.y));
+    }
     dragEnd();
   }
 
@@ -120,8 +153,8 @@
 <div class="canvas-scroll" data-testid="host-rack-canvas">
   <div class="canvas" style={`width:${layout.width}px;height:${layout.height}px`}
        role="presentation"
-       ondragover={newPartOver}
-       ondrop={newPartDrop}>
+       ondragover={canvasOver}
+       ondrop={canvasDrop}>
     <svg class="wires" width={layout.width} height={layout.height} aria-hidden="true">
       {#each layout.wires as wire (wire.kind + wire.from + wire.to)}
         <path d={wire.d} class={wire.kind} data-from={wire.from} data-to={wire.to} />
@@ -142,7 +175,7 @@
                       data-testid={`canvas-node-${node.id}`}
                       title={label}
                       aria-label={label}
-                      draggable={node.kind === 'part' || node.kind === 'bus'}
+                      draggable="true"
                       style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}
                       ondragstart={(e) => dragStart(e, node)}
                       ondragend={dragEnd}
@@ -184,17 +217,31 @@
         Dropping <strong>{$hostCanvasDrag.label}</strong> — onto a part to replace it, or anywhere
         empty for a new one.
       {:else if $hostCanvasDrag.kind}
-        Dropping <strong>{$hostCanvasDrag.label}</strong> — only the lit boxes will take it.
+        Dropping <strong>{$hostCanvasDrag.label}</strong> — onto a lit box to route it there, or
+        anywhere empty to leave it where you drop it.
       {:else}
-        Drag a part or bus onto its destination · drag an instrument or effect here from the right.
+        Drag a box onto its destination to route it, or onto empty space to place it · drag an
+        instrument or effect here from the right.
       {/if}
     </span>
+    {#if placedCount > 0}
+      <button type="button" class="reset-layout" data-testid="canvas-reset-layout"
+              title="Forget every hand-placed box and lay the canvas out again"
+              onclick={() => clearCanvasPositions()}>
+        Reset layout ({placedCount})
+      </button>
+    {/if}
   </div>
 </div>
 
 <style>
   .canvas-scroll { flex: 1; min-height: 0; overflow: auto; }
-  .canvas { position: relative; }
+  /* The canvas shrink-wraps its boxes, which made "drop on empty space" a promise it could
+     barely keep: on a small rack the element was a couple of hundred pixels tall and the
+     apparently-empty area below it belonged to the scroller, not the canvas, so a drop there
+     silently did nothing. Filling the viewport makes the empty space you can see the empty
+     space you can use. */
+  .canvas { position: relative; min-width: 100%; min-height: 100%; }
   .wires { position: absolute; inset: 0; pointer-events: none; }
   .wires path { fill: none; stroke-width: 1.5px; }
   .wires path.audio { stroke: #5b9bd5; }
@@ -216,6 +263,19 @@
     text-align: left;
     overflow: hidden;
   }
+  .reset-layout {
+    margin-left: auto;
+    padding: 2px 8px;
+    border: 1px solid #3b4652;
+    border-radius: 4px;
+    background: #20262c;
+    color: #a8b4c0;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .reset-layout:hover { border-color: #5b9bd5; color: #d6dbe0; }
+
   .node.new-part {
     border-style: dashed;
     border-color: #4a5a6a;

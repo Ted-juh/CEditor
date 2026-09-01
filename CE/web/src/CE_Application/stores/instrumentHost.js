@@ -487,7 +487,7 @@ export function emptyHostState() {
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
-            macros: [], pages: [], masterLatencyMs: 0 },
+            macros: [], pages: [], canvasPositions: [], masterLatencyMs: 0 },
     performance: emptyPerformance(),
     product: emptyProduct(),
     reliability: emptyReliability(),
@@ -1107,6 +1107,13 @@ export function rackCanvasLayout(rack) {
       focused: false },
   ];
 
+  // A box the user placed by hand keeps the place they put it; everything else is laid out.
+  // Mixing the two on purpose: auto-layout stays useful for the boxes you never touched, and
+  // a partly-arranged canvas is the normal state rather than an unsupported one.
+  const placed = new Map((Array.isArray(rack?.canvasPositions) ? rack.canvasPositions : [])
+    .filter((c) => c && c.nodeId)
+    .map((c) => [c.nodeId, { x: Number(c.x) || 0, y: Number(c.y) || 0 }]));
+
   // Returns sit in a band of their own under the main flow: they take a COPY of a part rather
   // than carrying it, and drawing them in line would say the signal goes through them.
   const columnFill = new Map();
@@ -1117,8 +1124,14 @@ export function rackCanvasLayout(rack) {
     const row = columnFill.get(column) ?? 0;
     columnFill.set(column, row + 1);
     node.column = column;
-    node.x = columnX(column);
-    node.y = CANVAS_PAD + row * (CANVAS_NODE_H + CANVAS_GAP_Y);
+    // The COLUMN stays computed even for a placed node. It is what decides a wire's shape and
+    // whether a run counts as skipping — those are facts about the signal, not about where
+    // the box was dragged, and taking them from a hand position would redraw the cabling
+    // every time somebody nudged a box.
+    const hand = placed.get(node.id);
+    node.placed = hand !== undefined;
+    node.x = hand ? hand.x : columnX(column);
+    node.y = hand ? hand.y : CANVAS_PAD + row * (CANVAS_NODE_H + CANVAS_GAP_Y);
     mainRows.push(row);
   }
   const mainBottom = CANVAS_PAD + (Math.max(0, ...mainRows, 0) + 1) * (CANVAS_NODE_H + CANVAS_GAP_Y);
@@ -1189,8 +1202,10 @@ export function rackCanvasLayout(rack) {
   const channelBottom = mainBottom + (lanes > 0 ? 6 + lanes * CANVAS_LANE_H : 0);
   returns.forEach((ret, index) => {
     const node = nodeById.get(ret.returnId);
-    node.x = columnX(node.column);
-    node.y = channelBottom + CANVAS_BAND_GAP + index * (CANVAS_NODE_H + CANVAS_GAP_Y);
+    const hand = placed.get(node.id);
+    node.placed = hand !== undefined;
+    node.x = hand ? hand.x : columnX(node.column);
+    node.y = hand ? hand.y : channelBottom + CANVAS_BAND_GAP + index * (CANVAS_NODE_H + CANVAS_GAP_Y);
   });
 
   const wires = links.map((link) => ({
@@ -1269,6 +1284,13 @@ export function normalizeHostState(payload) {
     licence: normalizeLicence(p.licence),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
+      // Hand-placed canvas boxes. Anything absent is laid out automatically, so a session
+      // from before this existed opens exactly as it did.
+      canvasPositions: (Array.isArray(rack.canvasPositions) ? rack.canvasPositions : []).map((c) => ({
+        nodeId: String(c?.nodeId ?? ''),
+        x: Number(c?.x ?? 0),
+        y: Number(c?.y ?? 0),
+      })).filter((c) => c.nodeId && Number.isFinite(c.x) && Number.isFinite(c.y)),
       focusedPartId: String(rack.focusedPartId ?? ''),
       masterLatencyMs: Number(rack.masterLatencyMs ?? 0),
       masterEffects: (Array.isArray(rack.masterEffects) ? rack.masterEffects : []).map(normalizeEffectSlot),
@@ -1525,6 +1547,16 @@ export function applyMockCommand(state, payload) {
   const next = normalizeHostState(state);
   const part = (id) => next.rack.parts.find((p) => p.partId === id);
 
+  if (cmd === 'setCanvasPosition') {
+    const positions = next.rack.canvasPositions.filter((c) => c.nodeId !== payload.nodeId);
+    positions.push({ nodeId: String(payload.nodeId), x: Number(payload.x) || 0, y: Number(payload.y) || 0 });
+    next.rack.canvasPositions = positions;
+    return next;
+  }
+  if (cmd === 'clearCanvasPositions') {
+    next.rack.canvasPositions = [];
+    return next;
+  }
   if (cmd === 'addPart') {
     const partId = `mock-part-${Date.now()}-${next.rack.parts.length + 1}`;
     // A new part starts with the same two modules the native side mints, both idle.
@@ -2723,6 +2755,9 @@ export const endParameterGesture = (partId, id) => send({ cmd: 'endParameterGest
 export const addEffect = (chainId, ceId) => send({ cmd: 'addEffect', chainId, ceId });
 export const removeEffect = (effectId) => send({ cmd: 'removeEffect', effectId });
 export const moveEffect = (effectId, index) => send({ cmd: 'moveEffect', effectId, index });
+export const setCanvasPosition = (nodeId, x, y) =>
+  send({ cmd: 'setCanvasPosition', nodeId, x: Math.round(x), y: Math.round(y) });
+export const clearCanvasPositions = () => send({ cmd: 'clearCanvasPositions' });
 export const setEffectBypassed = (effectId, bypassed) => send({ cmd: 'setEffectBypassed', effectId, bypassed });
 export const openEffectEditor = (effectId) => send({ cmd: 'openEffectEditor', effectId });
 export const addReturn = (name) => send(name ? { cmd: 'addReturn', name } : { cmd: 'addReturn' });

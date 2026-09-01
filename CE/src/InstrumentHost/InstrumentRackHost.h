@@ -225,6 +225,15 @@ public:
     bool setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                             const juce::String& name);
 
+    /** Records where a canvas box was dropped, or moves the one already recorded. Refuses an
+        id that is not a node — "@master", a part, a bus or a return — because a position for
+        something that cannot be drawn would sit in the session for ever and eventually land
+        on whatever inherits the id. Pure presentation: nothing in the graph changes. */
+    bool setCanvasPosition (const juce::String& nodeId, int x, int y);
+
+    /** Forgets every hand-placed box, so the canvas lays itself out again. */
+    void clearCanvasPositions();
+
     // -- per-part rules and mixer -------------------------------------------------------
     bool setMidiRules (const juce::String& partId, const PartMidiRules& rules);
     bool setEnabled (const juce::String& partId, bool enabled);
