@@ -194,6 +194,59 @@ parameter rather than an anonymous float.
 What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
 driven by unit tests; no restore in this build has reached a synth.
 
+## The rack host's own total recall — built, 2026-09-01
+
+Everything above is about an **exported panel**: a Player instance driving a synth it has a device
+profile for, where "the patch" is something CEditor can build, parse and name. That is the strong
+version, and it only works for the instruments somebody wrote a profile for.
+
+The rack host has the same problem and cannot make that assumption. A hardware part is any synth
+with a MIDI socket — a Juno, a rack module from 1989, something a person built. It remembered its
+port, its channel, its audio return, its program number and its device-profile link, and it forgot
+the one thing that makes it *that sound*: the patch. Six months later the session opens, the synth
+is on whatever the last person left it on, and the program number points at a slot whose contents
+have moved.
+
+So the rack host takes the weak version of the same promise, and takes it for every synth ever made:
+
+**Capture is armed, and it is armed for a reason.** `captureHardwarePatch` opens a listening window;
+`finishHardwarePatchCapture` closes it and keeps what arrived. There is no automatic collection,
+because a patch dump is indistinguishable on the wire from any other system-exclusive traffic — an
+editor's handshake, a librarian's backup, the synth's own chatter. The window is the only thing that
+says which messages you meant. While nothing is armed the MIDI thread does not even look at a SysEx
+message (`patchCaptureListening`, an atomic, gates it before anything else happens).
+
+**The bytes are kept and deliberately not understood.** `RackPart::hardwarePatchBase64` is the
+concatenation of the raw messages, base64'd into the session file. Nothing parses it, nothing
+validates it against a profile, nothing renames its fields. Refusing to understand it is exactly
+what makes this work for a synth nobody has written a profile for — the same bet the generic
+controller drawing makes, and it is the bet worth making twice. `splitSysexBlob` puts the messages
+back by walking `F0 … F7`, which is lossless because system-exclusive is self-delimiting.
+
+**The patch never crosses the bridge.** The state carries `hardwarePatchName` and
+`hardwarePatchBytes`; the blob stays native. It is opaque manufacturer data of unbounded length —
+a bank dump is megabytes — and the WebView has no reader for it and every reason not to carry it on
+every state push.
+
+**Sending is paced, not blasted.** One message per `drainParameterEvents` tick, roughly 30 a second,
+through the part's existing `MidiSendProcessor` sink. An older synth's input buffer is small and a
+bank dump pushed at once is a synth that hangs or drops the tail. Pressing Send twice replaces the
+queued send rather than transmitting the patch twice.
+
+**Ask / Always / Never, and the default is Ask** — the same rule S2 arrived at, for the same reason
+and with one addition: a session written before this existed has no policy field, and an absent
+policy reads as Ask, so opening an old session can never start transmitting. `never` is silent
+including the question; `ask` emits `instrumentHostHardwarePatchPrompt` and transmits nothing until
+somebody answers; `always` queues the send on load.
+
+Covered by `testHardwareTotalRecall` in `CE/tests/InstrumentHostServiceTests.cpp`, which drives all
+three policies across three separate service lifetimes reading the same session off disk, and
+asserts the returned bytes are identical to the captured ones, in order.
+
+What this does **not** do, and the exported-panel path above does: name the patch's contents, show
+its parameters, or notice that the synth on the other end is a different one today. Those need a
+profile. This needs a cable.
+
 ## Verification
 
 The failure modes here are all timing and ordering, so test those rather than the happy path:

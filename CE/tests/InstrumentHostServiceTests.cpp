@@ -22,6 +22,7 @@
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -3418,6 +3419,206 @@ void testHardwareParts()
            "the audio return restores through fader and inserts");
 }
 
+// Hardware total recall: the patch comes back with the session.
+//
+// A hardware part already remembered its port, its channel, its audio return and its program
+// number — everything about the synth except the sound. This is the sound: the dump the synth
+// answers with, kept byte for byte, and sent home on the terms the owner chose.
+void testHardwareTotalRecall()
+{
+    std::cout << "\nhardware total recall" << std::endl;
+
+    const auto dir = freshDataDir ("recall");
+    seedTwoSynthCatalog (dir);
+
+    std::vector<juce::MidiMessage> captured;
+    const auto tweak = [&captured] (InstrumentHostService::Options& options)
+    {
+        options.listMidiOutputs = []
+        {
+            juce::StringPairArray outputs;
+            outputs.set ("juno-port", "Juno Port");
+            return outputs;
+        };
+        options.openMidiOutput = [&captured] (const juce::String& deviceId, juce::String& errorOut)
+            -> ceditor::host::MidiSendProcessor::Sink
+        {
+            if (deviceId != "juno-port")
+            {
+                errorOut = "No such MIDI output.";
+                return {};
+            }
+            return [&captured] (const juce::MidiBuffer& messages)
+            {
+                for (const auto metadata : messages)
+                    captured.push_back (metadata.getMessage());
+            };
+        };
+    };
+
+    // Two dump messages with distinguishable payloads, so "the right bytes came back in the
+    // right order" is a question the test can actually answer.
+    const auto dump = [] (juce::uint8 tag, int length)
+    {
+        std::vector<juce::uint8> body { 0x41, 0x10, tag };
+        for (int i = 0; i < length; ++i)
+            body.push_back ((juce::uint8) (i & 0x7f));
+        return juce::MidiMessage::createSysExMessage (body.data(), (int) body.size());
+    };
+    const auto messageA = dump (0x01, 40);
+    const auto messageB = dump (0x02, 24);
+
+    juce::String partId;
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        partId = h.firstPartId();
+        h.cmd ("setHardwareConfig", { { "partId", partId },
+                                      { "midiOutputId", "juno-port" },
+                                      { "midiOutputName", "Juno Port" },
+                                      { "midiOutChannel", 4 } });
+
+        // Nothing is listening until a capture is armed — that is the whole point. A dump
+        // that arrives unasked is somebody else's traffic, and CEditor does not collect it.
+        h.service->noteMidiActivity ("Juno", messageA);
+        h.service->drainParameterEvents();
+        h.emits.clear();
+        h.cmd ("finishHardwarePatchCapture", { { "partId", partId } });
+        check (h.emits.lastError().contains ("No patch capture"),
+               "sysex arriving unarmed is not collected");
+
+        // Arm, dump, finish.
+        h.emits.clear();
+        h.cmd ("captureHardwarePatch", { { "partId", partId } });
+        const auto* armed = h.emits.last ("instrumentHostHardwarePatchCapture");
+        check (armed != nullptr && (bool) armed->getProperty ("armed", false),
+               "arming a capture says so");
+
+        h.service->noteMidiActivity ("Juno", messageA);
+        h.service->noteMidiActivity ("Juno", messageB);
+        h.service->drainParameterEvents();
+        const auto* progress = h.emits.last ("instrumentHostHardwarePatchCapture");
+        check (progress != nullptr && (int) progress->getProperty ("messages", 0) == 2
+                 && (int) progress->getProperty ("bytes", 0)
+                      == messageA.getRawDataSize() + messageB.getRawDataSize(),
+               "the capture counts what has arrived so far");
+
+        h.emits.clear();
+        h.cmd ("finishHardwarePatchCapture", { { "partId", partId }, { "name", "Brass Pad" } });
+        const auto* state = h.emits.lastState();
+        check (state != nullptr, "finishing a capture pushes state");
+        const auto part = state->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check (part.getProperty ("hardwarePatchName", {}).toString() == "Brass Pad"
+                 && (int) part.getProperty ("hardwarePatchBytes", 0) > 0,
+               "the part carries the captured patch's name and size");
+        check (! part.getDynamicObject()->hasProperty ("hardwarePatch"),
+               "the bytes themselves never cross the bridge");
+        check (part.getProperty ("hardwareRestore", {}).toString() == "ask",
+               "and its restore policy defaults to asking");
+
+        // Sending it back: paced, one message per drain, byte-identical.
+        captured.clear();
+        h.emits.clear();
+        h.cmd ("sendHardwarePatch", { { "partId", partId } });
+        check (captured.empty(), "the send is queued, not blasted out of the command");
+
+        h.service->drainParameterEvents();
+        check (captured.size() == 1, "one message leaves per drain");
+        h.service->drainParameterEvents();
+        check (captured.size() == 2, "and the next on the next");
+        h.service->drainParameterEvents();
+        check (captured.size() == 2, "then the queue is empty and stays quiet");
+
+        const auto sameBytes = [] (const juce::MidiMessage& a, const juce::MidiMessage& b)
+        {
+            return a.getRawDataSize() == b.getRawDataSize()
+                     && std::memcmp (a.getRawData(), b.getRawData(), (size_t) a.getRawDataSize()) == 0;
+        };
+        check (sameBytes (captured[0], messageA) && sameBytes (captured[1], messageB),
+               "the patch goes home byte for byte, in order");
+
+        const auto* sent = h.emits.last ("instrumentHostHardwarePatchSend");
+        check (sent != nullptr && (bool) sent->getProperty ("done", false)
+                 && (int) sent->getProperty ("total", 0) == 2
+                 && (bool) sent->getProperty ("delivered", false),
+               "and the send reports itself finished");
+
+        // Pressing Send twice must not transmit the patch twice.
+        captured.clear();
+        h.cmd ("sendHardwarePatch", { { "partId", partId } });
+        h.cmd ("sendHardwarePatch", { { "partId", partId } });
+        for (int i = 0; i < 6; ++i)
+            h.service->drainParameterEvents();
+        check (captured.size() == 2, "a second Send replaces the first rather than doubling it");
+
+        h.emits.clear();
+        h.cmd ("setHardwareRestorePolicy", { { "partId", partId }, { "policy", "sometimes" } });
+        check (h.emits.lastError().contains ("ask, always or never"),
+               "an unknown restore policy is refused");
+    }
+
+    // Reopening with "ask": nothing is transmitted, and the question is put instead.
+    {
+        captured.clear();
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        for (int i = 0; i < 4; ++i)
+            h.service->drainParameterEvents();
+        check (captured.empty(), "an 'ask' part transmits nothing on its own");
+        const auto* prompt = h.emits.last ("instrumentHostHardwarePatchPrompt");
+        check (prompt != nullptr
+                 && prompt->getProperty ("parts", {}).size() == 1
+                 && prompt->getProperty ("parts", {})[0].getProperty ("patchName", {}).toString()
+                      == "Brass Pad",
+               "it asks, naming the patch it would send");
+
+        h.cmd ("setHardwareRestorePolicy", { { "partId", partId }, { "policy", "never" } });
+    }
+
+    // "never" is silence, prompt included.
+    {
+        captured.clear();
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        for (int i = 0; i < 4; ++i)
+            h.service->drainParameterEvents();
+        check (captured.empty() && h.emits.last ("instrumentHostHardwarePatchPrompt") == nullptr,
+               "a 'never' part is silent and does not ask");
+
+        h.cmd ("setHardwareRestorePolicy", { { "partId", partId }, { "policy", "always" } });
+    }
+
+    // "always" sends it, on load, without being asked.
+    {
+        captured.clear();
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        for (int i = 0; i < 4; ++i)
+            h.service->drainParameterEvents();
+        std::vector<juce::MidiMessage> sysex;
+        for (const auto& message : captured)
+            if (message.isSysEx())
+                sysex.push_back (message);
+        check (sysex.size() == 2 && h.emits.last ("instrumentHostHardwarePatchPrompt") == nullptr,
+               "an 'always' part sends its patch on load without asking");
+
+        // Clearing it leaves the part hardware and the session quiet.
+        h.emits.clear();
+        h.cmd ("clearHardwarePatch", { { "partId", partId } });
+        const auto part = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+        check ((bool) part.getProperty ("hardware", false)
+                 && part.getProperty ("hardwarePatchName", "x").toString().isEmpty()
+                 && (int) part.getProperty ("hardwarePatchBytes", -1) == 0,
+               "clearing the patch keeps the part and forgets the sound");
+
+        h.emits.clear();
+        h.cmd ("sendHardwarePatch", { { "partId", partId } });
+        check (h.emits.lastError().contains ("no captured patch"),
+               "and there is nothing left to send");
+    }
+}
+
 // Virtual parameter addresses: faders, pans, sends and whole macros as ordinary parameter
 // targets — pages and macros drive the mixer through the same binding math, and a macro on
 // a page slot makes hardware encoders play macros (§18.7.8).
@@ -5839,6 +6040,7 @@ int main (int argc, char* argv[])
     testSendsAndReturns();
     testMultiOutputRouting();
     testHardwareParts();
+    testHardwareTotalRecall();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
     testLibrary();

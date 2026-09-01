@@ -1766,6 +1766,152 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    // -- hardware total recall -------------------------------------------------------------
+
+    if (cmd == "captureHardwarePatch")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr || ! part->hardware)
+        {
+            emitError ("That part is not a hardware instrument.");
+            return;
+        }
+
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            pendingPatchSysex.clear();
+        }
+        patchCapture = {};
+        patchCapture.armed = true;
+        patchCapture.partId = partId;
+        patchCaptureListening.store (true);
+        emitHardwarePatchCapture (true, partId, 0, 0);
+        return;
+    }
+
+    if (cmd == "cancelHardwarePatchCapture")
+    {
+        patchCaptureListening.store (false);
+        {
+            const std::scoped_lock lock (midiActivityLock);
+            pendingPatchSysex.clear();
+        }
+        patchCapture = {};
+        emitHardwarePatchCapture (false, {}, 0, 0);
+        return;
+    }
+
+    if (cmd == "finishHardwarePatchCapture")
+    {
+        // Whatever arrived in the window is the patch, so drain first: the last message may
+        // still be sitting in the observer's queue when the player presses Done.
+        drainHardwarePatchCapture();
+
+        if (! patchCapture.armed)
+        {
+            emitError ("No patch capture is running.");
+            return;
+        }
+
+        const auto partId = patchCapture.partId;
+        auto messages = std::move (patchCapture.messages);
+        patchCaptureListening.store (false);
+        patchCapture = {};
+
+        if (messages.empty())
+        {
+            emitHardwarePatchCapture (false, {}, 0, 0);
+            emitError ("Nothing arrived. Send a patch dump from the synth while capture is armed.");
+            return;
+        }
+
+        juce::MemoryBlock blob;
+        for (const auto& message : messages)
+            blob.append (message.getRawData(), (size_t) message.getRawDataSize());
+
+        auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitHardwarePatchCapture (false, {}, 0, 0);
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        auto name = payload.getProperty ("name", {}).toString().trim();
+        if (name.isEmpty())
+            name = "Captured patch";
+
+        if (! rack.setHardwarePatch (partId, blob.toBase64Encoding(), name))
+        {
+            emitHardwarePatchCapture (false, {}, 0, 0);
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        emitHardwarePatchCapture (false, partId, (int) messages.size(), (int) blob.getSize());
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "clearHardwarePatch")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        if (! rack.setHardwarePatch (partId, {}, {}))
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "setHardwareRestorePolicy")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto policy = payload.getProperty ("policy", {}).toString();
+        if (policy != "ask" && policy != "always" && policy != "never")
+        {
+            emitError ("Restore policy must be ask, always or never.");
+            return;
+        }
+        if (! rack.setHardwareRestorePolicy (partId, policy))
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "sendHardwarePatch")
+    {
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr || ! part->hardware)
+        {
+            emitError ("That part is not a hardware instrument.");
+            return;
+        }
+        if (part->hardwarePatchBase64.isEmpty())
+        {
+            emitError ("That part has no captured patch to send.");
+            return;
+        }
+
+        const auto before = patchSends.size();
+        queueHardwarePatchSend (partId);
+        if (patchSends.size() == before && before == 0)
+        {
+            emitError ("That part's captured patch could not be read back.");
+            return;
+        }
+        return;
+    }
+
     // -- Stage 6: transport ----------------------------------------------------------------
 
     if (cmd == "transportPlay" || cmd == "transportStop" || cmd == "transportContinue")
@@ -3315,6 +3461,43 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     {
         openHardwareMidi (partId);
         rack.sendHardwareProgram (partId);   // no-op unless a bank/program is configured
+    }
+
+    // Total recall: a captured patch goes home, but never silently and never by default.
+    // "always" is a decision the owner of that synth already made for that part; "ask" puts
+    // the question to them, because the thing on the other end of that cable may not be the
+    // thing that was there when the patch was captured, and transmitting a dump at it
+    // uninvited can overwrite an edit buffer somebody is standing in front of.
+    juce::StringArray askParts, askNames;
+    for (const auto& partId : hardwarePartIds)
+    {
+        const auto* part = model.findPart (partId);
+        if (part == nullptr || part->hardwarePatchBase64.isEmpty())
+            continue;
+
+        if (part->hardwareRestore == "always")
+            queueHardwarePatchSend (partId);
+        else if (part->hardwareRestore != "never")
+        {
+            askParts.add (partId);
+            askNames.add (part->hardwarePatchName.isNotEmpty() ? part->hardwarePatchName
+                                                               : part->pluginName);
+        }
+    }
+
+    if (! askParts.isEmpty() && options.emit != nullptr)
+    {
+        juce::Array<juce::var> asks;
+        for (int i = 0; i < askParts.size(); ++i)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("partId", askParts[i]);
+            obj->setProperty ("patchName", askNames[i]);
+            asks.add (juce::var (obj));
+        }
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("parts", asks);
+        options.emit ("instrumentHostHardwarePatchPrompt", juce::var (payload));
     }
 
     restartAudioIfNeeded();
@@ -4938,6 +5121,17 @@ void InstrumentHostService::drainEngineEvents()
 void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
                                               const juce::MidiMessage& message)
 {
+    // System-exclusive is the one non-voice message that means something here: while a patch
+    // capture is armed it IS the payload. Taken before the indicator filter below, because it
+    // is not activity to display — it is the thing being collected.
+    if (message.isSysEx() && patchCaptureListening.load())
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        if ((int) pendingPatchSysex.size() < maxCapturedPatchMessages)
+            pendingPatchSysex.push_back (message);
+        return;
+    }
+
     // Clock, active sensing and sysex housekeeping would light the indicator continuously and
     // prove nothing about the keys. Channel voice messages are what a person is testing.
     if (! (message.isNoteOnOrOff() || message.isController() || message.isPitchWheel()
@@ -5339,6 +5533,152 @@ void InstrumentHostService::drainChordLearn()
     }
 }
 
+std::vector<juce::MidiMessage> InstrumentHostService::splitSysexBlob (const juce::MemoryBlock& blob)
+{
+    // F0 … F7, over and over. Nothing is inferred about what is between the delimiters —
+    // that is the manufacturer's business and deliberately not ours.
+    std::vector<juce::MidiMessage> out;
+    const auto* bytes = static_cast<const juce::uint8*> (blob.getData());
+    const auto size = (size_t) blob.getSize();
+
+    for (size_t i = 0; i < size;)
+    {
+        if (bytes[i] != 0xf0)
+        {
+            ++i;                    // padding, or a truncated tail from an older file
+            continue;
+        }
+
+        size_t end = i + 1;
+        while (end < size && bytes[end] != 0xf7)
+            ++end;
+        if (end >= size)
+            break;                  // unterminated: the last message never finished arriving
+
+        // JUCE's createSysExMessage takes the body WITHOUT the delimiters and adds them back.
+        out.push_back (juce::MidiMessage::createSysExMessage (bytes + i + 1, (int) (end - i - 1)));
+        i = end + 1;
+    }
+
+    return out;
+}
+
+void InstrumentHostService::drainHardwarePatchCapture()
+{
+    std::vector<juce::MidiMessage> arrived;
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        arrived.swap (pendingPatchSysex);
+    }
+    if (arrived.empty())
+        return;
+    if (! patchCapture.armed)
+        return;   // disarmed between the observer writing and this drain reading
+
+    // The part can leave mid-capture; disarm out loud rather than collecting into a hole.
+    if (rack.getPerformance().findPart (patchCapture.partId) == nullptr)
+    {
+        patchCaptureListening.store (false);
+        patchCapture = {};
+        emitHardwarePatchCapture (false, {}, 0, 0);
+        return;
+    }
+
+    for (const auto& message : arrived)
+    {
+        if (patchCapture.bytes + message.getRawDataSize() > maxCapturedPatchBytes)
+            break;   // a synth that will not stop talking gets a bounded amount of memory
+        patchCapture.bytes += message.getRawDataSize();
+        patchCapture.messages.push_back (message);
+    }
+
+    emitHardwarePatchCapture (true, patchCapture.partId,
+                              (int) patchCapture.messages.size(), patchCapture.bytes);
+}
+
+void InstrumentHostService::emitHardwarePatchCapture (bool armed, const juce::String& partId,
+                                                      int messages, int bytes)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("armed", armed);
+    obj->setProperty ("partId", partId);
+    obj->setProperty ("messages", messages);
+    obj->setProperty ("bytes", bytes);
+    options.emit ("instrumentHostHardwarePatchCapture", juce::var (obj));
+}
+
+void InstrumentHostService::queueHardwarePatchSend (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr || ! part->hardware || part->hardwarePatchBase64.isEmpty())
+        return;
+
+    juce::MemoryBlock blob;
+    if (! blob.fromBase64Encoding (part->hardwarePatchBase64))
+        return;
+
+    auto messages = splitSysexBlob (blob);
+    if (messages.empty())
+        return;
+
+    // A second request for a part already sending replaces it rather than queueing behind
+    // itself — pressing Send twice must not transmit the patch twice.
+    for (auto it = patchSends.begin(); it != patchSends.end();)
+        it = (it->partId == partId) ? patchSends.erase (it) : std::next (it);
+
+    HardwarePatchSend send;
+    send.partId = partId;
+    send.messages = std::move (messages);
+    patchSends.push_back (std::move (send));
+}
+
+void InstrumentHostService::drainHardwarePatchSends()
+{
+    if (patchSends.empty())
+        return;
+
+    auto& send = patchSends.front();
+
+    // The part may have gone, or stopped being hardware, since the send was queued.
+    const auto* part = rack.getPerformance().findPart (send.partId);
+    if (part == nullptr || ! part->hardware)
+    {
+        patchSends.pop_front();
+        return;
+    }
+
+    juce::MidiBuffer buffer;
+    buffer.addEvent (send.messages[send.next], 0);
+    const auto delivered = rack.sendHardwareMidi (send.partId, buffer);
+    ++send.next;
+
+    const auto total = (int) send.messages.size();
+    const auto sent = (int) send.next;
+    const auto percent = total > 0 ? (sent * 100) / total : 100;
+    const auto done = send.next >= send.messages.size();
+
+    // Progress speaks on whole percents and on the edges, not thirty times a second.
+    if (options.emit != nullptr && (done || percent != send.lastReportedPercent))
+    {
+        send.lastReportedPercent = percent;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("partId", send.partId);
+        obj->setProperty ("sent", sent);
+        obj->setProperty ("total", total);
+        obj->setProperty ("done", done);
+        // A sink that is not open is not an error worth stopping for — the port diagnostic
+        // already says why — but it must not be reported as a patch that went home.
+        obj->setProperty ("delivered", delivered);
+        options.emit ("instrumentHostHardwarePatchSend", juce::var (obj));
+    }
+
+    if (done)
+        patchSends.pop_front();
+}
+
 void InstrumentHostService::drainParameterEvents()
 {
     drainEngineEvents();
@@ -5378,6 +5718,8 @@ void InstrumentHostService::drainParameterEvents()
 
     drainControllerEvents();
     drainChordLearn();
+    drainHardwarePatchCapture();
+    drainHardwarePatchSends();
 
     // The arp playhead: one tiny event whenever a part's live pattern step moved, nothing
     // while everything is idle. The UI only lights a column — timing stays the engine's,
@@ -5879,6 +6221,14 @@ juce::var InstrumentHostService::buildStatePayload()
             const auto errorIt = hardwareMidiErrors.find (part.partId);
             obj->setProperty ("midiOutError", errorIt != hardwareMidiErrors.end()
                                                 ? errorIt->second : juce::String());
+
+            // The patch itself never crosses the bridge. It is opaque manufacturer bytes
+            // the WebView has no use for and every reason not to carry — a bank dump is
+            // megabytes, and it would ride along on every state push. Its name and size are
+            // what a person needs to see; "there is one" is what the buttons need to know.
+            obj->setProperty ("hardwarePatchName",  part.hardwarePatchName);
+            obj->setProperty ("hardwarePatchBytes", (int) ((part.hardwarePatchBase64.length() / 4) * 3));
+            obj->setProperty ("hardwareRestore",    part.hardwareRestore);
         }
 
         // What this part's own plug-ins cost. Shown because it names the thing to blame:

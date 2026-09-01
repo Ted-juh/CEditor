@@ -32,6 +32,9 @@ import {
   onInstrumentHostParamLearn,
   onInstrumentHostArpStep,
   onInstrumentHostChordLearn,
+  onInstrumentHostHardwarePatchCapture,
+  onInstrumentHostHardwarePatchSend,
+  onInstrumentHostHardwarePatchPrompt,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -66,6 +69,19 @@ export const hostArpStep = writable({});
 // then the chord). Driven by instrumentHostChordLearn events; the map itself lands in the
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
+
+// Hardware total recall, in its three moments.
+//
+// Capturing: which part is listening and how much has arrived. The byte counter is the only
+// evidence a person gets that the synth answered at all — a dump that never came looks
+// exactly like a dump still coming.
+export const hostPatchCapture = writable({ armed: false, partId: '', messages: 0, bytes: 0 });
+// Sending: progress on the paced transmission, per part. Cleared as each one finishes, so
+// an empty map means nothing is going out.
+export const hostPatchSends = writable({});
+// The question a session asks when it opens holding patches whose policy is "ask". Nothing
+// has been transmitted at this point, and nothing will be until somebody says so.
+export const hostPatchPrompt = writable([]);
 
 /** What is currently being dragged, so the canvas can light up the legal targets. It has to be
     a store rather than the drag event's own payload: dataTransfer is deliberately unreadable
@@ -1540,6 +1556,14 @@ export function normalizeHostState(payload) {
         programBank: Number(part?.programBank ?? -1),
         programNumber: Number(part?.programNumber ?? -1),
         midiOutError: String(part?.midiOutError ?? ''),
+        deviceProfileId: String(part?.deviceProfileId ?? ''),
+        // Total recall: the name and size of the captured patch, never the patch. The bytes
+        // are opaque manufacturer data of unbounded length — nothing here can read them, and
+        // carrying a bank dump on every state push would be a cost for no reader.
+        hardwarePatchName: String(part?.hardwarePatchName ?? ''),
+        hardwarePatchBytes: Number(part?.hardwarePatchBytes ?? 0),
+        hardwareRestore: ['ask', 'always', 'never'].includes(part?.hardwareRestore)
+          ? part.hardwareRestore : 'ask',
         arp: normalizeArp(part?.arp),
         midiFx: normalizeMidiFx(part?.midiFx),
         midiChain: (Array.isArray(part?.midiChain) ? part.midiChain : []).map(normalizeMidiSlot),
@@ -1941,6 +1965,29 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'sendHardwareProgram') {
     return next; // nothing observable in the browser — the port lives with the native side
+  }
+  if (cmd === 'finishHardwarePatchCapture') {
+    const target = part(payload.partId);
+    if (target && mockPatchBytes > 0) {
+      target.hardwarePatchName = String(payload.name || 'Captured patch');
+      target.hardwarePatchBytes = mockPatchBytes;
+    }
+    return next;
+  }
+  if (cmd === 'clearHardwarePatch') {
+    const target = part(payload.partId);
+    if (target) { target.hardwarePatchName = ''; target.hardwarePatchBytes = 0; }
+    return next;
+  }
+  if (cmd === 'setHardwareRestorePolicy') {
+    const target = part(payload.partId);
+    if (target && ['ask', 'always', 'never'].includes(payload.policy))
+      target.hardwareRestore = payload.policy;
+    return next;
+  }
+  if (cmd === 'captureHardwarePatch' || cmd === 'cancelHardwarePatchCapture'
+      || cmd === 'sendHardwarePatch') {
+    return next; // the sysex itself only exists natively; the arming lives in the store
   }
   if (cmd === 'addMacro') {
     next.rack.macros.push(normalizeHostState({ rack: { macros: [{
@@ -2664,6 +2711,27 @@ export function initInstrumentHostBridge() {
     stage: String(payload?.stage ?? ''),
     key: Number.isInteger(payload?.key) ? payload.key : -1,
   }));
+  onInstrumentHostHardwarePatchCapture((payload) => hostPatchCapture.set({
+    armed: payload?.armed === true,
+    partId: String(payload?.partId ?? ''),
+    messages: Number(payload?.messages ?? 0),
+    bytes: Number(payload?.bytes ?? 0),
+  }));
+  onInstrumentHostHardwarePatchSend((payload) => hostPatchSends.update((sends) => {
+    const partId = String(payload?.partId ?? '');
+    if (!partId) return sends;
+    const rest = { ...sends };
+    // A finished send leaves the map rather than sitting in it at 100%: "nothing here" is
+    // how the UI knows nothing is going out.
+    if (payload?.done === true) { delete rest[partId]; return rest; }
+    return { ...rest, [partId]: { sent: Number(payload?.sent ?? 0), total: Number(payload?.total ?? 0) } };
+  }));
+  onInstrumentHostHardwarePatchPrompt((payload) => hostPatchPrompt.set(
+    (Array.isArray(payload?.parts) ? payload.parts : []).map((p) => ({
+      partId: String(p?.partId ?? ''),
+      patchName: String(p?.patchName ?? ''),
+    })).filter((p) => p.partId),
+  ));
   onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
@@ -2679,6 +2747,12 @@ export function initInstrumentHostBridge() {
 // preview has neither, so it keeps them here for the session — enough to exercise the star,
 // the pinning and the ordering without pretending to persist anything.
 const mockFavourites = new Set();
+
+// The browser preview has no MIDI in, so a capture has nothing to hear. Rather than leave the
+// counter at zero — which is what a synth that never answered looks like, and would make the
+// preview indistinguishable from a broken cable — it stands in a plausible dump the moment
+// capture is armed. Nothing about the real path is faked: the bytes never exist here.
+const mockPatchBytes = 296;
 
 // The controller the owner described, in the browser preview only. Native keeps it in the
 // data directory; here it lasts the session, which is all a preview needs.
@@ -3083,6 +3157,28 @@ export const removeExtraOut = (partId, pairIndex) => send({ cmd: 'removeExtraOut
 export const setHardwareConfig = (partId, fields) => send({ cmd: 'setHardwareConfig', partId, ...fields });
 export const clearHardware = (partId) => send({ cmd: 'clearHardware', partId });
 export const sendHardwareProgram = (partId) => send({ cmd: 'sendHardwareProgram', partId });
+
+// -- hardware total recall ----------------------------------------------------------------
+// Capture is armed, never automatic: system-exclusive traffic is indistinguishable from any
+// other, so the window is the only thing that says "this dump is the patch".
+export const captureHardwarePatch = (partId) => {
+  if (!isJuceAvailable())
+    hostPatchCapture.set({ armed: true, partId, messages: 2, bytes: mockPatchBytes });
+  send({ cmd: 'captureHardwarePatch', partId });
+};
+export const cancelHardwarePatchCapture = () => {
+  hostPatchCapture.set({ armed: false, partId: '', messages: 0, bytes: 0 });
+  send({ cmd: 'cancelHardwarePatchCapture' });
+};
+export const finishHardwarePatchCapture = (partId, name) => {
+  if (!isJuceAvailable())
+    hostPatchCapture.set({ armed: false, partId: '', messages: 0, bytes: 0 });
+  send({ cmd: 'finishHardwarePatchCapture', partId, name: name ?? '' });
+};
+export const clearHardwarePatch = (partId) => send({ cmd: 'clearHardwarePatch', partId });
+export const sendHardwarePatch = (partId) => send({ cmd: 'sendHardwarePatch', partId });
+export const setHardwareRestorePolicy = (partId, policy) =>
+  send({ cmd: 'setHardwareRestorePolicy', partId, policy });
 export const addMacro = (name) => send(name ? { cmd: 'addMacro', name } : { cmd: 'addMacro' });
 export const removeMacro = (macroId) => send({ cmd: 'removeMacro', macroId });
 export const renameMacro = (macroId, name) => send({ cmd: 'renameMacro', macroId, name });

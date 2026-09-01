@@ -41,6 +41,9 @@
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
+    captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
+    clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
+    hostPatchCapture, hostPatchSends, hostPatchPrompt,
     transportPlay, transportStop, setTempo, setTimeSignature, setExternalClock,
     setPartArp, setPartMidiFx,
     midiSlotTypes, midiSlotLabels,
@@ -91,6 +94,13 @@
   // rack-wide chains apply, and the parameter view appears once something is inspectable.
   let dockOpen = $state(true);
   let dockTab = $state('midi');
+  // What the patch being captured will be called. Typed while the capture is running, so it
+  // is asked for at the moment the player knows the answer rather than afterwards.
+  let patchName = $state('');
+
+  /** Bytes as something a person reads. A patch is a few hundred; a bank is tens of
+      thousands, and "38912" says less than "38 KB" about whether the whole thing arrived. */
+  const patchSize = (bytes) => (bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} bytes`);
   let dockHeight = $state(340);   // enough for the arp's two grids without a scrollbar
   let gripping = $state(false);
   let gripStartY = 0;
@@ -681,6 +691,25 @@
     </div>
   {/if}
 
+  <!-- Total recall's one question, asked once when a session opens holding patches set to
+       "ask". Nothing has been transmitted at this point and nothing will be until somebody
+       presses a button here: the thing on the other end of that cable may not be the thing
+       that was there when the patch was captured, and a dump sent at it uninvited overwrites
+       an edit buffer somebody may be standing in front of. -->
+  {#if $hostPatchPrompt.length > 0}
+    <div class="patch-prompt" data-testid="host-patch-prompt">
+      <span class="patch-prompt-text">
+        Restore {$hostPatchPrompt.length === 1 ? 'a captured patch' : `${$hostPatchPrompt.length} captured patches`}
+        to your hardware? ({$hostPatchPrompt.map((p) => p.patchName).join(', ')})
+      </span>
+      <button type="button" onclick={() => {
+        for (const p of $hostPatchPrompt) sendHardwarePatch(p.partId);
+        hostPatchPrompt.set([]);
+      }}>Send {$hostPatchPrompt.length === 1 ? 'it' : 'them'}</button>
+      <button type="button" class="ghost" onclick={() => hostPatchPrompt.set([])}>Not now</button>
+    </div>
+  {/if}
+
   <div class="host-columns">
     <section class="rack-column" aria-label="Instrument rack">
       <div class="column-head">
@@ -1204,6 +1233,65 @@
                         title="Send the bank select / program change now"
                         onclick={() => sendHardwareProgram(focusedPart.partId)}>Send program</button>
               </span>
+            </div>
+
+            <!-- Total recall. A program number names a slot; it does not name a sound — the
+                 sound moved the moment somebody edited it, or the moment the synth was
+                 handed to somebody else. So the patch itself is kept: whatever the synth
+                 dumps, byte for byte, sent home when the session opens.
+
+                 Capture is armed rather than automatic, and that is not caution for its own
+                 sake — a patch dump looks exactly like every other system-exclusive message
+                 on the wire, so the window is the only thing that says which one you meant. -->
+            <div class="hw-recall" data-testid="host-hardware-recall">
+              <div class="hw-recall-head">
+                <strong>Patch</strong>
+                {#if focusedPart.hardwarePatchBytes > 0}
+                  <span class="hw-patch-name">{focusedPart.hardwarePatchName}</span>
+                  <span class="hw-patch-size">{patchSize(focusedPart.hardwarePatchBytes)}</span>
+                {:else}
+                  <span class="hw-patch-none">None captured</span>
+                {/if}
+              </div>
+
+              {#if $hostPatchCapture.armed && $hostPatchCapture.partId === focusedPart.partId}
+                <div class="hw-capturing" data-testid="host-patch-capturing">
+                  <span class="hw-listen">Listening — send a patch dump from the synth.</span>
+                  <span class="hw-heard">{$hostPatchCapture.messages} message{$hostPatchCapture.messages === 1 ? '' : 's'},
+                    {patchSize($hostPatchCapture.bytes)}</span>
+                  <input type="text" placeholder="Patch name" bind:value={patchName}
+                         aria-label="Patch name" />
+                  <button type="button" disabled={$hostPatchCapture.bytes === 0}
+                          onclick={() => { finishHardwarePatchCapture(focusedPart.partId, patchName); patchName = ''; }}>Keep it</button>
+                  <button type="button" class="ghost"
+                          onclick={() => cancelHardwarePatchCapture()}>Cancel</button>
+                </div>
+              {:else}
+                <div class="hw-recall-row">
+                  <button type="button" title="Arm, then send a patch dump from the synth"
+                          onclick={() => captureHardwarePatch(focusedPart.partId)}>Capture patch…</button>
+                  <button type="button" disabled={focusedPart.hardwarePatchBytes === 0}
+                          title="Send the captured patch to the synth now"
+                          onclick={() => sendHardwarePatch(focusedPart.partId)}>Send patch</button>
+                  <button type="button" class="ghost" disabled={focusedPart.hardwarePatchBytes === 0}
+                          title="Forget the captured patch (the part stays hardware)"
+                          onclick={() => clearHardwarePatch(focusedPart.partId)}>Forget</button>
+                  <label class="hw-policy">On session open
+                    <select value={focusedPart.hardwareRestore}
+                            onchange={(e) => setHardwareRestorePolicy(focusedPart.partId, e.currentTarget.value)}>
+                      <option value="ask">Ask first</option>
+                      <option value="always">Send it</option>
+                      <option value="never">Do nothing</option>
+                    </select>
+                  </label>
+                </div>
+              {/if}
+
+              {#if $hostPatchSends[focusedPart.partId]}
+                <div class="hw-sending" data-testid="host-patch-sending">
+                  Sending… {$hostPatchSends[focusedPart.partId].sent} of {$hostPatchSends[focusedPart.partId].total}
+                </div>
+              {/if}
             </div>
           </div>
         {:else if focusedPart && !focusedPart.hasInstrument && !focusedPart.unresolved}
@@ -1899,6 +1987,45 @@
     font-size: 11px;
   }
   .hw-send { display: flex; align-items: flex-end; }
+  .hw-recall {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #2c343d;
+  }
+  .hw-recall-head { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .hw-patch-name { color: #d8e0e8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hw-patch-size, .hw-patch-none { color: #7d8894; font-size: 11px; }
+  .hw-recall-row, .hw-capturing { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .hw-policy { display: flex; align-items: center; gap: 4px; margin-left: auto; font-size: 11px; color: #9aa5b1; }
+  /* The armed state has to read as armed from across a room: this is the moment somebody is
+     standing at the synth pressing its own Send button, not looking at the screen. */
+  .hw-capturing {
+    padding: 6px 8px;
+    border: 1px solid #4a6a7a;
+    border-radius: 4px;
+    background: #1b262c;
+  }
+  /* A patch name is two words. Left to flex freely it became a text field the width of the
+     whole dock, which reads as a place to write a paragraph. */
+  .hw-capturing input[type='text'] { flex: 1; min-width: 90px; max-width: 220px; }
+  .hw-listen { color: #9fd0e4; }
+  .hw-heard { color: #7d8894; font-size: 11px; }
+  .hw-sending { font-size: 11px; color: #9fd0e4; }
+  .patch-prompt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    border: 1px solid #4a6a7a;
+    border-radius: 4px;
+    background: #1b262c;
+    font-size: 12px;
+  }
+  .patch-prompt-text { flex: 1; min-width: 200px; color: #cfe0ea; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .tile-button {
     flex: none;

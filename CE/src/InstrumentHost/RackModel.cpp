@@ -401,6 +401,9 @@ juce::var Performance::toVar() const
             p->setProperty ("programBank",        part.programBank);
             p->setProperty ("programNumber",      part.programNumber);
             p->setProperty ("deviceProfileId",    part.deviceProfileId);
+            p->setProperty ("hardwarePatch",      part.hardwarePatchBase64);
+            p->setProperty ("hardwarePatchName",  part.hardwarePatchName);
+            p->setProperty ("hardwareRestore",    part.hardwareRestore);
         }
 
         partVars.add (juce::var (p));
@@ -656,6 +659,15 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
             part.programBank        = intOf (p, "programBank", -1, -1, 16383);
             part.programNumber      = intOf (p, "programNumber", -1, -1, 127);
             part.deviceProfileId    = p.getProperty ("deviceProfileId", {}).toString();
+            part.hardwarePatchBase64 = p.getProperty ("hardwarePatch", {}).toString();
+            part.hardwarePatchName   = p.getProperty ("hardwarePatchName", {}).toString();
+            {
+                // Absent reads as "ask", which is the only safe default: a session written
+                // before this existed must not start transmitting on open.
+                const auto policy = p.getProperty ("hardwareRestore", {}).toString();
+                part.hardwareRestore = (policy == "always" || policy == "never") ? policy
+                                                                                : juce::String ("ask");
+            }
         }
 
         parsed.parts.add (std::move (part));

@@ -738,6 +738,47 @@ bool InstrumentRackHost::sendHardwareProgram (const juce::String& partId)
     return true;
 }
 
+bool InstrumentRackHost::setHardwarePatch (const juce::String& partId,
+                                           const juce::String& patchBase64,
+                                           const juce::String& patchName)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->hardwarePatchBase64 = patchBase64;
+    part->hardwarePatchName = patchBase64.isEmpty() ? juce::String() : patchName;
+    return true;
+}
+
+bool InstrumentRackHost::setHardwareRestorePolicy (const juce::String& partId,
+                                                   const juce::String& policy)
+{
+    if (policy != "ask" && policy != "always" && policy != "never")
+        return false;
+
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    part->hardwareRestore = policy;
+    return true;
+}
+
+bool InstrumentRackHost::sendHardwareMidi (const juce::String& partId,
+                                           const juce::MidiBuffer& messages)
+{
+    const auto* part = model.findPart (partId);
+    auto* lp = findLive (partId);
+    if (part == nullptr || ! part->hardware || lp == nullptr || lp->midiSend == nullptr)
+        return false;
+    if (messages.isEmpty())
+        return false;
+
+    lp->midiSend->sendNow (messages);
+    return true;
+}
+
 int InstrumentRackHost::partLatencySamples (const juce::String& partId) const
 {
     const auto* part = model.findPart (partId);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -970,6 +971,55 @@ private:
     std::vector<PendingNoteEvent> pendingChordNotes;
     void drainChordLearn();
     void emitChordLearn (bool armed, const juce::String& stage, int key, int chordSize);
+
+    // -- hardware total recall -------------------------------------------------------------
+    // A hardware part remembered everything about the synth except the sound. This is the
+    // sound: whatever the synth answers a dump request with, kept verbatim and handed back
+    // when the session opens again.
+    //
+    // Capture is armed, not automatic, and for a reason worth stating. A patch dump is
+    // indistinguishable from any other system-exclusive traffic — an editor's handshake, a
+    // librarian's backup, the synth's own chatter — so CEditor never guesses. You arm the
+    // part, press Send on the synth, and what arrives in that window is the patch.
+    struct HardwarePatchCapture
+    {
+        bool armed = false;
+        juce::String partId;
+        std::vector<juce::MidiMessage> messages;   // controlling thread's copy
+        int bytes = 0;
+    };
+    HardwarePatchCapture patchCapture;
+    /** Gates the observer: while this is false the MIDI thread does not even look at a
+        system-exclusive message, which is the state it is in for all but a few seconds. */
+    std::atomic<bool> patchCaptureListening { false };
+    /** Written on the MIDI thread under midiActivityLock, drained on the controlling one.
+        Capped: a runaway sender must cost a bounded amount of memory, not all of it. */
+    std::vector<juce::MidiMessage> pendingPatchSysex;
+    static constexpr int maxCapturedPatchMessages = 512;
+    static constexpr int maxCapturedPatchBytes = 4 * 1024 * 1024;
+
+    void drainHardwarePatchCapture();
+    void emitHardwarePatchCapture (bool armed, const juce::String& partId, int messages, int bytes);
+
+    /** A send in flight. Sysex goes out paced rather than in one burst: an older synth's
+        input buffer is small, and a bank dump pushed at once is a synth that hangs or drops
+        the tail. One message per drain (~30Hz) is slower than any device needs and faster
+        than anybody waits for. */
+    struct HardwarePatchSend
+    {
+        juce::String partId;
+        std::vector<juce::MidiMessage> messages;
+        size_t next = 0;
+        int lastReportedPercent = -1;
+    };
+    std::deque<HardwarePatchSend> patchSends;
+    void queueHardwarePatchSend (const juce::String& partId);
+    void drainHardwarePatchSends();
+
+    /** Splits a stored blob back into the messages it was made of. System-exclusive is
+        self-delimiting (F0 … F7), so the concatenation is lossless and this is its inverse;
+        anything outside a pair of delimiters is ignored rather than guessed at. */
+    static std::vector<juce::MidiMessage> splitSysexBlob (const juce::MemoryBlock& blob);
     void drainControllerEvents();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel);

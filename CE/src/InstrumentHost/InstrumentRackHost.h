@@ -157,6 +157,17 @@ public:
     /** Sends the configured bank select / program change through the sink, now. False when
         the part is not hardware or nothing is configured. */
     bool sendHardwareProgram (const juce::String& partId);
+    /** Stores the part's captured patch, or clears it when the blob is empty. Pure model
+        state: nothing in the graph changes, because the bytes only ever leave on request. */
+    bool setHardwarePatch (const juce::String& partId, const juce::String& patchBase64,
+                           const juce::String& patchName);
+    /** "ask" | "always" | "never" — what happens to that patch when a session opens. */
+    bool setHardwareRestorePolicy (const juce::String& partId, const juce::String& policy);
+    /** Pushes arbitrary messages straight out of the part's sender, outside any audio block —
+        the path a captured patch dump takes on its way home. Unlike the note path these are
+        NOT rechannelled: a system-exclusive message has no channel to rewrite, and rewriting
+        one would corrupt the very bytes the synth sent us. */
+    bool sendHardwareMidi (const juce::String& partId, const juce::MidiBuffer& messages);
 
     // -- master level and output pairs (Stage 7) ----------------------------------------
     /** The Performance-wide fader, 0..2 linear. The one control the generated product hands

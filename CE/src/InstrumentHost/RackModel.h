@@ -155,6 +155,25 @@ struct RackPart
     int programBank = -1;             // -1 = never send bank select
     int programNumber = -1;           // -1 = never send program change
     juce::String deviceProfileId;     // reference into CEditor's Device Profiles, when linked
+
+    // -- total recall for a hardware part -------------------------------------------------
+    //
+    // A hardware part remembered its port, its channel, its audio return and its program
+    // number, and forgot the one thing that makes it that sound: the patch. Open the rig six
+    // months later and the synth is on whatever somebody left it on, which from the player's
+    // chair is indistinguishable from the session not having been saved.
+    //
+    // So the patch travels with the part, as the BYTES the synth itself sent. CEditor does not
+    // parse them and does not need to: a dump is a dump, and refusing to understand it is what
+    // makes this work for every synth ever made rather than for a supported list. That is the
+    // same bet the generic controller drawing makes, and it is the bet worth making twice.
+    juce::String hardwarePatchBase64;   // exactly what came back, untouched
+    juce::String hardwarePatchName;     // what the player called it; display only
+    /** "ask" | "always" | "never" — what to do about sending it when the session opens.
+        Never silent-by-default: a program that blasts SysEx at whatever is plugged in
+        whenever a project opens is a bad citizen, and the device may be a different synth
+        today or the same synth mid-take. */
+    juce::String hardwareRestore { "ask" };
 };
 
 

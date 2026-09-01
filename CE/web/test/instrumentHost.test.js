@@ -1127,6 +1127,63 @@ test('mock reducer: hardware parts carry their config and the port-gone diagnost
   assert.equal(state.rack.parts[1].midiOutError, '');
 });
 
+test('normalizeHostState carries a captured patch by name and size, never by bytes', () => {
+  const state = normalizeHostState({
+    rack: { parts: [{
+      partId: 'p1',
+      hardware: true,
+      hardwarePatchName: 'Brass Pad',
+      hardwarePatchBytes: 296,
+      hardwareRestore: 'always',
+      // The native side never sends this, and a hostile or stale payload that did must not
+      // become a field anything downstream can read.
+      hardwarePatch: 'AAAA',
+    }] },
+  });
+  const part = state.rack.parts[0];
+  assert.equal(part.hardwarePatchName, 'Brass Pad');
+  assert.equal(part.hardwarePatchBytes, 296);
+  assert.equal(part.hardwareRestore, 'always');
+  assert.equal(part.hardwarePatch, undefined, 'the patch bytes are not a field of the state');
+});
+
+test('normalizeHostState clamps an unknown restore policy back to asking', () => {
+  const state = normalizeHostState({
+    rack: { parts: [{ partId: 'p1', hardware: true, hardwareRestore: 'sometimes' }] },
+  });
+  assert.equal(state.rack.parts[0].hardwareRestore, 'ask',
+    'anything but ask/always/never must not become a policy that transmits');
+});
+
+test('mock reducer: total recall captures, names, re-policies and forgets a patch', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'setHardwareConfig', partId: 'mock-part-2',
+                                    midiOutputId: 'mock-out-1', midiOutputName: 'Juno Out' });
+  const patch = () => state.rack.parts[1];
+  assert.equal(patch().hardwarePatchBytes, 0, 'a fresh hardware part has no patch');
+  assert.equal(patch().hardwareRestore, 'ask', 'and defaults to asking');
+
+  state = applyMockCommand(state, { cmd: 'captureHardwarePatch', partId: 'mock-part-2' });
+  assert.equal(patch().hardwarePatchBytes, 0, 'arming alone stores nothing');
+
+  state = applyMockCommand(state, { cmd: 'finishHardwarePatchCapture', partId: 'mock-part-2',
+                                    name: 'Brass Pad' });
+  assert.equal(patch().hardwarePatchName, 'Brass Pad');
+  assert.ok(patch().hardwarePatchBytes > 0, 'finishing keeps what arrived');
+
+  state = applyMockCommand(state, { cmd: 'setHardwareRestorePolicy', partId: 'mock-part-2',
+                                    policy: 'always' });
+  assert.equal(patch().hardwareRestore, 'always');
+  state = applyMockCommand(state, { cmd: 'setHardwareRestorePolicy', partId: 'mock-part-2',
+                                    policy: 'whenever' });
+  assert.equal(patch().hardwareRestore, 'always', 'an unknown policy changes nothing');
+
+  state = applyMockCommand(state, { cmd: 'clearHardwarePatch', partId: 'mock-part-2' });
+  assert.equal(patch().hardwarePatchName, '');
+  assert.equal(patch().hardwarePatchBytes, 0);
+  assert.equal(patch().hardware, true, 'forgetting the patch keeps the part hardware');
+});
+
 test('mock reducer: explicit multi-output routes add, retune and remove', () => {
   let state = mockHostState();
   state = applyMockCommand(state, { cmd: 'setExtraOut', partId: 'mock-part-1', pairIndex: 1, gain: 1 });
