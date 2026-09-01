@@ -247,6 +247,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
     )
 
     target_compile_definitions(CEditor PRIVATE
@@ -551,6 +552,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
         "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
     )
 
     juce_add_gui_app(CEHostStandalone
@@ -1002,6 +1004,7 @@ if(WIN32)
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -1258,6 +1261,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
     "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+    "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
     "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
     "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
     "${CE_ROOT}/src/Licensing/Licence.cpp"

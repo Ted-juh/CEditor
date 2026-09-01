@@ -50,6 +50,12 @@ public:
     /** The window's own close button, routed out — the service decides, never the window. */
     std::function<void (const juce::String& partId)> onCloseRequested;
 
+    /** Thumbnail capture, exactly as the docked pane does it and for the same reason: a
+        floated editor is a plug-in's window on screen, which is the only moment its picture
+        can be taken. See PluginEditorHost.h for why it is two hooks rather than one. */
+    std::function<bool (const juce::String& partId)> shouldCaptureEditor;
+    std::function<void (const juce::String& partId, const juce::Image& picture)> onEditorPictured;
+
 private:
     class EditorWindow;
 

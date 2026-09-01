@@ -323,6 +323,26 @@ public:
         and survived. */
     void reassertEditorPane();
 
+    // -- editor thumbnails ------------------------------------------------------------------
+    // Most plug-ins ship no artwork, so the second-best picture of a plug-in is its own
+    // window, captured the first time the user opens it. The service owns the policy — which
+    // classes still want one, where the file goes, when it becomes visible — and the pane
+    // owns the pixels, because the pane is what holds the editor. Two calls, in that order.
+    //
+    // NEVER AT SCAN TIME. Snapshotting a library of several hundred plug-ins means
+    // instantiating several hundred plug-ins, which is the whole reason the scanner is a
+    // separate process. A thumbnail is a side effect of the user opening an editor and
+    // nothing else.
+
+    /** True when this target's plug-in class has no picture yet — no vendor snapshot and
+        nothing cached. The pane asks first so an already-pictured plug-in costs nothing. */
+    bool wantsEditorSnapshot (const juce::String& targetId) const;
+
+    /** Offers the editor's own picture for this target. Blank or empty images are dropped,
+        an existing picture is never overwritten, and a picture that lands is published and
+        pushed so the tile changes without waiting for the next rack mutation. */
+    void offerEditorSnapshot (const juce::String& targetId, const juce::Image& image);
+
     // -- surface runtime API (Stage 3) ------------------------------------------------------
     // What a hardware bridge needs from the parameter model and nothing else: a display
     // projection per page, and a relative nudge per slot. The driver never touches plug-in
@@ -666,6 +686,15 @@ private:
     juce::String slotDisplayName (const ControlBinding& binding, bool resolved) const;
     /** The parameter's current value inverse-mapped into the slot's 0..1 position. */
     static float slotPositionFor (const ControlBinding& binding, float parameterValue);
+    /** Where a captured editor picture for this class lives. Keyed by class AND version: a
+        plug-in that got a new interface in an update should not keep showing the old one.
+        The name is readable and the hash makes it unique — a ceId is an identifier string,
+        not a filename, and two classes can share a display name. */
+    juce::File snapshotCacheFile (const PluginClassRecord& record) const;
+    /** The artwork to publish for a class: the vendor's own, else a captured one, else
+        nothing. Order matters — the vendor's picture is of the plug-in, ours is of whatever
+        preset happened to be open. */
+    juce::File artworkFor (const PluginClassRecord& record) const;
     juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();

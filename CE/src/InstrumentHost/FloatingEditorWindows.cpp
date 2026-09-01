@@ -1,4 +1,5 @@
 #include "FloatingEditorWindows.h"
+#include "EditorSnapshot.h"
 
 namespace ceditor::host
 {
@@ -7,7 +8,8 @@ namespace ceditor::host
 // stays explicit (editor first, window after), and a listener so a vendor GUI that resizes
 // itself carries its window along instead of being clipped.
 class FloatingEditorWindows::EditorWindow final : public juce::DocumentWindow,
-                                                 private juce::ComponentListener
+                                                 private juce::ComponentListener,
+                                                 private juce::Timer
 {
 public:
     EditorWindow (FloatingEditorWindows& ownerToUse, juce::String partIdToUse,
@@ -30,10 +32,17 @@ public:
         setContentNonOwned (editor.get(), true);
         setResizable (editor->isResizable(), false);
         setVisible (true);
+
+        if (owner.onEditorPictured != nullptr
+            && (owner.shouldCaptureEditor == nullptr || owner.shouldCaptureEditor (partId)))
+            startTimer (captureDelaysMs[0]);
     }
 
     ~EditorWindow() override
     {
+        // Before anything else: a pending capture must not outlive the editor it aimed at.
+        stopTimer();
+
         // The invariant's window half: the editor dies here, first, every path.
         if (editor != nullptr)
             editor->removeComponentListener (this);
@@ -49,6 +58,28 @@ public:
     }
 
 private:
+    // The same waiting the docked pane does, for the same reason: a plug-in is not finished
+    // drawing when its editor is constructed, and a blank result is retried rather than
+    // believed. PluginEditorHost.h carries the full reasoning.
+    static constexpr int captureDelaysMs[] { 900, 2200, 4500 };
+
+    void timerCallback() override
+    {
+        stopTimer();
+
+        if (editor == nullptr || owner.onEditorPictured == nullptr)
+            return;
+
+        if (auto picture = editorSnapshot::capture (*editor); picture.isValid())
+        {
+            owner.onEditorPictured (partId, picture);
+            return;
+        }
+
+        if (++captureAttempt < (int) juce::numElementsInArray (captureDelaysMs))
+            startTimer (captureDelaysMs[captureAttempt]);
+    }
+
     void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
     {
         // A vendor editor that resizes itself takes its window with it.
@@ -58,6 +89,7 @@ private:
 
     FloatingEditorWindows& owner;
     juce::String partId;
+    int captureAttempt = 0;
     std::unique_ptr<juce::AudioProcessorEditor> editor;
 };
 

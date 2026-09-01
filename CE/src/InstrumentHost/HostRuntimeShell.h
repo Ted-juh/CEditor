@@ -54,6 +54,9 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;
+    // Who the pane is currently showing. The pane is handed a processor and a title; the
+    // thumbnail hooks need the target's identity to ask the service about its class.
+    juce::String panedTargetId;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HostRuntimeShell)
 };

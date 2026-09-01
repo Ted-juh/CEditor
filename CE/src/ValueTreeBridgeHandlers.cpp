@@ -1719,9 +1719,12 @@ void ValueTreeBridge::ensureInstrumentHost()
     // the pane pointer clears nothing here at teardown, but member order in WebViewHost means
     // the pane (and any editor in it) is destroyed before this bridge — these hooks are only
     // ever called while both are alive, on the message thread.
-    options.editorPane.show = [this] (const juce::String&, juce::AudioProcessor& processor,
+    options.editorPane.show = [this] (const juce::String& targetId, juce::AudioProcessor& processor,
                                       const juce::String& title)
     {
+        // Remembered for the thumbnail hooks below: the pane is handed a processor and a
+        // title, and never learns whose they are.
+        panedEditorTargetId = targetId;
         if (editorPane != nullptr)
             editorPane->show (processor, title);
     };
@@ -1828,6 +1831,34 @@ void ValueTreeBridge::ensureInstrumentHost()
         payload->setProperty ("cmd", "closeEditorWindow");
         payload->setProperty ("partId", partId);
         instrumentHost->handleCommand (juce::var (payload));
+    };
+
+    // Thumbnails for the plug-ins that ship none: the pane and the windows take the picture
+    // when a vendor editor is up, the service decides whether it wanted one and keeps it.
+    // Wired after construction because they need the service that was just built.
+    if (editorPane != nullptr)
+    {
+        editorPane->shouldCaptureEditor = [this]
+        {
+            return instrumentHost != nullptr
+                   && instrumentHost->wantsEditorSnapshot (panedEditorTargetId);
+        };
+        editorPane->onEditorPictured = [this] (const juce::Image& picture)
+        {
+            if (instrumentHost != nullptr)
+                instrumentHost->offerEditorSnapshot (panedEditorTargetId, picture);
+        };
+    }
+
+    instrumentEditorWindows->shouldCaptureEditor = [this] (const juce::String& partId)
+    {
+        return instrumentHost != nullptr && instrumentHost->wantsEditorSnapshot (partId);
+    };
+    instrumentEditorWindows->onEditorPictured = [this] (const juce::String& partId,
+                                                        const juce::Image& picture)
+    {
+        if (instrumentHost != nullptr)
+            instrumentHost->offerEditorSnapshot (partId, picture);
     };
 
     // The CTRL49 comes alive with the service: discovery and the paced startup sequence run

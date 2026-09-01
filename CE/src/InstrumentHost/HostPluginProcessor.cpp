@@ -25,13 +25,25 @@ public:
         };
 
         InstrumentHostService::EditorPaneHooks hooks;
-        hooks.show = [this] (const juce::String&, juce::AudioProcessor& instrument,
+        hooks.show = [this] (const juce::String& targetId, juce::AudioProcessor& instrument,
                              const juce::String& title)
         {
+            // Remembered for the thumbnail hooks: the pane is told a processor, not whose.
+            panedTargetId = targetId;
             editorPane.show (instrument, title);
         };
         hooks.hide = [this] { editorPane.hide(); };
         owner.getService().setEditorPaneHooks (std::move (hooks));
+
+        // Thumbnails: the pane takes the picture, the service decides whether it wanted one.
+        editorPane.shouldCaptureEditor = [this]
+        {
+            return owner.getService().wantsEditorSnapshot (panedTargetId);
+        };
+        editorPane.onEditorPictured = [this] (const juce::Image& picture)
+        {
+            owner.getService().offerEditorSnapshot (panedTargetId, picture);
+        };
 
         auto webViewOptions = makeHostWebViewOptions ("CEHost_WebView2",
             [safe = juce::Component::SafePointer<HostPluginEditor> (this)] (const juce::var& payload)
@@ -106,6 +118,7 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;
+    juce::String panedTargetId;   // who the pane is showing, for the thumbnail hooks
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HostPluginEditor)
 };

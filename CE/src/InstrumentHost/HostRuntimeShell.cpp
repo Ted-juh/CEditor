@@ -34,9 +34,12 @@ HostRuntimeShell::HostRuntimeShell()
         });
     };
 
-    options.editorPane.show = [this] (const juce::String&, juce::AudioProcessor& processor,
+    options.editorPane.show = [this] (const juce::String& targetId, juce::AudioProcessor& processor,
                                       const juce::String& title)
     {
+        // Remembered because the pane itself is told a processor and a title, not who they
+        // belong to, and the thumbnail hooks below need to name the class they captured.
+        panedTargetId = targetId;
         editorPane.show (processor, title);
     };
     options.editorPane.hide = [this] { editorPane.hide(); };
@@ -113,6 +116,27 @@ HostRuntimeShell::HostRuntimeShell()
         auto* payload = new juce::DynamicObject();
         payload->setProperty ("cmd", "closeEditor");
         service->handleCommand (juce::var (payload));
+    };
+
+    // Thumbnails: the pane and the floating windows take the picture, the service decides
+    // whether it wanted one and where it goes.
+    editorPane.shouldCaptureEditor = [this]
+    {
+        return service != nullptr && service->wantsEditorSnapshot (panedTargetId);
+    };
+    editorPane.onEditorPictured = [this] (const juce::Image& picture)
+    {
+        if (service != nullptr)
+            service->offerEditorSnapshot (panedTargetId, picture);
+    };
+    editorWindows.shouldCaptureEditor = [this] (const juce::String& partId)
+    {
+        return service != nullptr && service->wantsEditorSnapshot (partId);
+    };
+    editorWindows.onEditorPictured = [this] (const juce::String& partId, const juce::Image& picture)
+    {
+        if (service != nullptr)
+            service->offerEditorSnapshot (partId, picture);
     };
 
     auto webViewOptions = makeHostWebViewOptions ("CEHost_WebView2",

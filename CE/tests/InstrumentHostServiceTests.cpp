@@ -18,6 +18,7 @@
 // The stub worker's path arrives as argv[1] from CTest, same as the coordinator tests.
 
 #include "InstrumentHost/InstrumentHostService.h"
+#include "InstrumentHost/EditorSnapshot.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
@@ -40,6 +41,7 @@ using ceditor::host::PluginCatalog;
 using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
 using ceditor::host::PluginSnapshotRegistry;
+namespace editorSnapshot = ceditor::host::editorSnapshot;
 using ceditor::test::StubSynthProcessor;
 
 juce::File freshDataDir (const juce::String& name)
@@ -4790,6 +4792,23 @@ void testFactoryPerformance()
 // The browse dialog behind "Add scan folder", and the module projection the browser column
 // cannot explain scans without. A cancelled picker changes nothing; a module full of effects
 // says so through numInstruments instead of silently showing nothing.
+/** The artwork route a state payload published for a class, or empty when it has none. */
+juce::String classUrl (const juce::var* state, const juce::String& ceId)
+{
+    if (state == nullptr)
+        return {};
+
+    for (const auto* list : { "instruments", "effectClasses" })
+    {
+        const auto classes = state->getProperty (list, {});
+        for (int i = 0; i < classes.size(); ++i)
+            if (classes[i].getProperty ("ceId", {}).toString() == ceId)
+                return classes[i].getProperty ("snapshotUrl", {}).toString();
+    }
+
+    return {};
+}
+
 // Vendor artwork reaches the frontend as a route, and only as a route.
 //
 // Two things are being checked and the second is the one that matters. That a class which
@@ -4856,6 +4875,154 @@ void testPluginSnapshots()
            "the route resolves back to the file the catalogue published");
     check (! PluginSnapshotRegistry::instance().resolve (png.getFullPathName()).existsAsFile(),
            "and nothing else does — a path is not a token");
+
+    dir.deleteRecursively();
+}
+
+// Captured editor thumbnails: the picture a plug-in that shipped nothing still has.
+//
+// The tests that matter here are the refusals. A thumbnail is written once, from a picture
+// that has something in it, for a class that has no artwork already — and a wrong or blank
+// one is worse than the generated tile, because the tile is at least honest. So: a blank
+// image is dropped, a vendor snapshot is never overwritten by a capture, and a class that
+// already has a capture does not get asked for another.
+//
+// What is NOT covered here, said plainly rather than implied: taking the picture. On Windows
+// a vendor editor draws into a foreign window and the capture goes through PrintWindow,
+// which cannot be compiled or run off Windows. Everything downstream of it — the blank test,
+// the downscale, the encode, and every policy decision below — is portable and is tested.
+void testEditorThumbnails()
+{
+    std::cout << "\ncaptured editor thumbnails" << std::endl;
+
+    const auto dir = freshDataDir ("thumbnails");
+    const auto vendorPng = dir.getChildFile ("vendor.png");
+    vendorPng.replaceWithText ("stand-in for the vendor's own PNG");
+
+    // "Good" ships artwork; "Other" ships none and is the one that wants a capture.
+    {
+        PluginCatalog catalog;
+        for (const auto* name : { "Good", "Other" })
+        {
+            ModuleScanResult module;
+            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.fingerprint = juce::String ("fp-") + name;
+            PluginClassRecord synth;
+            synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
+            synth.name = juce::String (name) + " Synth";
+            synth.vendor = "Test Audio";
+            synth.version = "1.0";
+            synth.isInstrument = true;
+            synth.descriptionXml = "<PLUGIN name=\"" + synth.name + "\"/>";
+            if (juce::String (name) == "Good")
+                synth.snapshotPath = vendorPng.getFullPathName();
+            module.classes.add (synth);
+            catalog.commitScanResult (module);
+        }
+        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    }
+
+    // A picture with something in it, and one without. isBlank is what tells them apart, and
+    // getting that wrong means caching a black rectangle as a plug-in's face for ever.
+    const auto realPicture = []
+    {
+        juce::Image image (juce::Image::ARGB, 320, 180, true);
+        juce::Graphics g (image);
+        g.fillAll (juce::Colour (0xff203040));
+        g.setColour (juce::Colour (0xffe0b070));
+        g.fillRect (20, 20, 120, 60);
+        g.fillEllipse (200.0f, 90.0f, 60.0f, 60.0f);
+        return image;
+    }();
+    const auto flatPicture = []
+    {
+        juce::Image image (juce::Image::ARGB, 320, 180, true);
+        juce::Graphics g (image);
+        g.fillAll (juce::Colours::black);
+        return image;
+    }();
+
+    check (! editorSnapshot::isBlank (realPicture), "a drawn picture is not blank");
+    check (editorSnapshot::isBlank (flatPicture), "a picture of one flat colour is");
+    check (editorSnapshot::isBlank (juce::Image()), "and so is no picture at all");
+
+    const auto shrunk = editorSnapshot::downscaled (realPicture, 64);
+    check (juce::jmax (shrunk.getWidth(), shrunk.getHeight()) == 64,
+           "downscaling fits the longest edge");
+    check (shrunk.getWidth() * 180 == shrunk.getHeight() * 320, "and keeps the aspect ratio");
+    check (editorSnapshot::downscaled (realPicture, 4096).getWidth() == 320,
+           "a picture already small enough is left alone rather than blown up");
+
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    // Nothing to offer a picture to yet.
+    check (! h.service->wantsEditorSnapshot (partId),
+           "an empty part wants no thumbnail — there is no plug-in to picture");
+    check (! h.service->wantsEditorSnapshot ("no-such-part"),
+           "and neither does a part that does not exist");
+
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    check (! h.service->wantsEditorSnapshot (partId),
+           "a plug-in with the vendor's own artwork is not asked to sit for a portrait");
+
+    // Offering one anyway must not overwrite the vendor's picture: theirs is of the plug-in,
+    // ours is of whatever preset happened to be open.
+    h.service->offerEditorSnapshot (partId, realPicture);
+    const auto* state = h.emits.lastState();
+    const auto goodUrl = classUrl (state, "VST3-good-synth");
+    check (goodUrl.isNotEmpty(), "the vendor's artwork is still published");
+    check (PluginSnapshotRegistry::instance().resolve (goodUrl.fromLastOccurrenceOf ("/", false, false))
+             == vendorPng,
+           "and still resolves to the vendor's file, not to the capture");
+
+    // Now the plug-in that ships nothing.
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-other-synth" } });
+    check (h.service->wantsEditorSnapshot (partId),
+           "a plug-in with no artwork wants a picture of its editor");
+    check (classUrl (h.emits.lastState(), "VST3-other-synth").isEmpty(),
+           "and has none until one is taken");
+
+    h.service->offerEditorSnapshot (partId, flatPicture);
+    check (h.service->wantsEditorSnapshot (partId),
+           "a blank capture is dropped — it still wants a real one");
+    check (classUrl (h.emits.lastState(), "VST3-other-synth").isEmpty(),
+           "and nothing was published for it");
+
+    h.service->offerEditorSnapshot (partId, realPicture);
+    const auto capturedUrl = classUrl (h.emits.lastState(), "VST3-other-synth");
+    check (capturedUrl.isNotEmpty(), "a real capture is published, without waiting for a rack change");
+    check (! h.service->wantsEditorSnapshot (partId), "and is not asked for again");
+
+    const auto capturedFile = PluginSnapshotRegistry::instance()
+                                .resolve (capturedUrl.fromLastOccurrenceOf ("/", false, false));
+    check (capturedFile.existsAsFile(), "the route resolves to a file that is really there");
+    check (capturedFile.getFileExtension() == ".png", "written as a PNG");
+    check (capturedFile.isAChildOf (dir), "inside the host's own data directory");
+    check (capturedFile.getFileName().contains ("Other"),
+           "named so a person looking in the folder can tell what it is");
+
+    {
+        // It is a real image, at the thumbnail size, not a truncated file.
+        juce::PNGImageFormat png;
+        juce::FileInputStream stream (capturedFile);
+        const auto reloaded = png.decodeImage (stream);
+        check (reloaded.isValid(), "and decodes back into an image");
+        check (juce::jmax (reloaded.getWidth(), reloaded.getHeight())
+                 <= editorSnapshot::thumbnailMaxEdge,
+               "stored at thumbnail size rather than at editor size");
+    }
+
+    // Survives a restart: a capture that had to be retaken every session would be a capture
+    // the user watches happen for ever.
+    {
+        Harness restarted (dir);
+        restarted.cmd ("getState");
+        check (classUrl (restarted.emits.lastState(), "VST3-other-synth").isNotEmpty(),
+               "the capture is still published after a restart");
+    }
 
     dir.deleteRecursively();
 }
@@ -5046,6 +5213,7 @@ int main (int argc, char* argv[])
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();
     testPluginSnapshots();
+    testEditorThumbnails();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

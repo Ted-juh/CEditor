@@ -1,4 +1,5 @@
 #include "InstrumentHostService.h"
+#include "EditorSnapshot.h"
 
 #include <algorithm>
 #include <utility>
@@ -5028,6 +5029,71 @@ const PluginClassRecord* InstrumentHostService::findClass (const juce::String& c
     return nullptr;
 }
 
+juce::File InstrumentHostService::snapshotCacheFile (const PluginClassRecord& record) const
+{
+    // Readable half so somebody looking in the folder can tell what they are looking at,
+    // hashed half so it is unique: a ceId is an identifier string with characters a filename
+    // cannot carry, and two vendors are perfectly free to both ship a "Compressor".
+    const auto readable = juce::File::createLegalFileName (record.name).substring (0, 40).trim();
+    const auto unique = juce::String::toHexString ((record.ceId + "|" + record.version).hashCode64());
+
+    return options.dataDirectory.getChildFile ("plugin-thumbnails")
+                                .getChildFile ((readable.isNotEmpty() ? readable + "-" : juce::String())
+                                                 + unique + ".png");
+}
+
+juce::File InstrumentHostService::artworkFor (const PluginClassRecord& record) const
+{
+    if (const juce::File vendor (record.snapshotPath); vendor.existsAsFile())
+        return vendor;
+
+    if (options.dataDirectory == juce::File())
+        return {};
+
+    const auto cached = snapshotCacheFile (record);
+    return cached.existsAsFile() ? cached : juce::File();
+}
+
+bool InstrumentHostService::wantsEditorSnapshot (const juce::String& targetId) const
+{
+    const auto ceId = targetClassCeId (targetId);
+    if (ceId.isEmpty() || options.dataDirectory == juce::File())
+        return false;
+
+    const std::scoped_lock lock (catalogLock);
+    const auto* record = findClass (ceId);
+    return record != nullptr && ! artworkFor (*record).existsAsFile();
+}
+
+void InstrumentHostService::offerEditorSnapshot (const juce::String& targetId,
+                                                 const juce::Image& image)
+{
+    // Everything here is a reason to do nothing, and doing nothing costs the user a coloured
+    // square with the right letters on it. Caching the wrong picture costs them a wrong
+    // picture until they find the cache folder, so every gate fails towards the tile.
+    if (! wantsEditorSnapshot (targetId))
+        return;
+
+    juce::File destination;
+    {
+        const std::scoped_lock lock (catalogLock);
+        const auto* record = findClass (targetClassCeId (targetId));
+        if (record == nullptr)
+            return;
+
+        destination = snapshotCacheFile (*record);
+    }
+
+    if (! editorSnapshot::writePng (editorSnapshot::downscaled (image, editorSnapshot::thumbnailMaxEdge),
+                                    destination))
+        return;
+
+    // The picture exists now, and nothing else is going to say so: a thumbnail arriving is
+    // not a rack mutation, so without this push it would appear the next time something
+    // unrelated changed.
+    emitState();
+}
+
 void InstrumentHostService::runScanNow()
 {
     if (options.emit != nullptr)
@@ -5119,9 +5185,10 @@ juce::var InstrumentHostService::buildStatePayload()
     {
         const std::scoped_lock lock (catalogLock);
 
-        // The vendor's own artwork, when the plug-in shipped some. Published rather than
-        // pathed: the frontend gets a token it can fetch and nothing about where the file is.
-        const auto classToVar = [] (const PluginClassRecord& record)
+        // The plug-in's picture: the vendor's own if it shipped one, else the capture taken
+        // the first time somebody opened its editor. Published rather than pathed — the
+        // frontend gets a token it can fetch and nothing about where the file is.
+        const auto classToVar = [this] (const PluginClassRecord& record)
         {
             auto* obj = new juce::DynamicObject();
             obj->setProperty ("ceId",    record.ceId);
@@ -5129,7 +5196,7 @@ juce::var InstrumentHostService::buildStatePayload()
             obj->setProperty ("vendor",  record.vendor);
             obj->setProperty ("version", record.version);
             if (const auto token = PluginSnapshotRegistry::instance()
-                                     .publish (record.ceId, juce::File (record.snapshotPath));
+                                     .publish (record.ceId, artworkFor (record));
                 token.isNotEmpty())
                 obj->setProperty ("snapshotUrl", "/plugin-snapshot/" + token);
             return juce::var (obj);

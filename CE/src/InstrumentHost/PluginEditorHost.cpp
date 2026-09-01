@@ -1,4 +1,5 @@
 #include "PluginEditorHost.h"
+#include "EditorSnapshot.h"
 
 namespace ceditor::host
 {
@@ -29,6 +30,7 @@ PluginEditorHost::PluginEditorHost()
 
 PluginEditorHost::~PluginEditorHost()
 {
+    stopTimer();
     viewport.setViewedComponent (nullptr, false);
     editor.reset();
 }
@@ -56,10 +58,49 @@ void PluginEditorHost::show (juce::AudioProcessor& processorToShow, const juce::
 
     if (onLayoutChanged != nullptr)
         onLayoutChanged();
+
+    // Ask now, capture later: the answer depends on the class that just appeared, and the
+    // pixels do not exist yet.
+    captureAttempt = -1;
+    stopTimer();
+
+    if (onEditorPictured != nullptr
+        && (shouldCaptureEditor == nullptr || shouldCaptureEditor()))
+    {
+        captureAttempt = 0;
+        startTimer (captureDelaysMs[0]);
+    }
+}
+
+void PluginEditorHost::timerCallback()
+{
+    stopTimer();
+
+    if (editor == nullptr || onEditorPictured == nullptr || captureAttempt < 0)
+        return;
+
+    if (auto picture = editorSnapshot::capture (*editor); picture.isValid())
+    {
+        captureAttempt = -1;
+        onEditorPictured (picture);
+        return;
+    }
+
+    // Nothing yet. A plug-in still loading its interface looks exactly like one that will
+    // never answer, and the two are only told apart by waiting — so wait, twice, then stop.
+    if (++captureAttempt < (int) juce::numElementsInArray (captureDelaysMs))
+        startTimer (captureDelaysMs[captureAttempt]);
+    else
+        captureAttempt = -1;
 }
 
 void PluginEditorHost::hide()
 {
+    // Before the early-out: a pending capture must never outlive the editor it was aimed at,
+    // or a pane that closed at 800ms fires at 900ms into a destroyed editor.
+    stopTimer();
+    captureAttempt = -1;
+
     if (editor == nullptr && ! isVisible())
         return;
 

@@ -212,8 +212,8 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load
    button — which is why the List view stays first.
-4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**. ~~Vendor snapshots~~ **BUILT,
-   2026-09-01**. Editor capture and user overrides still to come.
+4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**. ~~Vendor snapshots~~ and
+   ~~editor capture~~ **BUILT, 2026-09-01**. User overrides still to come.
 
    A tile is *derived*, not found: a hue, a pattern and two letters, all from the catalogue's
    stable `ceId`. Same class, same tile, on every machine and after every rescan — which is what
@@ -250,12 +250,40 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    In dev mode the page is served by Vite, so the relative URL goes to the dev server and 404s;
    the tile falls back, and a dev run looks like a machine whose plug-ins ship no snapshots.
 
-   **Still to build: editor capture.** For the plug-ins that ship nothing, capture the editor the
-   first time it opens (`Component::createComponentSnapshot`), downscale it, and cache it under
-   the data directory keyed by `ceId` + plug-in version. It must never happen at *scan* time, for
-   the reason above; the serving half is now solved — the registry publishes a cached file the
-   same way it publishes a vendor one. The generated tile stays as the fallback whenever neither
-   exists, the same pattern as auto-layout versus saved positions.
+   **Editor capture, 2026-09-01.** For the plug-ins that ship nothing — most of them — the
+   picture is their own window, taken the first time the user opens it, downscaled to 256px
+   and cached under the data directory keyed by `ceId` + version. It is served through the
+   same registry as a vendor snapshot, and a vendor snapshot always wins: theirs is a picture
+   of the plug-in, ours is a picture of whatever preset happened to be open.
+
+   *`createComponentSnapshot` is not the answer, which is the thing worth writing down.* A
+   hosted VST3 editor does not paint itself with JUCE. On Windows JUCE wraps it in an
+   `HWNDComponent` whose own `paint()` fills black, and the plug-in draws into a foreign HWND
+   the OS composites on top — so asking that component for a snapshot returns a perfectly
+   valid image of nothing, which would then be cached for ever as the plug-in's face. The
+   capture goes to the *window*: `PrintWindow` with `PW_RENDERFULLCONTENT` first (what reaches
+   a plug-in drawing through DirectComposition or D3D), plain `PrintWindow` second, a GDI blit
+   from the window's own DC third. `createComponentSnapshot` remains the path for a JUCE-drawn
+   editor and the generic parameter editor.
+
+   *Every gate fails towards the tile.* A blank result is never believed: the capture is
+   retried at 900ms, 2.2s and 4.5s — a plug-in still loading its skin looks exactly like one
+   that will never answer, and only waiting tells them apart — and a picture of one flat
+   colour is dropped at three separate points before it could become a file. Nothing is
+   cached on a maybe, because a wrong thumbnail is worse than no thumbnail.
+
+   *Never at scan time*, for the reason above. A thumbnail is a side effect of the user
+   opening an editor and nothing else. The pane and the floating windows take the picture
+   because they hold the editor; the service decides whether one was wanted, where it goes and
+   when it becomes visible, and pushes state itself so the tile changes without waiting for an
+   unrelated rack mutation.
+
+   *What is not verified.* The Windows capture body cannot be compiled or run off Windows, so
+   a Linux build checks everything downstream of it — the blank test, the downscale, the
+   encode, and every policy decision — and none of the pixel-fetching itself.
+
+   **Still to build: user overrides.** Point a class at an image of your own. The cache path
+   and the serving route both exist now, so this is a command and a file copy.
 5. **Persisted positions**, optional: `x`/`y` per node in the manifest, with auto-layout as the
    fallback when they are absent, so an older session and a hand-written manifest both still open.
    The repo's existing habit — migrate by construction, never refuse a file for a missing field.
