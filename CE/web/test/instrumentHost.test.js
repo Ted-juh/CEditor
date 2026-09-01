@@ -44,6 +44,7 @@ import {
   pluginTile,
   pluginInitials,
   pluginSnapshots,
+  customArtworkIds,
   TILE_PATTERNS,
   normalizeSurfaceLayout,
   filterEffects,
@@ -716,6 +717,33 @@ test('a class that shipped artwork carries a route, and the rest carry nothing',
 
   hostStateStore.set(emptyHostState());
   assert.deepEqual(get(pluginSnapshots), {}, 'and the map empties when the catalogue does');
+});
+
+test('the browser knows which plug-ins are showing a picture somebody chose', () => {
+  // "Revert to its own picture" must only be offered where there is one to go back to, and
+  // the four sources are not interchangeable: a capture and a vendor snapshot are the
+  // plug-in's, a custom one is the user's, and only the last can be undone.
+  const shaped = normalizeHostState({
+    instruments: [
+      { ceId: 'VST3-mine', snapshotUrl: '/plugin-snapshot/a', artworkSource: 'custom' },
+      { ceId: 'VST3-theirs', snapshotUrl: '/plugin-snapshot/b', artworkSource: 'vendor' },
+      { ceId: 'VST3-shot', snapshotUrl: '/plugin-snapshot/c', artworkSource: 'capture' },
+      { ceId: 'VST3-plain' },
+    ],
+    effectClasses: [{ ceId: 'VST3-fx-mine', snapshotUrl: '/plugin-snapshot/d', artworkSource: 'custom' }],
+  });
+  assert.equal(shaped.instruments[3].artworkSource, '', 'no artwork is an empty source, not undefined');
+
+  hostStateStore.set(shaped);
+  const custom = get(customArtworkIds);
+  assert.ok(custom.has('VST3-mine'), 'a chosen picture is offered a revert');
+  assert.ok(custom.has('VST3-fx-mine'), 'effects too');
+  assert.ok(!custom.has('VST3-theirs'), "the vendor's own is not something the user can revert");
+  assert.ok(!custom.has('VST3-shot'), 'and neither is a capture');
+  assert.ok(!custom.has('VST3-plain'));
+
+  hostStateStore.set(emptyHostState());
+  assert.equal(get(customArtworkIds).size, 0);
 });
 
 test('pluginTile carries a second channel besides colour', () => {

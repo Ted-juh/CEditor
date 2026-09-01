@@ -1771,6 +1771,23 @@ void ValueTreeBridge::ensureInstrumentHost()
             });
     };
 
+    // The same chooser, filtered to pictures: where a plug-in's thumbnail comes from when the
+    // vendor shipped none and its editor could not be captured.
+    options.pickImage = [this] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Choose a picture for this plug-in",
+            juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
+            "*.png;*.jpg;*.jpeg;*.gif");
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
     // member outlives the service that holds this function.
     options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);

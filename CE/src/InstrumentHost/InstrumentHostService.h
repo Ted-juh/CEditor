@@ -233,6 +233,10 @@ public:
         // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
         // browseScanPath refuse aloud rather than silently do nothing.
         std::function<void (std::function<void (const juce::String& directory)>)> pickDirectory;
+        // Opens the native picker filtered to images and calls back with the chosen file —
+        // empty for cancel. Absent (tests, plain browser) makes setPluginArtwork refuse
+        // aloud rather than silently do nothing, the same contract as pickDirectory.
+        std::function<void (std::function<void (const juce::String& imageFile)>)> pickImage;
         // Applies a vendor .vstpreset file to a live instrument. The app passes JUCE's own
         // VST3 preset loader (it re-validates the class id internally); tests stub it.
         // Absent = vendor preset records refuse to load, aloud.
@@ -691,6 +695,14 @@ private:
         The name is readable and the hash makes it unique — a ceId is an identifier string,
         not a filename, and two classes can share a display name. */
     juce::File snapshotCacheFile (const PluginClassRecord& record) const;
+    /** A picture the USER chose for this class. Kept beside the capture rather than
+        overwriting it, so "use the plug-in's own picture again" restores whatever was there
+        before instead of leaving the class with nothing. */
+    juce::File snapshotOverrideFile (const PluginClassRecord& record) const;
+    /** Which of the three the class is actually showing: "custom", "vendor", "capture", or
+        empty for the generated tile. Published so the UI can offer "revert" only where there
+        is something to revert to. */
+    juce::String artworkSourceFor (const PluginClassRecord& record) const;
     /** The artwork to publish for a class: the vendor's own, else a captured one, else
         nothing. Order matters — the vendor's picture is of the plug-in, ours is of whatever
         preset happened to be open. */

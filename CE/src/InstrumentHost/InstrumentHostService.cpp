@@ -261,6 +261,106 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     // Where the user put a box on the rack canvas. Refused for an id that is not a node: an
     // unknown id would be a position for something that cannot be drawn, kept in the session
     // for ever, and eventually applied to whatever inherits the id.
+    // A picture the user chooses for a plug-in class, beating the vendor's own and any
+    // capture. Copied into the host's own folder rather than referenced where it sits: a file
+    // in Downloads is one tidy-up away from a plug-in with no picture and no explanation, and
+    // the copy is normalised to a thumbnail-sized PNG on the way in so every source format
+    // ends up the same shape.
+    if (cmd == "setPluginArtwork")
+    {
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        PluginClassRecord record;
+        {
+            const std::scoped_lock lock (catalogLock);
+            const auto* found = findClass (ceId);
+            if (found == nullptr)
+            {
+                emitError ("That plug-in is not in the catalogue.");
+                return;
+            }
+            record = *found;
+        }
+
+        if (options.dataDirectory == juce::File())
+        {
+            emitError ("There is nowhere to keep a picture in this build.");
+            return;
+        }
+
+        // An explicit path is the scriptable route and what the tests use; without one the
+        // native picker is asked, and its absence is said out loud rather than ignored.
+        const auto chosen = payload.getProperty ("file", {}).toString();
+        const auto apply = [this, record] (const juce::String& imagePath)
+        {
+            if (imagePath.isEmpty())
+                return;                                  // cancelled: nothing to say
+
+            const juce::File source (imagePath);
+            const auto image = juce::ImageFileFormat::loadFrom (source);
+            if (! image.isValid())
+            {
+                emitError ("That file is not a picture this build can read.");
+                return;
+            }
+
+            // rejectBlank is off here on purpose: a flat colour is a strange thing to choose
+            // and it is still exactly what was chosen. The blank check exists to catch a
+            // plug-in that failed to draw itself, and a person is not that.
+            if (! editorSnapshot::writePng (editorSnapshot::downscaled (image, editorSnapshot::thumbnailMaxEdge),
+                                            snapshotOverrideFile (record), false))
+            {
+                emitError ("The picture could not be saved.");
+                return;
+            }
+
+            emitState();
+        };
+
+        if (chosen.isNotEmpty())
+        {
+            apply (chosen);
+            return;
+        }
+
+        if (options.pickImage == nullptr)
+        {
+            emitError ("Choosing a picture is not available in this build.");
+            return;
+        }
+
+        options.pickImage ([this, aliveToken = alive, apply] (const juce::String& imagePath)
+        {
+            if (aliveToken->load())
+                apply (imagePath);
+        });
+        return;
+    }
+
+    // Back to whatever the plug-in itself offers — the vendor's snapshot, the capture taken
+    // when its editor was open, or the generated tile. The override is deleted; nothing else
+    // is, which is why the capture is kept in a file of its own.
+    if (cmd == "clearPluginArtwork")
+    {
+        const auto ceId = payload.getProperty ("ceId", {}).toString();
+        PluginClassRecord record;
+        {
+            const std::scoped_lock lock (catalogLock);
+            const auto* found = findClass (ceId);
+            if (found == nullptr)
+            {
+                emitError ("That plug-in is not in the catalogue.");
+                return;
+            }
+            record = *found;
+        }
+
+        if (options.dataDirectory != juce::File())
+            snapshotOverrideFile (record).deleteFile();
+
+        emitState();
+        return;
+    }
+
     if (cmd == "setCanvasPosition")
     {
         if (! rack.setCanvasPosition (payload.getProperty ("nodeId", {}).toString(),
@@ -5070,8 +5170,20 @@ juce::File InstrumentHostService::snapshotCacheFile (const PluginClassRecord& re
                                                  + unique + ".png");
 }
 
+juce::File InstrumentHostService::snapshotOverrideFile (const PluginClassRecord& record) const
+{
+    return snapshotCacheFile (record).getSiblingFile (
+        snapshotCacheFile (record).getFileNameWithoutExtension() + "-custom.png");
+}
+
 juce::File InstrumentHostService::artworkFor (const PluginClassRecord& record) const
 {
+    // A picture the user chose beats everything, including the vendor's own. They looked at
+    // what was there and decided otherwise, which is the end of the argument.
+    if (options.dataDirectory != juce::File())
+        if (const auto custom = snapshotOverrideFile (record); custom.existsAsFile())
+            return custom;
+
     if (const juce::File vendor (record.snapshotPath); vendor.existsAsFile())
         return vendor;
 
@@ -5080,6 +5192,18 @@ juce::File InstrumentHostService::artworkFor (const PluginClassRecord& record) c
 
     const auto cached = snapshotCacheFile (record);
     return cached.existsAsFile() ? cached : juce::File();
+}
+
+juce::String InstrumentHostService::artworkSourceFor (const PluginClassRecord& record) const
+{
+    const auto file = artworkFor (record);
+    if (file == juce::File())
+        return {};
+
+    if (options.dataDirectory != juce::File() && file == snapshotOverrideFile (record))
+        return "custom";
+
+    return file.getFullPathName() == record.snapshotPath ? "vendor" : "capture";
 }
 
 bool InstrumentHostService::wantsEditorSnapshot (const juce::String& targetId) const
@@ -5226,7 +5350,12 @@ juce::var InstrumentHostService::buildStatePayload()
             if (const auto token = PluginSnapshotRegistry::instance()
                                      .publish (record.ceId, artworkFor (record));
                 token.isNotEmpty())
+            {
                 obj->setProperty ("snapshotUrl", "/plugin-snapshot/" + token);
+                // Which of the three is showing, so the UI can offer "use its own picture
+                // again" only where there is one to go back to.
+                obj->setProperty ("artworkSource", artworkSourceFor (record));
+            }
             return juce::var (obj);
         };
 

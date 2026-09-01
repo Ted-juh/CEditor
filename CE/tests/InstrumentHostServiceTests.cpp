@@ -5159,6 +5159,165 @@ void testCanvasPositions()
     dir.deleteRecursively();
 }
 
+// A picture the user chose, which beats everything the plug-in has to offer.
+//
+// The interesting cases are the ones about what an override must NOT destroy. It has to beat
+// the vendor's own snapshot — they looked at what was there and decided otherwise — while
+// leaving that snapshot exactly where it was, so "use its own picture again" has something to
+// go back to. Same for a capture. Which is why the override is a file of its own rather than
+// an overwrite of the cache.
+void testCustomArtwork()
+{
+    std::cout << "\ncustom plug-in artwork" << std::endl;
+
+    const auto dir = freshDataDir ("custom-artwork");
+    const auto vendorPng = dir.getChildFile ("vendor.png");
+    vendorPng.replaceWithText ("stand-in for the vendor's own PNG");
+
+    {
+        PluginCatalog catalog;
+        for (const auto* name : { "Good", "Other" })
+        {
+            ModuleScanResult module;
+            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.fingerprint = juce::String ("fp-") + name;
+            PluginClassRecord synth;
+            synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
+            synth.name = juce::String (name) + " Synth";
+            synth.vendor = "Test Audio";
+            synth.version = "1.0";
+            synth.isInstrument = true;
+            synth.descriptionXml = "<PLUGIN name=\"" + synth.name + "\"/>";
+            if (juce::String (name) == "Good")
+                synth.snapshotPath = vendorPng.getFullPathName();
+            module.classes.add (synth);
+            catalog.commitScanResult (module);
+        }
+        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    }
+
+    // A real picture on disk, in a format that is not PNG — the copy normalises it, so every
+    // source format ends up the same shape and the frontend only ever fetches one thing.
+    const auto chosen = dir.getChildFile ("chosen.png");
+    {
+        juce::Image art (juce::Image::ARGB, 400, 260, true);
+        juce::Graphics g (art);
+        g.fillAll (juce::Colour (0xff402030));
+        g.setColour (juce::Colours::orange);
+        g.fillEllipse (40.0f, 40.0f, 180.0f, 180.0f);
+        check (editorSnapshot::writePng (art, chosen), "a picture to choose exists");
+    }
+
+    Harness h (dir);
+    h.cmd ("getState");
+
+    const auto sourceOf = [] (const juce::var* state, const juce::String& ceId)
+    {
+        if (state == nullptr)
+            return juce::String ("<no state emitted>");
+
+        const auto instruments = state->getProperty ("instruments", {});
+        for (int i = 0; i < instruments.size(); ++i)
+            if (instruments[i].getProperty ("ceId", {}).toString() == ceId)
+                return instruments[i].getProperty ("artworkSource", {}).toString();
+        return juce::String();
+    };
+
+    check (sourceOf (h.emits.lastState(), "VST3-good-synth") == "vendor",
+           "a plug-in that shipped artwork is showing the vendor's");
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth").isEmpty(),
+           "and one that shipped none is showing nothing but its tile");
+
+    // The plug-in with nothing: a chosen picture is the only picture it has.
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-other-synth" }, { "file", chosen.getFullPathName() } });
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth") == "custom",
+           "a chosen picture becomes the plug-in's artwork");
+    const auto customUrl = classUrl (h.emits.lastState(), "VST3-other-synth");
+    const auto customFile = PluginSnapshotRegistry::instance()
+                              .resolve (customUrl.fromLastOccurrenceOf ("/", false, false));
+    check (customFile.existsAsFile() && customFile.isAChildOf (dir),
+           "copied into the host's own folder, not left where the user's file happened to be");
+    check (customFile != chosen, "the original is referenced by nobody — it can be moved or deleted");
+    {
+        juce::PNGImageFormat png;
+        juce::FileInputStream stream (customFile);
+        const auto reloaded = png.decodeImage (stream);
+        check (reloaded.isValid()
+                 && juce::jmax (reloaded.getWidth(), reloaded.getHeight())
+                      <= editorSnapshot::thumbnailMaxEdge,
+               "and normalised to a thumbnail-sized PNG on the way in");
+    }
+
+    // The plug-in with the vendor's own: a chosen picture wins, and the vendor's survives.
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-good-synth" }, { "file", chosen.getFullPathName() } });
+    check (sourceOf (h.emits.lastState(), "VST3-good-synth") == "custom",
+           "a chosen picture beats the vendor's own");
+    check (vendorPng.existsAsFile(), "without touching the vendor's file, which is not ours to delete");
+
+    h.cmd ("clearPluginArtwork", { { "ceId", "VST3-good-synth" } });
+    check (sourceOf (h.emits.lastState(), "VST3-good-synth") == "vendor",
+           "and clearing it gives the vendor's picture back");
+
+    // An override must not destroy a capture either: same rule, different source.
+    juce::Image capture (juce::Image::ARGB, 300, 200, true);
+    {
+        juce::Graphics g (capture);
+        g.fillAll (juce::Colour (0xff203040));
+        g.setColour (juce::Colours::white);
+        g.fillRect (10, 10, 100, 60);
+    }
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-other-synth" } });
+    check (! h.service->wantsEditorSnapshot (partId),
+           "a plug-in already showing a chosen picture is not asked to sit for a portrait");
+
+    h.cmd ("clearPluginArtwork", { { "ceId", "VST3-other-synth" } });
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth").isEmpty(),
+           "cleared, it is back to its generated tile");
+    check (h.service->wantsEditorSnapshot (partId), "and wants a capture again");
+
+    h.service->offerEditorSnapshot (partId, capture);
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth") == "capture", "which it then shows");
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-other-synth" }, { "file", chosen.getFullPathName() } });
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth") == "custom", "a chosen picture beats it");
+    h.cmd ("clearPluginArtwork", { { "ceId", "VST3-other-synth" } });
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth") == "capture",
+           "and clearing gives the capture back rather than leaving nothing");
+
+    // Refusals, each said out loud.
+    h.emits.clear();
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-nonsense" }, { "file", chosen.getFullPathName() } });
+    check (h.emits.lastError().isNotEmpty(), "a class that is not catalogued is refused");
+
+    h.emits.clear();
+    const auto notAPicture = dir.getChildFile ("notes.txt");
+    notAPicture.replaceWithText ("this is not a picture");
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-other-synth" }, { "file", notAPicture.getFullPathName() } });
+    check (h.emits.lastError().isNotEmpty(), "a file that is not a picture is refused, not stored");
+    check (h.emits.lastState() == nullptr, "and no state is pushed, because nothing changed");
+    h.cmd ("getState");
+    check (sourceOf (h.emits.lastState(), "VST3-other-synth") == "capture",
+           "the plug-in keeps what it had");
+
+    // Cancelling the picker changes nothing and says nothing — the one silence that is right.
+    h.emits.clear();
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-other-synth" }, { "file", "" } });
+    check (h.emits.lastError().isNotEmpty(),
+           "with no picker in this build, being asked to choose is refused aloud");
+
+    // It survives a restart, or it is a decoration rather than a preference.
+    h.cmd ("setPluginArtwork", { { "ceId", "VST3-other-synth" }, { "file", chosen.getFullPathName() } });
+    {
+        Harness restarted (dir);
+        restarted.cmd ("getState");
+        check (sourceOf (restarted.emits.lastState(), "VST3-other-synth") == "custom",
+               "a chosen picture is still chosen after a restart");
+    }
+
+    dir.deleteRecursively();
+}
+
 void testScanFolderBrowseAndModuleProjection()
 {
     std::cout << "\nscan-folder browse and module projection" << std::endl;
@@ -5347,6 +5506,7 @@ int main (int argc, char* argv[])
     testPluginSnapshots();
     testEditorThumbnails();
     testCanvasPositions();
+    testCustomArtwork();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

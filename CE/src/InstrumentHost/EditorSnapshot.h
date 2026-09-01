@@ -39,9 +39,12 @@ bool isBlank (const juce::Image& image);
     not an improvement. */
 juce::Image downscaled (const juce::Image& image, int maxEdge);
 
-/** Writes the image as a PNG, creating parent directories. False for a blank or empty image,
-    so a caller cannot accidentally cache one. */
-bool writePng (const juce::Image& image, const juce::File& destination);
+/** Writes the image as a PNG, creating parent directories. A blank image is refused by
+    default, so a caller cannot accidentally cache the black rectangle a plug-in that ignored
+    WM_PRINT hands back. Pass rejectBlank = false for a picture a PERSON chose: a flat orange
+    square is a strange thing to want and it is still what they asked for, and there is no
+    guessing involved to protect them from. */
+bool writePng (const juce::Image& image, const juce::File& destination, bool rejectBlank = true);
 
 /** The editor's own pixels, or an empty image when the platform could not get them. */
 juce::Image capture (juce::Component& editor);

@@ -929,6 +929,16 @@ export function pluginInitials(name, vendor = '') {
     their ceId and their name and nothing else. Threading a URL through each of those call
     sites would mean every one somebody forgot silently falls back to a generated tile, which
     is the failure you cannot see. */
+/** The classes showing a picture the user chose. Read by the browser rows to offer "use its
+    own picture again" only where there is something to go back to. */
+export const customArtworkIds = derived(hostState, ($state) => {
+  const ids = new Set();
+  for (const list of [$state?.instruments, $state?.effectClasses])
+    for (const record of Array.isArray(list) ? list : [])
+      if (record?.artworkSource === 'custom') ids.add(record.ceId);
+  return ids;
+});
+
 export const pluginSnapshots = derived(hostState, ($state) => {
   const byCeId = {};
   for (const list of [$state?.instruments, $state?.effectClasses])
@@ -1243,6 +1253,9 @@ function normalizePluginClass(i) {
     vendor: String(i?.vendor ?? ''),
     version: String(i?.version ?? ''),
     snapshotUrl: String(i?.snapshotUrl ?? ''),
+    // Which picture is showing: "custom" (one the user chose), "vendor" (shipped with the
+    // plug-in), "capture" (its editor, photographed) or empty for the generated tile.
+    artworkSource: String(i?.artworkSource ?? ''),
   };
 }
 
@@ -1547,6 +1560,18 @@ export function applyMockCommand(state, payload) {
   const next = normalizeHostState(state);
   const part = (id) => next.rack.parts.find((p) => p.partId === id);
 
+  if (cmd === 'setPluginArtwork' || cmd === 'clearPluginArtwork') {
+    // The mock cannot read a file off disk, so it models the one thing the UI reacts to: who
+    // is showing a picture of their own. Enough for the buttons to be exercised in a browser.
+    const custom = cmd === 'setPluginArtwork';
+    for (const list of [next.instruments, next.effectClasses])
+      for (const record of list)
+        if (record.ceId === payload.ceId) {
+          record.artworkSource = custom ? 'custom' : '';
+          record.snapshotUrl = custom ? `/plugin-snapshot/mock-${record.ceId}` : '';
+        }
+    return next;
+  }
   if (cmd === 'setCanvasPosition') {
     const positions = next.rack.canvasPositions.filter((c) => c.nodeId !== payload.nodeId);
     positions.push({ nodeId: String(payload.nodeId), x: Number(payload.x) || 0, y: Number(payload.y) || 0 });
@@ -2758,6 +2783,9 @@ export const moveEffect = (effectId, index) => send({ cmd: 'moveEffect', effectI
 export const setCanvasPosition = (nodeId, x, y) =>
   send({ cmd: 'setCanvasPosition', nodeId, x: Math.round(x), y: Math.round(y) });
 export const clearCanvasPositions = () => send({ cmd: 'clearCanvasPositions' });
+/** Opens the native picker; `file` is for tests and scripts, never the UI. */
+export const setPluginArtwork = (ceId, file) => send({ cmd: 'setPluginArtwork', ceId, file });
+export const clearPluginArtwork = (ceId) => send({ cmd: 'clearPluginArtwork', ceId });
 export const setEffectBypassed = (effectId, bypassed) => send({ cmd: 'setEffectBypassed', effectId, bypassed });
 export const openEffectEditor = (effectId) => send({ cmd: 'openEffectEditor', effectId });
 export const addReturn = (name) => send(name ? { cmd: 'addReturn', name } : { cmd: 'addReturn' });

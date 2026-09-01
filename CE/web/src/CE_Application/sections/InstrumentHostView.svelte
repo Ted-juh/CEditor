@@ -34,7 +34,7 @@
     saveUserPreset, saveRackToLibrary, saveChainToLibrary,
     setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     addEffect, removeEffect, moveEffect, setEffectBypassed, openEffectEditor,
-    reorderIndexForDrop,
+    reorderIndexForDrop, setPluginArtwork, clearPluginArtwork, customArtworkIds,
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
@@ -790,7 +790,21 @@
                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
                }}
                ondragend={() => hostCanvasDrag.set({ kind: '', id: '', label: '' })}>
-            <PluginTile ceId={instrument.ceId} name={instrument.name} vendor={instrument.vendor} size={30} />
+            <!-- The tile is the button: clicking a plug-in's picture to change it is where
+                 anyone would look first, and it costs the row no width. The revert appears
+                 only for a class that is showing a picture somebody chose. -->
+            <button type="button" class="tile-button"
+                    title={$customArtworkIds.has(instrument.ceId)
+                             ? `Choose a different picture for ${instrument.name}`
+                             : `Choose your own picture for ${instrument.name}`}
+                    onclick={() => setPluginArtwork(instrument.ceId)}>
+              <PluginTile ceId={instrument.ceId} name={instrument.name} vendor={instrument.vendor} size={30} />
+            </button>
+            {#if $customArtworkIds.has(instrument.ceId)}
+              <button type="button" class="ghost tile-revert"
+                      title={`Use ${instrument.name}'s own picture again`}
+                      onclick={() => clearPluginArtwork(instrument.ceId)}>↺</button>
+            {/if}
             <div class="instrument-id">
               <span class="instrument-name">{instrument.name}</span>
               <span class="instrument-vendor">{instrument.vendor} {instrument.version}</span>
@@ -828,7 +842,21 @@
                  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
                }}
                ondragend={() => hostCanvasDrag.set({ kind: '', id: '', label: '' })}>
-            <PluginTile ceId={effect.ceId} name={effect.name} vendor={effect.vendor} size={30} />
+            <!-- The tile is the button: clicking a plug-in's picture to change it is where
+                 anyone would look first, and it costs the row no width. The revert appears
+                 only for a class that is showing a picture somebody chose. -->
+            <button type="button" class="tile-button"
+                    title={$customArtworkIds.has(effect.ceId)
+                             ? `Choose a different picture for ${effect.name}`
+                             : `Choose your own picture for ${effect.name}`}
+                    onclick={() => setPluginArtwork(effect.ceId)}>
+              <PluginTile ceId={effect.ceId} name={effect.name} vendor={effect.vendor} size={30} />
+            </button>
+            {#if $customArtworkIds.has(effect.ceId)}
+              <button type="button" class="ghost tile-revert"
+                      title={`Use ${effect.name}'s own picture again`}
+                      onclick={() => clearPluginArtwork(effect.ceId)}>↺</button>
+            {/if}
             <div class="instrument-id">
               <span class="instrument-name">{effect.name}</span>
               <span class="instrument-vendor">{effect.vendor} {effect.version}</span>
@@ -1802,6 +1830,18 @@
   }
   .hw-send { display: flex; align-items: flex-end; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tile-button {
+    flex: none;
+    display: inline-flex;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+  }
+  .tile-button:hover { outline: 1px solid #5b9bd5; outline-offset: 1px; }
+  .tile-revert { flex: none; padding: 0 3px; font-size: 12px; line-height: 16px; }
+
   .fx-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   /* The insertion line is drawn on the row the pointer is over, on the side it will land —
      an inset shadow rather than a real element, so the rows never shift while you aim. */

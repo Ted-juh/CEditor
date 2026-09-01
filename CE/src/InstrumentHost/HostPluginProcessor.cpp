@@ -178,6 +178,25 @@ HostPluginProcessor::HostPluginProcessor()
             });
     };
 
+    // The same chooser, filtered to pictures: where a plug-in's thumbnail comes from when the
+    // vendor shipped none and its editor could not be captured.
+    options.pickImage = [this, aliveToken = alive] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Choose a picture for this plug-in",
+            juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
+            "*.png;*.jpg;*.jpeg;*.gif");
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [aliveToken, done] (const juce::FileChooser& fc)
+            {
+                if (! aliveToken->load())
+                    return;
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
     options.instantiate = makePluginInstantiator (formatManager);
     options.applyVstPreset = applyVstPresetFile;
     options.enableAudio = false;    // the DAW owns the device

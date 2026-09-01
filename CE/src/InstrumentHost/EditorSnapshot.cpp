@@ -45,12 +45,15 @@ juce::Image downscaled (const juce::Image& image, int maxEdge)
                            juce::Graphics::highResamplingQuality);
 }
 
-bool writePng (const juce::Image& image, const juce::File& destination)
+bool writePng (const juce::Image& image, const juce::File& destination, bool rejectBlank)
 {
     // The blank check lives here as well as at the call site on purpose: this is the last
     // place before a picture becomes permanent, and "cached a black square for ever" is the
     // failure that has no recovery short of the user finding the cache folder.
-    if (isBlank (image))
+    if (rejectBlank && isBlank (image))
+        return false;
+
+    if (! image.isValid())
         return false;
 
     destination.getParentDirectory().createDirectory();

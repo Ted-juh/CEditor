@@ -204,10 +204,30 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    CATALOGUE is a copy, anything dragged INSIDE the canvas is a move. A rule about a kind
    breaks when a kind is added; a rule about a category does not.
 
-   **Not built:** dragging to reorder a chain (inserts and MIDI modules still reorder with ▲▼ in
-   the dock), and dropping an instrument on empty canvas to make a new part — that one needs a
-   native add-and-load transaction, since add and load are two commands and the new part's id
-   only arrives on the next state push.
+   **Both built, 2026-09-01.**
+
+   *Dropping an instrument on empty canvas* needed no native transaction after all, which is
+   worth recording because this note said otherwise: `loadInstrument` with no partId already
+   means "into a new part", added earlier for the first click on an empty rack. One service
+   call, so there is never a window in which a part exists with nothing in it. The slot the
+   part will land in is drawn dashed while an instrument is in flight, and the canvas reserves
+   its height even at rest — otherwise the canvas grows the moment a drag starts and slides
+   the target out from under the pointer aiming at it.
+
+   *Reordering a chain by dragging* turned out to matter more than expected: the MIDI chain
+   had ▲▼ arrows, and the INSERT chain had no reordering of any kind, so the only fix for
+   putting the compressor after the reverb was to delete both and add them back the other way
+   round. Inserts now have the arrows (which is the keyboard's version of the move, so the
+   rule below is satisfied by construction) and both chains have a drag grip. The grip is
+   draggable, never the whole row — a row of five buttons that also drags makes every button
+   press feel like it might do something else.
+
+   The one piece of arithmetic worth a test lives in `reorderIndexForDrop`: both the service
+   and the mock take "move to this position AFTER the row has been lifted out", which is
+   exactly one off from what the pointer is saying whenever the row travels DOWNWARDS. Get it
+   wrong and the row lands one place short, in one direction only — the kind of bug that
+   survives a demo and a screenshot. The test asserts the resulting ORDER rather than the
+   index, because an index assertion can be wrong in the same way the code is.
 
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load
@@ -282,11 +302,44 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    a Linux build checks everything downstream of it — the blank test, the downscale, the
    encode, and every policy decision — and none of the pixel-fetching itself.
 
-   **Still to build: user overrides.** Point a class at an image of your own. The cache path
-   and the serving route both exist now, so this is a command and a file copy.
-5. **Persisted positions**, optional: `x`/`y` per node in the manifest, with auto-layout as the
-   fallback when they are absent, so an older session and a hand-written manifest both still open.
-   The repo's existing habit — migrate by construction, never refuse a file for a missing field.
+   **User overrides, 2026-09-01.** Click a plug-in's tile in the browser and pick a picture.
+   It beats everything — the vendor's own included, because the user looked at what was there
+   and decided otherwise — and it is a file of its OWN beside the capture rather than an
+   overwrite of it, which is what makes "use its own picture again" restore whatever was there
+   before instead of leaving the class with nothing. The chosen file is copied in and
+   normalised to a thumbnail PNG rather than referenced where it sits: a picture in Downloads
+   is one tidy-up away from a plug-in with no artwork and no explanation. The blank check is
+   off for this one path only — a flat colour is a strange thing to choose and it is still
+   exactly what was chosen; the check exists to catch a plug-in that failed to draw itself,
+   and a person is not that.
+5. **Persisted positions.** ~~Optional~~ **BUILT, 2026-09-01.**
+
+   Drop a box on another box to route it, drop it on empty canvas to place it. That is what
+   lets one drag mean two things with no modifier key, and it falls out of what the boxes
+   already are: a part or a bus has a destination to change, a return and the master do not,
+   so for those the drag only ever means "put it here" and nothing lights up to suggest
+   otherwise.
+
+   Positions are a side table on the Performance, not an `x`/`y` on `RackPart`, `BusChain` and
+   `ReturnChain`. A canvas node is not a model object — the master has a box and no struct of
+   its own — and all three would otherwise carry two fields the engine, the exporter and the
+   parameter model have to ignore. One list, keyed by the node ids the canvas already uses for
+   routing drops.
+
+   Three refusals, each guarding something with no recovery: a position whose node has gone is
+   dropped on save (left in, it eventually lands on whatever inherits the id — a new part
+   appearing where nobody put it); a malformed position is skipped rather than fatal (refusing
+   to open a rig because a coordinate was a string is an absurd trade for a drawing
+   preference); a negative coordinate is clamped rather than refused, because it is still an
+   intention and a box outside its own container can never be reached again.
+
+   The COLUMN stays computed even for a placed box. It decides a wire's shape and whether a
+   run counts as skipping, and those are facts about the signal, not about where the box was
+   dragged.
+
+   **Found by rendering, and by nothing else:** the canvas element shrink-wraps its boxes, so
+   on a small rack the visibly empty area below them belonged to the scroller, not the canvas,
+   and a drop there did nothing at all. The canvas now fills the viewport.
 
 ## What must not be lost on the way
 
