@@ -86,6 +86,17 @@ Or, for the shorter version: **your synth, playable.**
 
 *Working name: the Capture Session. The single largest moat available.*
 
+> **Built, 2026-08-23/24 — all five stages.** This section was written as a proposal and, by the
+> document's own rule about undated verdicts, kept reading as one for a week after the work
+> landed. The engine is `utils/captureInference.js`, the state machine `utils/captureSession.js`,
+> the conversation `editor/dpd/DpdCaptureScreen.svelte` (the Designer's fourth mode, "Capture"),
+> and the answer key `test/support/fakeSynth.js` with forty-six tests over it. What was built, and
+> the four rulings the plan did not have to make, are in
+> [`capture-session-plan.md`](design/capture-session-plan.md#what-was-built-2026-08-23). The
+> disabled "MIDI learn" button this section names below was removed rather than wired (see
+> `known-issues.md`); the Capture screen is the entry point. The text below is left as the
+> rationale it was.
+
 **The problem it kills.** Somebody has to know the byte layout. Today that somebody is a human with
 a PDF, and the category's entire history is a handful of such people. When they stop, the device is
 unsupported forever. This is why there are thousands of synths and a few hundred editors.
@@ -315,7 +326,7 @@ whether they compound or merely impress. Summary:
 | # | Feature | Moat | Cost | Ship |
 |---|---|---|---|---|
 | 0 | Reposition around the instrument layer | Already earned | ~zero | **Beta** |
-| 1 | Capture-and-infer profiling | **Highest — structurally uncopyable** | Medium | Beta headline |
+| 1 | ~~Capture-and-infer profiling~~ **built** (S1–S5; never run on a real synth) | **Highest — structurally uncopyable** | Medium | Beta headline |
 | 2 | Total Recall (**all four stages done**) | High — the #1 user pain | Low–medium | **Beta** |
 | 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
 | 4 | ~~Ctrlr harvest → profiles~~ **built** (never run on a real panel) | High — network effect, migration | Low (staged) | **Beta** |
@@ -357,7 +368,8 @@ deliberately narrow:
    visible.
 4. **Pick exactly one Tier-1 item as the headline.** Take the **Capture Session**: it is the only
    one a competitor cannot answer by adding a widget, it multiplies the value of everything already
-   built, and most of its plumbing is already in the tree.
+   built, and most of its plumbing is already in the tree. *(Since built — see the note under §1.
+   What it has not had is a real synth; that is the beta's job.)*
 
 Everything else is a stronger release *after* people are using this one.
 
