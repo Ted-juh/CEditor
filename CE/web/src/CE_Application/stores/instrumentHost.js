@@ -35,6 +35,7 @@ import {
   onInstrumentHostHardwarePatchCapture,
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
+  onInstrumentHostPatchCompare,
 } from '../bridge/bridge.js';
 
 export const hostState = writable(emptyHostState());
@@ -82,6 +83,28 @@ export const hostPatchSends = writable({});
 // The question a session asks when it opens holding patches whose policy is "ask". Nothing
 // has been transmitted at this point, and nothing will be until somebody says so.
 export const hostPatchPrompt = writable([]);
+// The last compare: where the part's patch and a library patch differ. null until asked.
+export const hostPatchCompare = writable(null);
+
+export function normalizePatchCompare(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const int = (v, d = 0) => (Number.isInteger(v) ? v : d);
+  return {
+    partId: String(payload.partId ?? ''),
+    recordId: String(payload.recordId ?? ''),
+    nameA: String(payload.nameA ?? ''),
+    nameB: String(payload.nameB ?? ''),
+    identical: payload.identical === true,
+    messagesA: int(payload.messagesA), messagesB: int(payload.messagesB),
+    bytesA: int(payload.bytesA), bytesB: int(payload.bytesB),
+    totalDifferences: int(payload.totalDifferences),
+    truncated: payload.truncated === true,
+    differences: (Array.isArray(payload.differences) ? payload.differences : []).map((d) => ({
+      message: int(d?.message), offset: int(d?.offset),
+      before: int(d?.before, -1), after: int(d?.after, -1),
+    })),
+  };
+}
 
 /** What is currently being dragged, so the canvas can light up the legal targets. It has to be
     a store rather than the drag event's own payload: dataTransfer is deliberately unreadable
@@ -1609,6 +1632,9 @@ export function normalizeHostState(payload) {
         hardwarePatchBytes: Number(part?.hardwarePatchBytes ?? 0),
         hardwareRestore: ['ask', 'always', 'never'].includes(part?.hardwareRestore)
           ? part.hardwareRestore : 'ask',
+        // Where this synth's patches are filed in the library (hw:<profile or port>).
+        hardwarePatchTarget: String(part?.hardwarePatchTarget
+          ?? (part?.hardware === true ? `hw:${String(part?.midiOutputName ?? '').trim().toLowerCase()}` : '')),
         arp: normalizeArp(part?.arp),
         midiFx: normalizeMidiFx(part?.midiFx),
         midiChain: (Array.isArray(part?.midiChain) ? part.midiChain : []).map(normalizeMidiSlot),
@@ -2000,6 +2026,8 @@ export function applyMockCommand(state, payload) {
     for (const key of ['midiOutChannel', 'audioReturnChannel', 'programBank', 'programNumber'])
       if (payload[key] !== undefined) target[key] = Number(payload[key]);
     if (payload.audioReturnStereo !== undefined) target.audioReturnStereo = payload.audioReturnStereo === true;
+    // Where this synth's patches are filed, as native derives it: the profile, else the port.
+    target.hardwarePatchTarget = `hw:${String(target.deviceProfileId || target.midiOutputName || '').trim().toLowerCase()}`;
     // The port-gone diagnostic, mirrored against the mock device list.
     target.midiOutError = target.midiOutputId
       && !['mock-out-1', 'mock-out-2'].includes(target.midiOutputId)
@@ -2008,7 +2036,7 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'clearHardware') {
     const target = part(payload.partId);
-    if (target) { target.hardware = false; target.midiOutError = ''; }
+    if (target) { target.hardware = false; target.midiOutError = ''; target.hardwarePatchTarget = ''; }
     return next;
   }
   if (cmd === 'sendHardwareProgram') {
@@ -2818,6 +2846,7 @@ export function initInstrumentHostBridge() {
     if (payload?.done === true) { delete rest[partId]; return rest; }
     return { ...rest, [partId]: { sent: Number(payload?.sent ?? 0), total: Number(payload?.total ?? 0) } };
   }));
+  onInstrumentHostPatchCompare((payload) => hostPatchCompare.set(normalizePatchCompare(payload)));
   onInstrumentHostHardwarePatchPrompt((payload) => hostPatchPrompt.set(
     (Array.isArray(payload?.parts) ? payload.parts : []).map((p) => ({
       partId: String(p?.partId ?? ''),
@@ -3323,6 +3352,31 @@ export const clearHardwarePatch = (partId) => send({ cmd: 'clearHardwarePatch', 
 export const sendHardwarePatch = (partId) => send({ cmd: 'sendHardwarePatch', partId });
 export const setHardwareRestorePolicy = (partId, policy) =>
   send({ cmd: 'setHardwareRestorePolicy', partId, policy });
+/** Where the part's captured patch and a library patch differ. */
+export const compareHardwarePatch = (partId, recordId) => {
+  if (!isJuceAvailable()) {
+    // No bytes in the browser, so the preview stands in a small, plausible answer: the
+    // panel, the counts and the offset list are what is being exercised.
+    const part = get(hostState).rack.parts.find((p) => p.partId === partId);
+    const record = get(hostLibrary).records.find((r) => r.recordId === recordId);
+    if (!part?.hardwarePatchBytes) { hostLastError.set('That part has no captured patch to compare.'); return; }
+    if (!record || record.sourceType !== 'hardwarePatch') { hostLastError.set('That library record is not a hardware patch.'); return; }
+    const identical = record.name === part.hardwarePatchName;
+    hostPatchCompare.set(normalizePatchCompare({
+      partId, recordId, nameA: part.hardwarePatchName, nameB: record.name, identical,
+      messagesA: 2, messagesB: 2, bytesA: mockPatchBytes, bytesB: mockPatchBytes,
+      totalDifferences: identical ? 0 : 3, truncated: false,
+      differences: identical ? [] : [
+        { message: 0, offset: 7, before: 0x40, after: 0x52 },
+        { message: 0, offset: 12, before: 0x00, after: 0x7f },
+        { message: 1, offset: 9, before: 0x23, after: 0x21 },
+      ],
+    }));
+    return;
+  }
+  send({ cmd: 'compareHardwarePatches', partId, recordId });
+};
+export const clearPatchCompare = () => hostPatchCompare.set(null);
 export const addMacro = (name) => send(name ? { cmd: 'addMacro', name } : { cmd: 'addMacro' });
 export const removeMacro = (macroId) => send({ cmd: 'removeMacro', macroId });
 export const renameMacro = (macroId, name) => send({ cmd: 'renameMacro', macroId, name });

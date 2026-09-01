@@ -1,4 +1,5 @@
 #include "InstrumentHostService.h"
+#include "PatchDiff.h"
 #include "EditorSnapshot.h"
 
 #include <algorithm>
@@ -1975,6 +1976,73 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
         savePerformance();
         emitState();
+        return;
+    }
+
+    if (cmd == "compareHardwarePatches")
+    {
+        // What changed between the patch on a part and one in the library — or between two
+        // library patches. Offsets, not meanings: the bytes stay unread here as everywhere.
+        ensureLibrary();
+        const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto recordIdA = payload.getProperty ("recordIdA", {}).toString();
+        const auto recordId = payload.getProperty ("recordId", payload.getProperty ("recordIdB", {})).toString();
+
+        juce::String nameA, nameB, blobA, blobB;
+        if (partId.isNotEmpty())
+        {
+            const auto* part = rack.getPerformance().findPart (partId);
+            if (part == nullptr || ! part->hardware)
+            {
+                emitError ("That part is not a hardware instrument.");
+                return;
+            }
+            if (part->hardwarePatchBase64.isEmpty())
+            {
+                emitError ("That part has no captured patch to compare.");
+                return;
+            }
+            nameA = part->hardwarePatchName.isNotEmpty() ? part->hardwarePatchName
+                                                         : juce::String ("The part's patch");
+            blobA = part->hardwarePatchBase64;
+        }
+        else if (const auto* a = library.find (recordIdA); a != nullptr && a->sourceType == "hardwarePatch")
+        {
+            nameA = a->name;
+            blobA = a->stateBlobBase64;
+        }
+        else
+        {
+            emitError ("Name a hardware part or a hardware patch record to compare from.");
+            return;
+        }
+
+        const auto* b = library.find (recordId);
+        if (b == nullptr || b->sourceType != "hardwarePatch")
+        {
+            emitError ("That library record is not a hardware patch.");
+            return;
+        }
+        nameB = b->name;
+        blobB = b->stateBlobBase64;
+
+        juce::MemoryBlock bytesA, bytesB;
+        if (! bytesA.fromBase64Encoding (blobA) || ! bytesB.fromBase64Encoding (blobB))
+        {
+            emitError ("One of the patches could not be read back.");
+            return;
+        }
+
+        auto result = patchDiff::toVar (patchDiff::compare (bytesA, bytesB));
+        if (auto* obj = result.getDynamicObject())
+        {
+            obj->setProperty ("partId",   partId);
+            obj->setProperty ("recordId", recordId);
+            obj->setProperty ("nameA",    nameA);
+            obj->setProperty ("nameB",    nameB);
+        }
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostPatchCompare", result);
         return;
     }
 
@@ -6493,6 +6561,9 @@ juce::var InstrumentHostService::buildStatePayload()
             obj->setProperty ("hardwarePatchName",  part.hardwarePatchName);
             obj->setProperty ("hardwarePatchBytes", (int) ((part.hardwarePatchBase64.length() / 4) * 3));
             obj->setProperty ("hardwareRestore",    part.hardwareRestore);
+            // What this synth's library patches are filed under, so the UI can offer the
+            // right ones to compare with and to walk — the same target saveUserPreset writes.
+            obj->setProperty ("hardwarePatchTarget", hardwarePatchTarget (part));
         }
 
         // What this part's own plug-ins cost. Shown because it names the thing to blame:

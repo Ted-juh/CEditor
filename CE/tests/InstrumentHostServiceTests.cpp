@@ -19,6 +19,7 @@
 
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/EditorSnapshot.h"
+#include "InstrumentHost/PatchDiff.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
@@ -3893,6 +3894,132 @@ void testMidiSourceCommands()
     }
 }
 
+// Patch compare: where two dumps of the same synth differ, without reading either.
+void testPatchCompare()
+{
+    std::cout << "\npatch compare" << std::endl;
+
+    const auto sysex = [] (std::vector<juce::uint8> body)
+    {
+        juce::MemoryBlock block;
+        const juce::uint8 head = 0xf0, tail = 0xf7;
+        block.append (&head, 1);
+        block.append (body.data(), body.size());
+        block.append (&tail, 1);
+        return block;
+    };
+    const auto join = [] (std::initializer_list<juce::MemoryBlock> blocks)
+    {
+        juce::MemoryBlock out;
+        for (const auto& b : blocks)
+            out.append (b.getData(), b.getSize());
+        return out;
+    };
+
+    // The pure function first.
+    {
+        const auto a = join ({ sysex ({ 0x41, 0x10, 0x01, 0x02, 0x03 }), sysex ({ 0x41, 0x20, 0x55 }) });
+        const auto same = ceditor::host::patchDiff::compare (a, a);
+        check (same.identical && same.totalDifferences == 0 && same.messagesA == 2 && same.bytesA == 12,
+               "a patch against itself is identical, and the sizes are counted");
+
+        const auto b = join ({ sysex ({ 0x41, 0x10, 0x01, 0x7f, 0x03 }), sysex ({ 0x41, 0x20, 0x55 }) });
+        const auto one = ceditor::host::patchDiff::compare (a, b);
+        check (! one.identical && one.totalDifferences == 1 && one.differences.size() == 1
+                 && one.differences[0].message == 0 && one.differences[0].offset == 4
+                 && one.differences[0].before == 0x02 && one.differences[0].after == 0x7f,
+               "one changed byte is reported at its message and offset, before and after");
+
+        // A missing second message is every one of its bytes, not a length note.
+        const auto shorter = sysex ({ 0x41, 0x10, 0x01, 0x02, 0x03 });
+        const auto missing = ceditor::host::patchDiff::compare (a, shorter);
+        check (! missing.identical && missing.messagesB == 1 && missing.totalDifferences == 5
+                 && missing.differences[0].message == 1 && missing.differences[0].after == -1
+                 && missing.differences[0].before == 0xf0,
+               "a message the other side lacks reads as every byte of it missing");
+
+        // Message-by-message, so a byte added to the first message is not every byte of the
+        // second having changed: the tail F7 moves (one difference), a byte appears after it
+        // (another), and message 1 is untouched.
+        const auto longer = join ({ sysex ({ 0x41, 0x10, 0x01, 0x02, 0x03, 0x04 }), sysex ({ 0x41, 0x20, 0x55 }) });
+        const auto inserted = ceditor::host::patchDiff::compare (a, longer);
+        check (inserted.totalDifferences == 2
+                 && inserted.differences[0].message == 0 && inserted.differences[0].offset == 6
+                 && inserted.differences[0].before == 0xf7 && inserted.differences[0].after == 0x04
+                 && inserted.differences[1].message == 0 && inserted.differences[1].offset == 7
+                 && inserted.differences[1].before == -1 && inserted.differences[1].after == 0xf7,
+               "a longer first message is two differences in the first message and none in the second");
+
+        juce::MemoryBlock big, bigger;
+        std::vector<juce::uint8> body (1000, 0x00), other (1000, 0x01);
+        big = sysex (body);
+        bigger = sysex (other);
+        const auto capped = ceditor::host::patchDiff::compare (big, bigger, 16);
+        check (capped.totalDifferences == 1000 && capped.differences.size() == 16 && capped.truncated,
+               "the list is capped and says so, the count is not");
+
+        const auto json = ceditor::host::patchDiff::toVar (one);
+        check ((bool) json.getProperty ("identical", true) == false
+                 && json.getProperty ("differences", {}).size() == 1
+                 && (int) json.getProperty ("differences", {})[0].getProperty ("offset", -1) == 4,
+               "and it serialises for the bridge");
+    }
+
+    // Then the command: the part's patch against a library record.
+    const auto dir = freshDataDir ("patch-compare");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("setHardwareConfig", { { "partId", partId }, { "midiOutputName", "Juno Port" } });
+
+    const auto dump = [] (juce::uint8 tag)
+    {
+        std::vector<juce::uint8> body { 0x41, 0x10, tag, 0x01, 0x02 };
+        return juce::MidiMessage::createSysExMessage (body.data(), (int) body.size());
+    };
+    h.cmd ("captureHardwarePatch", { { "partId", partId } });
+    h.service->noteMidiActivity ("Juno", dump (0x11));
+    h.service->drainParameterEvents();
+    h.cmd ("finishHardwarePatchCapture", { { "partId", partId }, { "name", "Brass Pad" } });
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Brass Pad" } });
+    juce::String recordId;
+    for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+        recordId = r.getProperty ("recordId", {}).toString();
+
+    h.emits.clear();
+    h.cmd ("compareHardwarePatches", { { "partId", partId }, { "recordId", recordId } });
+    const auto* same = h.emits.last ("instrumentHostPatchCompare");
+    check (same != nullptr && (bool) same->getProperty ("identical", false)
+             && same->getProperty ("nameB", {}).toString() == "Brass Pad",
+           "the part's patch against the record it was saved as is identical");
+
+    // Edit on the synth, capture again, compare: the one byte that moved.
+    h.cmd ("captureHardwarePatch", { { "partId", partId } });
+    h.service->noteMidiActivity ("Juno", dump (0x12));
+    h.service->drainParameterEvents();
+    h.cmd ("finishHardwarePatchCapture", { { "partId", partId }, { "name", "Brass Pad edited" } });
+    h.emits.clear();
+    h.cmd ("compareHardwarePatches", { { "partId", partId }, { "recordId", recordId } });
+    const auto* changed = h.emits.last ("instrumentHostPatchCompare");
+    check (changed != nullptr && ! (bool) changed->getProperty ("identical", true)
+             && (int) changed->getProperty ("totalDifferences", 0) == 1
+             && (int) changed->getProperty ("differences", {})[0].getProperty ("offset", -1) == 3
+             && (int) changed->getProperty ("differences", {})[0].getProperty ("before", -1) == 0x12
+             && (int) changed->getProperty ("differences", {})[0].getProperty ("after", -1) == 0x11,
+           "after an edit the compare names the byte that moved, part first, record second");
+    check (h.emits.lastState() == nullptr, "and comparing changes nothing");
+
+    h.emits.clear();
+    h.cmd ("compareHardwarePatches", { { "partId", partId }, { "recordId", "nope" } });
+    check (h.emits.lastError().contains ("not a hardware patch"), "an unknown record is refused");
+    h.cmd ("getState");   // the refusal pushed no state; ask before reading one
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+               .getProperty ("hardwarePatchTarget", {}).toString() == "hw:juno port",
+           "the part says what its patches are filed under");
+}
+
 // A MIDI module, added the way a person adds one, heard the way a person hears one.
 //
 // The six note modules are covered thoroughly in PerformanceEngineTests, which drives the
@@ -6639,6 +6766,7 @@ int main (int argc, char* argv[])
     testHardwarePatchesInTheLibrary();
     testPadsAndFaders();
     testMidiSourceCommands();
+    testPatchCompare();
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();

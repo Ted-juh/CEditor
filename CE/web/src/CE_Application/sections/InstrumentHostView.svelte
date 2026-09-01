@@ -45,6 +45,7 @@
     captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
     clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
     hostPatchCapture, hostPatchSends, hostPatchPrompt,
+    hostPatchCompare, compareHardwarePatch, clearPatchCompare, hostLibrary as hostLibraryStore,
     transportPlay, transportStop, setTempo, setTimeSignature, setExternalClock,
     setPartArp, setPartMidiFx,
     midiSlotTypes, midiSlotLabels,
@@ -102,6 +103,10 @@
   /** Bytes as something a person reads. A patch is a few hundred; a bank is tens of
       thousands, and "38912" says less than "38 KB" about whether the whole thing arrived. */
   const patchSize = (bytes) => (bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} bytes`);
+  /** A byte the way a synth manual writes it; a byte that is not there reads as absent. */
+  const hex = (b) => (b < 0 ? '—' : b.toString(16).toUpperCase().padStart(2, '0') + 'h');
+  // Which saved patch to compare the part's against.
+  let compareRecordId = $state('');
   let dockHeight = $state(340);   // enough for the arp's two grids without a scrollbar
   let gripping = $state(false);
   let gripStartY = 0;
@@ -1330,6 +1335,59 @@
                   Sending… {$hostPatchSends[focusedPart.partId].sent} of {$hostPatchSends[focusedPart.partId].total}
                 </div>
               {/if}
+
+              <!-- Patch compare. The one thing that can be said about the bytes without
+                   reading them: where two dumps of the same synth differ. "Is what's on the
+                   part what I saved?" and "what did I change since?" — offsets a person who
+                   knows the synth can read against its manual. -->
+              {#if focusedPart.hardwarePatchBytes > 0}
+                {@const candidates = $hostLibraryStore.records.filter((r) =>
+                  r.sourceType === 'hardwarePatch'
+                  && (!focusedPart.hardwarePatchTarget || r.targetCeId === focusedPart.hardwarePatchTarget))}
+                {#if candidates.length > 0}
+                  <div class="hw-compare-row" data-testid="host-patch-compare">
+                    <label>Compare with
+                      <select bind:value={compareRecordId}>
+                        <option value="">(choose a saved patch)</option>
+                        {#each candidates as r (r.recordId)}
+                          <option value={r.recordId}>{r.name}</option>
+                        {/each}
+                      </select>
+                    </label>
+                    <button type="button" disabled={!compareRecordId}
+                            onclick={() => compareHardwarePatch(focusedPart.partId, compareRecordId)}>Compare</button>
+                  </div>
+                {/if}
+              {/if}
+              {#if $hostPatchCompare && $hostPatchCompare.partId === focusedPart.partId}
+                {@const c = $hostPatchCompare}
+                <div class="hw-compare" data-testid="host-patch-compare-result">
+                  <div class="hw-compare-head">
+                    {#if c.identical}
+                      <strong>Identical</strong> — {c.nameA} is byte for byte {c.nameB}
+                    {:else}
+                      <strong>{c.totalDifferences} byte{c.totalDifferences === 1 ? '' : 's'} differ</strong>
+                      — {c.nameA} vs {c.nameB}
+                      ({c.messagesA} message{c.messagesA === 1 ? '' : 's'}, {patchSize(c.bytesA)}
+                      {#if c.messagesA !== c.messagesB || c.bytesA !== c.bytesB} vs {c.messagesB}, {patchSize(c.bytesB)}{/if})
+                    {/if}
+                    <button type="button" class="ghost" onclick={() => clearPatchCompare()}>×</button>
+                  </div>
+                  {#if !c.identical}
+                    <div class="hw-compare-list">
+                      {#each c.differences.slice(0, 48) as d, i (i)}
+                        <span class="hw-diff">
+                          <span class="hw-diff-where">msg {d.message} · {d.offset}</span>
+                          <span class="hw-diff-bytes">{hex(d.before)} → {hex(d.after)}</span>
+                        </span>
+                      {/each}
+                      {#if c.differences.length > 48 || c.truncated}
+                        <span class="dim">… and more</span>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             </div>
           </div>
         {:else if focusedPart && !focusedPart.hasInstrument && !focusedPart.unresolved}
@@ -2054,6 +2112,16 @@
   .hw-listen { color: #9fd0e4; }
   .hw-heard { color: #7d8894; font-size: 11px; }
   .hw-sending { font-size: 11px; color: #9fd0e4; }
+  .hw-compare-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .hw-compare-row label { display: flex; align-items: center; gap: 6px; }
+  .hw-compare { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border: 1px solid #2c343d; border-radius: 4px; background: #14191e; font-size: 12px; }
+  .hw-compare-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .hw-compare-head .ghost { margin-left: auto; }
+  /* Offsets read as a table without being one: fixed-width pairs that wrap. */
+  .hw-compare-list { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+  .hw-diff { display: inline-flex; gap: 8px; }
+  .hw-diff-where { color: #7d8894; min-width: 80px; }
+  .hw-diff-bytes { color: #d8e0e8; }
   .patch-prompt {
     display: flex;
     align-items: center;

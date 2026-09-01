@@ -265,6 +265,21 @@ with a plug-in it refuses, because turning that into a hardware part would unloa
 instrument for bytes it could never play. `testHardwarePatchesInTheLibrary` covers all of it
 across a restart, bytes compared exactly.
 
+### Patch compare — built, 2026-09-01
+
+The one thing that can be said about the bytes without reading them is where two dumps of the same
+synth differ, and it turns out to be most of what a person wants to know. `compareHardwarePatches`
+sets the part's captured patch against a library patch (or two library patches against each
+other) and answers with `identical`, the sizes, and a list of `{ message, offset, before, after }`
+— capped at 512 with the true count beside it. "Is the patch on the part the one I saved?" is one
+boolean; "what did I change since?" is a short list a person who knows the synth reads against its
+manual. Messages are compared one against one, in order, because a multi-message dump is one
+message per bank slot or parameter block and the same offset in the same message means the same
+thing; comparing the concatenation would report a one-byte length change as every byte after it
+having changed, which is true and useless. `PatchDiff.h` is juce_core only and pure, and it is
+the byte-diff the Capture Session below needs: a byte that moves when one knob moves is that
+knob's address.
+
 ## Verification
 
 The failure modes here are all timing and ordering, so test those rather than the happy path:

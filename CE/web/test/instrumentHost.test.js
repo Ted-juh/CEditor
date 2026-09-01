@@ -76,7 +76,7 @@ import {
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import {
   setHardwareConfig, captureHardwarePatch, finishHardwarePatchCapture, hostLastError,
-  midiSourceWouldLoop,
+  midiSourceWouldLoop, normalizePatchCompare, compareHardwarePatch, hostPatchCompare,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { get } from 'svelte/store';
 import {
@@ -1321,6 +1321,46 @@ test('one part driving another: the source is a field, loops are refused, remova
 
   const normalized = normalizeHostState({ rack: { parts: [{ partId: 'x', midiSourcePartId: 'y' }] } });
   assert.equal(normalized.rack.parts[0].midiSourcePartId, 'y', 'the field normalizes through');
+});
+
+test('patch compare shapes the answer and the preview stands one in', () => {
+  const shaped = normalizePatchCompare({ partId: 'p', recordId: 'r', nameA: 'A', nameB: 'B',
+    identical: false, messagesA: 2, messagesB: 1, bytesA: 20, bytesB: 10, totalDifferences: 2,
+    truncated: 'yes', differences: [{ message: 1, offset: 3, before: 0x10, after: 0x11 }, { offset: 'x' }] });
+  assert.equal(shaped.identical, false);
+  assert.equal(shaped.truncated, false, 'a string is not true');
+  assert.deepEqual(shaped.differences[0], { message: 1, offset: 3, before: 0x10, after: 0x11 });
+  assert.deepEqual(shaped.differences[1], { message: 0, offset: 0, before: -1, after: -1 }, 'garbage reads as absent bytes');
+  assert.equal(normalizePatchCompare(null), null);
+
+  hostStateStore.set(mockHostState());
+  setHardwareConfig('mock-part-2', { midiOutputId: 'mock-out-1', midiOutputName: 'Juno Out' });
+  hostLastError.set('');
+  hostPatchCompare.set(null);
+  compareHardwarePatch('mock-part-2', 'nothing');
+  assert.match(get(hostLastError), /no captured patch/, 'nothing captured, nothing to compare');
+  assert.equal(get(hostPatchCompare), null);
+
+  captureHardwarePatch('mock-part-2');
+  finishHardwarePatchCapture('mock-part-2', 'Brass Pad');
+  requestLibrary('', '');
+  saveUserPreset('mock-part-2');
+  const record = get(hostLibrary).records.at(-1);
+  assert.equal(get(hostStateStore).rack.parts[1].hardwarePatchTarget, 'hw:juno out',
+    'the part says where its patches are filed');
+  assert.equal(record.targetCeId, 'hw:juno out', 'and the saved record is filed there');
+
+  compareHardwarePatch('mock-part-2', record.recordId);
+  const same = get(hostPatchCompare);
+  assert.equal(same.identical, true, 'the patch against the record it was saved as is identical');
+  assert.equal(same.partId, 'mock-part-2');
+
+  captureHardwarePatch('mock-part-2');
+  finishHardwarePatchCapture('mock-part-2', 'Brass Pad edited');
+  compareHardwarePatch('mock-part-2', record.recordId);
+  const changed = get(hostPatchCompare);
+  assert.equal(changed.identical, false, 'after an edit they differ');
+  assert.ok(changed.differences.length > 0 && changed.totalDifferences === changed.differences.length);
 });
 
 test('mock reducer: explicit multi-output routes add, retune and remove', () => {

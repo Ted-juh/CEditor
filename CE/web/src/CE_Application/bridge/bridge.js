@@ -1078,6 +1078,15 @@ export function onInstrumentHostHardwarePatchSend(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Where two hardware patches differ ({ partId, recordId, nameA, nameB, identical, messagesA,
+    messagesB, bytesA, bytesB, totalDifferences, truncated, differences: [{ message, offset,
+    before, after }] }). Offsets, never meanings — the bytes stay unread. */
+export function onInstrumentHostPatchCompare(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostPatchCompare', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Asked once when a session opens carrying patches whose policy is "ask"
     ({ parts: [{ partId, patchName }] }). Nothing has been transmitted when this arrives. */
 export function onInstrumentHostHardwarePatchPrompt(callback) {
