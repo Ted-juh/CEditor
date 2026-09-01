@@ -155,11 +155,7 @@
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
   let effects = $derived(filterEffects($hostState.effectClasses, search));
-  // A module needs attention when it produced nothing loadable and there is a reason for it:
-  // quarantined, gone, the wrong architecture, or a scan that failed. A module that yielded
-  // classes needs no row anywhere — its classes are the row.
-  let troubledModules = $derived($hostState.modules.filter(
-    (m) => m.quarantined || m.missing || m.unavailableReason || m.failureCount > 0).length);
+
   let assignedIds = $derived(assignedParameterIds($hostState, paramTargetId));
   let paramAssignedOnly = $state(false);
   let visibleParameters = $derived(
@@ -897,20 +893,8 @@
         {/if}
       </div>
 
-      <!-- The module list moved to Health. It answers "what happened to the files I asked you
-           to scan?", which is a diagnostic question rather than a browsing one — and every
-           module that produced something loadable is now represented by its classes in the
-           two lists above. What stays here is the count, so a scan that found nothing still
-           says so, and a way to reach the ones that need looking at. -->
-      <div class="module-summary" data-testid="host-module-summary">
-        {$hostState.modules.length}
-        {$hostState.modules.length === 1 ? 'module scanned' : 'modules scanned'}
-        {#if troubledModules > 0}
-          · <button type="button" class="ghost warn" onclick={() => (reliabilityOpen = true)}>
-              {troubledModules} need{troubledModules === 1 ? 's' : ''} attention
-            </button>
-        {/if}
-      </div>
+      <!-- Nothing about scanned modules here. What the scanner did is a Health question, and
+           the browser is for browsing. -->
     </section>
   </div>
 
@@ -1664,16 +1648,6 @@
     font-size: 12px;
     overflow-wrap: anywhere;
   }
-  .module-summary {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    border-top: 1px solid #2c343d;
-    padding-top: 8px;
-    color: #7d8894;
-    font-size: 11px;
-  }
-  .module-summary .warn { color: #d6a3a3; font-size: 11px; padding: 0 4px; }
   .dim { color: #7d8894; font-size: 11px; }
 
   .param-view {
