@@ -232,8 +232,9 @@ Ordered so that each stage is useful shipped alone, and none of them requires th
    Keyboard equivalents exist by construction rather than by addition: every drop has a control
    that still does the same job — the mixer's destination dropdowns, and the browser's Load
    button — which is why the List view stays first.
-4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**. ~~Vendor snapshots~~ and
-   ~~editor capture~~ **BUILT, 2026-09-01**. User overrides still to come.
+4. **Thumbnails.** ~~Generated tiles~~ **BUILT, 2026-08-31**. ~~Vendor snapshots~~,
+   ~~editor capture~~ and ~~user overrides~~ **BUILT, 2026-09-01** — all four sources of a
+   plug-in's face are in.
 
    A tile is *derived*, not found: a hue, a pattern and two letters, all from the catalogue's
    stable `ceId`. Same class, same tile, on every machine and after every rescan — which is what
