@@ -74,6 +74,9 @@ import {
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
+import {
+  setHardwareConfig, captureHardwarePatch, finishHardwarePatchCapture, hostLastError,
+} from '../src/CE_Application/stores/instrumentHost.js';
 import { get } from 'svelte/store';
 import {
   activeEditorTab,
@@ -1182,6 +1185,50 @@ test('mock reducer: total recall captures, names, re-policies and forgets a patc
   assert.equal(patch().hardwarePatchName, '');
   assert.equal(patch().hardwarePatchBytes, 0);
   assert.equal(patch().hardware, true, 'forgetting the patch keeps the part hardware');
+});
+
+test('hardware patches save to the library, load onto hardware parts and refuse plug-ins', () => {
+  // Earlier tests reshape the shared store; start from the known two-part mock rack.
+  hostStateStore.set(mockHostState());
+  requestLibrary('', '');
+  const before = get(hostLibrary).records.length;
+
+  setHardwareConfig('mock-part-2', { midiOutputId: 'mock-out-1', midiOutputName: 'Juno Out' });
+  hostLastError.set('');
+  saveUserPreset('mock-part-2');
+  assert.equal(get(hostLibrary).records.length, before, 'nothing captured, nothing saved');
+  assert.match(get(hostLastError), /Capture a patch/, 'and it says why');
+
+  captureHardwarePatch('mock-part-2');
+  finishHardwarePatchCapture('mock-part-2', 'Brass Pad');
+  hostLastError.set('');
+  saveUserPreset('mock-part-2');
+  const records = get(hostLibrary).records;
+  assert.equal(records.length, before + 1, 'a captured patch joins the library');
+  const record = records.at(-1);
+  assert.equal(record.sourceType, 'hardwarePatch');
+  assert.equal(record.instrument, 'Juno Out', 'named after the synth it came from');
+  assert.equal(record.name, 'Brass Pad');
+  assert.equal(get(hostLastError), '');
+  const part2 = get(hostStateStore).rack.parts.find((p) => p.partId === 'mock-part-2');
+  assert.equal(part2.presetName, 'Brass Pad', "the part's cursor lands on what it saved");
+
+  // Onto a plug-in part: refused, part untouched.
+  const part1Before = { ...get(hostStateStore).rack.parts.find((p) => p.partId === 'mock-part-1') };
+  loadLibraryRecord(record.recordId, 'focused', 'mock-part-1');
+  assert.match(get(hostLastError), /hardware patch/, 'a plug-in part refuses a hardware patch');
+  const part1 = get(hostStateStore).rack.parts.find((p) => p.partId === 'mock-part-1');
+  assert.equal(part1.hardware, part1Before.hardware);
+  assert.equal(part1.presetName, part1Before.presetName);
+
+  // Add as new part: a hardware part with the patch and no port.
+  const partsBefore = get(hostStateStore).rack.parts.length;
+  loadLibraryRecord(record.recordId, 'add');
+  const added = get(hostStateStore).rack.parts.at(-1);
+  assert.equal(get(hostStateStore).rack.parts.length, partsBefore + 1);
+  assert.equal(added.hardware, true, 'the new part is hardware');
+  assert.equal(added.hardwarePatchName, 'Brass Pad');
+  assert.equal(added.hasInstrument, false);
 });
 
 test('mock reducer: explicit multi-output routes add, retune and remove', () => {

@@ -107,6 +107,26 @@ namespace
     /** The six later modules' fields. Clamped here as well as in the codec because a command
         arrives from a WebView and a codec only sees what was written to disk — an echo asked
         for four hundred repeats has to be refused at the door, not on the next load. */
+    /** What a hardware patch record targets. A plug-in has a class identity; a synth on a
+        cable has nothing of the kind, so the best available stand-in is used and the record
+        says which: the device profile it was linked to, or failing that the port it was
+        reached through. "hw:" keeps it out of the catalogue's namespace — no lookup will
+        ever mistake it for a class, and the availability check knows to leave it alone. */
+    juce::String hardwarePatchTarget (const RackPart& part)
+    {
+        const auto identity = part.deviceProfileId.isNotEmpty() ? part.deviceProfileId
+                                                                : part.midiOutputName;
+        return identity.isEmpty() ? juce::String ("hw:")
+                                  : "hw:" + identity.trim().toLowerCase();
+    }
+
+    juce::String hardwareInstrumentName (const RackPart& part)
+    {
+        return part.deviceProfileId.isNotEmpty() ? part.deviceProfileId
+             : part.midiOutputName.isNotEmpty()  ? part.midiOutputName
+                                                 : juce::String ("External hardware");
+    }
+
     void applyNoteModuleFields (perf::NoteModuleSettings& mod, const juce::var& payload,
                                 const juce::DynamicObject& fields)
     {
@@ -2895,31 +2915,69 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         ensureLibrary();
         const auto partId = payload.getProperty ("partId", {}).toString();
         const auto* part = rack.getPerformance().findPart (partId);
-        auto* instrument = rack.getInstrument (partId);
-        if (part == nullptr || instrument == nullptr)
+        if (part == nullptr)
         {
-            emitError ("That part has no instrument to capture.");
+            emitError ("Unknown rack part.");
             return;
         }
 
-        juce::MemoryBlock state;
-        instrument->getStateInformation (state);
-
         LibraryRecord record;
         record.type = "preset";
-        record.sourceType = "userState";
-        record.targetCeId = part->pluginCeId;
-        record.instrument = part->pluginName;
-        record.manufacturer = part->pluginVendor;
         record.name = payload.getProperty ("name", {}).toString().trim();
-        if (record.name.isEmpty())
-            record.name = part->pluginName + " preset";
         record.category = payload.getProperty ("category", {}).toString().trim();
-        record.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
+
+        if (part->hardware)
+        {
+            // A hardware part's sound is the patch it captured, and the library is where a
+            // sound belongs whichever box makes it: "warm pad" should find the Serum preset
+            // and the Juno patch in one list. The bytes stay opaque here exactly as they are
+            // on the part — the record carries them, never reads them.
+            if (part->hardwarePatchBase64.isEmpty())
+            {
+                emitError ("Capture a patch from the synth first — there is nothing to save yet.");
+                return;
+            }
+            record.sourceType = "hardwarePatch";
+            record.targetCeId = hardwarePatchTarget (*part);
+            record.instrument = hardwareInstrumentName (*part);
+            if (record.name.isEmpty())
+                record.name = part->hardwarePatchName.isNotEmpty() ? part->hardwarePatchName
+                                                                   : record.instrument + " patch";
+            record.stateBlobBase64 = part->hardwarePatchBase64;
+        }
+        else
+        {
+            auto* instrument = rack.getInstrument (partId);
+            if (instrument == nullptr)
+            {
+                emitError ("That part has no instrument to capture.");
+                return;
+            }
+
+            juce::MemoryBlock state;
+            instrument->getStateInformation (state);
+
+            record.sourceType = "userState";
+            record.targetCeId = part->pluginCeId;
+            record.instrument = part->pluginName;
+            record.manufacturer = part->pluginVendor;
+            if (record.name.isEmpty())
+                record.name = part->pluginName + " preset";
+            record.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
+        }
         record.fingerprint = juce::String::toHexString (record.stateBlobBase64.hashCode64());
 
-        library.addCapturedRecord (std::move (record));
+        const auto recordId = library.addCapturedRecord (std::move (record));
         library.saveTo (libraryFile());
+
+        // Saving is also arriving: the part's preset cursor lands on what it just saved, so
+        // prev/next walks on from here rather than from the top.
+        if (const auto* saved = library.find (recordId))
+        {
+            rack.setPartLastPreset (partId, saved->recordId, saved->name);
+            savePerformance();
+            emitState();
+        }
         emitLibrary ({}, {});
         return;
     }
@@ -3170,16 +3228,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             emitError ("Unknown rack part.");
             return;
         }
-        if (part->pluginCeId.isEmpty() || part->hardware)
+        if (part->pluginCeId.isEmpty() && ! part->hardware)
         {
             emitError ("Load an instrument on this part first — presets walk what is loaded.");
             return;
         }
 
+        // A hardware part walks the patches captured from the same synth — the front-panel
+        // prev/next VIP had for plug-ins, on a box that never had a preset browser at all.
+        const auto target = part->hardware ? hardwarePatchTarget (*part) : part->pluginCeId;
         juce::Array<const LibraryRecord*> candidates;
         for (const auto& record : library.allRecords())
             if (record.type == "preset" && ! record.missing
-                && record.targetCeId == part->pluginCeId)
+                && record.targetCeId == target
+                && (record.sourceType == "hardwarePatch") == part->hardware)
                 candidates.add (&record);
 
         const auto rankOf = [] (const LibraryRecord& r)
@@ -3199,8 +3261,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         if (candidates.isEmpty())
         {
-            emitError ("No presets in the library for " + part->pluginName
-                       + " — its factory sounds may only live in its own browser.");
+            emitError (part->hardware
+                         ? "No patches in the library for " + hardwareInstrumentName (*part)
+                             + " — capture one from the synth and save it."
+                         : "No presets in the library for " + part->pluginName
+                             + " — its factory sounds may only live in its own browser.");
             return;
         }
 
@@ -4328,6 +4393,13 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
         return {};
     }
 
+    // A hardware patch has no class to be missing. What it needs is a synth on a cable, which
+    // the library cannot see and must not pretend to: the record is always loadable, and
+    // whether the bytes reach anything is reported by the send, not guessed at here.
+    if (record.sourceType == "hardwarePatch")
+        return record.stateBlobBase64.isEmpty() ? juce::String ("The captured patch is empty.")
+                                                : juce::String();
+
     if (record.targetCeId.isEmpty())
         return "No installed instrument matches this preset — scan for instruments, then "
                "rescan the library.";
@@ -4528,6 +4600,41 @@ void InstrumentHostService::ingestProgramList (const juce::String& partId)
 void InstrumentHostService::loadPresetRecord (const LibraryRecord& record, const juce::String& partId)
 {
     const auto* part = rack.getPerformance().findPart (partId);
+
+    if (record.sourceType == "hardwarePatch")
+    {
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        // A part with a plug-in on it is not silently turned into a hardware part: that would
+        // unload somebody's instrument to make room for bytes it could never play. An EMPTY
+        // part, though, is exactly what "add as new part" hands over, and becoming a
+        // hardware part with no port yet is the honest shape for it — the patch is on it,
+        // the port picker is one click away, and the send reports that nothing was there
+        // to deliver to.
+        if (! part->hardware)
+        {
+            if (rack.getInstrument (partId) != nullptr || part->pluginCeId.isNotEmpty())
+            {
+                emitError (record.name + " is a hardware patch — load it onto a hardware part.");
+                return;
+            }
+            rack.setHardwareConfig (partId, {});
+            openHardwareMidi (partId);
+            restartAudioIfNeeded();
+        }
+
+        rack.setHardwarePatch (partId, record.stateBlobBase64, record.name);
+        rack.setPartLastPreset (partId, record.recordId, record.name);
+        queueHardwarePatchSend (partId);
+        savePerformance();
+        emitState();
+        return;
+    }
+
     const auto sameClassLoaded = part != nullptr
                               && rack.getInstrument (partId) != nullptr
                               && part->pluginCeId == record.targetCeId;

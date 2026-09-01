@@ -3420,6 +3420,198 @@ void testHardwareParts()
            "the audio return restores through fader and inserts");
 }
 
+// Hardware patches in the Library: a sound lives in the library whichever box makes it.
+void testHardwarePatchesInTheLibrary()
+{
+    std::cout << "\nhardware patches in the library" << std::endl;
+
+    const auto dir = freshDataDir ("recall-library");
+    seedTwoSynthCatalog (dir);
+
+    std::vector<juce::MidiMessage> captured;
+    const auto tweak = [&captured] (InstrumentHostService::Options& options)
+    {
+        options.listMidiOutputs = []
+        {
+            juce::StringPairArray outputs;
+            outputs.set ("juno-port", "Juno Port");
+            return outputs;
+        };
+        options.openMidiOutput = [&captured] (const juce::String& deviceId, juce::String& errorOut)
+            -> ceditor::host::MidiSendProcessor::Sink
+        {
+            if (deviceId != "juno-port")
+            {
+                errorOut = "No such MIDI output.";
+                return {};
+            }
+            return [&captured] (const juce::MidiBuffer& messages)
+            {
+                for (const auto metadata : messages)
+                    captured.push_back (metadata.getMessage());
+            };
+        };
+    };
+
+    const auto dump = [] (juce::uint8 tag)
+    {
+        std::vector<juce::uint8> body { 0x41, 0x10, tag, 0x01, 0x02, 0x03, 0x04 };
+        return juce::MidiMessage::createSysExMessage (body.data(), (int) body.size());
+    };
+    const auto brass = dump (0x11), glass = dump (0x22);
+    const auto sameBytes = [] (const juce::MidiMessage& a, const juce::MidiMessage& b)
+    {
+        return a.getRawDataSize() == b.getRawDataSize()
+                 && std::memcmp (a.getRawData(), b.getRawData(), (size_t) a.getRawDataSize()) == 0;
+    };
+    const auto lastSysex = [&captured] () -> juce::MidiMessage
+    {
+        for (auto it = captured.rbegin(); it != captured.rend(); ++it)
+            if (it->isSysEx())
+                return *it;
+        return {};
+    };
+    const auto drain = [] (Harness& harness)
+    {
+        for (int i = 0; i < 6; ++i)
+            harness.service->drainParameterEvents();
+    };
+    // Never dereference a state that a refused command did not push: a null here does not
+    // fail an assertion, it kills the binary with every later section unreported.
+    const auto partRow = [] (Harness& harness, int index)
+    {
+        const auto* state = harness.emits.lastState();
+        return state == nullptr ? juce::var()
+                                : state->getProperty ("rack", {}).getProperty ("parts", {})[index];
+    };
+    const auto captureAs = [&] (Harness& harness, const juce::String& partId,
+                                const juce::MidiMessage& message, const juce::String& name)
+    {
+        harness.cmd ("captureHardwarePatch", { { "partId", partId } });
+        harness.service->noteMidiActivity ("Juno", message);
+        harness.service->drainParameterEvents();
+        harness.cmd ("finishHardwarePatchCapture", { { "partId", partId }, { "name", name } });
+    };
+
+    juce::String brassId, glassId;
+    {
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partA = h.firstPartId();
+        h.cmd ("setHardwareConfig", { { "partId", partA }, { "midiOutputId", "juno-port" },
+                                      { "midiOutputName", "Juno Port" }, { "midiOutChannel", 2 } });
+
+        h.emits.clear();
+        h.cmd ("saveUserPreset", { { "partId", partA } });
+        check (h.emits.lastError().contains ("Capture a patch"),
+               "a hardware part with nothing captured has nothing to save, and says so");
+
+        captureAs (h, partA, brass, "Brass Pad");
+        h.emits.clear();
+        h.cmd ("saveUserPreset", { { "partId", partA }, { "name", "Brass Pad" } });
+        const auto* lib = h.emits.last ("instrumentHostLibrary");
+        check (lib != nullptr && lib->getProperty ("records", {}).size() == 1,
+               "saving the patch answers with the library");
+        const auto saved = lib->getProperty ("records", {})[0];
+        brassId = saved.getProperty ("recordId", {}).toString();
+        check (saved.getProperty ("sourceType", {}).toString() == "hardwarePatch"
+                 && saved.getProperty ("instrument", {}).toString() == "Juno Port"
+                 && saved.getProperty ("targetCeId", {}).toString().startsWith ("hw:")
+                 && (bool) saved.getProperty ("available", false)
+                 && ! (bool) saved.getProperty ("factory", true),
+               "as a hardware patch record naming the synth, available without a catalogue entry");
+        check (partRow (h, 0).getProperty ("presetName", {}).toString() == "Brass Pad",
+               "and the part's preset cursor lands on what it just saved");
+
+        captureAs (h, partA, glass, "Glass Keys");
+        h.cmd ("saveUserPreset", { { "partId", partA }, { "name", "Glass Keys" } });
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == "Glass Keys")
+                glassId = r.getProperty ("recordId", {}).toString();
+        check (glassId.isNotEmpty(), "a second patch from the same synth joins it");
+
+        // The walk: prev/next over the patches captured from THIS synth, sending each.
+        captured.clear();
+        h.cmd ("walkPartPreset", { { "partId", partA }, { "delta", 1 } });
+        drain (h);
+        check (sameBytes (lastSysex(), brass),
+               "walking from Glass Keys wraps to Brass Pad and sends its bytes");
+        check (partRow (h, 0).getProperty ("presetName", {}).toString() == "Brass Pad"
+                 && partRow (h, 0).getProperty ("hardwarePatchName", {}).toString() == "Brass Pad",
+               "and the part now carries that patch");
+
+        // Onto another hardware part of the same synth.
+        h.cmd ("addPart");
+        const auto partB = h.partIdAt (1);
+        h.cmd ("setHardwareConfig", { { "partId", partB }, { "midiOutputId", "juno-port" },
+                                      { "midiOutputName", "Juno Port" } });
+        captured.clear();
+        h.cmd ("loadLibraryRecord", { { "recordId", glassId }, { "action", "replace" },
+                                      { "partId", partB } });
+        drain (h);
+        check (partRow (h, 1).getProperty ("hardwarePatchName", {}).toString() == "Glass Keys"
+                 && sameBytes (lastSysex(), glass),
+               "loading a library patch onto a hardware part stores it and sends it");
+
+        // Never onto a plug-in: that would unload somebody's instrument for bytes it cannot play.
+        h.cmd ("addPart");
+        const auto partC = h.partIdAt (2);
+        h.cmd ("loadInstrument", { { "partId", partC }, { "ceId", "VST3-good-synth" } });
+        h.emits.clear();
+        h.cmd ("loadLibraryRecord", { { "recordId", glassId }, { "action", "replace" },
+                                      { "partId", partC } });
+        check (h.emits.lastError().contains ("hardware patch"),
+               "a hardware patch refuses to land on a part with a plug-in");
+        h.cmd ("getState");   // the refusal pushed no state; ask for one before reading it
+        check (partRow (h, 2).getProperty ("pluginName", {}).toString() == "Good Synth"
+                 && ! (bool) partRow (h, 2).getProperty ("hardware", true),
+               "and the plug-in part is untouched");
+
+        // Add as new part: the new part is a hardware part with the patch and no port yet.
+        h.cmd ("loadLibraryRecord", { { "recordId", glassId }, { "action", "add" } });
+        const auto added = partRow (h, 3);
+        check ((bool) added.getProperty ("hardware", false)
+                 && added.getProperty ("hardwarePatchName", {}).toString() == "Glass Keys"
+                 && added.getProperty ("midiOutputId", "x").toString().isEmpty(),
+               "adding one as a new part makes a hardware part carrying the patch, port to be chosen");
+
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "query", "glass" }, { "type", "" } });
+        check (h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size() == 1,
+               "search finds a hardware patch by name like any preset");
+        h.cmd ("getLibrary", { { "query", "juno" }, { "type", "" } });
+        check (h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size() == 2,
+               "and by the synth it came from");
+    }
+
+    // The records outlive the process, bytes intact.
+    {
+        captured.clear();
+        Harness h (dir, {}, tweak);
+        h.cmd ("getState");
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "query", "" }, { "type", "preset" } });
+        const auto records = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {});
+        int hardwarePatches = 0;
+        for (const auto& r : *records.getArray())
+            if (r.getProperty ("sourceType", {}).toString() == "hardwarePatch"
+                && (bool) r.getProperty ("available", false))
+                ++hardwarePatches;
+        check (hardwarePatches == 2, "both patches are in the library after a restart");
+
+        // Part B still points at Glass Keys; walking it sends Brass Pad's exact bytes.
+        // (getLibrary pushed no state, so ask for one before reading a part id out of it —
+        // an empty id would fall back to the focused part and walk the wrong synth.)
+        h.cmd ("getState");
+        const auto partB = h.partIdAt (1);
+        captured.clear();
+        h.cmd ("walkPartPreset", { { "partId", partB }, { "delta", 1 } });
+        drain (h);
+        check (sameBytes (lastSysex(), brass), "and a walk after the restart sends the stored bytes unchanged");
+    }
+}
+
 // A MIDI module, added the way a person adds one, heard the way a person hears one.
 //
 // The six note modules are covered thoroughly in PerformanceEngineTests, which drives the
@@ -6163,6 +6355,7 @@ int main (int argc, char* argv[])
     testMultiOutputRouting();
     testHardwareParts();
     testHardwareTotalRecall();
+    testHardwarePatchesInTheLibrary();
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();

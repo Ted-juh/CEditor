@@ -247,6 +247,24 @@ What this does **not** do, and the exported-panel path above does: name the patc
 its parameters, or notice that the synth on the other end is a different one today. Those need a
 profile. This needs a cable.
 
+### The patch in the Library — built, 2026-09-01
+
+A captured patch lived only on its part, which made it a setting rather than a sound. Now
+`saveUserPreset` accepts a hardware part and writes a `preset` record with
+`sourceType: "hardwarePatch"`: the bytes as the blob, the synth's name as `instrument`, and a
+target of `hw:<device profile id>` or, unlinked, `hw:<port name>`. The `hw:` prefix keeps it out of
+the catalogue's namespace, and the availability check leaves such records alone — a hardware patch
+has no class to be missing, it needs a synth on a cable, which the library cannot see and must not
+pretend to.
+
+So "warm pad" finds the Serum preset and the Juno patch in one list, and a hardware part gets the
+front-panel prev/next walk VIP had for plug-ins: `walkPartPreset` walks the patches captured from
+the same synth, sending each. Loading a record onto a hardware part stores it and sends it; onto an
+empty part it makes a hardware part carrying the patch with the port still to choose; onto a part
+with a plug-in it refuses, because turning that into a hardware part would unload somebody's
+instrument for bytes it could never play. `testHardwarePatchesInTheLibrary` covers all of it
+across a restart, bytes compared exactly.
+
 ## Verification
 
 The failure modes here are all timing and ordering, so test those rather than the happy path:

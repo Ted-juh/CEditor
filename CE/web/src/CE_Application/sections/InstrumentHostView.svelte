@@ -562,11 +562,20 @@
       </div>
 
       <div class="library-capture">
-        <button type="button" disabled={!focusedPart?.hasInstrument}
+        <!-- A hardware part saves the patch it captured. The Library is where a sound lives
+             whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
+             in one list. -->
+        <button type="button"
+                disabled={!(focusedPart?.hasInstrument
+                            || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
                 title={focusedPart?.hasInstrument ? `Capture ${partTitle(focusedPart)}'s current state`
-                                                  : 'Focus a part with an instrument first'}
+                       : focusedPart?.hardware
+                         ? (focusedPart.hardwarePatchBytes > 0
+                              ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
+                              : 'Capture a patch from the synth first (Routing tab)')
+                         : 'Focus a part with an instrument first'}
                 onclick={() => saveUserPreset(focusedPart.partId)}
-                data-testid="host-save-preset">Save preset of focused part</button>
+                data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch of focused part' : 'Save preset of focused part'}</button>
         <button type="button" disabled={!focusedPart?.hasInstrument}
                 title={focusedPart?.hasInstrument
                        ? `Capture ${partTitle(focusedPart)} whole: the instrument and its state, the MIDI modules ahead of it and the inserts behind it`
@@ -619,10 +628,12 @@
               <span class="library-name">{record.name}</span>
               <span class="library-detail">
                 {record.type === 'rack' ? 'Rack'
-                  : [record.type === 'chain' ? 'Chain' : null, record.instrument, record.manufacturer]
+                  : [record.type === 'chain' ? 'Chain'
+                       : record.sourceType === 'hardwarePatch' ? 'Hardware patch' : null,
+                     record.instrument, record.manufacturer]
                       .filter(Boolean).join(' · ') || 'Preset'}
                 {#if record.sourceType === 'userState' || record.sourceType === 'rackCapture'
-                     || record.sourceType === 'chainCapture'} · yours{/if}
+                     || record.sourceType === 'chainCapture' || record.sourceType === 'hardwarePatch'} · yours{/if}
                 {#if record.tags.length > 0} · {record.tags.join(', ')}{/if}
               </span>
               {#if !record.available}
@@ -741,18 +752,22 @@
             <span class="part-name">{partTitle(part)}</span>
             <span class="part-vendor">{part.pluginVendor}</span>
           </button>
-          {#if part.hasInstrument && !part.hardware}
+          {#if (part.hasInstrument && !part.hardware) || part.hardware}
             <!-- The VIP front-panel walk: every library preset for this plug-in — factory
-                 program list, vendor files, captured state — in one order, wrapping. -->
+                 program list, vendor files, captured state — in one order, wrapping. A
+                 hardware part walks the patches captured from the same synth, which is a
+                 preset browser on a box that never had one. -->
             <span class="preset-walk" data-testid="part-preset-walk">
-              <button type="button" class="ghost" title="Previous preset"
+              <button type="button" class="ghost" title={part.hardware ? 'Previous patch' : 'Previous preset'}
                       onclick={() => walkPartPreset(part.partId, -1)}>‹</button>
               <span class="preset-name" title={part.presetName
-                      ? `Loaded preset: ${part.presetName}`
-                      : 'No preset loaded yet — walk or pick one from the library'}>
-                {part.presetName || '— no preset —'}
+                      ? `Loaded ${part.hardware ? 'patch' : 'preset'}: ${part.presetName}`
+                      : part.hardware
+                        ? 'No library patch loaded yet — capture one, save it, then walk'
+                        : 'No preset loaded yet — walk or pick one from the library'}>
+                {part.presetName || (part.hardware ? '— no patch —' : '— no preset —')}
               </span>
-              <button type="button" class="ghost" title="Next preset"
+              <button type="button" class="ghost" title={part.hardware ? 'Next patch' : 'Next preset'}
                       onclick={() => walkPartPreset(part.partId, 1)}>›</button>
             </span>
           {/if}

@@ -2748,6 +2748,20 @@ export function initInstrumentHostBridge() {
 // the pinning and the ordering without pretending to persist anything.
 const mockFavourites = new Set();
 
+// Replaces one part with a changed copy, new array and all. The mock used to mutate parts in
+// place and return `{ ...state }`, which the store accepted and Svelte's keyed each ignored:
+// same part reference, no re-render — the preset name showed up only after refocusing the
+// part. A new object per changed part is what the reactivity is keyed on.
+function withPart(state, partId, change) {
+  return {
+    ...state,
+    rack: {
+      ...state.rack,
+      parts: state.rack.parts.map((p) => (p.partId === partId ? { ...p, ...change(p) } : p)),
+    },
+  };
+}
+
 // The browser preview has no MIDI in, so a capture has nothing to hear. Rather than leave the
 // counter at zero — which is what a synth that never answered looks like, and would make the
 // preview indistinguishable from a broken cable — it stands in a plausible dump the moment
@@ -2981,16 +2995,29 @@ function send(payload) {
       const kind = payload.cmd === 'saveRackToLibrary' ? 'rack'
                  : payload.cmd === 'saveChainToLibrary' ? 'chain' : 'preset';
       const part = get(hostState).rack.parts.find((p) => p.partId === payload.partId);
+      // A hardware part saves the patch it captured; with nothing captured there is nothing
+      // to save, and the native side refuses aloud — so does this.
+      const hardwarePatch = kind === 'preset' && part?.hardware === true;
+      if (hardwarePatch && !(part.hardwarePatchBytes > 0)) {
+        hostLastError.set('Capture a patch from the synth first — there is nothing to save yet.');
+        return;
+      }
+      const hardwareName = part?.midiOutputName || 'External hardware';
       const fallbackName = { rack: 'Rack capture', chain: `${part?.pluginName ?? 'Chain'} chain`,
-                             preset: `${part?.pluginName ?? 'Instrument'} preset` }[kind];
+                             preset: hardwarePatch
+                               ? (part.hardwarePatchName || `${hardwareName} patch`)
+                               : `${part?.pluginName ?? 'Instrument'} preset` }[kind];
+      const recordId = `lib-user-${Date.now()}`;
       hostLibrary.update((lib) => normalizeHostLibrary({
         ...lib,
         records: [...lib.records, {
-          recordId: `lib-user-${Date.now()}`,
+          recordId,
           type: kind,
-          sourceType: { rack: 'rackCapture', chain: 'chainCapture', preset: 'userState' }[kind],
+          sourceType: hardwarePatch ? 'hardwarePatch'
+            : { rack: 'rackCapture', chain: 'chainCapture', preset: 'userState' }[kind],
           name: payload.name || fallbackName,
-          instrument: part?.pluginName ?? '',
+          instrument: hardwarePatch ? hardwareName : (part?.pluginName ?? ''),
+          targetCeId: hardwarePatch ? `hw:${hardwareName.trim().toLowerCase()}` : (part?.pluginCeId ?? ''),
           available: true,
         }],
         counts: {
@@ -3000,6 +3027,9 @@ function send(payload) {
             Number(lib.counts[kind === 'preset' ? 'presets' : kind === 'chain' ? 'chains' : 'racks'] ?? 0) + 1,
         },
       }));
+      if (kind === 'preset' && part)
+        hostState.update((st) => withPart(st, part.partId,
+          () => ({ presetRecordId: recordId, presetName: payload.name || fallbackName })));
       return;
     }
     if (payload?.cmd === 'setLibraryUserMetadata') {
@@ -3028,6 +3058,18 @@ function send(payload) {
       if ((record.type === 'preset' || record.type === 'chain') && payload.action === 'add') {
         const next = applyMockCommand(get(hostState), { cmd: 'addPart' });
         const added = next.rack.parts.at(-1);
+        if (record.sourceType === 'hardwarePatch') {
+          // The new part becomes a hardware part with the patch on it and no port yet — the
+          // port picker is one click away, exactly as native leaves it.
+          added.hardware = true;
+          added.hasInstrument = false;
+          added.hardwarePatchName = record.name;
+          added.hardwarePatchBytes = mockPatchBytes;
+          added.presetRecordId = record.recordId;
+          added.presetName = record.name;
+          hostState.set(next);
+          return;
+        }
         added.pluginName = record.type === 'chain' ? (record.instrument || record.name) : record.name;
         added.pluginVendor = record.manufacturer;
         added.hasInstrument = true;
@@ -3041,30 +3083,37 @@ function send(payload) {
       if (record.type === 'chain') {
         // A chain replaces the voice: the instrument the record names, and the cursor moves
         // to the chain — the mock shows the visible half, as the preset path does.
-        hostState.update((st) => {
-          const target = st.rack.parts.find(
-            (p) => p.partId === (payload.partId || st.rack.focusedPartId));
-          if (target) {
-            target.pluginName = record.instrument || record.name;
-            target.pluginVendor = record.manufacturer;
-            target.hasInstrument = true;
-            target.presetRecordId = record.recordId;
-            target.presetName = record.name;
-          }
-          return { ...st };
-        });
+        hostState.update((st) => withPart(st, payload.partId || st.rack.focusedPartId, () => ({
+          pluginName: record.instrument || record.name,
+          pluginVendor: record.manufacturer,
+          hasInstrument: true,
+          presetRecordId: record.recordId,
+          presetName: record.name,
+        })));
         return;
       }
       if (record.type === 'preset') {
         // The focused load's visible half is the preset cursor moving on the part.
         hostState.update((st) => {
-          const target = st.rack.parts.find(
-            (p) => p.partId === (payload.partId || st.rack.focusedPartId));
-          if (target?.hasInstrument) {
-            target.presetRecordId = record.recordId;
-            target.presetName = record.name;
+          const targetId = payload.partId || st.rack.focusedPartId;
+          const target = st.rack.parts.find((p) => p.partId === targetId);
+          if (!target) return st;
+          if (record.sourceType === 'hardwarePatch') {
+            if (target.hasInstrument) {
+              hostLastError.set(`${record.name} is a hardware patch — load it onto a hardware part.`);
+              return st;
+            }
+            return withPart(st, targetId, () => ({
+              hardware: true,
+              hardwarePatchName: record.name,
+              hardwarePatchBytes: mockPatchBytes,
+              presetRecordId: record.recordId,
+              presetName: record.name,
+            }));
           }
-          return { ...st };
+          if (!target.hasInstrument) return st;
+          return withPart(st, targetId,
+            () => ({ presetRecordId: record.recordId, presetName: record.name }));
         });
       }
       return;
