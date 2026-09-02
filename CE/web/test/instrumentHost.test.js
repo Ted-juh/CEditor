@@ -76,6 +76,7 @@ import {
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
 import {
   setHardwareConfig, captureHardwarePatch, finishHardwarePatchCapture, hostLastError,
+  hostKeyboardMode, showPartRange, showKeyboardPlay,
   midiSourceWouldLoop, normalizePatchCompare, compareHardwarePatch, hostPatchCompare,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { get } from 'svelte/store';
@@ -1361,6 +1362,16 @@ test('patch compare shapes the answer and the preview stands one in', () => {
   const changed = get(hostPatchCompare);
   assert.equal(changed.identical, false, 'after an edit they differ');
   assert.ok(changed.differences.length > 0 && changed.totalDifferences === changed.differences.length);
+});
+
+test('the keyboard has two sizes, and Range on a part focuses it', () => {
+  hostStateStore.set(mockHostState());
+  assert.deepEqual(get(hostKeyboardMode), { mode: 'play', partId: '' }, 'three octaves by default');
+  showPartRange('mock-part-2');
+  assert.deepEqual(get(hostKeyboardMode), { mode: 'range', partId: 'mock-part-2' });
+  assert.equal(get(hostStateStore).rack.focusedPartId, 'mock-part-2', 'and the part is focused');
+  showKeyboardPlay();
+  assert.deepEqual(get(hostKeyboardMode), { mode: 'play', partId: '' });
 });
 
 test('mock reducer: explicit multi-output routes add, retune and remove', () => {

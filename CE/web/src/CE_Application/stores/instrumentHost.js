@@ -71,6 +71,19 @@ export const hostArpStep = writable({});
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
 
+// The one keyboard on screen has two jobs. `play`: three octaves to audition with. `range`: all
+// 128 keys with every part's key range drawn beneath, for setting a split by dragging — the
+// same picture, grown, rather than a second keyboard somewhere else that never quite lined up
+// with the first. Session state, not document state: which mode you are in is not a setting.
+export const hostKeyboardMode = writable({ mode: 'play', partId: '' });
+export function showPartRange(partId) {
+  hostKeyboardMode.set({ mode: 'range', partId: String(partId ?? '') });
+  if (partId) focusRackPart(partId);
+}
+export function showKeyboardPlay() {
+  hostKeyboardMode.set({ mode: 'play', partId: '' });
+}
+
 // Hardware total recall, in its three moments.
 //
 // Capturing: which part is listening and how much has arrived. The byte counter is the only

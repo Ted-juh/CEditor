@@ -41,7 +41,7 @@
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
-    setPartMidiSource, midiSourceWouldLoop,
+    setPartMidiSource, hostKeyboardMode, showPartRange, showKeyboardPlay, midiSourceWouldLoop,
     captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
     clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
     hostPatchCapture, hostPatchSends, hostPatchPrompt,
@@ -54,8 +54,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
-  import HostSplitEditor from './HostSplitEditor.svelte';
-  import MidiChainPanel from './MidiChainPanel.svelte';
+    import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
@@ -63,6 +62,7 @@
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
   import HostKeyboard from './HostKeyboard.svelte';
+  import { noteName } from '../utils/pianoGeometry.js';
 
   initInstrumentHostBridge();
 
@@ -793,6 +793,14 @@
             </span>
           {/if}
           <div class="part-controls">
+            <button type="button" class="toggle range-button"
+                    class:on={$hostKeyboardMode.mode === 'range' && $hostKeyboardMode.partId === part.partId}
+                    data-testid="part-range"
+                    title="Show this part's key range on the keyboard above — drag its edges to set the split"
+                    onclick={() => ($hostKeyboardMode.mode === 'range' && $hostKeyboardMode.partId === part.partId
+                                      ? showKeyboardPlay() : showPartRange(part.partId))}>
+              {noteName(part.keyLow)}–{noteName(part.keyHigh)}
+            </button>
             <button type="button" class="toggle" class:on={part.enabled} title="Part enabled (off panics its notes)"
                     onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>On</button>
             <button type="button" class="toggle" class:on={part.mute} title="Mute (audio only; notes keep running)"
@@ -833,12 +841,9 @@
         </div>
       {/each}
 
-      {#if parts.length > 0 && rackView === 'list'}
-        <!-- Splits and layers as a picture: every part's key range on one keyboard, edges
-             draggable. The numeric zone fields in the dock stay — the picture and the digits
-             drive the same command. -->
-        <HostSplitEditor />
-      {/if}
+      <!-- Splits and layers as a picture live on the keyboard at the top now — press Range on
+           a part and it grows to all 128 keys with every range drawn beneath. One keyboard,
+           one geometry, instead of a second strip down here that never lined up with it. -->
 
     </section>
 
@@ -1957,6 +1962,9 @@
   .part-art :global(.plugin-tile) { border-radius: 4px; }
   .part-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .mini { display: inline-flex; align-items: center; gap: 4px; }
+  /* The part's range, as a button: it says where the part plays and opens the keyboard to
+     change it, which is the same thing said twice in the right order. */
+  .range-button { font-variant-numeric: tabular-nums; min-width: 64px; }
   .mini-label { font-size: 10px; color: #9aa5b1; letter-spacing: 0.3px; }
 
   .part-main {
