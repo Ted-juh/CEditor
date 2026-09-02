@@ -41,7 +41,7 @@
     addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
     addReturn, removeReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
-    setPartMidiSource, hostKeyboardMode, showPartRange, showKeyboardPlay, midiSourceWouldLoop,
+    setPartMidiSource, hostKeyboardMode, showPartRange, showKeyboardPlay, partColor, midiSourceWouldLoop,
     captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
     clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
     hostPatchCapture, hostPatchSends, hostPatchPrompt,
@@ -755,7 +755,7 @@
         <HostRackCanvas />
       {/if}
 
-      {#each rackView === 'list' ? parts : [] as part (part.partId)}
+      {#each rackView === 'list' ? parts : [] as part, partIndex (part.partId)}
         <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}>
           <!-- The plug-in's face fills the row's whole height on the left, beside everything
                rather than above it. A snapshot is a picture of a window, and a 24px square of
@@ -795,6 +795,7 @@
           <div class="part-controls">
             <button type="button" class="toggle range-button"
                     class:on={$hostKeyboardMode.mode === 'range' && $hostKeyboardMode.partId === part.partId}
+                    style={`--part-color:${partColor(partIndex)}`}
                     data-testid="part-range"
                     title="Show this part's key range on the keyboard above — drag its edges to set the split"
                     onclick={() => ($hostKeyboardMode.mode === 'range' && $hostKeyboardMode.partId === part.partId
@@ -1964,7 +1965,7 @@
   .mini { display: inline-flex; align-items: center; gap: 4px; }
   /* The part's range, as a button: it says where the part plays and opens the keyboard to
      change it, which is the same thing said twice in the right order. */
-  .range-button { font-variant-numeric: tabular-nums; min-width: 64px; }
+  .range-button { font-variant-numeric: tabular-nums; min-width: 64px; border-left: 4px solid var(--part-color, #3b4652); }
   .mini-label { font-size: 10px; color: #9aa5b1; letter-spacing: 0.3px; }
 
   .part-main {

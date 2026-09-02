@@ -76,6 +76,10 @@ export const hostChordLearn = writable({ armed: false, partId: '', stage: '', ke
 // same picture, grown, rather than a second keyboard somewhere else that never quite lined up
 // with the first. Session state, not document state: which mode you are in is not a setting.
 export const hostKeyboardMode = writable({ mode: 'play', partId: '' });
+/** A part's colour on the keyboard and on its own row, by rack position — the same six the
+    split lanes used, so a colour seen on a key is findable in the rack without a legend. */
+export const partColor = (index) =>
+  ['#3d81c4', '#4aa88c', '#b4854a', '#9a6bbf', '#c46a6a', '#6a94c4'][((index % 6) + 6) % 6];
 export function showPartRange(partId) {
   hostKeyboardMode.set({ mode: 'range', partId: String(partId ?? '') });
   if (partId) focusRackPart(partId);
