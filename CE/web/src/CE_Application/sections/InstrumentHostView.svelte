@@ -330,6 +330,12 @@
     else openEditor(part.partId);
   }
 
+  /** L20 / C / R35 — how a pan reads on a desk, not -0.2. */
+  function panLabel(pan) {
+    const amount = Math.round(Math.abs(pan) * 100);
+    return amount === 0 ? 'C' : `${pan < 0 ? 'L' : 'R'}${amount}`;
+  }
+
   function partTitle(part) {
     if (part.hardware) return `${part.midiOutputName || 'External hardware'} (HW)`;
     if (part.hasInstrument) return part.pluginName || 'Loaded instrument';
@@ -751,10 +757,19 @@
 
       {#each rackView === 'list' ? parts : [] as part (part.partId)}
         <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}>
+          <!-- The plug-in's face fills the row's whole height on the left, beside everything
+               rather than above it. A snapshot is a picture of a window, and a 24px square of
+               one was a smudge; at the row's height it is recognisable from across the desk,
+               which is the point of having it. -->
+          {#if part.hasInstrument || part.unresolved}
+            <button type="button" class="part-art" title={part.pluginName || 'Focus this part'}
+                    data-testid="part-art"
+                    onclick={() => focusRackPart(part.partId)}>
+              <PluginTile ceId={part.pluginCeId} name={part.pluginName} vendor={part.pluginVendor} fill />
+            </button>
+          {/if}
+          <div class="part-body">
           <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
-            {#if part.hasInstrument || part.unresolved}
-              <PluginTile ceId={part.pluginCeId} name={part.pluginName} vendor={part.pluginVendor} size={24} />
-            {/if}
             <span class="part-name">{partTitle(part)}</span>
             <span class="part-vendor">{part.pluginVendor}</span>
           </button>
@@ -784,12 +799,17 @@
                     onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>M</button>
             <button type="button" class="toggle" class:on={part.solo} title="Solo"
                     onclick={() => setPartMixer(part.partId, { solo: !part.solo })}>S</button>
-            <label class="mini" title="Volume">
-              <input type="range" min="0" max="2" step="0.01" value={part.volume}
+            <!-- Two sliders with nothing written on them were two sliders nobody could name.
+                 The word is the label; the number is in the tooltip, where it is wanted
+                 while dragging and not otherwise. -->
+            <label class="mini" title={`Volume ${part.volume.toFixed(2)} (1.00 is unity)`}>
+              <span class="mini-label">Vol</span>
+              <input type="range" min="0" max="2" step="0.01" value={part.volume} aria-label="Volume"
                      oninput={(e) => setPartMixer(part.partId, { volume: Number(e.currentTarget.value) })} />
             </label>
-            <label class="mini" title="Pan">
-              <input type="range" min="-1" max="1" step="0.01" value={part.pan}
+            <label class="mini" title={`Pan ${panLabel(part.pan)}`}>
+              <span class="mini-label">Pan</span>
+              <input type="range" min="-1" max="1" step="0.01" value={part.pan} aria-label="Pan"
                      oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
             </label>
             {#if part.hasInstrument}
@@ -808,6 +828,7 @@
             {/if}
             <button type="button" class="ghost danger" title="Remove this part"
                     onclick={() => removeRackPart(part.partId)}>×</button>
+          </div>
           </div>
         </div>
       {/each}
@@ -1909,8 +1930,9 @@
 
   .part {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 10px;
     border: 1px solid #2c343d;
     border-radius: 5px;
     padding: 8px;
@@ -1918,6 +1940,24 @@
   }
   .part.focused { border-color: #5b9bd5; }
   .part.disabled { opacity: 0.55; }
+  /* The face on the left, the row's full height; the three lines to its right. */
+  .part-art {
+    flex: none;
+    position: relative;      /* the tile inside is absolute: it fills this, it never sizes it */
+    align-self: stretch;
+    width: 84px;             /* a little wider than a two-line row is tall: a window's proportion */
+    min-height: 52px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .part-art :global(.plugin-tile) { border-radius: 4px; }
+  .part-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .mini { display: inline-flex; align-items: center; gap: 4px; }
+  .mini-label { font-size: 10px; color: #9aa5b1; letter-spacing: 0.3px; }
 
   .part-main {
     display: flex;

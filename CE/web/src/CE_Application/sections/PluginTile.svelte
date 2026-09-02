@@ -21,7 +21,10 @@
    */
   import { pluginTile, pluginSnapshots } from '../stores/instrumentHost.js';
 
-  let { ceId = '', name = '', vendor = '', size = 26 } = $props();
+  // `fill` sizes the tile to whatever box it is put in — a rack row's full height rather than
+  // a fixed square — which is where a snapshot earns its space: a plug-in window is wider than
+  // it is tall, and at 24px it was a smudge.
+  let { ceId = '', name = '', vendor = '', size = 26, fill = false } = $props();
 
   let tile = $derived(pluginTile(ceId, name, vendor));
   let failedFor = $state('');
@@ -29,13 +32,15 @@
 </script>
 
 {#if artwork}
-  <img class="plugin-tile art" src={artwork} alt="" aria-hidden="true"
-       style={`--tile-edge:${tile.edge};width:${size}px;height:${size}px`}
+  <img class="plugin-tile art" class:fill src={artwork} alt="" aria-hidden="true"
+       style={fill ? `--tile-edge:${tile.edge}` : `--tile-edge:${tile.edge};width:${size}px;height:${size}px`}
        onerror={() => (failedFor = ceId)} />
 {:else}
-  <span class={`plugin-tile ${tile.pattern}`} aria-hidden="true"
-        style={`--tile-bg:${tile.background};--tile-edge:${tile.edge};--tile-ink:${tile.ink};
-                width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px`}>
+  <span class={`plugin-tile ${tile.pattern}`} class:fill aria-hidden="true"
+        style={fill
+          ? `--tile-bg:${tile.background};--tile-edge:${tile.edge};--tile-ink:${tile.ink}`
+          : `--tile-bg:${tile.background};--tile-edge:${tile.edge};--tile-ink:${tile.ink};
+             width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px`}>
     {tile.initials}
   </span>
 {/if}
@@ -60,6 +65,18 @@
   .plugin-tile.art {
     object-fit: cover;
     background-color: #12151b;
+  }
+  /* Filling a box: the tile covers whatever box holds it and never sizes that box. This has
+     to be absolute — an image with `height: 100%` in a stretched flex item resolves to its own
+     natural height, and a 320-pixel snapshot then makes a 260-pixel rack row, which is the
+     picture sizing the row rather than the row sizing the picture. The crop stays `cover`,
+     so the picture keeps its face rather than letterboxing to a strip. */
+  .plugin-tile.fill {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    font-size: 18px;
   }
   .plugin-tile.stripe {
     background-image: repeating-linear-gradient(45deg,
