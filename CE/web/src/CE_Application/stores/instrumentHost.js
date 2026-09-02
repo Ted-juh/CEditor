@@ -160,10 +160,10 @@ export function normalizeHostSurface(payload) {
 // --- the surface as a picture --------------------------------------------------------------------
 
 export function emptySurfaceLayout() {
-  return { profileId: '', displayName: '', vendor: '', aspect: 0, controls: [], regions: [],
+  return { displayName: '', vendor: '', aspect: 0, controls: [], regions: [],
            // The owner's own controller, when they described one: what to prefill the form
            // with, and whether a count is running.
-           userSurface: '', userEncoders: 0, userFaders: 0, userPads: 0,
+           profileId: '', own: false, profiles: [], userSurface: '', userEncoders: 0, userFaders: 0, userPads: 0,
            learning: false, heard: 0 };
 }
 
@@ -223,6 +223,16 @@ export function normalizeSurfaceLayout(payload) {
     regions,
     // The owner's own controller, when they described one: enough to prefill the form and to
     // show a running count, without a second round trip for either.
+    // Which drawing this is, and which others exist: the described one stands in for the
+    // authored ones by default, and the picker in the panel is how you get the CTRL49's own
+    // picture back without forgetting what you described.
+    profileId: String(p?.profileId ?? ''),
+    own: p?.own === true,
+    profiles: (Array.isArray(p?.profiles) ? p.profiles : []).map((r) => ({
+      profileId: String(r?.profileId ?? ''),
+      displayName: String(r?.displayName ?? ''),
+      vendor: String(r?.vendor ?? ''),
+    })).filter((r) => r.profileId),
     userSurface: String(p.userSurface ?? ''),
     userEncoders: Number(p.userEncoders ?? 0),
     userFaders: Number(p.userFaders ?? 0),
@@ -3081,9 +3091,14 @@ function send(payload) {
     }
     if (payload?.cmd === 'beginParameterGesture' || payload?.cmd === 'endParameterGesture') return;
     if (payload?.cmd === 'getSurfaceLayout') {
-      hostSurfaceLayout.set(normalizeSurfaceLayout(mockOwnSurface
-        ? { ...mockGenericLayout(mockOwnSurface), ...mockOwnSurfaceFields() }
-        : { ...mockSurfaceLayout(), ...mockOwnSurfaceFields() }));
+      const authored = { ...mockSurfaceLayout(), profileId: 'mock-ctrl49' };
+      const useOwn = mockOwnSurface && !payload.profileId;
+      hostSurfaceLayout.set(normalizeSurfaceLayout({
+        ...(useOwn ? { ...mockGenericLayout(mockOwnSurface), profileId: 'user' } : authored),
+        ...mockOwnSurfaceFields(),
+        own: !!useOwn,
+        profiles: [{ profileId: 'mock-ctrl49', displayName: authored.displayName, vendor: authored.vendor }],
+      }));
       return;
     }
     // Describing a controller: the browser preview has no hardware and no data directory, so

@@ -6495,6 +6495,10 @@ void testUserDescribedSurface()
         h.cmd ("setUserSurface", { { "name", "Advance 49" }, { "encoders", 8 },
                                    { "faders", 4 }, { "pads", 16 } });
         auto layout = layoutOf (h);
+        check (layout.getProperty ("profiles", {}).size() >= 1
+                 && layout.getProperty ("profiles", {})[0].getProperty ("profileId", {}).toString().isNotEmpty()
+                 && (bool) layout.getProperty ("own", false),
+               "the described drawing still lists the authored ones it stands in for");
         check (layout.getProperty ("displayName", {}).toString() == "Advance 49",
                "a described controller becomes the drawing");
         check (countOfKind (layout, "encoder") == 8, "with the knobs it was told about");

@@ -183,8 +183,22 @@
       <button type="button" class="ghost" data-testid="surface-back"
               onclick={() => (zoom = '')}>← Whole instrument</button>
     {/if}
-    <strong>{layout.displayName || 'No controller profile'}</strong>
-    {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
+    {#if layout.userSurface && layout.profiles.length > 0}
+      <!-- Two drawings exist: the one you described and the built-in one. Which is shown is
+           a choice on the tab, not a consequence of a form — describing a controller must
+           never make the CTRL49's own picture unreachable. -->
+      <select data-testid="surface-drawing" aria-label="Which controller drawing to show"
+              value={layout.own ? 'user' : layout.profileId}
+              onchange={(e) => requestSurfaceLayout(e.currentTarget.value === 'user' ? '' : e.currentTarget.value)}>
+        <option value="user">{layout.userSurface} (described by you)</option>
+        {#each layout.profiles as p (p.profileId)}
+          <option value={p.profileId}>{p.displayName} (built in)</option>
+        {/each}
+      </select>
+    {:else}
+      <strong>{layout.displayName || 'No controller profile'}</strong>
+      {#if layout.vendor}<span class="dim">{layout.vendor}</span>{/if}
+    {/if}
     <button type="button" class="ghost" data-testid="surface-describe"
             title="Any controller works — CEditor just needs to know what is on yours"
             onclick={() => (describing = !describing)}>{layout.userSurface ? 'Edit controller' : 'Describe controller'}</button>
@@ -276,7 +290,7 @@
               <div class="param-chip" draggable="true"
                    class:dragging={$hostParamDrag.parameterId === parameter.id}
                    data-testid="surface-param"
-                   title={`${parameter.name} — drag onto a knob`}
+                   title={`${parameter.name || parameter.id} — drag onto a knob`}
                    ondragstart={(e) => {
                      hostParamDrag.set({ partId: focusedPart.partId, parameterId: parameter.id,
                                          name: parameter.name });
@@ -284,7 +298,9 @@
                      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
                    }}
                    ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
-                {parameter.name}
+                <!-- A plug-in that reports no name for a parameter still has one to drag: its
+                     id, which is at least the thing the plug-in itself calls it. -->
+                {parameter.name || parameter.id || `#${parameter.index}`}
               </div>
             {/each}
             {#if parameters.length === 0}
@@ -360,10 +376,6 @@
           <span class="region-count" class:none={r.addressable === 0}>{r.addressable}/{r.count}</span>
         </button>
       {/each}
-      <span class="dim surface-note">
-        Drag a parameter onto a knob to assign it · click an assigned knob to clear it · faint
-        controls are on the keyboard but CEditor does not map them.
-      </span>
     </div>
   {/if}
 </div>
@@ -381,16 +393,19 @@
   .describe label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #a8b4c0; }
   .describe input[type='number'] { width: 62px; }
 
+  /* Left to right, no centring: the column, then the drawing, then whatever is left. Centred,
+     a short dock put a void the width of the column on the LEFT and the drawing in the
+     middle of nowhere. */
   .surface-body {
     flex: 1;
     min-height: 120px;
     display: flex;
-    gap: 8px;
-    justify-content: center;
+    gap: 10px;
+    justify-content: flex-start;
   }
   .param-column {
     flex: none;
-    width: 150px;
+    width: 230px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -399,6 +414,7 @@
   .param-column input { width: 100%; box-sizing: border-box; font-size: 11px; }
   .param-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .param-chip {
+    min-height: 15px;
     padding: 2px 6px;
     border: 1px solid #2c343d;
     border-radius: 4px;

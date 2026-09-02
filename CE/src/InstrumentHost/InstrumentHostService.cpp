@@ -5489,6 +5489,22 @@ void InstrumentHostService::emitSurfaceLayout (const juce::String& requestedProf
         root->setProperty ("controls", controls);
     }
 
+    // Every authored drawing there is, so the panel can offer them beside the described one.
+    // A described controller wins by default, but "I described one and now the CTRL49
+    // picture is gone" is a support call — the choice has to be on screen, not in a form.
+    juce::Array<juce::var> profiles;
+    for (const auto& id : registry.profileIds())
+        if (const auto* candidate = registry.find (id); candidate != nullptr && ! candidate->layout.isEmpty())
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("profileId",   candidate->profileId);
+            obj->setProperty ("displayName", candidate->displayName);
+            obj->setProperty ("vendor",      candidate->vendor);
+            profiles.add (juce::var (obj));
+        }
+    root->setProperty ("profiles", profiles);
+    root->setProperty ("own", useOwn);
+
     // What the panel needs to offer "describe your controller" without a second round trip:
     // whether one is described, and whether a count is running.
     root->setProperty ("userSurface",  userSurfaceName);
