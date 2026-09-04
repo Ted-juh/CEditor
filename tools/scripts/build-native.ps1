@@ -1,6 +1,11 @@
 param(
     [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Debug"
+    [string]$Configuration = "Debug",
+    # The app embeds CE\web\dist at build time, so a native build without a fresh web bundle
+    # ships whatever bundle was last built — which is how a pulled UI fix "did not show up"
+    # after a green native build. The bundle is rebuilt here by default; -SkipWeb is for the
+    # case where you just built it yourself and know it.
+    [switch]$SkipWeb
 )
 
 Set-StrictMode -Version Latest
@@ -42,6 +47,24 @@ Write-Host "Using vcvars: $vcvars"
 
 $repoRoot = Get-RepoRoot
 
+if (-not $SkipWeb) {
+    $webRoot = Join-Path $repoRoot "CE\web"
+    Push-Location $webRoot
+    try {
+        if (-not (Test-Path "node_modules")) {
+            Write-Host "Installing web dependencies (npm ci)..."
+            & npm ci
+            if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
+        }
+        Write-Host "Building the web bundle (npm run build)..."
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw "Web bundle build failed." }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 Push-Location $repoRoot
 try {
     $cmd = "`"$vcvars`" && cmake --preset native && cmake --build --preset native-$($Configuration.ToLowerInvariant())"
@@ -55,4 +78,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Native build failed (configuration: $Configuration)."
 }
 
-Write-Host "Native build succeeded ($Configuration)."
+$sha = "unknown"
+try { $sha = (& git -C $repoRoot rev-parse --short HEAD) } catch { }
+Write-Host ""
+Write-Host "Native build succeeded ($Configuration, source $sha)."
+Write-Host "Editor:  $repoRoot\build\native\CEditor_artefacts\$Configuration\CEditor.exe"
+Write-Host "Hostage: $repoRoot\build\native\CEHostStandalone_artefacts\$Configuration\Hostage.exe"
+Write-Host "Help > About in either should read build $sha."
