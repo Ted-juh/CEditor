@@ -128,10 +128,16 @@ worker centred its window and called `toFront`, Windows ignored the `toFront` be
 background process may not take the foreground, and Hostage then centred a placeholder window
 of its own on the same spot, on top. What it is now:
 
-- **Focused.** The worker reports its process id in the create reply. Before every
-  `editorOpen`, the proxy calls `AllowSetForegroundWindow` for that process (on the message
-  thread, from the click — the one moment the host is entitled to grant it), so the worker's
-  `toFront` is honoured.
+- **In front, by ownership.** `editorOpen` carries the native handle of Hostage's own window
+  and the worker makes its editor window an *owned* window of it (`GWLP_HWNDPARENT`). An owned
+  window sits above its owner in the z-order by rule, minimises with it, and has no taskbar
+  button of its own — a plug-in window's normal manners. Nobody has to win the foreground.
+  The pane's stand-in passes the window it is actually in, which inside a DAW is the DAW's
+  plug-in window. The first attempt at this was `AllowSetForegroundWindow` + the worker's
+  `SetForegroundWindow`; it failed on the desk because the click lands in WebView2, a separate
+  process, so Hostage is not reliably the foreground process when it tries to grant. The
+  grant is kept as a lesser measure that sometimes also activates the window; ownership is
+  what is relied on.
 - **Positioned.** `editorOpen` may carry an anchor — where `FloatingEditorWindows` would have
   put a window of its own, i.e. the part's remembered bounds. The worker honours it when the
   window is first created and ignores it after; between closes it remembers its own last

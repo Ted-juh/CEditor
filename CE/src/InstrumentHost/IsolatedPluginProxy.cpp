@@ -29,6 +29,24 @@ juce::uint32 currentProcessId() noexcept
 #endif
 }
 
+/** The native handle of a top-level window of Hostage's own, for the worker to make its
+    editor window an owned window of. The active one when there is one, else the first that is
+    showing, else 0 — which is the outer VST3 inside a DAW, where the plug-in window belongs to
+    the DAW and the pane's stand-in supplies its own peer instead. */
+juce::int64 hostWindowHandle()
+{
+    auto* window = juce::TopLevelWindow::getActiveTopLevelWindow();
+    for (int i = 0; window == nullptr && i < juce::TopLevelWindow::getNumTopLevelWindows(); ++i)
+        if (auto* candidate = juce::TopLevelWindow::getTopLevelWindow (i);
+            candidate != nullptr && candidate->isShowing())
+            window = candidate;
+    if (window == nullptr)
+        return 0;
+    if (auto* peer = window->getPeer())
+        return static_cast<juce::int64> (reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
+    return 0;
+}
+
 juce::MemoryBlock jsonPayload (const juce::var& value)
 {
     const auto json = juce::JSON::toString (value, true);
@@ -124,7 +142,15 @@ public:
         : juce::AudioProcessorEditor (&ownerToUse), owner (ownerToUse)
     {
         showButton.setButtonText ("Show editor window");
-        showButton.onClick = [this] { owner.showRemoteEditor ({}); };
+        // From here the stand-in is on screen, so the window it lives in is known — inside a
+        // DAW that is the DAW's plug-in window, which nothing else in this process can name.
+        showButton.onClick = [this]
+        {
+            auto* peer = getPeer();
+            owner.showRemoteEditor ({}, peer != nullptr
+                ? static_cast<juce::int64> (reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()))
+                : 0);
+        };
         addAndMakeVisible (showButton);
         setSize (380, 124);
         owner.acquireRemoteEditor ({});
@@ -873,22 +899,23 @@ void IsolatedPluginProxy::releaseRemoteEditor() noexcept
         sendEditorClose();
 }
 
-bool IsolatedPluginProxy::showRemoteEditor (juce::Rectangle<int> anchor)
+bool IsolatedPluginProxy::showRemoteEditor (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle)
 {
 #if JUCE_WINDOWS
-    // Windows lets a process hand the foreground to another only while it holds the
-    // foreground itself, and this runs on the message thread from a click — exactly that
-    // moment. Without the grant the worker's toFront is ignored and its window opens behind
-    // Hostage, which is where every vendor editor went until now. Named process when the
-    // worker told us its id; any process otherwise, briefly, rather than nobody.
+    // What keeps the worker's window in front is OWNERSHIP (the handle sent below): an owned
+    // window sits above its owner by rule. This grant is the lesser measure that lets the
+    // worker also ACTIVATE its window, and it only takes when this process is the foreground
+    // process at the time — which, with the click landing in WebView2's own process, it is
+    // not always. Kept because it costs nothing and sometimes gives the window focus too;
+    // not relied on, because it demonstrably could not be.
     ::AllowSetForegroundWindow (metadata.workerProcessId != 0
                                     ? static_cast<DWORD> (metadata.workerProcessId)
                                     : static_cast<DWORD> (ASFW_ANY));
 #endif
-    return sendEditorOpen (anchor);
+    return sendEditorOpen (anchor, ownerWindowHandle != 0 ? ownerWindowHandle : hostWindowHandle());
 }
 
-bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor)
+bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle)
 {
     auto* object = new juce::DynamicObject();
     if (! anchor.isEmpty())
@@ -898,6 +925,8 @@ bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor)
         object->setProperty ("width", anchor.getWidth());
         object->setProperty ("height", anchor.getHeight());
     }
+    if (ownerWindowHandle != 0)
+        object->setProperty ("owner", ownerWindowHandle);
     juce::MemoryBlock reply;
     juce::String error;
     if (! request (MessageType::editorOpen, jsonPayload (juce::var (object)),

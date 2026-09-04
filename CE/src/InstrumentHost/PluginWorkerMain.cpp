@@ -7,6 +7,7 @@
 #include "PluginWorkerControlChannel.h"
 #include "PluginWorkerCrashReporter.h"
 #include "PluginWorkerJob.h"
+#include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "PluginWorkerSharedMemory.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -375,8 +376,19 @@ public:
         Windows ignores toFront from a background process and the editor opens behind the host
         — which is where every vendor editor went until the grant existed.
 
+        `owner` is the native handle of Hostage's own window, and it is what actually keeps
+        this window in front. An OWNED window sits above its owner in the z-order by rule,
+        with nobody having to win the foreground: the earlier attempt — Hostage granting the
+        foreground to this process with AllowSetForegroundWindow, this process calling
+        SetForegroundWindow — worked on paper and not on the desk, because the click that
+        starts all this lands in WebView2, a separate process, so Hostage is not necessarily
+        the foreground process at that moment and its grant is refused. Ownership does not
+        care who is foreground. It also gives the window Hostage's behaviour for free: it
+        minimises with Hostage and has no taskbar button of its own — the generic-iconed
+        "window" in the taskbar is gone, which is a plug-in window's normal manners.
+
         The window's bounds come back so Hostage can remember them as it does its own. */
-    bool open (juce::Rectangle<int> anchor, juce::Rectangle<int>& boundsOut)
+    bool open (juce::Rectangle<int> anchor, juce::int64 owner, juce::Rectangle<int>& boundsOut)
     {
         if (window == nullptr)
         {
@@ -404,6 +416,10 @@ public:
             };
 
             window = std::make_unique<Window> (processor.getName(), editor);
+            if (const auto logo = juce::ImageFileFormat::loadFrom (
+                    ceditor::ctrl49::assets::kHostageLogoPng,
+                    ceditor::ctrl49::assets::kHostageLogoPngSize); logo.isValid())
+                window->setIcon (logo);
 
             // Position precedence: where this process last had it, then where Hostage asks,
             // then centred (what centreWithSize already did). Constrained so a position
@@ -413,6 +429,17 @@ public:
                                                          : window->getPosition();
             window->setBoundsConstrained (window->getBounds().withPosition (position));
         }
+
+        // Applied on every open, not just the first: the pane's stand-in learns its own
+        // window only once it is on screen, so the owner can arrive a call later.
+       #if JUCE_WINDOWS
+        if (owner != 0)
+            if (auto* peer = window->getPeer())
+                ::SetWindowLongPtrW (static_cast<HWND> (peer->getNativeHandle()), GWLP_HWNDPARENT,
+                                     static_cast<LONG_PTR> (owner));
+       #else
+        juce::ignoreUnused (owner);
+       #endif
 
         window->setVisible (true);
         window->toFront (true);
@@ -672,13 +699,17 @@ public:
                     juce::String jsonError;
                     const auto json = decodeJsonPayload (received.message, jsonError);
                     juce::Rectangle<int> anchor;
+                    juce::int64 owner = 0;
                     if (jsonError.isEmpty() && json.isObject())
+                    {
                         anchor = { (int) json.getProperty ("x", 0), (int) json.getProperty ("y", 0),
                                    (int) json.getProperty ("width", 0),
                                    (int) json.getProperty ("height", 0) };
+                        owner = (juce::int64) json.getProperty ("owner", 0);
+                    }
                     juce::Rectangle<int> bounds;
                     bool opened = false;
-                    invokeProcessor ([&] { opened = editor.open (anchor, bounds); });
+                    invokeProcessor ([&] { opened = editor.open (anchor, owner, bounds); });
                     if (! opened)
                         reply = errorReply (generation, received.message.requestId,
                                             "plug-in did not create a vendor editor");

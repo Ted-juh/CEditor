@@ -65,10 +65,15 @@ public:
         it forward without changing the count; it is what the placeholder's button does.
 
         `anchor` is where Hostage would have put a window of its own, honoured the first time
-        the worker creates the window and ignored after: see WorkerEditorController. */
+        the worker creates the window and ignored after: see WorkerEditorController.
+
+        `ownerWindowHandle` is the native handle the worker's window becomes an OWNED window
+        of, which is what keeps it above Hostage. 0 means "find Hostage's own top-level
+        window"; the pane's stand-in passes the window it is actually in, which inside a DAW
+        is the DAW's plug-in window and not anything JUCE knows about. */
     bool acquireRemoteEditor (juce::Rectangle<int> anchor);
     void releaseRemoteEditor() noexcept;
-    bool showRemoteEditor (juce::Rectangle<int> anchor);
+    bool showRemoteEditor (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle = 0);
     /** Where the worker last reported its window, empty until it has. */
     juce::Rectangle<int> lastRemoteEditorBounds() const noexcept { return remoteEditorBounds; }
 
@@ -140,7 +145,7 @@ private:
     void applyWorkerParameterEvents (const plugin_worker::PluginWorkerBlockBridge::Result&) noexcept;
     juce::String parameterText (int index, float value, int maximumLength);
     float parameterValueFromText (int index, const juce::String& text);
-    bool sendEditorOpen (juce::Rectangle<int> anchor);
+    bool sendEditorOpen (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle);
     void sendEditorClose() noexcept;
     void logDiagnostic (const juce::String& event, const juce::String& detail = {}) const;
     [[noreturn]] static void throwFailure (const juce::String&);
