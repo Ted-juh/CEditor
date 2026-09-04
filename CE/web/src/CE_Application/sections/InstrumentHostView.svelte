@@ -57,7 +57,7 @@
     import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
-  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import AppWindow from 'lucide-svelte/icons/app-window';
   import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
   import Unplug from 'lucide-svelte/icons/unplug';
   import Trash2 from 'lucide-svelte/icons/trash-2';
@@ -845,6 +845,13 @@
                and ⧉ for the floating window was a glyph nobody could be expected to read.
                The words all survive in the tooltips and the aria-labels.
 
+               The first one is a WINDOW, not a row of sliders. It was lucide's
+               sliders-horizontal for about an hour — three horizontal lines with a dot on
+               each — and at 15px that is a three-dot menu button to every eye that has ever
+               used software. Reintroducing the affordance this change exists to remove is a
+               bug however good the metaphor was, so the pair is now a window shown here and
+               a window popped out, which is the actual difference between the two.
+
                A part with no instrument still draws all four, disabled rather than absent — a
                strip whose width depends on the row is a strip you have to find again on the
                next one. -->
@@ -854,7 +861,7 @@
                     data-testid="part-open-editor"
                     aria-label={`Show ${partTitle(part)}'s own interface in the host`}
                     title="Show the plug-in's own interface in the native pane"
-                    onclick={() => toggleEditor(part)}><SlidersHorizontal size={15} strokeWidth={1.8} /></button>
+                    onclick={() => toggleEditor(part)}><AppWindow size={15} strokeWidth={1.8} /></button>
             <button type="button" class="toggle icon" disabled={!part.hasInstrument}
                     class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
                     data-testid="part-float-editor"

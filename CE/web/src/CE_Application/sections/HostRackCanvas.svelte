@@ -23,7 +23,7 @@
     openEditor, closeEditor, floatEditor, closeEditorWindow, unloadInstrument, removeRackPart,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
-  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import AppWindow from 'lucide-svelte/icons/app-window';
   import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
   import Unplug from 'lucide-svelte/icons/unplug';
   import Trash2 from 'lucide-svelte/icons/trash-2';
@@ -241,7 +241,7 @@
                     aria-label={`Show ${node.title}'s own interface in the host`}
                     title="Show the plug-in's own interface in the native pane"
                     onclick={(e) => actOn(e, () => toggleEditor(node.id))}>
-              <SlidersHorizontal size={13} strokeWidth={1.9} />
+              <AppWindow size={13} strokeWidth={1.9} />
             </button>
             <button type="button" class="node-action" disabled={!node.hasInstrument}
                     class:on={$hostState.floatingEditorPartIds.includes(node.id)}
