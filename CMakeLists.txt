@@ -149,6 +149,28 @@ endif()
 
 # ------------------------------------------------------------------ the app, the player, the VST
 # Everything from here to the tests needs WebView2 and a native juceaide. See CEDITOR_BUILD_APP.
+
+# CTRL49 embedded assets (Lua pages, knob filmstrip, defaults) — generated once and
+# compiled into every target that talks to the hardware: the bridge exe AND, since the
+# broker moved the surface into the product, the editor and both host targets.
+set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
+add_custom_command(
+    OUTPUT "${CTRL49_EMBED_OUT}"
+    COMMAND ${CMAKE_COMMAND}
+        -DROOT=${CMAKE_SOURCE_DIR}
+        -DOUT=${CTRL49_EMBED_OUT}
+        -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
+        "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
+    COMMENT "Embedding CTRL49 bridge assets"
+)
+
 if(CEDITOR_BUILD_APP)
     # --- WebView2 SDK (from NuGet package in CE/thirdparty/) ---
     set(WEBVIEW2_DIR "${CE_ROOT}/thirdparty/webview2/build/native")
@@ -198,10 +220,34 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/ValueTreeBridgeState.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CTRL49_EMBED_OUT}"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
     )
 
     target_compile_definitions(CEditor PRIVATE
@@ -220,11 +266,21 @@ if(CEDITOR_BUILD_APP)
 
     target_include_directories(CEditor PRIVATE
         "${WEBVIEW2_INCLUDE}"
+        # CE/src on the include path, like every other target here. It was missing, and it went
+        # unnoticed for as long as it did because the .cpp files at the ROOT of CE/src resolve
+        # "InstrumentHost/Foo.h" relative to themselves and never needed it. The moment a header
+        # INSIDE a subdirectory reached across to another one — RackModel.h asking for
+        # "Performance/PatternModel.h" — that fallback stopped applying and the app target would
+        # not compile at all. Fifteen such includes exist across ControlSurface, DeviceProfile,
+        # Export, InstrumentHost, Licensing, Performance and Scripting.
+        "${CE_ROOT}/src"
         "${CMAKE_BINARY_DIR}/BinaryData"
     )
 
     target_link_libraries(CEditor PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
@@ -415,6 +471,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_utils
         juce::juce_audio_devices
         juce::juce_core
+        juce::juce_cryptography
         juce::juce_midi_ci
         juce::juce_data_structures
         juce::juce_events
@@ -468,10 +525,34 @@ if(CEDITOR_BUILD_APP)
     set(CE_HOST_COMMON_SOURCES
         "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CTRL49_EMBED_OUT}"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginEditorHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/FloatingEditorWindows.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
     )
 
     juce_add_gui_app(CEHostStandalone
@@ -502,7 +583,13 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_link_libraries(CEHostStandalone PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
+        # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
+        # SHA256. Missed when juce_cryptography was linked into the other four targets that
+        # compile those sources, and invisible from Linux: both host targets are Windows-only,
+        # so the first linker to see them was the owner's. LNK2019 on RSAKey was the symptom.
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
@@ -552,7 +639,13 @@ if(CEDITOR_BUILD_APP)
     )
 
     target_link_libraries(CEHostVST3 PRIVATE
+        $<$<PLATFORM_ID:Windows>:winmm>   # CTRL49 WinMM transport, see the test target's note
         juce::juce_core
+        # The licence check (Licensing/*.cpp in the shared host sources above) uses RSAKey and
+        # SHA256. Missed when juce_cryptography was linked into the other four targets that
+        # compile those sources, and invisible from Linux: both host targets are Windows-only,
+        # so the first linker to see them was the owner's. LNK2019 on RSAKey was the symptom.
+        juce::juce_cryptography
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_processors
@@ -794,6 +887,21 @@ target_include_directories(CEditorCtrl49ReducerTests PRIVATE
 add_test(NAME Ctrl49Reducer COMMAND CEditorCtrl49ReducerTests)
 ce_configure_test(CEditorCtrl49ReducerTests)
 
+# CTRL49 rack surface display payloads + the reducer's normalized control events (Stage 3).
+# Pure std like the protocol tests; the payload shapes follow contracts proven on hardware.
+add_executable(CEditorCtrl49RackDisplayTests
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    "${CE_ROOT}/tests/Ctrl49RackDisplayTests.cpp"
+)
+target_compile_features(CEditorCtrl49RackDisplayTests PRIVATE cxx_std_23)
+target_include_directories(CEditorCtrl49RackDisplayTests PRIVATE "${CE_ROOT}/src")
+add_test(NAME Ctrl49RackDisplay COMMAND CEditorCtrl49RackDisplayTests)
+ce_configure_test(CEditorCtrl49RackDisplayTests)
+
 # CTRL49 preset selection primitive: Bank Select + Program Change bytes + browser index math.
 add_executable(CEditorCtrl49PresetTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
@@ -871,6 +979,52 @@ ce_configure_test(CEditorCtrl49PresetBankTests)
 # executable itself compiles everywhere (guarded), but the WinMM/KSPROPERTY backends are
 # only added on Windows. Not a test — build and run against real hardware.
 if(WIN32)
+    # CTRL49 rack demo (Stage 3): the keyboard drives the instrument host's control pages —
+    # real VST3 instruments through the Stage 2 parameter model, sharing the generated
+    # standalone's per-user session by default. The one hardware demo that hosts plug-ins,
+    # hence the JUCE hosting defines and the modal-loop permission (its console main loop
+    # pumps the message thread itself).
+    add_executable(Ctrl49RackDemo
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDemo.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
+        "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    )
+    target_compile_features(Ctrl49RackDemo PRIVATE cxx_std_23)
+    target_compile_definitions(Ctrl49RackDemo PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_MODAL_LOOPS_PERMITTED=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+    )
+    target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils)
+
     add_executable(Ctrl49BridgeDemo
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
@@ -931,23 +1085,7 @@ if(WIN32)
     # CTRL49 Bridge — the self-contained product exe: knobs mode (default) + --presets, all
     # assets (Lua pages, filmstrip, default assignment/bank, GAIA profile) embedded at build
     # time by tools/ctrl49/embed_assets.cmake. No files needed beside the exe.
-    set(CTRL49_EMBED_OUT "${CMAKE_BINARY_DIR}/generated/Ctrl49EmbeddedAssets.cpp")
-    add_custom_command(
-        OUTPUT "${CTRL49_EMBED_OUT}"
-        COMMAND ${CMAKE_COMMAND}
-            -DROOT=${CMAKE_SOURCE_DIR}
-            -DOUT=${CTRL49_EMBED_OUT}
-            -P ${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake
-        DEPENDS
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
-            "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
-            "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
-        COMMENT "Embedding CTRL49 bridge assets"
-    )
+    # (moved: the embed block now lives before the app targets, which also consume it)
     add_executable(Ctrl49Bridge
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
         "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
@@ -997,6 +1135,33 @@ target_link_libraries(CEditorPluginCatalogTests PRIVATE juce::juce_core)
 add_test(NAME PluginCatalog COMMAND CEditorPluginCatalogTests)
 ce_configure_test(CEditorPluginCatalogTests)
 
+# The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
+# juce_cryptography is the only module beyond juce_core: RSAKey and SHA256, the two primitives
+# an offline signature check needs. No network, and nothing to link that could introduce one.
+add_executable(CEditorLicensingTests
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+    "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+    "${CE_ROOT}/tests/LicensingTests.cpp"
+)
+target_compile_features(CEditorLicensingTests PRIVATE cxx_std_23)
+target_include_directories(CEditorLicensingTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLicensingTests PRIVATE juce::juce_core juce::juce_cryptography)
+add_test(NAME Licensing COMMAND CEditorLicensingTests)
+ce_configure_test(CEditorLicensingTests)
+
+# The vendor's side of the licence system: generate a key pair, sign a licence, sign the sunset
+# unlock, verify what came out. A licensing system with no way to issue a licence is not one.
+# Not installed and not shipped — this is an operator tool, built on demand.
+add_executable(CEditorLicenceTool EXCLUDE_FROM_ALL
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/tools/LicenceToolMain.cpp"
+)
+target_compile_features(CEditorLicenceTool PRIVATE cxx_std_23)
+target_include_directories(CEditorLicenceTool PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLicenceTool PRIVATE juce::juce_core juce::juce_cryptography)
+ce_configure_test(CEditorLicenceTool)
+
 # The stub is deliberately JUCE-free (pure std): it stands in for the worker in tests, and a
 # stub that could itself drag in module dependencies would defeat the point of having one.
 add_executable(CEditorScannerStub
@@ -1023,6 +1188,7 @@ ce_configure_test(CEditorPluginScannerCoordinatorTests)
 # need juce_audio_processors, with the same Linux X11/ALSA dev-package story as
 # CEditorPanelParametersTests.
 add_executable(CEditorRackModelTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/tests/RackModelTests.cpp"
 )
@@ -1044,9 +1210,33 @@ target_link_libraries(CEditorPartMidiFilterTests PRIVATE
 add_test(NAME PartMidiFilter COMMAND CEditorPartMidiFilterTests)
 ce_configure_test(CEditorPartMidiFilterTests)
 
+# The Stage 6 performance system: one transport, one compiled event model, one scheduler —
+# plus the arpeggiator and MIDI FX that are modes over it rather than clocks of their own.
+# juce_audio_basics is the whole dependency, so the timing arithmetic that decides where beat
+# three lands is provable on any machine rather than only on a Windows audio device.
+add_executable(CEditorPerformanceEngineTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
+    "${CE_ROOT}/tests/PerformanceEngineTests.cpp"
+)
+target_compile_features(CEditorPerformanceEngineTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPerformanceEngineTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPerformanceEngineTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+)
+add_test(NAME PerformanceEngine COMMAND CEditorPerformanceEngineTests)
+ce_configure_test(CEditorPerformanceEngineTests)
+
 add_executable(CEditorRackHostTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/tests/RackHostTests.cpp"
 )
 target_compile_features(CEditorRackHostTests PRIVATE cxx_std_23)
@@ -1062,18 +1252,46 @@ ce_configure_test(CEditorRackHostTests)
 # file so it is provable here — command dispatch, session persistence, the load transaction
 # and scan orchestration, driven with the stub instantiator and the stub scanner worker.
 add_executable(CEditorInstrumentHostServiceTests
+    "${CE_ROOT}/src/Performance/PatternModel.cpp"
+    "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+    "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
     "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
     "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
     "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+    "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
     "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+    "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
+    "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+    "${CE_ROOT}/src/Licensing/Licence.cpp"
+    "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+    "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+    "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+    "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+    "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
     juce::juce_core
+    juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
+    # The CTRL49 Windows transports (WinMmOutput/PrivateInput) ride along with the broker's
+    # endpoint factory in every target that compiles it; on Windows they need the multimedia
+    # library. Found by the owner's linker: LNK2019 on Ctrl49PrivateInput — the factory's
+    # real body only exists on Windows, so no Linux build could ever hit these symbols.
+    $<$<PLATFORM_ID:Windows>:winmm>
 )
 add_test(NAME InstrumentHostService
          COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)

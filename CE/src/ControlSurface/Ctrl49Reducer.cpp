@@ -75,9 +75,13 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
         const int slot = data1 - 11;
         activeSlot_ = slot;
         values_[page_][slot] = clamp (values_[page_][slot] + delta (data2));
-        return makeAction ("Encoder " + std::to_string (slot + 1) + " = "
-                               + std::to_string (values_[page_][slot]),
-                           true);
+        Ctrl49Action action = makeAction ("Encoder " + std::to_string (slot + 1) + " = "
+                                              + std::to_string (values_[page_][slot]),
+                                          true);
+        action.encoderMoved = true;
+        action.encoderSlot  = slot;
+        action.encoderDelta = delta (data2);
+        return action;
     }
 
     if (data1 >= 19 && data1 <= 26)  // encoder switch (or Time Division choice while held)
@@ -100,9 +104,13 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
     if (data1 == 34)  // data dial adjusts the active slot
     {
         values_[page_][activeSlot_] = clamp (values_[page_][activeSlot_] + delta (data2));
-        return makeAction ("Data Dial / slot " + std::to_string (activeSlot_ + 1) + " = "
-                               + std::to_string (values_[page_][activeSlot_]),
-                           true);
+        Ctrl49Action action = makeAction ("Data Dial / slot " + std::to_string (activeSlot_ + 1) + " = "
+                                              + std::to_string (values_[page_][activeSlot_]),
+                                          true);
+        action.encoderMoved = true;
+        action.encoderSlot  = activeSlot_;
+        action.encoderDelta = delta (data2);
+        return action;
     }
 
     if (data1 >= 35 && data1 <= 38 && data2 == 127)  // Main/Browser/Control/Multi -> pages 1..4
@@ -111,19 +119,25 @@ std::optional<Ctrl49Action> Ctrl49Reducer::process (const std::uint8_t* data, st
         if (requested >= pageCount_)
             return std::nullopt;  // no such page in this host
         page_ = requested;
-        return makeAction ("Mode button selected page " + std::to_string (page_ + 1), true);
+        Ctrl49Action action = makeAction ("Mode button selected page " + std::to_string (page_ + 1), true);
+        action.pageChanged = true;
+        return action;
     }
 
     if (data1 == 39 && data2 == 127)  // Page Left
     {
         page_ = (page_ + pageCount_ - 1) % pageCount_;
-        return makeAction ("Page Left -> page " + std::to_string (page_ + 1), true);
+        Ctrl49Action action = makeAction ("Page Left -> page " + std::to_string (page_ + 1), true);
+        action.pageChanged = true;
+        return action;
     }
 
     if (data1 == 40 && data2 == 127)  // Page Right
     {
         page_ = (page_ + 1) % pageCount_;
-        return makeAction ("Page Right -> page " + std::to_string (page_ + 1), true);
+        Ctrl49Action action = makeAction ("Page Right -> page " + std::to_string (page_ + 1), true);
+        action.pageChanged = true;
+        return action;
     }
 
     if (data1 >= 42 && data1 <= 45 && data2 == 127 && shiftDown_)  // Shift + Pad Bank A..D

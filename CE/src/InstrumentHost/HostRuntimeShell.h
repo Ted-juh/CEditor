@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HostRuntimeShared.h"
+#include "FloatingEditorWindows.h"
 #include "PluginEditorHost.h"
 
 // HostRuntimeShell — the generated standalone's whole window content (VIP-successor Stage 1).
@@ -19,10 +20,13 @@
 // callAsync check a SafePointer to this component, so a straggler after death is a no-op
 // rather than a crash.
 
+namespace ceditor::ctrl49 { class Ctrl49SurfaceBroker; }
+
 namespace ceditor::host
 {
 
-class HostRuntimeShell final : public juce::Component
+class HostRuntimeShell final : public juce::Component,
+                               private juce::Timer
 {
 public:
     HostRuntimeShell();
@@ -31,13 +35,28 @@ public:
     void resized() override;
 
 private:
+    // The UI-rate pump for parameter deltas: vendor edits land on audio-thread listeners in
+    // the service, and this drains them to the runtime page.
+    void timerCallback() override;
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
 
     juce::AudioPluginFormatManager formatManager;
+    std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
+    // Floating vendor-editor windows — declared after the service so they are destroyed
+    // first, before the rack tears the processors down (same contract as the pane's).
+    FloatingEditorWindows editorWindows;
+    // The CTRL49 broker — the generated product is where the hardware matters most, so the
+    // surface comes alive at launch, not on demand. Declared after the service (destroyed
+    // first: its teardown releases the hardware claim through the service) and ticked from
+    // timerCallback() beside the parameter drain.
+    std::unique_ptr<ctrl49::Ctrl49SurfaceBroker> surfaceBroker;
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;
+    // Who the pane is currently showing. The pane is handed a processor and a title; the
+    // thumbnail hooks need the target's identity to ask the service about its class.
+    juce::String panedTargetId;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HostRuntimeShell)
 };

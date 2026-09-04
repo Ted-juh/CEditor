@@ -79,6 +79,7 @@ public:
         int scanned = 0;
         int skippedUnchanged = 0;
         int skippedQuarantined = 0;
+        int skippedUnsupported = 0;   // wrong architecture for this host (§17.1)
         int failed = 0;
     };
 

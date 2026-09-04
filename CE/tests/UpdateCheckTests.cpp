@@ -146,6 +146,26 @@ void testConsent()
     check (ce::latestReleaseEndpoint().startsWith ("https://"), "the endpoint is https");
     check (ce::latestReleaseEndpoint().contains ("Ted-juh/CEditor"), "and points at this repository");
 }
+void testUpdateEntitlement()
+{
+    std::cout << "\nwhether a found update is included in what was bought (§27)" << std::endl;
+
+    const juce::String until = "2027-01-01T00:00:00.000Z";
+
+    check (ce::updateIsIncluded ("2026-06-01T00:00:00.000Z", until),
+           "a release published before the date is included");
+    check (! ce::updateIsIncluded ("2028-06-01T00:00:00.000Z", until),
+           "one published after it is a paid upgrade");
+
+    // Every failure mode resolves in the customer's favour, on purpose: a typo in a licence,
+    // or a date this code cannot read, must never take away something somebody paid for.
+    check (ce::updateIsIncluded ("2028-06-01T00:00:00.000Z", {}),
+           "no entitlement date means no limit");
+    check (ce::updateIsIncluded ("2028-06-01T00:00:00.000Z", "next Tuesday"),
+           "an unreadable entitlement date means no limit");
+    check (ce::updateIsIncluded ("sometime", until),
+           "an unreadable publication date is included — the failure is ours, not theirs");
+}
 } // namespace
 
 int main()
@@ -157,6 +177,7 @@ int main()
     testReadingTheReply();
     testTheReplyIsNotTrusted();
     testConsent();
+    testUpdateEntitlement();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

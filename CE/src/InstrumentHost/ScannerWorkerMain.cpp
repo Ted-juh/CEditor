@@ -45,11 +45,85 @@ int main (int argc, char* argv[])
     juce::OwnedArray<juce::PluginDescription> descriptions;
     format.findAllTypesForFile (descriptions, modulePath);
 
+    // VST3 plug-ins may ship their own artwork: Contents/Resources/Snapshots holds one PNG per
+    // class, named by the class UID, with optional _2.0x variants for hi-DPI. Reading them is
+    // a directory listing — no instantiation, nothing executed — but this worker is where it
+    // belongs anyway, because it is already the process that touched this module.
+    const auto snapshotsFor = [] (const juce::File& module)
+    {
+        const auto bundle = module.isDirectory() ? module : module.getParentDirectory();
+        return bundle.getChildFile ("Contents").getChildFile ("Resources").getChildFile ("Snapshots");
+    };
+
+    // The largest scale wins: a 2x image downscales cleanly and a 1x one does not scale up.
+    const auto scaleOf = [] (const juce::File& png)
+    {
+        const auto name = png.getFileNameWithoutExtension();
+        const auto tail = name.fromLastOccurrenceOf ("_", false, false);
+        return tail.endsWithIgnoreCase ("x") ? tail.dropLastCharacters (1).getFloatValue() : 1.0f;
+    };
+
+    juce::Array<juce::File> snapshots;
+    if (const auto folder = snapshotsFor (moduleFile); folder.isDirectory())
+        folder.findChildFiles (snapshots, juce::File::findFiles, false, "*.png");
+
+    // Attribution has to be exact or absent — the wrong picture on a plug-in is worse than
+    // none. moduleinfo.json names each class beside its snapshot, so use it when it is there;
+    // otherwise the only safe case is a module with a single class, where there is nothing to
+    // confuse. A multi-class module with no manifest gets no artwork, on purpose.
+    juce::HashMap<juce::String, juce::String> snapshotByClassName;
+    const auto bundle = moduleFile.isDirectory() ? moduleFile : moduleFile.getParentDirectory();
+    const auto moduleInfo = bundle.getChildFile ("Contents").getChildFile ("Resources")
+                                  .getChildFile ("moduleinfo.json");
+    if (moduleInfo.existsAsFile())
+    {
+        const auto parsedInfo = juce::JSON::parse (moduleInfo.loadFileAsString());
+        if (const auto* classes = parsedInfo.getProperty ("Classes", {}).getArray())
+            for (const auto& entry : *classes)
+            {
+                const auto className = entry.getProperty ("Name", {}).toString();
+                float best = 0.0f;
+                juce::String bestPath;
+                if (const auto* shots = entry.getProperty ("Snapshots", {}).getArray())
+                    for (const auto& shot : *shots)
+                    {
+                        const auto scale = (float) (double) shot.getProperty ("ScaleFactor", 1.0);
+                        const auto relative = shot.getProperty ("Path", {}).toString();
+                        if (relative.isEmpty() || scale < best)
+                            continue;
+                        best = scale;
+                        bestPath = bundle.getChildFile ("Contents").getChildFile (relative)
+                                         .getFullPathName();
+                    }
+                if (className.isNotEmpty() && bestPath.isNotEmpty())
+                    snapshotByClassName.set (className, bestPath);
+            }
+    }
+
+    juce::String loneSnapshot;
+    if (descriptions.size() == 1 && ! snapshots.isEmpty())
+    {
+        float best = 0.0f;
+        for (const auto& png : snapshots)
+            if (const auto scale = scaleOf (png); scale >= best)
+            {
+                best = scale;
+                loneSnapshot = png.getFullPathName();
+            }
+    }
+
     for (const auto* description : descriptions)
     {
         if (auto xml = description->createXml())
         {
             xml->setAttribute ("ceId", description->createIdentifierString());
+
+            auto artwork = snapshotByClassName.contains (description->name)
+                             ? snapshotByClassName[description->name]
+                             : loneSnapshot;
+            if (artwork.isNotEmpty() && juce::File (artwork).existsAsFile())
+                xml->setAttribute ("ceSnapshot", artwork);
+
             out.addChildElement (xml.release());
         }
     }

@@ -24,6 +24,10 @@ system, lived in `CE/web/src/CE_Application/docs/` and were deleted with the res
 - [Beta differentiation](beta-differentiation.md) — what actually sets CEditor apart, and the
   three bets that would define the product.
 - [License decision](license-decision.md)
+- [Licence, updates and the sunset promise](licence-and-sunset-policy.md) — what a
+  purchase includes, why an expired update entitlement never disables anything, and the
+  signed sunset key that unlocks every install if the software is ever discontinued.
+  Every promise in it is matched by a named test.
 - [Known issues](known-issues.md) — found, not fixed, not forgotten.
 - [Release notes](../RELEASE-NOTES.md) — what a beta tester is told before installing: Windows only,
   unsigned, and what this build can and cannot do.

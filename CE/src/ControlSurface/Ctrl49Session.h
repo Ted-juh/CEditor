@@ -55,9 +55,11 @@ public:
         Bytes png;
     };
 
-    // The proven startup sequence for one full-screen Lua page (raw = UTF-8 source + NUL),
-    // uploading any PNG assets before the bind/init so the page can decode them. Pure;
-    // exposed for golden-sequence tests.
+    // The proven startup sequence for one full-screen Lua page. `rawLua` is the plain
+    // UTF-8 source: the session appends the object convention's NUL terminator itself
+    // (idempotently — a caller-included NUL is left alone), exactly as it does for the
+    // PNGs. Uploads any PNG assets before the bind/init so the page can decode them.
+    // Pure; exposed for golden-sequence tests.
     static std::vector<TimedFrame> buildStartupSequence (const Bytes& rawLua,
                                                          const std::vector<PngAsset>& assets = {});
 

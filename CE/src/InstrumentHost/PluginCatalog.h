@@ -25,9 +25,50 @@
 // module is skipped by every future scan until the user clears it — never silently retried,
 // and never deleted (`missing` is a flag for the same reason: history survives an unplugged
 // drive or an uninstalled plug-in).
+//
+// ARCHITECTURE IS READ, NOT ATTEMPTED (§17.1 "Architecture check", §17.2 "Validate capability
+// and architecture records"). A 32-bit plug-in in a 64-bit host cannot load, and finding that
+// out by handing it to the scanner costs a process launch and produces a failure indis-
+// tinguishable from a broken plug-in — so the module gets quarantined for being the wrong
+// shape, which is wrong twice over. The architecture is instead read from the file: a VST3
+// bundle names its slices in directories, and a bare module names itself in its own binary
+// header. Neither needs the module loaded, so this stays in juce_core and runs everywhere.
+//
+// A wrong-architecture module is `unsupported`, which is deliberately NOT `quarantined`: it is
+// not broken and there is nothing to retry. It stays in the catalogue with its reason, it is
+// kept out of the browser (offering something that cannot load is a lie), and the reason is
+// there when somebody asks why their plug-in is not in the list. When the architecture cannot
+// be determined the module is treated as supported — silence is not evidence, and hiding a
+// working plug-in because a header was unfamiliar is the worse failure.
 
 namespace ceditor::host
 {
+
+/** Where the WebView is allowed to read plug-in artwork from.
+
+    A snapshot lives wherever the vendor installed the plug-in, which is an arbitrary absolute
+    path, and the frontend is a browser: handing it a path to fetch would mean a resource
+    provider that serves any file it is asked for. So it does not get a path. The service
+    registers the files it has decided are serveable and hands out an opaque token; the
+    provider serves a token or nothing. The set of readable files is exactly the set the
+    catalogue put here, which is the property that makes this safe rather than the string
+    checks a path-based version would need. */
+class PluginSnapshotRegistry
+{
+public:
+    static PluginSnapshotRegistry& instance();
+
+    /** Registers a file and returns its token, or an empty string if the file is not there.
+        Registering the same class twice is a no-op that returns the same token. */
+    juce::String publish (const juce::String& ceId, const juce::File& snapshot);
+
+    /** The file for a token, or a file that does not exist for anything unregistered. */
+    juce::File resolve (const juce::String& token) const;
+
+private:
+    mutable juce::CriticalSection lock;
+    juce::HashMap<juce::String, juce::String> pathsByToken;
+};
 
 struct PluginClassRecord
 {
@@ -37,7 +78,18 @@ struct PluginClassRecord
     juce::String version;
     juce::String category;
     bool isInstrument = false;
+    /** Which plug-in format this class came from (Stage 7, §18.9.6). "VST3" today; the field
+        exists so a second format is a REGISTRATION rather than a rewrite — the catalogue, the
+        library, the parameter model, the editor host and the state path all key off the same
+        record, and none of them care which format produced it. An absent value reads as VST3,
+        which is what every pre-Stage-7 catalogue on disk contains. */
+    juce::String formatName { "VST3" };
     juce::String descriptionXml;   // lossless JUCE PluginDescription XML, opaque at this layer
+    /** The vendor's own picture of this plug-in, if it shipped one: VST3 defines
+        Contents/Resources/Snapshots as PNGs named by class UID, and the scan worker reads that
+        folder while it is there. An absolute path at scan time, empty when the vendor shipped
+        nothing — which is most of them, and why the UI still needs a generated fallback. */
+    juce::String snapshotPath;
 };
 
 struct ModuleRecord
@@ -49,7 +101,16 @@ struct ModuleRecord
     bool quarantined = false;
     int failureCount = 0;
     juce::String lastFailureReason;
+    /** What the module's own file says it is: "x86", "x86_64", "arm64", or several of those
+        for a fat bundle. Empty means the check could not tell, which reads as supported. */
+    juce::StringArray architectures;
     juce::Array<PluginClassRecord> classes;
+
+    /** False only when the architectures are known AND this host's is not among them. */
+    bool architectureSupported() const;
+
+    /** Why the browser is not offering this module, or empty when it is. */
+    juce::String unavailableReason() const;
 };
 
 struct ModuleScanResult
@@ -100,9 +161,26 @@ public:
     /** Every instrument class from modules that are present and not quarantined — the default
         browser projection. */
     juce::Array<PluginClassRecord> instrumentClasses() const;
+    /** The non-instrument classes of healthy modules — the effect picker's projection
+        (Stage 5), same health rules as the instrument browser's. */
+    juce::Array<PluginClassRecord> effectClasses() const;
 
     const juce::Array<ModuleRecord>& allModules() const   { return modules; }
     int numModules() const                                { return modules.size(); }
+
+    /** Records the architectures read from a module's own files, without scanning it. Creates
+        the record if this is the first time the module has been seen, so a wrong-architecture
+        module is catalogued with its reason rather than silently skipped. */
+    void recordArchitectures (const juce::String& modulePath, const juce::StringArray& architectures);
+
+    /** The architecture slices a module declares, read from the file rather than by loading it:
+        a VST3 bundle's `Contents/<arch>-<os>` directory names, or the machine field in a bare
+        module's own binary header (PE, ELF and Mach-O are all recognised). Empty when nothing
+        recognisable was found — that is "could not tell", never "unsupported". */
+    static juce::StringArray architecturesOf (const juce::File& moduleFileOrBundle);
+
+    /** The architecture this build runs as, in the same vocabulary architecturesOf returns. */
+    static juce::String hostArchitecture();
 
     /** Change-detection stamp for a module file or bundle directory. For a directory the walk
         is recursive and sorted by relative path, so the stamp is deterministic and moves when

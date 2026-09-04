@@ -108,7 +108,7 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
 
     Pure: returns operations, executes nothing. Only the targets the manifest enables appear,
     and each op names the artifact it needs so a missing one refuses with its own name. */
-export function stagePlan({ project, artifacts, stageDir }) {
+export function stagePlan({ project, artifacts, stageDir, performanceFile = null }) {
   const ops = [];
   const missing = [];
 
@@ -118,6 +118,8 @@ export function stagePlan({ project, artifacts, stageDir }) {
       ops.push({ kind: 'copyFile', from: artifacts.standaloneExe, to: path.join(stageDir, 'Standalone', path.basename(artifacts.standaloneExe)) });
       if (artifacts.scannerExe)
         ops.push({ kind: 'copyFile', from: artifacts.scannerExe, to: path.join(stageDir, 'Standalone', 'CEditorPluginScanner.exe') });
+      if (performanceFile)
+        ops.push({ kind: 'copyFile', from: performanceFile, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
     }
   }
 
@@ -134,6 +136,10 @@ export function stagePlan({ project, artifacts, stageDir }) {
           // lives, and the runtime's worker search starts beside the loaded binary.
           to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'x86_64-win', 'CEditorPluginScanner.exe'),
         });
+      if (performanceFile)
+        // Contents/Resources is the bundle's place for non-binary assets, and where the
+        // runtime's factory-rack search looks from the module directory.
+        ops.push({ kind: 'copyFile', from: performanceFile, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'factory-performance.json') });
     }
   }
 
@@ -197,6 +203,7 @@ function parseArgs(argv) {
     else if (flag === '--config') out.config = next();
     else if (flag === '--out') out.out = next();
     else if (flag === '--iscc') out.iscc = next();
+    else if (flag === '--performance') out.performance = next();
     else throw new Error(`unknown argument: ${flag}`);
   }
   if (!out.project) throw new Error('--project <host-project.json> is required');
@@ -229,8 +236,14 @@ async function main() {
   for (const [kind, found] of Object.entries(artifacts))
     console.log(`  ${kind}: ${found ?? '(not found)'}`);
 
+  // The authored rack ships as the product's factory state; a project built without one
+  // starts empty, and the summary says which happened rather than leaving it to guesswork.
+  const performanceFile = args.performance && existsSync(args.performance) ? args.performance : null;
+  console.log(performanceFile ? `  factory rack: ${performanceFile}`
+                              : '  factory rack: none — the product starts with an empty rack');
+
   const stageDir = path.join(args.out, 'stage');
-  const { ops, missing } = stagePlan({ project, artifacts, stageDir });
+  const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceFile });
   if (missing.length > 0) {
     for (const m of missing) console.error(`MISSING: ${m}`);
     console.error('Build the C++ targets first (cmake --build build/native --target CEHostStandalone CEHostVST3 CEditorPluginScanner).');

@@ -1,0 +1,1832 @@
+// PerformanceEngineTests — the Stage 6 timing and event engine (VIP-successor §18.8).
+//
+// What must hold, and why each is here rather than in a Windows-only smoke test:
+//
+//   The transport is the only clock.       Tempo, signature, start/continue/stop and the
+//                                          block window are pure arithmetic; if bar three is
+//                                          in the wrong place it is wrong for the sequencer,
+//                                          the arp and the hardware display at once.
+//   Compilation decides everything it can. Ties, ratchets, swing and microtiming are already
+//                                          in the compiled events, so the audio thread never
+//                                          reasons about intent.
+//   Randomness is reproducible.            Probability and conditions roll from the pattern's
+//                                          seed and the loop index — same seed, same show.
+//   No note is ever orphaned.              Stop, jump, clip stop, scene change and panic all
+//                                          release exactly what is sounding.
+//   Polymeter is not a special case.       A 7-step lane against a 16-step lane is two lanes
+//                                          with different lengths, nothing more.
+
+#include "Performance/PerformanceEngine.h"
+#include "Performance/MidiInsertRack.h"
+#include <map>
+#include <set>
+#include "Performance/ArpEngine.h"
+#include "Performance/MidiFxChain.h"
+#include <iostream>
+#include <vector>
+
+namespace
+{
+int failures = 0;
+
+void check (bool cond, const juce::String& label)
+{
+    std::cout << (cond ? "  PASS  " : "  FAIL  ") << label << std::endl;
+    if (! cond) ++failures;
+}
+
+using namespace ceditor::perf;
+
+constexpr double sampleRate = 48000.0;
+constexpr int blockSize = 256;
+
+/** A lane of `stepCount` steps at `stepsPerBeat`, every `every`th step active. */
+Lane makeNoteLane (const juce::String& id, const juce::String& partId, int stepCount,
+                   int stepsPerBeat, int every, int note = 60)
+{
+    Lane lane;
+    lane.laneId = id;
+    lane.type = LaneType::note;
+    lane.targetPartId = partId;
+    lane.stepCount = stepCount;
+    lane.stepsPerBeat = stepsPerBeat;
+    lane.resizeSteps();
+
+    for (int i = 0; i < stepCount; ++i)
+        if (i % every == 0)
+        {
+            auto& step = lane.steps.getReference (i);
+            step.active = true;
+            step.note = note;
+            step.velocity = 100;
+            step.gate = 0.5f;
+        }
+
+    return lane;
+}
+
+/** The first message in a buffer — the iterator yields metadata, not messages. */
+juce::MidiMessage firstMessage (const juce::MidiBuffer& buffer)
+{
+    for (const auto metadata : buffer)
+        return metadata.getMessage();
+    return {};
+}
+
+CompileContext contextForOnePart()
+{
+    CompileContext context;
+    context.partIndexFor = [] (const juce::String& partId) { return partId == "p1" ? 0 : -1; };
+    context.parameterResolves = [] (const juce::String&, const juce::String&, const juce::String&)
+                                { return true; };
+    return context;
+}
+
+/** Runs the engine for `blocks` blocks and collects everything one part received. */
+struct Capture
+{
+    struct Event { int block; int sample; juce::MidiMessage message; };
+    std::vector<Event> events;
+
+    void run (PerformanceEngine& engine, int blocks, int partIndex = 0)
+    {
+        juce::MidiBuffer empty;
+        for (int b = 0; b < blocks; ++b)
+        {
+            engine.processBlock (blockSize, empty);
+            for (const auto metadata : engine.stagingFor (partIndex))
+                events.push_back ({ b, metadata.samplePosition, metadata.getMessage() });
+        }
+    }
+
+    int countNoteOns() const
+    {
+        int n = 0;
+        for (const auto& event : events)
+            n += event.message.isNoteOn() ? 1 : 0;
+        return n;
+    }
+
+    int countNoteOffs() const
+    {
+        int n = 0;
+        for (const auto& event : events)
+            n += event.message.isNoteOff() ? 1 : 0;
+        return n;
+    }
+
+    /** Absolute sample position of the nth note-on. */
+    int noteOnSample (int index) const
+    {
+        int seen = 0;
+        for (const auto& event : events)
+            if (event.message.isNoteOn() && seen++ == index)
+                return event.block * blockSize + event.sample;
+        return -1;
+    }
+
+    void clear() { events.clear(); }
+};
+
+void testTransport()
+{
+    std::cout << "\ntransport: the one clock" << std::endl;
+
+    Transport transport;
+    transport.setTempo (120.0);
+    transport.setTimeSignature (4, 4);
+
+    // 120bpm = 2 quarter notes a second; one 48k block of 256 samples is a known slice.
+    auto block = transport.advance (blockSize, sampleRate);
+    check (! block.playing && juce::approximatelyEqual (block.startPpq, block.endPpq),
+           "a stopped transport does not move");
+
+    transport.start();
+    block = transport.advance (blockSize, sampleRate);
+    const auto expected = 2.0 * (double) blockSize / sampleRate;
+    check (block.playing && block.justStarted,
+           "start is consumed at the top of the block, not somewhere inside it");
+    check (std::abs (block.endPpq - expected) < 1.0e-9,
+           "one block advances exactly tempo/60/sampleRate per sample");
+
+    // Bars and beats are a reading of ppq, so a signature change re-reads the same position.
+    transport.setPosition (4.0);
+    transport.advance (blockSize, sampleRate);
+    int bar = 0, beat = 0; double fraction = 0.0;
+    transport.positionInBarsBeats (bar, beat, fraction);
+    check (bar == 2 && beat == 1, "four quarter notes into 4/4 is bar 2 beat 1");
+    transport.setTimeSignature (3, 4);
+    transport.positionInBarsBeats (bar, beat, fraction);
+    check (bar == 2 && beat == 2, "the same position in 3/4 is bar 2 beat 2");
+
+    // Quantized launch boundaries.
+    transport.setTimeSignature (4, 4);
+    check (std::abs (transport.nextBoundary (4.2, Quantize::bar) - 8.0) < 1.0e-9,
+           "the next bar after 4.2 is 8.0");
+    check (std::abs (transport.nextBoundary (4.0, Quantize::bar) - 4.0) < 1.0e-9,
+           "a position already on the boundary is the boundary");
+    check (std::abs (transport.nextBoundary (4.2, Quantize::beat) - 5.0) < 1.0e-9,
+           "beat quantization lands on the next quarter note");
+    check (std::abs (transport.nextBoundary (4.2, Quantize::immediate) - 4.2) < 1.0e-9,
+           "immediate means now, so every launch path can share one code path");
+
+    // Start rewinds; continue does not — the MIDI verbs, kept apart.
+    transport.stop();
+    transport.advance (blockSize, sampleRate);
+    transport.setPosition (7.5);
+    transport.advance (blockSize, sampleRate);
+    transport.continuePlayback();
+    block = transport.advance (blockSize, sampleRate);
+    check (block.playing && std::abs (block.startPpq - 7.5) < 1.0e-9,
+           "continue resumes where the playhead was");
+    transport.start();
+    block = transport.advance (blockSize, sampleRate);
+    check (std::abs (block.startPpq) < 1.0e-9, "start goes back to the top");
+}
+
+void testExternalClock()
+{
+    std::cout << "\ntransport: following an external clock" << std::endl;
+
+    Transport transport;
+    transport.setExternalClockEnabled (true);
+    transport.setTempo (120.0);
+
+    // 24 ticks per quarter note at 120bpm = one tick every 1000 samples at 48k.
+    juce::MidiBuffer clock;
+    clock.addEvent (juce::MidiMessage::midiStart(), 0);
+    transport.consumeExternalClock (clock, sampleRate);
+    transport.advance (blockSize, sampleRate);
+    check (transport.isPlaying(), "the master's start starts the slave");
+
+    for (int i = 0; i < 48; ++i)
+    {
+        juce::MidiBuffer tick;
+        tick.addEvent (juce::MidiMessage::midiClock(), 0);
+        // Four blocks of 250 samples between ticks = 1000 samples = 120bpm.
+        for (int b = 0; b < 4; ++b)
+        {
+            transport.consumeExternalClock (b == 0 ? tick : juce::MidiBuffer(), sampleRate);
+            transport.advance (250, sampleRate);
+        }
+    }
+
+    check (std::abs (transport.getTempo() - 120.0) < 3.0,
+           "tempo is derived from the interval between ticks");
+    check (transport.getPositionPpq() > 1.5,
+           "and the position follows the tick count rather than free-running");
+
+    // Clock loss has a defined outcome: stop, and say so.
+    for (int b = 0; b < 200; ++b)
+        transport.advance (256, sampleRate);
+    check (! transport.isPlaying() && transport.hasLostExternalClock(),
+           "a master that goes silent stops the slave and is reported, not guessed at");
+
+    juce::MidiBuffer stop;
+    stop.addEvent (juce::MidiMessage::midiStop(), 0);
+    transport.setExternalClockEnabled (false);
+    transport.consumeExternalClock (stop, sampleRate);
+    check (! transport.hasLostExternalClock(),
+           "leaving external mode clears the diagnostic");
+}
+
+// Stage 7 (§18.9.3): the DAW is a third clock SOURCE, not a second clock. The transport
+// follows the host's playhead the way it follows a MIDI master — so a loop jump, a locate and
+// a tempo ramp all land where the DAW says, and the sequencer, the arps and the hardware
+// display keep agreeing with each other.
+void testHostSync()
+{
+    std::cout << "\ntransport: following a DAW playhead" << std::endl;
+
+    Transport transport;
+    transport.setHostSyncEnabled (true);
+    check (! transport.hasHostPosition(),
+           "a DAW that never reports a position leaves the transport on its own clock");
+
+    // A host that is stopped at bar 2 (ppq 4) with its own tempo and signature.
+    transport.applyHostPosition (140.0, 3, 4, 4.0, false);
+    auto block = transport.advance (blockSize, sampleRate);
+    check (transport.hasHostPosition() && ! block.playing,
+           "the host's stopped playhead stops the transport");
+    check (std::abs (transport.getTempo() - 140.0) < 1.0e-9
+             && transport.getTimeSignatureNumerator() == 3,
+           "and its tempo and signature are adopted");
+    check (std::abs (block.startPpq - 4.0) < 1.0e-9, "at the host's position");
+
+    // Rolling: the position comes from the host every block, never integrated here.
+    transport.applyHostPosition (140.0, 3, 4, 4.0, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (block.playing && std::abs (block.startPpq - 4.0) < 1.0e-9, "rolling from there");
+
+    transport.applyHostPosition (140.0, 3, 4, 4.5, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (std::abs (block.startPpq - 4.5) < 1.0e-9,
+           "the next block starts where the host says, not where we would have integrated to");
+
+    // A loop jump backwards is a jump, and the scheduler is told so it can release notes.
+    transport.applyHostPosition (140.0, 3, 4, 0.0, true);
+    transport.advance (blockSize, sampleRate);
+    check (transport.consumeJumped(), "a host locate reports as a jump");
+
+    // Local transport control is refused while the DAW owns it: its play button is the one.
+    transport.stop();
+    transport.applyHostPosition (140.0, 3, 4, 1.0, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (block.playing, "a local stop cannot stop a transport the host is driving");
+
+    // Leaving host sync hands the clock back.
+    transport.setHostSyncEnabled (false);
+    check (! transport.hasHostPosition(), "and leaving host sync releases it");
+    transport.stop();
+    block = transport.advance (blockSize, sampleRate);
+    check (! block.playing, "after which local control works again");
+}
+
+void testCompileAndPlay()
+{
+    std::cout << "\npatterns: compile, schedule, release" << std::endl;
+
+    auto pattern = Pattern::create ("Test");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 1));   // four sixteenths = one beat
+
+    juce::Array<Clip> clips;
+    Clip clip;
+    clip.clipId = "c1";
+    clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::immediate;
+    clips.add (clip);
+
+    juce::Array<Pattern> patterns;
+    patterns.add (pattern);
+
+    auto song = compileSong (patterns, clips, contextForOnePart());
+    check (song->patterns.size() == 1 && song->patterns[0].lanes.size() == 1
+             && song->patterns[0].lanes[0].events.size() == 4,
+           "four active steps compile into four events");
+    check (std::abs (song->patterns[0].lanes[0].lengthPpq - 1.0) < 1.0e-9,
+           "four sixteenths is one quarter note of lane");
+    check (song->clips.size() == 1 && song->clips[0].patternIndex == 0,
+           "the clip resolves to its pattern");
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (std::move (song), 1);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    // One beat at 120bpm is 24000 samples ≈ 94 blocks of 256.
+    // One beat is 24000 samples; 93 blocks of 256 is 23808 — one loop and not a sample more.
+    Capture capture;
+    capture.run (engine, 93);
+    check (capture.countNoteOns() == 4, "one loop plays its four notes");
+    check (capture.countNoteOffs() == 4, "and releases every one of them");
+
+    // Sixteenths at 120bpm are 6000 samples apart; the first sits at zero.
+    check (capture.noteOnSample (0) == 0, "the first note lands on the launch");
+    check (std::abs (capture.noteOnSample (1) - 6000) <= 1,
+           "and the next exactly one sixteenth later, inside the block it belongs to");
+    check (std::abs (capture.noteOnSample (3) - 18000) <= 1,
+           "sample-accurate all the way through the loop");
+
+    // The loop repeats without drift.
+    capture.clear();
+    capture.run (engine, 93);
+    check (capture.countNoteOns() == 4, "the loop repeats");
+    // The next loop's first note is at absolute sample 24000; this capture began at 23808.
+    check (std::abs (capture.noteOnSample (0) - 192) <= 1,
+           "starting exactly one beat after the first, with no accumulated drift");
+}
+
+void testSwingRatchetsTiesMicrotiming()
+{
+    std::cout << "\npatterns: swing, ratchets, ties, microtiming" << std::endl;
+
+    // Swing: the odd sixteenth moves later by swing * half a step.
+    {
+        auto pattern = Pattern::create ("Swung");
+        pattern.swing = 0.5f;
+        pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 1));
+        juce::Array<Pattern> patterns; patterns.add (pattern);
+        juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+        clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+        auto song = compileSong (patterns, clips, contextForOnePart());
+        const auto& events = song->patterns[0].lanes[0].events;
+        check (std::abs (events[0].ppq) < 1.0e-9 && std::abs (events[1].ppq - 0.3125) < 1.0e-9,
+               "swing delays the odd steps and leaves the even ones alone");
+    }
+
+    // Ratchets: one step becomes N events inside the step.
+    {
+        auto pattern = Pattern::create ("Ratchet");
+        auto lane = makeNoteLane ("l1", "p1", 4, 4, 4);
+        lane.steps.getReference (0).ratchets = 3;
+        pattern.lanes.add (lane);
+        juce::Array<Pattern> patterns; patterns.add (pattern);
+        juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+        clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+        auto song = compileSong (patterns, clips, contextForOnePart());
+        const auto& events = song->patterns[0].lanes[0].events;
+        check (events.size() == 3, "three ratchets compile into three events");
+        check (std::abs (events[1].ppq - 1.0 / 12.0) < 1.0e-9,
+               "spaced evenly across the step they subdivide");
+    }
+
+    // Ties: the following step extends the note instead of retriggering it.
+    {
+        auto pattern = Pattern::create ("Tied");
+        auto lane = makeNoteLane ("l1", "p1", 4, 4, 4);
+        lane.steps.getReference (0).gate = 1.0f;
+        lane.steps.getReference (1).active = true;
+        lane.steps.getReference (1).tie = true;
+        pattern.lanes.add (lane);
+        juce::Array<Pattern> patterns; patterns.add (pattern);
+        juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+        clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+        auto song = compileSong (patterns, clips, contextForOnePart());
+        const auto& events = song->patterns[0].lanes[0].events;
+        check (events.size() == 1, "a tie is not an event of its own");
+        check (std::abs (events[0].durationPpq - 0.5) < 1.0e-9,
+               "it is length on the note before it");
+    }
+
+    // Microtiming: a per-step nudge, ahead or behind the grid.
+    {
+        auto pattern = Pattern::create ("Nudged");
+        auto lane = makeNoteLane ("l1", "p1", 4, 4, 4);
+        lane.steps.getReference (0).microtiming = 0.25f;
+        pattern.lanes.add (lane);
+        juce::Array<Pattern> patterns; patterns.add (pattern);
+        juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+        clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+        auto song = compileSong (patterns, clips, contextForOnePart());
+        check (std::abs (song->patterns[0].lanes[0].events[0].ppq - 0.0625) < 1.0e-9,
+               "microtiming moves the event by a fraction of its step");
+    }
+}
+
+void testProbabilityAndConditions()
+{
+    std::cout << "\npatterns: probability and conditions are reproducible" << std::endl;
+
+    CompiledEvent event;
+    event.probability = 50;
+    event.seed = 12345;
+
+    int played = 0;
+    for (int loop = 0; loop < 1000; ++loop)
+        played += eventPlaysOnLoop (event, loop, 0) ? 1 : 0;
+    check (played > 400 && played < 600, "a 50% step plays about half the time");
+
+    int replayed = 0;
+    for (int loop = 0; loop < 1000; ++loop)
+        replayed += eventPlaysOnLoop (event, loop, 0) ? 1 : 0;
+    check (played == replayed, "and exactly the same times on the next run — a rehearsable show");
+
+    event.probability = 100;
+    event.conditionEvery = 3;
+    event.conditionOffset = 1;
+    check (! eventPlaysOnLoop (event, 0, 0) && eventPlaysOnLoop (event, 1, 0)
+             && ! eventPlaysOnLoop (event, 2, 0) && eventPlaysOnLoop (event, 4, 0),
+           "a 2:3 condition plays on the second loop of every three");
+
+    event.probability = 0;
+    event.conditionEvery = 1;
+    check (! eventPlaysOnLoop (event, 0, 0), "zero probability never plays");
+}
+
+void testPolymeterAndEuclid()
+{
+    std::cout << "\npatterns: polymeter and euclidean fills" << std::endl;
+
+    auto pattern = Pattern::create ("Poly");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 4, 60));   // one hit every beat
+    pattern.lanes.add (makeNoteLane ("l2", "p1", 3, 4, 3, 72));   // one hit every 3/4 beat
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+    juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+    auto song = compileSong (patterns, clips, contextForOnePart());
+    check (std::abs (song->patterns[0].lanes[0].lengthPpq - 1.0) < 1.0e-9
+             && std::abs (song->patterns[0].lanes[1].lengthPpq - 0.75) < 1.0e-9,
+           "each lane keeps its own loop length");
+    check (std::abs (song->patterns[0].lengthPpq - 1.0) < 1.0e-9,
+           "the pattern's own loop is the longest lane");
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (std::move (song), 1);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    Capture capture;
+    capture.run (engine, 281);   // three beats at 120bpm, less one block
+    int low = 0, high = 0;
+    for (const auto& e : capture.events)
+        if (e.message.isNoteOn())
+            (e.message.getNoteNumber() == 60 ? low : high) += 1;
+    check (low == 3 && high == 4,
+           "three beats give the 1-beat lane three hits and the 3/4-beat lane four");
+
+    const auto euclid = euclideanPattern (8, 3, 0);
+    juce::String shape;
+    for (const auto hit : euclid)
+        shape += hit ? "x" : ".";
+    check (shape == "..x..x.x" || shape == "x..x..x." || shape == ".x..x..x",
+           "E(3,8) distributes three hits evenly over eight steps (" + shape + ")");
+    check (euclideanPattern (16, 0, 0).contains (true) == false, "no pulses is silence");
+}
+
+void testNoOrphanNotes()
+{
+    std::cout << "\npatterns: no orphan notes, ever" << std::endl;
+
+    auto pattern = Pattern::create ("Long");
+    auto lane = makeNoteLane ("l1", "p1", 4, 4, 4);
+    lane.steps.getReference (0).gate = 4.0f;    // a note that outlives any single block
+    pattern.lanes.add (lane);
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+    juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (compileSong (patterns, clips, contextForOnePart()), 1);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    Capture capture;
+    capture.run (engine, 4);
+    check (capture.countNoteOns() == 1 && capture.countNoteOffs() == 0,
+           "a long note is still sounding");
+
+    // Stopping the transport releases it.
+    engine.getTransport().stop();
+    capture.clear();
+    capture.run (engine, 2);
+    check (capture.countNoteOffs() == 1, "stopping the transport releases what was sounding");
+
+    // A jump releases too.
+    engine.getTransport().start();
+    engine.launchClip (0);
+    capture.clear();
+    capture.run (engine, 4);
+    check (capture.countNoteOns() == 1, "playing again");
+    engine.getTransport().setPosition (16.0);
+    capture.clear();
+    capture.run (engine, 2);
+    check (capture.countNoteOffs() == 1, "and jumping the playhead releases it too");
+
+    // Panic, from anywhere.
+    engine.getTransport().setPosition (0.0);
+    engine.launchClip (0);
+    capture.clear();
+    capture.run (engine, 4);
+    check (capture.countNoteOns() >= 1, "sounding again");
+    engine.panic();
+    capture.clear();
+    capture.run (engine, 1);
+    check (capture.countNoteOffs() >= 1, "panic releases everything and stops every clip");
+    check (! engine.isClipActive (0), "including the clips themselves");
+}
+
+void testLaunchQuantizeAndScenes()
+{
+    std::cout << "\nclips and scenes: quantized launch" << std::endl;
+
+    auto pattern = Pattern::create ("Bar");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 4));   // one note at the top
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+
+    juce::Array<Clip> clips;
+    Clip a; a.clipId = "a"; a.patternId = pattern.patternId; a.launchQuantize = Quantize::bar;
+    Clip b; b.clipId = "b"; b.patternId = pattern.patternId; b.launchQuantize = Quantize::bar;
+    clips.add (a); clips.add (b);
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (compileSong (patterns, clips, contextForOnePart()), 7);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().setTimeSignature (4, 4);
+    engine.getTransport().start();
+
+    // Launched a beat in, a bar-quantized clip waits for the bar line.
+    Capture capture;
+    capture.run (engine, 94);          // one beat
+    engine.launchClip (0);
+    capture.clear();
+    capture.run (engine, 94);          // second beat: still waiting
+    check (capture.countNoteOns() == 0 && engine.isClipPending (0),
+           "a bar-quantized launch waits, and says it is waiting");
+
+    capture.clear();
+    capture.run (engine, 190);         // through the bar line
+    check (capture.countNoteOns() >= 1 && engine.isClipActive (0),
+           "and starts exactly at the bar");
+
+    // A scene launches its clips together and announces itself with its token.
+    juce::Array<int> sceneClips;
+    sceneClips.add (1);
+    engine.launchScene (sceneClips, true, Quantize::bar, 42);
+    capture.clear();
+    capture.run (engine, 380);
+
+    bool sawScene = false;
+    PerformanceEngine::OutEvent event;
+    while (engine.popEvent (event))
+        if (event.type == PerformanceEngine::OutEvent::Type::sceneApplied && event.index == 42)
+            sawScene = event.generation == 7;
+    check (sawScene, "a scene reports the moment it landed, with the song generation");
+    check (engine.isClipActive (1) && ! engine.isClipActive (0),
+           "its clips are running and the ones it omits were stopped");
+}
+
+void testParameterLanesAndGlide()
+{
+    std::cout << "\nautomation: parameter lanes leave through the queue" << std::endl;
+
+    auto pattern = Pattern::create ("Auto");
+    Lane lane;
+    lane.laneId = "auto";
+    lane.type = LaneType::parameter;
+    lane.targetId = "p1";
+    lane.parameterId = "cutoff";
+    lane.stepCount = 4;
+    lane.stepsPerBeat = 4;
+    lane.resizeSteps();
+    for (int i = 0; i < 4; ++i)
+    {
+        auto& step = lane.steps.getReference (i);
+        step.active = true;
+        step.value = (float) i / 3.0f;
+    }
+    pattern.lanes.add (lane);
+
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+    juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+    auto song = compileSong (patterns, clips, contextForOnePart());
+    check (song->parameterTargets.size() == 1
+             && song->parameterTargets[0].parameterId == "cutoff",
+           "a resolved automation lane registers its target once");
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (std::move (song), 3);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    juce::MidiBuffer empty;
+    for (int b = 0; b < 93; ++b)
+        engine.processBlock (blockSize, empty);
+
+    std::vector<float> values;
+    PerformanceEngine::OutEvent event;
+    while (engine.popEvent (event))
+        if (event.type == PerformanceEngine::OutEvent::Type::parameterValue)
+        {
+            check (event.index == 0 && event.generation == 3, "carrying its target and generation");
+            values.push_back (event.value);
+        }
+
+    check (values.size() == 4, "four steps deliver four values");
+    check (! values.empty() && std::abs (values.back() - 1.0f) < 1.0e-6,
+           "and the last is the value the last step holds");
+    check (engine.stagingFor (0).isEmpty(),
+           "a parameter lane emits no MIDI — it is not a CC in disguise");
+
+    // An unresolved target is marked, never retargeted by name.
+    CompileContext refusing;
+    refusing.partIndexFor = [] (const juce::String&) { return 0; };
+    refusing.parameterResolves = [] (const juce::String&, const juce::String&, const juce::String&)
+                                 { return false; };
+    auto unresolvedSong = compileSong (patterns, clips, refusing);
+    check (unresolvedSong->parameterTargets.empty()
+             && unresolvedSong->patterns[0].lanes[0].targetIndex == -1,
+           "an unresolved automation lane compiles to silence, not to somebody else's parameter");
+}
+
+void testFollowActions()
+{
+    std::cout << "\nclips: follow actions and one-shots" << std::endl;
+
+    auto pattern = Pattern::create ("Beat");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 4));
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+
+    juce::Array<Clip> clips;
+    Clip a; a.clipId = "a"; a.patternId = pattern.patternId; a.launchQuantize = Quantize::immediate;
+    a.followClipId = "b"; a.followAfterLoops = 2;
+    Clip b; b.clipId = "b"; b.patternId = pattern.patternId; b.launchQuantize = Quantize::immediate;
+    b.loop = false;
+    clips.add (a); clips.add (b);
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (compileSong (patterns, clips, contextForOnePart()), 1);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    Capture capture;
+    capture.run (engine, 200);   // two loops of one beat
+    check (! engine.isClipActive (0) && engine.isClipActive (1),
+           "after its follow count the clip hands over to the one it names");
+
+    capture.clear();
+    capture.run (engine, 200);
+    check (! engine.isClipActive (1), "and a one-shot clip stops itself after a single loop");
+}
+
+void testSongSwapWhilePlaying()
+{
+    std::cout << "\nedits: a new song swaps without corrupting the old one" << std::endl;
+
+    auto pattern = Pattern::create ("A");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 1, 60));
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+    juce::Array<Clip> clips; Clip clip; clip.clipId = "c"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::immediate; clips.add (clip);
+
+    PerformanceEngine engine;
+    engine.prepare (sampleRate, blockSize, 1);
+    engine.setSong (compileSong (patterns, clips, contextForOnePart()), 1);
+    engine.getTransport().setTempo (120.0);
+    engine.getTransport().start();
+    engine.launchClip (0);
+
+    Capture capture;
+    capture.run (engine, 20);
+    const auto before = capture.countNoteOns();
+    check (before >= 1, "the first song is playing");
+
+    // Edit: same pattern id, different note. The clip keeps running across the swap.
+    auto edited = pattern;
+    edited.lanes.getReference (0) = makeNoteLane ("l1", "p1", 4, 4, 1, 67);
+    juce::Array<Pattern> editedPatterns; editedPatterns.add (edited);
+    engine.setSong (compileSong (editedPatterns, clips, contextForOnePart()), 2);
+
+    capture.clear();
+    capture.run (engine, 90);
+    bool sawNewNote = false;
+    for (const auto& e : capture.events)
+        sawNewNote = sawNewNote || (e.message.isNoteOn() && e.message.getNoteNumber() == 67);
+    check (sawNewNote, "the edit is audible on the next event");
+    check (engine.isClipActive (0), "and the clip never stopped");
+    check (capture.countNoteOns() == capture.countNoteOffs()
+             || capture.countNoteOns() - capture.countNoteOffs() <= 1,
+           "with no notes stranded across the swap");
+}
+
+void testArpeggiator()
+{
+    std::cout << "\narpeggiator: a mode over the same clock" << std::endl;
+
+    ArpEngine arp;
+    ArpSettings settings;
+    settings.enabled = true;
+    settings.mode = ArpSettings::Mode::up;
+    settings.stepsPerBeat = 4;
+    settings.gate = 0.5f;
+    arp.setSettings (settings);
+
+    Transport transport;
+    transport.setTempo (120.0);
+    transport.start();
+
+    juce::MidiBuffer in, out;
+    in.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    in.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+    in.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+
+    std::vector<int> played;
+    for (int b = 0; b < 93; ++b)   // one beat, less a block
+    {
+        const auto block = transport.advance (blockSize, sampleRate);
+        arp.process (b == 0 ? in : juce::MidiBuffer(), out, block, blockSize);
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOn())
+                played.push_back (metadata.getMessage().getNoteNumber());
+    }
+
+    check (played.size() == 4, "one beat of sixteenths is four arp steps");
+    check (played.size() >= 3 && played[0] == 60 && played[1] == 64 && played[2] == 67,
+           "up mode walks the held chord upward");
+    check (played.size() >= 4 && played[3] == 60, "and wraps to the bottom");
+
+    // Down mode over two octaves. A fresh chord restarts the walk (the grid keeps running),
+    // so the first note of the new chord is the mode's first note.
+    juce::MidiBuffer lift;
+    lift.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    lift.addEvent (juce::MidiMessage::noteOff (1, 64), 0);
+    lift.addEvent (juce::MidiMessage::noteOff (1, 67), 0);
+    const auto lifted = transport.advance (blockSize, sampleRate);
+    arp.process (lift, out, lifted, blockSize);
+
+    settings.mode = ArpSettings::Mode::down;
+    settings.octaves = 2;
+    arp.setSettings (settings);
+    played.clear();
+    for (int b = 0; b < 93; ++b)
+    {
+        const auto block = transport.advance (blockSize, sampleRate);
+        arp.process (b == 0 ? in : juce::MidiBuffer(), out, block, blockSize);
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOn())
+                played.push_back (metadata.getMessage().getNoteNumber());
+    }
+    check (! played.empty() && played[0] == 79,
+           "down mode over two octaves starts at the top of the upper octave");
+
+    // Releasing the keys ends the arp and strands nothing.
+    juce::MidiBuffer release;
+    release.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    release.addEvent (juce::MidiMessage::noteOff (1, 64), 0);
+    release.addEvent (juce::MidiMessage::noteOff (1, 67), 0);
+    int ons = 0;
+    for (int b = 0; b < 40; ++b)
+    {
+        const auto block = transport.advance (blockSize, sampleRate);
+        arp.process (b == 0 ? release : juce::MidiBuffer(), out, block, blockSize);
+        for (const auto metadata : out)
+            ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+    }
+    check (ons == 0, "releasing the chord stops the arp");
+
+    juce::MidiBuffer leftovers;
+    arp.allNotesOff (leftovers, 0);
+    check (leftovers.isEmpty(), "and left nothing sounding behind it");
+
+    // Latch keeps the chord after the keys are up.
+    settings.mode = ArpSettings::Mode::up;
+    settings.octaves = 1;
+    settings.latch = true;
+    arp.setSettings (settings);
+
+    juce::MidiBuffer chord;
+    chord.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+    chord.addEvent (juce::MidiMessage::noteOff (1, 48), 10);
+    ons = 0;
+    for (int b = 0; b < 100; ++b)
+    {
+        const auto block = transport.advance (blockSize, sampleRate);
+        arp.process (b == 0 ? chord : juce::MidiBuffer(), out, block, blockSize);
+        for (const auto metadata : out)
+            ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+    }
+    check (ons >= 3, "latched, the arp keeps running after the key comes up");
+
+    // --- the drawable pattern: rests, long patterns, and the playhead -----------------------
+    // Velocity 0 is a rest — the grid advances, nothing sounds — and the pattern may now be
+    // up to 32 steps, both of which the step-grid UI depends on.
+    {
+        ArpEngine drawn;
+        ArpSettings drawnSettings;
+        drawnSettings.enabled = true;
+        drawnSettings.mode = ArpSettings::Mode::up;
+        drawnSettings.stepsPerBeat = 4;
+        drawnSettings.gate = 0.5f;
+        drawnSettings.velocityPattern = { 100, 0, 90, 0 };   // sound, rest, sound, rest
+        drawn.setSettings (drawnSettings);
+        check (drawn.patternStep() == -1, "idle, the playhead reports nowhere");
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+
+        std::vector<int> velocitiesHeard;
+        for (int b = 0; b < 186; ++b)   // two beats = eight sixteenth steps
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            drawn.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    velocitiesHeard.push_back (metadata.getMessage().getVelocity());
+        }
+        check (velocitiesHeard.size() == 4,
+               "eight steps of a sound-rest pattern sound exactly four times");
+        check (velocitiesHeard.size() >= 2
+                 && velocitiesHeard[0] == 100 && velocitiesHeard[1] == 90,
+               "each sounding step carries its own drawn velocity");
+        check (drawn.patternStep() >= 0 && drawn.patternStep() < 4,
+               "the playhead reports a live pattern position while held");
+
+        juce::MidiBuffer flush;
+        drawn.allNotesOff (flush, 0);
+        check (drawn.patternStep() == -1, "and reports nowhere again once silenced");
+    }
+
+    {
+        // Twelve distinct velocities, all used: the old eight-step cap is really gone.
+        ArpEngine wide;
+        ArpSettings wideSettings;
+        wideSettings.enabled = true;
+        wideSettings.stepsPerBeat = 4;
+        wideSettings.velocityPattern.clear();
+        for (int i = 0; i < 12; ++i)
+            wideSettings.velocityPattern.add (40 + i);
+        wide.setSettings (wideSettings);
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+
+        std::vector<int> velocitiesHeard;
+        for (int b = 0; b < 279; ++b)   // three beats = twelve sixteenth steps
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            wide.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    velocitiesHeard.push_back (metadata.getMessage().getVelocity());
+        }
+        check (velocitiesHeard.size() == 12, "a twelve-step pattern cycles all twelve steps");
+        bool allDistinct = velocitiesHeard.size() == 12;
+        for (size_t i = 0; allDistinct && i < velocitiesHeard.size(); ++i)
+            allDistinct = velocitiesHeard[i] == 40 + (int) i;
+        check (allDistinct, "in order, one velocity per step, none truncated at eight");
+    }
+
+    {
+        // --- pattern mode: the DRAWN melody ---------------------------------------------
+        // Each step names which note of the held pool plays (0 = lowest, octave-extended),
+        // -1 rests, and a degree past the pool clamps to the top instead of wrapping into
+        // a different note than the one drawn.
+        ArpEngine melodic;
+        ArpSettings drawnSettings;
+        drawnSettings.enabled = true;
+        drawnSettings.mode = ArpSettings::Mode::pattern;
+        drawnSettings.stepsPerBeat = 4;
+        drawnSettings.gate = 0.5f;
+        drawnSettings.octaves = 2;
+        drawnSettings.degreePattern = { 0, 2, 1, -1, 3, 9 };   // C E4? -> see asserts below
+        melodic.setSettings (drawnSettings);
+
+        Transport clock;
+        clock.setTempo (120.0);
+        clock.start();
+
+        juce::MidiBuffer hold, stepped;
+        hold.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        hold.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+        hold.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+
+        std::vector<int> played;
+        for (int b = 0; b < 140; ++b)   // six sixteenth steps and change
+        {
+            const auto block = clock.advance (blockSize, sampleRate);
+            melodic.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+            for (const auto metadata : stepped)
+                if (metadata.getMessage().isNoteOn())
+                    played.push_back (metadata.getMessage().getNoteNumber());
+        }
+
+        // Pool over two octaves: 60 64 67 72 76 79. Drawn: 0->60, 2->67, 1->64, rest,
+        // 3->72 (the octave row), 9 clamps to the pool top 79.
+        check (played.size() == 5, "six drawn steps with one rest sound five notes");
+        check (played.size() >= 3 && played[0] == 60 && played[1] == 67 && played[2] == 64,
+               "the drawn degrees play the drawn notes, not a walk");
+        check (played.size() >= 4 && played[3] == 72,
+               "a degree above the held count reaches the octave extension");
+        check (played.size() >= 5 && played[4] == 79,
+               "a degree past the whole pool clamps to the top");
+        check (melodic.patternStep() >= 0 && melodic.patternStep() < 6,
+               "the playhead reports the drawn grid's position");
+    }
+
+    {
+        // --- semitone rows: the FREE drawing --------------------------------------------
+        // Rows are offsets around the ground note (the lowest held key, row 12 = ground),
+        // so one finger transposes the whole riff chromatically — and the riff may hold
+        // notes the chord does not, which the degree grid cannot.
+        ArpEngine free;
+        ArpSettings freeSettings;
+        freeSettings.enabled = true;
+        freeSettings.mode = ArpSettings::Mode::pattern;
+        freeSettings.patternSemitones = true;
+        freeSettings.stepsPerBeat = 4;
+        freeSettings.gate = 0.5f;
+        freeSettings.degreePattern = { 12, 19, 24, -1, 10 };   // ground, +7, +12, rest, -2
+        free.setSettings (freeSettings);
+
+        auto runHolding = [&] (int ground)
+        {
+            Transport clock;
+            clock.setTempo (120.0);
+            clock.start();
+            juce::MidiBuffer hold, stepped;
+            hold.addEvent (juce::MidiMessage::noteOn (1, ground, (juce::uint8) 100), 0);
+            std::vector<int> played;
+            for (int b = 0; b < 116; ++b)   // five sixteenth steps
+            {
+                const auto block = clock.advance (blockSize, sampleRate);
+                free.process (b == 0 ? hold : juce::MidiBuffer(), stepped, block, blockSize);
+                for (const auto metadata : stepped)
+                    if (metadata.getMessage().isNoteOn())
+                        played.push_back (metadata.getMessage().getNoteNumber());
+            }
+            juce::MidiBuffer lift, flush;
+            lift.addEvent (juce::MidiMessage::noteOff (1, ground), 0);
+            free.process (lift, flush, clock.advance (blockSize, sampleRate), blockSize);
+            return played;
+        };
+
+        const auto fromC = runHolding (60);
+        check (fromC.size() == 4, "five drawn steps with one rest sound four notes");
+        check (fromC.size() >= 4 && fromC[0] == 60 && fromC[1] == 67 && fromC[2] == 72
+                 && fromC[3] == 58,
+               "rows play as offsets: ground, a fifth up, an octave up, a tone below");
+
+        const auto fromF = runHolding (65);
+        check (fromF.size() >= 3 && fromF[0] == 65 && fromF[1] == 72 && fromF[2] == 77,
+               "and the same drawing transposes with the finger — that is the point");
+    }
+}
+
+// The MIDI insert chain: the event chain stops being welded to the part. What must hold is
+// that ORDER is now a decision (chord into arp and arp into chord differ, and both are
+// reachable), that a bypassed module is inert, that several of a kind work, and — the one
+// that bites — that changing the chain under a held chord strands nothing.
+void testMidiInsertRack()
+{
+    std::cout << "\nMIDI inserts: a chain, not a welded order" << std::endl;
+
+    auto slot = [] (const juce::String& type)
+    {
+        return MidiSlot::create (type, "slot-" + type);
+    };
+
+    auto notesFrom = [] (MidiInsertRack& rack, int key)
+    {
+        Transport clock;
+        clock.setTempo (120.0);
+        juce::MidiBuffer press, out;
+        press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+        rack.process (press, out, clock.advance (blockSize, sampleRate), blockSize);
+        std::vector<int> notes;
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOn())
+                notes.push_back (metadata.getMessage().getNoteNumber());
+        std::sort (notes.begin(), notes.end());
+        return notes;
+    };
+
+    {
+        // Order is the whole point. Transpose +12 then chord builds the triad ON the
+        // transposed note; chord then transpose moves the whole triad. Same two modules,
+        // deliberately different results — the welded chain could only ever do one.
+        auto transpose = slot ("transpose");
+        transpose.fx.transpose = 12;
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::triad;
+
+        MidiInsertRack up;
+        up.prepare (blockSize);
+        up.setSlots ({ transpose, chord });
+        check (notesFrom (up, 60) == std::vector<int> { 72, 76, 79 },
+               "transpose then chord: the triad is built on the transposed note");
+
+        MidiInsertRack down;
+        down.prepare (blockSize);
+        down.setSlots ({ chord, transpose });
+        check (notesFrom (down, 60) == std::vector<int> { 72, 76, 79 },
+               "chord then transpose: the whole triad moves — same notes here by symmetry");
+
+        // Where the order genuinely diverges: a scale fold after a chord repairs the chord,
+        // before it only repairs the key.
+        auto scale = slot ("scale");
+        scale.fx.constrainToScale = true;
+        scale.fx.scaleType = "major";
+        scale.fx.scaleRoot = 0;
+        auto minorish = slot ("chord");
+        minorish.fx.chord = MidiFxSettings::ChordType::triadFirstInversion;
+
+        MidiInsertRack foldAfter;
+        foldAfter.prepare (blockSize);
+        foldAfter.setSlots ({ minorish, scale });
+        const auto after = notesFrom (foldAfter, 60);
+        MidiInsertRack foldBefore;
+        foldBefore.prepare (blockSize);
+        foldBefore.setSlots ({ scale, minorish });
+        const auto before = notesFrom (foldBefore, 60);
+        check (after != before,
+               "a scale fold before or after a chord is audibly not the same chain");
+    }
+
+    {
+        // Several of a kind: two transposes stack, which the one-of-each chain could not do.
+        auto octave = slot ("transpose");
+        octave.fx.transpose = 12;
+        auto fifth = MidiSlot::create ("transpose", "slot-transpose-2");
+        fifth.fx.transpose = 7;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ octave, fifth });
+        check (notesFrom (rack, 60) == std::vector<int> { 79 }, "two transposes stack");
+
+        // Bypass is inert, not removed: the module keeps its place and its settings.
+        fifth.bypassed = true;
+        rack.setSlots ({ octave, fifth });
+        check (notesFrom (rack, 60) == std::vector<int> { 72 },
+               "a bypassed module passes its input through untouched");
+    }
+
+    {
+        // The one that bites: retype a slot while a chord is sounding. The module holding
+        // those notes is about to be destroyed, so the chain owes their releases — and pays
+        // them on the next block rather than leaving a stuck chord behind.
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::triad;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ chord });
+
+        Transport clock;
+        clock.setTempo (120.0);
+        juce::MidiBuffer press, sounding;
+        press.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        rack.process (press, sounding, clock.advance (blockSize, sampleRate), blockSize);
+        int ons = 0;
+        for (const auto metadata : sounding) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+        check (ons == 3, "the chord is sounding three notes");
+
+        // Swap the chorder out for a transpose — the held triad has nowhere to be released
+        // from any more.
+        rack.setSlots ({ slot ("transpose") });
+        juce::MidiBuffer nothing, afterSwap;
+        rack.process (nothing, afterSwap, clock.advance (blockSize, sampleRate), blockSize);
+        std::vector<int> released;
+        for (const auto metadata : afterSwap)
+            if (metadata.getMessage().isNoteOff())
+                released.push_back (metadata.getMessage().getNoteNumber());
+        std::sort (released.begin(), released.end());
+        check (released == std::vector<int> { 60, 64, 67 },
+               "every note the retired module was holding is released by the new chain");
+    }
+
+    {
+        // An empty chain is a wire, and panic reaches every module.
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        check (notesFrom (rack, 60) == std::vector<int> { 60 }, "an empty chain passes notes through");
+
+        auto chord = slot ("chord");
+        chord.fx.chord = MidiFxSettings::ChordType::seventh;
+        rack.setSlots ({ chord });
+        (void) notesFrom (rack, 48);
+        juce::MidiBuffer panic;
+        rack.allNotesOff (panic, 0);
+        int offs = 0;
+        for (const auto metadata : panic) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (offs == 4, "panic releases every voice the chain is holding");
+    }
+
+    {
+        // Migration is the promise that nothing changes for anybody: a pre-chain part's two
+        // settings blocks become two slots, in the order the welded code ran them.
+        MidiFxSettings legacyFx;
+        legacyFx.transpose = 5;
+        legacyFx.scaleType = "dorian";
+        ArpSettings legacyArp;
+        legacyArp.enabled = true;
+        legacyArp.mode = ArpSettings::Mode::down;
+
+        const auto chain = migrateLegacyEventChain (legacyFx, legacyArp);
+        check (chain.size() == 2 && chain[0].type == "fx" && chain[1].type == "arp",
+               "a migrated part is note shaping first, then the arpeggiator");
+        check (chain[0].fx.transpose == 5 && chain[1].arp.mode == ArpSettings::Mode::down,
+               "carrying the settings it always had");
+        check (chain[1].fx.scaleType == "dorian",
+               "and the arp keeps the scale it used to read from the shared block");
+    }
+}
+
+void testMidiFxChain()
+{
+    std::cout << "\nMIDI FX: a defined chain, in a defined order" << std::endl;
+
+    MidiFxChain chain;
+    MidiFxSettings settings;
+    settings.transpose = 12;
+    chain.setSettings (settings);
+
+    juce::MidiBuffer in, out;
+    in.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    chain.process (in, out);
+    check (out.getNumEvents() == 1 && firstMessage (out).getNoteNumber() == 72,
+           "transpose moves the note");
+
+    // The invariant: the note-off follows what was SENT, even after the rules change.
+    settings.transpose = 0;
+    chain.setSettings (settings);
+    juce::MidiBuffer release;
+    release.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    chain.process (release, out);
+    check (out.getNumEvents() == 1 && firstMessage (out).getNoteNumber() == 72
+             && firstMessage (out).isNoteOff(),
+           "and the release still finds the note that is actually sounding");
+
+    // Scale constraint moves notes to the nearest member.
+    settings.constrainToScale = true;
+    settings.scaleType = "major";
+    settings.scaleRoot = 0;
+    chain.setSettings (settings);
+    in.clear();
+    in.addEvent (juce::MidiMessage::noteOn (1, 61, (juce::uint8) 100), 0);   // C#
+    chain.process (in, out);
+    check (out.getNumEvents() == 1 && firstMessage (out).getNoteNumber() == 62,
+           "C sharp folds into the nearest note of C major");
+
+    // Chord generation stacks voices, and all of them are released together.
+    settings.constrainToScale = false;
+    settings.chord = MidiFxSettings::ChordType::triad;
+    chain.setSettings (settings);
+    in.clear();
+    in.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    chain.process (in, out);
+    int ons = 0;
+    for (const auto metadata : out)
+        ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+    check (ons == 3, "a triad plays three notes from one key");
+
+    release.clear();
+    release.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    chain.process (release, out);
+    int offs = 0;
+    for (const auto metadata : out)
+        offs += metadata.getMessage().isNoteOff() ? 1 : 0;
+    check (offs == 3, "and one key release takes all three with it");
+
+    // Velocity: scale then fixed.
+    settings.chord = MidiFxSettings::ChordType::off;
+    settings.velocityScale = 0.5f;
+    chain.setSettings (settings);
+    in.clear();
+    in.addEvent (juce::MidiMessage::noteOn (1, 62, (juce::uint8) 100), 0);
+    chain.process (in, out);
+    check (firstMessage (out).getVelocity() == 50, "velocity scaling applies");
+
+    settings.velocityFixed = 90;
+    chain.setSettings (settings);
+    in.clear();
+    in.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 20), 0);
+    chain.process (in, out);
+    check (firstMessage (out).getVelocity() == 90, "a fixed velocity overrides the scale");
+
+    {
+        // --- the chorder's diatonic half: one finger, the chord OF that degree ----------
+        MidiFxChain diatonicChain;
+        MidiFxSettings diatonicSettings;
+        diatonicSettings.scaleType = "major";
+        diatonicSettings.scaleRoot = 0;
+        diatonicSettings.chord = MidiFxSettings::ChordType::diatonic;
+        diatonicChain.setSettings (diatonicSettings);
+
+        auto notesFor = [] (MidiFxChain& fx, int key)
+        {
+            juce::MidiBuffer press, result;
+            press.addEvent (juce::MidiMessage::noteOn (1, key, (juce::uint8) 100), 0);
+            fx.process (press, result);
+            std::vector<int> notes;
+            for (const auto metadata : result)
+                if (metadata.getMessage().isNoteOn())
+                    notes.push_back (metadata.getMessage().getNoteNumber());
+            juce::MidiBuffer lift, flush;
+            lift.addEvent (juce::MidiMessage::noteOff (1, key), 0);
+            fx.process (lift, flush);
+            return notes;
+        };
+
+        check (notesFor (diatonicChain, 62) == std::vector<int> { 62, 65, 69 },
+               "D in C major plays D minor — the degree's own chord, not a shape");
+        check (notesFor (diatonicChain, 71) == std::vector<int> { 71, 74, 77 },
+               "and B plays B diminished, because that is what lives on that degree");
+
+        diatonicSettings.chord = MidiFxSettings::ChordType::diatonicSeventh;
+        diatonicChain.setSettings (diatonicSettings);
+        check (notesFor (diatonicChain, 60) == std::vector<int> { 60, 64, 67, 71 },
+               "the seventh flavour stacks one more scale third");
+
+        // --- and its learned half: per-key chords, exactly as captured ------------------
+        MidiFxChain learned;
+        MidiFxSettings learnedSettings;
+        learnedSettings.chord = MidiFxSettings::ChordType::keyChords;
+        MidiFxSettings::KeyChord captured;
+        captured.key = 60;
+        captured.offsets = { 0, 3, 7, 12 };
+        learnedSettings.keyChords.add (captured);
+        learned.setSettings (learnedSettings);
+
+        check (notesFor (learned, 60) == std::vector<int> { 60, 63, 67, 72 },
+               "a mapped key plays exactly the chord captured for it");
+        check (notesFor (learned, 61) == std::vector<int> { 61 },
+               "an unmapped key passes through plain — the map is the whole rule");
+
+        // Six voices release cleanly: press a wide mapped chord, lift, count the offs.
+        MidiFxSettings::KeyChord wide;
+        wide.key = 48;
+        wide.offsets = { 0, 4, 7, 12, 16, 19 };
+        learnedSettings.keyChords.add (wide);
+        learned.setSettings (learnedSettings);
+        juce::MidiBuffer press, sound, lift, silence;
+        press.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+        learned.process (press, sound);
+        lift.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+        learned.process (lift, silence);
+        int ons = 0, offs = 0;
+        for (const auto metadata : sound) ons += metadata.getMessage().isNoteOn() ? 1 : 0;
+        for (const auto metadata : silence) offs += metadata.getMessage().isNoteOff() ? 1 : 0;
+        check (ons == 6 && offs == 6, "six captured voices sound and all six release");
+    }
+}
+
+void testScalesAndSerialization()
+{
+    std::cout << "\nmodel: scales and the document round trip" << std::endl;
+
+    const auto major = scaleMask ("major", 0);
+    check ((major & (1 << 0)) != 0 && (major & (1 << 1)) == 0 && (major & (1 << 4)) != 0,
+           "C major holds C and E and not C sharp");
+    check (constrainNoteToScale (61, major) == 62, "a foreign note moves to the nearest member");
+    check (constrainNoteToScale (60, scaleMask ("nonsense", 0)) == 60,
+           "an unknown scale name is chromatic, never a muted keyboard");
+
+    auto pattern = Pattern::create ("Round trip");
+    pattern.swing = 0.25f;
+    auto lane = makeNoteLane ("l1", "p1", 7, 6, 2, 48);
+    lane.steps.getReference (0).probability = 60;
+    lane.steps.getReference (0).ratchets = 3;
+    lane.steps.getReference (2).microtiming = -0.25f;
+    lane.type = LaneType::chord;
+    lane.steps.getReference (0).chordNotes.add (55);
+    pattern.lanes.add (lane);
+
+    Pattern restored;
+    check (patternFromVar (patternToVar (pattern), restored), "a pattern serializes and parses");
+    check (restored.lanes.size() == 1 && restored.lanes[0].stepCount == 7
+             && restored.lanes[0].stepsPerBeat == 6
+             && restored.lanes[0].steps[0].ratchets == 3
+             && restored.lanes[0].steps[0].probability == 60
+             && std::abs (restored.lanes[0].steps[2].microtiming + 0.25f) < 1.0e-6f
+             && restored.lanes[0].steps[0].chordNotes.contains (55)
+             && std::abs (restored.swing - 0.25f) < 1.0e-6f,
+           "with every step property intact");
+    check (restored.seed == pattern.seed, "and the seed, so the same dice roll again");
+
+    Scene scene;
+    scene.sceneId = "s1";
+    scene.name = "Verse";
+    scene.clipIds.add ("c1");
+    scene.slots.add ({ "p1", true, false, 0.8f, true });
+    scene.macros.add ({ "m1", 0.5f });
+    scene.tempo = 96.0;
+    Scene restoredScene;
+    check (sceneFromVar (sceneToVar (scene), restoredScene)
+             && restoredScene.name == "Verse"
+             && restoredScene.clipIds.contains ("c1")
+             && restoredScene.slots.size() == 1
+             && std::abs (restoredScene.slots[0].volume - 0.8f) < 1.0e-6f
+             && restoredScene.macros.size() == 1
+             && std::abs (restoredScene.tempo - 96.0) < 1.0e-9,
+           "a scene carries its clips, slots, macros and tempo");
+
+    Setlist setlist;
+    setlist.items.add ({ "i1", "Opener", "s1", "count in on the hats", 128.0 });
+    setlist.currentIndex = 0;
+    Setlist restoredSetlist;
+    check (setlistFromVar (setlistToVar (setlist), restoredSetlist)
+             && restoredSetlist.items.size() == 1
+             && restoredSetlist.items[0].notes == "count in on the hats"
+             && restoredSetlist.currentIndex == 0,
+           "and a setlist keeps its notes and its place");
+
+    ArpSettings arp;
+    arp.enabled = true;
+    arp.mode = ArpSettings::Mode::upDown;
+    arp.octaves = 3;
+    arp.velocityPattern.add (127);
+    arp.velocityPattern.add (80);
+    arp.mode = ArpSettings::Mode::pattern;
+    arp.degreePattern.add (0);
+    arp.degreePattern.add (-1);
+    arp.degreePattern.add (5);
+    arp.patternSemitones = true;
+    ArpSettings restoredArp;
+    arpFromVar (arpToVar (arp), restoredArp);
+    check (restoredArp.enabled && restoredArp.mode == ArpSettings::Mode::pattern
+             && restoredArp.octaves == 3 && restoredArp.velocityPattern.size() == 2,
+           "arp settings round trip, accents and the drawn mode included");
+    check (restoredArp.degreePattern.size() == 3 && restoredArp.degreePattern[1] == -1
+             && restoredArp.degreePattern[2] == 5,
+           "the drawn melody survives the trip, rests included");
+    check (restoredArp.patternSemitones, "and remembers whether rows are degrees or semitones");
+
+    MidiFxSettings fx;
+    fx.transpose = -7;
+    fx.chord = MidiFxSettings::ChordType::seventh;
+    {
+        MidiFxSettings::KeyChord kc;
+        kc.key = 62;
+        kc.offsets = { -2, 2, 5 };
+        fx.keyChords.add (kc);
+    }
+    fx.constrainToScale = true;
+    fx.scaleType = "dorian";
+    MidiFxSettings restoredFx;
+    midiFxFromVar (midiFxToVar (fx), restoredFx);
+    check (restoredFx.transpose == -7 && restoredFx.chord == MidiFxSettings::ChordType::seventh
+             && restoredFx.scaleType == "dorian",
+           "and so do the MIDI FX");
+    check (restoredFx.keyChords.size() == 1 && restoredFx.keyChords[0].key == 62
+             && restoredFx.keyChords[0].offsets == juce::Array<int> { -2, 2, 5 },
+           "the learned key map survives the trip");
+}
+
+} // namespace
+
+// The six later MIDI modules. What each one must do, and — the half that matters more —
+// what none of them may do: leave a note sounding.
+//
+// Every module here either invents notes or swallows the note-off for one it passed on, so
+// every one of them owns something. A module that emits and forgets is a stuck note, which on
+// stage is the only bug that matters.
+void testNoteModules()
+{
+    std::cout << "\nthe six later MIDI modules" << std::endl;
+
+    const auto slot = [] (const juce::String& type)
+    {
+        return MidiSlot::create (type, "slot-" + type);
+    };
+
+    // Runs a press-and-release through a rack and collects everything, block by block, with
+    // the sample offset each event landed on.
+    struct Event { int block; int sample; bool on; int note; int velocity; };
+    const auto run = [] (MidiInsertRack& rack, juce::MidiBuffer input, int blocks)
+    {
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < blocks; ++block)
+        {
+            juce::MidiBuffer out;
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            input.clear();
+            for (const auto metadata : out)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition, message.isNoteOn(),
+                                        message.getNoteNumber(), (int) message.getVelocity() });
+            }
+        }
+        return events;
+    };
+    const auto onsOf = [] (const std::vector<Event>& events)
+    {
+        int count = 0;
+        for (const auto& event : events)
+            if (event.on) ++count;
+        return count;
+    };
+    const auto balanced = [] (const std::vector<Event>& events)
+    {
+        std::map<int, int> sounding;
+        for (const auto& event : events)
+            sounding[event.note] += event.on ? 1 : -1;
+        for (const auto& [note, count] : sounding)
+            if (count != 0)
+                return false;
+        return true;
+    };
+
+    // Every module is transparent until it is set up. This is a rule the file already had and
+    // these six nearly broke — an inserted module must not change the sound by existing.
+    for (const auto* type : { "echo", "strum", "humanize", "chance", "length", "latch" })
+    {
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ slot (type) });
+
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 40);
+        const auto events = run (rack, input, 4);
+        check (events.size() == 2 && events[0].on && ! events[1].on
+                 && events[0].note == 60 && events[0].velocity == 100,
+               juce::String ("a fresh ") + type + " passes the note through untouched");
+    }
+
+    // -- echo ---------------------------------------------------------------------------
+    {
+        auto echo = slot ("echo");
+        echo.mod.echoRepeats = 3;
+        echo.mod.echoStepBeats = 0.25;
+        echo.mod.echoFeedback = 0.6f;
+        echo.mod.echoTranspose = 12;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ echo });
+
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        const auto events = run (rack, input, 200);
+
+        check (onsOf (events) == 4, "the note plus three repeats");
+        check (balanced (events), "and every one of them ends — nothing is left sounding");
+
+        std::vector<int> notes, velocities;
+        for (const auto& event : events)
+            if (event.on) { notes.push_back (event.note); velocities.push_back (event.velocity); }
+        check (notes == std::vector<int> ({ 60, 72, 84, 96 }), "each repeat climbs an octave");
+        check (velocities[1] < velocities[0] && velocities[2] < velocities[1]
+                 && velocities[3] < velocities[2],
+               "and each is quieter than the one before");
+
+        // Off the top of the keyboard the chain stops rather than wrapping to a bass note.
+        auto high = echo;
+        high.mod.echoTranspose = 24;
+        MidiInsertRack ceiling;
+        ceiling.prepare (blockSize);
+        ceiling.setSlots ({ high });
+        juce::MidiBuffer top;
+        top.addEvent (juce::MidiMessage::noteOn (1, 100, (juce::uint8) 100), 0);
+        top.addEvent (juce::MidiMessage::noteOff (1, 100), 20);
+        const auto ceilingEvents = run (ceiling, top, 200);
+        bool wrapped = false;
+        for (const auto& event : ceilingEvents)
+            wrapped = wrapped || event.note < 100;
+        check (! wrapped, "a repeat past the top of the keyboard is dropped, never wrapped");
+        check (balanced (ceilingEvents), "and what did sound still stops");
+    }
+
+    // -- strum --------------------------------------------------------------------------
+    {
+        auto strum = slot ("strum");
+        strum.mod.strumBeats = 0.25;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ strum });
+
+        // A chord arriving together, deliberately out of pitch order.
+        juce::MidiBuffer chord;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 1);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 2);
+        const auto events = run (rack, chord, 200);
+
+        std::vector<int> order;
+        for (const auto& event : events)
+            if (event.on) order.push_back (event.note);
+        check (order == std::vector<int> ({ 60, 64, 67 }),
+               "the chord comes out low to high, whatever order the keys were hit in");
+
+        // Spread means spread: the last note is genuinely later than the first.
+        int firstBlock = -1, lastBlock = -1;
+        for (const auto& event : events)
+            if (event.on) { if (firstBlock < 0) firstBlock = event.block; lastBlock = event.block; }
+        check (lastBlock > firstBlock, "and they are spread over time rather than stacked");
+
+        // Downwards is the same notes, the other way round — the case arrival order alone
+        // could never do, which is why the module collects before it deals.
+        auto down = strum;
+        down.mod.strumDown = true;
+        MidiInsertRack downwards;
+        downwards.prepare (blockSize);
+        downwards.setSlots ({ down });
+        juce::MidiBuffer again;
+        again.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        again.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 1);
+        again.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 2);
+        std::vector<int> downOrder;
+        for (const auto& event : run (downwards, again, 200))
+            if (event.on) downOrder.push_back (event.note);
+        check (downOrder == std::vector<int> ({ 67, 64, 60 }), "downwards strums high to low");
+    }
+
+    // -- humanize -----------------------------------------------------------------------
+    {
+        auto humanize = slot ("humanize");
+        humanize.mod.humanizeTimingBeats = 0.05;
+        humanize.mod.humanizeVelocity = 20;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ humanize });
+
+        // The same note, over and over: the point is that it does NOT come out identical.
+        std::vector<int> velocities;
+        std::vector<int> positions;
+        Transport clock;
+        clock.setTempo (120.0);
+        for (int i = 0; i < 24; ++i)
+        {
+            juce::MidiBuffer input, out;
+            input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 64), 0);
+            input.addEvent (juce::MidiMessage::noteOff (1, 60), 30);
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            const auto collect = [&velocities, &positions] (const juce::MidiBuffer& buffer)
+            {
+                for (const auto metadata : buffer)
+                    if (metadata.getMessage().isNoteOn())
+                    {
+                        velocities.push_back ((int) metadata.getMessage().getVelocity());
+                        positions.push_back (metadata.samplePosition);
+                    }
+            };
+            collect (out);
+            // The settle blocks count too. Humanize can only push a note LATER, so most of
+            // them land in a block after the one they arrived in — reading only the first
+            // block would measure the module's latency rather than its output.
+            for (int settle = 0; settle < 3; ++settle)
+            {
+                juce::MidiBuffer none, tail;
+                rack.process (none, tail, clock.advance (blockSize, sampleRate), blockSize);
+                collect (tail);
+            }
+        }
+        check (velocities.size() > 12, "the notes come through");
+        check (std::set<int> (velocities.begin(), velocities.end()).size() > 3,
+               "velocity varies rather than repeating one value");
+        check (std::set<int> (positions.begin(), positions.end()).size() > 1,
+               "and so does when they land");
+        bool outOfBounds = false;
+        for (const auto velocity : velocities)
+            outOfBounds = outOfBounds || velocity < 44 || velocity > 84;
+        check (! outOfBounds, "within the bounds asked for, never outside");
+    }
+
+    // -- chance -------------------------------------------------------------------------
+    {
+        auto chance = slot ("chance");
+        chance.mod.chance = 0.0f;
+        MidiInsertRack none;
+        none.prepare (blockSize);
+        none.setSlots ({ chance });
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        input.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        const auto silent = run (none, input, 4);
+        check (silent.empty(), "at zero chance nothing gets through — the note AND its note-off");
+
+        chance.mod.chance = 1.0f;
+        MidiInsertRack all;
+        all.prepare (blockSize);
+        all.setSlots ({ chance });
+        juce::MidiBuffer again;
+        again.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        again.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        check (run (all, again, 4).size() == 2, "and at full chance everything does");
+
+        // The half that is easy to get wrong: rolling again on the note-off would let a
+        // dropped note's OFF through, or a passed note's off be swallowed. Either is a stuck
+        // note or a phantom one, so the decision is remembered, not repeated.
+        chance.mod.chance = 0.5f;
+        MidiInsertRack half;
+        half.prepare (blockSize);
+        half.setSlots ({ chance });
+        std::vector<Event> everything;
+        Transport clock;
+        clock.setTempo (120.0);
+        for (int i = 0; i < 200; ++i)
+        {
+            juce::MidiBuffer press, out;
+            press.addEvent (juce::MidiMessage::noteOn (1, 60 + (i % 5), (juce::uint8) 100), 0);
+            press.addEvent (juce::MidiMessage::noteOff (1, 60 + (i % 5)), 30);
+            half.process (press, out, clock.advance (blockSize, sampleRate), blockSize);
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    everything.push_back ({ i, metadata.samplePosition,
+                                            metadata.getMessage().isNoteOn(),
+                                            metadata.getMessage().getNoteNumber(), 0 });
+        }
+        check (! everything.empty() && (int) everything.size() < 400,
+               "at half chance some get through and some do not");
+        check (balanced (everything),
+               "and every note that sounded stopped — the decision is remembered, not re-rolled");
+    }
+
+    // -- length -------------------------------------------------------------------------
+    {
+        auto length = slot ("length");
+        length.mod.lengthBeats = 0.25;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ length });
+
+        // Held far longer than the fixed length: the module's own note-off must win.
+        juce::MidiBuffer input;
+        input.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        Transport clock;
+        clock.setTempo (120.0);
+        std::vector<Event> events;
+        for (int block = 0; block < 200; ++block)
+        {
+            juce::MidiBuffer out;
+            rack.process (input, out, clock.advance (blockSize, sampleRate), blockSize);
+            input.clear();
+            if (block == 150)
+                input.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    events.push_back ({ block, metadata.samplePosition,
+                                        metadata.getMessage().isNoteOn(),
+                                        metadata.getMessage().getNoteNumber(), 0 });
+        }
+        check (onsOf (events) == 1 && balanced (events), "one note, ended once");
+        int offBlock = -1;
+        for (const auto& event : events)
+            if (! event.on) offBlock = event.block;
+        check (offBlock >= 0 && offBlock < 150,
+               "and it ended at the length asked for, not when the key came up");
+
+        // Legato: a new note releases the last one, so only one thing sounds at a time.
+        auto joined = slot ("length");
+        joined.mod.legato = true;
+        MidiInsertRack legato;
+        legato.prepare (blockSize);
+        legato.setSlots ({ joined });
+        juce::MidiBuffer first;
+        first.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        first.addEvent (juce::MidiMessage::noteOff (1, 60), 10);
+        std::vector<Event> legatoEvents;
+        Transport legatoClock;
+        legatoClock.setTempo (120.0);
+        for (int block = 0; block < 8; ++block)
+        {
+            juce::MidiBuffer out;
+            legato.process (first, out, legatoClock.advance (blockSize, sampleRate), blockSize);
+            first.clear();
+            if (block == 2)
+            {
+                first.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 0);
+                first.addEvent (juce::MidiMessage::noteOff (1, 64), 10);
+            }
+            for (const auto metadata : out)
+                if (metadata.getMessage().isNoteOnOrOff())
+                    legatoEvents.push_back ({ block, metadata.samplePosition,
+                                              metadata.getMessage().isNoteOn(),
+                                              metadata.getMessage().getNoteNumber(), 0 });
+        }
+        int soundingAtOnce = 0, peak = 0;
+        for (const auto& event : legatoEvents)
+        {
+            soundingAtOnce += event.on ? 1 : -1;
+            peak = juce::jmax (peak, soundingAtOnce);
+        }
+        check (peak == 1, "legato joins notes rather than stacking them");
+
+        juce::MidiBuffer panic;
+        legato.allNotesOff (panic, 0);
+        check (! panic.isEmpty(), "and what it is holding is released on panic");
+    }
+
+    // -- latch --------------------------------------------------------------------------
+    {
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ latch });
+
+        juce::MidiBuffer chord;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOn (1, 64, (juce::uint8) 100), 1);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 60), 30);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 64), 31);
+        const auto held = run (rack, chord, 4);
+        check (onsOf (held) == 2, "the chord sounds");
+        check (! balanced (held), "and keeps sounding after the keys came up — that is the feature");
+
+        // A new phrase replaces it wholesale, which is what every hardware latch means.
+        juce::MidiBuffer next;
+        next.addEvent (juce::MidiMessage::noteOn (1, 67, (juce::uint8) 100), 0);
+        juce::MidiBuffer out;
+        Transport clock;
+        clock.setTempo (120.0);
+        rack.process (next, out, clock.advance (blockSize, sampleRate), blockSize);
+        int offs = 0;
+        for (const auto metadata : out)
+            if (metadata.getMessage().isNoteOff())
+                ++offs;
+        check (offs == 2, "and the next phrase releases the whole of the last one first");
+
+        juce::MidiBuffer panic;
+        rack.allNotesOff (panic, 0);
+        check (! panic.isEmpty(), "panic reaches what a latch is holding");
+    }
+
+    // Retyping a slot must release what the old module was holding — the same rule the arp
+    // and the chorder already answer to, now with six more ways to break it.
+    {
+        auto latch = slot ("latch");
+        latch.mod.latchOn = true;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ latch });
+
+        juce::MidiBuffer chord, out;
+        chord.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        chord.addEvent (juce::MidiMessage::noteOff (1, 60), 20);
+        Transport clock;
+        clock.setTempo (120.0);
+        rack.process (chord, out, clock.advance (blockSize, sampleRate), blockSize);
+
+        rack.setSlots ({ slot ("chance") });      // same id, different type
+        juce::MidiBuffer after, flushed;
+        rack.process (after, flushed, clock.advance (blockSize, sampleRate), blockSize);
+        bool released = false;
+        for (const auto metadata : flushed)
+            if (metadata.getMessage().isNoteOff() && metadata.getMessage().getNoteNumber() == 60)
+                released = true;
+        check (released, "retyping a slot releases what the old module was holding");
+    }
+}
+
+int main()
+{
+    std::cout << "Performance engine tests" << std::endl;
+
+    testTransport();
+    testExternalClock();
+    testHostSync();
+    testCompileAndPlay();
+    testSwingRatchetsTiesMicrotiming();
+    testProbabilityAndConditions();
+    testPolymeterAndEuclid();
+    testNoOrphanNotes();
+    testLaunchQuantizeAndScenes();
+    testParameterLanesAndGlide();
+    testFollowActions();
+    testSongSwapWhilePlaying();
+    testArpeggiator();
+    testMidiFxChain();
+    testMidiInsertRack();
+    testNoteModules();
+    testScalesAndSerialization();
+
+    std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures))
+              << std::endl;
+    return failures == 0 ? 0 : 1;
+}

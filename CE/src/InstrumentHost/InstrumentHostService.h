@@ -1,10 +1,21 @@
 #pragma once
 
+#include <deque>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
+#include "ParameterModel.h"
+#include "Library.h"
+#include "PlatformMatrix.h"
+#include "ActiveHostingMarker.h"
+#include "SafeMode.h"
+#include "SessionRecovery.h"
+#include "SupportBundle.h"
+#include "Licensing/LicenceStore.h"
+#include "ControlSurface/SurfaceProfile.h"
 
 // InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
 //
@@ -24,7 +35,9 @@
 //
 // COMMANDS IN (handleCommand payload.cmd):
 //   getState                                     (first call restores the saved session)
-//   scan | addScanPath {path} | removeScanPath {path} | clearQuarantine {modulePath}
+//   scan | addScanPath {path} | removeScanPath {path} | browseScanPath | clearQuarantine {modulePath}
+//     (browseScanPath opens the native directory picker through Options::pickDirectory and
+//      adds whatever the user chose; cancelling chooses nothing and changes nothing)
 //   addPart | removePart {partId} | movePart {partId,index} | focusPart {partId}
 //   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
@@ -38,6 +51,111 @@
 //     (both project commands answer with instrumentHostProject; the appId is minted once and
 //      never writable from the page — installer identity survives every rename. Building goes
 //      through Options::runBuild; without the hook the command refuses aloud.)
+//   getParameters {partId} | setParameter {partId,id,value} | resetParameter {partId,id}
+//   beginParameterGesture {partId,id} | endParameterGesture {partId,id}
+//     (the Stage 2 parameter model: getParameters answers with instrumentHostParameters —
+//      the part's full registry with live values; vendor-editor edits arrive as coalesced
+//      instrumentHostParamValues deltas whenever the owner pumps drainParameterEvents().
+//      Addresses are partId + the plug-in's own parameter ID, never display names; a wrong
+//      part or unknown ID refuses instead of writing to an arbitrary index.)
+//   addControlPage {name?} | removeControlPage {pageId} | renameControlPage {pageId,name}
+//   generateControlPages {partId}   (the automatic first pass over the part's registry;
+//     replaces only that part's previously generated pages, never a user-authored one)
+//   getLibrary {query?,type?} | scanLibrary | addLibraryPath {path} | removeLibraryPath {path}
+//   browseLibraryPath | saveUserPreset {partId,name?,category?} | saveRackToLibrary {name?}
+//   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
+//   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
+//     (the Stage 4 library: getLibrary answers with instrumentHostLibrary — records
+//      projected with live availability. Loading goes through Stage 1's one transaction:
+//      action is "focused", "replace" (with partId) or "add"; a vendor .vstpreset applies
+//      through Options::applyVstPreset after the normal commit; a rack record restores
+//      through the same path the session file uses, degraded-but-loud when classes are
+//      missing. Vendor rescans never touch favourites, notes or captured records.)
+//   addEffect {chainId,ceId} | removeEffect {effectId} | moveEffect {effectId,index}
+//   setEffectBypassed {effectId,bypassed} | openEffectEditor {effectId}
+//     (Stage 5 insert chains: chainId is a partId or "master". Effects load through the same
+//      prime/begin/commit transaction as instruments, show in the same editor pane, register
+//      in the same parameter model — their targetId is the effectId wherever a partId is
+//      accepted: getParameters, setParameter, page-slot and macro assignment.)
+//   addMacro {name?} | removeMacro {macroId} | renameMacro {macroId,name}
+//   setMacroValue {macroId,value,final?} | addMacroTarget {macroId,targetId,parameterId}
+//   removeMacroTarget {macroId,targetId,parameterId}
+//   setMacroTargetOptions {macroId,targetId,parameterId, rangeMin?,rangeMax?,inverted?}
+//     (a macro fans one 0..1 value into several parameter addresses through the SAME write
+//      path as everything else — mapped per target, gesture-wrapped, unresolved targets
+//      skipped and shown. `final:true` persists and re-announces state; drags without it
+//      stay cheap.)
+//   addReturn {name?} | removeReturn {returnId} | renameReturn {returnId,name}
+//   setReturnLevel {returnId,level} | setSendLevel {partId,returnId,level}
+//     (Stage 5 shared buses: each return is one more effect chain — addEffect and the whole
+//      effect transaction take a returnId as the chainId — fed by post-fader sends from any
+//      part and rejoining ahead of the master inserts.)
+//   setExtraOut {partId,pairIndex,gain} | removeExtraOut {partId,pairIndex}
+//     (explicit multi-output routing: an instrument's extra stereo pair gets its own gain
+//      into the master path; the main pair keeps the inserts and the fader.)
+//   setHardwareConfig {partId, midiOutputId?,midiOutputName?,midiOutChannel?,
+//     audioReturnChannel?,audioReturnStereo?,programBank?,programNumber?,deviceProfileId?}
+//   clearHardware {partId} | sendHardwareProgram {partId}
+//     (hardware-instrument parts, §18.7.6: the part reaches an external synth over the named
+//      MIDI output — opened through Options::openMidiOutput, port failures reported per part
+//      in state — and can return audio through the interface's inputs, where it runs the
+//      part's own inserts, fader and sends. Absent config fields keep their value.)
+//
+//   -- the Stage 6 performance system (§18.8) --
+//   transportPlay | transportStop | transportContinue | setTempo {tempo}
+//   setTimeSignature {numerator,denominator} | setTransportPosition {ppq}
+//   setExternalClock {enabled}
+//     (one transport for everything: the sequencer, the arpeggiators and the hardware
+//      display all read it, and nothing else schedules musical events.)
+//   addPattern {name?} | removePattern {patternId} | renamePattern {patternId,name}
+//   setPatternOptions {patternId, swing?, seed?}
+//   addLane {patternId, type?, targetPartId?} | removeLane {patternId,laneId}
+//   setLaneOptions {patternId,laneId, name?,targetPartId?,targetId?,parameterId?,channel?,
+//     ccNumber?,drumNote?,stepCount?,stepsPerBeat?,muted?,glide?}
+//   euclidFill {patternId,laneId,pulses,rotation?} | clearLane {patternId,laneId}
+//   setStep {patternId,laneId,index, active?,note?,velocity?,value?,gate?,microtiming?,
+//     probability?,ratchets?,tie?,every?,offset?,chord?}
+//   toggleStep {patternId,laneId,index}
+//     (one Pattern object with typed lanes — note, chord, drum, cc and parameter — each with
+//      its own length and rate, which is polymeter without a special case.)
+//   addClip {patternId,name?} | removeClip {clipId}
+//   setClipOptions {clipId, name?,launchQuantize?,loop?,followClipId?,followAfterLoops?}
+//   launchClip {clipId} | stopClip {clipId} | stopAllClips
+//   armCapture {clipId,laneId} | disarmCapture
+//     (capture snaps played notes to the armed lane's grid and writes them into the pattern
+//      on this thread — the audio thread only ever reports what it heard.)
+//   addScene {name?} | removeScene {sceneId} | renameScene {sceneId,name}
+//   captureScene {sceneId} | setSceneOptions {sceneId, launchQuantize?,stopOtherClips?,tempo?}
+//   setSceneClip {sceneId,clipId,included} | launchScene {sceneId}
+//     (a scene recalls clips, slot states, macros, focus and page through the SAME rack and
+//      parameter systems built earlier — it is not a second snapshot engine. captureScene
+//      takes the current rig as the scene's content.)
+//   addSetlistItem {sceneId?,name?} | removeSetlistItem {itemId}
+//   setSetlistItem {itemId, name?,notes?,tempo?,sceneId?} | moveSetlistItem {itemId,index}
+//   setlistGo {index} | setlistNext | setlistPrev
+//     (navigation recalls the item's scene; a scene that cannot be recalled leaves the rig on
+//      the last stable item and says so rather than half-loading.)
+//   setPartArp {partId, enabled?,mode?,stepsPerBeat?,gate?,swing?,octaves?,latch?,
+//     constrainToScale?,velocityPattern?}
+//   setPartMidiFx {partId, transpose?,constrainToScale?,scaleRoot?,scaleType?,chord?,
+//     velocityFixed?,velocityScale?}
+//     (both are modes over the shared transport, applied in the part's own event chain.)
+//
+// VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
+// the rack's own state instead of a plug-in registry: "@gain" and "@pan" on any part,
+// "@send:<returnId>" for that part's send level, "@macro" with the macroId as the target id.
+// They work everywhere a plug-in parameter does — setParameter, page slots, macro targets
+// (except "@macro" itself: a macro may not target a macro), surface nudges — so hardware
+// encoders drive faders, sends and whole macros through the same binding math. Their writes
+// persist and re-announce state, because the value lives in the manifest, not a plug-in.
+//   assignControlSlot {pageId,slotId,partId,parameterId} | clearControlSlot {pageId,slotId}
+//   setControlSlotOptions {pageId,slotId, rangeMin?,rangeMax?,inverted?,bipolar?,label?}
+//   setControlSlotValue {pageId,slotId,value}
+//     (neutral pages over parameter addresses — no hardware bytes. Assignment captures the
+//      part's class identity; a part that later loads a different class shows the slot
+//      unresolved in state rather than driving whatever answers to the same id, and
+//      setControlSlotValue refuses an unresolved slot. Values map through the binding's
+//      range/inversion so hardware and UI share one transform.)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
 // carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
@@ -87,6 +205,17 @@ public:
         std::function<void()> hide;
     };
 
+    /** Floating editor windows — any number at once, owned by the app like the pane is.
+        The service only decides WHICH parts float; the windows themselves live behind
+        these hooks so the service stays headless and testable. */
+    struct EditorWindowHooks
+    {
+        std::function<void (const juce::String& partId, juce::AudioProcessor& processor,
+                            const juce::String& title)> show;
+        std::function<void (const juce::String& partId)> close;
+        std::function<void()> closeAll;
+    };
+
     struct Options
     {
         juce::File dataDirectory;
@@ -101,12 +230,46 @@ public:
         // tests capture the call). Absent = building is not available in this build, and
         // buildHostProduct says so instead of doing nothing.
         std::function<void (const juce::var& project, const juce::String& outputDirectory)> runBuild;
+        // Opens the native directory picker and calls back with the chosen path — empty for
+        // cancel. The app provides an async FileChooser; absent (tests, plain browser) makes
+        // browseScanPath refuse aloud rather than silently do nothing.
+        std::function<void (std::function<void (const juce::String& directory)>)> pickDirectory;
+        // Opens the native picker filtered to images and calls back with the chosen file —
+        // empty for cancel. Absent (tests, plain browser) makes setPluginArtwork refuse
+        // aloud rather than silently do nothing, the same contract as pickDirectory.
+        std::function<void (std::function<void (const juce::String& imageFile)>)> pickImage;
+        // Applies a vendor .vstpreset file to a live instrument. The app passes JUCE's own
+        // VST3 preset loader (it re-validates the class id internally); tests stub it.
+        // Absent = vendor preset records refuse to load, aloud.
+        std::function<bool (juce::AudioProcessor&, const juce::File& presetFile)> applyVstPreset;
+        // Hardware-part MIDI (Stage 5). Absent = the service talks to the real system
+        // devices (juce::MidiOutput); tests inject an id→name map and capture sinks.
+        // openMidiOutput returns the sink that will receive the part's MIDI, or nullptr
+        // with `errorOut` set.
+        // Approved performance events for scripts (§18.8.11): transportStarted/Stopped,
+        // clipStarted/clipStopped, sceneApplied, setlistChanged. Called on the controlling
+        // thread only — a script never runs anywhere near the scheduler.
+        std::function<void (const juce::String& event, const juce::var& payload)> scriptEvent;
+        std::function<juce::StringPairArray()> listMidiOutputs;
+        std::function<MidiSendProcessor::Sink (const juce::String& deviceId,
+                                               juce::String& errorOut)> openMidiOutput;
         EditorPaneHooks editorPane;
+        EditorWindowHooks editorWindows;
+        // The Host Project's authored rack, shipped beside the generated binaries. Loaded
+        // when nothing newer exists: the standalone uses it until the user has a session of
+        // their own; the outer VST3 uses it for a fresh instance until the DAW hands over a
+        // project chunk. Never written to — the product's factory state is read-only.
+        juce::File factoryPerformanceFile;
         bool enableAudio = false;
         // The editor and the standalone persist the rack session to dataDirectory after every
         // mutation; the outer VST3 sets this false because the DAW owns the session through
         // get/setStateInformation — a host file would fight the project file over the truth.
         bool persistSession = true;
+        /** Whether a scan also sweeps the standard system VST3 folders (§8.6.5) on top of the
+            user's own scan paths. The product wants them; a TEST must not, because a test that
+            reads whatever the developer happens to have installed is not a test — it passes on
+            a clean machine and fails on a working one, which is the worst way round. */
+        bool includeDefaultScanRoots = true;
         double sampleRate = 44100.0;
         int blockSize = 512;
     };
@@ -120,8 +283,9 @@ public:
 
     /** Loads the catalogue and saved session from the data directory, quarantines any module
         a leftover dead-man marker names, rebuilds the rack and asks the instantiator for
-        every resolved part's instrument. Runs once — getState calls it lazily so plug-in
-        code only ever loads after the UI is up and asking. */
+        every resolved part's instrument. Falls back to Options::factoryPerformanceFile when
+        no user session exists. Runs once — getState calls it lazily so plug-in code only
+        ever loads after the UI is up and asking. */
     void restoreSession();
 
     const InstrumentRackHost& getRackHost() const     { return rack; }
@@ -139,8 +303,9 @@ public:
 
     /** The plug-in wrapper's prepareToPlay: adopt the host's rate and block size and
         (re)prepare the graph. Safe to call repeatedly; later instantiations use the new
-        values too. */
-    void prepareRuntime (double sampleRate, int blockSize);
+        values too. `numInputChannels` feeds hardware parts' audio returns — the outer VST3
+        passes none, tests pass what their buffers carry. */
+    void prepareRuntime (double sampleRate, int blockSize, int numInputChannels = 0);
 
     /** The plug-in wrapper's releaseResources. */
     void releaseRuntime();
@@ -163,6 +328,290 @@ public:
         and survived. */
     void reassertEditorPane();
 
+    // -- editor thumbnails ------------------------------------------------------------------
+    // Most plug-ins ship no artwork, so the second-best picture of a plug-in is its own
+    // window, captured the first time the user opens it. The service owns the policy — which
+    // classes still want one, where the file goes, when it becomes visible — and the pane
+    // owns the pixels, because the pane is what holds the editor. Two calls, in that order.
+    //
+    // NEVER AT SCAN TIME. Snapshotting a library of several hundred plug-ins means
+    // instantiating several hundred plug-ins, which is the whole reason the scanner is a
+    // separate process. A thumbnail is a side effect of the user opening an editor and
+    // nothing else.
+
+    /** True when this target's plug-in class has no picture yet — no vendor snapshot and
+        nothing cached. The pane asks first so an already-pictured plug-in costs nothing. */
+    bool wantsEditorSnapshot (const juce::String& targetId) const;
+
+    /** Offers the editor's own picture for this target. Blank or empty images are dropped,
+        an existing picture is never overwritten, and a picture that lands is published and
+        pushed so the tile changes without waiting for the next rack mutation. */
+    void offerEditorSnapshot (const juce::String& targetId, const juce::Image& image);
+
+    // -- surface runtime API (Stage 3) ------------------------------------------------------
+    // What a hardware bridge needs from the parameter model and nothing else: a display
+    // projection per page, and a relative nudge per slot. The driver never touches plug-in
+    // objects (baseline §18.5.1) — it consumes these views and emits normalized movements,
+    // and both sides go through the same binding resolution as every other path, so an
+    // unresolved slot renders as such and refuses to move anything.
+
+    struct SurfaceSlot
+    {
+        juce::String slotId;
+        juce::String displayName;   // label override, else the parameter's live name, else the id
+        juce::String valueText;     // the plug-in's own formatted value — never a second numeric guess
+        float position = 0.0f;      // 0..1 slot position, the binding's range/inversion inverse-mapped
+        bool assigned = false;
+        bool resolved = false;
+    };
+
+    /** The display projection for one page — empty for an unknown pageId. */
+    juce::Array<SurfaceSlot> surfaceSlots (const juce::String& pageId) const;
+
+    /** Relative encoder movement: moves the slot's position by delta/127 through the
+        binding's range and inversion, wrapped in a begin/end gesture. Relative behavior is
+        what makes page and Performance changes jump-free — there is no stale absolute
+        position to snap to. Returns false, moving nothing, for an unknown, unassigned or
+        unresolved slot. */
+    bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
+
+    // -- the Stage 6 performance system ------------------------------------------------------
+
+    /** Recompiles the patterns and clips and publishes them to the engine. Called after any
+        edit that changes what would play — a pattern, a clip, the part roster, or a plug-in
+        load that makes an automation target resolvable again. */
+    void recompilePerformance();
+
+    perf::PerformanceEngine& getEngine()              { return rack.getEngine(); }
+
+    /** Launches a scene by id: its clips through the engine's quantized launch, the rest of
+        it (slots, macros, focus, page, tempo) when the launch actually lands. Returns false
+        for an unknown scene. */
+    bool launchScene (const juce::String& sceneId);
+
+    /** Recalls setlist item `index`, or the next/previous one. A scene that cannot be
+        recalled leaves the rig where it was and reports why (§18.8.9). */
+    bool goToSetlistItem (int index);
+
+    // -- the performance surface runtime (Stage 6, §18.8.10) ---------------------------------
+    // Stage 3's rule again: the hardware driver never touches an engine object. It reads
+    // these projections and sends these movements, and both go through the same code the UI
+    // does. Polling here is deliberately the caller's business — the surface refreshes at
+    // whatever rate it can stand, entirely apart from musical scheduling.
+
+    struct SurfaceTransport
+    {
+        bool playing = false;
+        double tempo = 120.0;
+        int bar = 1;
+        int beat = 1;
+        bool externalClock = false;
+        bool clockLost = false;
+    };
+
+    struct SurfaceClip
+    {
+        juce::String clipId;
+        juce::String name;
+        bool active = false;
+        bool pending = false;
+        float phase = 0.0f;
+    };
+
+    SurfaceTransport surfaceTransport() const;
+    /** Clips in document order — which is pad order, so pad N is clip N and stays clip N. */
+    juce::Array<SurfaceClip> surfaceClips() const;
+    juce::StringArray surfaceSceneNames() const;
+
+    /** A pad press on the clip bank: launches an idle clip, stops a running one. */
+    bool surfaceClipPad (int padIndex);
+    /** A pad press on the scene bank. */
+    bool surfaceScenePad (int padIndex);
+    /** A pad press on the step bank: toggles that step of the surface-focused lane, which is
+        step triggering without a second editing model. */
+    bool surfaceStepPad (int padIndex);
+    /** Which lane the surface's encoders and step pads address. */
+    bool setSurfaceLane (const juce::String& patternId, const juce::String& laneId);
+
+    enum class SurfaceEncoder { tempo = 0, swing, gate, rate, length, probability, velocity };
+
+    /** A relative encoder movement on the performance page. Returns false when there is
+        nothing focused for that encoder to move. */
+    bool nudgePerformanceEncoder (SurfaceEncoder encoder, int delta);
+
+    // -- the scripting surface (Stage 6, §18.8.11) -------------------------------------------
+    // Scripts observe approved events and call a bounded set of actions. They never see the
+    // engine, never run on the audio thread, and cannot reach anything not named here — the
+    // baseline's "bounded APIs" made literal.
+
+    /** Runs one approved action. Returns an empty var for an unknown or refused action, so a
+        script cannot discover the rest of the command surface by probing. */
+    juce::var runScriptAction (const juce::String& action, const juce::var& payload);
+
+    /** A read-only snapshot for scripts: transport, clips, scenes and the setlist position. */
+    juce::var scriptPerformanceState() const;
+
+    // -- the generated product's DAW surface (Stage 7, §18.9.3) ------------------------------
+    // The curated automation set, deliberately small and deliberately INDEX-STABLE: macro
+    // slot N is DAW parameter N whether or not a macro exists there yet, so a project's
+    // automation lane still means the same thing after the rack is edited. Exposing every
+    // inner plug-in parameter instead would make a DAW project unmanageable and would break
+    // the moment an instrument was swapped — which is exactly what the baseline forbids.
+
+    static constexpr int exposedMacroCount = 16;
+
+    float exposedMacroValue (int index) const;
+    /** Writes one exposed macro through the Stage 5 macro path (its targets, its ranges).
+        An index with no macro behind it is accepted and does nothing — the parameter still
+        exists, because a stable surface is the point. */
+    bool setExposedMacroValue (int index, float value);
+    juce::String exposedMacroName (int index) const;
+
+    int sceneCount() const;
+    juce::String sceneNameAt (int index) const;
+    /** Launches scene `index`; -1 (or an unknown index) is "no scene", not an error. */
+    bool selectSceneByIndex (int index);
+    int selectedSceneIndex() const;
+
+    float masterLevel() const;
+    void setMasterLevel (float level);
+
+    /** What the DAW should be told about this instance: what the render sequence actually
+        costs, and the longest tail anything loaded claims.
+
+        The latency comes from the graph rather than from a sum computed beside it, because
+        the graph is what builds the sequence and inserts the compensation delays. A sum over
+        parts and the master chain misses a return chain entirely, and a short latency report
+        puts the whole instance early against every other track in the project. */
+    int reportedLatencySamples() const;
+    double tailLengthSeconds() const;
+
+    /** How many stereo output buses the product renders (§18.9.3 multi-output). */
+    int outputPairCount() const;
+
+    // -- project portability and recovery (Stage 7, §18.9.4) ---------------------------------
+    // A DAW instance uses the SAME Runtime State schema as the standalone — there is no
+    // DAW-only Performance format — and carries the identity and compatibility data a project
+    // needs to be reopened somewhere else and either work or say exactly why not.
+
+    /** What a restore could not resolve, kept until the next successful one. A project opened
+        on a machine missing a plug-in reports it here rather than quietly dropping the part:
+        the identity and state blob stay in the manifest, so installing the plug-in and
+        reopening the project is the whole repair (§18.9.3 "missing-content recovery"). */
+    struct RestoreReport
+    {
+        juce::StringArray missingInstruments;   // display names, or ceIds when that is all we have
+        juce::StringArray missingEffects;
+        juce::StringArray notes;                // anything else worth saying out loud
+        bool degraded() const { return ! missingInstruments.isEmpty() || ! missingEffects.isEmpty(); }
+    };
+
+    /** Computed live from what the rack could and could not resolve — always current, and
+        therefore never a stale claim about a repair that has since happened. */
+    RestoreReport lastRestoreReport() const;
+
+    // -- multi-instance arbitration (Stage 7, §18.9.3) ---------------------------------------
+    // Several outer-VST3 instances (and the standalone) share one per-user data directory, so
+    // two things need an owner: the hardware surface, which is a physical device only one
+    // instance can drive, and the catalogue, which is a file two scanners must not interleave.
+
+    /** True when this instance currently owns the hardware surface. */
+    bool ownsHardwareSurface() const;
+    /** Claims the surface for this instance, taking it from an instance whose heartbeat has
+        gone stale. Returns false when another live instance holds it. */
+    bool claimHardwareSurface();
+    void releaseHardwareSurface();
+    /** A human-readable owner for the UI ("this instance", "another instance", "nobody"). */
+    juce::String hardwareSurfaceOwner() const;
+
+    // -- platform support and active-hosting evidence (Stage 7, §18.9.7, §18.9.8) -------------
+
+    /** The compatibility matrix, run on this machine. "It compiles" is not support. */
+    PlatformReport platformReport() const;
+
+    /** Incidents where a plug-in was live when the process died — the field data §18.9.8
+        requires before anyone builds active isolation. Not isolation itself, on purpose. */
+    juce::Array<ActiveHostingMarker::Incident> activeHostingIncidents() const;
+
+    // -- safe startup (§17.1, §18.3.3) --------------------------------------------------------
+    // The other half of the marker Stage 7 wrote. A plug-in that was live when the process
+    // died does not load again on the next start; the part keeps its identity and state and
+    // reports itself degraded, exactly as a missing plug-in already does.
+
+    SafeMode::Level safeModeLevel() const;
+    /** Levels are sticky. Raising to noThirdParty takes effect at the next restore; dropping
+        to normal does not resurrect the parts this run refused — reopening the project does,
+        which is the same repair a newly installed plug-in needs. */
+    void setSafeModeLevel (SafeMode::Level level);
+    juce::Array<SafeMode::Suspect> safeModeSuspects() const;
+    /** The user vouches for a module: it loads again from the next restore. */
+    void clearSafeModeSuspect (const juce::String& modulePath);
+    void clearAllSafeModeSuspects();
+    /** Why this module will not be loaded on this run, or empty when it will be. */
+    juce::String safeModeRefusal (const juce::String& modulePath) const;
+
+    // -- session recovery (§17.3) --------------------------------------------------------------
+
+    /** What the last run was doing when it stopped, and what there is to go back to. */
+    SessionRecovery::Report recoveryReport() const;
+    /** The user has read it; the standing last-known-good offer survives. */
+    void acknowledgeRecoveryReport();
+    /** Replaces the live session with the last state this product is known to have run
+        cleanly, and restores the rack from it. Returns false when there is none. */
+    bool restoreLastKnownGood();
+    /** Parts and effect slots whose stored state no longer matches the digest saved with it.
+        Never emptied by loading: a damaged blob is kept and reported, never quietly dropped. */
+    juce::StringArray damagedStateNotes() const   { return stateDigestMismatches; }
+
+    // -- licensing (§19 "Trust", §20, §26.2, §27) ----------------------------------------------
+    // The public key and the product id come from the Host Project manifest, so a generated
+    // instrument carries its own — one build's licence is not another's.
+
+    licensing::LicenceStatus licenceStatus();
+    licensing::Entitlements entitlements();
+    /** Installs a licence from the text of a licence file. Empty on success, else the reason. */
+    juce::String installLicence (const juce::String& licenceFileText);
+    void removeLicence();
+    juce::String activateLicenceHere();
+    juce::String deactivateLicenceHere();
+    juce::Array<licensing::LicenceStore::Activation> licenceActivations();
+
+    /** True when the edition allows it. When it does not, emits the refusal — one sentence
+        naming what would allow it and what still works — so no caller has to compose one. */
+    bool requireFeature (licensing::Feature feature);
+
+    // -- support bundle (§17.7) ----------------------------------------------------------------
+
+    /** What this machine would contribute to a bundle: version, OS, architecture, the devices
+        and surfaces actually seen. Filled here because only the service knows them. */
+    SupportBundleContents supportBundleContents() const;
+    /** Exactly what would be written, before anything is. §17.7's "with user review" is this. */
+    juce::Array<SupportBundle::Entry> previewSupportBundle (const SupportBundleOptions& bundleOptions) const;
+    /** Writes the bundle. Empty on success, otherwise the reason. */
+    juce::String writeSupportBundle (const juce::File& destination,
+                                     const SupportBundleOptions& bundleOptions) const;
+
+    /** Offline render/bounce (§18.9.3). A bounce must be deterministic and must not spray
+        MIDI at hardware that is not part of the render, so hardware ports are released while
+        it runs and re-opened when it ends. Everything else is already deterministic: the
+        engine's randomness is seeded. */
+    void setOfflineRender (bool offline);
+    bool isOfflineRender() const                       { return offlineRender; }
+
+    /** MIDI arriving from any enabled input, noted for the activity readout (§26.2's "test
+        keys" — a person plugging a keyboard in needs to SEE notes arrive before anything is
+        loaded to play them). Called from the MIDI thread by the observer below; tests call it
+        directly, which is the whole reason it is public. Only channel voice messages are
+        noted — clock and active-sensing would light the indicator continuously. */
+    void noteMidiActivity (const juce::String& deviceName, const juce::MidiMessage& message);
+
+    /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
+        automation report through listeners that may fire on the audio thread) and emits one
+        coalesced instrumentHostParamValues per part that changed — current value and text,
+        read now, not whatever the callback once saw. The owner pumps this from a UI-rate
+        timer; tests call it directly. */
+    void drainParameterEvents();
+
 private:
     struct ClassInfoForCommit
     {
@@ -171,28 +620,200 @@ private:
 
     void emitState();
     void emitError (const juce::String& message);
-    juce::var buildStatePayload() const;
+    /** Not const, and that is the licence block's doing: the licence store is built on first
+        need because its public key lives in the Host Project, which is itself loaded lazily.
+        Its one caller, emitState, is not const either. */
+    juce::var buildStatePayload();
     static juce::var scanProgressPayload (const juce::String& line, bool done);
 
+    /** Runs the load transaction for a part: begin ticket, instantiate, commit; on success
+        `afterCommit` runs with the live instrument before anything is announced — the
+        vendor-preset apply rides there. */
+    void requestInstrument (const juce::String& partId, const juce::String& ceId,
+                            std::function<void (juce::AudioProcessor&)> afterCommit = {});
+
     void runScanNow();
+    void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
+    void ensureLibrary();
+    void emitLibrary (const juce::String& query, const juce::String& type);
+    void scanVstPresets();
+    /** Availability, computed live against the catalogue (caller holds no locks; this takes
+        catalogLock itself): empty = loadable, else the actionable reason. */
+    juce::String recordUnavailableReason (const LibraryRecord& record) const;
+    void loadPresetRecord (const LibraryRecord& record, const juce::String& partId);
+    /** A chain capture applied onto one part: the instrument, its MIDI modules and its
+        insert chain, all at once. The instrument and every effect load through the same
+        transactions a plain load uses — a capture is a shortcut for the player, never a
+        second path into the rack. */
+    void loadChainRecord (const LibraryRecord& record, const juce::String& partId);
+    /** Layer B of the preset engine: enumerates the live instrument's program list into
+        the library as vendor records, scoped to its class. No-op below two programs. */
+    void ingestProgramList (const juce::String& partId);
+    void loadRackRecord (const LibraryRecord& record);
+    void attachParameters (const juce::String& partId);
+    void applyPerformance (Performance&& performance);
+    /** Mirrors requestInstrument for an effect slot, through the rack's effect transaction. */
+    void requestEffect (const juce::String& effectId, const juce::String& ceId);
+    /** The live processor behind any target id — a part's instrument or an effect. */
+    juce::AudioProcessor* targetProcessor (const juce::String& targetId) const;
+    /** The class identity any target currently carries (for binding capture/resolution). */
+    juce::String targetClassCeId (const juce::String& targetId) const;
+    juce::String targetDisplayName (const juce::String& targetId) const;
+    void showEditorForEffect (const juce::String& effectId);
+    /** Applies one macro's value to every resolved target through the parameter path. */
+    void applyMacroValue (const Macro& macro);
+    juce::AudioProcessorParameter* resolveParameter (const juce::String& partId,
+                                                     const juce::String& definitionId,
+                                                     const ParameterDescriptor** descriptorOut = nullptr);
+
+    // -- virtual parameter addresses (Stage 5) -----------------------------------------
+    // '@'-prefixed ids resolve against the rack's own state: "@gain"/"@pan"/"@send:<id>" on
+    // a part, "@macro" on a macro id. Values are normalized 0..1 like everything else on
+    // the parameter path; writes go through the rack's setters, never a second store.
+    static bool isVirtualParameterId (const juce::String& parameterId)
+    {
+        return parameterId.startsWith ("@");
+    }
+    bool virtualParameterExists (const juce::String& targetId, const juce::String& parameterId) const;
+    float virtualParameterValue (const juce::String& targetId, const juce::String& parameterId) const;
+    juce::String virtualParameterText (const juce::String& targetId, const juce::String& parameterId) const;
+    juce::String virtualParameterName (const juce::String& targetId, const juce::String& parameterId) const;
+    static float virtualParameterDefault (const juce::String& parameterId);
+    void setVirtualParameter (const juce::String& targetId, const juce::String& parameterId,
+                              float normalized);
+    /** True when targetId+parameterId can be written right now — plug-in or virtual. */
+    bool targetParameterExists (const juce::String& targetId, const juce::String& parameterId);
+    /** One mapped, gesture-wrapped write through a binding — page slots, nudges and macro
+        targets all funnel here so plug-in and virtual addresses share the transform. */
+    void writeMappedBinding (const ControlBinding& binding, float value01);
+
+    /** A slot binding resolves only when its part still carries the class it was assigned
+        against AND that parameter exists in the live registry — anything else is unresolved,
+        shown, and refused for writes. Virtual addresses resolve on existence alone: they
+        belong to the rack, not a plug-in class. */
+    bool bindingResolves (const ControlBinding& binding) const;
+    juce::String slotDisplayName (const ControlBinding& binding, bool resolved) const;
+    /** The parameter's current value inverse-mapped into the slot's 0..1 position. */
+    static float slotPositionFor (const ControlBinding& binding, float parameterValue);
+    /** Where a captured editor picture for this class lives. Keyed by class AND version: a
+        plug-in that got a new interface in an update should not keep showing the old one.
+        The name is readable and the hash makes it unique — a ceId is an identifier string,
+        not a filename, and two classes can share a display name. */
+    juce::File snapshotCacheFile (const PluginClassRecord& record) const;
+    /** A picture the USER chose for this class. Kept beside the capture rather than
+        overwriting it, so "use the plug-in's own picture again" restores whatever was there
+        before instead of leaving the class with nothing. */
+    juce::File snapshotOverrideFile (const PluginClassRecord& record) const;
+    /** Which of the three the class is actually showing: "custom", "vendor", "capture", or
+        empty for the generated tile. Published so the UI can offer "revert" only where there
+        is something to revert to. */
+    juce::String artworkSourceFor (const PluginClassRecord& record) const;
+    /** The artwork to publish for a class: the vendor's own, else a captured one, else
+        nothing. Order matters — the vendor's picture is of the plug-in, ours is of whatever
+        preset happened to be open. */
+    juce::File artworkFor (const PluginClassRecord& record) const;
+    /** Favourite parameters, per plug-in CLASS rather than per part or per session: you reach
+        for the same dozen on the same synth every time, whichever rack it happens to be in
+        today. A per-user preference about a plug-in, so it lives beside the catalogue and the
+        thumbnails rather than in the Performance. */
+    juce::File parameterFavouritesFile() const
+    {
+        return options.dataDirectory.getChildFile ("parameter-favourites.json");
+    }
+    // -- the owner's own controller --------------------------------------------------------
+    // Everything CEditor drives, it drives over MIDI learn, which never cared what device sent
+    // the message. So a controller nobody authored a profile for is not unsupported — it is
+    // undrawn, and the only thing missing is how many of each control it has. The owner can
+    // say, or CEditor can count while they sweep. Stored per user beside the catalogue: it is
+    // a fact about their desk, not about a song.
+    juce::File userSurfaceFile() const
+    {
+        return options.dataDirectory.getChildFile ("surface-profile.json");
+    }
+    /** Answers instrumentHostSurfaceLayout with the drawing in force: the profile named, the
+        owner's own controller when they described one, else the first authored profile that
+        has a layout. */
+    void emitSurfaceLayout (const juce::String& requestedProfileId = {});
+    void loadUserSurface();
+    void saveUserSurface() const;
+    /** Empty name = the owner has not described a controller, and authored profiles decide. */
+    juce::String userSurfaceName;
+    ctrl49::SurfaceCapabilities userSurfaceCapabilities;
+    bool userSurfaceLoaded = false;
+    /** Counting distinct controllers while the owner sweeps everything they want to use. */
+    bool userSurfaceLearning = false;
+    juce::SortedSet<int> userSurfaceHeard;
+
+    void loadParameterFavourites();
+    void saveParameterFavourites() const;
+    /** ceId -> the parameter ids marked on that class. Loaded once, on first use. */
+    std::map<juce::String, juce::StringArray> parameterFavourites;
+    bool parameterFavouritesLoaded = false;
+
+    juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
+    juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
-    void requestInstrument (const juce::String& partId, const juce::String& ceId);
     void showEditorFor (const juce::String& partId);
     void hideEditor();
     void startAudio();
     void stopAudio();
+    /** Reopens the device when a hardware audio return now needs more input channels than
+        the running device has. */
+    void restartAudioIfNeeded();
+    /** Input channels the model's hardware returns need — 0 when none are configured. */
+    int neededInputChannels() const;
     void emitAudioDevices();
+
+    // -- hardware-part MIDI (Stage 5) ---------------------------------------------------
+    juce::StringPairArray listMidiOutputsNow() const;
+    MidiSendProcessor::Sink openMidiOutputNow (const juce::String& deviceId, juce::String& errorOut) const;
+    /** (Re)opens the part's configured MIDI output into its sender; failures land in
+        `hardwareMidiErrors` and the state payload, never in silence. */
+    void openHardwareMidi (const juce::String& partId);
 
     /** Caller holds catalogLock. */
     const PluginClassRecord* findClass (const juce::String& ceId,
                                         const ModuleRecord** moduleOut = nullptr) const;
 
+    // -- Stage 6 internals -------------------------------------------------------------------
+    /** Pops everything the engine queued: automation values (applied through the Stage 2
+        path), scene landings, clip state changes and captured notes. Runs on the same pump as
+        drainParameterEvents. */
+    void drainEngineEvents();
+    /** Writes one automation value to its target. No gestures: automation is a continuous
+        stream, and wrapping every value would spam the host with begin/end pairs. */
+    void applyAutomationValue (const juce::String& targetId, const juce::String& parameterId,
+                               float value);
+    /** The half of a scene that is not clips — slots, macros, focus, page, tempo. */
+    void applySceneState (const perf::Scene& scene);
+    /** Fills a scene from the rig as it stands right now. */
+    void captureSceneFromRack (perf::Scene& scene);
+    juce::var performancePayload() const;
+    /** The Stage 7 block: the DAW surface, the restore report, the platform matrix, the
+        hardware owner and the active-hosting evidence. */
+    juce::var productPayload() const;
+    /** Everything about whether this install is healthy and what it did about it when it was
+        not: safe startup and its suspects, and what this run actually refused. */
+    juce::var reliabilityPayload() const;
+    /** The edition, the licence behind it, its seats, and what is gated. Never a nag: the
+        panel reads this to say what somebody has, not to interrupt them. */
+    juce::var licencePayload();
+
     void savePerformance();
+    /** Keeps previous manifest revisions beside the session file: before an overwrite, the
+        current file is copied into the revisions directory when the newest copy there is
+        older than the snapshot interval, and the directory is pruned to a fixed count. A
+        crash or a bad edit costs keystrokes, not the last good rig. */
+    void maybeSnapshotRevision();
     void saveScanPaths();
 
     juce::File catalogFile() const      { return options.dataDirectory.getChildFile ("plugin-catalog.json"); }
     juce::File performanceFile() const  { return options.dataDirectory.getChildFile ("session-performance.json"); }
+    juce::File revisionsDirectory() const { return options.dataDirectory.getChildFile ("session-revisions"); }
+    /** Checks every stored state blob against the digest saved with it and fills
+        stateDigestMismatches. Reports; never repairs, and never deletes a blob. */
+    void checkStateDigests();
     juce::File scanPathsFile() const    { return options.dataDirectory.getChildFile ("scan-paths.json"); }
     juce::File hostProjectFile() const  { return options.dataDirectory.getChildFile ("host-project.json"); }
 
@@ -205,15 +826,210 @@ private:
     mutable std::mutex catalogLock;
     InstrumentRackHost rack;
     juce::StringArray userScanPaths;
-    juce::String editorPartId;      // the part whose editor the pane is showing, or empty
+    juce::String editorTargetId;      // the part whose editor the pane is showing, or empty
+    juce::StringArray floatingEditorIds;   // parts whose editors float in their own windows
     bool sessionRestored = false;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
+    Library library;                // the Stage 4 unified index; loaded on first ask
+    juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
+    bool libraryLoaded = false;
+    // Per-part MIDI-output failures ("port is gone"), reported in state until the next
+    // successful open — the §18.7.7 missing-device diagnostic.
+    std::map<juce::String, juce::String> hardwareMidiErrors;
+
+    // Stage 6: the compiled song's generation, and the scene launches waiting for the engine
+    // to tell us they landed (so the non-audio half arrives at the same musical instant).
+    int songGeneration = 0;
+    int nextSceneToken = 1;
+    std::map<int, juce::String> pendingScenes;
+    juce::String captureClipId, captureLaneId;
+    // What the surface's encoders and step pads address; empty = the first lane of the first
+    // pattern, so an unconfigured surface still does something sensible.
+    juce::String surfacePatternId, surfaceLaneId;
+    bool lastReportedPlaying = false;
+    bool offlineRender = false;
+    int lastSelectedScene = -1;
+    juce::String instanceId { juce::Uuid().toDashedString() };
+    bool holdsHardwareSurface = false;
+    juce::int64 lastHardwareHeartbeat = 0;
+    std::unique_ptr<ActiveHostingMarker> activeMarker;
+    ActiveHostingMarker::Incident pendingActiveIncident;   // reported once, at the first state
+    std::unique_ptr<SafeMode> safeMode;
+    std::unique_ptr<SessionRecovery> recovery;
+    std::unique_ptr<licensing::LicenceStore> licence;
+    /** Constructs the store on first need, because the public key lives in the Host Project
+        and that manifest is itself loaded lazily. */
+    void ensureLicence();
+    /** How many parts currently hold a plug-in — what §26.2's free-tier limit counts. */
+    int loadedPartCount() const;
+    /** Anything whose saved state did not match the digest stored beside it, in words. */
+    juce::StringArray stateDigestMismatches;
+    /** Modules this run actually refused, with the reason, so the restore report can say what
+        happened rather than reporting them as merely missing. Keyed by module path. */
+    std::map<juce::String, juce::String> safeModeRefusals;
+    // A claim is refreshed this often and considered abandoned after this long, so an
+    // instance that crashed frees the surface without anyone having to clean up after it.
+    static constexpr juce::int64 hardwareHeartbeatMs = 2000;
+    static constexpr juce::int64 hardwareClaimTimeoutMs = 8000;
+
+    juce::File hardwareOwnerFile() const { return options.dataDirectory.getChildFile ("hardware-owner.json"); }
+    /** The package identity a saved state carries, so a project reopened elsewhere can say
+        which product and revision wrote it (§18.9.4). */
+    juce::var packageIdentity() const;
+
+    void emitScriptEvent (const juce::String& event, const juce::var& payload) const;
+    /** The lane the surface currently addresses, or nullptr. */
+    perf::Lane* surfaceLane();
+
+    // The Stage 2 registry, per part with a live instrument: descriptors plus the RT-safe
+    // change listener. Attached on every successful commit, dropped from the same rack hook
+    // that hides the editor — the sync must stop listening before its processor dies.
+    struct PartParameters
+    {
+        ParameterInventory inventory;
+        std::unique_ptr<PartParameterSync> sync;
+    };
+    std::map<juce::String, PartParameters> partParameters;
 
     // Declared after the rack so destruction stops them first; stopAudio() in the destructor
     // detaches the callbacks before the graph they drive goes down.
     juce::AudioDeviceManager deviceManager;
     juce::AudioProcessorPlayer player;
+
+    /** Forwards incoming MIDI to noteMidiActivity beside the player's own callback — an
+        observer, not a second consumer: nothing here reaches the graph. */
+    struct MidiActivityObserver : juce::MidiInputCallback
+    {
+        explicit MidiActivityObserver (InstrumentHostService& ownerToUse) : owner (ownerToUse) {}
+        void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override
+        {
+            owner.noteMidiActivity (source != nullptr ? source->getName() : juce::String(), message);
+        }
+        InstrumentHostService& owner;
+    };
+    MidiActivityObserver midiObserver { *this };
+    // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
+    // string copies, far from any audio path.
+    std::mutex midiActivityLock;
+    // -- parameter learn -------------------------------------------------------------------
+    // The answer to a plug-in with five hundred parameters, which is a list nobody can search
+    // and a name nobody knows. Arm a slot, then move the control in the plug-in's OWN window:
+    // the parameter that moved is the one you meant, and it never had to be named.
+    //
+    // The events were already flowing — PartParameterSync has always reported every change,
+    // because that is what drives the live readouts. All that was missing was remembering
+    // which ones moved and why.
+    juce::String parameterLearnPageId, parameterLearnSlotId;
+    /** Parameters CEditor itself wrote since the last drain. Excluded from "touched", because
+        a list of what you just dragged in CEditor answers a question nobody asked — the point
+        is what moved in the VENDOR's window. */
+    juce::StringArray parametersWrittenByUs;
+    /** Most recently touched first, per target. Capped: this is a shortcut to the handful you
+        were just working on, and a hundred of them is the list it exists to replace. */
+    std::map<juce::String, juce::StringArray> touchedParametersByTarget;
+    static constexpr int maxTouchedParameters = 12;
+
+    void emitParameterLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
+                             const juce::String& parameterId);
+
+    juce::String midiActivityDevice, midiActivityText;
+    // The controller behind the readout, when the message was one. The surface drawing lights
+    // the knob you are turning, and it can only find it by matching the controller against
+    // what the control slots are bound to — which the frontend already has. So the event
+    // carries the numbers rather than a second lookup living here.
+    int midiActivityCc = -1, midiActivityChannel = 0, midiActivityValue = 0;
+    int midiActivityNote = -1;   // the drawing lights a pad the same way it lights a knob
+    juce::int64 midiActivitySeq = 0, midiActivityEmittedSeq = 0;
+
+    // Controller changes captured by the same observer, coalesced per (channel, cc) so a
+    // knob sweep costs one entry however fast it turns. Guarded by midiActivityLock; drained
+    // on the controlling thread, where MIDI learn and the bound-slot writes actually happen.
+    // A note rides the same queue with cc = -1: a pad that sends notes is a controller too,
+    // and a key is a pad if you say so. Notes are never coalesced — each press counts.
+    struct PendingCc { int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false; };
+    std::vector<PendingCc> pendingCcs;
+
+    // MIDI-learn armed target — controlling thread only, like every other piece of service
+    // state. Empty page id = not armed.
+    juce::String midiLearnPageId, midiLearnSlotId;
+    /** Gates the observer's note queue: true while learn is armed or any slot is bound to a
+        note, false the rest of the time so ordinary playing costs the MIDI thread nothing. */
+    std::atomic<bool> slotNotesWanted { false };
+    void refreshSlotNoteListening();
+
+    // Last arp playhead step announced per part, so the drain only speaks on change.
+    std::map<juce::String, int> lastArpStepByPart;
+
+    // Chord learn (the chorder's capture). Armed state lives on the controlling thread;
+    // the observer only queues raw note on/offs — gated by the atomic so the audio path
+    // pays nothing while nobody is learning.
+    struct ChordLearn
+    {
+        bool armed = false;
+        juce::String partId;
+        int key = -1;                  // -1 until the target key was tapped
+        juce::Array<int> groupNotes;   // the notes of the group currently held
+        int downCount = 0;
+    };
+    ChordLearn chordLearn;
+    std::atomic<bool> chordLearnListening { false };
+    struct PendingNoteEvent { int note = 0; bool on = false; };
+    std::vector<PendingNoteEvent> pendingChordNotes;
+    void drainChordLearn();
+    void emitChordLearn (bool armed, const juce::String& stage, int key, int chordSize);
+
+    // -- hardware total recall -------------------------------------------------------------
+    // A hardware part remembered everything about the synth except the sound. This is the
+    // sound: whatever the synth answers a dump request with, kept verbatim and handed back
+    // when the session opens again.
+    //
+    // Capture is armed, not automatic, and for a reason worth stating. A patch dump is
+    // indistinguishable from any other system-exclusive traffic — an editor's handshake, a
+    // librarian's backup, the synth's own chatter — so CEditor never guesses. You arm the
+    // part, press Send on the synth, and what arrives in that window is the patch.
+    struct HardwarePatchCapture
+    {
+        bool armed = false;
+        juce::String partId;
+        std::vector<juce::MidiMessage> messages;   // controlling thread's copy
+        int bytes = 0;
+    };
+    HardwarePatchCapture patchCapture;
+    /** Gates the observer: while this is false the MIDI thread does not even look at a
+        system-exclusive message, which is the state it is in for all but a few seconds. */
+    std::atomic<bool> patchCaptureListening { false };
+    /** Written on the MIDI thread under midiActivityLock, drained on the controlling one.
+        Capped: a runaway sender must cost a bounded amount of memory, not all of it. */
+    std::vector<juce::MidiMessage> pendingPatchSysex;
+    static constexpr int maxCapturedPatchMessages = 512;
+    static constexpr int maxCapturedPatchBytes = 4 * 1024 * 1024;
+
+    void drainHardwarePatchCapture();
+    void emitHardwarePatchCapture (bool armed, const juce::String& partId, int messages, int bytes);
+
+    /** A send in flight. Sysex goes out paced rather than in one burst: an older synth's
+        input buffer is small, and a bank dump pushed at once is a synth that hangs or drops
+        the tail. One message per drain (~30Hz) is slower than any device needs and faster
+        than anybody waits for. */
+    struct HardwarePatchSend
+    {
+        juce::String partId;
+        std::vector<juce::MidiMessage> messages;
+        size_t next = 0;
+        int lastReportedPercent = -1;
+    };
+    std::deque<HardwarePatchSend> patchSends;
+    void queueHardwarePatchSend (const juce::String& partId);
+    void drainHardwarePatchSends();
+
+    /** Splits a stored blob back into the messages it was made of. System-exclusive is
+        self-delimiting (F0 … F7), so the concatenation is lossless and this is its inverse;
+        anything outside a pair of delimiters is ignored rather than guessed at. */
+    static std::vector<juce::MidiMessage> splitSysexBlob (const juce::MemoryBlock& blob);
+    void drainControllerEvents();
+    void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
+                        int cc, int channel, int note = -1);
     bool audioRunning = false;
 
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this

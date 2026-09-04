@@ -51,7 +51,8 @@ int main (int argc, char* argv[])
 
     std::printf ("<SCANRESULT module=\"%s\">"
                  "<PLUGIN name=\"Stub Synth\" manufacturer=\"Stub Audio\" version=\"1.2.3\""
-                 " category=\"Instrument\" isInstrument=\"1\" ceId=\"VST3-stub-synth-1\"/>"
+                 " category=\"Instrument\" isInstrument=\"1\" ceId=\"VST3-stub-synth-1\""
+                 " ceSnapshot=\"/plugins/Stub.vst3/Contents/Resources/Snapshots/synth.png\"/>"
                  "<PLUGIN name=\"Stub Verb\" manufacturer=\"Stub Audio\" version=\"1.2.3\""
                  " category=\"Fx\" isInstrument=\"0\" ceId=\"VST3-stub-verb-1\"/>"
                  "</SCANRESULT>\n",

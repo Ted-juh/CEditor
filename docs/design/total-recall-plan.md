@@ -194,6 +194,92 @@ parameter rather than an anonymous float.
 What has NOT happened is a test against hardware. Everything here is reasoned from the profile and
 driven by unit tests; no restore in this build has reached a synth.
 
+## The rack host's own total recall — built, 2026-09-01
+
+Everything above is about an **exported panel**: a Player instance driving a synth it has a device
+profile for, where "the patch" is something CEditor can build, parse and name. That is the strong
+version, and it only works for the instruments somebody wrote a profile for.
+
+The rack host has the same problem and cannot make that assumption. A hardware part is any synth
+with a MIDI socket — a Juno, a rack module from 1989, something a person built. It remembered its
+port, its channel, its audio return, its program number and its device-profile link, and it forgot
+the one thing that makes it *that sound*: the patch. Six months later the session opens, the synth
+is on whatever the last person left it on, and the program number points at a slot whose contents
+have moved.
+
+So the rack host takes the weak version of the same promise, and takes it for every synth ever made:
+
+**Capture is armed, and it is armed for a reason.** `captureHardwarePatch` opens a listening window;
+`finishHardwarePatchCapture` closes it and keeps what arrived. There is no automatic collection,
+because a patch dump is indistinguishable on the wire from any other system-exclusive traffic — an
+editor's handshake, a librarian's backup, the synth's own chatter. The window is the only thing that
+says which messages you meant. While nothing is armed the MIDI thread does not even look at a SysEx
+message (`patchCaptureListening`, an atomic, gates it before anything else happens).
+
+**The bytes are kept and deliberately not understood.** `RackPart::hardwarePatchBase64` is the
+concatenation of the raw messages, base64'd into the session file. Nothing parses it, nothing
+validates it against a profile, nothing renames its fields. Refusing to understand it is exactly
+what makes this work for a synth nobody has written a profile for — the same bet the generic
+controller drawing makes, and it is the bet worth making twice. `splitSysexBlob` puts the messages
+back by walking `F0 … F7`, which is lossless because system-exclusive is self-delimiting.
+
+**The patch never crosses the bridge.** The state carries `hardwarePatchName` and
+`hardwarePatchBytes`; the blob stays native. It is opaque manufacturer data of unbounded length —
+a bank dump is megabytes — and the WebView has no reader for it and every reason not to carry it on
+every state push.
+
+**Sending is paced, not blasted.** One message per `drainParameterEvents` tick, roughly 30 a second,
+through the part's existing `MidiSendProcessor` sink. An older synth's input buffer is small and a
+bank dump pushed at once is a synth that hangs or drops the tail. Pressing Send twice replaces the
+queued send rather than transmitting the patch twice.
+
+**Ask / Always / Never, and the default is Ask** — the same rule S2 arrived at, for the same reason
+and with one addition: a session written before this existed has no policy field, and an absent
+policy reads as Ask, so opening an old session can never start transmitting. `never` is silent
+including the question; `ask` emits `instrumentHostHardwarePatchPrompt` and transmits nothing until
+somebody answers; `always` queues the send on load.
+
+Covered by `testHardwareTotalRecall` in `CE/tests/InstrumentHostServiceTests.cpp`, which drives all
+three policies across three separate service lifetimes reading the same session off disk, and
+asserts the returned bytes are identical to the captured ones, in order.
+
+What this does **not** do, and the exported-panel path above does: name the patch's contents, show
+its parameters, or notice that the synth on the other end is a different one today. Those need a
+profile. This needs a cable.
+
+### The patch in the Library — built, 2026-09-01
+
+A captured patch lived only on its part, which made it a setting rather than a sound. Now
+`saveUserPreset` accepts a hardware part and writes a `preset` record with
+`sourceType: "hardwarePatch"`: the bytes as the blob, the synth's name as `instrument`, and a
+target of `hw:<device profile id>` or, unlinked, `hw:<port name>`. The `hw:` prefix keeps it out of
+the catalogue's namespace, and the availability check leaves such records alone — a hardware patch
+has no class to be missing, it needs a synth on a cable, which the library cannot see and must not
+pretend to.
+
+So "warm pad" finds the Serum preset and the Juno patch in one list, and a hardware part gets the
+front-panel prev/next walk VIP had for plug-ins: `walkPartPreset` walks the patches captured from
+the same synth, sending each. Loading a record onto a hardware part stores it and sends it; onto an
+empty part it makes a hardware part carrying the patch with the port still to choose; onto a part
+with a plug-in it refuses, because turning that into a hardware part would unload somebody's
+instrument for bytes it could never play. `testHardwarePatchesInTheLibrary` covers all of it
+across a restart, bytes compared exactly.
+
+### Patch compare — built, 2026-09-01
+
+The one thing that can be said about the bytes without reading them is where two dumps of the same
+synth differ, and it turns out to be most of what a person wants to know. `compareHardwarePatches`
+sets the part's captured patch against a library patch (or two library patches against each
+other) and answers with `identical`, the sizes, and a list of `{ message, offset, before, after }`
+— capped at 512 with the true count beside it. "Is the patch on the part the one I saved?" is one
+boolean; "what did I change since?" is a short list a person who knows the synth reads against its
+manual. Messages are compared one against one, in order, because a multi-message dump is one
+message per bank slot or parameter block and the same offset in the same message means the same
+thing; comparing the concatenation would report a one-byte length change as every byte after it
+having changed, which is true and useless. `PatchDiff.h` is juce_core only and pure, and it is
+the byte-diff the Capture Session below needs: a byte that moves when one knob moves is that
+knob's address.
+
 ## Verification
 
 The failure modes here are all timing and ordering, so test those rather than the happy path:

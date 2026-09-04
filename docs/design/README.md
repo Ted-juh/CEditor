@@ -40,6 +40,8 @@ with an *as built* section per phase.
 |---|---|
 | [Instrument Host integration audit](instrument-host-integration-audit.md) | The VIP-successor baseline's required first task: what the host builder reuses (bridge, documents, settings, pages, CTRL49, export identity, installer route), what is genuinely new (hosting, the audio path, the scanner helper), and the documented deviations. |
 | [Generated instrument-host product](instrument-host-product.md) | Stage 1 as built: one service under four consumers (editor tab, `CEHostStandalone`, `CEHostVST3`, tests), the Host Project manifest with its minted-once installer identity, and the assemble-don't-compile build pipeline (`tools/scripts/build-host-product.mjs` + `tools/installer/HostProductTemplate.iss`). Ends with what Stage 1 leaves open. |
+| [The modular chain](modular-chain.md) | *As built.* Instruments, MIDI modules and inserts as separate things: the per-part MIDI insert chain that replaced the welded FX-into-arp pair (with its migration), group buses where several parts become one signal that keeps going, and chain presets that keep a whole voice — instrument, modules, inserts and zone — as one library record. Ends with what it deliberately does not do. |
+| [Reliability, diagnostics and the support bundle](instrument-host-reliability.md) | The baseline's §17 layer, built after the seven functionality stages: the architecture check that keeps an unloadable module out of the browser without calling it broken, safe startup after a plug-in takes the process down, a last-known-good session that is not the crash, and a support bundle gathered by allowlist. Carries the §18.12 handover material for the host as a whole — compatibility matrix, known limitations, failure fixtures and a manual test plan. |
 
 ## Controls and components
 
@@ -79,6 +81,7 @@ written to be argued with before anybody builds one. The overview is
 
 | Document | What it is |
 |---|---|
+| [The rack canvas](rack-canvas-plan.md) | *Nothing built.* Why the instrument host reads as a form rather than an instrument, and the proposal it deserves: thumbnail nodes on a canvas, wired the way Reason cables devices, with one bottom dock showing whichever node is selected. Names the tension that decides it — Reason's wires imply arbitrary routing and this engine's topology is deliberately constrained — and carries a running idea log. |
 | [Tier 3 moonshots](tier-3-moonshots.md) | The post-beta bets, ranked, and the Tier 1 story in plain English. |
 | [Capture Session](capture-session-plan.md) | Learning a synth from the synth: turn its knobs, watch what it sends, write the profile. |
 | [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |

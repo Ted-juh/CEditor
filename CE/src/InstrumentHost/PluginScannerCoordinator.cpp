@@ -14,6 +14,7 @@ namespace
         c.version      = e.getStringAttribute ("version");
         c.category     = e.getStringAttribute ("category");
         c.isInstrument = e.getBoolAttribute ("isInstrument");
+        c.snapshotPath = e.getStringAttribute ("ceSnapshot");
         c.descriptionXml = e.toString (juce::XmlElement::TextFormat().singleLine());
         return c;
     }
@@ -121,6 +122,20 @@ PluginScannerCoordinator::ScanOutcome PluginScannerCoordinator::scanModules (con
         if (existing != nullptr && existing->quarantined)
         {
             ++outcome.skippedQuarantined;
+            continue;
+        }
+
+        // The architecture check (§17.1) happens before the fingerprint check, because it must
+        // also run on a module that has not changed: what changed may be the host. It reads the
+        // module's own files and never loads them, so it costs a directory walk and a header.
+        const auto architectures = PluginCatalog::architecturesOf (juce::File (path));
+        catalog.recordArchitectures (path, architectures);
+
+        if (const auto* checked = catalog.findModule (path);
+            checked != nullptr && ! checked->architectureSupported())
+        {
+            ++outcome.skippedUnsupported;
+            log ("skipped, " + checked->unavailableReason() + ": " + path);
             continue;
         }
 

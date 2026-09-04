@@ -993,3 +993,122 @@ export function onInstrumentHostBuildProgress(callback) {
   const token = window.__JUCE__.backend.addEventListener('instrumentHostBuildProgress', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
+
+/** One part's full parameter registry with live values ({ partId, parameters, warnings }),
+    answered by the getParameters command. */
+export function onInstrumentHostParameters(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParameters', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Coalesced parameter deltas ({ partId, changes:[{id,value,text}], gestures:[{id,phase}] })
+    — vendor-editor edits and automation, drained at UI rate by the native side. */
+export function onInstrumentHostParamValues(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParamValues', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** The Stage 4 library ({ records, counts, paths, query, type }), answered by getLibrary and
+    after every library mutation. */
+export function onInstrumentHostLibrary(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLibrary', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** MIDI arriving from any enabled input ({ device, text }) — at most one per UI tick,
+    carrying the latest message. The Audio & MIDI panel's "is it even plugged in" answer. */
+export function onInstrumentHostMidiActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMidiActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostSurface(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSurface', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostSurfaceLayout(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSurfaceLayout', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostMidiLearn(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMidiLearn', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostParamLearn(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostParamLearn', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostArpStep(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostArpStep', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onInstrumentHostChordLearn(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostChordLearn', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** A hardware patch capture, while it runs ({ armed, partId, messages, bytes }). The counter
+    is the whole feedback a person gets that the synth actually answered. */
+export function onInstrumentHostHardwarePatchCapture(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostHardwarePatchCapture', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** A captured patch on its way back to the synth ({ partId, sent, total, done, delivered }).
+    Paced by the native side, so this is progress rather than a promise. */
+export function onInstrumentHostHardwarePatchSend(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostHardwarePatchSend', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Where two hardware patches differ ({ partId, recordId, nameA, nameB, identical, messagesA,
+    messagesB, bytesA, bytesB, totalDifferences, truncated, differences: [{ message, offset,
+    before, after }] }). Offsets, never meanings — the bytes stay unread. */
+export function onInstrumentHostPatchCompare(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostPatchCompare', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Asked once when a session opens carrying patches whose policy is "ask"
+    ({ parts: [{ partId, patchName }] }). Nothing has been transmitted when this arrives. */
+export function onInstrumentHostHardwarePatchPrompt(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostHardwarePatchPrompt', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** The receipt for a released activation ({ receipt }). Emitted only when a seat was actually
+    released — it is the one thing the customer needs to keep, so it travels as an event rather
+    than as a return value nobody sees. */
+export function onInstrumentHostLicenceReceipt(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLicenceReceipt', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** The §17.7 support-bundle answer ({ entries, includeStateBlobs, written?, path? }). The same
+    event carries the preview and the export, because they are the same list — the difference
+    is only whether a file was written, which the payload says. */
+export function onInstrumentHostSupportBundle(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSupportBundle', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}

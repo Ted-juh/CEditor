@@ -39,3 +39,20 @@ If the project stays personal/open: add **AGPLv3** now (option 1) — it's the o
 actually valid without paying for JUCE. If commercial exports are the plan (the compile-per-panel
 pipeline suggests they might be), budget for a JUCE license first and then pick the repo license
 to match the business model.
+
+---
+
+## Update, 2026-08-27: the mechanism now exists, the decision still does not
+
+The §19 "Trust" block of the VIP-successor baseline has been implemented — perpetual licences,
+offline signature verification, seat records, the sunset key — and is documented for users in
+[Licence, updates and the sunset promise](licence-and-sunset-policy.md).
+
+**None of that resolves this document.** The price ladder that mechanism serves (€39 founder,
+€59 Core, €89 Pro) assumes a proprietary product, and option 1 is what the repository is on.
+Selling under those terms means buying the JUCE commercial licence first — option 2 — and until
+somebody does, the editions in the policy document are a plan rather than an offer. The policy
+document says so in its own words, in a section headed for the purpose.
+
+Recording it here as well because this is where the question lives, and because a reader who
+finds the pricing document first should be sent back to this one.

@@ -4,6 +4,10 @@
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/PluginInstantiator.h"
 #include "InstrumentHost/PluginEditorHost.h"
+#include "InstrumentHost/FloatingEditorWindows.h"
+#include "ControlSurface/Ctrl49SurfaceBroker.h"
+#include "ControlSurface/Ctrl49WindowsEndpoints.h"
+#include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "UpdateCheck.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -1715,9 +1719,12 @@ void ValueTreeBridge::ensureInstrumentHost()
     // the pane pointer clears nothing here at teardown, but member order in WebViewHost means
     // the pane (and any editor in it) is destroyed before this bridge — these hooks are only
     // ever called while both are alive, on the message thread.
-    options.editorPane.show = [this] (const juce::String&, juce::AudioProcessor& processor,
+    options.editorPane.show = [this] (const juce::String& targetId, juce::AudioProcessor& processor,
                                       const juce::String& title)
     {
+        // Remembered for the thumbnail hooks below: the pane is handed a processor and a
+        // title, and never learns whose they are.
+        panedEditorTargetId = targetId;
         if (editorPane != nullptr)
             editorPane->show (processor, title);
     };
@@ -1727,11 +1734,64 @@ void ValueTreeBridge::ensureInstrumentHost()
             editorPane->hide();
     };
 
+    // Floating windows beside the pane. Built here so the hooks below capture a live
+    // manager; declared AFTER the service member, so every window — and the editor inside
+    // it — is destroyed before the rack destroys the processors they watch.
+    instrumentEditorWindows = std::make_unique<ceditor::host::FloatingEditorWindows>();
+    options.editorWindows.show = [this] (const juce::String& partId,
+                                         juce::AudioProcessor& processor,
+                                         const juce::String& title)
+    {
+        instrumentEditorWindows->show (partId, processor, title);
+    };
+    options.editorWindows.close = [this] (const juce::String& partId)
+    {
+        instrumentEditorWindows->close (partId);
+    };
+    options.editorWindows.closeAll = [this]
+    {
+        instrumentEditorWindows->closeAll();
+    };
+
     options.enableAudio = true;
+
+    // The scan-folder browse dialog. Reuses the bridge's chooser member the way every other
+    // file dialog in this file does; the service's callback guards its own lifetime.
+    options.pickDirectory = [this] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Add VST3 Scan Folder",
+            juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
+
+    // The same chooser, filtered to pictures: where a plug-in's thumbnail comes from when the
+    // vendor shipped none and its editor could not be captured.
+    options.pickImage = [this] (std::function<void (const juce::String&)> done)
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Choose a picture for this plug-in",
+            juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
+            "*.png;*.jpg;*.jpeg;*.gif");
+        fileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [done] (const juce::FileChooser& fc)
+            {
+                const auto result = fc.getResult();
+                done (result == juce::File() ? juce::String() : result.getFullPathName());
+            });
+    };
 
     // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
     // member outlives the service that holds this function.
     options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);
+    options.applyVstPreset = ceditor::host::applyVstPresetFile;
 
     // The Host Project build: the node pipeline as a streamed child process, one at a time.
     // The service already validated the manifest; the persisted file is what the script reads,
@@ -1767,15 +1827,98 @@ void ValueTreeBridge::ensureInstrumentHost()
             node.getFullPathName(),
             root.getChildFile ("tools").getChildFile ("scripts")
                 .getChildFile ("build-host-product.mjs").getFullPathName(),
-            "--project",   dataDir.getChildFile ("host-project.json").getFullPathName(),
-            "--build-dir", root.getChildFile ("build").getChildFile ("native").getFullPathName(),
-            "--config",    "Release",
-            "--out",       out.getFullPathName(),
+            "--project",     dataDir.getChildFile ("host-project.json").getFullPathName(),
+            // The editor's preview session IS the authored rack; it ships as the product's
+            // factory Performance (the script skips it gracefully when none exists yet).
+            "--performance", dataDir.getChildFile ("session-performance.json").getFullPathName(),
+            "--build-dir",   root.getChildFile ("build").getChildFile ("native").getFullPathName(),
+            "--config",      "Release",
+            "--out",         out.getFullPathName(),
         };
         hostBuildJob = std::make_unique<HostBuildJob> (browser, command);
     };
 
     instrumentHost = std::make_unique<ceditor::host::InstrumentHostService> (std::move (options));
+
+    // The window's X goes through the service, exactly like the pane's close button — the
+    // WebView's toggles stay the truth about what is open.
+    instrumentEditorWindows->onCloseRequested = [this] (const juce::String& partId)
+    {
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("cmd", "closeEditorWindow");
+        payload->setProperty ("partId", partId);
+        instrumentHost->handleCommand (juce::var (payload));
+    };
+
+    // Thumbnails for the plug-ins that ship none: the pane and the windows take the picture
+    // when a vendor editor is up, the service decides whether it wanted one and keeps it.
+    // Wired after construction because they need the service that was just built.
+    if (editorPane != nullptr)
+    {
+        editorPane->shouldCaptureEditor = [this]
+        {
+            return instrumentHost != nullptr
+                   && instrumentHost->wantsEditorSnapshot (panedEditorTargetId);
+        };
+        editorPane->onEditorPictured = [this] (const juce::Image& picture)
+        {
+            if (instrumentHost != nullptr)
+                instrumentHost->offerEditorSnapshot (panedEditorTargetId, picture);
+        };
+    }
+
+    instrumentEditorWindows->shouldCaptureEditor = [this] (const juce::String& partId)
+    {
+        return instrumentHost != nullptr && instrumentHost->wantsEditorSnapshot (partId);
+    };
+    instrumentEditorWindows->onEditorPictured = [this] (const juce::String& partId,
+                                                        const juce::Image& picture)
+    {
+        if (instrumentHost != nullptr)
+            instrumentHost->offerEditorSnapshot (partId, picture);
+    };
+
+    // The CTRL49 comes alive with the service: discovery and the paced startup sequence run
+    // on the broker's own worker, every service touch happens in tick() below. On a machine
+    // without the hardware (or off Windows) the discover hook returns null forever and the
+    // broker idles in `searching` — no cost beyond one poll every two seconds.
+    {
+        namespace surface = ceditor::ctrl49;
+        surface::Ctrl49SurfaceBroker::Options surfaceOptions;
+        surfaceOptions.discover = &surface::discoverCtrl49WindowsEndpoints;
+        // Same marshal-and-guard as the service's emit above, same documented raw `this`.
+        surfaceOptions.emit = [this] (const juce::String& eventName, const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, eventName, payload]()
+            {
+                if (browser != nullptr)
+                    browser->emitEventIfBrowserIsVisible (eventName, payload);
+            });
+        };
+        surfaceOptions.pageLua.assign (surface::assets::kKnobPageLua,
+                                       surface::assets::kKnobPageLua + surface::assets::kKnobPageLuaSize);
+        surfaceOptions.pngAssets.push_back ({ 0x0200,
+            surface::Bytes (surface::assets::kKnobStripPng,
+                            surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        instrumentSurfaceBroker = std::make_unique<surface::Ctrl49SurfaceBroker> (*instrumentHost,
+                                                                                  std::move (surfaceOptions));
+    }
+
+    // Vendor-editor edits land on audio-thread listeners inside the service; this drains the
+    // coalesced marks to the WebView at UI rate, and gives the surface broker its controlling-
+    // thread tick in the same breath. Cheap when idle (an empty drain is a few atomic reads
+    // per loaded part; an idle broker tick is a clock read), so it simply runs for the
+    // service's lifetime.
+    struct ParamPump final : juce::Timer
+    {
+        ParamPump (ceditor::host::InstrumentHostService& serviceToPump,
+                   ceditor::ctrl49::Ctrl49SurfaceBroker& brokerToTick)
+            : service (serviceToPump), broker (brokerToTick) { startTimerHz (30); }
+        void timerCallback() override { service.drainParameterEvents(); broker.tick(); }
+        ceditor::host::InstrumentHostService& service;
+        ceditor::ctrl49::Ctrl49SurfaceBroker& broker;
+    };
+    instrumentParamPump = std::make_unique<ParamPump> (*instrumentHost, *instrumentSurfaceBroker);
 }
 
 void ValueTreeBridge::requestInstrumentEditorClose()

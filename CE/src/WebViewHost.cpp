@@ -1,5 +1,7 @@
 #include "WebViewHost.h"
 
+#include "InstrumentHost/PluginCatalog.h"
+
 #include <cstring>
 #include <functional>
 #include <optional>
@@ -222,10 +224,36 @@ std::optional<juce::WebBrowserComponent::Resource> makeMissingFrontendPage()
 )", "text/html; charset=utf-8");
 }
 
+// Plug-in artwork the catalogue has decided is serveable, addressed by token.
+//
+// The path never leaves the native side: PluginSnapshotRegistry holds token -> file, and this
+// serves a token or nothing. So the WebView cannot ask for a file the catalogue did not put
+// there, which is the whole point of routing artwork through a registry rather than letting
+// the frontend fetch an absolute path.
+//
+// Dev mode note: the page is served by Vite, so a relative /plugin-snapshot URL goes to the
+// dev server and 404s. The tile falls back to its generated artwork when the image fails to
+// load, so a dev run looks like a machine whose plug-ins ship no snapshots.
+constexpr const char* snapshotRoutePrefix = "/plugin-snapshot/";
+
+std::optional<juce::WebBrowserComponent::Resource> providePluginSnapshot (const juce::String& path)
+{
+    const auto token = path.fromFirstOccurrenceOf (snapshotRoutePrefix, false, false);
+    const auto file = ceditor::host::PluginSnapshotRegistry::instance().resolve (token);
+
+    if (token.isEmpty() || ! file.existsAsFile())
+        return std::nullopt;
+
+    return loadFrontendFile (file);
+}
+
 std::optional<juce::WebBrowserComponent::Resource> provideFrontendResource (const juce::String& rawPath)
 {
     auto distFolder = getFrontendDistFolder();
     auto path = normaliseRequestPath (rawPath);
+
+    if (path.startsWith (snapshotRoutePrefix))
+        return providePluginSnapshot (path);
 
     if (! distFolder.getChildFile ("index.html").existsAsFile())
         return path == "/" ? makeMissingFrontendPage() : std::nullopt;

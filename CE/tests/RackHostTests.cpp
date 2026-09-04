@@ -433,6 +433,217 @@ void testUnloadAndRemove()
 }
 } // namespace
 
+// Plug-in delay compensation: it happens, and it is not this code that does it.
+//
+// This file used to carry a comment saying the opposite — "the graph does not compensate
+// parallel paths (a live rack keeps every path as fast as its plug-ins allow)" — and a
+// compensation pass was written against it before anyone checked. juce::AudioProcessorGraph
+// has done PDC all along: RenderSequenceBuilder::createRenderingOpsForNode takes
+// getInputLatencyForNode over every node's inputs and inserts DelayChannelOps for the shorter
+// ones (juce_AudioProcessorGraph.cpp, JUCE 8.0.7, around lines 1136-1258). Adding a second
+// pass on top made the FAST path arrive 128 samples LATE — compensated twice.
+//
+// So this test exists to stop the claim coming back. It is not testing our code; it is
+// pinning a behaviour of JUCE's that the rack depends on and that nothing else here would
+// notice losing.
+//
+// The stub effect it uses reports its latency AND incurs it. Against one that reports without
+// delaying — StubEffectProcessor, which is right for the amplitude tests it serves — the graph
+// would align paths that were never misaligned and this test would pass while proving nothing.
+// One part driving another: the destination takes the source's chain OUTPUT — after its
+// zone and its modules — and the source keeps playing its own instrument too.
+void testMidiRouting()
+{
+    std::cout << "\none part driving another" << std::endl;
+
+    Rig rig;
+    const auto a = rig.host.addPart();
+    const auto b = rig.host.addPart();
+    auto* stubA = rig.load (a);
+    auto* stubB = rig.load (b);
+
+    // A transposes up an octave. Routed through A, B must hear the SHIFTED note: that is the
+    // difference between "after A's chain" and "a copy of the keyboard".
+    PartMidiRules up;
+    up.transpose = 12;
+    rig.host.setMidiRules (a, up);
+
+    check (rig.host.setPartMidiSource (b, a), "B takes its MIDI from A");
+    check (rig.host.getPerformance().findPart (b)->midiSourcePartId == a, "and the document says so");
+
+    stubA->received.clear();
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubA->received.empty() && stubA->received.front().getNoteNumber() == 72,
+           "A still plays its own instrument, transposed");
+    check (! stubB->received.empty() && stubB->received.front().isNoteOn()
+             && stubB->received.front().getNoteNumber() == 72,
+           "and B hears A's output — the transposed note, not the keyboard's");
+    rig.noteOff (1, 60);
+    rig.process();
+    check (stubA->activeNotes == 0 && stubB->activeNotes == 0, "the release reaches both");
+
+    // B's own zone still applies to what arrives: one rule for notes, however they came.
+    PartMidiRules bass;
+    bass.keyHigh = 48;
+    rig.host.setMidiRules (b, bass);
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (stubB->received.empty(), "B's zone filters the routed note like a keyboard note");
+    rig.noteOff (1, 60);
+    rig.process();
+    rig.host.setMidiRules (b, {});
+
+    // Loops are refused at the model: A from B while B is from A, and a part from itself.
+    check (! rig.host.setPartMidiSource (a, b), "A from B would loop and is refused");
+    check (! rig.host.setPartMidiSource (a, a), "a part cannot take its MIDI from itself");
+    check (! rig.host.setPartMidiSource (b, "no-such-part"), "an unknown source is refused");
+    check (rig.host.getPerformance().findPart (a)->midiSourcePartId.isEmpty(), "and nothing changed");
+
+    // A chain of three: C from B from A. The keyboard reaches C through both.
+    const auto c = rig.host.addPart();
+    auto* stubC = rig.load (c);
+    check (rig.host.setPartMidiSource (c, b), "C from B");
+    check (! rig.host.setPartMidiSource (a, c), "A from C would close the loop through B");
+    stubC->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubC->received.empty() && stubC->received.front().getNoteNumber() == 72,
+           "C hears the note through B and A");
+    rig.noteOff (1, 60);
+    rig.process();
+
+    // Back to the keyboard: an empty source is the default feed again.
+    check (rig.host.setPartMidiSource (b, {}), "B back to the keyboard");
+    stubB->received.clear();
+    rig.noteOn (1, 60);
+    rig.process();
+    check (! stubB->received.empty() && stubB->received.front().getNoteNumber() == 60,
+           "and hears the keyboard's note untransposed");
+    rig.noteOff (1, 60);
+    rig.process();
+
+    // Removing a source hands its dependents back to the keyboard, never wires them to nothing.
+    rig.host.setPartMidiSource (c, a);
+    rig.host.removePart (a);
+    check (rig.host.getPerformance().findPart (c)->midiSourcePartId.isEmpty(),
+           "C is back on the keyboard once A is gone");
+    stubC->received.clear();
+    rig.noteOn (1, 62);
+    rig.process();
+    check (! stubC->received.empty() && stubC->received.front().getNoteNumber() == 62,
+           "and plays");
+    rig.noteOff (1, 62);
+    rig.process();
+
+    // The routing survives a save and a load.
+    rig.host.setPartMidiSource (c, b);
+    const auto saved = rig.host.captureState().toVar();
+    Rig rig2;
+    const auto unresolved = rig2.host.loadModel ([&saved]
+    {
+        Performance restored;
+        Performance::fromVar (saved, restored);
+        return restored;
+    }());
+    check (rig2.host.getPerformance().findPart (c) != nullptr
+             && rig2.host.getPerformance().findPart (c)->midiSourcePartId == b,
+           "a restored rack keeps who drives whom");
+}
+
+void testLatencyCompensation()
+{
+    std::cout << "\nplug-in delay compensation" << std::endl;
+
+    constexpr int lateBy = 128;
+
+    Rig rig;
+    const auto fast = rig.host.addPart();
+    const auto slow = rig.host.addPart();
+    rig.load (fast);
+    rig.load (slow);
+
+    const auto busId = rig.host.addBus ("Layer");
+    rig.host.setPartDestination (fast, busId);
+    rig.host.setPartDestination (slow, busId);
+
+    // One insert on the slow part, which really does hold its signal back.
+    const auto effectId = rig.host.addEffectSlot (slow);
+    const auto generation = rig.host.beginEffectLoad (effectId);
+    rig.host.commitEffectLoad (effectId, generation,
+                               std::make_unique<ceditor::test::DelayingEffectProcessor> (lateBy),
+                               { "stub-delay", {}, "Delay", "Test" });
+
+    check (rig.host.partLatencySamples (slow) == lateBy,
+           "the reported cost of a part is what its plug-ins cost");
+    check (rig.host.partLatencySamples (fast) == 0, "and a part with no inserts costs nothing");
+
+    // Where the sound starts, in samples from the note. Both parts hold a DC level while a
+    // note is down, so the summed output is a staircase: one step per part arriving. One step
+    // means they arrived together; two means a flam.
+    const auto firstAbove = [&rig] (float threshold)
+    {
+        rig.noteOn (1, 60);
+        for (int block = 0, offset = 0; block < 16; ++block, offset += rig.buffer.getNumSamples())
+        {
+            rig.process();
+            const auto* samples = rig.buffer.getReadPointer (0);
+            for (int i = 0; i < rig.buffer.getNumSamples(); ++i)
+                if (std::abs (samples[i]) > threshold)
+                    return offset + i;
+        }
+        return -1;
+    };
+
+    const auto reset = [&rig]
+    {
+        rig.noteOff (1, 60);
+        for (int i = 0; i < 12; ++i)
+            rig.process();
+    };
+
+    const auto anything = firstAbove (0.01f);
+    reset();
+    const auto both = firstAbove (0.3f);          // one part alone is 0.25
+    reset();
+
+    check (anything >= 0 && both >= 0, "the rack makes sound at all");
+    check (anything == both,
+           "the layered parts start together — one step in the output, not two");
+    check (anything == lateBy,
+           "and both arrive when the slower one does, which is the whole of compensation");
+
+    // The graph's own number, which is the one worth reporting anywhere. It is not a sum this
+    // file computes; it is what the render sequence actually costs.
+    check (rig.host.getGraph().getLatencySamples() == lateBy,
+           "the graph reports the same latency it is compensating for");
+    check (rig.host.graphLatencySamples() == lateBy, "and the rack passes that number on");
+
+    // A return chain is on the master path too, and a sum walked over PARTS cannot see it.
+    // This is the case that made the hand-rolled report wrong rather than merely redundant:
+    // the DAW is told one number for the whole instance, and a short one puts every note
+    // early against every other track in the project.
+    constexpr int wetLatency = 512;
+    const auto returnId = rig.host.addReturn ("Verb");
+    rig.host.setSendLevel (fast, returnId, 1.0f);
+    const auto wetEffect = rig.host.addEffectSlot (returnId);
+    const auto wetGeneration = rig.host.beginEffectLoad (wetEffect);
+    rig.host.commitEffectLoad (wetEffect, wetGeneration,
+                               std::make_unique<ceditor::test::DelayingEffectProcessor> (wetLatency),
+                               { "stub-delay", {}, "Delay", "Test" });
+
+    check (rig.host.graphLatencySamples() == wetLatency,
+           "a laggy return is the longest path, and the graph knows it");
+    int worstPart = 0;
+    for (const auto& part : rig.host.getPerformance().parts)
+        worstPart = juce::jmax (worstPart, rig.host.partLatencySamples (part.partId));
+    check (worstPart + rig.host.masterLatencySamples() < rig.host.graphLatencySamples(),
+           "while a sum walked over parts and the master chain comes out SHORT — which is "
+           "exactly what the product used to hand the DAW");
+}
+
 int main()
 {
     std::cout << "RackHost tests" << std::endl;
@@ -444,6 +655,8 @@ int main()
     testStateCaptureRestore();
     testWillBeRemovedHook();
     testUnloadAndRemove();
+    testMidiRouting();
+    testLatencyCompensation();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

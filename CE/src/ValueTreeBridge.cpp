@@ -3,6 +3,8 @@
 // The header only forward-declares the instrument-host types, but this file defines
 // ~ValueTreeBridge, and destroying the unique_ptr members needs them complete here.
 #include "InstrumentHost/InstrumentHostService.h"
+#include "ControlSurface/Ctrl49SurfaceBroker.h"
+#include "InstrumentHost/FloatingEditorWindows.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <cmath>
@@ -507,16 +509,26 @@ juce::String ValueTreeBridge::renderFontPreviewDataUrl (const juce::String& font
     if (textBounds.isEmpty())
         textBounds = image.getBounds().translated (offsetX, offsetY);
 
-    juce::Graphics g (image);
-    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
-    g.fillAll (juce::Colours::transparentBlack);
-    g.setColour (juce::Colour::fromString (colourHex.isNotEmpty() ? colourHex : "FFFFFFFF"));
-    g.setFont (font);
-    g.drawFittedText (text,
-                      textBounds,
-                      justificationFromString (justification),
-                      juce::jmax (1, height / juce::jmax (1, (int) std::round (fontHeight))),
-                      1.0f);
+    // The scope around the drawing is load-bearing, not tidiness. JUCE allows only one
+    // Graphics context or BitmapData on an Image at a time
+    // (juce_Direct2DImage_windows.cpp:560), and writeImageToStream below opens a reading
+    // BitmapData. On the software renderer, leaving the context open costs nothing — the
+    // drawing already went into the pixels being read. On Windows it is a different image
+    // entirely: NativeImageType hands back a Direct2D one, the read returns the stale
+    // main-memory copy, and this returns a data URL for a fully transparent PNG. Silently,
+    // because the assertion that catches it is compiled out of a Release build.
+    {
+        juce::Graphics g (image);
+        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+        g.fillAll (juce::Colours::transparentBlack);
+        g.setColour (juce::Colour::fromString (colourHex.isNotEmpty() ? colourHex : "FFFFFFFF"));
+        g.setFont (font);
+        g.drawFittedText (text,
+                          textBounds,
+                          justificationFromString (justification),
+                          juce::jmax (1, height / juce::jmax (1, (int) std::round (fontHeight))),
+                          1.0f);
+    }
 
     output.reset();
     juce::PNGImageFormat png;
