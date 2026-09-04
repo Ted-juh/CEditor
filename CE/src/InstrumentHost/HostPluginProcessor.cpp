@@ -135,7 +135,6 @@ HostPluginProcessor::HostPluginProcessor()
           .withOutput ("Out 5-6", juce::AudioChannelSet::stereo(), false)
           .withOutput ("Out 7-8", juce::AudioChannelSet::stereo(), false))
 {
-    formatManager.addFormat (new juce::VST3PluginFormat());
     addProductParameters();
 
     InstrumentHostService::Options options;
@@ -197,7 +196,10 @@ HostPluginProcessor::HostPluginProcessor()
             });
     };
 
-    options.instantiate = makePluginInstantiator (formatManager);
+    const auto liveWorker = findHostLiveWorker ({ options.dataDirectory });
+    options.livePluginIsolationAvailable = liveWorker.existsAsFile();
+    options.instantiate = makeIsolatedPluginInstantiator (
+        liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
     options.applyVstPreset = applyVstPresetFile;
     options.enableAudio = false;    // the DAW owns the device
     options.persistSession = false; // the DAW owns the session (get/setStateInformation)
@@ -389,7 +391,7 @@ const juce::String HostPluginProcessor::getName() const
    #ifdef JucePlugin_Name
     return JucePlugin_Name;
    #else
-    return "CE Instrument Host";
+    return "Hostage";
    #endif
 }
 

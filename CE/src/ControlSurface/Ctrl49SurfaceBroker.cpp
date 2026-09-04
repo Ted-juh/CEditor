@@ -59,6 +59,18 @@ void Ctrl49SurfaceBroker::emitStatus() const
     obj->setProperty ("state", stateName());
     obj->setProperty ("detail", statusDetail);
     obj->setProperty ("device", endpoints != nullptr ? endpoints->description : juce::String());
+    // The software Stage view mirrors the page the keyboard is actually showing. Connection
+    // status alone made it guess page zero, which became wrong the first time Page Right was
+    // pressed on the hardware.
+    obj->setProperty ("pageIndex", reducer.page());
+    obj->setProperty ("activeSlot", reducer.activeSlot());
+    obj->setProperty ("padBank", reducer.padBank());
+    // Value deltas for plug-in parameters travel on a separate, focused-part stream, so the
+    // Stage monitor cannot reliably infer every hardware turn from rack state alone. This
+    // counter is transient hardware activity, not document state: every encoder message
+    // advances it even when the same encoder remains focused or a parameter value is clamped.
+    obj->setProperty ("movementSeq", movementSequence);
+    obj->setProperty ("movingSlot", movingSlot);
     options.emit ("instrumentHostSurface", juce::var (obj));
 }
 
@@ -282,7 +294,7 @@ void Ctrl49SurfaceBroker::tick()
             // its automatic first pass, once per connection, through the same command the UI
             // uses — so the state emit reaches the editor too.
             const auto& performance = service.getRackHost().getPerformance();
-            if (! triedPageGeneration && performance.pages.isEmpty()
+            if (! triedPageGeneration && ! service.isStageLocked() && performance.pages.isEmpty()
                 && performance.focusedPartId.isNotEmpty()
                 && service.getRackHost().partHasInstrument (performance.focusedPartId))
             {
@@ -310,13 +322,52 @@ void Ctrl49SurfaceBroker::pumpInput()
     const auto& performance = service.getRackHost().getPerformance();
     const auto controlPages = juce::jmin (Ctrl49Reducer::kPageCount - 1, performance.pages.size());
     const auto performancePage = controlPages;
+    const auto pageBeforeCountChange = reducer.page();
     reducer.setPageCount (controlPages + 1);
+    if (pageBeforeCountChange != reducer.page())
+        emitStatus();
+
+    // Scene/setlist page recall is intentionally consumed once. It moves the hardware to
+    // the requested layout, then gets out of the way so the player's next Page press wins.
+    if (const auto requested = service.consumeSurfacePageRequest(); requested.isNotEmpty())
+        for (int i = 0; i < controlPages; ++i)
+            if (performance.pages.getReference (i).pageId == requested)
+            {
+                if (reducer.setPage (i))
+                {
+                    lastLabels.clear();
+                    lastState.clear();
+                    emitStatus();
+                }
+                break;
+            }
+
+    service.noteSurfacePage (reducer.page() < controlPages
+        ? performance.pages.getReference (reducer.page()).pageId : juce::String());
 
     for (auto message = endpoints->dequeueInput(); message; message = endpoints->dequeueInput())
     {
+        const auto previousPage = reducer.page();
+        const auto previousSlot = reducer.activeSlot();
+        const auto previousBank = reducer.padBank();
         const auto action = reducer.process (message->data(), message->size());
         if (! action)
             continue;
+
+        const auto encoderMoved = action->encoderMoved && action->encoderSlot >= 0;
+        if (encoderMoved)
+        {
+            movingSlot = juce::jlimit (0, 7, action->encoderSlot);
+            ++movementSequence;
+        }
+
+        if (previousPage != reducer.page() || previousSlot != reducer.activeSlot()
+            || previousBank != reducer.padBank() || encoderMoved)
+            emitStatus();
+
+        if (previousPage != reducer.page())
+            service.noteSurfacePage (reducer.page() < controlPages
+                ? performance.pages.getReference (reducer.page()).pageId : juce::String());
 
         if (reducer.page() == performancePage)
         {

@@ -1,10 +1,10 @@
-// build-host-product.mjs — assemble the generated instrument-host product (VIP-successor Stage 1).
+// build-host-product.mjs — assemble the generated Hostage product.
 //
 //   node tools/scripts/build-host-product.mjs --project <host-project.json> [--build-dir <dir>]
 //        [--config Release] [--out <dir>] [--iscc <ISCC.exe>]
 //
-// WHAT THIS DOES AND DOES NOT DO. The C++ targets (CEHostStandalone, CEHostVST3, the scanner
-// worker) are already built by CMake; this script finds them, stages them into a product folder
+// WHAT THIS DOES AND DOES NOT DO. The C++ targets (CEHostStandalone, CEHostVST3, the scan and
+// live-processing workers) are already built by CMake; this script finds them and stages them
 // laid out the way the installer wants, and compiles tools/installer/HostProductTemplate.iss
 // with the Host Project's manifest as /D switches. It does not compile C++ — per-product binary
 // identity (CE_HOST_PRODUCT_NAME and friends) is CMake's job, and a rebuild with those cache
@@ -16,12 +16,15 @@
 // for a reason nobody can fix there. The missing-installer case is called out in the summary
 // so a run that skipped it cannot be read as one that produced it.
 //
-// Everything below `main` is a pure function over injected `exists`/`listDir`, which is what
-// CE/web/test/hostProductBuild.test.js drives — the path arithmetic and the /D switch list are
-// where the mistakes live, and neither needs a filesystem to prove.
+// The manifest, path and staging planners are pure functions, which is what
+// CE/web/test/hostProductBuild.test.js drives. Only the CLI hashes/copies the already-built files.
 
-import { existsSync, mkdirSync, cpSync, rmSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, cpSync, rmSync, readFileSync, readdirSync, createReadStream,
+  writeFileSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -77,10 +80,15 @@ export function artifactCandidateDirs({ buildDir, config }) {
       path.join(buildDir, cfg),
       buildDir,
     ],
+    symbols: [
+      path.join(buildDir, 'symbols', cfg),
+      path.join(buildDir, 'symbols'),
+    ],
   };
 }
 
-/** Resolves the three artifacts through injected fs probes. `listDir` returns basenames or []
+/** Resolves the shipping artifacts plus the private worker PDB through injected fs probes.
+    `listDir` returns basenames or []
     for a missing directory. Missing artifacts come back null — the caller decides which ones
     the manifest actually needs. */
 export function resolveArtifacts({ candidateDirs, listDir }) {
@@ -93,9 +101,16 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
   };
 
   return {
-    standaloneExe: firstMatch(candidateDirs.standalone, (n) => n.toLowerCase().endsWith('.exe') && !n.toLowerCase().includes('scanner')),
+    standaloneExe: firstMatch(candidateDirs.standalone, (n) => {
+      const lower = n.toLowerCase();
+      return lower.endsWith('.exe') && !lower.includes('scanner')
+        && lower !== 'ceditorpluginworker.exe';
+    }),
     vst3Bundle: firstMatch(candidateDirs.vst3, (n) => n.toLowerCase().endsWith('.vst3')),
     scannerExe: firstMatch(candidateDirs.scanner, (n) => n.toLowerCase() === 'ceditorpluginscanner.exe'),
+    liveWorkerExe: firstMatch(candidateDirs.scanner, (n) => n.toLowerCase() === 'ceditorpluginworker.exe'),
+    liveWorkerPdb: firstMatch(candidateDirs.symbols ?? [],
+      (n) => n.toLowerCase() === 'ceditorpluginworker.pdb'),
   };
 }
 
@@ -103,8 +118,8 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
 
 /** The copy operations that turn built artifacts into the installer's source tree:
 
-      <stageDir>/Standalone/<exe> + CEditorPluginScanner.exe
-      <stageDir>/VST3/<bundle>.vst3/** (+ the scanner inside the bundle, beside the module)
+      <stageDir>/Standalone/<exe> + both worker executables
+      <stageDir>/VST3/<bundle>.vst3/** (+ both workers beside the module)
 
     Pure: returns operations, executes nothing. Only the targets the manifest enables appear,
     and each op names the artifact it needs so a missing one refuses with its own name. */
@@ -118,6 +133,8 @@ export function stagePlan({ project, artifacts, stageDir, performanceFile = null
       ops.push({ kind: 'copyFile', from: artifacts.standaloneExe, to: path.join(stageDir, 'Standalone', path.basename(artifacts.standaloneExe)) });
       if (artifacts.scannerExe)
         ops.push({ kind: 'copyFile', from: artifacts.scannerExe, to: path.join(stageDir, 'Standalone', 'CEditorPluginScanner.exe') });
+      if (artifacts.liveWorkerExe)
+        ops.push({ kind: 'copyFile', from: artifacts.liveWorkerExe, to: path.join(stageDir, 'Standalone', 'CEditorPluginWorker.exe') });
       if (performanceFile)
         ops.push({ kind: 'copyFile', from: performanceFile, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
     }
@@ -136,6 +153,12 @@ export function stagePlan({ project, artifacts, stageDir, performanceFile = null
           // lives, and the runtime's worker search starts beside the loaded binary.
           to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'x86_64-win', 'CEditorPluginScanner.exe'),
         });
+      if (artifacts.liveWorkerExe)
+        ops.push({
+          kind: 'copyFile',
+          from: artifacts.liveWorkerExe,
+          to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'x86_64-win', 'CEditorPluginWorker.exe'),
+        });
       if (performanceFile)
         // Contents/Resources is the bundle's place for non-binary assets, and where the
         // runtime's factory-rack search looks from the module directory.
@@ -147,8 +170,53 @@ export function stagePlan({ project, artifacts, stageDir, performanceFile = null
   // then scan nothing, which is worse than refusing here.
   if ((project.includeStandalone || project.includeVst3) && !artifacts.scannerExe)
     missing.push('CEditorPluginScanner.exe (the out-of-process scanner ships with every target)');
+  if ((project.includeStandalone || project.includeVst3) && !artifacts.liveWorkerExe)
+    missing.push('CEditorPluginWorker.exe (live plug-in crash isolation ships with every target)');
 
   return { ops, missing };
+}
+
+/** Plans a private, content-addressed symbol archive beside (never inside) the installer stage.
+    The executable and PDB hashes bind the archive to one exact build; rebuilding the same product
+    version therefore creates another directory instead of silently replacing the symbols needed
+    by older customer dumps. */
+export function privateSymbolPlan({ project, artifacts, symbolsRoot,
+                                    workerExeSha256, workerPdbSha256 }) {
+  const missing = [];
+  if (!artifacts.liveWorkerPdb)
+    missing.push('CEditorPluginWorker.pdb (private crash symbols were not produced)');
+  if (!/^[0-9a-f]{64}$/i.test(workerExeSha256 ?? ''))
+    missing.push('CEditorPluginWorker.exe SHA-256');
+  if (!/^[0-9a-f]{64}$/i.test(workerPdbSha256 ?? ''))
+    missing.push('CEditorPluginWorker.pdb SHA-256');
+  if (missing.length > 0)
+    return { ops: [], missing, manifest: null, manifestPath: null };
+
+  const buildKey = workerExeSha256.toLowerCase().slice(0, 16);
+  const archiveDir = path.join(symbolsRoot, project.version, buildKey);
+  const pdbName = path.basename(artifacts.liveWorkerPdb);
+  return {
+    missing,
+    ops: [{ kind: 'copyFile', from: artifacts.liveWorkerPdb,
+            to: path.join(archiveDir, pdbName) }],
+    manifestPath: path.join(archiveDir, 'symbols.json'),
+    manifest: {
+      schemaVersion: 1,
+      visibility: 'private-not-shipped',
+      product: { name: project.productName, version: project.version, appId: project.appId },
+      binary: {
+        name: 'CEditorPluginWorker.exe',
+        sha256: workerExeSha256.toLowerCase(),
+      },
+      symbols: { name: pdbName, sha256: workerPdbSha256.toLowerCase() },
+    },
+  };
+}
+
+async function sha256File(file) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 // --- the installer compile ---------------------------------------------------------------------
@@ -244,9 +312,17 @@ async function main() {
 
   const stageDir = path.join(args.out, 'stage');
   const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceFile });
-  if (missing.length > 0) {
-    for (const m of missing) console.error(`MISSING: ${m}`);
-    console.error('Build the C++ targets first (cmake --build build/native --target CEHostStandalone CEHostVST3 CEditorPluginScanner).');
+  const symbolsRoot = path.join(args.out, 'private-symbols');
+  const workerExeSha256 = artifacts.liveWorkerExe
+    ? await sha256File(artifacts.liveWorkerExe) : null;
+  const workerPdbSha256 = artifacts.liveWorkerPdb
+    ? await sha256File(artifacts.liveWorkerPdb) : null;
+  const symbolPlan = privateSymbolPlan({ project, artifacts, symbolsRoot,
+    workerExeSha256, workerPdbSha256 });
+  const allMissing = [...missing, ...symbolPlan.missing];
+  if (allMissing.length > 0) {
+    for (const m of allMissing) console.error(`MISSING: ${m}`);
+    console.error('Build the C++ targets first (cmake --build build/native --target CEHostStandalone CEHostVST3 CEditorPluginScanner CEditorPluginWorker).');
     process.exit(3);
   }
 
@@ -257,6 +333,14 @@ async function main() {
     else cpSync(op.from, op.to);
     console.log(`  staged ${path.relative(args.out, op.to)}`);
   }
+
+  for (const op of symbolPlan.ops) {
+    mkdirSync(path.dirname(op.to), { recursive: true });
+    cpSync(op.from, op.to);
+  }
+  mkdirSync(path.dirname(symbolPlan.manifestPath), { recursive: true });
+  writeFileSync(symbolPlan.manifestPath, `${JSON.stringify(symbolPlan.manifest, null, 2)}\n`);
+  console.log(`  private symbols: ${path.dirname(symbolPlan.manifestPath)} (not staged)`);
 
   const installerDir = path.join(args.out, 'installer');
   mkdirSync(installerDir, { recursive: true });

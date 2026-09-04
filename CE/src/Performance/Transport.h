@@ -3,7 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <atomic>
 
-// Transport — the one timing authority (VIP-successor Stage 6, baseline §18.8.3).
+// Transport — Hostage's one timing authority.
 //
 // The audio engine owns musical time. Everything else — the WebView's playhead, the
 // hardware's position display, the pattern scheduler — READS this; nothing else schedules
@@ -212,6 +212,16 @@ public:
     // -- readable from any thread ---------------------------------------------------------
 
     bool isPlaying() const noexcept                 { return playing.load(); }
+    /** Status for controls: reflects a local start/stop request immediately, while the
+        audio thread still remains the authority that applies it at the next block edge. */
+    bool isPlayingOrPending() const noexcept
+    {
+        if (hostSync.load() && haveHostPosition.load())
+            return hostPlaying.load();
+        if (stopRequested.load())
+            return false;
+        return playing.load() || startRequested.load();
+    }
     double getPositionPpq() const noexcept          { return positionPpq.load(); }
 
     /** Bars/beats for display: bar and beat are 1-based, the way a musician counts. */

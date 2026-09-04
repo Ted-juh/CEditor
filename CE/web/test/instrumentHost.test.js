@@ -1,4 +1,4 @@
-// instrumentHost.test.js — the Instrument Host workspace's pure logic (VIP-successor Stage 1).
+// instrumentHost.test.js — the Hostage workspace's pure logic.
 //
 // The store renders whatever the native side pushes, so what must hold here is the shaping:
 // arbitrary payloads normalize into exactly the structure the view renders, the search filter
@@ -15,6 +15,11 @@ import {
   filterInstruments,
   mockHostState,
   applyMockCommand,
+  advanceMockMidiLfos,
+  advanceMockEnvelopes,
+  advanceMockMsegs,
+  advanceMockRandomModulators,
+  deterministicRandomUnit,
   normalizeHostProject,
   emptyHostBuild,
   applyBuildProgress,
@@ -57,6 +62,12 @@ import {
   setLibraryUserMetadata,
   removeLibraryRecord,
   loadLibraryRecord,
+  setPresetAudition,
+  auditionLibraryRecord,
+  startSoundComparison,
+  stepSoundComparison,
+  keepSoundComparison,
+  cancelSoundComparison,
   emptyProduct,
   normalizeProduct,
   emptyReliability,
@@ -68,12 +79,25 @@ import {
   parameterControlKind,
   normalizeMidiSlot,
   midiSlotTypes,
+  buildStrumPlan,
+  buildArticulationMessages,
+  applySmartChordVoicing,
+  factoryGrooveTemplates,
+  normalizeGrooveTemplate,
+  applyGrooveToPattern,
+  snapshotMorphValue,
+  makePatternVariation,
+  normalizeMicrotuning,
+  parseScalaTuning,
   groupParameters,
   assignedParameterIds,
   emptyLicence,
   normalizeLicence,
 } from '../src/CE_Application/stores/instrumentHost.js';
 import { classifyWorkspace, workspaceOwnsChrome } from '../src/CE_Application/utils/workspaceChrome.js';
+import {
+  applyResponseCurve7, normalizeResponseCurvePoints, responseCurveDisplayPoints,
+} from '../src/CE_Application/utils/responseCurve.js';
 import {
   setHardwareConfig, captureHardwarePatch, finishHardwarePatchCapture, hostLastError,
   hostKeyboardMode, showPartRange, showKeyboardPlay,
@@ -134,6 +158,49 @@ test('mock reducer: addPart appends and the first part takes focus', () => {
   assert.equal(state.rack.focusedPartId, state.rack.parts[0].partId, 'focus stays put');
 });
 
+test('mock reducer: rapid additions never reuse an entity identity', () => {
+  const realNow = Date.now;
+  Date.now = () => 1_700_000_000_000;
+  try {
+    let state = normalizeHostState({});
+    state = applyMockCommand(state, { cmd: 'addPart' });
+    state = applyMockCommand(state, { cmd: 'addPart' });
+    assert.equal(new Set(state.rack.parts.map((part) => part.partId)).size, 2);
+
+    state = applyMockCommand(state, { cmd: 'addPattern', name: 'First' });
+    state = applyMockCommand(state, { cmd: 'addPattern', name: 'Second' });
+    assert.equal(new Set(state.performance.patterns.map((pattern) => pattern.patternId)).size, 2);
+
+    const patternId = state.performance.patterns[0].patternId;
+    state = applyMockCommand(state, { cmd: 'addClip', patternId });
+    state = applyMockCommand(state, { cmd: 'addClip', patternId });
+    assert.equal(new Set(state.performance.clips.map((clip) => clip.clipId)).size, 2);
+
+    state = applyMockCommand(state, { cmd: 'addScene', name: 'First' });
+    state = applyMockCommand(state, { cmd: 'addScene', name: 'Second' });
+    assert.equal(new Set(state.performance.scenes.map((scene) => scene.sceneId)).size, 2);
+
+    const sceneId = state.performance.scenes[0].sceneId;
+    state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId });
+    state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId });
+    assert.equal(new Set(state.performance.setlist.items.map((item) => item.itemId)).size, 2);
+
+    const partId = state.rack.parts[0].partId;
+    state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'echo' });
+    state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'humanize' });
+    const slotIds = state.rack.parts[0].midiChain.map((slot) => slot.slotId);
+    assert.equal(new Set(slotIds).size, slotIds.length);
+
+    state = applyMockCommand(state, { cmd: 'startPerformanceRecording', name: 'Take 1' });
+    state = applyMockCommand(state, { cmd: 'finishPerformanceRecording' });
+    state = applyMockCommand(state, { cmd: 'startPerformanceRecording', name: 'Take 2' });
+    state = applyMockCommand(state, { cmd: 'finishPerformanceRecording' });
+    assert.equal(new Set(state.performance.performanceTakes.map((take) => take.takeId)).size, 2);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
 test('mock reducer: loadInstrument stamps identity from the catalogue', () => {
   let state = mockHostState();
   const partId = state.rack.parts[1].partId;   // the empty mock part
@@ -164,6 +231,14 @@ test('mock reducer: removePart refocuses the first remaining part', () => {
   state = applyMockCommand(state, { cmd: 'removePart', partId: focused });
   assert.equal(state.rack.parts.length, 1);
   assert.equal(state.rack.focusedPartId, state.rack.parts[0].partId);
+});
+
+test('mock reducer: rack parts move without changing focus or identity', () => {
+  let state = mockHostState();
+  const before = state.rack.parts.map((part) => part.partId);
+  state = applyMockCommand(state, { cmd: 'movePart', partId: before[0], index: 1 });
+  assert.deepEqual(state.rack.parts.map((part) => part.partId), [before[1], before[0]]);
+  assert.equal(state.rack.focusedPartId, before[0]);
 });
 
 test('mock reducer: quarantine clears and scan paths dedupe', () => {
@@ -340,12 +415,15 @@ test('mock reducer: the parameter view round-trips set and reset', () => {
 
 test('normalizeHostState shapes pages and slots with their resolution status', () => {
   const shaped = normalizeHostState({ rack: { pages: [{
-    pageId: 'p1', name: 'Perf', slots: [{ slotId: 's1', assigned: true, resolved: false, rangeMax: '0.8' }],
+    pageId: 'p1', name: 'Perf', slots: [{ slotId: 's1', assigned: true, resolved: false,
+      rangeMax: '0.8', value: 0.75, valueText: '7.5 kHz' }],
   }] } });
   const slot = shaped.rack.pages[0].slots[0];
   assert.equal(slot.assigned, true);
   assert.equal(slot.resolved, false);
   assert.equal(slot.rangeMax, 0.8);
+  assert.equal(slot.value, 0.75);
+  assert.equal(slot.valueText, '7.5 kHz');
   assert.deepEqual(normalizeHostState({}).rack.pages, [], 'a Stage 1 payload has no pages and loads clean');
 });
 
@@ -359,6 +437,9 @@ test('mock reducer: the page lifecycle — add, assign from the loaded part, dri
   assert.equal(state.rack.pages.length, 1);
   assert.equal(state.rack.pages[0].slots.length, 8);
   const pageId = state.rack.pages[0].pageId;
+  hostStateStore.set(applyMockCommand(state, { cmd: 'renameControlPage', pageId, name: 'Live Mix' }));
+  state = get(hostStateStore);
+  assert.equal(state.rack.pages[0].name, 'Live Mix');
 
   assignControlSlot(pageId, 's1', partId, 'cutoff');
   state = get(hostStateStore);
@@ -403,6 +484,64 @@ test('normalizeHostLibrary shapes records with availability and user metadata', 
   assert.equal(record.reason, '7');
   assert.deepEqual(record.tags, ['a', '2']);
   assert.equal(shaped.counts.total, 3);
+});
+
+test('preset audition settings normalize to a safe, persistent phrase recipe', () => {
+  const settings = normalizeHostState({ rack: { presetAudition: {
+    enabled: true, phrase: 'scale', rootNote: 140, velocity: 0,
+    noteLengthMs: 10, gapMs: 9000, playing: true,
+  } } }).rack.presetAudition;
+  assert.deepEqual(settings, {
+    enabled: true, phrase: 'scale', rootNote: 127, velocity: 1,
+    noteLengthMs: 40, gapMs: 2000, playing: true,
+  });
+  assert.equal(normalizeHostState({ rack: { presetAudition: { phrase: 'noise' } } })
+    .rack.presetAudition.phrase, 'chord');
+});
+
+test('mock bridge persists audition controls and loads the clicked preset', () => {
+  hostStateStore.set(mockHostState());
+  requestLibrary('', '');
+  setPresetAudition({ enabled: true, phrase: 'riff', rootNote: 48,
+                      velocity: 88, noteLengthMs: 240, gapMs: 60 });
+  assert.deepEqual(get(hostStateStore).rack.presetAudition, {
+    enabled: true, phrase: 'riff', rootNote: 48, velocity: 88,
+    noteLengthMs: 240, gapMs: 60, playing: false,
+  });
+
+  auditionLibraryRecord('lib-1', 'focused');
+  const part = get(hostStateStore).rack.parts.find((p) => p.partId === 'mock-part-1');
+  assert.equal(part.presetName, 'Warm Pad');
+  assert.equal(part.presetRecordId, 'lib-1');
+});
+
+test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () => {
+  hostStateStore.set(mockHostState());
+  requestLibrary('', '');
+  const original = get(hostStateStore).rack.parts[0];
+  assert.equal(original.presetRecordId, '');
+
+  startSoundComparison(original.partId, ['lib-1', 'lib-2']);
+  let state = get(hostStateStore);
+  assert.equal(state.rack.soundComparison.active, true);
+  assert.equal(state.rack.soundComparison.count, 2);
+  assert.equal(state.rack.parts[0].presetName, 'Warm Pad');
+
+  stepSoundComparison(1);
+  state = get(hostStateStore);
+  assert.equal(state.rack.soundComparison.index, 1);
+  assert.equal(state.rack.parts[0].presetName, 'My Growl');
+  cancelSoundComparison();
+  state = get(hostStateStore);
+  assert.equal(state.rack.soundComparison.active, false);
+  assert.equal(state.rack.parts[0].presetName, '', 'cancel restores the original sound cursor');
+
+  startSoundComparison(original.partId, ['lib-1', 'lib-2']);
+  stepSoundComparison(1);
+  keepSoundComparison();
+  state = get(hostStateStore);
+  assert.equal(state.rack.soundComparison.active, false);
+  assert.equal(state.rack.parts[0].presetName, 'My Growl', 'keep commits the compared sound');
 });
 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
@@ -672,27 +811,36 @@ test('the shortlist is what you pinned and what you last touched, without repeat
   assert.deepEqual(parameterShortlist(null, null, null), { pinned: [], recent: [] });
 });
 
-test('the six later MIDI modules arrive transparent', () => {
+test('the later MIDI note modules arrive transparent', () => {
   // The rule this nearly broke and that the native side keeps too: an inserted module must
   // not change the sound by existing. A fresh echo repeats nothing, a fresh strum spreads
   // nothing, a fresh latch latches nothing.
-  for (const type of ['echo', 'strum', 'humanize', 'chance', 'length', 'latch']) {
+  for (const type of ['echo', 'strum', 'humanize', 'chance', 'length', 'latch', 'mpe',
+                      'articulation']) {
     const slot = normalizeMidiSlot({ slotId: 's', type });
     assert.equal(slot.type, type, `${type} is a module the UI knows`);
     assert.equal(slot.mod.echoRepeats, 0, `${type}: no repeats by default`);
     assert.equal(slot.mod.strumBeats, 0, `${type}: no spread by default`);
+    assert.equal(slot.mod.strumPattern, 'ascending');
+    assert.equal(slot.mod.strumCurve, 0);
+    assert.equal(slot.mod.strumVelocityRamp, 0);
     assert.equal(slot.mod.humanizeTimingBeats, 0);
     assert.equal(slot.mod.humanizeVelocity, 0);
+    assert.equal(slot.mod.humanizeGatePercent, 0);
+    assert.equal(slot.mod.humanizePreserveChords, false);
+    assert.equal(slot.mod.humanizeProtectBeats, false);
     assert.equal(slot.mod.chance, 1, `${type}: every note passes by default`);
     assert.equal(slot.mod.lengthBeats, 0);
     assert.equal(slot.mod.legato, false);
     assert.equal(slot.mod.latchOn, false, `${type}: latch starts off`);
+    assert.equal(slot.mod.mpeEnabled, false, `${type}: expression conversion starts off`);
+    assert.equal(slot.mod.articulationEnabled, false, `${type}: articulation triggers start off`);
   }
 
   // Out-of-range values are clamped rather than believed: these arrive from a text field.
   const wild = normalizeMidiSlot({ slotId: 's', type: 'echo', mod: {
     echoRepeats: 900, echoStepBeats: 1e6, echoFeedback: -3, echoTranspose: 99,
-    chance: 5, humanizeVelocity: 'lots', lengthBeats: -2,
+    chance: 5, humanizeVelocity: 'lots', humanizeGatePercent: 400, lengthBeats: -2,
   } });
   assert.equal(wild.mod.echoRepeats, 8, 'four hundred repeats is eight');
   assert.equal(wild.mod.echoStepBeats, 4);
@@ -700,11 +848,196 @@ test('the six later MIDI modules arrive transparent', () => {
   assert.equal(wild.mod.echoTranspose, 12);
   assert.equal(wild.mod.chance, 1);
   assert.equal(wild.mod.humanizeVelocity, 0, 'and nonsense falls back rather than becoming NaN');
+  assert.equal(wild.mod.humanizeGatePercent, 100, 'gate variation is kept in its safe range');
   assert.equal(wild.mod.lengthBeats, 0);
+
+  const mpe = normalizeMidiSlot({ slotId: 'mpe', type: 'mpe', mod: {
+    mpeEnabled: true, mpeInput: 'poly aftertouch', mpeOutput: 'mpe',
+    mpeInputAxis: 'wrong', mpeOutputAxis: 'timbre', mpeInputCc: -8, mpeOutputCc: 500,
+    mpeOutputChannel: 19, mpeMemberFirst: 15, mpeMemberLast: 2, mpeCollapse: 'highest',
+  } });
+  assert.equal(mpe.mod.mpeEnabled, true);
+  assert.equal(mpe.mod.mpeInput, 'poly aftertouch');
+  assert.equal(mpe.mod.mpeOutput, 'mpe');
+  assert.equal(mpe.mod.mpeInputAxis, 'pressure', 'unknown axes fall back safely');
+  assert.equal(mpe.mod.mpeOutputAxis, 'timbre');
+  assert.equal(mpe.mod.mpeInputCc, 0);
+  assert.equal(mpe.mod.mpeOutputCc, 127);
+  assert.equal(mpe.mod.mpeOutputChannel, 16);
+  assert.deepEqual([mpe.mod.mpeMemberFirst, mpe.mod.mpeMemberLast], [2, 15],
+    'a reversed member range is normalized into a usable zone');
+  assert.equal(mpe.mod.mpeCollapse, 'highest');
 
   // A slot written before these existed has no mod block at all, and gains a transparent one.
   const old = normalizeMidiSlot({ slotId: 's', type: 'arp' });
   assert.equal(old.mod.echoRepeats, 0, 'an older session migrates by construction');
+});
+
+test('Velocity / Expression Designer curves and device ranges are deterministic', () => {
+  assert.equal(applyResponseCurve7(60, {
+    inputMin: 20, inputMax: 100, outputMin: 30, outputMax: 110,
+    curve: 'hard', noteVelocity: true,
+  }), 50, 'the hard curve squares a halfway strike inside the two calibrated ranges');
+  assert.equal(applyResponseCurve7(60, {
+    inputMin: 20, inputMax: 100, outputMin: 0, outputMax: 127, curve: 'linear',
+  }), 64);
+  assert.ok(applyResponseCurve7(20, { curve: 'soft', noteVelocity: true }) > 20,
+    'soft touch makes a light strike more useful');
+
+  const identity = normalizeResponseCurvePoints([]);
+  assert.deepEqual(identity, [0, 16, 32, 48, 64, 79, 95, 111, 127]);
+  const custom = [0, 0, 0, 0, 127, 127, 127, 127, 127];
+  assert.equal(applyResponseCurve7(64, {
+    curve: 'custom', points: custom, noteVelocity: true,
+  }), 127, 'custom points are interpolated on the same nine-point grid as native');
+  assert.equal(responseCurveDisplayPoints('hard')[4], 32,
+    'the plotted preset is sampled from the mapping, not a separate drawing guess');
+
+  const shaped = normalizeMidiSlot({ type: 'velocity', fx: {
+    responseProfileName: `  ${'x'.repeat(100)}  `,
+    velocityCurve: 'custom', velocityInputMin: 116, velocityInputMax: 18,
+    velocityOutputMin: 120, velocityOutputMax: 25, velocityCurveValues: custom,
+    expressionEnabled: true, expressionSource: 'channel pressure', expressionCurve: 'soft',
+    expressionInputMin: 110, expressionInputMax: 4,
+    expressionOutputMin: 118, expressionOutputMax: 10,
+  } }).fx;
+  assert.equal(shaped.responseProfileName.length, 80);
+  assert.deepEqual([shaped.velocityInputMin, shaped.velocityInputMax], [18, 116]);
+  assert.deepEqual([shaped.velocityOutputMin, shaped.velocityOutputMax], [25, 120]);
+  assert.deepEqual([shaped.expressionInputMin, shaped.expressionInputMax], [4, 110]);
+  assert.deepEqual([shaped.expressionOutputMin, shaped.expressionOutputMax], [10, 118]);
+  assert.deepEqual(shaped.velocityCurveValues, custom);
+});
+
+test('Velocity / Expression Designer settings reach the browser-preview MIDI chain', () => {
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'velocity' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiSlotOptions', partId, slotId, responseProfileName: 'CTRL49 studio',
+    velocityCurve: 'hard', velocityInputMin: 112, velocityInputMax: 12,
+    velocityOutputMin: 20, velocityOutputMax: 118,
+    expressionEnabled: true, expressionSource: 'cc', expressionCc: 11,
+    expressionCurve: 's curve', expressionInputMin: 4, expressionInputMax: 120,
+  });
+  const configured = state.rack.parts[0].midiChain.at(-1).fx;
+  assert.equal(configured.responseProfileName, 'CTRL49 studio');
+  assert.equal(configured.velocityCurve, 'hard');
+  assert.deepEqual([configured.velocityInputMin, configured.velocityInputMax], [12, 112],
+    'the mock mirrors native range ordering immediately');
+  assert.equal(configured.expressionEnabled, true);
+  assert.equal(configured.expressionSource, 'cc');
+  assert.equal(configured.expressionCc, 11);
+  assert.equal(configured.expressionCurve, 's curve');
+});
+
+test('Strummer plans guitar strokes, harp orders, timing feel and dynamics', () => {
+  const chord = [67, 60, 72, 64];
+  assert.deepEqual(buildStrumPlan(chord, { pattern: 'outside in', spread: 0.25 })
+    .map((event) => event.note), [60, 72, 64, 67]);
+  assert.deepEqual(buildStrumPlan(chord, { pattern: 'inside out', spread: 0.25 })
+    .map((event) => event.note), [64, 67, 60, 72]);
+  assert.deepEqual(buildStrumPlan(chord, { pattern: 'alternate', alternateDown: true })
+    .map((event) => event.note), [72, 67, 64, 60]);
+
+  const expressive = buildStrumPlan([60, 64, 67], {
+    pattern: 'ascending', spread: 0.5, curve: 1, velocityRamp: -30,
+  });
+  assert.equal(expressive[0].delayBeats, 0);
+  assert.equal(expressive.at(-1).delayBeats, 0.5, 'the named spread remains the total span');
+  assert.deepEqual(expressive.map((event) => event.velocity), [100, 98, 70],
+    'the curve clusters the early plucks while the velocity ramp reaches its exact endpoint');
+
+  const legacy = normalizeMidiSlot({ type: 'strum', mod: { strumDown: true } });
+  assert.equal(legacy.mod.strumPattern, 'descending', 'old sessions retain their stroke direction');
+
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'strum' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiSlotOptions', partId, slotId, strumBeats: 0.5,
+    strumPattern: 'outside in', strumCurve: 0.65, strumVelocityRamp: -24,
+  });
+  const configured = state.rack.parts[0].midiChain.at(-1).mod;
+  assert.equal(configured.strumPattern, 'outside in');
+  assert.equal(configured.strumCurve, 0.65);
+  assert.equal(configured.strumVelocityRamp, -24);
+});
+
+test('MPE Transformer settings reach the browser-preview MIDI chain', () => {
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'mpe' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiSlotOptions', partId, slotId, mpeEnabled: true,
+    mpeInput: 'mpe', mpeInputAxis: 'timbre', mpeOutput: 'cc', mpeOutputCc: 11,
+    mpeOutputChannel: 16, mpeMemberFirst: 1, mpeMemberLast: 15, mpeCollapse: 'average',
+  });
+  const configured = state.rack.parts[0].midiChain.at(-1).mod;
+  assert.equal(configured.mpeEnabled, true);
+  assert.equal(configured.mpeInputAxis, 'timbre');
+  assert.equal(configured.mpeOutput, 'cc');
+  assert.equal(configured.mpeOutputCc, 11);
+  assert.equal(configured.mpeOutputChannel, 16);
+  assert.deepEqual([configured.mpeMemberFirst, configured.mpeMemberLast], [1, 15]);
+  assert.equal(configured.mpeCollapse, 'average');
+});
+
+test('Articulation Manager normalizes maps and emits keyswitch, program and CC actions', () => {
+  const slot = normalizeMidiSlot({ slotId: 'a', type: 'articulation', mod: {
+    articulationEnabled: true, articulationMapName: `  ${'S'.repeat(90)}  `,
+    articulations: [{
+      articulationId: 'spiccato', name: 'Spiccato', triggerNote: 200, triggerChannel: 20,
+      type: 'program change', outputChannel: 5, program: 200, bankMsb: 3, bankLsb: 9,
+    }],
+  } });
+  assert.equal(slot.mod.articulationEnabled, true);
+  assert.equal(slot.mod.articulationMapName.length, 80);
+  assert.equal(slot.mod.articulations[0].triggerNote, 127);
+  assert.equal(slot.mod.articulations[0].triggerChannel, 16);
+  assert.equal(slot.mod.articulations[0].program, 127);
+  assert.deepEqual(buildArticulationMessages(slot.mod.articulations[0], 2), [
+    { type: 'cc', channel: 5, controller: 0, value: 3 },
+    { type: 'cc', channel: 5, controller: 32, value: 9 },
+    { type: 'program change', channel: 5, program: 127 },
+  ], 'bank select is ordered before the program change');
+
+  assert.deepEqual(buildArticulationMessages({
+    type: 'keyswitch', outputChannel: 0, keyswitchNote: 24, keyswitchVelocity: 77,
+  }, 4), [
+    { type: 'note on', channel: 4, note: 24, velocity: 77 },
+    { type: 'note off', channel: 4, note: 24, velocity: 0 },
+  ]);
+  assert.deepEqual(buildArticulationMessages({
+    type: 'cc', outputChannel: 6, controller: 58, controllerValue: 91,
+  }, 2), [{ type: 'cc', channel: 6, controller: 58, value: 91 }]);
+});
+
+test('Articulation Manager settings reach the browser-preview control stage', () => {
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'articulation' });
+  const slotId = state.rack.parts[0].midiChain.at(-1).slotId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiSlotOptions', partId, slotId,
+    articulationEnabled: true, articulationMapName: 'Solo strings',
+    articulations: [{
+      articulationId: 'legato', name: 'Legato', triggerNote: 12, triggerChannel: 2,
+      type: 'keyswitch', outputChannel: 4, keyswitchNote: 24, keyswitchVelocity: 88,
+    }],
+  });
+  const configured = state.rack.parts[0].midiChain.at(-1).mod;
+  assert.equal(configured.articulationEnabled, true);
+  assert.equal(configured.articulationMapName, 'Solo strings');
+  assert.equal(configured.articulations.length, 1);
+  assert.deepEqual(configured.articulations[0], {
+    articulationId: 'legato', name: 'Legato', triggerNote: 12, triggerChannel: 2,
+    type: 'keyswitch', outputChannel: 4, keyswitchNote: 24, keyswitchVelocity: 88,
+    program: 0, bankMsb: -1, bankLsb: -1, controller: 0, controllerValue: 127,
+  });
 });
 
 test('rackCanvasLayout puts columns in signal order, sources first', () => {
@@ -1068,7 +1401,8 @@ test('normalizeHostState shapes effect chains and macros', () => {
       parts: [{ partId: 'p1', effects: [{ effectId: 'e1', pluginName: 'Verb', bypassed: 1 }] }],
       masterEffects: [{ effectId: 'e2', hasProcessor: true }],
       macros: [{ macroId: 'm1', name: 'Bright', value: '0.5',
-                 targets: [{ targetId: 'p1', parameterId: 'cutoff', resolved: true }] }],
+                 targets: [{ targetId: 'p1', parameterId: 'cutoff', rangeMin: 1.4,
+                             rangeMax: -0.2, resolved: true }] }],
     },
   });
   assert.equal(shaped.effectClasses[0].name, 'Verb');
@@ -1076,6 +1410,9 @@ test('normalizeHostState shapes effect chains and macros', () => {
   assert.equal(shaped.rack.masterEffects[0].hasProcessor, true);
   assert.equal(shaped.rack.macros[0].value, 0.5);
   assert.equal(shaped.rack.macros[0].targets[0].resolved, true);
+  assert.deepEqual(
+    [shaped.rack.macros[0].targets[0].rangeMin, shaped.rack.macros[0].targets[0].rangeMax],
+    [0, 1], 'macro target ranges clamp and sort while normalizing saved state');
   assert.deepEqual(normalizeHostState({}).rack.masterEffects, [], 'older payloads load clean');
 });
 
@@ -1098,10 +1435,21 @@ test('mock reducer: macros collect targets and hold their value', () => {
   let state = mockHostState();
   state = applyMockCommand(state, { cmd: 'addMacro', name: 'Bright' });
   const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'renameMacro', macroId, name: 'Brightness' });
+  assert.equal(state.rack.macros[0].name, 'Brightness');
   state = applyMockCommand(state, { cmd: 'addMacroTarget', macroId, targetId: 'mock-part-1', parameterId: 'cutoff' });
   state = applyMockCommand(state, { cmd: 'addMacroTarget', macroId, targetId: 'mock-part-1', parameterId: 'cutoff' });
   assert.equal(state.rack.macros[0].targets.length, 1, 'duplicate targets collapse');
   assert.equal(state.rack.macros[0].targets[0].displayName, 'Cutoff');
+
+  state = applyMockCommand(state, { cmd: 'setMacroTargetOptions', macroId,
+    targetId: 'mock-part-1', parameterId: 'cutoff', rangeMin: 0.8, rangeMax: 0.2,
+    inverted: true });
+  assert.deepEqual(
+    (({ rangeMin, rangeMax, inverted }) => ({ rangeMin, rangeMax, inverted }))(
+      state.rack.macros[0].targets[0]),
+    { rangeMin: 0.2, rangeMax: 0.8, inverted: true },
+    'each macro destination exposes its own range and direction');
 
   state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 1.7 });
   assert.equal(state.rack.macros[0].value, 1, 'values clamp to 0..1');
@@ -1110,6 +1458,309 @@ test('mock reducer: macros collect targets and hold their value', () => {
   assert.equal(state.rack.macros[0].targets.length, 0);
   state = applyMockCommand(state, { cmd: 'removeMacro', macroId });
   assert.equal(state.rack.macros.length, 0);
+});
+
+test('modulation routes normalize their source, destination and bipolar depth', () => {
+  const [route] = normalizeHostState({ rack: { modulationRoutes: [{
+    routeId: 'route-1', sourceType: 'midiCc', sourceChannel: 99, sourceNumber: 200,
+    sourceValue: 0.7, targetId: 'part-1', parameterId: 'cutoff', amount: -2,
+    baseValue: 1.4, enabled: false, resolved: false,
+  }] } }).rack.modulationRoutes;
+  assert.deepEqual(route, {
+    routeId: 'route-1', sourceType: 'midiCc', sourceId: '', sourceChannel: 16,
+    sourceNumber: 127, sourceValue: 0.7, targetId: 'part-1', parameterId: 'cutoff',
+    targetName: '', displayName: '', amount: -1, baseValue: 1, enabled: false,
+    resolved: false,
+  });
+});
+
+test('mock reducer: modulation route lifecycle keeps macro source values live', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Motion' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, {
+    cmd: 'addModulationRoute', sourceType: 'macro', sourceId: macroId,
+    targetId: 'mock-part-1', parameterId: '@gain', amount: 0.4,
+  });
+  const routeId = state.rack.modulationRoutes[0].routeId;
+  assert.equal(state.rack.modulationRoutes[0].baseValue, 0.5,
+    'the part level is remembered as an unmodulated normalized base');
+
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.8 });
+  assert.equal(state.rack.modulationRoutes[0].sourceValue, 0.8);
+  assert.ok(Math.abs(state.rack.parts[0].volume - 1.64) < 0.0001,
+    'the mock preview evaluates the route against the normalized part-level base');
+  state = applyMockCommand(state, { cmd: 'setModulationRoute', routeId, amount: -4, enabled: false });
+  assert.equal(state.rack.modulationRoutes[0].amount, -1);
+  assert.equal(state.rack.modulationRoutes[0].enabled, false);
+  assert.equal(state.rack.parts[0].volume, 1, 'disabling restores the base');
+  state = applyMockCommand(state, { cmd: 'removeModulationRoute', routeId });
+  assert.equal(state.rack.modulationRoutes.length, 0);
+});
+
+test('MIDI LFOs normalize ranges and safe hardware outputs', () => {
+  const [lfo] = normalizeHostState({ rack: { midiLfos: [{
+    lfoId: 'lfo-a', name: 'Pulse', shape: 'nonsense', rateHz: 500, syncBeats: 0,
+    phaseOffset: 2, minimum: 0.9, maximum: 0.2, value: 3,
+    outputs: [{ outputId: 'out-a', type: 'nrpn', channel: 30, number: 30000,
+                enabled: true, resolved: false }],
+  }] } }).rack.midiLfos;
+  assert.equal(lfo.shape, 'sine');
+  assert.equal(lfo.rateHz, 40);
+  assert.equal(lfo.syncBeats, 1, 'zero falls back before clamping');
+  assert.deepEqual([lfo.minimum, lfo.maximum], [0.2, 0.9]);
+  assert.equal(lfo.value, 1);
+  assert.deepEqual([lfo.outputs[0].channel, lfo.outputs[0].number], [16, 16383]);
+  assert.equal(lfo.outputs[0].resolved, false);
+});
+
+test('mock MIDI LFO drives a macro through the matrix and configures hardware MIDI safely', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Motion' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.3 });
+  state = applyMockCommand(state, { cmd: 'addMidiLfo', name: 'Slow rise' });
+  const lfoId = state.rack.midiLfos[0].lfoId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiLfo', lfoId, sync: false, rateHz: 1, shape: 'sawUp', minimum: 0, maximum: 1,
+  });
+  state = applyMockCommand(state, {
+    cmd: 'addModulationRoute', sourceType: 'lfo', sourceId: lfoId,
+    targetId: macroId, parameterId: '@macro', amount: 0.5,
+  });
+  state = advanceMockMidiLfos(state, 0.25);
+  assert.ok(Math.abs(state.rack.midiLfos[0].phase - 0.25) < 0.0001);
+  assert.ok(Math.abs(state.rack.midiLfos[0].value - 0.25) < 0.0001);
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.425) < 0.0001,
+    'LFO depth is added around the macro base value');
+
+  state.rack.parts[0].hardware = true;
+  state.rack.parts[0].midiOutputName = 'External synth';
+  state = applyMockCommand(state, {
+    cmd: 'addMidiLfoOutput', lfoId, type: 'nrpn', targetPartId: state.rack.parts[0].partId,
+    channel: 4, number: 999,
+  });
+  assert.equal(state.rack.midiLfos[0].outputs[0].enabled, false,
+    'new hardware streams never transmit until explicitly enabled');
+  const outputId = state.rack.midiLfos[0].outputs[0].outputId;
+  state = applyMockCommand(state, {
+    cmd: 'setMidiLfoOutput', lfoId, outputId, enabled: true,
+  });
+  assert.equal(state.rack.midiLfos[0].outputs[0].enabled, true);
+
+  state = applyMockCommand(state, { cmd: 'removeMidiLfo', lfoId });
+  assert.equal(state.rack.modulationRoutes[0].resolved, false);
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.3) < 0.0001,
+    'removing the generator restores the macro base');
+});
+
+test('external envelopes normalize their note filters, timing and response safely', () => {
+  const [envelope] = normalizeHostState({ rack: { envelopes: [{
+    envelopeId: 'env-a', name: 'Pluck', channel: 30, noteLow: 110, noteHigh: 4,
+    attackMs: -1, decayMs: 90000, sustain: 2, releaseMs: -5,
+    curve: -4, velocityAmount: 7, stage: 'nonsense', value: 3,
+  }] } }).rack.envelopes;
+  assert.equal(envelope.name, 'Pluck');
+  assert.equal(envelope.channel, 16);
+  assert.deepEqual([envelope.noteLow, envelope.noteHigh], [4, 110]);
+  assert.deepEqual([envelope.attackMs, envelope.decayMs, envelope.releaseMs], [0, 60000, 0]);
+  assert.deepEqual([envelope.sustain, envelope.curve, envelope.velocityAmount], [1, -1, 1]);
+  assert.deepEqual([envelope.stage, envelope.value, envelope.gate], ['idle', 1, false]);
+});
+
+test('mock ADSR follows gate and velocity while driving a macro through the matrix', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Envelope target' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.2 });
+  state = applyMockCommand(state, { cmd: 'addEnvelope', name: 'Filter pluck' });
+  const envelopeId = state.rack.envelopes[0].envelopeId;
+  state = applyMockCommand(state, {
+    cmd: 'setEnvelope', envelopeId, channel: 2, noteLow: 48, noteHigh: 84,
+    attackMs: 0, decayMs: 0, sustain: 0.6, releaseMs: 0, velocityAmount: 1,
+  });
+  state = applyMockCommand(state, {
+    cmd: 'addModulationRoute', sourceType: 'envelope', sourceId: envelopeId,
+    targetId: macroId, parameterId: '@macro', amount: 0.5,
+  });
+  state = applyMockCommand(state, {
+    cmd: 'triggerEnvelope', envelopeId, gate: true, velocity: 0.8,
+  });
+  state = advanceMockEnvelopes(state, 0);
+  assert.equal(state.rack.envelopes[0].stage, 'sustain');
+  assert.ok(Math.abs(state.rack.envelopes[0].value - 0.48) < 0.0001);
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.44) < 0.0001,
+    'the envelope contributes around the authored macro base');
+
+  state = applyMockCommand(state, { cmd: 'triggerEnvelope', envelopeId, gate: false });
+  assert.equal(state.rack.envelopes[0].stage, 'idle');
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.2) < 0.0001);
+
+  state = applyMockCommand(state, { cmd: 'removeEnvelope', envelopeId });
+  assert.equal(state.rack.envelopes.length, 0);
+  assert.equal(state.rack.modulationRoutes[0].resolved, false);
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.2) < 0.0001);
+});
+
+test('MSEGs normalize timing and keep sorted, anchored curve points', () => {
+  const [mseg] = normalizeHostState({ rack: { msegs: [{
+    msegId: 'mseg-a', name: 'Motion', rateHz: 500, syncBeats: 0, phaseOffset: 4,
+    points: [
+      { pointId: 'end', position: 2, value: -1, curve: 8 },
+      { pointId: 'start', position: -2, value: 3, curve: -8 },
+      { pointId: 'middle', position: 0.7, value: 0.4, curve: 0.2 },
+    ],
+  }] } }).rack.msegs;
+  assert.equal(mseg.name, 'Motion');
+  assert.deepEqual([mseg.rateHz, mseg.syncBeats, mseg.phaseOffset], [40, 0.03125, 1]);
+  assert.deepEqual(mseg.points.map((point) => point.pointId), ['start', 'middle', 'end']);
+  assert.deepEqual([mseg.points[0].position, mseg.points.at(-1).position], [0, 1]);
+  assert.deepEqual([mseg.points[0].value, mseg.points.at(-1).value], [1, 0]);
+  assert.deepEqual([mseg.points[0].curve, mseg.points.at(-1).curve], [-1, 1]);
+});
+
+test('mock MSEG evaluates curved segments and drives a macro through the matrix', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'MSEG target' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.2 });
+  state = applyMockCommand(state, { cmd: 'addMseg', name: 'Motion' });
+  const msegId = state.rack.msegs[0].msegId;
+  state = applyMockCommand(state, {
+    cmd: 'setMseg', msegId, sync: false, rateHz: 0.01, phaseOffset: 0.5,
+    points: [
+      { pointId: 'start', position: 0, value: 0, curve: 0 },
+      { pointId: 'end', position: 1, value: 1, curve: 1 },
+    ],
+  });
+  state = applyMockCommand(state, { cmd: 'resetMseg', msegId });
+  assert.ok(Math.abs(state.rack.msegs[0].value - 0.0625) < 0.0001,
+    'curve +1 raises segment progress to the fourth power');
+  state = applyMockCommand(state, {
+    cmd: 'addModulationRoute', sourceType: 'mseg', sourceId: msegId,
+    targetId: macroId, parameterId: '@macro', amount: 0.5,
+  });
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.23125) < 0.0001);
+
+  state = advanceMockMsegs(state, 0.5);
+  assert.ok(state.rack.msegs[0].phase > 0.5, 'free-running MSEG advances in seconds');
+  state = applyMockCommand(state, { cmd: 'setMseg', msegId, enabled: false });
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.2) < 0.0001);
+  state = applyMockCommand(state, { cmd: 'removeMseg', msegId });
+  assert.equal(state.rack.modulationRoutes[0].resolved, false);
+});
+
+test('random modulators normalize modes, timing, probability and output bounds safely', () => {
+  const [random] = normalizeHostState({ rack: { randomModulators: [{
+    randomId: 'random-a', name: 'Drift', mode: 'unknown', rateHz: 500, syncBeats: 0,
+    seed: -12, probability: 4, smoothing: -2, stepSize: 8, chaos: -1,
+    minimum: 0.9, maximum: 0.2,
+  }] } }).rack.randomModulators;
+  assert.equal(random.name, 'Drift');
+  assert.equal(random.mode, 'sampleHold');
+  assert.deepEqual([random.rateHz, random.syncBeats, random.seed], [40, 0.03125, 1]);
+  assert.deepEqual(
+    [random.probability, random.smoothing, random.stepSize, random.chaos], [1, 0, 1, 0]);
+  assert.deepEqual([random.minimum, random.maximum], [0.2, 0.9]);
+});
+
+test('Scala tunings parse cents, ratios and comments into one safe repeating scale', () => {
+  const tuning = parseScalaTuning(`! header comment
+Five-limit triad
+3
+386.3137139
+3/2 ! perfect fifth
+2/1
+`, 'triad.scl');
+  assert.equal(tuning.enabled, true);
+  assert.equal(tuning.name, 'Five-limit triad');
+  assert.equal(tuning.sourceName, 'triad.scl');
+  assert.equal(tuning.degreeCount, 3);
+  assert.ok(Math.abs(tuning.degreesCents[1] - 386.3137139) < 1e-7);
+  assert.ok(Math.abs(tuning.degreesCents[2] - 701.955000865) < 1e-6);
+  assert.equal(tuning.periodCents, 1200);
+  assert.throws(() => parseScalaTuning('Broken\n2\n100.0\n'), /ends before/);
+
+  const fallback = normalizeMicrotuning({ enabled: true, degreesCents: [0, 500, 400] });
+  assert.equal(fallback.enabled, false, 'a corrupt table is not left enabled');
+  assert.equal(fallback.degreeCount, 12, 'bad state data falls back to a safe 12-TET table');
+});
+
+test('microtuning mock commands preserve rig addressing and opt parts in explicitly', () => {
+  let state = mockHostState();
+  const partId = state.rack.parts[0].partId;
+  state = applyMockCommand(state, { cmd: 'setMicrotuning', rootMidiNote: 48,
+    referenceFrequency: 442, mtsDeviceId: 12, mtsProgram: 3 });
+  state = applyMockCommand(state, { cmd: 'importScalaTuning', sourceName: 'triad.scl', text: `Triad
+3
+5/4
+3/2
+2/1` });
+  assert.equal(state.rack.microtuning.name, 'Triad');
+  assert.equal(state.rack.microtuning.rootMidiNote, 48, 'import changes the scale, not its keyboard map');
+  assert.equal(state.rack.microtuning.referenceFrequency, 442);
+  assert.equal(state.rack.microtuning.mtsDeviceId, 12);
+  assert.equal(state.rack.microtuning.mtsProgram, 3);
+
+  state = applyMockCommand(state, { cmd: 'setPartMicrotuning', partId, enabled: true });
+  assert.equal(state.rack.parts[0].microtuningEnabled, true);
+  assert.equal(state.rack.parts[0].microtuningError, '');
+  state = applyMockCommand(state, { cmd: 'resetMicrotuning' });
+  assert.equal(state.rack.microtuning.enabled, false);
+  assert.equal(state.rack.microtuning.degreeCount, 12);
+  assert.equal(state.rack.microtuning.mtsDeviceId, 12, 'reset keeps the destination address');
+});
+
+test('seeded random modes restart exactly and drive a macro through the matrix', () => {
+  assert.equal(deterministicRandomUnit(424242, 7, 0xc8013ea4),
+    deterministicRandomUnit(424242, 7, 0xc8013ea4));
+  assert.notEqual(deterministicRandomUnit(424242, 7, 0xc8013ea4),
+    deterministicRandomUnit(424243, 7, 0xc8013ea4));
+
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Random target' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.2 });
+  state = applyMockCommand(state, { cmd: 'addRandomModulator', name: 'Drift', mode: 'randomWalk' });
+  const randomId = state.rack.randomModulators[0].randomId;
+  state = applyMockCommand(state, {
+    cmd: 'setRandomModulator', randomId, mode: 'randomWalk', sync: false, rateHz: 2,
+    seed: 424242, probability: 1, stepSize: 0.3, minimum: 0.1, maximum: 0.9,
+  });
+  const firstValue = state.rack.randomModulators[0].value;
+  state = advanceMockRandomModulators(state, 0.5);
+  assert.notEqual(state.rack.randomModulators[0].value, firstValue,
+    'the bounded walk takes a deterministic step at the next boundary');
+  state = applyMockCommand(state, { cmd: 'resetRandomModulator', randomId });
+  assert.ok(Math.abs(state.rack.randomModulators[0].value - firstValue) < 0.000001,
+    'restart reproduces the same seed from step zero');
+
+  state = applyMockCommand(state, {
+    cmd: 'setRandomModulator', randomId, mode: 'smoothRandom', probability: 1,
+    smoothing: 1, rateHz: 1, minimum: 0, maximum: 1,
+  });
+  const start = state.rack.randomModulators[0].value;
+  state = advanceMockRandomModulators(state, 0.5);
+  const midway = state.rack.randomModulators[0].value;
+  assert.notEqual(midway, start, 'smooth random glides during the decision interval');
+
+  state = applyMockCommand(state, {
+    cmd: 'setRandomModulator', randomId, mode: 'sampleHold', probability: 0,
+    minimum: 0.1, maximum: 0.9,
+  });
+  assert.ok(Math.abs(state.rack.randomModulators[0].value - 0.5) < 0.000001,
+    'zero chance deliberately holds the neutral value');
+  state = applyMockCommand(state, {
+    cmd: 'addModulationRoute', sourceType: 'random', sourceId: randomId,
+    targetId: macroId, parameterId: '@macro', amount: 0.5,
+  });
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.45) < 0.000001);
+
+  state = applyMockCommand(state, { cmd: 'setRandomModulator', randomId, enabled: false });
+  assert.ok(Math.abs(state.rack.macros[0].value - 0.2) < 0.000001);
+  state = applyMockCommand(state, { cmd: 'removeRandomModulator', randomId });
+  assert.equal(state.rack.randomModulators.length, 0);
+  assert.equal(state.rack.modulationRoutes[0].resolved, false);
 });
 
 // --- Stage 5 completion: returns, sends, hardware parts, multi-out, engine -----------------------
@@ -1159,6 +1810,8 @@ test('mock reducer: returns and sends, with the drop-stranded-sends rule', () =>
   state = applyMockCommand(state, { cmd: 'addReturn', name: 'Verb Bus' });
   const returnId = state.rack.returns[0].returnId;
   assert.equal(state.rack.returns[0].name, 'Verb Bus');
+  state = applyMockCommand(state, { cmd: 'renameReturn', returnId, name: 'Hall' });
+  assert.equal(state.rack.returns[0].name, 'Hall');
 
   state = applyMockCommand(state, { cmd: 'addEffect', chainId: returnId, ceId: 'mock-reverb' });
   assert.equal(state.rack.returns[0].effects[0].pluginName, 'Sweet Reverb',
@@ -1324,6 +1977,48 @@ test('one part driving another: the source is a field, loops are refused, remova
   assert.equal(normalized.rack.parts[0].midiSourcePartId, 'y', 'the field normalizes through');
 });
 
+test('layer groups normalize and edit dynamic layers, voice allocation and crossfades', () => {
+  const shaped = normalizeHostState({ rack: { layerGroups: [{
+    layerGroupId: 'layers', allocation: 'broken', source: 'cc', controller: 999,
+    members: [
+      { partId: 'a', minimum: 0.8, maximum: 0.2, crossfade: 3 },
+      { partId: 'b', minimum: -1, maximum: 2, crossfade: -4 },
+    ],
+  }] } }).rack.layerGroups[0];
+  assert.equal(shaped.allocation, 'all');
+  assert.equal(shaped.controller, 127);
+  assert.deepEqual([shaped.members[0].minimum, shaped.members[0].maximum,
+                    shaped.members[0].crossfade], [0.2, 0.8, 0.5]);
+
+  let state = mockHostState();
+  const [a, b] = state.rack.parts.map((part) => part.partId);
+  state = applyMockCommand(state, { cmd: 'addLayerGroup', name: 'Strings' });
+  assert.equal(state.rack.layerGroups.length, 1);
+  const groupId = state.rack.layerGroups[0].layerGroupId;
+  assert.deepEqual(state.rack.layerGroups[0].members.map((member) => member.partId), [a, b],
+    'a new group claims the first two available keyboard parts');
+
+  state = applyMockCommand(state, { cmd: 'setLayerGroup', layerGroupId: groupId,
+    allocation: 'roundRobin', source: 'key' });
+  assert.equal(state.rack.layerGroups[0].allocation, 'roundRobin');
+  assert.equal(state.rack.layerGroups[0].source, 'key');
+  state = applyMockCommand(state, { cmd: 'setLayerMember', layerGroupId: groupId, partId: a,
+    minimum: 0.1, maximum: 0.55, crossfade: 0.08 });
+  assert.deepEqual(state.rack.layerGroups[0].members[0], {
+    ...state.rack.layerGroups[0].members[0], minimum: 0.1, maximum: 0.55, crossfade: 0.08,
+  });
+
+  hostLastError.set('');
+  state = applyMockCommand(state, { cmd: 'setPartMidiSource', partId: b, sourcePartId: a });
+  assert.equal(state.rack.parts[1].midiSourcePartId, '',
+    'a grouped destination cannot simultaneously take another part as its source');
+  assert.match(get(hostLastError), /Remove that part from its layer/);
+
+  state = applyMockCommand(state, { cmd: 'removePart', partId: a });
+  assert.equal(state.rack.layerGroups.length, 0,
+    'removing a destination dissolves a group that can no longer allocate');
+});
+
 test('patch compare shapes the answer and the preview stands one in', () => {
   const shaped = normalizePatchCompare({ partId: 'p', recordId: 'r', nameA: 'A', nameB: 'B',
     identical: false, messagesA: 2, messagesB: 1, bytesA: 20, bytesB: 10, totalDifferences: 2,
@@ -1366,7 +2061,7 @@ test('patch compare shapes the answer and the preview stands one in', () => {
 
 test('the keyboard has two sizes, and Range on a part focuses it', () => {
   hostStateStore.set(mockHostState());
-  assert.deepEqual(get(hostKeyboardMode), { mode: 'play', partId: '' }, 'three octaves by default');
+  assert.deepEqual(get(hostKeyboardMode), { mode: 'play', partId: '' }, 'play mode by default');
   showPartRange('mock-part-2');
   assert.deepEqual(get(hostKeyboardMode), { mode: 'range', partId: 'mock-part-2' });
   assert.equal(get(hostStateStore).rack.focusedPartId, 'mock-part-2', 'and the part is focused');
@@ -1413,15 +2108,43 @@ test('normalizeHostState shapes the performance system', () => {
       transport: { playing: 1, tempo: '128', bar: 3, beat: 2, externalClock: true },
       // `playing: 1` is deliberate: the store is strictly boolean, like `scanning` above.
       patterns: [{
-        patternId: 'p1', name: 'Riff', swing: '0.25',
+        patternId: 'p1', name: 'Riff', swing: '0.25', seed: '37',
+        variationGroupId: 'vg1', variationLabel: 'A',
+        variationSourcePatternId: 'p1', variationAmount: '0.85',
         lanes: [{ laneId: 'l1', type: 'drum', stepCount: '8', stepsPerBeat: 2, drumNote: 38,
-                  resolved: true,
+                  resolved: true, lockSourceLaneId: 'source-lane',
                   steps: [{ active: true, note: 40, ratchets: 3, probability: 60 }] }],
       }],
-      clips: [{ clipId: 'c1', patternId: 'p1', active: true, phase: 0.5 }],
-      scenes: [{ sceneId: 's1', name: 'Verse', clipIds: ['c1'] }],
+      clips: [{ clipId: 'c1', patternId: 'p1', active: true, phase: 0.5,
+                looperLayer: true, overdubPasses: '2', gestureClip: true, gesturePasses: '3',
+                frozenMidi: true, frozenFromClipId: 'source', frozenCycles: '4', frozenNoteCount: '17',
+                followAction: 'random', followAfterLoops: '4',
+                fillPatternId: 'p-fill', fillQuantize: 'beat', fillCc: '80', fillChannel: '2',
+                fillActive: true, fillPending: false }],
+      scenes: [{ sceneId: 's1', name: 'Verse', clipIds: ['c1'], morphBeats: '4',
+                 slots: [{ partId: 'part-1', volume: 1.4, applyVolume: true,
+                           pan: -0.3, applyPan: true }],
+                 macros: [{ macroId: 'macro-1', value: 0.7 }],
+                 parameters: [{ targetId: 'part-1', targetCeId: 'synth-1',
+                                parameterId: 'cutoff', value: 0.8 }] }],
+      snapshotMorph: { active: true, sceneId: 's1', name: 'Verse',
+                       durationBeats: '4', progress: '0.45', targetCount: '4' },
       setlist: { items: [{ itemId: 'i1', name: 'Opener', sceneId: 's1' }], currentIndex: 0 },
+      arrangement: {
+        items: [{ itemId: 'a1', name: 'Verse x8', sceneId: 's1', bars: '8' }],
+        loop: true, playing: true, currentIndex: 0, queuedIndex: 0, progress: '0.5', bar: '4',
+      },
       capture: { armed: true, clipId: 'c1', laneId: 'l1' },
+      looper: { recording: true, overdubbing: true, targetClipId: 'c1', elapsedSeconds: '3.5' },
+      gestures: { recording: true, mode: 'replace', targetClipId: 'c1', pointCount: '12',
+                  targetCount: '2', truncated: true },
+      performanceTakes: [{ takeId: 'take-1', name: 'Show', createdAt: 'today',
+                           durationSeconds: '12.5', midiEventCount: '30', actionCount: '7',
+                           truncated: true }],
+      performanceRecorder: { recording: true, name: 'Show 2', elapsedSeconds: '3.5',
+                             midiEventCount: '8', actionCount: '2' },
+      performanceReplay: { state: 'restoring', takeId: 'take-1', name: 'Show',
+                           progress: '0.25', degraded: true },
       scales: ['major', 'minor'],
     },
   });
@@ -1431,12 +2154,56 @@ test('normalizeHostState shapes the performance system', () => {
   assert.equal(perf.transport.externalClock, true, 'a real boolean passes through');
   assert.equal(perf.transport.tempo, 128);
   assert.equal(perf.patterns[0].swing, 0.25);
+  assert.equal(perf.patterns[0].seed, 37);
+  assert.equal(perf.patterns[0].variationGroupId, 'vg1');
+  assert.equal(perf.patterns[0].variationLabel, 'A');
+  assert.equal(perf.patterns[0].variationSourcePatternId, 'p1');
+  assert.equal(perf.patterns[0].variationAmount, 0.85);
   assert.equal(perf.patterns[0].lanes[0].type, 'drum');
+  assert.equal(perf.patterns[0].lanes[0].lockSourceLaneId, 'source-lane');
   assert.equal(perf.patterns[0].lanes[0].steps[0].ratchets, 3);
   assert.equal(perf.clips[0].phase, 0.5);
+  assert.equal(perf.clips[0].looperLayer, true);
+  assert.equal(perf.clips[0].overdubPasses, 2);
+  assert.equal(perf.clips[0].gestureClip, true);
+  assert.equal(perf.clips[0].gesturePasses, 3);
+  assert.equal(perf.clips[0].frozenMidi, true);
+  assert.equal(perf.clips[0].frozenFromClipId, 'source');
+  assert.equal(perf.clips[0].frozenCycles, 4);
+  assert.equal(perf.clips[0].frozenNoteCount, 17);
+  assert.equal(perf.clips[0].followAction, 'random');
+  assert.equal(perf.clips[0].followAfterLoops, 4);
+  assert.equal(perf.clips[0].fillPatternId, 'p-fill');
+  assert.equal(perf.clips[0].fillQuantize, 'beat');
+  assert.equal(perf.clips[0].fillCc, 80);
+  assert.equal(perf.clips[0].fillChannel, 2);
+  assert.equal(perf.clips[0].fillActive, true);
   assert.equal(perf.scenes[0].clipIds[0], 'c1');
+  assert.equal(perf.scenes[0].morphBeats, 4);
+  assert.equal(perf.scenes[0].slots[0].pan, -0.3);
+  assert.equal(perf.scenes[0].numParameters, 1);
+  assert.equal(perf.snapshotMorph.active, true);
+  assert.equal(perf.snapshotMorph.progress, 0.45);
   assert.equal(perf.setlist.currentIndex, 0);
+  assert.equal(perf.arrangement.items[0].bars, 8);
+  assert.equal(perf.arrangement.loop, true);
+  assert.equal(perf.arrangement.playing, true);
+  assert.equal(perf.arrangement.progress, 0.5);
   assert.equal(perf.capture.armed, true);
+  assert.equal(perf.looper.recording, true);
+  assert.equal(perf.looper.targetClipId, 'c1');
+  assert.equal(perf.gestures.recording, true);
+  assert.equal(perf.gestures.mode, 'replace');
+  assert.equal(perf.gestures.pointCount, 12);
+  assert.equal(perf.gestures.truncated, true);
+  assert.equal(perf.performanceTakes[0].durationSeconds, 12.5);
+  assert.equal(perf.performanceTakes[0].midiEventCount, 30);
+  assert.equal(perf.performanceTakes[0].truncated, true);
+  assert.equal(perf.performanceRecorder.recording, true);
+  assert.equal(perf.performanceRecorder.actionCount, 2);
+  assert.equal(perf.performanceReplay.state, 'restoring');
+  assert.equal(perf.performanceReplay.progress, 0.25);
+  assert.equal(perf.performanceReplay.degraded, true);
   assert.deepEqual(normalizeHostState({}).performance, emptyPerformance(),
     'an older payload loads clean');
 });
@@ -1472,6 +2239,184 @@ test('mock reducer: patterns, lanes and steps', () => {
   assert.equal(state.performance.patterns.length, 1);
 });
 
+test('groove templates normalize, import and commit editable timing and accents', () => {
+  assert.equal(factoryGrooveTemplates.length, 3);
+  const bounded = normalizeGrooveTemplate({
+    grooveId: 'wild', name: 'Wild', stepsPerBeat: 99,
+    timingOffsets: [-5, 0.25, 8], velocityMultipliers: [0, 1, 9],
+  });
+  assert.equal(bounded.stepsPerBeat, 16);
+  assert.deepEqual(bounded.timingOffsets, [-0.5, 0.25, 0.5]);
+  assert.deepEqual(bounded.velocityMultipliers, [0.25, 1, 2]);
+
+  const direct = normalizeHostState({ performance: { patterns: [{
+    patternId: 'p', lanes: [{ laneId: 'l', type: 'note', stepsPerBeat: 4, stepCount: 2,
+      steps: [{ active: true, velocity: 100 }, { active: true, velocity: 100 }] }],
+  }] } }).performance.patterns[0];
+  applyGrooveToPattern(direct, factoryGrooveTemplates[1], 0.5, true);
+  assert.equal(direct.lanes[0].steps[1].microtiming, 0.12);
+  assert.equal(direct.lanes[0].steps[0].velocity, 105);
+
+  let state = mockHostState();
+  assert.equal(state.performance.grooves.length, 3, 'factory feels exist in a fresh performance');
+  state = applyMockCommand(state, { cmd: 'importGrooveTemplate', name: 'My pocket',
+    stepsPerBeat: 4, timingOffsets: [0, .1, -.05, .15],
+    velocityMultipliers: [1.1, .9, 1, .85] });
+  const custom = state.performance.grooves.at(-1);
+  assert.equal(custom.name, 'My pocket');
+  assert.equal(custom.source, 'imported');
+
+  state = applyMockCommand(state, { cmd: 'applyGrooveTemplate', patternId: 'mock-pattern-1',
+    grooveId: custom.grooveId, amount: 1, applyVelocity: true });
+  const pattern = state.performance.patterns[0];
+  assert.equal(pattern.appliedGrooveId, custom.grooveId);
+  assert.equal(pattern.lanes[0].steps[1].microtiming, 0.1,
+    'the committed timing stays visible and editable on the step');
+
+  state = applyMockCommand(state, { cmd: 'removeGrooveTemplate', grooveId: custom.grooveId });
+  assert.equal(state.performance.grooves.some((groove) => groove.grooveId === custom.grooveId), false);
+  state = applyMockCommand(state, { cmd: 'removeGrooveTemplate',
+    grooveId: factoryGrooveTemplates[0].grooveId });
+  assert.ok(state.performance.grooves.some((groove) =>
+    groove.grooveId === factoryGrooveTemplates[0].grooveId), 'factory feels cannot be removed');
+});
+
+test('pattern variations create and safely regenerate related A/B/C/D patterns', () => {
+  let state = mockHostState();
+  const sourceId = state.performance.patterns[0].patternId;
+  const sourceHits = state.performance.patterns[0].lanes[0].steps
+    .filter((step) => step.active).length;
+
+  state = applyMockCommand(state,
+    { cmd: 'createPatternVariations', patternId: sourceId, amount: 0.85 });
+  const family = state.performance.patterns.filter((pattern) => pattern.variationGroupId);
+  assert.deepEqual(family.map((pattern) => pattern.variationLabel).sort(), ['A', 'B', 'C', 'D']);
+  const sparse = family.find((pattern) => pattern.variationLabel === 'C');
+  const fill = family.find((pattern) => pattern.variationLabel === 'D');
+  assert.ok(sparse.lanes[0].steps.some((step) => step.active), 'C never empties the phrase');
+  assert.ok(sparse.lanes[0].steps.filter((step) => step.active).length < sourceHits,
+    'C is a genuinely sparser relative');
+  assert.ok(fill.lanes[0].steps.filter((step) => step.active).length > sourceHits,
+    'D adds editable notes in the final quarter');
+
+  const idsBefore = family.map((pattern) => pattern.patternId).sort();
+  state = applyMockCommand(state,
+    { cmd: 'createPatternVariations', patternId: sparse.patternId, amount: 0.25 });
+  const regenerated = state.performance.patterns.filter((pattern) => pattern.variationGroupId);
+  assert.equal(regenerated.length, 4, 'regeneration replaces B/C/D instead of duplicating them');
+  assert.deepEqual(regenerated.map((pattern) => pattern.patternId).sort(), idsBefore,
+    'stable pattern ids keep existing clips valid');
+  assert.ok(regenerated.every((pattern) => pattern.variationAmount === 0.25));
+});
+
+test('generated variation lanes remap locks without inventing locks for fill notes', () => {
+  const noteSteps = Array.from({ length: 16 }, (_, index) => ({
+    active: index % 4 === 0, note: 60, velocity: 100,
+  }));
+  const lockSteps = noteSteps.map((step, index) => ({
+    active: step.active, value: index / 15,
+  }));
+  const source = normalizeHostState({ performance: { patterns: [{
+    patternId: 'source', name: 'Pulse', seed: 12345,
+    variationGroupId: 'family', variationLabel: 'A', variationSourcePatternId: 'source',
+    lanes: [
+      { laneId: 'notes', type: 'note', stepCount: 16, stepsPerBeat: 4, steps: noteSteps },
+      { laneId: 'locks', type: 'parameter', lockSourceLaneId: 'notes',
+        stepCount: 16, stepsPerBeat: 4, steps: lockSteps },
+    ],
+  }] } }).performance.patterns[0];
+
+  const fill = makePatternVariation(source, 'D', 0.85, 'fill');
+  assert.equal(fill.lanes[1].lockSourceLaneId, fill.lanes[0].laneId,
+    'the generated lock lane targets the generated notes');
+  assert.ok(fill.lanes[0].steps[13].active && !fill.lanes[1].steps[13].active,
+    'a generated fill note does not acquire a made-up plug-in value');
+});
+
+test('mock held fill uses a related pattern only while the button or pedal is down', () => {
+  let state = mockHostState();
+  const sourceId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state,
+    { cmd: 'createPatternVariations', patternId: sourceId, amount: 0.55 });
+  state = applyMockCommand(state, { cmd: 'addClip', patternId: sourceId, name: 'Fill test' });
+  const clip = state.performance.clips.at(-1);
+  const fillPattern = state.performance.patterns.find((pattern) => pattern.variationLabel === 'D');
+  assert.equal(clip.fillPatternId, fillPattern.patternId,
+    'a variation-family clip defaults to its related D pattern');
+
+  state = applyMockCommand(state, { cmd: 'setClipOptions', clipId: clip.clipId,
+    fillQuantize: '1/8', fillCc: 80, fillChannel: 2,
+    followAction: 'random', followAfterLoops: 4 });
+  state = applyMockCommand(state, { cmd: 'launchClip', clipId: clip.clipId });
+  state = applyMockCommand(state, { cmd: 'setPerformanceFill', clipId: clip.clipId, active: true });
+  assert.equal(state.performance.clips.at(-1).fillActive, true);
+  assert.equal(state.performance.clips.at(-1).fillQuantize, '1/8');
+  assert.equal(state.performance.clips.at(-1).fillCc, 80);
+  assert.equal(state.performance.clips.at(-1).fillChannel, 2);
+  assert.equal(state.performance.clips.at(-1).followAction, 'random');
+  assert.equal(state.performance.clips.at(-1).followAfterLoops, 4);
+  state = applyMockCommand(state, { cmd: 'setPerformanceFill', clipId: clip.clipId, active: false });
+  assert.equal(state.performance.clips.at(-1).fillActive, false,
+    'release returns to A without stopping the clip');
+  assert.equal(state.performance.clips.at(-1).active, true);
+});
+
+test('mock reducer: parameter locks stay linked to their source step', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'addPattern', name: 'Locks' });
+  const pattern = state.performance.patterns.at(-1);
+  const patternId = pattern.patternId;
+  const laneId = pattern.lanes[0].laneId;
+
+  state = applyMockCommand(state, { cmd: 'setStepParameterLock', patternId, laneId, index: 2,
+    targetId: 'mock-part-1', parameterId: 'cutoff', value: 0.72 });
+  state = applyMockCommand(state, { cmd: 'setStepCcLock', patternId, laneId, index: 2,
+    targetPartId: 'mock-part-1', channel: 2, ccNumber: 74, value: 0.5 });
+
+  let locks = state.performance.patterns.at(-1).lanes
+    .filter((lane) => lane.lockSourceLaneId === laneId);
+  assert.equal(locks.length, 2, 'plug-in and MIDI locks coexist on one step');
+  const parameterLock = locks.find((lane) => lane.type === 'parameter');
+  const ccLock = locks.find((lane) => lane.type === 'cc');
+  assert.equal(parameterLock.steps[2].value, 0.72);
+  assert.equal(ccLock.channel, 2);
+  assert.equal(ccLock.ccNumber, 74);
+  assert.equal(ccLock.steps[2].value, 0.5);
+
+  state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId, index: 2,
+    microtiming: 0.125, probability: 80, every: 3, offset: 1 });
+  locks = state.performance.patterns.at(-1).lanes
+    .filter((lane) => lane.lockSourceLaneId === laneId);
+  assert.ok(locks.every((lane) => lane.steps[2].microtiming === 0.125
+    && lane.steps[2].probability === 80 && lane.steps[2].every === 3
+    && lane.steps[2].offset === 1), 'locks inherit timing and trigger conditions');
+
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId, laneId,
+    stepCount: 8, stepsPerBeat: 2, muted: true });
+  locks = state.performance.patterns.at(-1).lanes
+    .filter((lane) => lane.lockSourceLaneId === laneId);
+  assert.ok(locks.every((lane) => lane.stepCount === 8 && lane.stepsPerBeat === 2
+    && lane.steps.length === 8 && lane.muted), 'linked lanes follow the source grid and mute');
+
+  state = applyMockCommand(state, { cmd: 'removeStepLock', patternId, laneId, index: 2,
+    lockLaneId: parameterLock.laneId });
+  assert.equal(state.performance.patterns.at(-1).lanes
+    .filter((lane) => lane.lockSourceLaneId === laneId).length, 1,
+  'one lock can be removed independently');
+
+  state = applyMockCommand(state, { cmd: 'clearStepLocks', patternId, laneId, index: 2 });
+  assert.equal(state.performance.patterns.at(-1).lanes
+    .some((lane) => lane.lockSourceLaneId === laneId), false,
+  'empty lock lanes are pruned after clearing the step');
+
+  state = applyMockCommand(state, { cmd: 'setStepParameterLock', patternId, laneId, index: 0,
+    targetId: 'mock-part-1', parameterId: '@pan', value: 0.25 });
+  state = applyMockCommand(state, { cmd: 'clearLane', patternId, laneId });
+  assert.equal(state.performance.patterns.at(-1).lanes
+    .some((lane) => lane.lockSourceLaneId === laneId), false,
+  'clearing the visible lane clears its hidden locks too');
+});
+
 test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   let state = mockHostState();
   const patternId = state.performance.patterns[0].patternId;
@@ -1482,18 +2427,43 @@ test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   state = applyMockCommand(state, { cmd: 'launchClip', clipId });
   assert.equal(state.performance.clips[1].active, true);
 
+  state = applyMockCommand(state, { cmd: 'setPartMixer', partId: 'mock-part-1',
+                                    mute: true, volume: 1.4, pan: -0.35 });
+  state = applyMockCommand(state, { cmd: 'addMacro', name: 'Scene motion' });
+  const macroId = state.rack.macros[0].macroId;
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.75 });
+
   state = applyMockCommand(state, { cmd: 'addScene', name: 'Verse' });
   const sceneId = state.performance.scenes[0].sceneId;
+  state = applyMockCommand(state, { cmd: 'renameScene', sceneId, name: 'Verse A' });
+  assert.equal(state.performance.scenes[0].name, 'Verse A');
   assert.deepEqual(state.performance.scenes[0].clipIds, [clipId],
     'a new scene captures what is running');
+  assert.equal(state.performance.scenes[0].numSlots, 2);
+  assert.equal(state.performance.scenes[0].numMacros, 1);
 
   state = applyMockCommand(state, { cmd: 'stopAllClips' });
+  state = applyMockCommand(state, { cmd: 'setPartMixer', partId: 'mock-part-1',
+                                    mute: false, volume: 0.25, pan: 0.8 });
+  state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.1 });
+  state = applyMockCommand(state, { cmd: 'setSceneOptions', sceneId, morphBeats: 4 });
   state = applyMockCommand(state, { cmd: 'launchScene', sceneId });
   assert.equal(state.performance.clips[1].active, true, 'recalling the scene starts its clips');
   assert.equal(state.performance.clips[0].active, false, 'and stops the ones it omits');
+  assert.equal(state.rack.parts[0].mute, true, 'the scene restores discrete mixer state');
+  assert.equal(state.rack.parts[0].volume, 1.4, 'and its captured continuous level');
+  assert.equal(state.rack.parts[0].pan, -0.35, 'including pan');
+  assert.equal(state.rack.macros[0].value, 0.75, 'and all captured macro values');
+  assert.equal(state.performance.snapshotMorph.durationBeats, 4);
+  assert.equal(state.performance.snapshotMorph.progress, 1,
+    'the browser mock lands a morph deterministically instead of owning a clock');
 
   state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId, name: 'Opener' });
   state = applyMockCommand(state, { cmd: 'addSetlistItem', sceneId: 'gone', name: 'Broken' });
+  const openerItemId = state.performance.setlist.items[0].itemId;
+  state = applyMockCommand(state, { cmd: 'moveSetlistItem', itemId: openerItemId, index: 1 });
+  assert.equal(state.performance.setlist.items[1].name, 'Opener', 'songs can be reordered');
+  state = applyMockCommand(state, { cmd: 'moveSetlistItem', itemId: openerItemId, index: 0 });
   state = applyMockCommand(state, { cmd: 'setlistGo', index: 0 });
   assert.equal(state.performance.setlist.currentIndex, 0);
 
@@ -1506,6 +2476,56 @@ test('mock reducer: clips, scenes and the setlist recovery rule', () => {
     'removing a clip takes it out of the scenes that named it');
 });
 
+test('snapshot morph interpolation shares one clamped linear position', () => {
+  assert.equal(snapshotMorphValue(0.2, 0.8, 0.5), 0.5);
+  assert.equal(snapshotMorphValue(0.2, 0.8, -1), 0.2);
+  assert.equal(snapshotMorphValue(0.2, 0.8, 3), 0.8);
+});
+
+test('mock reducer: song arranger orders scene blocks and plays from any block', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'launchClip', clipId: 'mock-clip-1' });
+  state = applyMockCommand(state, { cmd: 'addScene', name: 'Verse' });
+  const sceneId = state.performance.scenes[0].sceneId;
+
+  state = applyMockCommand(state, { cmd: 'addArrangementItem', sceneId, name: 'Verse A' });
+  state = applyMockCommand(state, { cmd: 'addArrangementItem', sceneId, name: 'Verse B', bars: 8 });
+  const second = state.performance.arrangement.items[1];
+  state = applyMockCommand(state, { cmd: 'moveArrangementItem', itemId: second.itemId, index: 0 });
+  state = applyMockCommand(state, { cmd: 'setArrangementItem', itemId: second.itemId, bars: 12 });
+  state = applyMockCommand(state, { cmd: 'setArrangementOptions', loop: true });
+  assert.equal(state.performance.arrangement.items[0].name, 'Verse B');
+  assert.equal(state.performance.arrangement.items[0].bars, 12);
+  assert.equal(state.performance.arrangement.loop, true);
+
+  state = applyMockCommand(state, { cmd: 'startArrangement', index: 0 });
+  assert.equal(state.performance.arrangement.playing, true);
+  assert.equal(state.performance.arrangement.currentIndex, 0);
+  assert.equal(state.performance.clips[0].active, true, 'the block recalls its existing scene');
+
+  state = applyMockCommand(state, { cmd: 'stopArrangement' });
+  assert.equal(state.performance.arrangement.playing, false);
+  assert.equal(state.performance.clips[0].active, false, 'stop ends the arranged performance');
+});
+
+test('mock reducer: MIDI freeze creates a deterministic editable clip', () => {
+  let state = mockHostState();
+  const sourceClip = state.performance.clips[0];
+  state = applyMockCommand(state, { cmd: 'freezeMidiClip', clipId: sourceClip.clipId, cycles: 2 });
+  const frozen = state.performance.clips.at(-1);
+  const pattern = state.performance.patterns.find((candidate) => candidate.patternId === frozen.patternId);
+  assert.equal(frozen.frozenMidi, true);
+  assert.equal(frozen.frozenFromClipId, sourceClip.clipId);
+  assert.equal(frozen.frozenCycles, 2);
+  assert.ok(frozen.frozenNoteCount > 0);
+  assert.ok(pattern.lanes.every((lane) => lane.steps.every((step) => step.probability === 100
+    && step.ratchets === 1 && step.every === 1)), 'the browser preview removes generation rules');
+
+  state = applyMockCommand(state, { cmd: 'removeClip', clipId: frozen.clipId });
+  assert.equal(state.performance.patterns.some((candidate) => candidate.patternId === pattern.patternId), false,
+    'a frozen clip owns and removes its private rendered pattern');
+});
+
 test('mock reducer: transport, capture and the per-part event chain', () => {
   let state = mockHostState();
   state = applyMockCommand(state, { cmd: 'transportPlay' });
@@ -1514,6 +2534,15 @@ test('mock reducer: transport, capture and the per-part event chain', () => {
   assert.equal(state.performance.transport.tempo, 300, 'tempo clamps');
   state = applyMockCommand(state, { cmd: 'transportStop' });
   assert.equal(state.performance.transport.playing, false);
+  state = applyMockCommand(state, { cmd: 'setTransportPosition', ppq: 12 });
+  state = applyMockCommand(state, { cmd: 'transportContinue' });
+  assert.equal(state.performance.transport.playing, true);
+  assert.equal(state.performance.transport.positionPpq, 12,
+    'Continue preserves the stopped position');
+  state = applyMockCommand(state, { cmd: 'transportStop' });
+  state = applyMockCommand(state, { cmd: 'transportPlay' });
+  assert.equal(state.performance.transport.positionPpq, 0,
+    'Play remains the explicit restart action');
 
   const clipId = state.performance.clips[0].clipId;
   const laneId = state.performance.patterns[0].lanes[0].laneId;
@@ -1521,6 +2550,60 @@ test('mock reducer: transport, capture and the per-part event chain', () => {
   assert.equal(state.performance.capture.armed, true);
   state = applyMockCommand(state, { cmd: 'disarmCapture' });
   assert.equal(state.performance.capture.armed, false);
+
+  const patternCount = state.performance.patterns.length;
+  const clipCount = state.performance.clips.length;
+  state = applyMockCommand(state, { cmd: 'captureRecentMidi', seconds: 30 });
+  assert.equal(state.performance.patterns.length, patternCount + 1,
+    'retrospective capture creates an ordinary editable pattern');
+  assert.equal(state.performance.clips.length, clipCount + 1,
+    'and one launchable clip that references it');
+  assert.equal(state.performance.capture.lastNoteCount, 4);
+  assert.equal(state.performance.capture.lastPatternId,
+    state.performance.patterns.at(-1).patternId);
+
+  state = applyMockCommand(state, { cmd: 'startMidiLoop' });
+  assert.equal(state.performance.looper.recording, true);
+  assert.equal(state.performance.transport.playing, true,
+    'starting a first pass also starts the shared transport');
+  state = applyMockCommand(state, { cmd: 'finishMidiLoop' });
+  const loopLayer = state.performance.clips.find((clip) => clip.looperLayer);
+  assert.ok(loopLayer?.active, 'closing the first pass creates and starts an independent layer');
+
+  state = applyMockCommand(state, { cmd: 'startMidiLoop', clipId: loopLayer.clipId });
+  assert.equal(state.performance.looper.overdubbing, true);
+  state = applyMockCommand(state, { cmd: 'finishMidiLoop' });
+  assert.equal(state.performance.clips.find((clip) => clip.clipId === loopLayer.clipId).overdubPasses, 1,
+    'finishing an overdub merges one pass without replacing the layer');
+
+  state = applyMockCommand(state, { cmd: 'startGestureRecording', clipId: loopLayer.clipId,
+                                    mode: 'overdub' });
+  assert.equal(state.performance.gestures.recording, true);
+  assert.equal(state.performance.gestures.targetClipId, loopLayer.clipId);
+  state = applyMockCommand(state, { cmd: 'finishGestureRecording' });
+  assert.equal(state.performance.clips.find((clip) => clip.clipId === loopLayer.clipId).gesturePasses, 1,
+    'a gesture pass merges into a MIDI layer');
+  assert.ok(state.performance.patterns.find((pattern) => pattern.patternId === loopLayer.patternId)
+    .lanes.some((lane) => lane.type === 'parameter' && lane.glide),
+  'the recorded movement is editable gliding automation');
+
+  state = applyMockCommand(state, { cmd: 'startGestureRecording' });
+  state = applyMockCommand(state, { cmd: 'finishGestureRecording' });
+  const gestureClip = state.performance.clips.find((clip) => clip.gestureClip);
+  assert.ok(gestureClip?.active, 'a standalone gesture take creates and starts its own clip');
+  const gesturePatternId = gestureClip.patternId;
+  state = applyMockCommand(state, { cmd: 'clearGestureLanes', clipId: gestureClip.clipId });
+  assert.equal(state.performance.patterns.find((pattern) => pattern.patternId === gesturePatternId)
+    .lanes.some((lane) => lane.type === 'parameter'), false, 'Clear removes its automation lanes');
+  state = applyMockCommand(state, { cmd: 'removeClip', clipId: gestureClip.clipId });
+  assert.equal(state.performance.patterns.some((pattern) => pattern.patternId === gesturePatternId), false,
+    'removing a private gesture clip removes its private pattern');
+
+  const loopPatternId = loopLayer.patternId;
+  state = applyMockCommand(state, { cmd: 'removeMidiLoop', clipId: loopLayer.clipId });
+  assert.equal(state.performance.clips.some((clip) => clip.clipId === loopLayer.clipId), false);
+  assert.equal(state.performance.patterns.some((pattern) => pattern.patternId === loopPatternId), false,
+    'removing a layer also removes its private editable pattern');
 
   state = applyMockCommand(state, { cmd: 'setPartMidiFx', partId: 'mock-part-1', transpose: 12,
                                     constrainToScale: true, scaleType: 'dorian' });
@@ -1532,6 +2615,32 @@ test('mock reducer: transport, capture and the per-part event chain', () => {
   assert.equal(state.rack.parts[0].arp.enabled, true);
   assert.equal(state.rack.parts[0].arp.mode, 'up-down');
   assert.equal(state.rack.parts[0].arp.octaves, 3);
+});
+
+test('mock reducer: whole performances record, replay and remove as complete takes', () => {
+  let state = mockHostState();
+  state = applyMockCommand(state, { cmd: 'startPerformanceRecording', name: 'Friday show' });
+  assert.equal(state.performance.performanceRecorder.recording, true);
+  assert.equal(state.performance.performanceRecorder.name, 'Friday show');
+
+  state.performance.performanceRecorder.elapsedSeconds = 9.5;
+  state.performance.performanceRecorder.midiEventCount = 14;
+  state.performance.performanceRecorder.actionCount = 6;
+  state = applyMockCommand(state, { cmd: 'finishPerformanceRecording' });
+  assert.equal(state.performance.performanceRecorder.recording, false);
+  assert.equal(state.performance.performanceTakes.length, 1);
+  assert.equal(state.performance.performanceTakes[0].name, 'Friday show');
+  assert.equal(state.performance.performanceTakes[0].midiEventCount, 14);
+
+  const takeId = state.performance.performanceTakes[0].takeId;
+  state = applyMockCommand(state, { cmd: 'replayPerformanceTake', takeId });
+  assert.equal(state.performance.performanceReplay.state, 'playing');
+  assert.equal(state.performance.performanceReplay.takeId, takeId);
+  state = applyMockCommand(state, { cmd: 'stopPerformanceReplay' });
+  assert.equal(state.performance.performanceReplay.state, 'idle');
+
+  state = applyMockCommand(state, { cmd: 'removePerformanceTake', takeId });
+  assert.equal(state.performance.performanceTakes.length, 0);
 });
 
 // --- Stage 7: the mature generated product ---------------------------------------------------
@@ -1668,6 +2777,14 @@ test('normalizeReliability: safe startup and the recovery report survive a hosti
       lastKnownGoodAt: '2026-08-27T10:00:00',
     },
     damagedState: ['Part 1 state mismatch', 7],
+    automaticFailover: {
+      isolationAvailable: true, enabled: false, maxAttempts: '9', retryDelayMs: '20',
+      events: [
+        { targetId: 'part-1', name: 'Rusty', effect: false, state: 'waiting',
+          attempts: '2', error: 'processor exception', nextAttemptMs: '-10' },
+        { targetId: '', state: 'future-state' },
+      ],
+    },
   });
 
   assert.equal(r.safeMode.level, 'skipSuspects');
@@ -1680,6 +2797,14 @@ test('normalizeReliability: safe startup and the recovery report survive a hosti
   assert.equal(r.recovery.hasLastKnownGood, true);
   assert.equal(r.recovery.lastOperation, 'loadInstrument');
   assert.deepEqual(r.damagedState, ['Part 1 state mismatch', '7']);
+  assert.equal(r.automaticFailover.enabled, false);
+  assert.equal(r.automaticFailover.isolationAvailable, true,
+    'the panel only claims process isolation when the native runtime confirms its worker');
+  assert.equal(r.automaticFailover.maxAttempts, 5, 'attempt policy is clamped');
+  assert.equal(r.automaticFailover.retryDelayMs, 100, 'retry delay is clamped');
+  assert.equal(r.automaticFailover.events.length, 1, 'events without a target are inert');
+  assert.equal(r.automaticFailover.events[0].attempts, 2);
+  assert.equal(r.automaticFailover.events[0].nextAttemptMs, 0);
 
   // An unrecognised level reads as normal, exactly as the native side reads it: a state file
   // from a future build must not leave the panel claiming a safe mode it cannot explain.
@@ -1717,11 +2842,14 @@ test('normalizeSupportBundle: a preview is not a written file', () => {
       { name: 'crash-state/', description: 'None recorded', included: false },
     ],
     includeStateBlobs: false,
+    includeWorkerDumps: true,
   });
 
   assert.equal(preview.entries.length, 2);
   assert.equal(preview.entries[0].sizeBytes, 0, 'sizes arrive as numbers');
   assert.equal(preview.entries[1].included, false, 'an entry that does not apply is still shown');
+  assert.equal(preview.includeWorkerDumps, true,
+    'the review remembers the separate opt-in for memory-bearing worker dumps');
   assert.equal(preview.written, false,
     'a payload with no `written` is a preview — the panel must not claim a file exists');
   assert.equal(preview.path, '');
@@ -1783,6 +2911,24 @@ test('mock reducer: safe startup levels, vouching, and the recovery notice', () 
   state = applyMockCommand(state, { cmd: 'restoreLastKnownGood' });
   assert.deepEqual(state.reliability.damagedState, [],
     'going back to a rig that booted clears what the damaged one reported');
+
+  state.reliability.automaticFailover.events = [{
+    targetId: 'part-1', name: 'Rusty', effect: false, state: 'waiting', attempts: 0,
+    error: 'processor exception', nextAttemptMs: 500,
+  }];
+  state = applyMockCommand(state, { cmd: 'setAutomaticFailover', enabled: false,
+                                    maxAttempts: 8, retryDelayMs: 20 });
+  assert.equal(state.reliability.automaticFailover.enabled, false);
+  assert.equal(state.reliability.automaticFailover.maxAttempts, 5);
+  assert.equal(state.reliability.automaticFailover.retryDelayMs, 100);
+  assert.equal(state.reliability.automaticFailover.events[0].state, 'bypassed',
+    'disabling automatic recovery exposes a pending incident for manual repair');
+  assert.equal(state.reliability.automaticFailover.events[0].nextAttemptMs, 0);
+  state = applyMockCommand(state, { cmd: 'retryFailedProcessor', targetId: 'part-1' });
+  assert.equal(state.reliability.automaticFailover.events[0].state, 'recovered',
+    'manual recovery stays available while automatic attempts are disabled');
+  state = applyMockCommand(state, { cmd: 'dismissFailoverEvent', targetId: 'part-1' });
+  assert.equal(state.reliability.automaticFailover.events.length, 0);
 });
 
 
@@ -1911,18 +3057,31 @@ test('hostMidiActivity: every arrival bumps seq so identical notes still flash',
 test('normalizeHostSurface shapes broker payloads and fails safe on garbage', () => {
   // The broker's own vocabulary passes through untouched.
   assert.deepEqual(
-    normalizeHostSurface({ state: 'connected', detail: 'ready', device: 'CTRL49 USB' }),
-    { state: 'connected', detail: 'ready', device: 'CTRL49 USB' });
+    normalizeHostSurface({ state: 'connected', detail: 'ready', device: 'CTRL49 USB',
+                           pageIndex: 2, activeSlot: 5, padBank: 1,
+                           movementSeq: 12, movingSlot: 5 }),
+    { state: 'connected', detail: 'ready', device: 'CTRL49 USB',
+      pageIndex: 2, activeSlot: 5, padBank: 1, movementSeq: 12, movingSlot: 5 });
   assert.deepEqual(
     normalizeHostSurface({ state: 'heldElsewhere', detail: '', device: '' }),
-    { state: 'heldElsewhere', detail: '', device: '' });
+    { state: 'heldElsewhere', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
+      movementSeq: 0, movingSlot: -1 });
 
   // Anything else — unknown states, missing fields, non-objects — lands on searching,
   // because a status row must never be the thing that crashes the devices panel.
   assert.equal(normalizeHostSurface({ state: 'exploded' }).state, 'searching');
-  assert.deepEqual(normalizeHostSurface(null), { state: 'searching', detail: '', device: '' });
-  assert.deepEqual(normalizeHostSurface('nonsense'), { state: 'searching', detail: '', device: '' });
+  assert.deepEqual(normalizeHostSurface(null),
+    { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
+      movementSeq: 0, movingSlot: -1 });
+  assert.deepEqual(normalizeHostSurface('nonsense'),
+    { state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
+      movementSeq: 0, movingSlot: -1 });
   assert.equal(normalizeHostSurface({ detail: 7, device: 9 }).detail, '7');
+  assert.deepEqual(
+    normalizeHostSurface({ pageIndex: 99, activeSlot: -4, padBank: 8 }),
+    { state: 'searching', detail: '', device: '', pageIndex: 3, activeSlot: 0, padBank: 3,
+      movementSeq: 0, movingSlot: -1 },
+    'hardware indices clamp to the physical surface');
 });
 
 test('slots normalize their MIDI-learn binding and default to unbound', () => {
@@ -2066,7 +3225,7 @@ test('groupParameters folds registry order into named groups with an orphan buck
   assert.deepEqual(groupParameters(null), [], 'garbage folds to nothing');
 });
 
-test('assignedParameterIds reads slots and macros for one target only', () => {
+test('assignedParameterIds reads slots, macros and modulation for one target only', () => {
   const state = normalizeHostState({ rack: {
     pages: [{ pageId: 'p', slots: [
       { slotId: 's1', assigned: true, partId: 'part-a', parameterId: 'cutoff' },
@@ -2074,9 +3233,10 @@ test('assignedParameterIds reads slots and macros for one target only', () => {
       { slotId: 's3' },
     ] }],
     macros: [{ macroId: 'm', targets: [{ targetId: 'part-a', parameterId: 'drive' }] }],
+    modulationRoutes: [{ routeId: 'r', targetId: 'part-a', parameterId: 'resonance' }],
   } });
   const ids = assignedParameterIds(state, 'part-a');
-  assert.deepEqual([...ids].sort(), ['cutoff', 'drive']);
+  assert.deepEqual([...ids].sort(), ['cutoff', 'drive', 'resonance']);
   assert.equal(assignedParameterIds(state, 'part-c').size, 0);
   assert.equal(assignedParameterIds(null, 'part-a').size, 0, 'garbage reads as nothing assigned');
 });
@@ -2153,6 +3313,9 @@ test('the chorder: key maps normalize, and the mock learns and clears', () => {
       keyChords: [{ key: 62, offsets: [-2, 2, 5] }] } },
   ] } });
   assert.equal(shaped.rack.parts[0].midiFx.chord, 'custom keys');
+  assert.equal(shaped.rack.parts[0].midiFx.chordInversion, 0);
+  assert.equal(shaped.rack.parts[0].midiFx.chordVoicing, 'close');
+  assert.equal(shaped.rack.parts[0].midiFx.chordVoiceLeading, false);
   assert.deepEqual(shaped.rack.parts[0].midiFx.keyChords, [{ key: 62, offsets: [-2, 2, 5] }]);
   assert.deepEqual(normalizeHostState({}).rack.parts, [], 'nothing crashes on nothing');
 
@@ -2166,6 +3329,16 @@ test('the chorder: key maps normalize, and the mock learns and clears', () => {
   assert.deepEqual(state.rack.parts[0].midiFx.keyChords, [], 'clear takes it away');
 });
 
+test('Smart Chorder inversion, voicing and nearest-motion rules match the native engine', () => {
+  assert.deepEqual(applySmartChordVoicing([60, 64, 67], { inversion: 1 }), [64, 67, 72]);
+  assert.deepEqual(applySmartChordVoicing([60, 64, 67], { voicing: 'open' }), [60, 67, 76]);
+  assert.deepEqual(applySmartChordVoicing([65, 69, 72], {
+    voiceLeading: true, previous: [60, 64, 67],
+  }), [60, 65, 69], 'F becomes F/C, keeping one common tone and moving the others 1–2 semitones');
+  assert.deepEqual(applySmartChordVoicing([60, 64, 67]), [60, 64, 67],
+    'all-default settings preserve the legacy output exactly');
+});
+
 test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes', () => {
   const shaped = normalizeMidiSlot({ slotId: 's1', type: 'chord', bypassed: true,
                                      fx: { chord: 'diatonic' } });
@@ -2175,6 +3348,13 @@ test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes
   assert.equal(shaped.arp.mode, 'up', 'the unused block is present and defaulted, never undefined');
   assert.equal(normalizeMidiSlot({ type: 'wobble' }).type, 'arp',
     'an unknown module type falls back rather than rendering as nothing');
+  const smartTranspose = normalizeMidiSlot({ type: 'transpose', fx: {
+    transpose: 2, transposeMode: 'diatonic', scaleRoot: 0, scaleType: 'major',
+  } });
+  assert.equal(smartTranspose.fx.transposeMode, 'diatonic');
+  assert.equal(smartTranspose.fx.transpose, 2);
+  assert.equal(normalizeMidiSlot({ type: 'transpose', fx: { transposeMode: 'mystery' } })
+    .fx.transposeMode, 'chromatic', 'old and unknown modes retain semitone transposition');
 
   let state = mockHostState();
   const partId = state.rack.parts[0].partId;
@@ -2191,8 +3371,12 @@ test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes
     'chord ahead of arp — the arrangement the welded chain could not express');
 
   state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: chordId,
-                                    chord: 'diatonic' });
+                                    chord: 'diatonic', chordInversion: 2,
+                                    chordVoicing: 'drop 2', chordVoiceLeading: true });
   assert.equal(chain()[1].fx.chord, 'diatonic', 'options reach the slot they name');
+  assert.equal(chain()[1].fx.chordInversion, 2);
+  assert.equal(chain()[1].fx.chordVoicing, 'drop 2');
+  assert.equal(chain()[1].fx.chordVoiceLeading, true);
 
   state = applyMockCommand(state, { cmd: 'setMidiSlotBypassed', partId, slotId: chordId,
                                     bypassed: true });
@@ -2201,6 +3385,34 @@ test('MIDI slots normalize, and the mock chain adds, moves, bypasses and removes
 
   state = applyMockCommand(state, { cmd: 'removeMidiSlot', partId, slotId: chordId });
   assert.deepEqual(chain().map((s) => s.type), ['fx', 'arp'], 'remove closes the gap');
+
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'transpose' });
+  const transposeId = chain().at(-1).slotId;
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: transposeId,
+                                    transposeMode: 'diatonic', transpose: 3,
+                                    scaleRoot: 9, scaleType: 'minor' });
+  assert.deepEqual({
+    mode: chain().at(-1).fx.transposeMode,
+    amount: chain().at(-1).fx.transpose,
+    root: chain().at(-1).fx.scaleRoot,
+    scale: chain().at(-1).fx.scaleType,
+  }, { mode: 'diatonic', amount: 3, root: 9, scale: 'minor' },
+  'the mock UI command carries all four smart-transpose controls together');
+
+  state = applyMockCommand(state, { cmd: 'addMidiSlot', partId, type: 'humanize' });
+  const humanizeId = chain().at(-1).slotId;
+  state = applyMockCommand(state, { cmd: 'setMidiSlotOptions', partId, slotId: humanizeId,
+                                    humanizeTimingBeats: 0.03, humanizeVelocity: 12,
+                                    humanizeGatePercent: 35, humanizePreserveChords: true,
+                                    humanizeProtectBeats: true });
+  assert.deepEqual({
+    timing: chain().at(-1).mod.humanizeTimingBeats,
+    velocity: chain().at(-1).mod.humanizeVelocity,
+    gate: chain().at(-1).mod.humanizeGatePercent,
+    chords: chain().at(-1).mod.humanizePreserveChords,
+    beats: chain().at(-1).mod.humanizeProtectBeats,
+  }, { timing: 0.03, velocity: 12, gate: 35, chords: true, beats: true },
+  'all Humanizer dimensions and constraints reach its slot');
 
   // The part-level setters are doors onto the chain, so one truth reaches the screen.
   state = applyMockCommand(state, { cmd: 'setPartArp', partId, mode: 'down' });
@@ -2225,6 +3437,8 @@ test('group buses: parts join one, removal releases them, loops are refused', ()
   state = applyMockCommand(state, { cmd: 'addBus', name: 'Keys' });
   state = applyMockCommand(state, { cmd: 'addBus', name: 'Sub' });
   const [keys, sub] = state.rack.buses.map((x) => x.busId);
+  state = applyMockCommand(state, { cmd: 'renameBus', busId: keys, name: 'Keys Group' });
+  assert.equal(state.rack.buses[0].name, 'Keys Group');
 
   state = applyMockCommand(state, { cmd: 'setPartDestination', partId: a, busId: keys });
   state = applyMockCommand(state, { cmd: 'setPartDestination', partId: b, busId: keys });

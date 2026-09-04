@@ -8,8 +8,6 @@ namespace ceditor::host
 
 HostRuntimeShell::HostRuntimeShell()
 {
-    formatManager.addFormat (new juce::VST3PluginFormat());
-
     addChildComponent (editorPane);
     editorPane.onLayoutChanged = [this] { resized(); };
 
@@ -84,7 +82,10 @@ HostRuntimeShell::HostRuntimeShell()
             });
     };
 
-    options.instantiate = makePluginInstantiator (formatManager);
+    const auto liveWorker = findHostLiveWorker ({ options.dataDirectory });
+    options.livePluginIsolationAvailable = liveWorker.existsAsFile();
+    options.instantiate = makeIsolatedPluginInstantiator (
+        liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
     options.applyVstPreset = applyVstPresetFile;
     options.enableAudio = true;   // the shell is the Performance Runtime: it owns the device
 
@@ -108,11 +109,14 @@ HostRuntimeShell::HostRuntimeShell()
                     safe->emitToWebView (eventName, payload);
             });
         };
-        surfaceOptions.pageLua.assign (surface::assets::kKnobPageLua,
-                                       surface::assets::kKnobPageLua + surface::assets::kKnobPageLuaSize);
+        surfaceOptions.pageLua.assign (surface::assets::kHostagePageLua,
+                                       surface::assets::kHostagePageLua + surface::assets::kHostagePageLuaSize);
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        surfaceOptions.pngAssets.push_back ({ 0x0210,
+            surface::Bytes (surface::assets::kHostageLogoPng,
+                            surface::assets::kHostageLogoPng + surface::assets::kHostageLogoPngSize) });
         surfaceBroker = std::make_unique<surface::Ctrl49SurfaceBroker> (*service,
                                                                         std::move (surfaceOptions));
     }

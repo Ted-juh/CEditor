@@ -1,4 +1,4 @@
-// Ctrl49RackDisplay — the rack surface's display payloads (VIP-successor Stage 3).
+// Ctrl49RackDisplay — Hostage rack display payloads for the CTRL49.
 //
 // The proven multiknob Lua page takes two calls: set_labels ([titleLen][title][8x[len][label]],
 // ASCII) and set_values (the 22-byte state the reducer documents). For the RACK surface the

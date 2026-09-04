@@ -4,7 +4,7 @@
 #include <functional>
 #include <vector>
 
-// SurfaceProfile — how a controller family joins the product (VIP-successor Stage 7, §18.9.5).
+// SurfaceProfile — how a controller family joins Hostage.
 //
 // The baseline's rule for new hardware is a process, not a feature: capture the protocol, add
 // a transport only if the device needs one, define a profile and a page renderer, run

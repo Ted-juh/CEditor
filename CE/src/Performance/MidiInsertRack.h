@@ -6,6 +6,7 @@
 
 #include "ArpEngine.h"
 #include "NoteModules.h"
+#include "MpeTransformer.h"
 #include "MidiFxChain.h"
 #include "PatternModel.h"
 
@@ -76,14 +77,15 @@ private:
         bool bypassed = false;
         std::unique_ptr<MidiFxChain> fx;    // transpose / scale / chord / velocity / fx
         std::unique_ptr<ArpEngine> arp;     // "arp"
-        // The six later modules. One pointer each rather than a variant: each is a small
-        // object, only one is ever non-null, and a chain of ifs beats a visitor for six.
+        // The later modules. One pointer each rather than a variant: each is a small
+        // object, only one is ever non-null, and a short chain of ifs beats a visitor here.
         std::unique_ptr<NoteEchoEngine> echo;
         std::unique_ptr<StrumEngine> strum;
         std::unique_ptr<HumanizeEngine> humanize;
         std::unique_ptr<ChanceEngine> chance;
         std::unique_ptr<NoteLengthEngine> length;
         std::unique_ptr<LatchEngine> latch;
+        std::unique_ptr<MpeTransformerEngine> mpe;
     };
 
     static void releaseNoteModules (Module& module, juce::MidiBuffer& out, int position);

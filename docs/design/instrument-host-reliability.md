@@ -1,6 +1,6 @@
 # Reliability, diagnostics and the support bundle
 
-The §17 layer of the VIP-successor baseline, built after the seven functionality stages and
+The §17 layer of the Hostage baseline, built after the seven functionality stages and
 recorded here because §18.12 requires it: every stage handover must carry known limitations, a
 compatibility matrix, updated diagnostics and support-bundle fields, and the architecture
 decisions where implementation deviated from the plan. Those four were the ones nobody had
@@ -45,6 +45,7 @@ The rest is what this layer closed.
 | **Architecture check** | `PluginCatalog::architecturesOf`, `hostArchitecture` | **here** |
 | **Safe mode without third-party plug-ins** | `SafeMode::Level::noThirdParty` | **here** |
 | Editor before instance destruction, generic fallback, load errors caught | `InstrumentRackHost`, `PluginEditorHost` | Stage 1–2 |
+| **Contain a live processor's C++ exception and retry from saved state** | `GuardedPluginProcessor`, `InstrumentHostService` | **here** |
 | **Validate architecture records before loading** | `ModuleRecord::unavailableReason` at both refusal sites | **here** |
 | Last explicitly saved session | `session-performance.json` | Stage 1 |
 | Rolling recovery snapshots | `session-revisions/` | Stage 5 |
@@ -59,12 +60,12 @@ The rest is what this layer closed.
 | WebView2: local content only, structured JSON, no arbitrary host objects | `ValueTreeBridge` | pre-existing |
 | **Support bundle** | `SupportBundle` | **here** |
 
-Two rows are deliberately *not* claimed. §17.5's "transactions, write-ahead logging, periodic
+One row is deliberately *not* claimed. §17.5's "transactions, write-ahead logging, periodic
 integrity check" describes a SQLite-shaped store; the catalogue and library are JSON documents
 written whole through `replaceWithText`, which is atomic enough for a document of this size and
-has no transaction log to keep. §17.3's "crash dumps where available" is not a minidump — what
-this product preserves is the rack state that was live at an interruption, which is what a
-diagnosis of *this* product needs. The bundle calls it that and not a crash dump.
+has no transaction log to keep. The newer live-worker boundary does implement §17.3's Windows
+minidump path in source. Interrupted Hostage state and worker minidumps remain distinct bundle
+entries because they answer different questions and carry different privacy risks.
 
 ---
 
@@ -153,6 +154,39 @@ The bundle records which choice was made, so "no blobs here" cannot be mistaken 
 had none". And previewing writes nothing: "with user review" only means something if the review
 happens before the file exists.
 
+The live plug-in boundary adds two and only two log paths to that allowlist:
+`logs/live-worker-events.jsonl` and its rotated `live-worker-events.previous.jsonl`. Each line is
+a bounded JSON object describing a launch, handshake, control failure, exit or forced stop by
+timestamp, worker generation and plug-in name. It deliberately contains neither opaque plug-in
+state nor parameter values. Writes from the standalone and VST3 wrapper are serialised across
+processes, and rotation caps each diagnostic window at 512 KiB so a crash loop cannot consume the
+disk. A missing file remains visible-but-not-included in the preview; it is never fabricated in
+the exported zip.
+
+Worker minidumps are stricter. The crash reporter writes `MiniDumpNormal` plus thread and unloaded-
+module metadata—never full-process memory—to one of eight fixed ring filenames. Those exact slots
+are the allowlist, so a different `.dmp` placed beside them cannot travel. Existing dumps appear in
+the preview as excluded by default. Export requires a separate `includeWorkerDumps` choice, warns
+that stack memory and local paths may be present, preserves the binary bytes, and records the choice
+as `workerMinidumpsIncluded` in the bundle manifest. Each dump may have one equally bounded JSON
+sidecar containing its plug-in identity and the SHA-256 of the exact worker executable. The host
+computes that fingerprint before launch, verifies it in the worker handshake, and the crash reporter
+uses only precomputed bytes. A sidecar is allowlisted only while its matching dump exists and travels
+only behind the same explicit opt-in; unrelated JSON in the directory remains excluded.
+
+After extracting an explicitly reviewed support bundle, resolve its sidecar against retained private
+symbols with:
+
+```powershell
+node tools/scripts/resolve-worker-symbols.mjs `
+  --metadata .\extracted-bundle\crash-dumps\live-worker-slot-03.json `
+  --symbols .\build\host-product\private-symbols
+```
+
+The resolver is read-only. It accepts only a strict SHA-256 identity, ignores symlinked archive
+directories, confines every PDB name to its manifest directory, and then hashes the PDB again before
+printing a match. Use `build\package\private-symbols` for a CEditor-package crash instead.
+
 ---
 
 ## Bridge and state contract
@@ -166,13 +200,21 @@ New commands on the one `instrumentHost` listener:
 | `clearAllSafeModeSuspects` | — | Same, for all of them. |
 | `acknowledgeRecovery` | — | Clears the interruption notice. Never the known-good offer. |
 | `restoreLastKnownGood` | — | Restores the last rig known to boot, and saves it as the live session. |
-| `previewSupportBundle` | `{ includeStateBlobs?, includeCrashStates?, includeLogs? }` | Answers `instrumentHostSupportBundle`. Writes nothing. |
+| `setAutomaticFailover` | `{ enabled?, maxAttempts?, retryDelayMs? }` | Sets the live processor retry policy. Attempts clamp to 1–5 and the initial delay to 100–10,000 ms. |
+| `retryFailedProcessor` | `{ targetId }` | Re-instantiates one failed instrument or effect immediately, even when automatic retry is off. |
+| `dismissFailoverEvent` | `{ targetId }` | Removes a recovered, failed or bypassed incident from the Reliability panel. It does not unload the processor. |
+| `previewSupportBundle` | `{ includeStateBlobs?, includeCrashStates?, includeLogs?, includeWorkerDumps? }` | Answers `instrumentHostSupportBundle`. Writes nothing. Worker dumps default off. |
 | `exportSupportBundle` | the same, plus `{ path? }` | Writes the zip, then answers with `written` and `path`. |
 
 New event: **`instrumentHostSupportBundle`** — `{ entries: [{ name, description, sizeBytes,
-included, note }], includeStateBlobs, written?, path? }`. The same event carries the preview and
+included, note }], includeStateBlobs, includeWorkerDumps, written?, path? }`. The same event carries the preview and
 the export; a payload with no `written` is a preview, and the panel must not report a file that
 does not exist.
+
+The bounded scripting surface also emits **`pluginFailover`** with `{ targetId, name, effect,
+automatic }` when a live processor is first disabled. It carries no vendor state or parameter
+data; scripts can announce or log the incident without gaining a second control path into the
+failed object.
 
 New top-level block in `instrumentHostState`:
 
@@ -182,6 +224,10 @@ reliability: {
   refusedThisRun: [{ modulePath, name, reason }],
   recovery:       { interrupted, lastOperation, lastOperationDetail,
                     preservedStateFile, hasLastKnownGood, lastKnownGoodAt },
+  automaticFailover: {
+    enabled, maxAttempts, retryDelayMs,
+    events: [{ targetId, name, effect, state, attempts, error, nextAttemptMs }]
+  },
   damagedState:   [ "…" ],
 }
 ```
@@ -193,16 +239,17 @@ empty when the module is on offer).
 
 ## State and schema migrations
 
-**None are required, and that is a decision rather than an omission.** Two additive fields
+**None are required, and that is a decision rather than an omission.** Three additive fields
 landed:
 
 | Field | In | Absent means |
 |---|---|---|
 | `architectures` | the catalogue's module records | not yet read — treated as supported |
 | `stateBlobHash` | every part and effect slot in a Performance | written before hashes existed — unchecked, never "damaged" |
+| `automaticFailover` | a Performance | enabled, three attempts, 500 ms initial delay |
 
-Both have a safe absent reading, both are ignored by an older build reading a newer file, and
-neither changes the meaning of any existing field. So `PluginCatalog`'s stored `version` stays
+All three have a safe absent reading, all are ignored by an older build reading a newer file,
+and none changes the meaning of any existing field. So `PluginCatalog`'s stored `version` stays
 1 and `Performance::currentSchemaVersion` stays 2. Bumping a schema version for a purely
 additive field would make every older session report a compatibility caveat it does not have.
 
@@ -214,6 +261,9 @@ New files in the per-user data directory:
 | `operation.marker` | around each plug-in load and each restore | once at startup, then deleted |
 | `session-last-known-good.json` | after a clean restore of a clean rig | on `restoreLastKnownGood` |
 | `crash-state/session-at-*.json` | at startup when a marker was found; pruned to 8 | by the support bundle |
+| `logs/live-worker-events.jsonl` | on live-worker lifecycle/control failures; rotated at 512 KiB | support-bundle allowlist |
+| `logs/live-worker-events.previous.jsonl` | when the current worker log rotates | support-bundle allowlist |
+| `crash-dumps/live-worker-slot-00.dmp` … `07.dmp` | an unhandled worker exception overwrites its fixed ring slot | support preview; export only with explicit dump opt-in |
 
 ---
 
@@ -231,6 +281,12 @@ rather than a mocked call:
 | A plug-in live at an abnormal termination | a planted `active-hosting.marker` — which is exactly what the file looks like either way | `InstrumentHostServiceTests::testSafeStartup` |
 | An interrupted run | a planted `operation.marker` plus an edited live session, so preserved-versus-known-good is a real distinction | `InstrumentHostServiceTests::testSessionRecovery` |
 | A damaged state blob | a manifest whose `stateBlob` and `stateBlobHash` disagree | same |
+| A processor that throws during audio processing | throwing instrument and effect stubs; the instrument is silenced, the effect returns its dry input, and the incident edge is consumed once | `RackHostTests::testProcessorFailureContainment` |
+| A processor that fails once and can be recreated | a stateful synth stub whose first instance throws and whose replacements do not | `InstrumentHostServiceTests::testAutomaticFailover` |
+| Worker diagnostic rotation or an unrelated lookalike log | a real 512 KiB current log plus `logs/unrelated-worker-notes.txt` | `InstrumentHostServiceTests::{testLiveWorkerDiagnostics,testSupportBundle}` |
+| An unhandled native plug-in fault | access-violation worker plus actual `MDMP` signature check; support test also plants an unrelated `.dmp` | `PluginWorkerIsolationTests::testUnhandledWorkerCreatesMinidump`; `InstrumentHostServiceTests::testSupportBundle` |
+| Supported live-worker block sizes and repeated slot reuse | one worker is re-prepared at 16, 64, 128, 256, 512, 1024, 2048, 4096 and 8192 samples, with 12 processed round trips at each size | `PluginWorkerIsolationTests::testSupportedBlockSizeSoak` |
+| A representative installed VST3 | scanner subprocess selects a real class; isolated proxy prepares, processes audio/MIDI, round-trips non-empty state and confirms worker liveness | opt-in `CEditorPluginWorkerRealVstSmoke` target; source present, deferred native run pending |
 | A licence file, a token and a stray document in the data directory | planted, then the exported zip is read back | `InstrumentHostServiceTests::testSupportBundle` |
 
 ---
@@ -247,7 +303,7 @@ developed in; the product's own platform is Windows.
 | Parameters, control pages, surface runtime | `Ctrl49*` suites on Linux | a physical CTRL49 |
 | Transport, patterns, clips, scenes, setlists | `PerformanceEngine` on Linux | a real MIDI clock master |
 | Service commands, persistence, restore, recovery, safe startup, support bundle | `InstrumentHostService` on Linux | — |
-| Web surfaces | 4,169 node tests + Playwright over `host.html` | WebView2 (the app uses it, the tests use Chromium) |
+| Web surfaces | 4,322 Node tests (4,320 passed, 2 skipped) plus the existing rendered `host.html` pass | WebView2 (the app uses it, the tests use Chromium) |
 | App, player and plug-in link | — | Windows only: `dwmapi` |
 | MSVC's opinion of the source | — | Windows only |
 | DAW transport sync, host automation, multi-out buses | `Transport` and the processor unit-tested | a real DAW |
@@ -257,9 +313,37 @@ developed in; the product's own platform is Windows.
 
 These are true of the tree as it stands and are recorded so they are not mistaken for oversights.
 
-- **A crash dump is not collected.** What is preserved is the rack state at an interruption. On
-  Windows a real minidump would need an unhandled-exception filter and a symbol story; neither
-  is built, and the bundle does not claim otherwise.
+- **Worker minidumps are implemented in source but not yet native-binary verified.** The worker
+  installs its unhandled-exception filter before vendor construction and DbgHelp writes a bounded
+  stack/module dump without full memory. The fixture raises an actual access violation and checks
+  the `MDMP` signature, but that Windows test has not run under the user-deferred rebuild. Optimized
+  Release workers are configured to emit a full linker PDB, and both editor and generated-product
+  packaging retain the exact worker/PDB pair in a content-addressed private archive outside the
+  customer staging tree. A fixed JSON crash sidecar carries that executable hash for direct archive
+  lookup. Whether MSVC emits and the packaging run retains those files still belongs to the deferred
+  native gate.
+- **Live process isolation is implemented in source but not native-binary verified.** Product and
+  editor instantiation now create one `CEditorPluginWorker` per plug-in behind an
+  `IsolatedPluginProxy`. The proxy never blocks its audio callback, reports one block of latency,
+  returns dry/silent fallback and feeds process death or a hung worker into the existing retry
+  state machine. The rack's controlling thread terminates the failed worker even when automatic
+  retry is disabled, and polls liveness so editor/control crashes are found while transport is
+  stopped; parameters and program lists remain available through the proxy. A bounded structured
+  lifecycle/error log is present and explicitly included in the support-bundle preview/export.
+  Before either the real worker or controlled fixture sends its handshake, it joins a host-owned
+  Windows Job Object with kill-on-close, no unhandled-fault dialog and a 64-process tree ceiling.
+  CPU and address space are not capped: fixed quotas would make real-time spikes and large sample
+  libraries look like plug-in faults.
+  Protocol/data-plane unit tests, a crash/hang process fixture and a default-off real-VST smoke
+  harness are present, but the user-requested native rebuild has not been run. Until it is,
+  access-violation and real-VST containment remain source claims rather than shipped proof.
+- **Vendor editors are worker-owned top-level windows.** The Hostage editor pane shows a small
+  status surface while the real vendor UI stays in its isolated process. Cross-process HWND
+  embedding is intentionally avoided because plug-in toolkits and per-monitor DPI handling make
+  it substantially less reliable than a worker-owned window.
+- **The retry restores the last captured state, not unsaved changes made inside the plug-in
+  since that capture.** Normal session and performance saves refresh the state blob. The guard
+  deliberately does not call vendor state serialization after the processor has failed.
 - **The architecture check reads three binary formats.** A module in a format none of them
   recognise reads as unknown, which means supported, which means it is offered and may fail at
   load. That is the deliberate direction to fail in.
@@ -315,6 +399,15 @@ proves; a step that cannot be run is a gap to report rather than a step to skip.
    `"stateBlobsIncluded": false`.
 8. **Explicit inclusion.** Turn on "Include each plug-in's own saved state" and export again.
    *Expect:* the blobs are present, the manifest says so, and `licence.key` still is not.
+9. **Live failover.** In a controlled debug plug-in, throw a C++ exception from
+   `processBlock`. *Expect:* the affected instrument becomes silent or the affected effect
+   becomes dry; the rest of the rack keeps playing; the Reliability panel names the plug-in,
+   counts retry attempts, and either reports recovery or leaves a visible Retry button.
+10. **Representative real VST3 boundary.** Build the default-off smoke target, then run
+    `tools/scripts/run-real-vst-acceptance.ps1` with one installed instrument and one installed
+    effect. *Expect:* both scanner jobs and both isolated workers pass twelve 48 kHz / 256-sample
+    blocks, state retrieval (and restore when non-empty), and liveness checks; the command ends in
+    one `REAL_VST_ACCEPTANCE` record with `"ok":true`.
 
 ## Demonstration
 

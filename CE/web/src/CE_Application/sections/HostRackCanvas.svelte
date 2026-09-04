@@ -175,6 +175,7 @@
                       data-testid={`canvas-node-${node.id}`}
                       title={label}
                       aria-label={label}
+                      role={node.kind === 'part' ? undefined : 'group'}
                       draggable="true"
                       style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}
                       ondragstart={(e) => dragStart(e, node)}

@@ -113,6 +113,7 @@ Performance Performance::create()
 {
     Performance p;
     p.performanceId = juce::Uuid().toDashedString();
+    p.grooves = perf::GrooveTemplate::factoryTemplates();
     return p;
 }
 
@@ -138,6 +139,19 @@ bool Performance::removePart (const juce::String& partId)
         return false;
 
     parts.remove (index);
+
+    // A layer cannot retain a destination that no longer exists. A one-member group is no
+    // longer a routing decision, so dissolve it and let that remaining part return to the
+    // ordinary keyboard path.
+    for (int groupIndex = layerGroups.size(); --groupIndex >= 0;)
+    {
+        auto& group = layerGroups.getReference (groupIndex);
+        for (int memberIndex = group.members.size(); --memberIndex >= 0;)
+            if (group.members.getReference (memberIndex).partId == partId)
+                group.members.remove (memberIndex);
+        if (group.members.size() < 2)
+            layerGroups.remove (groupIndex);
+    }
 
     if (focusedPartId == partId)
         focusedPartId = parts.isEmpty() ? juce::String() : parts.getReference (0).partId;
@@ -188,12 +202,67 @@ const Macro* Performance::findMacro (const juce::String& macroId) const
     return const_cast<Performance*> (this)->findMacro (macroId);
 }
 
+MidiLfo* Performance::findMidiLfo (const juce::String& lfoId)
+{
+    for (auto& lfo : midiLfos)
+        if (lfo.lfoId == lfoId)
+            return &lfo;
+    return nullptr;
+}
+
+const MidiLfo* Performance::findMidiLfo (const juce::String& lfoId) const
+{
+    return const_cast<Performance*> (this)->findMidiLfo (lfoId);
+}
+
+EnvelopeGenerator* Performance::findEnvelope (const juce::String& envelopeId)
+{
+    for (auto& envelope : envelopes)
+        if (envelope.envelopeId == envelopeId)
+            return &envelope;
+    return nullptr;
+}
+
+const EnvelopeGenerator* Performance::findEnvelope (const juce::String& envelopeId) const
+{
+    return const_cast<Performance*> (this)->findEnvelope (envelopeId);
+}
+
 ReturnChain* Performance::findReturn (const juce::String& returnId)
 {
     for (auto& chain : returns)
         if (chain.returnId == returnId)
             return &chain;
     return nullptr;
+}
+
+MsegGenerator* Performance::findMseg (const juce::String& msegId)
+{
+    for (auto& mseg : msegs)
+        if (mseg.msegId == msegId)
+            return &mseg;
+    return nullptr;
+}
+
+const MsegGenerator* Performance::findMseg (const juce::String& msegId) const
+{
+    for (const auto& mseg : msegs)
+        if (mseg.msegId == msegId)
+            return &mseg;
+    return nullptr;
+}
+
+RandomModulator* Performance::findRandomModulator (const juce::String& randomId)
+{
+    for (auto& random : randomModulators)
+        if (random.randomId == randomId)
+            return &random;
+    return nullptr;
+}
+
+const RandomModulator* Performance::findRandomModulator (const juce::String& randomId) const
+{
+    return const_cast<Performance*> (this)->findRandomModulator (randomId);
 }
 
 const ReturnChain* Performance::findReturn (const juce::String& returnId) const
@@ -388,6 +457,7 @@ juce::var Performance::toVar() const
         p->setProperty ("midiSourcePartId", part.midiSourcePartId);
         p->setProperty ("lastPresetRecordId", part.lastPresetRecordId);
         p->setProperty ("lastPresetName",     part.lastPresetName);
+        p->setProperty ("microtuningEnabled", part.microtuningEnabled);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
         // The legacy blocks are mirrors now, not the source of truth: they carry the first
@@ -509,9 +579,158 @@ juce::var Performance::toVar() const
         auto* m = new juce::DynamicObject();
         m->setProperty ("macroId", macro.macroId);
         m->setProperty ("name",    macro.name);
-        m->setProperty ("value",   macro.value);
+        auto storedValue = macro.value;
+        for (const auto& route : modulationRoutes)
+            if (route.targetId == macro.macroId && route.parameterId == "@macro")
+            {
+                storedValue = route.baseValue;
+                break;
+            }
+        m->setProperty ("value",   storedValue);
         m->setProperty ("targets", targetVars);
         macroVars.add (juce::var (m));
+    }
+
+    juce::Array<juce::var> modulationVars;
+    for (const auto& route : modulationRoutes)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("routeId",       route.routeId);
+        r->setProperty ("sourceType",    route.sourceType);
+        r->setProperty ("sourceId",      route.sourceId);
+        r->setProperty ("sourceChannel", route.sourceChannel);
+        r->setProperty ("sourceNumber",  route.sourceNumber);
+        r->setProperty ("targetId",      route.targetId);
+        r->setProperty ("targetCeId",    route.targetCeId);
+        r->setProperty ("parameterId",   route.parameterId);
+        r->setProperty ("amount",        route.amount);
+        r->setProperty ("baseValue",     route.baseValue);
+        r->setProperty ("enabled",       route.enabled);
+        modulationVars.add (juce::var (r));
+    }
+
+    juce::Array<juce::var> lfoVars;
+    for (const auto& lfo : midiLfos)
+    {
+        juce::Array<juce::var> outputVars;
+        for (const auto& output : lfo.outputs)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("outputId",      output.outputId);
+            o->setProperty ("type",          output.type);
+            o->setProperty ("targetPartId",  output.targetPartId);
+            o->setProperty ("channel",       output.channel);
+            o->setProperty ("number",        output.number);
+            o->setProperty ("sysexTemplate", output.sysexTemplate);
+            o->setProperty ("enabled",       output.enabled);
+            outputVars.add (juce::var (o));
+        }
+
+        auto* l = new juce::DynamicObject();
+        l->setProperty ("lfoId",       lfo.lfoId);
+        l->setProperty ("name",        lfo.name);
+        l->setProperty ("shape",       lfo.shape);
+        l->setProperty ("enabled",     lfo.enabled);
+        l->setProperty ("sync",        lfo.sync);
+        l->setProperty ("rateHz",      lfo.rateHz);
+        l->setProperty ("syncBeats",   lfo.syncBeats);
+        l->setProperty ("phaseOffset", lfo.phaseOffset);
+        l->setProperty ("minimum",     lfo.minimum);
+        l->setProperty ("maximum",     lfo.maximum);
+        l->setProperty ("outputs",     outputVars);
+        lfoVars.add (juce::var (l));
+    }
+
+    juce::Array<juce::var> envelopeVars;
+    for (const auto& envelope : envelopes)
+    {
+        auto* e = new juce::DynamicObject();
+        e->setProperty ("envelopeId",    envelope.envelopeId);
+        e->setProperty ("name",          envelope.name);
+        e->setProperty ("enabled",       envelope.enabled);
+        e->setProperty ("channel",       envelope.channel);
+        e->setProperty ("noteLow",       envelope.noteLow);
+        e->setProperty ("noteHigh",      envelope.noteHigh);
+        e->setProperty ("retrigger",     envelope.retrigger);
+        e->setProperty ("attackMs",      envelope.attackMs);
+        e->setProperty ("decayMs",       envelope.decayMs);
+        e->setProperty ("sustain",       envelope.sustain);
+        e->setProperty ("releaseMs",     envelope.releaseMs);
+        e->setProperty ("curve",         envelope.curve);
+        e->setProperty ("velocityAmount", envelope.velocityAmount);
+        envelopeVars.add (juce::var (e));
+    }
+
+    juce::Array<juce::var> msegVars;
+    for (const auto& mseg : msegs)
+    {
+        juce::Array<juce::var> pointVars;
+        for (const auto& point : mseg.points)
+        {
+            auto* p = new juce::DynamicObject();
+            p->setProperty ("pointId",  point.pointId);
+            p->setProperty ("position", point.position);
+            p->setProperty ("value",    point.value);
+            p->setProperty ("curve",    point.curve);
+            pointVars.add (juce::var (p));
+        }
+        auto* m = new juce::DynamicObject();
+        m->setProperty ("msegId",      mseg.msegId);
+        m->setProperty ("name",        mseg.name);
+        m->setProperty ("enabled",     mseg.enabled);
+        m->setProperty ("sync",        mseg.sync);
+        m->setProperty ("rateHz",      mseg.rateHz);
+        m->setProperty ("syncBeats",   mseg.syncBeats);
+        m->setProperty ("phaseOffset", mseg.phaseOffset);
+        m->setProperty ("points",      pointVars);
+        msegVars.add (juce::var (m));
+    }
+
+    juce::Array<juce::var> randomVars;
+    for (const auto& random : randomModulators)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("randomId",    random.randomId);
+        r->setProperty ("name",        random.name);
+        r->setProperty ("mode",        random.mode);
+        r->setProperty ("enabled",     random.enabled);
+        r->setProperty ("sync",        random.sync);
+        r->setProperty ("rateHz",      random.rateHz);
+        r->setProperty ("syncBeats",   random.syncBeats);
+        r->setProperty ("seed",        random.seed);
+        r->setProperty ("probability", random.probability);
+        r->setProperty ("smoothing",   random.smoothing);
+        r->setProperty ("stepSize",    random.stepSize);
+        r->setProperty ("chaos",       random.chaos);
+        r->setProperty ("minimum",     random.minimum);
+        r->setProperty ("maximum",     random.maximum);
+        randomVars.add (juce::var (r));
+    }
+
+    juce::Array<juce::var> layerGroupVars;
+    for (const auto& group : layerGroups)
+    {
+        juce::Array<juce::var> memberVars;
+        for (const auto& member : group.members)
+        {
+            auto* m = new juce::DynamicObject();
+            m->setProperty ("partId",    member.partId);
+            m->setProperty ("minimum",   member.minimum);
+            m->setProperty ("maximum",   member.maximum);
+            m->setProperty ("crossfade", member.crossfade);
+            memberVars.add (juce::var (m));
+        }
+
+        auto* g = new juce::DynamicObject();
+        g->setProperty ("layerGroupId", group.layerGroupId);
+        g->setProperty ("name",         group.name);
+        g->setProperty ("enabled",      group.enabled);
+        g->setProperty ("allocation",   group.allocation);
+        g->setProperty ("source",       group.source);
+        g->setProperty ("controller",   group.controller);
+        g->setProperty ("macroId",      group.macroId);
+        g->setProperty ("members",      memberVars);
+        layerGroupVars.add (juce::var (g));
     }
 
     auto* root = new juce::DynamicObject();
@@ -545,6 +764,10 @@ juce::var Performance::toVar() const
     for (const auto& pattern : patterns)
         patternVars.add (perf::patternToVar (pattern));
 
+    juce::Array<juce::var> grooveVars;
+    for (const auto& groove : grooves)
+        grooveVars.add (perf::grooveTemplateToVar (groove));
+
     juce::Array<juce::var> clipVars;
     for (const auto& clip : clips)
         clipVars.add (perf::clipToVar (clip));
@@ -552,6 +775,34 @@ juce::var Performance::toVar() const
     juce::Array<juce::var> sceneVars;
     for (const auto& scene : scenes)
         sceneVars.add (perf::sceneToVar (scene));
+
+    juce::Array<juce::var> performanceTakeVars;
+    for (const auto& take : performanceTakes)
+    {
+        juce::Array<juce::var> actionVars;
+        for (const auto& action : take.actions)
+        {
+            auto* a = new juce::DynamicObject();
+            a->setProperty ("sampleOffset", action.sampleOffset);
+            a->setProperty ("commandJson", action.commandJson);
+            actionVars.add (juce::var (a));
+        }
+
+        auto* t = new juce::DynamicObject();
+        t->setProperty ("takeId", take.takeId);
+        t->setProperty ("name", take.name);
+        t->setProperty ("createdAt", take.createdAt);
+        t->setProperty ("sampleRate", take.sampleRate);
+        t->setProperty ("durationSamples", take.durationSamples);
+        t->setProperty ("startPositionPpq", take.startPositionPpq);
+        t->setProperty ("transportWasPlaying", take.transportWasPlaying);
+        t->setProperty ("initialStateJson", take.initialStateJson);
+        t->setProperty ("midiData", take.midiDataBase64);
+        t->setProperty ("midiEventCount", take.midiEventCount);
+        t->setProperty ("actions", actionVars);
+        t->setProperty ("truncated", take.truncated);
+        performanceTakeVars.add (juce::var (t));
+    }
 
     // Written last of the lists so the prune below can see every live id. A position whose
     // node has gone is dropped rather than kept: a stale entry is invisible until the id is
@@ -574,6 +825,20 @@ juce::var Performance::toVar() const
             }
     }
 
+    juce::Array<juce::var> tuningDegrees;
+    for (const auto cents : microtuning.degreesCents)
+        tuningDegrees.add (cents);
+    auto* tuning = new juce::DynamicObject();
+    tuning->setProperty ("enabled",            microtuning.enabled);
+    tuning->setProperty ("name",               microtuning.name);
+    tuning->setProperty ("sourceName",         microtuning.sourceName);
+    tuning->setProperty ("rootMidiNote",       microtuning.rootMidiNote);
+    tuning->setProperty ("referenceMidiNote",  microtuning.referenceMidiNote);
+    tuning->setProperty ("referenceFrequency", microtuning.referenceFrequency);
+    tuning->setProperty ("mtsDeviceId",        microtuning.mtsDeviceId);
+    tuning->setProperty ("mtsProgram",         microtuning.mtsProgram);
+    tuning->setProperty ("degreesCents",       tuningDegrees);
+
     root->setProperty ("canvasPositions", positionVars);
     root->setProperty ("schemaVersion", currentSchemaVersion);
     root->setProperty ("masterLevel",   masterLevel);
@@ -583,12 +848,39 @@ juce::var Performance::toVar() const
     root->setProperty ("returns",       returnVars);
     root->setProperty ("buses",         busVars);
     root->setProperty ("macros",        macroVars);
+    root->setProperty ("midiLfos",      lfoVars);
+    root->setProperty ("envelopes",     envelopeVars);
+    root->setProperty ("msegs",         msegVars);
+    root->setProperty ("randomModulators", randomVars);
+    root->setProperty ("layerGroups",   layerGroupVars);
+    root->setProperty ("modulationRoutes", modulationVars);
     root->setProperty ("pages",         pageVars);
     root->setProperty ("transport",     perf::transportSettingsToVar (transport));
+    root->setProperty ("grooves",       grooveVars);
     root->setProperty ("patterns",      patternVars);
     root->setProperty ("clips",         clipVars);
     root->setProperty ("scenes",        sceneVars);
     root->setProperty ("setlist",       perf::setlistToVar (setlist));
+    root->setProperty ("arrangement",   perf::arrangementToVar (arrangement));
+    root->setProperty ("performanceTakes", performanceTakeVars);
+    root->setProperty ("microtuning",   juce::var (tuning));
+    {
+        auto* audition = new juce::DynamicObject();
+        audition->setProperty ("enabled",      presetAudition.enabled);
+        audition->setProperty ("phrase",       presetAudition.phrase);
+        audition->setProperty ("rootNote",     presetAudition.rootNote);
+        audition->setProperty ("velocity",     presetAudition.velocity);
+        audition->setProperty ("noteLengthMs", presetAudition.noteLengthMs);
+        audition->setProperty ("gapMs",        presetAudition.gapMs);
+        root->setProperty ("presetAudition", juce::var (audition));
+    }
+    {
+        auto* failover = new juce::DynamicObject();
+        failover->setProperty ("enabled", automaticFailover.enabled);
+        failover->setProperty ("maxAttempts", automaticFailover.maxAttempts);
+        failover->setProperty ("retryDelayMs", automaticFailover.retryDelayMs);
+        root->setProperty ("automaticFailover", juce::var (failover));
+    }
     return juce::var (root);
 }
 
@@ -599,7 +891,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
     if (! stored.isObject())
         return false;
 
-    Performance parsed;
+    Performance parsed = Performance::create();
     parsed.performanceId = stored.getProperty ("performanceId", {}).toString();
     parsed.name          = stored.getProperty ("name", {}).toString();
     parsed.focusedPartId = stored.getProperty ("focusedPartId", {}).toString();
@@ -610,6 +902,61 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                                          (int) stored.getProperty ("schemaVersion", 1));
     parsed.masterLevel = floatOf (stored, "masterLevel", 1.0f, 0.0f, 2.0f);
     parsed.outputPairs = intOf (stored, "outputPairs", 1, 1, 8);
+
+    if (const auto audition = stored.getProperty ("presetAudition", {}); audition.isObject())
+    {
+        static const juce::StringArray phrases { "single", "chord", "scale", "riff" };
+        parsed.presetAudition.enabled = (bool) audition.getProperty ("enabled", false);
+        const auto phrase = audition.getProperty ("phrase", "chord").toString();
+        parsed.presetAudition.phrase = phrases.contains (phrase) ? phrase : juce::String ("chord");
+        parsed.presetAudition.rootNote = intOf (audition, "rootNote", 60, 0, 127);
+        parsed.presetAudition.velocity = intOf (audition, "velocity", 100, 1, 127);
+        parsed.presetAudition.noteLengthMs = intOf (audition, "noteLengthMs", 360, 40, 4000);
+        parsed.presetAudition.gapMs = intOf (audition, "gapMs", 90, 0, 2000);
+    }
+
+    if (const auto failover = stored.getProperty ("automaticFailover", {}); failover.isObject())
+    {
+        parsed.automaticFailover.enabled = (bool) failover.getProperty ("enabled", true);
+        parsed.automaticFailover.maxAttempts = intOf (failover, "maxAttempts", 3, 1, 5);
+        parsed.automaticFailover.retryDelayMs = intOf (failover, "retryDelayMs", 500, 100, 10000);
+    }
+
+    if (const auto tuning = stored.getProperty ("microtuning", {}); tuning.isObject())
+    {
+        auto candidate = perf::Microtuning::equalTemperament();
+        candidate.enabled = (bool) tuning.getProperty ("enabled", false);
+        candidate.name = tuning.getProperty ("name", candidate.name).toString().substring (0, 80);
+        candidate.sourceName = tuning.getProperty ("sourceName", {}).toString().substring (0, 260);
+        candidate.rootMidiNote = intOf (tuning, "rootMidiNote", 60, 0, 127);
+        candidate.referenceMidiNote = intOf (tuning, "referenceMidiNote", 69, 0, 127);
+        candidate.referenceFrequency = (double) floatOf (tuning, "referenceFrequency",
+                                                          440.0f, 1.0f, 40000.0f);
+        candidate.mtsDeviceId = intOf (tuning, "mtsDeviceId", 127, 0, 127);
+        candidate.mtsProgram = intOf (tuning, "mtsProgram", 0, 0, 127);
+
+        if (const auto* degrees = tuning.getProperty ("degreesCents", {}).getArray())
+        {
+            juce::Array<double> parsedDegrees;
+            auto valid = degrees->size() >= 2 && degrees->size() <= 129;
+            auto previous = -1.0;
+            for (const auto& degree : *degrees)
+            {
+                const auto cents = (double) degree;
+                valid = valid && std::isfinite (cents) && cents >= 0.0
+                     && cents > previous && cents <= 19200.0;
+                if (parsedDegrees.isEmpty())
+                    valid = valid && juce::approximatelyEqual (cents, 0.0);
+                parsedDegrees.add (cents);
+                previous = cents;
+            }
+            if (valid)
+                candidate.degreesCents = std::move (parsedDegrees);
+            else
+                candidate.enabled = false;
+        }
+        parsed.microtuning = std::move (candidate);
+    }
 
     if (parsed.performanceId.isEmpty())
         return false;
@@ -682,6 +1029,7 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.midiSourcePartId = p.getProperty ("midiSourcePartId", {}).toString();
         part.lastPresetRecordId = p.getProperty ("lastPresetRecordId", {}).toString();
         part.lastPresetName     = p.getProperty ("lastPresetName", {}).toString();
+        part.microtuningEnabled = (bool) p.getProperty ("microtuningEnabled", false);
         part.outputPair = intOf (p, "outputPair", 0, 0, 7);
 
         // Explicit multi-output pairs: a clamped pair index, duplicates dropped — a damaged
@@ -723,6 +1071,67 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         }
 
         parsed.parts.add (std::move (part));
+    }
+
+    // One part may belong to at most one layer group: otherwise two upstream decisions
+    // would compete for the same private MIDI destination. Damaged entries are discarded
+    // rather than making the whole performance unloadable; valid groups remain playable.
+    if (const auto* groupArray = stored.getProperty ("layerGroups", {}).getArray())
+    {
+        juce::StringArray seenGroupIds, claimedPartIds;
+        static const juce::StringArray allocations { "all", "roundRobin", "leastBusy" };
+        static const juce::StringArray sources { "velocity", "key", "cc", "expression", "macro" };
+
+        for (const auto& value : *groupArray)
+        {
+            if (parsed.layerGroups.size() >= 32)
+                break;
+
+            LayerGroup group;
+            group.layerGroupId = value.getProperty ("layerGroupId", {}).toString();
+            if (group.layerGroupId.isEmpty() || seenGroupIds.contains (group.layerGroupId))
+                continue;
+            seenGroupIds.add (group.layerGroupId);
+
+            group.name = value.getProperty ("name", "Layer").toString().trim().substring (0, 80);
+            group.enabled = (bool) value.getProperty ("enabled", true);
+            group.allocation = value.getProperty ("allocation", "all").toString();
+            if (! allocations.contains (group.allocation))
+                group.allocation = "all";
+            group.source = value.getProperty ("source", "velocity").toString();
+            if (! sources.contains (group.source))
+                group.source = "velocity";
+            group.controller = intOf (value, "controller", 11, 0, 127);
+            group.macroId = value.getProperty ("macroId", {}).toString();
+
+            juce::StringArray candidatePartIds;
+            if (const auto* members = value.getProperty ("members", {}).getArray())
+                for (const auto& memberValue : *members)
+                {
+                    if (group.members.size() >= 8)
+                        break;
+                    LayerMember member;
+                    member.partId = memberValue.getProperty ("partId", {}).toString();
+                    if (member.partId.isEmpty() || candidatePartIds.contains (member.partId)
+                        || claimedPartIds.contains (member.partId)
+                        || parsed.findPart (member.partId) == nullptr
+                        || parsed.findPart (member.partId)->midiSourcePartId.isNotEmpty())
+                        continue;
+
+                    member.minimum = floatOf (memberValue, "minimum", 0.0f, 0.0f, 1.0f);
+                    member.maximum = floatOf (memberValue, "maximum", 1.0f, 0.0f, 1.0f);
+                    if (member.minimum > member.maximum)
+                        std::swap (member.minimum, member.maximum);
+                    member.crossfade = floatOf (memberValue, "crossfade", 0.0f, 0.0f, 0.5f);
+                    candidatePartIds.add (member.partId);
+                    group.members.add (std::move (member));
+                }
+
+            if (group.members.size() < 2)
+                continue;
+            claimedPartIds.addArray (candidatePartIds);
+            parsed.layerGroups.add (std::move (group));
+        }
     }
 
     // Effect identities follow the part rules: empty or duplicated ids (across every chain)
@@ -834,11 +1243,248 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     target.parameterId = t.getProperty ("parameterId", {}).toString();
                     target.rangeMin    = floatOf (t, "rangeMin", 0.0f, 0.0f, 1.0f);
                     target.rangeMax    = floatOf (t, "rangeMax", 1.0f, 0.0f, 1.0f);
+                    if (target.rangeMin > target.rangeMax)
+                        std::swap (target.rangeMin, target.rangeMax);
                     target.inverted    = (bool) t.getProperty ("inverted", false);
                     macro.targets.add (std::move (target));
                 }
 
             parsed.macros.add (std::move (macro));
+        }
+    }
+
+    // A deleted macro must not leave a silent crossfade behind on restore. The live command
+    // performs this migration at deletion time; this is the repair path for hand-edited or
+    // older manifests.
+    for (auto& group : parsed.layerGroups)
+        if (group.source == "macro" && parsed.findMacro (group.macroId) == nullptr)
+        {
+            group.source = "velocity";
+            group.macroId.clear();
+        }
+
+    if (const auto* routeArray = stored.getProperty ("modulationRoutes", {}).getArray())
+    {
+        juce::StringArray seenRouteIds;
+        for (const auto& r : *routeArray)
+        {
+            ModulationRoute route;
+            route.routeId = r.getProperty ("routeId", {}).toString();
+            if (route.routeId.isEmpty() || seenRouteIds.contains (route.routeId))
+                return false;
+            seenRouteIds.add (route.routeId);
+
+            route.sourceType    = r.getProperty ("sourceType", {}).toString();
+            route.sourceId      = r.getProperty ("sourceId", {}).toString();
+            route.sourceChannel = intOf (r, "sourceChannel", 0, 0, 16);
+            route.sourceNumber  = intOf (r, "sourceNumber", 0, 0, 127);
+            route.targetId      = r.getProperty ("targetId", {}).toString();
+            route.targetCeId    = r.getProperty ("targetCeId", {}).toString();
+            route.parameterId   = r.getProperty ("parameterId", {}).toString();
+            route.amount        = floatOf (r, "amount", 0.25f, -1.0f, 1.0f);
+            route.baseValue     = floatOf (r, "baseValue", 0.0f, 0.0f, 1.0f);
+            route.enabled       = (bool) r.getProperty ("enabled", true);
+            if (route.sourceType == "macro" || route.sourceType == "lfo"
+                || route.sourceType == "envelope" || route.sourceType == "mseg"
+                || route.sourceType == "random")
+            {
+                route.sourceChannel = 0;
+                route.sourceNumber = 0;
+            }
+
+            // Broken cables remain visible and repairable, just like stale control-page and
+            // macro bindings. Only malformed source names are omitted: there is no useful
+            // way to present or evaluate a cable whose source vocabulary is unknown.
+            static const juce::StringArray sourceTypes {
+                "velocity", "modWheel", "expression", "channelPressure",
+                "polyAftertouch", "pitchBend", "midiCc", "macro", "lfo", "envelope", "mseg",
+                "random"
+            };
+            if (sourceTypes.contains (route.sourceType)
+                && route.targetId.isNotEmpty() && route.parameterId.isNotEmpty())
+                parsed.modulationRoutes.add (std::move (route));
+        }
+    }
+
+    if (const auto* lfoArray = stored.getProperty ("midiLfos", {}).getArray())
+    {
+        juce::StringArray seenLfoIds;
+        static const juce::StringArray shapes {
+            "sine", "triangle", "sawUp", "sawDown", "square", "sampleHold"
+        };
+        static const juce::StringArray outputTypes { "cc", "nrpn", "sysex" };
+
+        for (const auto& l : *lfoArray)
+        {
+            if (parsed.midiLfos.size() >= 32)
+                break;
+
+            MidiLfo lfo;
+            lfo.lfoId = l.getProperty ("lfoId", {}).toString();
+            if (lfo.lfoId.isEmpty() || seenLfoIds.contains (lfo.lfoId))
+                return false;
+            seenLfoIds.add (lfo.lfoId);
+
+            lfo.name = l.getProperty ("name", {}).toString().trim();
+            lfo.shape = l.getProperty ("shape", "sine").toString();
+            if (! shapes.contains (lfo.shape))
+                lfo.shape = "sine";
+            lfo.enabled = (bool) l.getProperty ("enabled", true);
+            lfo.sync = (bool) l.getProperty ("sync", true);
+            lfo.rateHz = (double) floatOf (l, "rateHz", 1.0f, 0.01f, 40.0f);
+            lfo.syncBeats = (double) floatOf (l, "syncBeats", 1.0f, 0.03125f, 64.0f);
+            lfo.phaseOffset = floatOf (l, "phaseOffset", 0.0f, 0.0f, 1.0f);
+            lfo.minimum = floatOf (l, "minimum", 0.0f, 0.0f, 1.0f);
+            lfo.maximum = floatOf (l, "maximum", 1.0f, 0.0f, 1.0f);
+            if (lfo.minimum > lfo.maximum)
+                std::swap (lfo.minimum, lfo.maximum);
+
+            if (const auto* outputs = l.getProperty ("outputs", {}).getArray())
+            {
+                juce::StringArray seenOutputIds;
+                for (const auto& o : *outputs)
+                {
+                    if (lfo.outputs.size() >= 32)
+                        break;
+
+                    MidiLfoOutput output;
+                    output.outputId = o.getProperty ("outputId", {}).toString();
+                    if (output.outputId.isEmpty() || seenOutputIds.contains (output.outputId))
+                        return false;
+                    seenOutputIds.add (output.outputId);
+
+                    output.type = o.getProperty ("type", "cc").toString();
+                    if (! outputTypes.contains (output.type))
+                        continue;
+                    output.targetPartId = o.getProperty ("targetPartId", {}).toString();
+                    output.channel = intOf (o, "channel", 1, 1, 16);
+                    output.number = intOf (o, "number", 1, 0,
+                                           output.type == "nrpn" ? 16383 : 127);
+                    output.sysexTemplate = o.getProperty ("sysexTemplate",
+                                                          "F0 7D {value7} F7").toString();
+                    output.enabled = (bool) o.getProperty ("enabled", false);
+                    lfo.outputs.add (std::move (output));
+                }
+            }
+
+            parsed.midiLfos.add (std::move (lfo));
+        }
+    }
+
+    if (const auto* envelopeArray = stored.getProperty ("envelopes", {}).getArray())
+    {
+        juce::StringArray seenEnvelopeIds;
+        for (const auto& e : *envelopeArray)
+        {
+            if (parsed.envelopes.size() >= 32)
+                break;
+
+            EnvelopeGenerator envelope;
+            envelope.envelopeId = e.getProperty ("envelopeId", {}).toString();
+            if (envelope.envelopeId.isEmpty()
+                || seenEnvelopeIds.contains (envelope.envelopeId))
+                return false;
+            seenEnvelopeIds.add (envelope.envelopeId);
+
+            envelope.name = e.getProperty ("name", {}).toString().trim();
+            envelope.enabled = (bool) e.getProperty ("enabled", true);
+            envelope.channel = intOf (e, "channel", 0, 0, 16);
+            envelope.noteLow = intOf (e, "noteLow", 0, 0, 127);
+            envelope.noteHigh = intOf (e, "noteHigh", 127, 0, 127);
+            if (envelope.noteLow > envelope.noteHigh)
+                std::swap (envelope.noteLow, envelope.noteHigh);
+            envelope.retrigger = (bool) e.getProperty ("retrigger", true);
+            envelope.attackMs = (double) floatOf (e, "attackMs", 20.0f, 0.0f, 60000.0f);
+            envelope.decayMs = (double) floatOf (e, "decayMs", 180.0f, 0.0f, 60000.0f);
+            envelope.sustain = floatOf (e, "sustain", 0.65f, 0.0f, 1.0f);
+            envelope.releaseMs = (double) floatOf (e, "releaseMs", 350.0f, 0.0f, 60000.0f);
+            envelope.curve = floatOf (e, "curve", 0.0f, -1.0f, 1.0f);
+            envelope.velocityAmount = floatOf (e, "velocityAmount", 0.0f, 0.0f, 1.0f);
+            parsed.envelopes.add (std::move (envelope));
+        }
+    }
+
+    if (const auto* msegArray = stored.getProperty ("msegs", {}).getArray())
+    {
+        juce::StringArray seenMsegIds;
+        for (const auto& m : *msegArray)
+        {
+            if (parsed.msegs.size() >= 32)
+                break;
+
+            MsegGenerator mseg;
+            mseg.msegId = m.getProperty ("msegId", {}).toString();
+            if (mseg.msegId.isEmpty() || seenMsegIds.contains (mseg.msegId))
+                return false;
+            seenMsegIds.add (mseg.msegId);
+            mseg.name = m.getProperty ("name", {}).toString().trim();
+            mseg.enabled = (bool) m.getProperty ("enabled", true);
+            mseg.sync = (bool) m.getProperty ("sync", true);
+            mseg.rateHz = (double) floatOf (m, "rateHz", 0.5f, 0.01f, 40.0f);
+            mseg.syncBeats = (double) floatOf (m, "syncBeats", 4.0f, 0.03125f, 64.0f);
+            mseg.phaseOffset = floatOf (m, "phaseOffset", 0.0f, 0.0f, 1.0f);
+
+            const auto* points = m.getProperty ("points", {}).getArray();
+            if (points == nullptr || points->size() < 2)
+                return false;
+            juce::StringArray seenPointIds;
+            for (const auto& p : *points)
+            {
+                if (mseg.points.size() >= 64)
+                    break;
+                MsegPoint point;
+                point.pointId = p.getProperty ("pointId", {}).toString();
+                if (point.pointId.isEmpty() || seenPointIds.contains (point.pointId))
+                    return false;
+                seenPointIds.add (point.pointId);
+                point.position = floatOf (p, "position", 0.0f, 0.0f, 1.0f);
+                point.value = floatOf (p, "value", 0.0f, 0.0f, 1.0f);
+                point.curve = floatOf (p, "curve", 0.0f, -1.0f, 1.0f);
+                mseg.points.add (std::move (point));
+            }
+            std::sort (mseg.points.begin(), mseg.points.end(),
+                       [] (const MsegPoint& a, const MsegPoint& b)
+                       { return a.position < b.position; });
+            mseg.points.getReference (0).position = 0.0f;
+            mseg.points.getReference (mseg.points.size() - 1).position = 1.0f;
+            parsed.msegs.add (std::move (mseg));
+        }
+    }
+
+    if (const auto* randomArray = stored.getProperty ("randomModulators", {}).getArray())
+    {
+        juce::StringArray seenRandomIds;
+        static const juce::StringArray modes {
+            "sampleHold", "smoothRandom", "chaos", "randomWalk"
+        };
+        for (const auto& r : *randomArray)
+        {
+            if (parsed.randomModulators.size() >= 32)
+                break;
+
+            RandomModulator random;
+            random.randomId = r.getProperty ("randomId", {}).toString();
+            if (random.randomId.isEmpty() || seenRandomIds.contains (random.randomId))
+                return false;
+            seenRandomIds.add (random.randomId);
+            random.name = r.getProperty ("name", {}).toString().trim();
+            random.mode = r.getProperty ("mode", "sampleHold").toString();
+            if (! modes.contains (random.mode))
+                random.mode = "sampleHold";
+            random.enabled = (bool) r.getProperty ("enabled", true);
+            random.sync = (bool) r.getProperty ("sync", true);
+            random.rateHz = (double) floatOf (r, "rateHz", 2.0f, 0.01f, 40.0f);
+            random.syncBeats = (double) floatOf (r, "syncBeats", 0.5f, 0.03125f, 64.0f);
+            random.seed = intOf (r, "seed", 1, 1, 0x7fffffff);
+            random.probability = floatOf (r, "probability", 1.0f, 0.0f, 1.0f);
+            random.smoothing = floatOf (r, "smoothing", 1.0f, 0.0f, 1.0f);
+            random.stepSize = floatOf (r, "stepSize", 0.2f, 0.0f, 1.0f);
+            random.chaos = floatOf (r, "chaos", 0.85f, 0.0f, 1.0f);
+            random.minimum = floatOf (r, "minimum", 0.0f, 0.0f, 1.0f);
+            random.maximum = floatOf (r, "maximum", 1.0f, 0.0f, 1.0f);
+            if (random.minimum > random.maximum)
+                std::swap (random.minimum, random.maximum);
+            parsed.randomModulators.add (std::move (random));
         }
     }
 
@@ -915,6 +1561,21 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
     // parts and pages; an absent array is a pre-Stage-6 document and loads clean.
     perf::transportSettingsFromVar (stored.getProperty ("transport", {}), parsed.transport);
 
+    if (const auto* grooveArray = stored.getProperty ("grooves", {}).getArray())
+    {
+        parsed.grooves.clearQuick();
+        juce::StringArray seenGrooveIds;
+        for (const auto& g : *grooveArray)
+        {
+            perf::GrooveTemplate groove;
+            if (! perf::grooveTemplateFromVar (g, groove)
+                || seenGrooveIds.contains (groove.grooveId))
+                return false;
+            seenGrooveIds.add (groove.grooveId);
+            parsed.grooves.add (std::move (groove));
+        }
+    }
+
     if (const auto* patternArray = stored.getProperty ("patterns", {}).getArray())
     {
         juce::StringArray seenPatternIds;
@@ -956,6 +1617,56 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
 
     if (! perf::setlistFromVar (stored.getProperty ("setlist", {}), parsed.setlist))
         return false;
+    if (! perf::arrangementFromVar (stored.getProperty ("arrangement", {}), parsed.arrangement))
+        return false;
+
+    if (const auto* takeArray = stored.getProperty ("performanceTakes", {}).getArray())
+    {
+        juce::StringArray seenTakeIds;
+        for (const auto& t : *takeArray)
+        {
+            if (parsed.performanceTakes.size() >= 32 || ! t.isObject())
+                break;
+
+            PerformanceTake take;
+            take.takeId = t.getProperty ("takeId", {}).toString();
+            if (take.takeId.isEmpty() || seenTakeIds.contains (take.takeId))
+                return false;
+            seenTakeIds.add (take.takeId);
+            take.name = t.getProperty ("name", "Performance take").toString().trim().substring (0, 80);
+            take.createdAt = t.getProperty ("createdAt", {}).toString().substring (0, 80);
+            take.sampleRate = juce::jlimit (8000.0, 768000.0,
+                                            (double) t.getProperty ("sampleRate", 44100.0));
+            take.durationSamples = juce::jmax ((juce::int64) 0,
+                (juce::int64) t.getProperty ("durationSamples", (juce::int64) 0));
+            take.startPositionPpq = juce::jmax (0.0,
+                (double) t.getProperty ("startPositionPpq", 0.0));
+            take.transportWasPlaying = (bool) t.getProperty ("transportWasPlaying", false);
+            take.initialStateJson = t.getProperty ("initialStateJson", {}).toString();
+            take.midiDataBase64 = t.getProperty ("midiData", {}).toString();
+            take.midiEventCount = juce::jlimit (0, 500000,
+                (int) t.getProperty ("midiEventCount", 0));
+            take.truncated = (bool) t.getProperty ("truncated", false);
+
+            if (const auto* actions = t.getProperty ("actions", {}).getArray())
+                for (const auto& a : *actions)
+                {
+                    if (take.actions.size() >= 100000 || ! a.isObject())
+                    {
+                        take.truncated = true;
+                        break;
+                    }
+                    PerformanceTakeAction action;
+                    action.sampleOffset = juce::jlimit ((juce::int64) 0, take.durationSamples,
+                        (juce::int64) a.getProperty ("sampleOffset", (juce::int64) 0));
+                    action.commandJson = a.getProperty ("commandJson", {}).toString();
+                    if (action.commandJson.isNotEmpty())
+                        take.actions.add (std::move (action));
+                }
+
+            parsed.performanceTakes.add (std::move (take));
+        }
+    }
 
     // Canvas positions are a preference, so a malformed one is skipped rather than refusing
     // the whole session: losing a rig because a box's coordinate was a string would be an

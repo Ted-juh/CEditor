@@ -184,7 +184,7 @@
       { label: 'Open Shared Panel...', action: () => openSharedPanelFromFile() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
-      { label: 'Instrument Host...', action: () => openInstrumentHostTab() },
+      { label: 'Hostage...', action: () => openInstrumentHostTab() },
       { label: 'Settings...', shortcut: 'Ctrl+,', action: () => openSettingsTab() },
       { type: 'separator' },
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },

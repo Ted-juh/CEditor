@@ -12,7 +12,7 @@
   import {
     hostState, focusRackPart, setPartMixer, setSendLevel, setReturnLevel,
     setMasterLevel, setPartOutputPair,
-    addBus, removeBus, setBusLevel, setBusDestination, setPartDestination,
+    addBus, removeBus, renameBus, setBusLevel, setBusDestination, setPartDestination,
     busDestinationWouldLoop,
   } from '../stores/instrumentHost.js';
 
@@ -51,35 +51,7 @@
                silent row's slider creates the send natively (setSendLevel is create-or-
                update), which is exactly how a desk's aux knobs behave at zero. -->
           <div class="sends">
-            {#each buses as bus (bus.busId)}
-      <div class="strip bus" data-testid="bus-strip">
-        <span class="strip-name" title={`Group bus — ${bus.name}`}>{bus.name}</span>
-        <span class="strip-kind">
-          bus{bus.effects.length ? ` · ${bus.effects.length} fx` : ''}
-          {#if bus.latencyMs > 0.05}<br />+{bus.latencyMs.toFixed(1)} ms{/if}
-        </span>
-        <input class="fader" type="range" min="0" max="2" step="0.01" value={bus.level}
-               aria-label={`Bus level — ${bus.name}`}
-               ondblclick={() => setBusLevel(bus.busId, 1)}
-               oninput={(e) => setBusLevel(bus.busId, Number(e.currentTarget.value))} />
-        <span class="db">{db(bus.level)}</span>
-        <!-- A bus can feed another bus; a routing that would close a loop is refused natively
-             and is not offered here either. Excluding only the bus ITSELF was not enough — an
-             indirect loop (A into B, then B into A) was still on the menu, and picking it got
-             you an error instead of a destination. -->
-        <select class="out" title="Destination" value={bus.destinationBusId}
-                onchange={(e) => setBusDestination(bus.busId, e.currentTarget.value)}>
-          <option value="">Master</option>
-          {#each buses.filter((other) => !busDestinationWouldLoop($hostState.rack, bus.busId, other.busId)) as other (other.busId)}
-            <option value={other.busId}>{other.name}</option>
-          {/each}
-        </select>
-        <button type="button" class="ghost danger" title="Remove this bus (its parts go back to the master)"
-                onclick={() => removeBus(bus.busId)}>×</button>
-      </div>
-    {/each}
-
-    {#each returns as chain (chain.returnId)}
+            {#each returns as chain (chain.returnId)}
               <label class="send" title={`Send to ${chain.name}`}>
                 <span>{chain.name.slice(0, 6)}</span>
                 <input type="range" min="0" max="2" step="0.01"
@@ -127,7 +99,9 @@
 
     {#each buses as bus (bus.busId)}
       <div class="strip bus" data-testid="bus-strip">
-        <span class="strip-name" title={`Group bus — ${bus.name}`}>{bus.name}</span>
+        <input type="text" class="strip-name editable-name" value={bus.name}
+               aria-label="Bus name" title="Rename group bus"
+               onchange={(e) => renameBus(bus.busId, e.currentTarget.value)} />
         <span class="strip-kind">
           bus{bus.effects.length ? ` · ${bus.effects.length} fx` : ''}
           {#if bus.latencyMs > 0.05}<br />+{bus.latencyMs.toFixed(1)} ms{/if}
@@ -190,40 +164,41 @@
 </div>
 
 <style>
-  .mixer { background: #10161c; border: 1px solid #232c36; border-radius: 6px; padding: 10px; }
-  .strips { display: flex; gap: 8px; overflow-x: auto; align-items: stretch; }
-  .strip { display: flex; flex-direction: column; align-items: center; gap: 6px;
-           background: #161e27; border: 1px solid #232c36; border-radius: 5px;
-           padding: 8px 6px; min-width: 84px; }
-  .strip.focused { border-color: #3d81c4; }
-  .strip.disabled { opacity: 0.55; }
+  .mixer { background: var(--host-bg-deep); border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-panel); padding: 10px; }
+  .strips { display: flex; gap: 10px; overflow-x: auto; align-items: stretch; }
+  .strip { display: flex; flex-direction: column; align-items: center; gap: 8px;
+           background: var(--host-surface); border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-panel);
+           padding: 10px 8px; min-width: 98px; }
+  .strip.focused { border-color: #67abe3; box-shadow: inset 0 0 0 1px #3d81c4; }
+  .strip.disabled { opacity: 0.68; }
   .strip.return { background: #142020; }
   .strip.master { background: #1d1a14; border-color: #3a3223; }
   .strip.bus { background: #171d2a; border-color: #29344a; }
-  .strip.add-bus { justify-content: center; min-width: 60px; background: none; border-style: dashed; }
-  .ghost { background: none; border: 1px solid #2c3742; border-radius: 3px; color: #9aa5b1;
-           cursor: pointer; font-size: 11px; padding: 2px 6px; }
-  .ghost.danger { color: #d68a8a; }
-  .strip-name { max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                font-size: 11px; font-weight: 600; color: #d6dbe0; background: none; border: none;
-                cursor: pointer; padding: 0; }
+  .strip.add-bus { justify-content: center; min-width: 76px; background: none; border-style: dashed; }
+  .ghost { background: none; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); color: var(--host-text-soft);
+           cursor: pointer; font-size: 12px; padding: 3px 7px; }
+  .ghost.danger { color: var(--host-danger); }
+  .strip-name { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                font-size: 12px; font-weight: 600; color: #e2e8ed; background: none; border: none;
+                cursor: pointer; padding: 2px 4px; }
   span.strip-name { cursor: default; }
-  .strip-kind { font-size: 10px; color: #66707b; }
-  .pan input { width: 64px; }
-  .sends { display: flex; flex-direction: column; gap: 2px; width: 100%; }
-  .send { display: flex; align-items: center; gap: 3px; font-size: 9px; color: #7d8894; }
-  .send input { flex: 1; min-width: 0; height: 10px; }
+  input.strip-name { width: 92px; box-sizing: border-box; text-align: center; }
+  .strip-kind { font-size: 11px; color: #8d9aa5; }
+  .pan input { width: 76px; }
+  .sends { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .send { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #96a2ad; }
+  .send input { flex: 1; min-width: 0; }
   /* The one vertical control in the app: a real fader. Chromium (which WebView2 is)
      renders a range vertically from writing-mode alone; rtl puts loud at the top. */
   .fader { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 130px; margin: 2px 0; }
-  .db { font-size: 10px; color: #9aa5b1; font-variant-numeric: tabular-nums; }
-  .switches { display: flex; gap: 3px; }
-  .switches .toggle { font-size: 10px; padding: 2px 6px; background: #1c2630; color: #9aa5b1;
-                      border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
-  .switches .toggle.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
-  .out { font-size: 10px; background: #1c2630; color: #d6dbe0; border: 1px solid #2c3742;
-         border-radius: 3px; }
-  .engine { font-size: 10px; color: #7d8894; }
+  .db { font-size: 12px; color: #b1bbc3; font-variant-numeric: tabular-nums; }
+  .switches { display: flex; gap: 4px; }
+  .switches .toggle { min-width: 30px; font-size: 11px; padding: 3px 7px; background: var(--host-surface-raised); color: var(--host-text-soft);
+                      border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); cursor: pointer; }
+  .switches .toggle.on { background: var(--host-accent-surface); color: var(--host-text); border-color: var(--host-accent); }
+  .out { font-size: 11px; background: var(--host-field); color: var(--host-text); border: 1px solid var(--host-line-soft);
+         border-radius: var(--host-radius-control); }
+  .engine { font-size: 11px; color: #96a2ad; }
   .engine.hot { color: #e0a056; }
   .empty-hint { color: #66707b; font-size: 12px; align-self: center; padding: 20px; }
 </style>

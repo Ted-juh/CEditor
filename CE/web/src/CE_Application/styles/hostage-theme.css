@@ -1,0 +1,269 @@
+/*
+ * HOSTAGE shared visual system
+ *
+ * This file is deliberately global but strictly scoped to .host-workspace. Svelte component
+ * styles cannot cross component boundaries, which previously left child panels to either
+ * copy a near-identical button theme or fall back to white browser controls. Layout and
+ * authored controller geometry stay in their components; the common visual vocabulary lives
+ * here once.
+ */
+
+.host-workspace {
+  color-scheme: dark;
+
+  --host-bg: #1e2226;
+  --host-bg-deep: #101418;
+  --host-surface: #171c21;
+  --host-surface-raised: #20272e;
+  --host-surface-hover: #27323b;
+  --host-field: #12171b;
+
+  --host-line-soft: #2c353e;
+  --host-line: #3b4652;
+  --host-line-strong: #526170;
+
+  --host-text: #d9e0e6;
+  --host-text-soft: #aab5be;
+  --host-text-dim: #7f8b96;
+  --host-text-faint: #65717c;
+
+  --host-accent: #5b9bd5;
+  --host-accent-strong: #79b9ee;
+  --host-accent-surface: #243746;
+  --host-active: #58a879;
+  --host-active-surface: #20372a;
+  --host-pending: #d7a44e;
+  --host-pending-surface: #46371d;
+  --host-danger: #d98c8c;
+  --host-danger-line: #8a5151;
+  --host-danger-surface: #452529;
+
+  --host-radius-control: 3px;
+  --host-radius-panel: 6px;
+  --host-control-height: 30px;
+  --host-space-1: 4px;
+  --host-space-2: 8px;
+  --host-space-3: 12px;
+  --host-space-4: 16px;
+
+  --host-font: 'Archivo', 'Segoe UI', sans-serif;
+  --host-font-mono: 'JetBrains Mono', 'Cascadia Mono', monospace;
+
+  background: var(--host-bg);
+  color: var(--host-text);
+  font-family: var(--host-font);
+}
+
+/* Standard controls. The doubled root class makes these rules strong enough to cross Svelte's
+   generated scope class, while the exclusions preserve sequencer cells and controller shapes. */
+.host-workspace.host-workspace button:not(.ctl):not(.step):not(.piano-key) {
+  min-height: var(--host-control-height);
+  box-sizing: border-box;
+  padding: 4px 10px;
+  border: 1px solid var(--host-line);
+  border-radius: var(--host-radius-control);
+  background: var(--host-surface-raised);
+  color: var(--host-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.host-workspace.host-workspace button:not(.ctl):not(.step):not(.piano-key):hover:not(:disabled) {
+  border-color: var(--host-accent);
+  background: var(--host-surface-hover);
+}
+
+.host-workspace.host-workspace button:not(.ctl):not(.step):not(.piano-key):active:not(:disabled) {
+  background: var(--host-accent-surface);
+}
+
+.host-workspace.host-workspace button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.host-workspace.host-workspace input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='color']),
+.host-workspace.host-workspace select,
+.host-workspace.host-workspace textarea {
+  min-height: var(--host-control-height);
+  box-sizing: border-box;
+  border: 1px solid var(--host-line);
+  border-radius: var(--host-radius-control);
+  background: var(--host-field);
+  color: var(--host-text);
+  padding: 4px 7px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.host-workspace.host-workspace textarea {
+  min-height: 64px;
+  line-height: 1.4;
+}
+
+.host-workspace.host-workspace input::placeholder,
+.host-workspace.host-workspace textarea::placeholder {
+  color: var(--host-text-faint);
+}
+
+.host-workspace.host-workspace option {
+  background: var(--host-field);
+  color: var(--host-text);
+}
+
+/* Semantic button states are shared vocabulary, not panel-specific decoration. */
+.host-workspace.host-workspace button.toggle {
+  color: var(--host-text-dim);
+}
+
+.host-workspace.host-workspace button.toggle.on,
+.host-workspace.host-workspace button.navigation-tab.on,
+.host-workspace.host-workspace button.utility-tab.on,
+.host-workspace.host-workspace button.dock-tab.on,
+.host-workspace.host-workspace button.mode-button.on {
+  border-color: var(--host-accent);
+  background: var(--host-accent-surface);
+  color: var(--host-text);
+}
+
+.host-workspace.host-workspace button.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--host-text-dim);
+}
+
+.host-workspace.host-workspace button.ghost:hover:not(:disabled) {
+  border-color: var(--host-line);
+  background: var(--host-surface-raised);
+  color: var(--host-text);
+}
+
+.host-workspace.host-workspace button.param-chip { cursor: grab; }
+.host-workspace.host-workspace button.strip-name {
+  min-height: var(--host-control-height);
+  padding: 2px 4px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.host-workspace.host-workspace button.danger,
+.host-workspace.host-workspace button.panic,
+.host-workspace.host-workspace button.warn {
+  border-color: var(--host-danger-line);
+  color: var(--host-danger);
+}
+
+.host-workspace.host-workspace button.danger:hover:not(:disabled),
+.host-workspace.host-workspace button.panic:hover:not(:disabled),
+.host-workspace.host-workspace button.warn:hover:not(:disabled),
+.host-workspace.host-workspace button.confirming {
+  border-color: var(--host-danger);
+  background: var(--host-danger-surface);
+  color: #ffe3e3;
+}
+
+/* Square tracks and caps are intentional: they match the user's chosen mixer language. */
+.host-workspace.host-workspace input[type='range'] {
+  min-height: 28px;
+  cursor: pointer;
+  accent-color: var(--host-accent);
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.host-workspace.host-workspace input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid var(--host-line-strong);
+  border-radius: 0;
+  background: #202a32;
+}
+
+.host-workspace.host-workspace input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 18px;
+  margin-top: -7px;
+  border: 1px solid var(--host-bg-deep);
+  border-radius: 0;
+  background: #aebac4;
+  box-shadow: inset 0 0 0 1px #d0d8de;
+  -webkit-appearance: none;
+}
+
+.host-workspace.host-workspace input[type='range']::-moz-range-track {
+  height: 6px;
+  border: 1px solid var(--host-line-strong);
+  border-radius: 0;
+  background: #202a32;
+}
+
+.host-workspace.host-workspace input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 18px;
+  border: 1px solid var(--host-bg-deep);
+  border-radius: 0;
+  background: #aebac4;
+}
+
+.host-workspace.host-workspace input.fader::-webkit-slider-runnable-track {
+  width: 6px;
+  height: 100%;
+}
+
+.host-workspace.host-workspace input.fader::-webkit-slider-thumb {
+  width: 22px;
+  height: 12px;
+  margin-top: 0;
+  margin-left: -9px;
+}
+
+.host-workspace.host-workspace input[type='checkbox'],
+.host-workspace.host-workspace input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--host-accent);
+}
+
+.host-workspace.host-workspace button:focus-visible,
+.host-workspace.host-workspace input:focus-visible,
+.host-workspace.host-workspace select:focus-visible,
+.host-workspace.host-workspace textarea:focus-visible,
+.host-workspace.host-workspace [role='button']:focus-visible {
+  outline: 2px solid var(--host-accent-strong);
+  outline-offset: 2px;
+}
+
+/* Reusable state labels. Components may size them differently, but the meaning stays fixed. */
+.host-workspace .state-pill,
+.host-workspace .badge,
+.host-workspace .key-badge,
+.host-workspace .midi-cc,
+.host-workspace .scene-chip {
+  border-radius: var(--host-radius-control);
+}
+
+.host-workspace .state-pill.assigned,
+.host-workspace .badge.paid {
+  border-color: var(--host-active);
+  background: var(--host-active-surface);
+  color: #afe0c0;
+}
+
+.host-workspace .state-pill.problem {
+  border-color: var(--host-danger-line);
+  background: var(--host-danger-surface);
+  color: #efb2b2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .host-workspace *,
+  .host-workspace *::before,
+  .host-workspace *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

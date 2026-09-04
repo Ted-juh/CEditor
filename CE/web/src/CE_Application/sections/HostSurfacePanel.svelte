@@ -17,8 +17,11 @@
    * gap: the picture is of the instrument in front of you, not of the subset we drive, and a
    * fader that quietly looked mappable would be the lie worth avoiding.
    */
+  import { onDestroy } from 'svelte';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import {
     hostSurface, hostSurfaceLayout, requestSurfaceLayout, hostState, hostMidiActivity,
+    hostMidiLearn, cancelMidiLearn, clearControlSlotMidi,
     hostParamDrag, assignControlSlot, clearControlSlot, hostParameters, requestParameters,
     filterParameters, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
     setControlSlotOptions,
@@ -27,6 +30,11 @@
 
   let zoom = $state('');        // '' = the whole instrument, else a region id
   let asked = $state(false);
+  let defaultedLayout = '';
+  let selectedControlId = $state('');
+  let selectedParameterId = $state('');
+  let clearArmed = $state(false);
+  let clearTimer;
 
   let layout = $derived($hostSurfaceLayout);
   let region = $derived(layout.regions.find((r) => r.id === zoom) ?? null);
@@ -39,6 +47,20 @@
   $effect(() => {
     // Ask once, the first time anybody looks. The layout is static per profile.
     if (!asked) { asked = true; requestSurfaceLayout(); }
+  });
+
+  $effect(() => {
+    // Start where the useful controls are rather than showing a postage-stamp overview of
+    // the entire keyboard. Remember a user's later zoom choice until the drawing changes.
+    if (layout.controls.length === 0) return;
+    const stamp = `${layout.profileId}:${layout.own}:${layout.controls.length}`;
+    if (stamp === defaultedLayout) return;
+    defaultedLayout = stamp;
+    zoom = ['encoders', 'faders', 'pads']
+      .map((id) => layout.regions.find((candidate) => candidate.id === id
+                                      && candidate.addressable > 0))
+      .find(Boolean)?.id ?? '';
+    selectedControlId = '';
   });
 
   // --- describing a controller nobody wrote a profile for ---------------------------------
@@ -86,6 +108,9 @@
   let page = $derived(pages.find((p) => p.pageId === pageId) ?? pages[0] ?? null);
 
   const slotFor = (control) => surfaceControlSlot(page, control);
+  let selectedControl = $derived(
+    layout.controls.find((control) => control.controlId === selectedControlId) ?? null);
+  let selectedSlot = $derived(selectedControl ? slotFor(selectedControl) : null);
 
   // A control the runtime can reach: an encoder, a fader or a pad the layout gave an index.
   // Encoders have a slot from the day the page was made; a fader or a pad gets one minted
@@ -124,10 +149,9 @@
       return `${named} — ${slot.displayName}${slot.partName ? ` (${slot.partName})` : ''}${bound}`
              + (slot.resolved ? '' : ' — the part no longer has this parameter')
              + (slot.toggle ? (slot.latched ? ' — latching, ON' : ' — latching, off') : '')
-             + '\nDrop a parameter here to reassign it, click to clear it, Alt-click to MIDI-learn it'
-             + (control.kind === 'pad' ? `, right-click to make it ${slot.toggle ? 'momentary' : 'latching'}` : '');
+             + '\nClick to inspect, or drop a parameter here to reassign it.';
     if (addressable(control))
-      return `${named} — unassigned. Drag a parameter from the Params tab onto it, or Alt-click to MIDI-learn it.`;
+      return `${named} — unassigned. Click to inspect, or drag a parameter onto it.`;
     return `${named} — CEditor addresses this as ${control.kind} ${control.index}`;
   }
 
@@ -169,12 +193,52 @@
   let focusedPart = $derived($hostState.rack.parts.find(
     (p) => p.partId === $hostState.rack.focusedPartId) ?? null);
   let parameters = $derived(filterParameters($hostParameters.parameters, paramQuery));
+  let selectedParameter = $derived(
+    parameters.find((parameter) => parameter.id === selectedParameterId) ?? null);
 
   $effect(() => {
     // Follow the focused part, so the column is always the instrument you are looking at.
     const partId = focusedPart?.partId ?? '';
     if (partId && $hostParameters.partId !== partId) requestParameters(partId);
   });
+
+  $effect(() => {
+    if (selectedParameterId && !parameters.some((parameter) => parameter.id === selectedParameterId))
+      selectedParameterId = '';
+  });
+
+  function assignSelected() {
+    if (!selectedControl || !selectedParameter || !focusedPart
+        || !addressable(selectedControl)) return;
+    assignSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index,
+                         focusedPart.partId, selectedParameter.id);
+  }
+
+  function learnSelected() {
+    if (!selectedControl || !addressable(selectedControl)) return;
+    if ($hostMidiLearn.armed) cancelMidiLearn();
+    else learnSurfaceControl(page?.pageId ?? '', selectedControl.kind, selectedControl.index);
+  }
+
+  function clearSelected() {
+    if (!page || !selectedSlot?.assigned) return;
+    if (!clearArmed) {
+      clearArmed = true;
+      clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => (clearArmed = false), 5000);
+      return;
+    }
+    clearTimeout(clearTimer);
+    clearArmed = false;
+    clearControlSlot(page.pageId, selectedSlot.slotId);
+  }
+
+  function updateSelectedOptions(fields) {
+    if (!page || !selectedSlot) return;
+    setControlSlotOptions(page.pageId, selectedSlot.slotId, fields);
+  }
+
+  onDestroy(() => clearTimeout(clearTimer));
 </script>
 
 <div class="surface" data-testid="host-surface-panel">
@@ -206,13 +270,16 @@
       <!-- Which page the drawing is showing. Eight knobs mean eight assignments, and which
            eight depends entirely on the page — a drawing that did not say which would be
            showing one set of labels and implying another. -->
-      <select data-testid="surface-page" aria-label="Control page shown on the drawing"
-              value={page?.pageId ?? ''}
-              onchange={(e) => (pageId = e.currentTarget.value)}>
-        {#each pages as p (p.pageId)}
-          <option value={p.pageId}>{p.name}</option>
-        {/each}
-      </select>
+      <label class="page-picker">
+        <span>CONTROL PAGE {Math.max(1, pages.indexOf(page) + 1)} / {pages.length}</span>
+        <select data-testid="surface-page" aria-label="Control page shown on the drawing"
+                value={page?.pageId ?? ''}
+                onchange={(e) => (pageId = e.currentTarget.value)}>
+          {#each pages as p (p.pageId)}
+            <option value={p.pageId}>{p.name}</option>
+          {/each}
+        </select>
+      </label>
     {/if}
     <!-- The drag prompt lives HERE, in a row of fixed height, and NOT down beside the
          drawing. Put in the note under the plate it read better and broke the feature: the
@@ -286,11 +353,12 @@
                  aria-label="Search this instrument's parameters" />
           <div class="param-scroll">
             {#each parameters as parameter (parameter.id)}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <div class="param-chip" draggable="true"
+              <button type="button" class="param-chip" draggable="true"
                    class:dragging={$hostParamDrag.parameterId === parameter.id}
+                   class:selected={selectedParameterId === parameter.id}
                    data-testid="surface-param"
-                   title={`${parameter.name || parameter.id} — drag onto a knob`}
+                   title={`${parameter.name || parameter.id} — select or drag onto a control`}
+                   onclick={() => (selectedParameterId = parameter.id)}
                    ondragstart={(e) => {
                      hostParamDrag.set({ partId: focusedPart.partId, parameterId: parameter.id,
                                          name: parameter.name });
@@ -301,7 +369,7 @@
                 <!-- A plug-in that reports no name for a parameter still has one to drag: its
                      id, which is at least the thing the plug-in itself calls it. -->
                 {parameter.name || parameter.id || `#${parameter.index}`}
-              </div>
+              </button>
             {/each}
             {#if parameters.length === 0}
               <div class="empty-hint">No parameter matches.</div>
@@ -322,6 +390,8 @@
                   class:assigned={slot?.assigned}
                   class:unresolved={slot?.assigned && !slot.resolved}
                   class:lit={slot && litSlotId === slot.slotId}
+                  class:selected={selectedControlId === control.controlId}
+                  class:learning={$hostMidiLearn.armed && selectedControlId === control.controlId}
                   class:target={hoveredId === control.controlId}
                   data-testid={`surface-${control.controlId}`}
                   title={title(control)}
@@ -329,23 +399,9 @@
                   class:latched={slot?.toggle && slot?.latched}
                   ondragover={(e) => dragOver(e, control)}
                   ondrop={(e) => dropOn(e, control)}
-                  onclick={(e) => {
-                    // Alt-click learns; a plain click clears. Not double-click for learn:
-                    // a double-click is two clicks first, and the first of them cleared the
-                    // assignment before the learn ever armed.
-                    if (e.altKey) {
-                      if (addressable(control)) learnSurfaceControl(page?.pageId ?? '', control.kind, control.index);
-                      return;
-                    }
-                    if (slot?.assigned) clearControlSlot(page.pageId, slot.slotId);
-                  }}
-                  oncontextmenu={(e) => {
-                    // A pad is momentary or latching; the right button is where that lives,
-                    // because the left one is already taken by clear and the drawing has no
-                    // room for a checkbox per pad.
-                    if (control.kind !== 'pad' || !slot?.assigned) return;
-                    e.preventDefault();
-                    setControlSlotOptions(page.pageId, slot.slotId, { toggle: !slot.toggle });
+                  onclick={() => {
+                    selectedControlId = control.controlId;
+                    clearArmed = false;
                   }}
                   style={`left:${((control.x - view.x) / view.w) * 100}%;
                           top:${((control.y - view.y) / view.h) * 100}%;
@@ -362,9 +418,104 @@
           </button>
         {/each}
       </div>
+
+      <aside class="control-inspector" data-testid="surface-control-inspector"
+             aria-label="Selected controller assignment">
+        {#if selectedControl}
+          <div class="inspector-head">
+            <div>
+              <span class="eyebrow">SELECTED CONTROL</span>
+              <strong>{kindLabel[selectedControl.kind] ?? selectedControl.kind} {selectedControl.label}</strong>
+            </div>
+            <span class="state-pill" class:assigned={selectedSlot?.assigned}
+                  class:problem={selectedSlot?.assigned && !selectedSlot.resolved}>
+              {selectedControl.index < 0 ? 'UNAVAILABLE'
+                : selectedSlot?.assigned ? (selectedSlot.resolved ? 'MAPPED' : 'UNRESOLVED') : 'EMPTY'}
+            </span>
+          </div>
+
+          {#if selectedControl.index < 0}
+            <p class="empty-hint">This control is shown because it exists on the hardware, but the current profile cannot address it.</p>
+          {:else}
+            <div class="assignment-summary">
+              <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}</strong>
+              <span>{selectedSlot?.partName || (selectedParameter
+                ? `Ready to assign ${selectedParameter.name || selectedParameter.id}`
+                : 'Select a parameter or drag one onto the control')}</span>
+              {#if selectedSlot?.midiNote >= 0}
+                <span>Hardware binding · note {selectedSlot.midiNote}</span>
+              {:else if selectedSlot?.midiCc >= 0}
+                <span>Hardware binding · CC {selectedSlot.midiCc}{selectedSlot.midiChannel ? ` · ch ${selectedSlot.midiChannel}` : ''}</span>
+              {:else}
+                <span>No MIDI binding learned</span>
+              {/if}
+            </div>
+
+            <div class="inspector-actions">
+              <button type="button" disabled={!selectedParameter || !focusedPart}
+                      data-testid="surface-assign-selected" onclick={assignSelected}>Assign selected</button>
+              <button type="button" class="toggle" class:on={$hostMidiLearn.armed}
+                      data-testid="surface-learn-selected" onclick={learnSelected}>
+                {$hostMidiLearn.armed ? 'Cancel learning' : 'Learn hardware'}
+              </button>
+            </div>
+
+            {#if selectedSlot?.assigned}
+              <div class="option-grid">
+                <label>Minimum
+                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMin}
+                         onchange={(e) => updateSelectedOptions({ rangeMin: Number(e.currentTarget.value) })} />
+                </label>
+                <label>Maximum
+                  <input type="number" min="0" max="1" step="0.01" value={selectedSlot.rangeMax}
+                         onchange={(e) => updateSelectedOptions({ rangeMax: Number(e.currentTarget.value) })} />
+                </label>
+              </div>
+              <div class="check-row">
+                <span>Invert control direction</span>
+                <PropertyToggle
+                  compact
+                  value={selectedSlot.inverted}
+                  ariaLabel="Invert control direction"
+                  onchange={(value) => updateSelectedOptions({ inverted: value })}
+                />
+              </div>
+              {#if selectedControl.kind === 'pad'}
+                <label>Pad mode
+                  <select value={selectedSlot.toggle ? 'latching' : 'momentary'}
+                          onchange={(e) => updateSelectedOptions({ toggle: e.currentTarget.value === 'latching' })}>
+                    <option value="momentary">Momentary</option>
+                    <option value="latching">Latching</option>
+                  </select>
+                </label>
+              {/if}
+              <div class="inspector-actions secondary">
+                {#if selectedSlot.midiCc >= 0 || selectedSlot.midiNote >= 0}
+                  <button type="button" class="ghost"
+                          onclick={() => clearControlSlotMidi(page.pageId, selectedSlot.slotId)}>Clear MIDI binding</button>
+                {/if}
+                <button type="button" class="ghost danger" class:confirming={clearArmed}
+                        data-testid="surface-clear-selected" onclick={clearSelected}>
+                  {clearArmed ? 'Confirm clear' : 'Clear assignment'}
+                </button>
+              </div>
+            {/if}
+          {/if}
+        {:else}
+          <div class="inspector-empty">
+            <span class="eyebrow">ASSIGNMENT INSPECTOR</span>
+            <strong>Select a control</strong>
+            <p>Click an encoder, fader or pad to inspect it. Clicking never clears it.</p>
+          </div>
+        {/if}
+      </aside>
     </div>
 
     <div class="surface-regions">
+      <span class="state-key"><i class="empty"></i>Empty</span>
+      <span class="state-key"><i class="mapped"></i>Mapped</span>
+      <span class="state-key"><i class="problem"></i>Unresolved</span>
+      <span class="state-key"><i class="moving"></i>Moving</span>
       {#each layout.regions as r (r.id)}
         <button type="button" class="toggle" class:on={zoom === r.id}
                 data-testid={`surface-region-${r.id}`}
@@ -382,15 +533,18 @@
 
 <style>
   .surface { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
-  .surface-head { display: flex; align-items: center; gap: 8px; }
-  .dim { color: #7d8894; font-size: 11px; }
+  .surface-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dim { color: var(--host-text-dim); font-size: 12px; }
   .surface-state { margin-left: auto; white-space: nowrap; }
+  .page-picker { display: flex; flex-direction: column; gap: 2px; }
+  .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
+  .page-picker select { min-width: 150px; font-weight: 650; }
 
   .describe { display: flex; flex-direction: column; gap: 6px; padding: 8px;
-              border: 1px solid #3b4652; border-radius: 6px; background: #1a1f25; }
+              border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
   .describe p { margin: 0; }
   .describe-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
-  .describe label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #a8b4c0; }
+  .describe label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b5c0c9; }
   .describe input[type='number'] { width: 62px; }
 
   /* Left to right, no centring: the column, then the drawing, then whatever is left. Centred,
@@ -405,22 +559,22 @@
   }
   .param-column {
     flex: none;
-    width: 230px;
+    width: 260px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     min-height: 0;
   }
-  .param-column input { width: 100%; box-sizing: border-box; font-size: 11px; }
-  .param-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .param-column input { width: 100%; box-sizing: border-box; font-size: 12px; }
+  .param-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
   .param-chip {
-    min-height: 15px;
-    padding: 2px 6px;
-    border: 1px solid #2c343d;
-    border-radius: 4px;
-    background: #1c2126;
-    color: #b9c3cd;
-    font-size: 11px;
+    min-height: 30px;
+    padding: 5px 8px;
+    border: 1px solid var(--host-line-soft);
+    border-radius: var(--host-radius-control);
+    background: var(--host-surface-raised);
+    color: var(--host-text-soft);
+    font-size: 12px;
     cursor: grab;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -428,13 +582,14 @@
   }
   .param-chip:hover { border-color: #5b9bd5; color: #d6dbe0; }
   .param-chip.dragging { opacity: 0.45; }
+  .param-chip.selected { border-color: #79b9ee; background: #263b4c; color: #eef7fd; }
   .surface-plate {
     position: relative;
     height: 100%;
     max-width: 100%;
-    border: 1px solid #3b4652;
-    border-radius: 6px;
-    background: #101418;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-bg-deep);
     overflow: hidden;
   }
 
@@ -450,6 +605,9 @@
      assigned colour already means something, and a second fill on top would fight it. */
   .ctl.target { outline: 2px solid #5b9bd5; outline-offset: 1px; }
   .ctl.lit { outline: 2px solid #e0c060; outline-offset: 1px; }
+  .ctl.selected { outline: 3px solid #79b9ee; outline-offset: 2px; z-index: 2; }
+  .ctl.learning { animation: learn-pulse 0.75s ease-in-out infinite alternate; }
+  @keyframes learn-pulse { from { box-shadow: 0 0 0 0 #e0b65e66; } to { box-shadow: 0 0 0 7px #e0b65e22; } }
   /* The label has to be readable at BOTH sizes, and the two differ by a factor of eight: a
      knob is ~17px in the whole-instrument view and ~130px zoomed into its region. A fixed
      font size is illegible at one end or overflowing at the other, so it scales with the
@@ -477,7 +635,7 @@
     background: #1b2127;
     color: #5f6a75;
     font: inherit;
-    font-size: 9px;
+    font-size: 10px;
     overflow: hidden;
     cursor: default;
   }
@@ -497,8 +655,49 @@
 
   .ctl-label { pointer-events: none; white-space: nowrap; }
 
+  .control-inspector {
+    flex: none;
+    width: 280px;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-surface);
+  }
+  .inspector-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .inspector-head > div, .inspector-empty { display: flex; flex-direction: column; gap: 5px; }
+  .inspector-head strong { font-size: 14px; }
+  .state-pill { flex: none; padding: 3px 6px; border: 1px solid #59636c; color: #9da8b1; font-size: 9px; letter-spacing: 0.08em; }
+  .state-pill.assigned { border-color: #4f8b69; color: #a7d8bb; }
+  .state-pill.problem { border-color: #8b5555; color: #e6aaaa; }
+  .assignment-summary { display: flex; flex-direction: column; gap: 4px; padding: 9px; border: 1px solid var(--host-line-soft); background: var(--host-bg-deep); }
+  .assignment-summary span, .inspector-empty p { color: #9ba6af; font-size: 11px; line-height: 1.35; }
+  .inspector-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .inspector-actions.secondary { display: flex; flex-wrap: wrap; }
+  .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .option-grid label, .control-inspector > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
+  .option-grid input { width: 100%; box-sizing: border-box; }
+  .control-inspector .check-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; color: #aab5be; font-size: 11px; }
+  .control-inspector button.confirming { border-color: #c57575; background: #51282c; color: #ffd8d8; }
+  .inspector-empty { margin: auto 0; text-align: center; }
+
   .surface-regions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .region-count { margin-left: 4px; color: #8fc4a8; font-size: 10px; }
+  .state-key { display: inline-flex; align-items: center; gap: 4px; color: #8f9ba5; font-size: 10px; }
+  .state-key i { width: 8px; height: 8px; border: 1px solid #4d7fae; background: #22303c; }
+  .state-key i.mapped { border-color: #5f9e79; background: #22362a; }
+  .state-key i.problem { border-color: #7f5050; background: #2a1d1d; }
+  .state-key i.moving { border-color: #e0c060; background: #4a4021; }
+  .region-count { margin-left: 4px; color: #9fd5b6; font-size: 11px; }
   .region-count.none { color: #7d8894; }
   .surface-note { margin-left: auto; max-width: 320px; }
+
+  @media (max-width: 1050px) {
+    .param-column { width: 210px; }
+    .control-inspector { width: 240px; }
+  }
 </style>

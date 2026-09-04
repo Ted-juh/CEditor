@@ -5,7 +5,6 @@
 #include "DeviceProfile/DeviceProfileService.h"
 
 class AppSettings;
-namespace juce { class AudioPluginFormatManager; }
 namespace ceditor::host { class InstrumentHostService; class PluginEditorHost; class FloatingEditorWindows; }
 namespace ceditor::ctrl49 { class Ctrl49SurfaceBroker; }
 
@@ -150,12 +149,10 @@ private:
     std::unique_ptr<juce::Timer> stallWatch;
     ceditor::device::DeviceProfileService deviceProfileService;
 
-    // The instrument host (VIP-successor Stage 1): built lazily on the first "instrumentHost"
-    // command so no third-party plug-in code loads before the UI is up and asking. The format
-    // manager lives here because async instantiations must outlive any one command. Both are
-    // incomplete types on purpose — only the handlers .cpp needs juce_audio_processors.
+    // Hostage: built lazily on the first "instrumentHost" command so no third-party plug-in
+    // worker starts before the UI is up and asking. The service stays an incomplete type here;
+    // only the handlers .cpp needs the host implementation.
     std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
-    std::unique_ptr<juce::AudioPluginFormatManager> pluginFormatManager;
     ceditor::host::PluginEditorHost* editorPane = nullptr;
     // Who the pane is currently showing. The pane is told a processor and a title; the
     // thumbnail hooks need the target's identity to ask the service about its class.
@@ -167,7 +164,7 @@ private:
     // with the service; declared after it so every window (and the editor inside it) is
     // destroyed before the rack destroys the processors they watch.
     std::unique_ptr<ceditor::host::FloatingEditorWindows> instrumentEditorWindows;
-    // The CTRL49 as a resident front end (VIP-successor task: the hardware works in the
+    // The CTRL49 as a resident front end (Hostage: the hardware works in the
     // product, not just in demo executables). Created with the service, ticked from the
     // pump below. Declaration order is the destruction contract: after the service, so the
     // broker's teardown — which releases the hardware-surface claim through the service —

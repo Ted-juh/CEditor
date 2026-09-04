@@ -10,8 +10,10 @@ namespace ceditor::ctrl49::assets
 
 extern const unsigned char kBridgePageLua[];      extern const unsigned int kBridgePageLuaSize;
 extern const unsigned char kKnobPageLua[];        extern const unsigned int kKnobPageLuaSize;
+extern const unsigned char kHostagePageLua[];     extern const unsigned int kHostagePageLuaSize;
 extern const unsigned char kPresetListLua[];      extern const unsigned int kPresetListLuaSize;
 extern const unsigned char kKnobStripPng[];       extern const unsigned int kKnobStripPngSize;
+extern const unsigned char kHostageLogoPng[];     extern const unsigned int kHostageLogoPngSize;
 extern const unsigned char kDefaultAssignment[];  extern const unsigned int kDefaultAssignmentSize;
 extern const unsigned char kDefaultPresetBank[];  extern const unsigned int kDefaultPresetBankSize;
 extern const unsigned char kGaiaProfileJson[];    extern const unsigned int kGaiaProfileJsonSize;

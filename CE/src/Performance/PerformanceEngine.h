@@ -5,6 +5,7 @@
 #include <vector>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "CompiledPattern.h"
+#include "MidiCaptureJournal.h"
 #include "Transport.h"
 
 // PerformanceEngine — the Stage 6 scheduler (baseline §18.8.3, §18.8.4, §18.8.13).
@@ -33,7 +34,9 @@
 //
 // WHAT LEAVES, AND WHERE. Note and CC lanes are written into per-part staging buffers that
 // the rack's part processors merge into their own MIDI stream (they run downstream of this
-// node in the graph, so the staging is always written before it is read). Parameter lanes do
+// node in the graph, so the staging is always written before it is read). A frozen MIDI clip
+// uses a parallel post-FX staging buffer because its steps already are that chain's output.
+// Parameter lanes do
 // NOT write plug-in parameters from the audio thread: they push (target index, value) into
 // the outbound FIFO, and the message thread applies them through the same Stage 2 path as a
 // knob or a macro. That is §18.8.7's "bounded, block-aware delivery" and the reason automation
@@ -81,6 +84,11 @@ public:
     void stopClip (int clipIndex, Quantize quantize);
     void stopAllClips (Quantize quantize);
 
+    /** Temporarily renders another compiled pattern at the clip's current phase. A negative
+        pattern index releases the fill. Both edges cross the same quantized command queue as
+        clip launch, so a held UI button or MIDI pedal never edits the song on the audio thread. */
+    void setClipFill (int clipIndex, int patternIndex, Quantize quantize);
+
     /** A scene's clips, launched together at one boundary. `token` comes back through the
         outbound FIFO when the launch actually lands, so the message thread applies the
         non-audio half of the scene (macros, mixer, focus) at the same musical instant. */
@@ -98,14 +106,26 @@ public:
             sceneApplied,
             clipStarted,
             clipStopped,
+            fillChanged,
             capturedNote,      // a played note, already quantized to the armed lane's grid
+            modulationSource,  // a normalized live MIDI value for the modulation matrix
+            envelopeGate,      // raw input note gate: index 1=on, 0=off; value is velocity
         };
         Type type = Type::parameterValue;
         int index = -1;        // parameter target index, clip index, scene token, or step index
         float value = 0.0f;
-        int data1 = 0;         // captured note number
-        int data2 = 0;         // captured velocity
+        int data1 = 0;         // captured note number, or MIDI channel
+        int data2 = 0;         // captured velocity, CC number, or poly-pressure note
         int generation = 0;
+    };
+
+    enum ModulationSource : int
+    {
+        velocitySource = 0,
+        midiCcSource,
+        channelPressureSource,
+        polyAftertouchSource,
+        pitchBendSource,
     };
 
     /** Arms capture into one lane of one clip's pattern (§18.8.2): live note-ons are snapped
@@ -117,21 +137,53 @@ public:
     /** Message thread: pops one queued event. Returns false when the queue is empty. */
     bool popEvent (OutEvent& event);
 
+    /** The always-listening performance history. Copying is message-thread work; recording
+        into it is fixed-capacity and lock-free on the audio thread. */
+    MidiCaptureJournal::Snapshot recentMidi (double seconds) const
+    {
+        return midiJournal.snapshot (seconds);
+    }
+    double midiHistorySecondsAvailable() const noexcept { return midiJournal.secondsAvailable(); }
+    int midiHistoryEventCount() const noexcept          { return midiJournal.retainedEventCount(); }
+    juce::int64 midiHistorySamplePosition() const noexcept
+    {
+        return (juce::int64) midiJournal.currentSamplePosition();
+    }
+    double midiHistorySampleRate() const noexcept       { return midiJournal.sampleRate(); }
+    bool hasRecentMidiNotes (double seconds) const noexcept
+    {
+        return midiJournal.hasRecentNoteOn (seconds);
+    }
+
+    /** Message thread: schedules one recorded channel-voice message against the engine's
+        monotonic sample clock. The audio thread merges it into the universal inlet, before
+        zones, MIDI FX, modulation observation and the retrospective journal. */
+    bool scheduleReplayMidi (const juce::MidiMessage& message, juce::int64 absoluteSample);
+    void clearReplayMidi() noexcept;
+    int replayMidiSlotsAvailable() const noexcept;
+    bool hasReplayMidiPending() const noexcept { return replayOutstanding.load() > 0; }
+
     // -- status, readable from any thread --------------------------------------------------
 
     bool isClipActive (int clipIndex) const noexcept;
     /** 0..1 through the clip's current loop, for playhead display; 0 when inactive. */
     float clipPhase (int clipIndex) const noexcept;
     bool isClipPending (int clipIndex) const noexcept;
+    bool isClipFillActive (int clipIndex) const noexcept;
+    bool isClipFillPending (int clipIndex) const noexcept;
 
     // -- audio thread -----------------------------------------------------------------------
 
     /** Advances time and renders this block's events into the per-part staging buffers. */
-    void processBlock (int numSamples, const juce::MidiBuffer& liveInput);
+    void processBlock (int numSamples, juce::MidiBuffer& liveInput);
 
     /** The events generated for one rack slot this block. Valid until the next processBlock;
         the part processors read it downstream in the same graph pass. */
     const juce::MidiBuffer& stagingFor (int partIndex) const noexcept;
+    /** Already-rendered MIDI from frozen clips. Part processors merge this after their
+        inserts, preventing a captured chorder/arpeggiator performance from being processed
+        a second time. */
+    const juce::MidiBuffer& postFxStagingFor (int partIndex) const noexcept;
 
     /** The musical window of the block just processed. The per-part arpeggiators read this
         rather than advancing a clock of their own — same window, same grid, one authority. */
@@ -140,9 +192,13 @@ public:
 private:
     struct Command
     {
-        enum class Type : juce::uint8 { launchClip = 0, stopClip, stopAll, launchScene, panic };
+        enum class Type : juce::uint8
+        {
+            launchClip = 0, stopClip, stopAll, launchScene, setFill, panic
+        };
         Type type = Type::panic;
         int index = -1;
+        int patternIndex = -1;
         Quantize quantize = Quantize::bar;
         bool stopOthers = false;
         int token = 0;
@@ -160,6 +216,9 @@ private:
         double stopAtPpq = -1.0;
         int loopsPlayed = 0;
         int sceneToken = 0;         // non-zero when this launch belongs to a scene
+        int fillPatternIndex = -1;
+        int pendingFillPatternIndex = -2; // -2 = no edge waiting; -1 = release waiting
+        double fillAtPpq = -1.0;
         std::array<float, maxGlideLanes> lastGlide {};
     };
 
@@ -171,20 +230,32 @@ private:
         int clipIndex = -1;
         juce::uint8 channel = 1;
         juce::uint8 note = 0;
+        bool postFx = false;
     };
 
     void handleCommands (double positionPpq);
     void applyLaunch (int clipIndex, double atPpq, int sceneToken);
     void renderClip (int clipIndex, const CompiledSong& song, const Transport::BlockTime& block,
                      int numSamples);
+    void renderPatternWindow (int clipIndex, const CompiledPattern& pattern,
+                              const Transport::BlockTime& block, int numSamples,
+                              double clipStart, double clipEnd, bool postFx);
     void emitNote (int partIndex, int clipIndex, juce::uint8 channel, juce::uint8 note,
-                   juce::uint8 velocity, double releasePpq, int sampleOffset);
+                   juce::uint8 velocity, double releasePpq, int sampleOffset, bool postFx);
     void releaseDueNotes (const Transport::BlockTime& block, int numSamples);
     void flushNotes (int clipIndex, int sampleOffset);   // clipIndex < 0 = every note
     void pushEvent (OutEvent::Type type, int index, float value, int data1 = 0, int data2 = 0);
     void captureFrom (const juce::MidiBuffer& liveInput, const CompiledSong& song,
                       const Transport::BlockTime& block, int numSamples);
     void reclaimRetiredSongs();
+    void injectReplayMidi (juce::MidiBuffer& input, int numSamples);
+
+    struct ReplayMidiEvent
+    {
+        juce::int64 samplePosition = 0;
+        juce::uint32 packedMessage = 0;
+        juce::uint32 generation = 0;
+    };
 
     Transport transport;
 
@@ -196,9 +267,14 @@ private:
     std::atomic<juce::int64> blockCounter { 0 };
 
     std::array<juce::MidiBuffer, maxParts> staging;
+    std::array<juce::MidiBuffer, maxParts> postFxStaging;
     juce::MidiBuffer emptyStaging;
     std::array<ClipState, maxClips> clips;
     std::array<SoundingNote, maxSoundingNotes> sounding;
+    // A scene containing no clips still has a musical boundary: its mixer/macros/tempo
+    // recall must not jump ahead merely because there is no clip state to carry the token.
+    int pendingEmptySceneToken = 0;
+    double pendingEmptySceneAtPpq = -1.0;
 
     // Lock-free command queue in, event queue out. Both are single-producer/single-consumer
     // in practice (message thread ↔ audio thread), which is exactly what AbstractFifo covers.
@@ -206,6 +282,13 @@ private:
     std::array<Command, 256> commandSlots;
     juce::AbstractFifo eventFifo { 1024 };
     std::array<OutEvent, 1024> eventSlots;
+    static constexpr int replayMidiCapacity = 8192;
+    juce::AbstractFifo replayMidiFifo { replayMidiCapacity };
+    std::array<ReplayMidiEvent, replayMidiCapacity> replayMidiSlots;
+    ReplayMidiEvent replayMidiPending;
+    bool replayMidiPendingValid = false;              // audio-thread owned
+    std::atomic<juce::uint32> replayGeneration { 1 };
+    std::atomic<int> replayOutstanding { 0 };
 
     Transport::BlockTime lastBlock;
     double currentSampleRate = 44100.0;
@@ -213,6 +296,7 @@ private:
     std::atomic<bool> panicRequested { false };
     std::atomic<int> captureClip { -1 };
     std::atomic<int> captureLane { -1 };
+    MidiCaptureJournal midiJournal;
 };
 
 } // namespace ceditor::perf

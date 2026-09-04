@@ -4,7 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "RackModel.h"
 
-// ParameterModel — the one authoritative parameter layer (VIP-successor Stage 2).
+// ParameterModel — Hostage's authoritative parameter layer.
 //
 // Everything that will ever address a plug-in parameter — the Web UI now, hardware pages and
 // macros and automation later — goes through the records here instead of inventing its own

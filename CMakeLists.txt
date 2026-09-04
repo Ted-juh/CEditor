@@ -67,6 +67,27 @@ else()
 endif()
 option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (links against Windows dwmapi; compiles anywhere)" ${CEDITOR_BUILD_APP_DEFAULT})
 
+# A worker minidump is only actionable when its exact linker PDB still exists. Release normally
+# omits debug information, so preserve optimized symbols for crash-contained helper processes in a
+# private build-tree directory. /Z7 keeps compile records in the objects until the linker writes the
+# final PDB; /DEBUG:FULL creates that PDB without disabling Release optimisations, and PDBALTPATH
+# keeps the developer's absolute build path out of the shipped executable's debug directory.
+function(ce_enable_private_release_symbols target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE "$<$<CONFIG:Release>:/Z7>")
+        target_link_options(${target} PRIVATE
+            "$<$<CONFIG:Release>:/DEBUG:FULL>"
+            "$<$<CONFIG:Release>:/OPT:REF>"
+            "$<$<CONFIG:Release>:/OPT:ICF>"
+            "$<$<CONFIG:Release>:/PDBALTPATH:$<TARGET_PDB_FILE_NAME:${target}>>"
+        )
+        set_target_properties(${target} PROPERTIES
+            PDB_NAME_RELEASE "${target}"
+            PDB_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/symbols/Release"
+        )
+    endif()
+endfunction()
+
 # JUCE 8.0.7 from local install
 #
 # The install is vendored in three parts: headers and module sources under
@@ -163,8 +184,10 @@ add_custom_command(
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/embed_assets.cmake"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_MultiKnob.lua"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/Hostage_MultiKnob.lua"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/CEditor_PresetList.lua"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/knob_strip.png"
+        "${CMAKE_SOURCE_DIR}/tools/ctrl49/hostage_logo.png"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/bridge-default.assignment.json"
         "${CMAKE_SOURCE_DIR}/tools/ctrl49/gaia-patches.presetbank.json"
         "${CMAKE_SOURCE_DIR}/CE/profiles/test/roland-gaia.ceditor-device.json"
@@ -225,6 +248,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/IsolatedPluginProxy.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
@@ -255,7 +280,7 @@ if(CEDITOR_BUILD_APP)
         JUCE_WEB_BROWSER=1
         JUCE_USE_WIN_WEBVIEW2=1
         JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
-        # The instrument host (VIP-successor Stage 1): the editor scans and hosts inner VST3
+        # Hostage: the editor scans and hosts inner VST3
         # instruments. The scanner runs out-of-process (CEditorPluginScanner below); this is
         # the in-editor hosting half — catalogue resolution, instantiation, the rack.
         JUCE_PLUGINHOST_VST3=1
@@ -506,7 +531,7 @@ if(CEDITOR_BUILD_APP)
         message(STATUS "CEditor: CLAP format ENABLED (target CEditorPlayerVST_CLAP, id ${CE_CLAP_ID}).")
     endif()
 
-    # --- The generated instrument-host product (VIP-successor Stage 1) --------------------------
+    # --- The generated Hostage product ---------------------------------------------------------
     # Two wrappers around the same InstrumentHostService the editor's preview uses: a standalone
     # (CEHostStandalone — owns the audio device, persists its session per user) and an outer VST3
     # (CEHostVST3 — the DAW owns audio and session; the rack rides in the project chunk). Both
@@ -516,7 +541,15 @@ if(CEDITOR_BUILD_APP)
     # Identity is stamped from cache variables because the Host Project build reuses these targets
     # per product: same shape, whatever name/code the project chose (the CEditorPlayerVST
     # pattern, applied to the host).
-    set(CE_HOST_PRODUCT_NAME    "CE Instrument Host" CACHE STRING "Generated host product name")
+    # Keep the internal targets and plug-in codes stable: DAW projects, build scripts and the
+    # product assembler already know CEHostStandalone / CEHostVST3. Only the produced product
+    # name changes. Migrate the old default in an existing CMake cache, but never overwrite a
+    # custom product name.
+    set(CE_HOST_PRODUCT_NAME    "Hostage"            CACHE STRING "Generated host product name")
+    if (CE_HOST_PRODUCT_NAME STREQUAL "CE Instrument Host")
+        message(STATUS "Hostage: migrating the legacy default product name in this build tree.")
+        set(CE_HOST_PRODUCT_NAME "Hostage" CACHE STRING "Generated host product name" FORCE)
+    endif()
     set(CE_HOST_PRODUCT_VERSION "0.1.0"              CACHE STRING "Generated host product version")
     set(CE_HOST_COMPANY_NAME    "Tedjuh-inc"         CACHE STRING "Generated host vendor / company name")
     set(CE_HOST_MFR_CODE        "Tdjh"               CACHE STRING "Generated host 4-char manufacturer code")
@@ -530,6 +563,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/IsolatedPluginProxy.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
@@ -1002,6 +1037,8 @@ if(WIN32)
         "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
         "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/IsolatedPluginProxy.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -1117,7 +1154,7 @@ if(WIN32)
     target_link_libraries(Ctrl49PresetTest PRIVATE winmm juce::juce_core)
 endif()
 
-# --- Instrument host (VIP-successor Stage 1): VST3 catalogue + isolated scanner ----------------
+# --- Hostage: VST3 catalogue + isolated scanner ------------------------------------------------
 # The reuse rulings and the reasoning behind this block are in
 # docs/design/instrument-host-integration-audit.md. The catalogue and coordinator are
 # juce_core-only ON PURPOSE: their tests drive a stub worker (ScannerStubMain.cpp) through
@@ -1180,6 +1217,90 @@ target_link_libraries(CEditorPluginScannerCoordinatorTests PRIVATE juce::juce_co
 add_test(NAME PluginScannerCoordinator
          COMMAND CEditorPluginScannerCoordinatorTests $<TARGET_FILE:CEditorScannerStub>)
 ce_configure_test(CEditorPluginScannerCoordinatorTests)
+
+# Live plug-in isolation, slice 1: the versioned worker control protocol. This is a pure
+# juce_core test and deliberately does not claim the processor proxy/data plane is complete.
+add_executable(CEditorPluginWorkerProtocolTests
+    "${CE_ROOT}/tests/PluginWorkerProtocolTests.cpp"
+)
+target_compile_features(CEditorPluginWorkerProtocolTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPluginWorkerProtocolTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPluginWorkerProtocolTests PRIVATE juce::juce_core)
+add_test(NAME PluginWorkerProtocol COMMAND CEditorPluginWorkerProtocolTests)
+ce_configure_test(CEditorPluginWorkerProtocolTests)
+
+# Live plug-in isolation, slice 2: the fixed double-buffer layout and MIDI codec. This remains
+# process-free, so malformed blocks and sequence fencing can be proved without a VST or worker.
+add_executable(CEditorPluginWorkerDataPlaneTests
+    "${CE_ROOT}/tests/PluginWorkerDataPlaneTests.cpp"
+)
+target_compile_features(CEditorPluginWorkerDataPlaneTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPluginWorkerDataPlaneTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPluginWorkerDataPlaneTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+)
+add_test(NAME PluginWorkerDataPlane COMMAND CEditorPluginWorkerDataPlaneTests)
+ce_configure_test(CEditorPluginWorkerDataPlaneTests)
+
+# Live plug-in isolation, slice 3: proxy-side one-block pipelining and bounded failure policy.
+add_executable(CEditorPluginWorkerBlockBridgeTests
+    "${CE_ROOT}/tests/PluginWorkerBlockBridgeTests.cpp"
+)
+target_compile_features(CEditorPluginWorkerBlockBridgeTests PRIVATE cxx_std_23)
+target_include_directories(CEditorPluginWorkerBlockBridgeTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorPluginWorkerBlockBridgeTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+)
+add_test(NAME PluginWorkerBlockBridge COMMAND CEditorPluginWorkerBlockBridgeTests)
+ce_configure_test(CEditorPluginWorkerBlockBridgeTests)
+
+if (WIN32)
+    # End-to-end process boundary: the stub can process, exit or hang on demand. The test drives
+    # the same IsolatedPluginProxy shipped by the product and proves the host process survives.
+    add_executable(CEditorPluginWorkerCrashStub
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerCrashReporter.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
+        "${CE_ROOT}/tests/PluginWorkerCrashStubMain.cpp"
+    )
+    target_compile_features(CEditorPluginWorkerCrashStub PRIVATE cxx_std_23)
+    target_include_directories(CEditorPluginWorkerCrashStub PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorPluginWorkerCrashStub PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_processors
+        dbghelp
+    )
+    ce_configure_test(CEditorPluginWorkerCrashStub)
+
+    add_executable(CEditorPluginWorkerIsolationTests
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/InstrumentHost/IsolatedPluginProxy.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
+        "${CE_ROOT}/tests/PluginWorkerIsolationTests.cpp"
+    )
+    target_compile_features(CEditorPluginWorkerIsolationTests PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorPluginWorkerIsolationTests PRIVATE
+        JUCE_MODAL_LOOPS_PERMITTED=1
+    )
+    target_include_directories(CEditorPluginWorkerIsolationTests PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorPluginWorkerIsolationTests PRIVATE
+        juce::juce_core
+        juce::juce_cryptography
+        juce::juce_audio_processors
+        juce::juce_gui_basics
+    )
+    add_test(NAME PluginWorkerIsolation
+             COMMAND CEditorPluginWorkerIsolationTests $<TARGET_FILE:CEditorPluginWorkerCrashStub>)
+    set_tests_properties(PluginWorkerIsolation PROPERTIES TIMEOUT 60)
+    ce_configure_test(CEditorPluginWorkerIsolationTests)
+endif()
 
 # The rack: document model, per-part MIDI gate, and the live graph host. Split by dependency
 # so each layer is testable at the cheapest tier that can prove it: the model is juce_core,
@@ -1317,6 +1438,85 @@ if (CEDITOR_SCANNER_WORKER)
     target_include_directories(CEditorPluginScanner PRIVATE "${CE_ROOT}/src")
     target_link_libraries(CEditorPluginScanner PRIVATE juce::juce_audio_processors)
     message(STATUS "CEditor: VST3 scanner worker ENABLED (CEditorPluginScanner).")
+endif()
+
+# The persistent live worker is Windows-only because its data plane uses named file mappings
+# and events. Unlike the scanner it owns one prepared processor and stays alive for audio.
+option(CEDITOR_PLUGIN_WORKER "Build the crash-isolated live VST3 worker (CEditorPluginWorker)" ${CEDITOR_BUILD_APP_DEFAULT})
+if (CEDITOR_PLUGIN_WORKER AND WIN32)
+    add_executable(CEditorPluginWorker
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerMain.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerCrashReporter.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
+    )
+    target_compile_features(CEditorPluginWorker PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorPluginWorker PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+        JUCE_MODAL_LOOPS_PERMITTED=1
+    )
+    target_include_directories(CEditorPluginWorker PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorPluginWorker PRIVATE
+        juce::juce_audio_processors
+        juce::juce_gui_basics
+        dbghelp
+    )
+    ce_enable_private_release_symbols(CEditorPluginWorker)
+    foreach(host_target CEditor CEHostStandalone CEHostVST3 CEHostVST3_VST3 Ctrl49RackDemo)
+        if (TARGET ${host_target})
+            add_dependencies(${host_target} CEditorPluginWorker)
+            add_custom_command(TARGET ${host_target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:CEditorPluginWorker>"
+                    "$<TARGET_FILE_DIR:${host_target}>/CEditorPluginWorker.exe"
+                COMMENT "Staging the live plug-in worker beside ${host_target}"
+            )
+        endif()
+    endforeach()
+    message(STATUS "CEditor: live VST3 worker ENABLED (CEditorPluginWorker).")
+elseif (CEDITOR_PLUGIN_WORKER)
+    message(STATUS "CEditor: live VST3 worker is Windows-only; target not added.")
+endif()
+
+# A machine-dependent acceptance harness for the real scanner -> worker -> VST3 path. It is
+# default-off and deliberately absent from CTest: installed plug-ins may require a licence,
+# show first-run UI or be unsuitable for unattended CI. Enabling this option adds one explicit
+# target and makes its build pull in the exact scanner and worker binaries it exercises.
+option(CEDITOR_REAL_VST_SMOKE
+    "Add the opt-in real-VST3 isolated-worker acceptance harness (never a default CTest)" OFF)
+if (CEDITOR_REAL_VST_SMOKE)
+    if (NOT WIN32)
+        message(FATAL_ERROR "CEDITOR_REAL_VST_SMOKE requires Windows live-worker isolation.")
+    elseif (NOT TARGET CEditorPluginScanner OR NOT TARGET CEditorPluginWorker)
+        message(FATAL_ERROR
+            "CEDITOR_REAL_VST_SMOKE requires CEDITOR_SCANNER_WORKER=ON and CEDITOR_PLUGIN_WORKER=ON.")
+    else()
+        add_executable(CEditorPluginWorkerRealVstSmoke EXCLUDE_FROM_ALL
+            "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+            "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+            "${CE_ROOT}/src/InstrumentHost/IsolatedPluginProxy.cpp"
+            "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
+            "${CE_ROOT}/tests/PluginWorkerRealVstSmokeMain.cpp"
+        )
+        target_compile_definitions(CEditorPluginWorkerRealVstSmoke PRIVATE
+            JUCE_PLUGINHOST_VST3=0
+            JUCE_MODAL_LOOPS_PERMITTED=1
+        )
+        target_include_directories(CEditorPluginWorkerRealVstSmoke PRIVATE "${CE_ROOT}/src")
+        target_link_libraries(CEditorPluginWorkerRealVstSmoke PRIVATE
+            juce::juce_core
+            juce::juce_cryptography
+            juce::juce_audio_processors
+            juce::juce_gui_basics
+        )
+        add_dependencies(CEditorPluginWorkerRealVstSmoke
+            CEditorPluginScanner CEditorPluginWorker)
+        ce_configure_test(CEditorPluginWorkerRealVstSmoke)
+        message(STATUS
+            "CEditor: opt-in real-VST3 isolation smoke target ENABLED (not registered with CTest).")
+    endif()
 endif()
 
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
@@ -1483,6 +1683,12 @@ if (TARGET CEditor)
         RUNTIME DESTINATION "."
         RESOURCE DESTINATION "."
     )
+    if (TARGET CEditorPluginScanner)
+        install(TARGETS CEditorPluginScanner RUNTIME DESTINATION ".")
+    endif()
+    if (TARGET CEditorPluginWorker)
+        install(TARGETS CEditorPluginWorker RUNTIME DESTINATION ".")
+    endif()
 
     if (EXISTS "${CE_ROOT}/web/dist")
         install(DIRECTORY "${CE_ROOT}/web/dist/"

@@ -1,5 +1,4 @@
-// Ctrl49PerformanceDisplay — the performance page's display payloads (VIP-successor Stage 6,
-// baseline §18.8.10).
+// Ctrl49PerformanceDisplay — Hostage performance-page payloads for the CTRL49.
 //
 // The same two Lua calls the rack page uses (set_labels and the 22-byte set_values), filled
 // from the performance system instead of the parameter model: the title carries the transport

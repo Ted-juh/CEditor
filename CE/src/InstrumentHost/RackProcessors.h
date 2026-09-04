@@ -1,13 +1,15 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "LayerRouter.h"
 #include "PartMidiFilterCore.h"
 #include "Performance/PerformanceEngine.h"
 #include "Performance/ArpEngine.h"
+#include "Performance/ArticulationManager.h"
 #include "Performance/MidiInsertRack.h"
 #include "Performance/MidiFxChain.h"
 
-// RackProcessors — the two per-part graph nodes around an instrument (VIP-successor Stage 1).
+// RackProcessors — the two per-part Hostage graph nodes around an instrument.
 //
 // The baseline's Stage 1 topology, literally:
 //
@@ -41,11 +43,47 @@ public:
     PartMidiFilterCore& getCore()                             { return core; }
     perf::MidiInsertRack& getMidiInserts()                    { return inserts; }
 
+    /** Articulations are stored as MIDI slots but are a control stage around the musical
+        chain. Keeping this one setter prevents the document, trigger decoder and inserts from
+        ever receiving different versions of the chain. */
+    void setMidiChain (const juce::Array<perf::MidiSlot>& slots)
+    {
+        articulations.setSlots (slots);
+        inserts.setSlots (slots);
+    }
+
+    void setPartInputChannel (int channel) noexcept
+    {
+        articulations.setPartInputChannel (channel);
+    }
+
+    void setPartEnabled (bool enabled) noexcept
+    {
+        articulations.setPartEnabled (enabled);
+        core.setEnabled (enabled);
+    }
+
+    /** Controlling thread: injects system/configuration MIDI into this part's next audio
+        block. Used for MTS tables; a try-lock in processBlock means audio never waits. */
+    void queueMessages (const juce::MidiBuffer& messages)
+    {
+        const juce::SpinLock::ScopedLockType lock (queuedLock);
+        queued.addEvents (messages, 0, -1, 0);
+    }
+
     /** Where this part's sequenced events come from. Null (the default) is a part with no
         engine behind it, which is exactly how the Stage 1 tests still drive this. */
     void setEngine (perf::PerformanceEngine* engineToUse, int partIndexToUse) noexcept
     {
         engine = engineToUse;
+        partIndex = partIndexToUse;
+    }
+
+    /** The shared router owns live-key allocation. A grouped part reads its private buffer;
+        an ordinary part still reads the graph MIDI input exactly as before. */
+    void setLayerRouter (LayerRouter* routerToUse, int partIndexToUse) noexcept
+    {
+        layerRouter = routerToUse;
         partIndex = partIndexToUse;
     }
 
@@ -55,6 +93,14 @@ public:
         scratch.ensureSize (size);
         merged.ensureSize (size);
         afterFx.ensureSize (size);
+        articulationInput.ensureSize (size);
+        articulationStaging.ensureSize (size);
+        articulationActions.ensureSize (size);
+        stagingActions.ensureSize (size);
+        {
+            const juce::SpinLock::ScopedLockType lock (queuedLock);
+            queued.ensureSize (size);
+        }
         inserts.prepare (maximumExpectedSamplesPerBlock);
     }
 
@@ -64,16 +110,36 @@ public:
     {
         const auto numSamples = audio.getNumSamples();
 
-        core.process (midi, scratch);
+        // Trigger notes are controls, not playable notes. Decode them before the key zone so
+        // C-2 can switch a violin part whose playable range starts at G3.
+        const auto& liveInput = layerRouter != nullptr && layerRouter->routesPart (partIndex)
+                              ? layerRouter->outputFor (partIndex) : midi;
+        articulations.process (liveInput, articulationInput, articulationActions);
+        core.process (articulationInput, scratch);
+
+        {
+            const juce::SpinLock::ScopedTryLockType lock (queuedLock);
+            if (lock.isLocked() && ! queued.isEmpty())
+            {
+                scratch.addEvents (queued, 0, -1, 0);
+                queued.clear();
+            }
+        }
 
         // The engine node runs upstream in the same graph pass, so its staging for this part
         // is already written by the time we read it.
         if (engine != nullptr && partIndex >= 0)
         {
+            articulations.process (engine->stagingFor (partIndex), articulationStaging,
+                                   stagingActions);
             merged.clear();
             merged.addEvents (scratch, 0, -1, 0);
-            merged.addEvents (engine->stagingFor (partIndex), 0, -1, 0);
+            merged.addEvents (articulationStaging, 0, -1, 0);
             scratch.swapWith (merged);
+        }
+        else
+        {
+            stagingActions.clear();
         }
 
         // The part's MIDI inserts, in the order the player put them: what used to be one
@@ -81,7 +147,19 @@ public:
         const auto block = engine != nullptr ? engine->lastBlockTime()
                                              : perf::Transport::BlockTime();
         inserts.process (scratch, afterFx, block, numSamples);
-        midi.swapWith (afterFx);
+        // Generated articulation messages bypass note processors. A keyswitch selected as C0
+        // must reach C0 even when this part has transpose, scale and chorder modules enabled.
+        // They are merged FIRST: when a sequenced switch and its first note share a sample, the
+        // instrument must select the articulation before it sees the note.
+        merged.clear();
+        merged.addEvents (articulationActions, 0, -1, 0);
+        merged.addEvents (stagingActions, 0, -1, 0);
+        merged.addEvents (afterFx, 0, -1, 0);
+        // A frozen clip already contains this chain's rendered result. It joins here — after
+        // the inserts, before the instrument/hardware sender — so it sounds exactly once.
+        if (engine != nullptr && partIndex >= 0)
+            merged.addEvents (engine->postFxStagingFor (partIndex), 0, -1, 0);
+        midi.swapWith (merged);
     }
 
     /** Releases everything the chain is holding — the panic path reaches every module. */
@@ -107,10 +185,16 @@ public:
 
 private:
     PartMidiFilterCore core;
+    perf::ArticulationManagerEngine articulations;
     perf::MidiInsertRack inserts;
     perf::PerformanceEngine* engine = nullptr;
+    LayerRouter* layerRouter = nullptr;
     int partIndex = -1;
     juce::MidiBuffer scratch, merged, afterFx;
+    juce::MidiBuffer articulationInput, articulationStaging;
+    juce::MidiBuffer articulationActions, stagingActions;
+    juce::SpinLock queuedLock;
+    juce::MidiBuffer queued;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PartMidiFilterProcessor)
 };
@@ -122,17 +206,27 @@ private:
 class PerformanceEngineProcessor final : public juce::AudioProcessor
 {
 public:
-    explicit PerformanceEngineProcessor (perf::PerformanceEngine& engineToDrive)
-        : engine (engineToDrive)
+    PerformanceEngineProcessor (perf::PerformanceEngine& engineToDrive,
+                                LayerRouter& layerRouterToDrive)
+        : engine (engineToDrive), layerRouter (layerRouterToDrive)
     {
     }
 
-    void prepareToPlay (double, int) override {}
+    void prepareToPlay (double, int maximumExpectedSamplesPerBlock) override
+    {
+        // A replay can legitimately put dense controller streams beside live input. Reserve
+        // once here so merging them never grows storage on the audio thread.
+        combined.ensureSize ((size_t) juce::jmax (262144, maximumExpectedSamplesPerBlock * 32));
+    }
     void releaseResources() override {}
 
     void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
     {
-        engine.processBlock (juce::jmax (1, audio.getNumSamples()), midi);
+        combined.clear();
+        combined.addEvents (midi, 0, -1, 0);
+        engine.processBlock (juce::jmax (1, audio.getNumSamples()), combined);
+        layerRouter.process (combined);
+        midi.swapWith (combined);
     }
 
     const juce::String getName() const override               { return "CEditor Performance Engine"; }
@@ -152,6 +246,8 @@ public:
 
 private:
     perf::PerformanceEngine& engine;
+    LayerRouter& layerRouter;
+    juce::MidiBuffer combined;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PerformanceEngineProcessor)
 };
@@ -255,6 +351,12 @@ public:
         targetRight.store (right);
     }
 
+    void setLayerRouter (LayerRouter* routerToUse, int partIndexToUse) noexcept
+    {
+        layerRouter = routerToUse;
+        partIndex = partIndexToUse;
+    }
+
     void prepareToPlay (double, int) override
     {
         // Snap on prepare: a restored mixer position must not fade in from silence.
@@ -267,8 +369,9 @@ public:
     void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer&) override
     {
         const auto numSamples = audio.getNumSamples();
-        const float newLeft  = targetLeft.load();
-        const float newRight = targetRight.load();
+        const auto layerGain = layerRouter != nullptr ? layerRouter->gainForPart (partIndex) : 1.0f;
+        const float newLeft  = targetLeft.load() * layerGain;
+        const float newRight = targetRight.load() * layerGain;
 
         if (audio.getNumChannels() > 0)
             audio.applyGainRamp (0, 0, numSamples, currentLeft, newLeft);
@@ -296,6 +399,8 @@ public:
 private:
     std::atomic<float> targetLeft { 1.0f }, targetRight { 1.0f };
     float currentLeft = 1.0f, currentRight = 1.0f;
+    LayerRouter* layerRouter = nullptr;
+    int partIndex = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GainPanProcessor)
 };

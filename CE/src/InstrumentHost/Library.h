@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
-// Library — the unified preset, instrument and rack library (VIP-successor Stage 4).
+// Library — Hostage's unified preset, instrument and rack library.
 //
 // One index with explicit record types, never a second host: a record ORCHESTRATES Stage 1
 // identities and state (a preset targets a plug-in class and carries or references processor

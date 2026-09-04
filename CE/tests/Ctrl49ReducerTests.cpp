@@ -95,6 +95,23 @@ int main()
         check (r.displayArguments()[6] == 65, "Page 1 slot 1 retained 65 across page switch");
     }
 
+    {   // --- scene/setlist page recall --------------------------------------------------------------
+        Ctrl49Reducer r;
+        r.setPageCount (3);
+        feed (r, 0xB0, 0x0B, 0x01);           // page 1 slot 1 -> 65
+        check (r.setPage (2) && r.page() == 2 && r.activeSlot() == 0,
+               "Programmatic recall selects the requested controller page");
+        check (! r.setPage (2), "Recalling the visible page does not request a redraw");
+        check (r.setPage (99) == false && r.page() == 2,
+               "Programmatic recall clamps at the host's real page count");
+        feed (r, 0xB0, 0x27, 0x7F);           // Page Left from recalled page
+        check (r.page() == 1,
+               "Physical Page Left continues from the recalled page instead of stale state");
+        r.setPage (-10);
+        check (r.page() == 0 && r.displayArguments()[6] == 65,
+               "Recall clamps at page one and preserves each page's values");
+    }
+
     std::cout << "\nCtrl49 session sequence test\n----------------------------\n";
 
     {   // --- startup sequence shape ----------------------------------------------------------------

@@ -72,12 +72,18 @@ struct CompiledPattern
 
 struct CompiledClip
 {
+    enum class FollowAction : juce::uint8 { none = 0, clip, next, random, stop };
+
     juce::String clipId;
     int patternIndex = -1;        // -1 = the clip names a pattern that is gone
+    int fillPatternIndex = -1;    // related pattern rendered only while the fill is held
     Quantize launchQuantize = Quantize::bar;
     bool loop = true;
     int followClipIndex = -1;
     int followAfterLoops = 0;
+    FollowAction followAction = FollowAction::none;
+    juce::uint32 followSeed = 1;
+    bool bypassMidiFx = false;     // rendered/frozen events join after the part's MIDI chain
 };
 
 /** One resolved automation destination. The strings stay here for the message thread to read

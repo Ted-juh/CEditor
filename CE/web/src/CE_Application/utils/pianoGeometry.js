@@ -20,6 +20,35 @@ export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A',
 
 export const isBlack = (note) => BLACK_IN_OCTAVE.has(((note % 12) + 12) % 12);
 
+export const FULL_KEYBOARD = 'full';
+export const MAX_COMPLETE_OCTAVES = 10;
+
+const octaveCount = (value) => Math.max(1, Math.min(MAX_COMPLETE_OCTAVES,
+  Math.round(Number(value) || 1)));
+
+/** The highest C octave from which `count` complete octaves still fit inside MIDI 0..127. */
+export function maxPlayBaseOctave(count) {
+  return count === FULL_KEYBOARD ? -1 : 9 - octaveCount(count);
+}
+
+/** Keep the playable strip on complete octaves. "Full" is the one intentionally partial
+    span because MIDI ends at G9 rather than at the end of an octave. */
+export function playKeyboardRange(baseOctave = 4, count = 4) {
+  if (count === FULL_KEYBOARD) return { low: 0, high: 127 };
+  const octaves = octaveCount(count);
+  const base = Math.max(-1, Math.min(maxPlayBaseOctave(octaves),
+    Math.round(Number(baseOctave) || 0)));
+  const low = (base + 1) * 12;
+  return { low, high: low + octaves * 12 - 1 };
+}
+
+/** Four octaves establish the normal key width. Shorter keyboards occupy only the space their
+    keys need; longer keyboards fill the bar and therefore make each key progressively narrower. */
+export function playKeyboardWidthPercent(count = 4) {
+  if (count === FULL_KEYBOARD) return 100;
+  return Math.min(100, octaveCount(count) * 25);
+}
+
 /** C-1 for 0, C4 for 60 — the convention the split lanes already used. */
 export const noteName = (note) => `${NOTE_NAMES[note % 12]}${Math.floor(note / 12) - 1}`;
 

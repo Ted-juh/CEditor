@@ -25,7 +25,7 @@ struct Ctrl49Action
     bool padChanged  = false;  // pad strike or release
     int  pad         = -1;     // 1..8 when padChanged
     int  velocity    = -1;     // strike velocity, 0 on release
-    // The normalized control event a mapping runtime consumes (VIP-successor Stage 3): the
+    // The normalized control event the Hostage mapping runtime consumes: the
     // raw relative movement, before the reducer's own 0..127 bookkeeping absorbs it. A rack
     // host applies the delta to ITS value model (the parameter position) and builds its own
     // display payload — the internal values_ then only serve hosts without one.
@@ -46,6 +46,9 @@ public:
     // storage always covers all kPageCount pages; this only bounds navigation so a host
     // with fewer real pages never lands on an empty one. Clamped to [1, kPageCount].
     void setPageCount (int count);
+    /** Programmatic recall used by a scene or setlist item. Returns true only when the page
+        actually changed; physical Page Left/Right continues from the recalled page. */
+    bool setPage (int page);
 
     // Processes one complete MIDI message from the hidden input. Returns the resulting
     // action, or nullopt for messages that change nothing (poly pressure, SysEx replies,

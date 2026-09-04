@@ -2,8 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-// PluginEditorHost — the one native pane that shows a plug-in's own interface (VIP-successor
-// Stage 1).
+// PluginEditorHost — Hostage's native pane for a plug-in's own interface.
 //
 // The baseline's rule made concrete: vendor editors are native platform views and stay native
 // — this component owns exactly one AudioProcessorEditor at a time in a reserved region

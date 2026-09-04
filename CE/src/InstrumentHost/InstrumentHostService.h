@@ -1,9 +1,14 @@
 #pragma once
 
 #include <deque>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <mutex>
+#include <set>
 #include <thread>
+#include <utility>
+#include <vector>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
@@ -17,7 +22,7 @@
 #include "Licensing/LicenceStore.h"
 #include "ControlSurface/SurfaceProfile.h"
 
-// InstrumentHostService — the instrument host behind one bridge event (VIP-successor Stage 1).
+// InstrumentHostService — the Hostage engine behind one bridge event.
 //
 // The WebView drives the host through a single "instrumentHost" listener whose payload carries
 // `cmd` plus arguments, and hears back through emitted events. This class is that whole
@@ -35,11 +40,18 @@
 //
 // COMMANDS IN (handleCommand payload.cmd):
 //   getState                                     (first call restores the saved session)
+//   setStageLock {enabled} | beginStageUnlock | cancelStageUnlock
+//     (locking is immediate; unlocking requires beginStageUnlock to remain active for the
+//      native hold interval. While locked, construction commands are refused before dispatch.)
 //   scan | addScanPath {path} | removeScanPath {path} | browseScanPath | clearQuarantine {modulePath}
 //     (browseScanPath opens the native directory picker through Options::pickDirectory and
 //      adds whatever the user chose; cancelling chooses nothing and changes nothing)
 //   addPart | removePart {partId} | movePart {partId,index} | focusPart {partId}
 //   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
+//   importScalaTuning {text,sourceName?} | resetMicrotuning
+//   setMicrotuning {enabled?,name?,rootMidiNote?,referenceMidiNote?,referenceFrequency?,
+//     mtsDeviceId?,mtsProgram?} | setPartMicrotuning {partId,enabled}
+//   sendMicrotuning {partId?}    (MTS SysEx; absent partId sends to every opted-in part)
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
 //   loadInstrument {partId, ceId} | unloadInstrument {partId} | panic {partId?}
 //   openEditor {partId} | closeEditor
@@ -63,6 +75,17 @@
 //     replaces only that part's previously generated pages, never a user-authored one)
 //   getLibrary {query?,type?} | scanLibrary | addLibraryPath {path} | removeLibraryPath {path}
 //   browseLibraryPath | saveUserPreset {partId,name?,category?} | saveRackToLibrary {name?}
+//   setPresetAudition {enabled?,phrase?,rootNote?,velocity?,noteLengthMs?,gapMs?}
+//   auditionLibraryRecord {recordId,action,partId?}
+//   startSoundComparison {partId?,recordIds?} | stepSoundComparison {delta}
+//   keepSoundComparison | cancelSoundComparison
+//   addLayerGroup {name?,partIds?} | removeLayerGroup {layerGroupId}
+//   setLayerGroup {layerGroupId,name?,enabled?,allocation?,source?,controller?,macroId?}
+//   addLayerMember {layerGroupId,partId} | removeLayerMember {layerGroupId,partId}
+//   setLayerMember {layerGroupId,partId,minimum?,maximum?,crossfade?}
+//     (allocation is all|roundRobin|leastBusy; source is velocity|key|cc|expression|macro.
+//      A part belongs to one group and must take MIDI from the keyboard. Continuous sources
+//      in all mode crossfade live audio; key/velocity sources shape incoming note velocity.)
 //   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
 //   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
 //     (the Stage 4 library: getLibrary answers with instrumentHostLibrary — records
@@ -85,6 +108,28 @@
 //      path as everything else — mapped per target, gesture-wrapped, unresolved targets
 //      skipped and shown. `final:true` persists and re-announces state; drags without it
 //      stay cheap.)
+//   addModulationRoute {sourceType,sourceId?,sourceChannel?,sourceNumber?,targetId,parameterId,amount?}
+//   setModulationRoute {routeId,amount?,enabled?,sourceChannel?,sourceNumber?}
+//   removeModulationRoute {routeId} | clearModulationRoutes
+//   addMidiLfo {name?} | setMidiLfo {lfoId,name?,shape?,enabled?,sync?,rateHz?,syncBeats?,
+//                                   phaseOffset?,minimum?,maximum?}
+//   resetMidiLfo {lfoId} | removeMidiLfo {lfoId}
+//   addMidiLfoOutput {lfoId,type,targetPartId,channel?,number?,sysexTemplate?}
+//   setMidiLfoOutput {lfoId,outputId,type?,targetPartId?,channel?,number?,sysexTemplate?,enabled?}
+//   removeMidiLfoOutput {lfoId,outputId}
+//   addEnvelope {name?} | setEnvelope {envelopeId,name?,enabled?,channel?,noteLow?,noteHigh?,
+//                                        retrigger?,attackMs?,decayMs?,sustain?,releaseMs?,
+//                                        curve?,velocityAmount?}
+//   triggerEnvelope {envelopeId,gate,velocity?} | resetEnvelope {envelopeId}
+//   removeEnvelope {envelopeId}
+//   addMseg {name?} | setMseg {msegId,name?,enabled?,sync?,rateHz?,syncBeats?,
+//                              phaseOffset?,points?}
+//   resetMseg {msegId} | removeMseg {msegId}
+//   addRandomModulator {name?} | setRandomModulator {randomId,name?,mode?,enabled?,sync?,
+//       rateHz?,syncBeats?,seed?,probability?,smoothing?,stepSize?,chaos?,minimum?,maximum?}
+//   resetRandomModulator {randomId} | removeRandomModulator {randomId}
+//     (velocity, CC/mod wheel/expression, pressure, pitch bend and macros are usable sources
+//      now. Several routes sum at one destination while its unmodulated base stays intact.)
 //   addReturn {name?} | removeReturn {returnId} | renameReturn {returnId,name}
 //   setReturnLevel {returnId,level} | setSendLevel {partId,returnId,level}
 //     (Stage 5 shared buses: each return is one more effect chain — addEffect and the whole
@@ -118,23 +163,52 @@
 //   toggleStep {patternId,laneId,index}
 //     (one Pattern object with typed lanes — note, chord, drum, cc and parameter — each with
 //      its own length and rate, which is polymeter without a special case.)
+//   setStepParameterLock {patternId,laneId,index,targetId,parameterId,value}
+//   setStepCcLock {patternId,laneId,index,targetPartId,channel?,ccNumber,value}
+//   removeStepLock {patternId,laneId,index,lockLaneId} | clearStepLocks {patternId,laneId,index?}
+//     (locks are ordinary non-gliding parameter/CC lanes linked to the visible source lane;
+//      the existing compiler schedules them, while the editor presents them on the step.)
 //   addClip {patternId,name?} | removeClip {clipId}
 //   setClipOptions {clipId, name?,launchQuantize?,loop?,followClipId?,followAfterLoops?}
 //   launchClip {clipId} | stopClip {clipId} | stopAllClips
 //   armCapture {clipId,laneId} | disarmCapture
 //     (capture snaps played notes to the armed lane's grid and writes them into the pattern
 //      on this thread — the audio thread only ever reports what it heard.)
+//   captureRecentMidi {seconds?}
+//     (turns the always-listening MIDI history into a new editable pattern and clip; unlike
+//      armed capture it also hears ordinary playing while the transport is stopped.)
+//   freezeMidiClip {clipId,cycles?}
+//     (renders 1..8 cycles through each addressed part's MIDI modules into a new editable
+//      clip. The result joins after those modules on replay, so generated notes occur once.)
+//   startMidiLoop {clipId?} | finishMidiLoop | cancelMidiLoop | removeMidiLoop {clipId}
+//     (no clipId records a new independently looping layer; a looper clipId records an
+//      overdub whose notes fold into that layer's established length and phase.)
+//   startGestureRecording {clipId?,mode?} | finishGestureRecording | cancelGestureRecording
+//   clearGestureLanes {clipId}
+//     (records plug-in, macro and mixer movements into gliding parameter lanes. No clipId
+//      creates a reusable automation clip; a clipId writes into an existing gesture or MIDI
+//      loop. mode is "overdub" or "replace"; replace affects only controls touched in the take.)
 //   addScene {name?} | removeScene {sceneId} | renameScene {sceneId,name}
-//   captureScene {sceneId} | setSceneOptions {sceneId, launchQuantize?,stopOtherClips?,tempo?}
+//   captureScene {sceneId} | setSceneOptions {sceneId, launchQuantize?,stopOtherClips?,tempo?,morphBeats?,pageId?}
 //   setSceneClip {sceneId,clipId,included} | launchScene {sceneId}
 //     (a scene recalls clips, slot states, macros, focus and page through the SAME rack and
 //      parameter systems built earlier — it is not a second snapshot engine. captureScene
 //      takes the current rig as the scene's content.)
-//   addSetlistItem {sceneId?,name?} | removeSetlistItem {itemId}
-//   setSetlistItem {itemId, name?,notes?,tempo?,sceneId?} | moveSetlistItem {itemId,index}
+//   addSetlistItem {sceneId?,rackRecordId?,pageId?,name?} | removeSetlistItem {itemId}
+//   setSetlistItem {itemId,name?,notes?,tempo?,sceneId?,rackRecordId?,pageId?}
+//   setSetlistOptions {preloadAhead?} | moveSetlistItem {itemId,index}
 //   setlistGo {index} | setlistNext | setlistPrev
-//     (navigation recalls the item's scene; a scene that cannot be recalled leaves the rig on
-//      the last stable item and says so rather than half-loading.)
+//     (a row can recall the current rig's scene or a full-rack Library capture, then recall a
+//      CTRL49 page. The next 0..2 full rigs are warmed according to preloadAhead.)
+//   setAutomaticFailover {enabled?,maxAttempts?,retryDelayMs?}
+//   retryFailedProcessor {targetId} | dismissFailoverEvent {targetId}
+//     (a processor that throws is removed from the audio path and optionally re-instantiated
+//      from its last saved identity/state. Effects pass dry audio; instruments fall silent.)
+//   addArrangementItem {sceneId,name?} | removeArrangementItem {itemId}
+//   setArrangementItem {itemId,name?,sceneId?,bars?} | moveArrangementItem {itemId,index}
+//   setArrangementOptions {loop?} | startArrangement {index?} | stopArrangement
+//     (an ordered, bar-counted scene chain: enough to make a song repeatable without a DAW
+//      timeline or a second clock. Scene changes still land in the native quantized engine.)
 //   setPartArp {partId, enabled?,mode?,stepsPerBeat?,gate?,swing?,octaves?,latch?,
 //     constrainToScale?,velocityPattern?}
 //   setPartMidiFx {partId, transpose?,constrainToScale?,scaleRoot?,scaleType?,chord?,
@@ -171,7 +245,7 @@
 // actually open so the UI never pretends.
 //
 // THE INSTANTIATOR is injected because it is the one piece that genuinely needs a real
-// plug-in format: the app passes AudioPluginFormatManager::createPluginInstanceAsync over the
+// plug-in format: shipping runtimes pass the out-of-process live-worker factory over the
 // catalogue's stored PluginDescription XML; tests pass a factory of stub processors. Its
 // callback may arrive asynchronously (the message thread, in the app); the commit then runs
 // through the rack host's generation ticket, so a part removed or re-targeted in the meantime
@@ -223,6 +297,10 @@ public:
         std::function<void (const juce::String& eventName, const juce::var& payload)> emit;
         std::function<void (const juce::String& descriptionXml, double sampleRate, int blockSize,
                             InstantiateCallback)> instantiate;
+        // Set by shipping entry points only when the disposable live-worker executable was
+        // resolved on disk. This is projected to the Reliability panel so it never claims
+        // process isolation merely because an instantiation callback happens to be configured.
+        bool livePluginIsolationAvailable = false;
         // Runs the scan body. Default (nullptr) = the service's own background thread;
         // tests pass [] (auto fn) { fn(); } to run inline.
         std::function<void (std::function<void()>)> scanExecutor;
@@ -290,6 +368,7 @@ public:
 
     const InstrumentRackHost& getRackHost() const     { return rack; }
     bool isScanning() const                           { return scanBusy.load(); }
+    bool isStageLocked() const noexcept               { return stageLocked; }
 
     // -- wrapper-context API --------------------------------------------------------------
     // The generated targets drive the service beside the bridge, not through it. The
@@ -374,6 +453,15 @@ public:
         position to snap to. Returns false, moving nothing, for an unknown, unassigned or
         unresolved slot. */
     bool nudgeControlSlot (const juce::String& pageId, const juce::String& slotId, int delta);
+
+    /** The surface broker reports manual page changes so a captured scene can remember the
+        layout the player was actually looking at. Recall is a one-shot request: consuming it
+        prevents the service from fighting later Page Left/Right presses. */
+    void noteSurfacePage (const juce::String& pageId) { currentSurfacePageId = pageId; }
+    juce::String consumeSurfacePageRequest()
+    {
+        return std::exchange (requestedSurfacePageId, {});
+    }
 
     // -- the Stage 6 performance system ------------------------------------------------------
 
@@ -630,7 +718,9 @@ private:
         `afterCommit` runs with the live instrument before anything is announced — the
         vendor-preset apply rides there. */
     void requestInstrument (const juce::String& partId, const juce::String& ceId,
-                            std::function<void (juce::AudioProcessor&)> afterCommit = {});
+                            std::function<void (juce::AudioProcessor&)> afterCommit = {},
+                            std::function<void (bool, const juce::String&)> completion = {},
+                            bool failoverAttempt = false);
 
     void runScanNow();
     void restoreSessionImpl (bool includePerformance);
@@ -641,7 +731,8 @@ private:
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
         catalogLock itself): empty = loadable, else the actionable reason. */
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
-    void loadPresetRecord (const LibraryRecord& record, const juce::String& partId);
+    void loadPresetRecord (const LibraryRecord& record, const juce::String& partId,
+                           std::function<void()> afterLoaded = {});
     /** A chain capture applied onto one part: the instrument, its MIDI modules and its
         insert chain, all at once. The instrument and every effect load through the same
         transactions a plain load uses — a capture is a shortcut for the player, never a
@@ -654,7 +745,9 @@ private:
     void attachParameters (const juce::String& partId);
     void applyPerformance (Performance&& performance);
     /** Mirrors requestInstrument for an effect slot, through the rack's effect transaction. */
-    void requestEffect (const juce::String& effectId, const juce::String& ceId);
+    void requestEffect (const juce::String& effectId, const juce::String& ceId,
+                        std::function<void (bool, const juce::String&)> completion = {},
+                        bool failoverAttempt = false);
     /** The live processor behind any target id — a part's instrument or an effect. */
     juce::AudioProcessor* targetProcessor (const juce::String& targetId) const;
     /** The class identity any target currently carries (for binding capture/resolution). */
@@ -682,6 +775,12 @@ private:
     static float virtualParameterDefault (const juce::String& parameterId);
     void setVirtualParameter (const juce::String& targetId, const juce::String& parameterId,
                               float normalized);
+    /** Writes the destination itself without changing a modulation route's remembered base. */
+    void writeTargetValueRaw (const juce::String& targetId, const juce::String& parameterId,
+                              float value, bool wrapGesture = false);
+    /** A human or automation write changes the base, then active routes are summed onto it. */
+    void writeTargetBaseValue (const juce::String& targetId, const juce::String& parameterId,
+                               float value, bool wrapGesture = false);
     /** True when targetId+parameterId can be written right now — plug-in or virtual. */
     bool targetParameterExists (const juce::String& targetId, const juce::String& parameterId);
     /** One mapped, gesture-wrapped write through a binding — page slots, nudges and macro
@@ -771,6 +870,11 @@ private:
     /** (Re)opens the part's configured MIDI output into its sender; failures land in
         `hardwareMidiErrors` and the state payload, never in silence. */
     void openHardwareMidi (const juce::String& partId);
+    /** Builds and sends the Performance-global MIDI Tuning Standard table to one opted-in
+        hardware device or software instrument. Compatibility is the destination's concern;
+        delivery failures are exposed per part instead of silently pretending it was tuned. */
+    bool sendMicrotuningToPart (const juce::String& partId, bool reportError = true);
+    void sendMicrotuningToEnabledParts();
 
     /** Caller holds catalogLock. */
     const PluginClassRecord* findClass (const juce::String& ceId,
@@ -781,14 +885,170 @@ private:
         path), scene landings, clip state changes and captured notes. Runs on the same pump as
         drainParameterEvents. */
     void drainEngineEvents();
+    /** Shared scene-launch primitive. Returns the engine token, or zero for an unknown scene.
+        The quantize override lets the arranger make every transition a bar boundary without
+        changing how the same scene behaves when launched manually. */
+    int queueSceneLaunch (const juce::String& sceneId, perf::Quantize quantize);
+    bool startArrangementPlayback (int index);
+    void stopArrangementPlayback (bool stopClips);
+    void tickArrangement();
+    /** Queues one held-fill edge after resolving the clip's configured alternate pattern. */
+    bool setClipFillState (const juce::String& clipId, bool active, bool reportError = true);
+    /** Converts the requested tail of the always-listening MIDI journal into an ordinary
+        editable pattern and clip. Pairing, quantization and document mutation are all
+        controlling-thread work; the audio thread only fills the fixed history ring. */
+    void createRetrospectiveClip (double seconds);
+    void freezeMidiClip (const juce::String& clipId, int cycles);
+    /** Starts the persisted browse phrase only after the requested preset has committed.
+        Events are advanced by the normal 30 Hz controlling-thread pump and injected into
+        the one target part, so rapid browsing can cancel the old phrase without leaving
+        future note-ons hidden in a global MIDI collector. */
+    void startPresetAudition (const juce::String& partId, bool force = false);
+    void stopPresetAudition();
+    void tickPresetAudition();
+    bool startSoundComparison (const juce::String& partId,
+                               const juce::StringArray& requestedRecordIds);
+    bool applySoundComparisonIndex (int index);
+    void finishSoundComparison (bool keepSelection);
+    void startMidiLoop (const juce::String& clipId);
+    void finishMidiLoop();
+    void cancelMidiLoop();
+    void removeMidiLoop (const juce::String& clipId);
+    void startGestureRecording (const juce::String& clipId, bool replace);
+    void finishGestureRecording();
+    void cancelGestureRecording();
+    void clearGestureLanes (const juce::String& clipId);
+    /** Captures a human-originated normalized value while the gesture recorder is armed.
+        Automation playback deliberately never calls this path, so it cannot record itself. */
+    void recordGestureValue (const juce::String& targetId, const juce::String& parameterId,
+                             float value);
     /** Writes one automation value to its target. No gestures: automation is a continuous
         stream, and wrapping every value would spam the host with begin/end pairs. */
     void applyAutomationValue (const juce::String& targetId, const juce::String& parameterId,
                                float value);
-    /** The half of a scene that is not clips — slots, macros, focus, page, tempo. */
+    // -- whole-performance capture and deterministic replay -----------------------------
+    void startPerformanceRecording (const juce::String& name);
+    void finishPerformanceRecording();
+    void cancelPerformanceRecording();
+    void drainPerformanceRecordingMidi();
+    void recordPerformanceAction (const juce::var& payload);
+    bool startPerformanceReplay (const juce::String& takeId);
+    void stopPerformanceReplay (bool announce = true);
+    void tickPerformanceReplay();
+    static bool isPerformanceReplayableCommand (const juce::String& command);
+    static juce::String encodePerformanceMidi (
+        const std::vector<perf::MidiCaptureJournal::Event>& events,
+        juce::int64 startSample);
+    static std::vector<perf::MidiCaptureJournal::Event> decodePerformanceMidi (
+        const PerformanceTake& take);
+    // -- modulation matrix ---------------------------------------------------------------
+    static bool validModulationSourceType (const juce::String& sourceType);
+    bool modulationRouteResolves (const ModulationRoute& route);
+    float modulationSourceValue (const ModulationRoute& route) const;
+    void setModulationSourceValue (const juce::String& sourceType,
+                                   const juce::String& sourceId, int channel, int number,
+                                   float value);
+    void applyModulationTarget (const juce::String& targetId,
+                                const juce::String& parameterId);
+    void applyAllModulationRoutes();
+    bool updateModulationBase (const juce::String& targetId,
+                               const juce::String& parameterId, float value);
+    static juce::String modulationSourceKey (const juce::String& sourceType,
+                                             const juce::String& sourceId,
+                                             int channel, int number);
+    // -- MIDI LFOs ----------------------------------------------------------------------
+    struct MidiLfoRuntime
+    {
+        double cycles = 0.0;
+        double lastSeconds = 0.0;
+        double syncOriginPpq = 0.0;
+        float phase = 0.0f;
+        float value = 0.0f;
+        bool initialized = false;
+        bool retriggered = false;
+    };
+    void tickMidiLfos();
+    float evaluateMidiLfo (const MidiLfo& lfo, MidiLfoRuntime& runtime,
+                           double nowSeconds);
+    void sendMidiLfoOutputs (const MidiLfo& lfo, float value, double nowSeconds);
+    void emitMidiLfoActivity();
+    static bool validMidiLfoShape (const juce::String& shape);
+    static bool validMidiLfoOutputType (const juce::String& type);
+    static bool buildMidiLfoSysEx (const juce::String& text, int value7, int value14,
+                                   juce::MidiMessage& message);
+    // -- envelope generators ------------------------------------------------------------
+    struct EnvelopeRuntime
+    {
+        enum class Stage { idle, attack, decay, sustain, release };
+        Stage stage = Stage::idle;
+        std::set<int> heldNotes;
+        double stageElapsed = 0.0;
+        double lastSeconds = 0.0;
+        float stageStartValue = 0.0f;
+        float peak = 1.0f;
+        float value = 0.0f;
+        float progress = 0.0f;
+        bool initialized = false;
+    };
+    void noteEnvelopeGate (int channel, int note, bool on, float velocity);
+    void triggerEnvelopeAttack (const EnvelopeGenerator& envelope, EnvelopeRuntime& runtime,
+                                float velocity);
+    void triggerEnvelopeRelease (EnvelopeRuntime& runtime);
+    void tickEnvelopeGenerators();
+    float advanceEnvelope (const EnvelopeGenerator& envelope, EnvelopeRuntime& runtime,
+                           double nowSeconds);
+    void emitEnvelopeActivity();
+    static float shapeEnvelopeProgress (float progress, float curve, bool falling);
+    static const char* envelopeStageName (EnvelopeRuntime::Stage stage);
+    // -- multi-segment envelope generators ---------------------------------------------
+    struct MsegRuntime
+    {
+        double cycles = 0.0;
+        double lastSeconds = 0.0;
+        float phase = 0.0f;
+        float value = 0.0f;
+        bool initialized = false;
+    };
+    void tickMsegs();
+    float evaluateMseg (const MsegGenerator& mseg, MsegRuntime& runtime,
+                        double nowSeconds);
+    void emitMsegActivity();
+    // -- random/probability modulators -------------------------------------------------
+    struct RandomModulatorRuntime
+    {
+        double cycles = 0.0;
+        double lastSeconds = 0.0;
+        std::int64_t step = -1;
+        float phase = 0.0f;
+        float previous = 0.5f;
+        float target = 0.5f;
+        float chaosValue = 0.5f;
+        float walkValue = 0.5f;
+        float value = 0.0f;
+        bool initialized = false;
+    };
+    void tickRandomModulators();
+    float evaluateRandomModulator (const RandomModulator& random,
+                                   RandomModulatorRuntime& runtime, double nowSeconds);
+    void emitRandomModulatorActivity();
+    static bool validRandomModulatorMode (const juce::String& mode);
+    static float deterministicRandomUnit (int seed, std::int64_t step, std::uint32_t salt);
+    /** The half of a scene that is not clips — discrete state lands immediately while its
+        continuous snapshot is either cut or handed to sceneMorph. */
     void applySceneState (const perf::Scene& scene);
+    void tickSceneMorph();
     /** Fills a scene from the rig as it stands right now. */
     void captureSceneFromRack (perf::Scene& scene);
+    void refreshSetlistPreloads();
+    void pumpSetlistPreloadQueue();
+    void tickPendingSetlistRecall();
+    void drainProcessorFailures();
+    void tickAutomaticFailover();
+    void beginFailoverAttempt (const juce::String& targetId);
+    void retryFailedProcessor (const juce::String& targetId);
+    bool rackProcessorsReady() const;
+    std::unique_ptr<juce::AudioProcessor> takePreloadedProcessor (
+        const juce::String& targetId, const juce::String& ceId, bool effect);
     juce::var performancePayload() const;
     /** The Stage 7 block: the DAW surface, the restore report, the platform matrix, the
         hardware owner and the active-hosting evidence. */
@@ -829,21 +1089,178 @@ private:
     juce::String editorTargetId;      // the part whose editor the pane is showing, or empty
     juce::StringArray floatingEditorIds;   // parts whose editors float in their own windows
     bool sessionRestored = false;
+    // Stage Lock is deliberately session-only: reopening the application must not strand the
+    // owner in a performance view. The unlock clock is native so a WebView click cannot
+    // bypass the hold gesture by sending `enabled: false` directly.
+    bool stageLocked = false;
+    double stageUnlockStartedMs = 0.0;
+    static constexpr double stageUnlockHoldMs = 900.0;
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
     Library library;                // the Stage 4 unified index; loaded on first ask
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
     bool libraryLoaded = false;
+    struct PresetAuditionEvent
+    {
+        double dueMs = 0.0;
+        int note = 60;
+        int velocity = 100;
+        bool noteOn = true;
+    };
+    std::deque<PresetAuditionEvent> presetAuditionEvents;
+    std::set<int> presetAuditionHeldNotes;
+    juce::String presetAuditionPartId;
+    double presetAuditionStartedMs = 0.0;
+    bool presetAuditionPlaying = false;
+    struct SoundComparisonRuntime
+    {
+        bool active = false;
+        juce::String partId;
+        juce::StringArray recordIds;
+        int index = -1;
+        juce::MemoryBlock originalState;
+        juce::String originalPresetRecordId;
+        juce::String originalPresetName;
+    } soundComparison;
     // Per-part MIDI-output failures ("port is gone"), reported in state until the next
     // successful open — the §18.7.7 missing-device diagnostic.
     std::map<juce::String, juce::String> hardwareMidiErrors;
+    std::map<juce::String, juce::String> microtuningErrors;
 
     // Stage 6: the compiled song's generation, and the scene launches waiting for the engine
     // to tell us they landed (so the non-audio half arrives at the same musical instant).
     int songGeneration = 0;
     int nextSceneToken = 1;
     std::map<int, juce::String> pendingScenes;
+    juce::String currentSurfacePageId;
+    juce::String requestedSurfacePageId;
+    struct WarmSetlistProcessor
+    {
+        juce::String ceId;
+        bool effect = false;
+        std::unique_ptr<juce::AudioProcessor> processor;
+    };
+    struct SetlistPreloadRig
+    {
+        juce::String recordId, name, error;
+        int total = 0;
+        int ready = 0;
+        int failed = 0;
+        std::map<juce::String, WarmSetlistProcessor> processors;
+    };
+    struct SetlistPreloadJob
+    {
+        juce::String recordId, targetId, ceId, descriptionXml, modulePath, name;
+        juce::String stateBlobBase64;
+        bool effect = false;
+    };
+    std::map<juce::String, SetlistPreloadRig> setlistPreloads;
+    std::deque<SetlistPreloadJob> setlistPreloadQueue;
+    bool setlistPreloadBusy = false;
+    bool setlistPreloadPumpActive = false;
+    juce::String consumingSetlistPreloadRecordId;
+    struct PendingSetlistRecall
+    {
+        bool active = false;
+        int index = -1;
+        juce::String itemId, sceneId, pageId;
+        double tempo = 0.0;
+        double startedMs = 0.0;
+    } pendingSetlistRecall;
+    struct FailoverRuntime
+    {
+        juce::String targetId, ceId, name, error;
+        bool effect = false;
+        juce::String state { "waiting" }; // waiting | loading | recovered | failed | bypassed
+        int attempts = 0;
+        double nextAttemptMs = 0.0;
+        // The most recent values observed by the controlling thread. The opaque state is still
+        // authoritative, but many plug-ins do not serialize every automatable value promptly;
+        // replaying this stable-ID overlay avoids jumping back to an older captured sound.
+        std::map<juce::String, float> parameterValues;
+    };
+    std::map<juce::String, FailoverRuntime> failovers;
+    struct SceneMorphTarget
+    {
+        juce::String targetId, parameterId;
+        float startValue = 0.0f;
+        float endValue = 0.0f;
+    };
+    struct SceneMorphRuntime
+    {
+        bool active = false;
+        bool followsTransport = false;
+        juce::String sceneId, name;
+        double durationBeats = 0.0;
+        double startPpq = 0.0;
+        double lastPpq = -1.0;
+        double elapsedBeats = 0.0;
+        double startMs = 0.0;
+        double durationMs = 0.0;
+        float progress = 0.0f;
+        int lastReportedBucket = -1;
+        juce::Array<SceneMorphTarget> targets;
+    } sceneMorph;
+    struct PendingArrangementLaunch
+    {
+        int index = -1;
+        double startPpq = 0.0;
+    };
+    std::map<int, PendingArrangementLaunch> pendingArrangementLaunches;
+    bool arrangementPlaying = false;
+    int arrangementCurrentIndex = -1;
+    int arrangementQueuedIndex = -1;
+    double arrangementItemStartPpq = 0.0;
+    double arrangementStopAtPpq = -1.0;
     juce::String captureClipId, captureLaneId;
+    std::map<juce::String, bool> fillPedalStates;
+    juce::String lastRetrospectivePatternId, lastRetrospectiveClipId;
+    int lastRetrospectiveNoteCount = 0;
+    int lastRetrospectiveStepCount = 0;
+    double lastRetrospectiveSeconds = 0.0;
+    bool lastRetrospectiveTrimmed = false;
+    bool midiLoopRecording = false;
+    bool midiLoopOverdub = false;
+    juce::String midiLoopTargetClipId;
+    juce::int64 midiLoopStartSample = 0;
+    double midiLoopStartPhasePpq = 0.0;
+    struct GesturePoint
+    {
+        juce::int64 samplePosition = 0;
+        juce::String targetId, parameterId, targetCeId, name;
+        float value = 0.0f;
+    };
+    bool gestureRecording = false;
+    bool gestureReplace = false;
+    bool gestureTruncated = false;
+    juce::String gestureTargetClipId;
+    juce::String lastGestureClipId;
+    juce::int64 gestureStartSample = 0;
+    double gestureStartPhasePpq = 0.0;
+    std::vector<GesturePoint> gesturePoints;
+    static constexpr std::size_t maxGesturePoints = 8192;
+    bool performanceRecording = false;
+    PerformanceTake performanceRecordingTake;
+    juce::int64 performanceRecordingStartSample = 0;
+    juce::int64 performanceRecordingMidiCursor = 0;
+    std::vector<perf::MidiCaptureJournal::Event> performanceRecordingMidi;
+    static constexpr std::size_t maxPerformanceMidiEvents = 500000;
+    static constexpr int maxPerformanceActions = 100000;
+    struct PerformanceReplayRuntime
+    {
+        enum class State { idle, restoring, playing };
+        State state = State::idle;
+        PerformanceTake take;
+        std::vector<perf::MidiCaptureJournal::Event> midi;
+        std::size_t nextMidi = 0;
+        int nextAction = 0;
+        juce::int64 startSample = 0;
+        double restoreStartedMs = 0.0;
+        float progress = 0.0f;
+        bool degraded = false;
+    } performanceReplay;
+    bool performanceReplayDispatching = false;
+    bool handlingCommand = false;
     // What the surface's encoders and step pads address; empty = the first lane of the first
     // pattern, so an unconfigured surface still does something sensible.
     juce::String surfacePatternId, surfaceLaneId;
@@ -889,6 +1306,7 @@ private:
     {
         ParameterInventory inventory;
         std::unique_ptr<PartParameterSync> sync;
+        std::map<juce::String, float> lastKnownValues;
     };
     std::map<juce::String, PartParameters> partParameters;
 
@@ -925,6 +1343,19 @@ private:
         a list of what you just dragged in CEditor answers a question nobody asked — the point
         is what moved in the VENDOR's window. */
     juce::StringArray parametersWrittenByUs;
+    /** Live source positions are performance state, not document state. */
+    std::map<juce::String, float> modulationSourceValues;
+    bool applyingModulation = false;
+    std::map<juce::String, MidiLfoRuntime> midiLfoRuntimes;
+    std::map<juce::String, int> midiLfoLastSentValue;
+    std::map<juce::String, double> midiLfoLastSentSeconds;
+    double lastMidiLfoActivitySeconds = 0.0;
+    std::map<juce::String, EnvelopeRuntime> envelopeRuntimes;
+    double lastEnvelopeActivitySeconds = 0.0;
+    std::map<juce::String, MsegRuntime> msegRuntimes;
+    double lastMsegActivitySeconds = 0.0;
+    std::map<juce::String, RandomModulatorRuntime> randomModulatorRuntimes;
+    double lastRandomModulatorActivitySeconds = 0.0;
     /** Most recently touched first, per target. Capped: this is a shortcut to the handful you
         were just working on, and a hundred of them is the list it exists to replace. */
     std::map<juce::String, juce::StringArray> touchedParametersByTarget;

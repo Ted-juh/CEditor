@@ -1,4 +1,4 @@
-// PluginCatalogTests — the persistent class-level VST3 catalogue (VIP-successor Stage 1).
+// PluginCatalogTests — Hostage's persistent class-level VST3 catalogue.
 //
 // The failures being designed against, in order of how bad they are:
 //

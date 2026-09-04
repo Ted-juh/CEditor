@@ -1,6 +1,6 @@
 #pragma once
 
-// PartMidiRules — one rack part's MIDI acceptance zone (VIP-successor Stage 1).
+// PartMidiRules — one Hostage rack part's MIDI acceptance zone.
 //
 // Shared by the persisted rack model (RackModel.h) and the real-time filter
 // (PartMidiFilterCore.h), so the saved document and the audio thread cannot drift apart on

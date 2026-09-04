@@ -1,6 +1,6 @@
 <script>
   /**
-   * ProductPanel.svelte — the mature generated product (VIP-successor Stage 7, §18.9).
+   * ProductPanel.svelte — the mature generated Hostage product.
    *
    * What a person needs to see once this rack is a plug-in inside somebody's DAW, and what
    * they need to see about the machine it is running on. Four honest readouts and one control
@@ -187,9 +187,9 @@
   .product-panel {
     margin: 8px 14px 0;
     padding: 10px;
-    border: 1px solid #3b4652;
-    border-radius: 6px;
-    background: #171a1d;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-surface);
     max-height: 420px;
     overflow-y: auto;
   }
@@ -250,27 +250,5 @@
     gap: 4px;
   }
 
-  button {
-    background: #232a31;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 8px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  button:hover { border-color: #5b9bd5; }
-  button.ghost { background: none; border-color: transparent; color: #7d8894; align-self: flex-start; }
-  button.ghost:hover { color: #d6dbe0; border-color: #3b4652; }
-
-  input, select {
-    background: #14171a;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 6px;
-    font: inherit;
-    font-size: 12px;
-  }
+  button.ghost { align-self: flex-start; }
 </style>

@@ -4,9 +4,9 @@
 #include "PartMidiRules.h"
 #include "SessionRecovery.h"
 #include "Performance/PatternModel.h"
+#include "Performance/Microtuning.h"
 
-// RackModel — the persistent Performance → InstrumentRack → Part hierarchy (VIP-successor
-// Stage 1).
+// RackModel — Hostage's persistent Performance → InstrumentRack → Part hierarchy.
 //
 // This is the document side of the rack: the one persistent root object the baseline requires
 // from the beginning, so that Stage 4 can index the same records as Multis and Stage 5 can
@@ -27,7 +27,7 @@
 namespace ceditor::host
 {
 
-// One VST3 effect in an insert chain (VIP-successor Stage 5). The same identity rules as a
+// One VST3 effect in a Hostage insert chain. The same identity rules as a
 // part's instrument: effectId is minted once and stable, pluginCeId is the catalogue's class
 // identity, and an empty pluginCeId means an empty or unresolved slot whose state blob is
 // kept for repair, never deleted.
@@ -135,6 +135,9 @@ struct RackPart
     // cache still truthfully names the sound that was loaded). Empty until a preset loads.
     juce::String lastPresetRecordId;
     juce::String lastPresetName;
+    /** This part receives the Performance's shared Scala/MTS table. Off by default because
+        sending tuning SysEx to an instrument that does not support it is not useful. */
+    bool microtuningEnabled = false;
 
     // Hardware-instrument parts (Stage 5, baseline §18.7.6): the part is an external synth
     // reached over MIDI, optionally returning audio through the interface's inputs. It reuses
@@ -185,8 +188,8 @@ struct RackPart
 };
 
 
-// A binding connects one named control slot to one parameter address (VIP-successor Stage 2,
-// baseline §18.4.3). The address keeps the class identity BESIDE the part id on purpose:
+// A binding connects one named Hostage control slot to one parameter address. The address
+// keeps the class identity BESIDE the part id on purpose:
 // partId says which slot in the rack, pluginCeId says which plug-in the author assigned
 // against — so when a part later loads something else, the binding shows as unresolved
 // instead of silently driving whatever now answers to the same parameter id. Transformations
@@ -281,6 +284,130 @@ struct Macro
     juce::Array<ControlBinding> targets;
 };
 
+/** One modulation-matrix cable. `baseValue` is deliberately stored with the route: the
+    destination itself may currently contain a modulated value, and reopening or removing
+    the last cable must still be able to recover the value the player actually set.
+
+    Sources use stable names rather than an enum so later generators (LFOs, envelopes and
+    sequencers) can join the same routing layer without another manifest migration. */
+struct ModulationRoute
+{
+    juce::String routeId;
+    juce::String sourceType;       // velocity, modWheel, expression, channelPressure,
+                                   // polyAftertouch, pitchBend, midiCc, macro, lfo, envelope,
+                                   // mseg, random
+    juce::String sourceId;         // macro or generator id
+    int sourceChannel = 0;         // 0 = omni, otherwise MIDI channel 1..16
+    int sourceNumber = 0;          // CC number for midiCc
+    juce::String targetId;
+    juce::String targetCeId;       // class identity captured when the cable is made
+    juce::String parameterId;
+    float amount = 0.25f;          // bipolar modulation depth, -1..1
+    float baseValue = 0.0f;        // unmodulated normalized destination value, 0..1
+    bool enabled = true;
+};
+
+/** One direct hardware destination of a MIDI LFO. Matrix cables handle plug-in, mixer and
+    macro destinations; these outputs cover protocols whose destination is a MIDI port rather
+    than a normalized host parameter. SysEx templates contain hexadecimal bytes including F0
+    and F7, and may use {value7}, {valueMSB} and {valueLSB} placeholders. */
+struct MidiLfoOutput
+{
+    juce::String outputId;
+    juce::String type = "cc";       // cc, nrpn, sysex
+    juce::String targetPartId;      // a hardware rack part
+    int channel = 1;
+    int number = 1;                 // CC 0..127 or NRPN 0..16383
+    juce::String sysexTemplate = "F0 7D {value7} F7";
+    bool enabled = false;           // opt-in: never start transmitting merely by adding it
+};
+
+/** A control-rate oscillator. Its live phase/value are runtime state and therefore not in
+    the manifest; reopening a performance resumes from the transport (sync) or from phase 0
+    (free), while every authored setting and hardware output remains repeatable. */
+struct MidiLfo
+{
+    juce::String lfoId;
+    juce::String name;
+    juce::String shape = "sine";    // sine, triangle, sawUp, sawDown, square, sampleHold
+    bool enabled = true;
+    bool sync = true;
+    double rateHz = 1.0;            // free-running cycles per second
+    double syncBeats = 1.0;         // quarter-note beats per cycle
+    float phaseOffset = 0.0f;       // 0..1 cycle
+    float minimum = 0.0f;           // normalized output range
+    float maximum = 1.0f;
+    juce::Array<MidiLfoOutput> outputs;
+};
+
+/** A host-level ADSR source. It listens to the performance input before parts split, with an
+    optional channel/key filter, so one envelope can animate several plug-ins or mixer targets
+    without belonging to any synth. It complements the looping breakpoint MSEG below: this
+    generator follows note gates, while an MSEG follows its own musical or free-running cycle. */
+struct EnvelopeGenerator
+{
+    juce::String envelopeId;
+    juce::String name;
+    bool enabled = true;
+    int channel = 0;                 // 0 = omni, otherwise 1..16
+    int noteLow = 0;
+    int noteHigh = 127;
+    bool retrigger = true;           // false = legato: another held note does not restart
+    double attackMs = 20.0;
+    double decayMs = 180.0;
+    float sustain = 0.65f;
+    double releaseMs = 350.0;
+    float curve = 0.0f;              // -1..1: logarithmic through linear to exponential
+    float velocityAmount = 0.0f;     // 0 = full range, 1 = peak follows note velocity
+};
+
+/** One breakpoint in a multi-segment modulation curve. Curve belongs to the segment ending
+    at this point: negative bends arrive early, zero is linear, positive arrives late. Stable
+    point ids let the editor sort points without losing the handle currently being dragged. */
+struct MsegPoint
+{
+    juce::String pointId;
+    float position = 0.0f;           // normalized cycle position, 0..1
+    float value = 0.0f;              // normalized modulation value, 0..1
+    float curve = 0.0f;              // -1..1
+};
+
+/** A looping arbitrary modulation curve. Sync mode derives phase from the shared musical
+    transport; free mode advances in seconds, including while stopped. Runtime phase/value
+    are deliberately not persisted, so reopening a performance remains deterministic. */
+struct MsegGenerator
+{
+    juce::String msegId;
+    juce::String name;
+    bool enabled = true;
+    bool sync = true;
+    double rateHz = 0.5;             // free-running cycles per second
+    double syncBeats = 4.0;          // quarter-note beats per cycle
+    float phaseOffset = 0.0f;        // 0..1 cycle
+    juce::Array<MsegPoint> points;
+};
+
+/** A repeatable random source for the modulation matrix. The seed and shaping controls are
+    authored state; the current step/value are runtime state. Probability is evaluated at
+    each clock boundary, so a skipped step deliberately retains the previous value. */
+struct RandomModulator
+{
+    juce::String randomId;
+    juce::String name;
+    juce::String mode = "sampleHold"; // sampleHold, smoothRandom, chaos, randomWalk
+    bool enabled = true;
+    bool sync = true;
+    double rateHz = 2.0;              // free-running decisions per second
+    double syncBeats = 0.5;           // quarter-note beats per decision
+    int seed = 1;                     // stable, positive 31-bit seed
+    float probability = 1.0f;         // chance of a new decision at each boundary
+    float smoothing = 1.0f;           // smoothRandom transition fraction, 0..1 cycle
+    float stepSize = 0.2f;            // maximum randomWalk step, normalized
+    float chaos = 0.85f;              // logistic-map intensity, 0..1
+    float minimum = 0.0f;
+    float maximum = 1.0f;
+};
+
 /** Where the user dragged one box on the rack canvas.
 
     A side table on the Performance rather than an x/y on RackPart, BusChain and ReturnChain,
@@ -299,6 +426,85 @@ struct CanvasNodePosition
     int y = 0;
 };
 
+/** The phrase played after a library preset has actually landed on its target part. Keeping
+    this in the Performance makes browsing behaviour follow the rig between launches instead
+    of resetting to a WebView-local toggle every time the window is reopened. Runtime notes
+    are deliberately not stored. */
+struct PresetAuditionSettings
+{
+    bool enabled = false;
+    juce::String phrase { "chord" }; // single | chord | scale | riff
+    int rootNote = 60;
+    int velocity = 100;
+    int noteLengthMs = 360;
+    int gapMs = 90;
+};
+
+/** Recoverable live fault policy. In-process exception containment keeps the rest of the
+    graph running while the service reconstructs the failed target. Native access violations
+    still require process isolation and remain covered by safe startup on the next launch. */
+struct AutomaticFailoverSettings
+{
+    bool enabled = true;
+    int maxAttempts = 3;          // 1..5 fresh instances before leaving the slot bypassed
+    int retryDelayMs = 500;       // 100..10000, exponentially backed off per attempt
+};
+
+/** One destination inside a shared keyboard layer. Ranges are normalized so the same
+    structure can describe velocity, key position, a controller, expression or a macro.
+    Crossfade extends either edge by up to half the source range; overlapping members are
+    intentional and are what make velocity blends and continuous audio morphs possible. */
+struct LayerMember
+{
+    juce::String partId;
+    float minimum = 0.0f;
+    float maximum = 1.0f;
+    float crossfade = 0.0f;
+};
+
+/** Parts in a layer group share one upstream note decision. "all" is the dynamic-layer /
+    crossfade mode; the other modes assign each new note to one eligible destination. */
+struct LayerGroup
+{
+    juce::String layerGroupId;
+    juce::String name;
+    bool enabled = true;
+    juce::String allocation { "all" };       // all | roundRobin | leastBusy
+    juce::String source { "velocity" };      // velocity | key | cc | expression | macro
+    int controller = 11;
+    juce::String macroId;
+    juce::Array<LayerMember> members;
+};
+
+/** One message-thread action in a complete performance take. The payload is kept as JSON
+    rather than as a second command schema: replay deliberately re-enters the same native
+    command door the UI used, so a scene, fader or transport action cannot acquire a subtly
+    different meaning on playback. */
+struct PerformanceTakeAction
+{
+    juce::int64 sampleOffset = 0;
+    juce::String commandJson;
+};
+
+/** A complete, repeatable performance. `initialStateJson` is the rack as it stood when
+    recording began (without nested takes); MIDI holds compact channel-voice events and the
+    action list holds everything Hostage itself changed while the take ran. */
+struct PerformanceTake
+{
+    juce::String takeId;
+    juce::String name;
+    juce::String createdAt;
+    double sampleRate = 44100.0;
+    juce::int64 durationSamples = 0;
+    double startPositionPpq = 0.0;
+    bool transportWasPlaying = false;
+    juce::String initialStateJson;
+    juce::String midiDataBase64;
+    int midiEventCount = 0;
+    juce::Array<PerformanceTakeAction> actions;
+    bool truncated = false;
+};
+
 struct Performance
 {
     /** The manifest's own version (Stage 6, §18.8.12). 1 is everything up to Stage 5, which
@@ -315,6 +521,11 @@ struct Performance
     juce::Array<ReturnChain> returns;        // shared send/return chains (Stage 5)
     juce::Array<BusChain> buses;             // group buses parts route INTO (Stage 8)
     juce::Array<Macro> macros;
+    juce::Array<MidiLfo> midiLfos;
+    juce::Array<EnvelopeGenerator> envelopes;
+    juce::Array<MsegGenerator> msegs;
+    juce::Array<RandomModulator> randomModulators;
+    juce::Array<ModulationRoute> modulationRoutes;
     juce::Array<ControlPage> pages;
     /** Hand-placed canvas boxes; anything absent is laid out automatically (Stage 5 of the
         rack-canvas plan). Purely a drawing concern — nothing downstream reads it. */
@@ -330,10 +541,17 @@ struct Performance
     int outputPairs = 1;
 
     perf::TransportSettings transport;
+    juce::Array<perf::GrooveTemplate> grooves;
     juce::Array<perf::Pattern> patterns;
     juce::Array<perf::Clip> clips;
     juce::Array<perf::Scene> scenes;
     perf::Setlist setlist;
+    perf::Arrangement arrangement;
+    perf::Microtuning microtuning = perf::Microtuning::equalTemperament();
+    PresetAuditionSettings presetAudition;
+    AutomaticFailoverSettings automaticFailover;
+    juce::Array<LayerGroup> layerGroups;
+    juce::Array<PerformanceTake> performanceTakes;
 
     perf::Pattern* findPattern (const juce::String& patternId);
     const perf::Pattern* findPattern (const juce::String& patternId) const;
@@ -364,6 +582,18 @@ struct Performance
 
     Macro* findMacro (const juce::String& macroId);
     const Macro* findMacro (const juce::String& macroId) const;
+
+    MidiLfo* findMidiLfo (const juce::String& lfoId);
+    const MidiLfo* findMidiLfo (const juce::String& lfoId) const;
+
+    EnvelopeGenerator* findEnvelope (const juce::String& envelopeId);
+    const EnvelopeGenerator* findEnvelope (const juce::String& envelopeId) const;
+
+    MsegGenerator* findMseg (const juce::String& msegId);
+    const MsegGenerator* findMseg (const juce::String& msegId) const;
+
+    RandomModulator* findRandomModulator (const juce::String& randomId);
+    const RandomModulator* findRandomModulator (const juce::String& randomId) const;
 
     ReturnChain* findReturn (const juce::String& returnId);
     const ReturnChain* findReturn (const juce::String& returnId) const;

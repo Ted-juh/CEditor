@@ -199,9 +199,9 @@
   .licence-panel {
     margin: 8px 14px 0;
     padding: 10px;
-    border: 1px solid #3b4652;
-    border-radius: 6px;
-    background: #171a1d;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-surface);
     max-height: 420px;
     overflow-y: auto;
   }
@@ -220,15 +220,15 @@
 
   .edition-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .badge {
-    border: 1px solid #3b4652;
+    border: 1px solid var(--host-line);
     border-radius: 3px;
     padding: 1px 7px;
-    color: #9aa5b1;
+    color: var(--host-text-soft);
     font-size: 11px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
-  .badge.paid { border-color: #5b9bd5; color: #cfe3f5; background: #1c2431; }
+  .badge.paid { border-color: var(--host-active); color: #afe0c0; background: var(--host-active-surface); }
 
   .readout { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
   .label { flex: 0 0 auto; color: #9aa5b1; font-size: 11px; }
@@ -260,28 +260,8 @@
 
   textarea {
     width: 100%;
-    background: #14171a;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 5px 6px;
-    font: inherit;
     font-size: 11px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--host-font-mono);
     resize: vertical;
   }
-
-  button {
-    background: #232a31;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 8px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  button:hover { border-color: #5b9bd5; }
-  button.ghost { background: none; border-color: transparent; color: #7d8894; }
-  button.ghost:hover { color: #d6dbe0; border-color: #3b4652; }
 </style>

@@ -1,6 +1,6 @@
-# Instrument Host integration audit
+# Hostage integration audit
 
-The VIP-successor baseline (the *CEditor / Instrument Host Builder* implementation document,
+The Hostage baseline (the *CEditor / Hostage Builder* implementation document,
 v1.0) makes its first required engineering task a source-tree integration audit: before any
 host-builder infrastructure lands, map what CEditor already has, rule on what Stage 1 reuses,
 and document every deviation. This is that audit.
@@ -33,7 +33,7 @@ Component designer (the `Custom*` files under `sections/`), the Scripting worksp
 (`scripting/`), and the Screen Builder (`ScreenBuilderEditor.svelte`, `screen/`), all driving
 the one bridge, with ~100 stores under `stores/` holding UI state.
 
-**Ruling.** The Instrument Host Builder registers the way every existing editor did: a new
+**Ruling.** The Hostage Builder registers the way every existing editor did: a new
 CE_Application workspace (sections + stores) plus new bridge event listeners plus native
 services behind them. No new shell, no separate application, no second window architecture.
 

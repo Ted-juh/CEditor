@@ -14,11 +14,13 @@
    * arpeggiators drawing two different patterns.
    */
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import ResponseCurveDesigner from '../components/ResponseCurveDesigner.svelte';
   import {
     hostState, hostArpStep, hostChordLearn,
     midiSlotTypes, midiSlotLabels,
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
     reorderIndexForDrop,
+    hostNote,
     learnKeyChord, cancelKeyChordLearn, clearKeyChord,
   } from '../stores/instrumentHost.js';
 
@@ -31,6 +33,13 @@
   let openSlot = $derived(chain.find((slot) => slot.slotId === openSlotId) ?? null);
 
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const STRUM_LABELS = {
+    ascending: 'low → high', descending: 'high → low', alternate: 'alternate',
+    'outside in': 'outside → in', 'inside out': 'inside → out', random: 'harp scatter',
+  };
+  const MPE_FORMAT_LABELS = {
+    mpe: 'MPE', 'poly aftertouch': 'Poly AT', 'channel pressure': 'Channel AT', cc: 'CC',
+  };
   const keyName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
 
   const set = (slot, fields) => setMidiSlotOptions(part.partId, slot.slotId, fields);
@@ -42,16 +51,29 @@
         ? `${slot.arp.mode} · ${slot.arp.stepsPerBeat}/beat · ${slot.arp.octaves} oct`
         : 'off';
     if (slot.type === 'transpose')
-      return slot.fx.transpose === 0 ? 'no change' : `${slot.fx.transpose > 0 ? '+' : ''}${slot.fx.transpose} semitones`;
+      return slot.fx.transpose === 0 ? 'no change'
+        : `${slot.fx.transpose > 0 ? '+' : ''}${slot.fx.transpose} ${slot.fx.transposeMode === 'diatonic'
+            ? `scale steps · ${NOTE_NAMES[slot.fx.scaleRoot]} ${slot.fx.scaleType}` : 'semitones'}`;
     if (slot.type === 'scale')
       return slot.fx.constrainToScale ? `${NOTE_NAMES[slot.fx.scaleRoot]} ${slot.fx.scaleType}` : 'off';
-    if (slot.type === 'chord')
-      return slot.fx.chord === 'off' ? 'off'
-        : slot.fx.chord === 'custom keys' ? `custom · ${slot.fx.keyChords.length} keys`
-        : slot.fx.chord;
-    if (slot.type === 'velocity')
-      return slot.fx.velocityFixed > 0 ? `fixed ${slot.fx.velocityFixed}` : `× ${slot.fx.velocityScale}`;
-    // The six later modules. Each says "off" in the state that changes nothing, because a
+    if (slot.type === 'chord') {
+      if (slot.fx.chord === 'off') return 'off';
+      const details = [slot.fx.chord === 'custom keys'
+        ? `custom · ${slot.fx.keyChords.length} keys` : slot.fx.chord];
+      if (slot.fx.chordInversion > 0) details.push(`inv ${slot.fx.chordInversion}`);
+      if (slot.fx.chordVoicing !== 'close') details.push(slot.fx.chordVoicing);
+      if (slot.fx.chordVoiceLeading) details.push('voice lead');
+      return details.join(' · ');
+    }
+    if (slot.type === 'velocity') {
+      if (slot.fx.velocityFixed > 0) return `fixed ${slot.fx.velocityFixed}`;
+      const shaped = slot.fx.velocityCurve !== 'linear'
+        || slot.fx.velocityInputMin !== 1 || slot.fx.velocityInputMax !== 127
+        || slot.fx.velocityOutputMin !== 1 || slot.fx.velocityOutputMax !== 127;
+      const velocity = shaped ? slot.fx.velocityCurve : `× ${slot.fx.velocityScale}`;
+      return slot.fx.expressionEnabled ? `${velocity} · + expression` : velocity;
+    }
+    // The later note modules. Each says "off" in the state that changes nothing, because a
     // module that is doing nothing should say so rather than look configured.
     if (slot.type === 'echo')
       return slot.mod.echoRepeats === 0 ? 'off'
@@ -59,10 +81,14 @@
           + (slot.mod.echoTranspose ? ` · ${slot.mod.echoTranspose > 0 ? '+' : ''}${slot.mod.echoTranspose}st` : '');
     if (slot.type === 'strum')
       return slot.mod.strumBeats === 0 ? 'off'
-        : `${beatLabel(slot.mod.strumBeats)} ${slot.mod.strumDown ? 'down' : 'up'}`;
+        : `${beatLabel(slot.mod.strumBeats)} · ${STRUM_LABELS[slot.mod.strumPattern] ?? slot.mod.strumPattern}`;
     if (slot.type === 'humanize')
-      return slot.mod.humanizeTimingBeats === 0 && slot.mod.humanizeVelocity === 0 ? 'off'
-        : `${beatLabel(slot.mod.humanizeTimingBeats)} · ±${slot.mod.humanizeVelocity} vel`;
+      return slot.mod.humanizeTimingBeats === 0 && slot.mod.humanizeVelocity === 0
+          && slot.mod.humanizeGatePercent === 0 ? 'off'
+        : `${beatLabel(slot.mod.humanizeTimingBeats)} · ±${slot.mod.humanizeVelocity} vel`
+          + (slot.mod.humanizeGatePercent ? ` · ±${slot.mod.humanizeGatePercent}% gate` : '')
+          + (slot.mod.humanizePreserveChords ? ' · chord lock' : '')
+          + (slot.mod.humanizeProtectBeats ? ' · beat anchors' : '');
     if (slot.type === 'chance')
       return slot.mod.chance >= 1 ? 'every note' : `${Math.round(slot.mod.chance * 100)}%`;
     if (slot.type === 'length')
@@ -70,7 +96,47 @@
         : slot.mod.lengthBeats === 0 ? 'as played' : beatLabel(slot.mod.lengthBeats);
     if (slot.type === 'latch')
       return slot.mod.latchOn ? 'holding' : 'off';
+    if (slot.type === 'mpe')
+      return slot.mod.mpeEnabled
+        ? `${MPE_FORMAT_LABELS[slot.mod.mpeInput]} → ${MPE_FORMAT_LABELS[slot.mod.mpeOutput]}`
+        : 'off';
+    if (slot.type === 'articulation')
+      return slot.mod.articulationEnabled
+        ? `${slot.mod.articulations.length} mapped`
+        : 'off';
     return 'transpose · scale · chord · velocity';
+  }
+
+  function addArticulation(slot) {
+    if (slot.mod.articulations.length >= 32) return;
+    const triggerNote = Math.min(127, 24 + slot.mod.articulations.length);
+    const articulationId = globalThis.crypto?.randomUUID?.()
+      ?? `articulation-${Date.now()}-${slot.mod.articulations.length}`;
+    set(slot, {
+      articulationEnabled: true,
+      articulations: [...slot.mod.articulations, {
+        articulationId, name: `Articulation ${slot.mod.articulations.length + 1}`,
+        triggerNote, triggerChannel: 0, type: 'keyswitch', outputChannel: 0,
+        keyswitchNote: triggerNote, keyswitchVelocity: 100,
+        program: 0, bankMsb: -1, bankLsb: -1, controller: 0, controllerValue: 127,
+      }],
+    });
+  }
+
+  function updateArticulation(slot, articulationId, fields) {
+    set(slot, { articulations: slot.mod.articulations.map((entry) =>
+      entry.articulationId === articulationId ? { ...entry, ...fields } : entry) });
+  }
+
+  function removeArticulation(slot, articulationId) {
+    set(slot, { articulations: slot.mod.articulations.filter((entry) =>
+      entry.articulationId !== articulationId) });
+  }
+
+  function auditionArticulation(entry) {
+    const channel = entry.triggerChannel || part.channel || 1;
+    hostNote(entry.triggerNote, 100, true, channel);
+    setTimeout(() => hostNote(entry.triggerNote, 0, false, channel), 80);
   }
 
   /** Beats as a musician reads them. Everything in these modules is timed in beats rather
@@ -265,10 +331,37 @@
       {#if openSlotId === slot.slotId}
         <div class="slot-body">
           {#if slot.type === 'transpose' || slot.type === 'fx'}
-            <label class="mini-field">Semitones
-              <input type="number" min="-48" max="48" value={slot.fx.transpose}
+            <label class="mini-field">Mode
+              <select value={slot.fx.transposeMode}
+                      onchange={(e) => set(slot, { transposeMode: e.currentTarget.value })}>
+                <option value="chromatic">Chromatic</option>
+                <option value="diatonic">Diatonic / key-aware</option>
+              </select>
+            </label>
+            <label class="mini-field">{slot.fx.transposeMode === 'diatonic' ? 'Scale steps' : 'Semitones'}
+              <input type="number" min={slot.fx.transposeMode === 'diatonic' ? -28 : -48}
+                     max={slot.fx.transposeMode === 'diatonic' ? 28 : 48} value={slot.fx.transpose}
                      onchange={(e) => set(slot, { transpose: Number(e.currentTarget.value) })} />
             </label>
+            {#if slot.fx.transposeMode === 'diatonic'}
+              <label class="mini-field">Key
+                <select value={slot.fx.scaleRoot}
+                        onchange={(e) => set(slot, { scaleRoot: Number(e.currentTarget.value) })}>
+                  {#each NOTE_NAMES as name, i (name)}
+                    <option value={i}>{name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="mini-field">Scale
+                <select value={slot.fx.scaleType}
+                        onchange={(e) => set(slot, { scaleType: e.currentTarget.value })}>
+                  {#each scales as name (name)}
+                    <option value={name}>{name}</option>
+                  {/each}
+                </select>
+              </label>
+              <span class="hint">Moves by scale degree: in C major, +2 turns C→E, D→F and E→G.</span>
+            {/if}
           {/if}
 
           {#if slot.type === 'scale' || slot.type === 'fx'}
@@ -303,7 +396,51 @@
               </select>
             </label>
             {#if slot.fx.chord === 'diatonic' || slot.fx.chord === 'diatonic 7th'}
-              <span class="hint">plays the chord OF each scale degree — set this module's scale for real harmony</span>
+              {#if slot.type === 'chord'}
+                <label class="mini-field">Scale
+                  <select value={slot.fx.scaleType}
+                          onchange={(e) => set(slot, { scaleType: e.currentTarget.value })}>
+                    {#each scales as name (name)}
+                      <option value={name}>{name}</option>
+                    {/each}
+                  </select>
+                </label>
+                <label class="mini-field">Root
+                  <select value={slot.fx.scaleRoot}
+                          onchange={(e) => set(slot, { scaleRoot: Number(e.currentTarget.value) })}>
+                    {#each NOTE_NAMES as name, i (name)}
+                      <option value={i}>{name}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              <span class="hint">builds the chord that belongs to each scale degree</span>
+            {/if}
+            {#if slot.fx.chord !== 'off'}
+              <label class="mini-field">Inversion
+                <select value={slot.fx.chordInversion}
+                        onchange={(e) => set(slot, { chordInversion: Number(e.currentTarget.value) })}>
+                  <option value={0}>root position</option>
+                  <option value={1}>1st</option>
+                  <option value={2}>2nd</option>
+                  <option value={3}>3rd</option>
+                </select>
+              </label>
+              <label class="mini-field">Voicing
+                <select value={slot.fx.chordVoicing}
+                        onchange={(e) => set(slot, { chordVoicing: e.currentTarget.value })}>
+                  <option value="close">close</option>
+                  <option value="open">open</option>
+                  <option value="drop 2">drop 2</option>
+                  <option value="wide">wide</option>
+                </select>
+              </label>
+              <label class="mini-field">Motion
+                <PropertyToggle compact label="Voice leading" value={slot.fx.chordVoiceLeading}
+                                title="Choose the nearest inversion and octave to the previous chord"
+                                ariaLabel="Automatic chord voice leading"
+                                onchange={(on) => set(slot, { chordVoiceLeading: on })} />
+              </label>
             {/if}
             {#if slot.fx.chord === 'custom keys'}
               <div class="key-chords" data-testid="key-chords">
@@ -330,14 +467,118 @@
           {/if}
 
           {#if slot.type === 'velocity' || slot.type === 'fx'}
-            <label class="mini-field">Vel scale
-              <input type="number" min="0.1" max="2" step="0.05" value={slot.fx.velocityScale}
-                     onchange={(e) => set(slot, { velocityScale: Number(e.currentTarget.value) })} />
-            </label>
-            <label class="mini-field">Fixed vel (0 = off)
-              <input type="number" min="0" max="127" value={slot.fx.velocityFixed}
-                     onchange={(e) => set(slot, { velocityFixed: Number(e.currentTarget.value) })} />
-            </label>
+            <div class="response-editor" data-testid="velocity-expression-designer">
+              <div class="response-profile">
+                <label class="mini-field profile-name">Device calibration
+                  <input type="text" maxlength="80" value={slot.fx.responseProfileName}
+                         placeholder="e.g. CTRL49 studio"
+                         onchange={(e) => set(slot, { responseProfileName: e.currentTarget.value })} />
+                </label>
+                <span class="hint">This named calibration is saved with the part. When several MIDI inputs are enabled, isolate its controller with the part’s MIDI channel/range.</span>
+              </div>
+
+              <div class="response-block">
+                <div class="response-row">
+                  <strong>Velocity</strong>
+                  <label class="mini-field">Curve
+                    <select value={slot.fx.velocityCurve}
+                            onchange={(e) => set(slot, { velocityCurve: e.currentTarget.value })}>
+                      <option value="linear">Linear</option>
+                      <option value="soft">Soft touch</option>
+                      <option value="hard">Hard touch</option>
+                      <option value="s curve">S curve</option>
+                      <option value="custom">Custom · 9 point</option>
+                    </select>
+                  </label>
+                  <label class="mini-field range-pair">Device range
+                    <span><input type="number" min="1" max="127" value={slot.fx.velocityInputMin}
+                                 aria-label="Velocity device range minimum"
+                                 onchange={(e) => set(slot, { velocityInputMin: Number(e.currentTarget.value) })} />
+                      – <input type="number" min="1" max="127" value={slot.fx.velocityInputMax}
+                               aria-label="Velocity device range maximum"
+                               onchange={(e) => set(slot, { velocityInputMax: Number(e.currentTarget.value) })} /></span>
+                  </label>
+                  <label class="mini-field range-pair">Instrument range
+                    <span><input type="number" min="1" max="127" value={slot.fx.velocityOutputMin}
+                                 aria-label="Velocity instrument range minimum"
+                                 onchange={(e) => set(slot, { velocityOutputMin: Number(e.currentTarget.value) })} />
+                      – <input type="number" min="1" max="127" value={slot.fx.velocityOutputMax}
+                               aria-label="Velocity instrument range maximum"
+                               onchange={(e) => set(slot, { velocityOutputMax: Number(e.currentTarget.value) })} /></span>
+                  </label>
+                  <label class="mini-field">Final scale
+                    <input type="number" min="0.1" max="2" step="0.05" value={slot.fx.velocityScale}
+                           onchange={(e) => set(slot, { velocityScale: Number(e.currentTarget.value) })} />
+                  </label>
+                  <label class="mini-field">Fixed (0 = off)
+                    <input type="number" min="0" max="127" value={slot.fx.velocityFixed}
+                           onchange={(e) => set(slot, { velocityFixed: Number(e.currentTarget.value) })} />
+                  </label>
+                </div>
+                <ResponseCurveDesigner label="Velocity" curve={slot.fx.velocityCurve}
+                  points={slot.fx.velocityCurveValues}
+                  onchange={(points) => set(slot, { velocityCurveValues: points })}
+                  onmakecustom={(points) => set(slot, {
+                    velocityCurve: 'custom', velocityCurveValues: points,
+                  })} />
+              </div>
+
+              <div class="response-block expression" class:off={!slot.fx.expressionEnabled}>
+                <div class="response-row">
+                  <strong>Expression</strong>
+                  <PropertyToggle compact label={slot.fx.expressionEnabled ? 'On' : 'Off'}
+                                  value={slot.fx.expressionEnabled} ariaLabel="Expression response mapping"
+                                  onchange={(on) => set(slot, { expressionEnabled: on })} />
+                  <label class="mini-field">Source
+                    <select value={slot.fx.expressionSource}
+                            onchange={(e) => set(slot, { expressionSource: e.currentTarget.value })}>
+                      <option value="cc">MIDI CC</option>
+                      <option value="channel pressure">Channel aftertouch</option>
+                      <option value="poly aftertouch">Poly aftertouch</option>
+                    </select>
+                  </label>
+                  {#if slot.fx.expressionSource === 'cc'}
+                    <label class="mini-field">CC
+                      <input type="number" min="0" max="127" value={slot.fx.expressionCc}
+                             onchange={(e) => set(slot, { expressionCc: Number(e.currentTarget.value) })} />
+                    </label>
+                  {/if}
+                  <label class="mini-field">Curve
+                    <select value={slot.fx.expressionCurve}
+                            onchange={(e) => set(slot, { expressionCurve: e.currentTarget.value })}>
+                      <option value="linear">Linear</option>
+                      <option value="soft">Soft touch</option>
+                      <option value="hard">Hard touch</option>
+                      <option value="s curve">S curve</option>
+                      <option value="custom">Custom · 9 point</option>
+                    </select>
+                  </label>
+                  <label class="mini-field range-pair">Device range
+                    <span><input type="number" min="0" max="127" value={slot.fx.expressionInputMin}
+                                 aria-label="Expression device range minimum"
+                                 onchange={(e) => set(slot, { expressionInputMin: Number(e.currentTarget.value) })} />
+                      – <input type="number" min="0" max="127" value={slot.fx.expressionInputMax}
+                               aria-label="Expression device range maximum"
+                               onchange={(e) => set(slot, { expressionInputMax: Number(e.currentTarget.value) })} /></span>
+                  </label>
+                  <label class="mini-field range-pair">Instrument range
+                    <span><input type="number" min="0" max="127" value={slot.fx.expressionOutputMin}
+                                 aria-label="Expression instrument range minimum"
+                                 onchange={(e) => set(slot, { expressionOutputMin: Number(e.currentTarget.value) })} />
+                      – <input type="number" min="0" max="127" value={slot.fx.expressionOutputMax}
+                               aria-label="Expression instrument range maximum"
+                               onchange={(e) => set(slot, { expressionOutputMax: Number(e.currentTarget.value) })} /></span>
+                  </label>
+                </div>
+                <ResponseCurveDesigner label="Expression" curve={slot.fx.expressionCurve}
+                  points={slot.fx.expressionCurveValues}
+                  onchange={(points) => set(slot, { expressionCurveValues: points })}
+                  onmakecustom={(points) => set(slot, {
+                    expressionCurve: 'custom', expressionCurveValues: points,
+                  })} />
+                <span class="hint">Only the selected expression message is reshaped. Put the MPE Transformer before or after this insert when format conversion is also needed.</span>
+              </div>
+            </div>
           {/if}
 
           {#if slot.type === 'echo'}
@@ -370,18 +611,34 @@
               <select value={slot.mod.strumBeats}
                       onchange={(e) => set(slot, { strumBeats: Number(e.currentTarget.value) })}>
                 <option value={0}>off</option>
-                {#each BEAT_CHOICES.slice(0, 6) as [value, label] (value)}
+                {#each BEAT_CHOICES.slice(0, 7) as [value, label] (value)}
                   <option value={value}>{label}</option>
                 {/each}
               </select>
             </label>
-            <label class="mini-field">Direction
-              <select value={slot.mod.strumDown ? 'down' : 'up'}
-                      onchange={(e) => set(slot, { strumDown: e.currentTarget.value === 'down' })}>
-                <option value="up">low to high</option>
-                <option value="down">high to low</option>
+            <label class="mini-field">Stroke
+              <select value={slot.mod.strumPattern}
+                      onchange={(e) => set(slot, { strumPattern: e.currentTarget.value })}>
+                <option value="ascending">low → high</option>
+                <option value="descending">high → low</option>
+                <option value="alternate">alternate strokes</option>
+                <option value="outside in">outside → in</option>
+                <option value="inside out">inside → out</option>
+                <option value="random">harp scatter</option>
               </select>
             </label>
+            <label class="mini-field">Feel — {slot.mod.strumCurve < -0.15 ? 'slow start'
+                                                : slot.mod.strumCurve > 0.15 ? 'quick start' : 'even'}
+              <input type="range" min="-1" max="1" step="0.05" value={slot.mod.strumCurve}
+                     aria-label="Strum timing curve"
+                     oninput={(e) => set(slot, { strumCurve: Number(e.currentTarget.value) })} />
+            </label>
+            <label class="mini-field">Last-note velocity — {slot.mod.strumVelocityRamp > 0 ? '+' : ''}{slot.mod.strumVelocityRamp}
+              <input type="range" min="-64" max="64" step="1" value={slot.mod.strumVelocityRamp}
+                     aria-label="Strum velocity ramp"
+                     oninput={(e) => set(slot, { strumVelocityRamp: Number(e.currentTarget.value) })} />
+            </label>
+            <span class="hint">Original note lengths are preserved across the stroke.</span>
           {/if}
 
           {#if slot.type === 'humanize'}
@@ -399,6 +656,20 @@
               <input type="number" min="0" max="64" value={slot.mod.humanizeVelocity}
                      onchange={(e) => set(slot, { humanizeVelocity: Number(e.currentTarget.value) })} />
             </label>
+            <label class="mini-field">Gate variation — ±{slot.mod.humanizeGatePercent}%
+              <input type="range" min="0" max="100" step="1" value={slot.mod.humanizeGatePercent}
+                     aria-label="Humanize gate length"
+                     oninput={(e) => set(slot, { humanizeGatePercent: Number(e.currentTarget.value) })} />
+            </label>
+            <div class="toggle-line">
+              <PropertyToggle compact label="Keep chords together"
+                              value={slot.mod.humanizePreserveChords}
+                              onchange={(on) => set(slot, { humanizePreserveChords: on })} />
+              <PropertyToggle compact label="Protect whole beats"
+                              value={slot.mod.humanizeProtectBeats}
+                              onchange={(on) => set(slot, { humanizeProtectBeats: on })} />
+            </div>
+            <span class="hint">Gate changes are bounded so a release can never precede its note-on.</span>
           {/if}
 
           {#if slot.type === 'chance'}
@@ -434,6 +705,218 @@
                               onchange={(on) => set(slot, { latchOn: on })} />
             </label>
             <span class="dim">Play another chord to replace it.</span>
+          {/if}
+
+          {#if slot.type === 'mpe'}
+            <div class="mpe-controls" data-testid="mpe-transformer-controls">
+              <PropertyToggle compact label={slot.mod.mpeEnabled ? 'On' : 'Off'}
+                              value={slot.mod.mpeEnabled} ariaLabel="MPE transformer"
+                              onchange={(on) => set(slot, { mpeEnabled: on })} />
+              <label class="mini-field">Input
+                <select value={slot.mod.mpeInput}
+                        onchange={(e) => set(slot, { mpeInput: e.currentTarget.value })}>
+                  <option value="mpe">MPE member channels</option>
+                  <option value="poly aftertouch">Poly aftertouch</option>
+                  <option value="channel pressure">Channel aftertouch</option>
+                  <option value="cc">MIDI CC</option>
+                </select>
+              </label>
+              {#if slot.mod.mpeInput === 'mpe'}
+                <label class="mini-field">MPE input axis
+                  <select value={slot.mod.mpeInputAxis}
+                          onchange={(e) => set(slot, { mpeInputAxis: e.currentTarget.value })}>
+                    <option value="pressure">Pressure · Channel AT</option>
+                    <option value="timbre">Timbre · CC74</option>
+                    <option value="pitch bend">Pitch · bend</option>
+                  </select>
+                </label>
+              {:else if slot.mod.mpeInput === 'cc'}
+                <label class="mini-field">Input CC
+                  <input type="number" min="0" max="127" value={slot.mod.mpeInputCc}
+                         onchange={(e) => set(slot, { mpeInputCc: Number(e.currentTarget.value) })} />
+                </label>
+              {/if}
+              <span class="mpe-arrow" aria-hidden="true">→</span>
+              <label class="mini-field">Output
+                <select value={slot.mod.mpeOutput}
+                        onchange={(e) => set(slot, { mpeOutput: e.currentTarget.value })}>
+                  <option value="mpe">MPE member channels</option>
+                  <option value="poly aftertouch">Poly aftertouch</option>
+                  <option value="channel pressure">Channel aftertouch</option>
+                  <option value="cc">MIDI CC</option>
+                </select>
+              </label>
+              {#if slot.mod.mpeOutput === 'mpe'}
+                <label class="mini-field">MPE output axis
+                  <select value={slot.mod.mpeOutputAxis}
+                          onchange={(e) => set(slot, { mpeOutputAxis: e.currentTarget.value })}>
+                    <option value="pressure">Pressure · Channel AT</option>
+                    <option value="timbre">Timbre · CC74</option>
+                    <option value="pitch bend">Pitch · bend</option>
+                  </select>
+                </label>
+              {:else if slot.mod.mpeOutput === 'cc'}
+                <label class="mini-field">Output CC
+                  <input type="number" min="0" max="127" value={slot.mod.mpeOutputCc}
+                         onchange={(e) => set(slot, { mpeOutputCc: Number(e.currentTarget.value) })} />
+                </label>
+              {/if}
+            </div>
+            <div class="mpe-routing">
+              {#if slot.mod.mpeInput === 'mpe' || slot.mod.mpeOutput === 'mpe'}
+                <label class="mini-field">First member
+                  <input type="number" min="1" max="16" value={slot.mod.mpeMemberFirst}
+                         onchange={(e) => set(slot, { mpeMemberFirst: Number(e.currentTarget.value) })} />
+                </label>
+                <label class="mini-field">Last member
+                  <input type="number" min="1" max="16" value={slot.mod.mpeMemberLast}
+                         onchange={(e) => set(slot, { mpeMemberLast: Number(e.currentTarget.value) })} />
+                </label>
+              {/if}
+              {#if slot.mod.mpeOutput === 'channel pressure' || slot.mod.mpeOutput === 'cc'
+                    || (slot.mod.mpeInput === 'mpe' && slot.mod.mpeOutput === 'poly aftertouch')}
+                <label class="mini-field">Output channel
+                  <input type="number" min="1" max="16" value={slot.mod.mpeOutputChannel}
+                         onchange={(e) => set(slot, { mpeOutputChannel: Number(e.currentTarget.value) })} />
+                </label>
+              {/if}
+              {#if (slot.mod.mpeInput === 'mpe' || slot.mod.mpeInput === 'poly aftertouch')
+                    && (slot.mod.mpeOutput === 'channel pressure' || slot.mod.mpeOutput === 'cc')}
+                <label class="mini-field">Poly → mono
+                  <select value={slot.mod.mpeCollapse}
+                          onchange={(e) => set(slot, { mpeCollapse: e.currentTarget.value })}>
+                    <option value="latest">Latest gesture</option>
+                    <option value="highest">Highest gesture</option>
+                    <option value="average">Average voices</option>
+                  </select>
+                </label>
+              {/if}
+              <span class="hint mpe-hint">MPE uses one member channel per note: bend for pitch, CC74 for timbre, and channel aftertouch for pressure. Converting to one channel is necessarily lossy.</span>
+            </div>
+          {/if}
+
+          {#if slot.type === 'articulation'}
+            <div class="articulation-editor">
+              <div class="articulation-toolbar">
+                <PropertyToggle compact
+                                label={slot.mod.articulationEnabled ? 'On' : 'Off'}
+                                value={slot.mod.articulationEnabled}
+                                ariaLabel="Articulation manager"
+                                onchange={(on) => set(slot, { articulationEnabled: on })} />
+                <label class="mini-field map-name">Map name
+                  <input type="text" maxlength="80" value={slot.mod.articulationMapName}
+                         placeholder="e.g. BBCSO Core"
+                         onchange={(e) => set(slot, { articulationMapName: e.currentTarget.value })} />
+                </label>
+                <button type="button" class="ghost" disabled={slot.mod.articulations.length >= 32}
+                        onclick={() => addArticulation(slot)}>+ Articulation</button>
+                <span class="hint articulation-hint">Trigger notes are control keys: they work outside this part's playable key zone. Generated keyswitch, program and CC messages bypass transpose, scale and chorder modules.</span>
+              </div>
+
+              {#if slot.mod.articulations.length === 0}
+                <div class="empty-hint">No articulations mapped. Add one, choose its trigger key, then choose what the instrument expects.</div>
+              {/if}
+
+              <div class="articulation-list">
+                {#each slot.mod.articulations as articulation, articulationIndex (articulation.articulationId)}
+                  <div class="articulation-row">
+                    <button type="button" class="articulation-trigger"
+                            title={`Send ${keyName(articulation.triggerNote)} now`}
+                            onclick={() => auditionArticulation(articulation)}>
+                      <span>{keyName(articulation.triggerNote)}</span>
+                      <small>play</small>
+                    </button>
+                    <label class="mini-field articulation-name">Name
+                      <input type="text" maxlength="80" value={articulation.name}
+                             onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                  { name: e.currentTarget.value })} />
+                    </label>
+                    <label class="mini-field">Trigger note
+                      <input type="number" min="0" max="127" value={articulation.triggerNote}
+                             title={keyName(articulation.triggerNote)}
+                             onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                  { triggerNote: Number(e.currentTarget.value) })} />
+                    </label>
+                    <label class="mini-field">Trigger channel
+                      <select value={articulation.triggerChannel}
+                              onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                   { triggerChannel: Number(e.currentTarget.value) })}>
+                        <option value={0}>part input</option>
+                        {#each Array.from({ length: 16 }, (_, i) => i + 1) as channel (channel)}
+                          <option value={channel}>{channel}</option>
+                        {/each}
+                      </select>
+                    </label>
+                    <label class="mini-field">Sends
+                      <select value={articulation.type}
+                              onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                   { type: e.currentTarget.value })}>
+                        <option value="keyswitch">Keyswitch</option>
+                        <option value="program change">Bank + program</option>
+                        <option value="cc">MIDI CC</option>
+                      </select>
+                    </label>
+                    <label class="mini-field">Output channel
+                      <select value={articulation.outputChannel}
+                              onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                   { outputChannel: Number(e.currentTarget.value) })}>
+                        <option value={0}>same</option>
+                        {#each Array.from({ length: 16 }, (_, i) => i + 1) as channel (channel)}
+                          <option value={channel}>{channel}</option>
+                        {/each}
+                      </select>
+                    </label>
+
+                    {#if articulation.type === 'keyswitch'}
+                      <label class="mini-field">Keyswitch note
+                        <input type="number" min="0" max="127" value={articulation.keyswitchNote}
+                               title={keyName(articulation.keyswitchNote)}
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { keyswitchNote: Number(e.currentTarget.value) })} />
+                      </label>
+                      <label class="mini-field">Velocity
+                        <input type="number" min="1" max="127" value={articulation.keyswitchVelocity}
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { keyswitchVelocity: Number(e.currentTarget.value) })} />
+                      </label>
+                    {:else if articulation.type === 'program change'}
+                      <label class="mini-field">Bank MSB
+                        <input type="number" min="-1" max="127" value={articulation.bankMsb}
+                               title="-1 sends no Bank MSB"
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { bankMsb: Number(e.currentTarget.value) })} />
+                      </label>
+                      <label class="mini-field">Bank LSB
+                        <input type="number" min="-1" max="127" value={articulation.bankLsb}
+                               title="-1 sends no Bank LSB"
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { bankLsb: Number(e.currentTarget.value) })} />
+                      </label>
+                      <label class="mini-field">Program · 1–128
+                        <input type="number" min="1" max="128" value={articulation.program + 1}
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { program: Number(e.currentTarget.value) - 1 })} />
+                      </label>
+                    {:else}
+                      <label class="mini-field">CC
+                        <input type="number" min="0" max="127" value={articulation.controller}
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { controller: Number(e.currentTarget.value) })} />
+                      </label>
+                      <label class="mini-field">Value
+                        <input type="number" min="0" max="127" value={articulation.controllerValue}
+                               onchange={(e) => updateArticulation(slot, articulation.articulationId,
+                                                                    { controllerValue: Number(e.currentTarget.value) })} />
+                      </label>
+                    {/if}
+
+                    <button type="button" class="ghost danger articulation-remove"
+                            title={`Remove ${articulation.name || `articulation ${articulationIndex + 1}`}`}
+                            onclick={() => removeArticulation(slot, articulation.articulationId)}>×</button>
+                  </div>
+                {/each}
+              </div>
+            </div>
           {/if}
 
           {#if slot.type === 'arp'}
@@ -559,11 +1042,11 @@
 </div>
 
 <style>
-  .midi-chain { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #2c343d;
+  .midi-chain { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--host-line-soft);
                 padding-top: 8px; }
   .fx-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .slot { border: 1px solid #2c343d; border-radius: 5px; background: #1c2126; }
-  .slot.open { border-color: #3d81c4; }
+  .slot { border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-panel); background: var(--host-surface-raised); }
+  .slot.open { border-color: var(--host-accent); }
   /* The insertion line, drawn on the side the module will land. An inset shadow rather than a
      real element, so nothing shifts under the pointer while you are aiming at it. */
   .slot.drop-before { box-shadow: inset 0 2px 0 0 #5b9bd5; }
@@ -585,7 +1068,49 @@
   .slot-summary { color: #7d8894; font-size: 10px; }
   .slot-body { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 8px 8px; }
   .mini-field { display: flex; flex-direction: column; gap: 3px; color: #9aa5b1; font-size: 11px; }
+  .toggle-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; width: 100%; }
   .arp-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
+  .mpe-controls, .mpe-routing { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; width: 100%; }
+  .mpe-routing { padding-top: 7px; border-top: 1px solid var(--host-line-soft); }
+  .mpe-controls select { min-width: 142px; }
+  .mpe-controls input, .mpe-routing input { width: 54px; }
+  .mpe-arrow { align-self: center; color: var(--host-accent); font-size: 18px; }
+  .mpe-hint { max-width: 360px; line-height: 1.4; }
+  .articulation-editor { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .articulation-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+  .articulation-toolbar .map-name { flex: 0 1 240px; }
+  .articulation-toolbar .map-name input { width: 220px; }
+  .articulation-hint { max-width: 620px; line-height: 1.4; }
+  .articulation-list { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+  .articulation-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px;
+                      padding: 7px; border: 1px solid var(--host-line-soft);
+                      border-radius: var(--host-radius-panel); background: #111820; }
+  .articulation-row input[type="number"] { width: 64px; }
+  .articulation-row select { min-width: 94px; }
+  .articulation-name { flex: 1 1 150px; }
+  .articulation-name input { width: 100%; min-width: 130px; }
+  .articulation-trigger { width: 48px; height: 39px; display: flex; flex-direction: column;
+                          justify-content: center; align-items: center; border: 1px solid var(--host-accent);
+                          border-radius: var(--host-radius-control); background: var(--host-accent-surface);
+                          color: var(--host-text); cursor: pointer; }
+  .articulation-trigger span { font: 600 11px var(--host-font-mono, monospace); }
+  .articulation-trigger small { color: var(--host-text-dim); font-size: 8px; text-transform: uppercase; }
+  .articulation-remove { align-self: center; margin-left: auto; }
+  .response-editor { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .response-profile { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+  .profile-name { flex: 0 1 260px; }
+  .profile-name input { width: 240px; }
+  .response-profile .hint { max-width: 540px; }
+  .response-block { padding: 8px; display: flex; gap: 10px; flex-wrap: wrap;
+                    border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-panel);
+                    background: #111820; }
+  .response-block.expression.off { opacity: 0.65; }
+  .response-row { flex: 1 1 330px; min-width: 300px; display: flex; align-content: flex-start;
+                  align-items: flex-end; flex-wrap: wrap; gap: 8px; }
+  .response-row > strong { width: 100%; color: var(--host-text); font-size: 12px; }
+  .response-row select { min-width: 120px; }
+  .response-row input[type="number"] { width: 58px; }
+  .range-pair > span { display: flex; align-items: center; gap: 4px; color: var(--host-text-dim); }
   .hint { color: #66707b; font-size: 10px; max-width: 150px; }
   .empty-hint { color: #66707b; font-size: 12px; }
   .key-chords { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
@@ -619,11 +1144,11 @@
   .vel-col.playing .vel-bar { background: #7fb4e0; }
   .grid-side { display: flex; flex-direction: column; gap: 4px; justify-content: flex-start; }
   .row-mode { display: flex; gap: 2px; }
-  .row-mode button { flex: 1; font-size: 10px; padding: 2px 4px; background: #1c2630;
-                     color: #9aa5b1; border: 1px solid #2c3742; border-radius: 3px; cursor: pointer; }
-  .row-mode button.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
-  .ghost { background: none; border: 1px solid #2c3742; border-radius: 3px; color: #9aa5b1;
+  .row-mode button { flex: 1; font-size: 10px; padding: 2px 4px; background: var(--host-surface-raised);
+                     color: var(--host-text-soft); border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); cursor: pointer; }
+  .row-mode button.on { background: var(--host-accent-surface); color: var(--host-text); border-color: var(--host-accent); }
+  .ghost { background: none; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); color: var(--host-text-soft);
            cursor: pointer; font-size: 11px; padding: 2px 6px; }
   .ghost:disabled { opacity: 0.35; cursor: default; }
-  .ghost.danger { color: #d68a8a; }
+  .ghost.danger { color: var(--host-danger); }
 </style>
