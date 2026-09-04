@@ -57,6 +57,10 @@
     import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
+  import Unplug from 'lucide-svelte/icons/unplug';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
@@ -821,23 +825,56 @@
               <input type="range" min="-1" max="1" step="0.01" value={part.pan} aria-label="Pan"
                      oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
             </label>
-            {#if part.hasInstrument}
-              <button type="button" class="toggle" class:on={$hostState.editorOpenPartId === part.partId}
-                      title="Show the plug-in's own interface in the native pane"
-                      onclick={() => toggleEditor(part)}>Editor</button>
-              <button type="button" class="toggle"
-                      class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
-                      data-testid="part-float-editor"
-                      title="Pop the plug-in's interface out into its own window — several parts can float at once"
-                      onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
-                                        ? closeEditorWindow(part.partId)
-                                        : floatEditor(part.partId))}>⧉</button>
-              <button type="button" class="ghost" title="Unload the instrument, keep the part"
-                      onclick={() => unloadInstrument(part.partId)}>Unload</button>
-            {/if}
-            <button type="button" class="ghost danger" title="Remove this part"
-                    onclick={() => removeRackPart(part.partId)}>×</button>
           </div>
+          </div>
+          <!-- The four things you came to the rack to press, in a strip of their own outside
+               the part's body. They used to be the last items INSIDE .part-controls, behind
+               the range button, On/M/S and two sliders — in a wrapping flex sharing the window
+               50/50 with the browser column, so on a narrow enough one they dropped to a
+               second line, at a different x on every row depending on how long the plug-in was
+               called and whether the preset walk was showing. Nothing was ever collapsed into
+               a menu, but a control that moves every row is a control you have to hunt for,
+               which is the same cost.
+
+               Out here they cannot wrap and cannot be pushed: same place, every row. That is
+               the rule the insert rows already state further down ("Controls first, name
+               after … the mouse travels a fixed short distance"), applied to the surface it
+               matters most on.
+
+               Icons, not words: "Editor" and "Unload" were the two widest things in the row,
+               and ⧉ for the floating window was a glyph nobody could be expected to read.
+               The words all survive in the tooltips and the aria-labels.
+
+               A part with no instrument still draws all four, disabled rather than absent — a
+               strip whose width depends on the row is a strip you have to find again on the
+               next one. -->
+          <div class="part-actions" data-testid="part-actions">
+            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
+                    class:on={$hostState.editorOpenPartId === part.partId}
+                    data-testid="part-open-editor"
+                    aria-label={`Show ${partTitle(part)}'s own interface in the host`}
+                    title="Show the plug-in's own interface in the native pane"
+                    onclick={() => toggleEditor(part)}><SlidersHorizontal size={15} strokeWidth={1.8} /></button>
+            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
+                    class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
+                    data-testid="part-float-editor"
+                    aria-label={`Pop ${partTitle(part)}'s interface out into its own window`}
+                    title="Pop the plug-in's interface out into its own window — several parts can float at once"
+                    onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
+                                      ? closeEditorWindow(part.partId)
+                                      : floatEditor(part.partId))}><PictureInPicture2 size={15} strokeWidth={1.8} /></button>
+            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
+                    data-testid="part-unload"
+                    aria-label={`Unload ${partTitle(part)}'s instrument, keep the part`}
+                    title="Unload the instrument, keep the part"
+                    onclick={() => unloadInstrument(part.partId)}><Unplug size={15} strokeWidth={1.8} /></button>
+            <!-- The one that destroys work does not sit flush against the three that do not. -->
+            <span class="action-sep" aria-hidden="true"></span>
+            <button type="button" class="toggle icon danger"
+                    data-testid="part-remove"
+                    aria-label={`Remove ${partTitle(part)} from the rack`}
+                    title="Remove this part"
+                    onclick={() => removeRackPart(part.partId)}><Trash2 size={15} strokeWidth={1.8} /></button>
           </div>
         </div>
       {/each}
@@ -1989,6 +2026,29 @@
   .part-vendor { color: #7d8894; }
 
   .part-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* Outside .part-body on purpose: it is not in the wrapping flex, so nothing above it
+     can push it to a second line, and it lands at the same x on every row. */
+  .part-actions {
+    flex: none;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 6px;
+  }
+  .action-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: #2c343d; }
+  /* Square, so four of them read as one strip rather than four words of four lengths.
+     The double class beats plain `button.toggle` further down, which sets the padding. */
+  button.toggle.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+  }
+  button.toggle.icon.danger { color: #8d7b7b; }
+  button.toggle.icon.danger:hover:not(:disabled) { color: #e4b3b3; border-color: #7a4a4a; }
   .mini input[type="range"] { width: 70px; }
 
   .midi-zone {

@@ -20,8 +20,13 @@
     hostState, focusRackPart, loadInstrument, addEffect, setPartDestination, setBusDestination,
     rackCanvasLayout, canvasDropTargets, hostCanvasDrag, CANVAS_NODE_W, CANVAS_NODE_H,
     setCanvasPosition, clearCanvasPositions,
+    openEditor, closeEditor, floatEditor, closeEditorWindow, unloadInstrument, removeRackPart,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
+  import Unplug from 'lucide-svelte/icons/unplug';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
 
   let layout = $derived(rackCanvasLayout($hostState.rack));
 
@@ -41,6 +46,19 @@
   // ever means "put it here" — canvasDropTargets returns nothing for them and no box lights.
   const isNodeDrag = (kind) => kind === 'part' || kind === 'bus'
                                || kind === 'return' || kind === 'master';
+
+  // The same four actions the list row carries, so the canvas is not a view you have to
+  // leave to do anything. Before this, a part node could be focused and rewired and nothing
+  // else: opening a plug-in's interface, floating it or removing the part all meant switching
+  // back to List, which is a worse place to hide a control than any menu.
+  const toggleEditor = (partId) =>
+    ($hostState.editorOpenPartId === partId ? closeEditor() : openEditor(partId));
+  const toggleFloat = (partId) =>
+    ($hostState.floatingEditorPartIds.includes(partId)
+       ? closeEditorWindow(partId) : floatEditor(partId));
+  // A click on the strip is about the plug-in, not about which box is focused, and a drag
+  // started on a button would otherwise also be read as a drag of the node underneath.
+  const actOn = (event, run) => { event.stopPropagation(); run(); };
 
   const editedIn = {
     part: 'Drag onto a bus or the master to route it · drop an effect here to insert it',
@@ -152,6 +170,7 @@
 
 <div class="canvas-scroll" data-testid="host-rack-canvas">
   <div class="canvas" style={`width:${layout.width}px;height:${layout.height}px`}
+       class:drag-in-flight={$hostCanvasDrag.kind !== ''}
        role="presentation"
        ondragover={canvasOver}
        ondrop={canvasDrop}>
@@ -163,27 +182,42 @@
 
     {#each layout.nodes as node (node.id)}
       {@const label = `${node.title} — ${editedIn[node.kind]}`}
-      <svelte:element this={node.kind === 'part' ? 'button' : 'div'}
-                      type={node.kind === 'part' ? 'button' : undefined}
-                      class={`node ${node.kind}`}
-                      class:focused={node.focused}
-                      class:muted={node.muted}
-                      class:unresolved={node.unresolved}
-                      class:dragging={$hostCanvasDrag.id === node.id}
-                      class:target={targets.has(node.id)}
-                      class:hovered={hovered === node.id}
-                      data-testid={`canvas-node-${node.id}`}
-                      title={label}
-                      aria-label={label}
-                      draggable="true"
-                      style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}
-                      ondragstart={(e) => dragStart(e, node)}
-                      ondragend={dragEnd}
-                      ondragover={(e) => dragOver(e, node)}
-                      ondrop={(e) => drop(e, node)}
-                      onclick={node.kind === 'part' ? () => focusRackPart(node.id) : undefined}>
+      {@const isPart = node.kind === 'part'}
+      <!-- A part node used to BE a <button>, which is no longer possible now that it carries
+           buttons of its own — a button inside a button is not a tree a browser will build.
+           role, tabindex and the Enter/Space handler put back exactly what the element gave
+           up, and the box keeps its click-to-focus.
+
+           Both ignores below are the analyser losing a ternary, not a11y being waived: role
+           and tabindex are driven by the SAME `isPart`, so the element that carries a
+           tabindex is always the one that carries role="button" and the key handler, and a
+           bus, return or master node gets neither. -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class={`node ${node.kind}`}
+           class:focused={node.focused}
+           class:muted={node.muted}
+           class:unresolved={node.unresolved}
+           class:dragging={$hostCanvasDrag.id === node.id}
+           class:target={targets.has(node.id)}
+           class:hovered={hovered === node.id}
+           data-testid={`canvas-node-${node.id}`}
+           title={label}
+           aria-label={label}
+           role={isPart ? 'button' : undefined}
+           tabindex={isPart ? 0 : undefined}
+           draggable="true"
+           style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}
+           ondragstart={(e) => dragStart(e, node)}
+           ondragend={dragEnd}
+           ondragover={(e) => dragOver(e, node)}
+           ondrop={(e) => drop(e, node)}
+           onclick={isPart ? () => focusRackPart(node.id) : undefined}
+           onkeydown={isPart
+                        ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusRackPart(node.id); } }
+                        : undefined}>
         <span class="node-head">
-          {#if node.kind === 'part' && (node.hasInstrument || node.unresolved)}
+          {#if isPart && (node.hasInstrument || node.unresolved)}
             <PluginTile ceId={node.ceId} name={node.title} vendor={node.subtitle} size={20} />
           {/if}
           <span class="node-title">{node.title}</span>
@@ -193,7 +227,47 @@
           {#if node.inserts > 0}<span class="badge fx" title={`${node.inserts} inserts`}>fx{node.inserts}</span>{/if}
           <span class="node-sub">{node.subtitle}</span>
         </span>
-      </svelte:element>
+
+        <!-- On hover and on keyboard focus rather than always: at rest the picture is the
+             signal path, and four icons on every box would compete with the wires it exists
+             to draw. While anything is being dragged the strip stays down whatever the
+             pointer is over — a drop target that sprouts buttons under the cursor is a drop
+             you will miss. -->
+        {#if isPart}
+          <span class="node-actions">
+            <button type="button" class="node-action" disabled={!node.hasInstrument}
+                    class:on={$hostState.editorOpenPartId === node.id}
+                    data-testid="canvas-open-editor"
+                    aria-label={`Show ${node.title}'s own interface in the host`}
+                    title="Show the plug-in's own interface in the native pane"
+                    onclick={(e) => actOn(e, () => toggleEditor(node.id))}>
+              <SlidersHorizontal size={13} strokeWidth={1.9} />
+            </button>
+            <button type="button" class="node-action" disabled={!node.hasInstrument}
+                    class:on={$hostState.floatingEditorPartIds.includes(node.id)}
+                    data-testid="canvas-float-editor"
+                    aria-label={`Pop ${node.title}'s interface out into its own window`}
+                    title="Pop the plug-in's interface out into its own window"
+                    onclick={(e) => actOn(e, () => toggleFloat(node.id))}>
+              <PictureInPicture2 size={13} strokeWidth={1.9} />
+            </button>
+            <button type="button" class="node-action" disabled={!node.hasInstrument}
+                    data-testid="canvas-unload"
+                    aria-label={`Unload ${node.title}'s instrument, keep the part`}
+                    title="Unload the instrument, keep the part"
+                    onclick={(e) => actOn(e, () => unloadInstrument(node.id))}>
+              <Unplug size={13} strokeWidth={1.9} />
+            </button>
+            <button type="button" class="node-action danger"
+                    data-testid="canvas-remove-part"
+                    aria-label={`Remove ${node.title} from the rack`}
+                    title="Remove this part"
+                    onclick={(e) => actOn(e, () => removeRackPart(node.id))}>
+              <Trash2 size={13} strokeWidth={1.9} />
+            </button>
+          </span>
+        {/if}
+      </div>
     {/each}
 
     <!-- Where the new part will appear, shown only while an instrument is in flight. The
@@ -285,8 +359,9 @@
   }
   .node.new-part.hovered { border-color: #5b9bd5; background: rgba(91, 155, 213, 0.16); color: #d6dbe0; }
 
-  button.node { cursor: pointer; font-family: inherit; }
-  button.node:hover { border-color: #5b9bd5; }
+  .node[role='button'] { cursor: pointer; font-family: inherit; }
+  .node[role='button']:hover { border-color: #5b9bd5; }
+  .node[role='button']:focus-visible { outline: 2px solid #5b9bd5; outline-offset: 1px; }
   .node.focused { border-color: #5b9bd5; background: #24313d; }
   .node[draggable='true'] { cursor: grab; }
   .node.dragging { opacity: 0.4; }
@@ -317,6 +392,47 @@
   }
   .badge.midi { color: #7fb4e0; }
   .badge.fx { color: #8fc4a8; }
+
+  /* Bottom-right, over the subtitle: the two lines that matter — the name and the routing
+     the wires draw — stay uncovered. Its own ground so the text underneath does not read
+     through the icons. */
+  .node-actions {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 1px;
+    border-radius: 4px;
+    background: rgba(23, 26, 29, 0.94);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 90ms linear;
+  }
+  .node:hover > .node-actions,
+  .node:focus-within > .node-actions { opacity: 1; pointer-events: auto; }
+  /* Spelled out rather than left to source order: while a drag is on, the strip stays
+     down whatever is hovered or focused. */
+  .canvas.drag-in-flight .node:hover > .node-actions,
+  .canvas.drag-in-flight .node:focus-within > .node-actions { opacity: 0; pointer-events: none; }
+  .node-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: none;
+    color: #8b97a3;
+    cursor: pointer;
+  }
+  .node-action:hover:not(:disabled) { background: #2c3742; color: #d6dbe0; }
+  .node-action.on { background: #24313d; color: #7fb4e0; }
+  .node-action.danger:hover:not(:disabled) { background: #3a2626; color: #e4b3b3; }
+  .node-action:disabled { opacity: 0.3; cursor: default; }
 
   .canvas-key {
     position: sticky;
