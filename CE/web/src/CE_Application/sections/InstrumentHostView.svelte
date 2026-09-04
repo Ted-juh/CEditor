@@ -64,6 +64,12 @@
   import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
+  import ChevronUp from 'lucide-svelte/icons/chevron-up';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import AppWindow from 'lucide-svelte/icons/app-window';
+  import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
+  import Unplug from 'lucide-svelte/icons/unplug';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
@@ -1055,41 +1061,65 @@
               {#if part.mute}<span class="part-state muted">Muted</span>{/if}
               {#if part.solo}<span class="part-state soloed">Solo</span>{/if}
             </span>
-            <details class="part-actions" data-testid="part-actions">
-              <summary title="Editor and part actions" aria-label={`Actions for ${partTitle(part)}`}>•••</summary>
-              <div class="part-action-menu">
-                <button type="button" class="ghost" disabled={partIndex === 0}
-                        onclick={() => moveRackPart(part.partId, partIndex - 1)}>Move up</button>
-                <button type="button" class="ghost" disabled={partIndex === parts.length - 1}
-                        onclick={() => moveRackPart(part.partId, partIndex + 1)}>Move down</button>
-                {#if part.hasInstrument}
-                  <button type="button" class="toggle" class:on={$hostState.editorOpenPartId === part.partId}
-                          title="Show the plug-in's own interface in the native pane"
-                          onclick={() => toggleEditor(part)}>Editor</button>
-                  <button type="button" class="toggle"
-                          class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
-                          data-testid="part-float-editor"
-                          title="Pop the plug-in's interface out into its own window"
-                          onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
-                                            ? closeEditorWindow(part.partId)
-                                            : floatEditor(part.partId))}>Floating editor</button>
-                  <button type="button" class="ghost" class:confirming={pendingDestructive === `unload:${part.partId}`}
-                          title={pendingDestructive === `unload:${part.partId}`
-                            ? 'Click again to confirm unload' : 'Unload the instrument, keep the part'}
-                          onclick={() => guardedAction(`unload:${part.partId}`,
-                            () => unloadInstrument(part.partId))}>
-                    {pendingDestructive === `unload:${part.partId}` ? 'Confirm unload' : 'Unload instrument'}
-                  </button>
-                {/if}
-                <button type="button" class="ghost danger" class:confirming={pendingDestructive === `part:${part.partId}`}
-                        title={pendingDestructive === `part:${part.partId}`
-                          ? 'Click again to confirm removal' : 'Remove this part'}
-                        onclick={() => guardedAction(`part:${part.partId}`,
-                          () => removeRackPart(part.partId))}>
-                  {pendingDestructive === `part:${part.partId}` ? 'Confirm remove' : 'Remove part'}
-                </button>
-              </div>
-            </details>
+            <!-- The part's actions, in the open. These were a ••• menu: six things behind
+                 one button, including the two you reach for most — the plug-in's own
+                 interface, here or in its own window — and the one that must never be a
+                 surprise, remove. A menu is the right shape for actions that are rare; these
+                 are not, and the row has the width. Icons, at the same place on every row.
+                 Every word survives in the tooltip and the aria-label, and the two
+                 destructive ones keep their click-again-to-confirm: the icon turns red and
+                 the tooltip says so, for five seconds, exactly as the menu did.
+
+                 A part with no instrument still draws all six, three of them disabled: a
+                 strip whose width depends on the row is a strip you have to find again on
+                 the next one. -->
+            <div class="part-actions" data-testid="part-actions" role="group"
+                 aria-label={`Actions for ${partTitle(part)}`}>
+              <button type="button" class="ghost icon" disabled={partIndex === 0}
+                      data-testid="part-move-up"
+                      aria-label={`Move ${partTitle(part)} up`} title="Move up"
+                      onclick={() => moveRackPart(part.partId, partIndex - 1)}><ChevronUp size={16} strokeWidth={2} /></button>
+              <button type="button" class="ghost icon" disabled={partIndex === parts.length - 1}
+                      data-testid="part-move-down"
+                      aria-label={`Move ${partTitle(part)} down`} title="Move down"
+                      onclick={() => moveRackPart(part.partId, partIndex + 1)}><ChevronDown size={16} strokeWidth={2} /></button>
+              <span class="action-sep" aria-hidden="true"></span>
+              <button type="button" class="toggle icon" disabled={!part.hasInstrument}
+                      class:on={$hostState.editorOpenPartId === part.partId}
+                      data-testid="part-open-editor"
+                      aria-label={`Show ${partTitle(part)}'s own interface in the host`}
+                      title="Show the plug-in's own interface in the native pane"
+                      onclick={() => toggleEditor(part)}><AppWindow size={15} strokeWidth={1.8} /></button>
+              <button type="button" class="toggle icon" disabled={!part.hasInstrument}
+                      class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
+                      data-testid="part-float-editor"
+                      aria-label={`Pop ${partTitle(part)}'s interface out into its own window`}
+                      title="Pop the plug-in's interface out into its own window"
+                      onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
+                                        ? closeEditorWindow(part.partId)
+                                        : floatEditor(part.partId))}><PictureInPicture2 size={15} strokeWidth={1.8} /></button>
+              <button type="button" class="ghost icon" disabled={!part.hasInstrument}
+                      class:confirming={pendingDestructive === `unload:${part.partId}`}
+                      data-testid="part-unload"
+                      aria-label={pendingDestructive === `unload:${part.partId}`
+                        ? `Click again to unload ${partTitle(part)}'s instrument`
+                        : `Unload ${partTitle(part)}'s instrument, keep the part`}
+                      title={pendingDestructive === `unload:${part.partId}`
+                        ? 'Click again to confirm unload' : 'Unload the instrument, keep the part'}
+                      onclick={() => guardedAction(`unload:${part.partId}`,
+                        () => unloadInstrument(part.partId))}><Unplug size={15} strokeWidth={1.8} /></button>
+              <span class="action-sep" aria-hidden="true"></span>
+              <button type="button" class="ghost icon danger"
+                      class:confirming={pendingDestructive === `part:${part.partId}`}
+                      data-testid="part-remove"
+                      aria-label={pendingDestructive === `part:${part.partId}`
+                        ? `Click again to remove ${partTitle(part)}`
+                        : `Remove ${partTitle(part)} from the rack`}
+                      title={pendingDestructive === `part:${part.partId}`
+                        ? 'Click again to confirm removal' : 'Remove this part'}
+                      onclick={() => guardedAction(`part:${part.partId}`,
+                        () => removeRackPart(part.partId))}><Trash2 size={15} strokeWidth={1.8} /></button>
+            </div>
           </div>
           <div class="part-performance">
             {#if (part.hasInstrument && !part.hardware) || part.hardware}
@@ -2569,7 +2599,6 @@
   .part.focused { border-color: #67abe3; box-shadow: inset 0 0 0 1px #3d81c4; }
   .part.disabled { background: #181c20; }
   .part.disabled .part-main, .part.disabled .part-performance { opacity: 0.68; }
-  .part:has(.part-actions[open]) { z-index: 5; }
   /* The face on the left, the row's full height; the three lines to its right. */
   .part-art {
     flex: none;
@@ -2615,38 +2644,26 @@
   .part-state.problem, .part-state.muted { border-color: #7a4a4a; background: #2a1d1d; color: #e8b5b5; }
   .part-state.off { border-color: #626a72; background: #25292d; color: #b4bbc1; }
   .part-state.soloed { border-color: #806d36; background: #2a2618; color: #ead58f; }
-  .part-actions { position: relative; flex: none; }
-  .part-actions summary {
-    width: 34px;
-    min-height: 30px;
-    display: grid;
-    place-items: center;
-    box-sizing: border-box;
-    border: 1px solid #3b4652;
-    background: #20262c;
-    color: #aab4bd;
-    cursor: pointer;
-    list-style: none;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+  /* Flex none and outside anything that wraps: the strip lands at the same x on every
+     row whatever the part is called, which is the rule the insert rows already follow
+     ("the mouse travels a fixed short distance instead of chasing however long a
+     plug-in's name is"). */
+  .part-actions { flex: none; display: flex; align-items: center; gap: 3px; }
+  .action-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--host-line-soft); }
+  /* Square, at the control height, so six of them read as one strip rather than six
+     words of six lengths. */
+  .part-actions button.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--host-control-height);
+    height: var(--host-control-height);
+    padding: 0;
   }
-  .part-actions summary::-webkit-details-marker { display: none; }
-  .part-actions[open] summary { border-color: #67abe3; color: #edf5fa; background: #24384c; }
-  .part-action-menu {
-    position: absolute;
-    z-index: 10;
-    top: calc(100% + 4px);
-    right: 0;
-    width: 170px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 6px;
-    border: 1px solid #46515b;
-    background: #151a1f;
-    box-shadow: 0 8px 18px #080a0caa;
-  }
-  .part-action-menu button { width: 100%; justify-content: flex-start; text-align: left; white-space: nowrap; }
+  .part-actions button.icon:disabled { opacity: 0.35; }
+  /* The confirm state on an icon has no words to change, so it changes colour instead —
+     the same red the menu's "Confirm remove" wore — and the tooltip says the rest. */
+  .part-actions button.icon.confirming { border-color: var(--host-danger); background: var(--host-danger-surface); color: var(--host-danger); }
   .part-performance { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
   .preset-walk { flex: 0 1 220px; min-width: 150px; display: inline-flex; align-items: center; gap: 3px; }
   .preset-walk .ghost { flex: none; padding: 0 8px; font-size: 16px; line-height: 1; }

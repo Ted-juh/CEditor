@@ -14,15 +14,31 @@ const theme = fs.readFileSync(
 test('rack parts separate identity, live controls and secondary actions', () => {
   assert.match(source, /class="part-head"/);
   assert.match(source, /class="part-performance"/);
-  assert.match(source, /<details class="part-actions"/);
 
-  const menu = source.match(/<div class="part-action-menu">[\s\S]*?<\/div>/)?.[0] ?? '';
-  assert.match(menu, />Editor<\/button>/);
-  assert.match(menu, />Floating editor<\/button>/);
-  assert.match(menu, /'Unload instrument'/);
-  assert.match(menu, /'Remove part'/);
-  assert.match(menu, /Confirm unload/);
-  assert.match(menu, /Confirm remove/);
+  // The actions are a strip in the row head, not a menu: the two most-used ones (the
+  // plug-in's interface, here or in its own window) and the one that must never be a
+  // surprise (remove) are visible at the same place on every row. A ••• button hiding
+  // six things was the complaint that removed it, so its absence is asserted, not assumed.
+  assert.doesNotMatch(source, /<details class="part-actions"/);
+  assert.doesNotMatch(source, /part-action-menu/);
+  const strip = source.match(/<div class="part-actions"[\s\S]*?\n {12}<\/div>/)?.[0] ?? '';
+  assert.ok(strip, 'the action strip is in the part head');
+  for (const id of ['part-move-up', 'part-move-down', 'part-open-editor', 'part-float-editor',
+                    'part-unload', 'part-remove']) {
+    assert.match(strip, new RegExp(`data-testid="${id}"`), id);
+  }
+  // Every word the menu carried is still there for the tooltip and the screen reader.
+  assert.match(strip, /title="Show the plug-in's own interface in the native pane"/);
+  assert.match(strip, /own window/);
+  assert.match(strip, /aria-label=\{`Move \$\{partTitle\(part\)\} up`\}/);
+  // The two destructive ones keep click-again-to-confirm through the same guard the menu
+  // used; with no words to change, the button says so in its tooltip and turns red.
+  assert.match(strip, /guardedAction\(`unload:\$\{part\.partId\}`/);
+  assert.match(strip, /guardedAction\(`part:\$\{part\.partId\}`/);
+  assert.match(strip, /Click again to confirm unload/);
+  assert.match(strip, /Click again to confirm removal/);
+  assert.match(strip, /class:confirming=\{pendingDestructive === `part:\$\{part\.partId\}`\}/);
+  assert.match(source, /\.part-actions button\.icon\.confirming \{[^}]*--host-danger/);
 });
 
 test('rack parts expose plain-language performance controls and exception states', () => {
