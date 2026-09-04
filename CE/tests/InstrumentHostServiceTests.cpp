@@ -1,4 +1,4 @@
-// InstrumentHostServiceTests — the bridge-facing command surface (VIP-successor Stage 1).
+// InstrumentHostServiceTests — the bridge-facing Hostage command surface.
 //
 // This drives the exact payloads the WebView will send and asserts on the exact events it
 // will hear back, with a stub instantiator standing in for AudioPluginFormatManager and the
@@ -19,13 +19,16 @@
 
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/EditorSnapshot.h"
+#include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
+#include "InstrumentHost/PluginWorkerCrashDumps.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
 #include <cstring>
 #include <map>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 
 namespace
@@ -45,7 +48,34 @@ using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
 using ceditor::host::PluginSnapshotRegistry;
 namespace editorSnapshot = ceditor::host::editorSnapshot;
+using ceditor::test::StubEffectProcessor;
 using ceditor::test::StubSynthProcessor;
+
+struct SwitchableServiceSynth final : StubSynthProcessor
+{
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        if (throwOnProcess)
+            throw std::runtime_error ("service failover test");
+        StubSynthProcessor::processBlock (audio, midi);
+    }
+
+    bool throwOnProcess = false;
+};
+
+struct SwitchableServiceEffect final : StubEffectProcessor
+{
+    SwitchableServiceEffect() : StubEffectProcessor (0.5f) {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        if (throwOnProcess)
+            throw std::runtime_error ("service effect failover test");
+        StubEffectProcessor::processBlock (audio, midi);
+    }
+
+    bool throwOnProcess = false;
+};
 
 juce::File freshDataDir (const juce::String& name)
 {
@@ -463,6 +493,51 @@ void testCommandFlow()
            "an unknown command is refused aloud");
 }
 
+void testStageLock()
+{
+    std::cout << "\nstage lock" << std::endl;
+
+    Harness h (freshDataDir ("stage-lock"));
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    h.cmd ("setStageLock", { { "enabled", true } });
+    check ((bool) h.emits.lastState()->getProperty ("stageLocked", false),
+           "entering Stage publishes the native lock state");
+
+    h.emits.clear();
+    h.cmd ("removePart", { { "partId", partId } });
+    check (h.emits.lastError().contains ("Stage Lock"),
+           "Stage Lock refuses a structural command aloud");
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 1,
+           "and the refused command cannot change the rig");
+
+    h.emits.clear();
+    h.cmd ("setPartMixer", { { "partId", partId }, { "mute", true } });
+    check ((bool) h.emits.lastState()->getProperty ("rack", {})
+                          .getProperty ("parts", {})[0].getProperty ("mute", false),
+           "performance-safe mixer changes remain live");
+    check (h.emits.lastError().isEmpty(), "a safe Stage command is not reported as blocked");
+
+    h.emits.clear();
+    h.cmd ("setStageLock", { { "enabled", false } });
+    check (h.emits.lastError().contains ("Hold Build"),
+           "a direct unlock cannot bypass the hold gesture");
+    check ((bool) h.emits.lastState()->getProperty ("stageLocked", false),
+           "the native lock remains engaged after a short unlock");
+
+    h.cmd ("beginStageUnlock");
+    juce::Thread::sleep (950);
+    h.cmd ("setStageLock", { { "enabled", false } });
+    check (! (bool) h.emits.lastState()->getProperty ("stageLocked", true),
+           "holding Build long enough releases the native lock");
+
+    h.cmd ("removePart", { { "partId", partId } });
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 0,
+           "structural commands work again after the deliberate unlock");
+}
+
 void testSessionSurvivesProcess()
 {
     std::cout << "\nsession round trip" << std::endl;
@@ -874,6 +949,45 @@ void testSessionRecovery()
 // or complete user directories." Zipping the data directory is how a bundle ends up carrying
 // somebody's licence file, so the test that matters is that a planted one does NOT travel.
 
+void testLiveWorkerDiagnostics()
+{
+    std::cout << "\nlive worker diagnostics: structured, bounded and allowlisted" << std::endl;
+
+    const auto dir = freshDataDir ("live-worker-diagnostics");
+    const auto current = ceditor::host::LiveWorkerDiagnostics::currentFile (dir);
+    const auto previous = ceditor::host::LiveWorkerDiagnostics::previousFile (dir);
+    const auto supportFiles = ceditor::host::LiveWorkerDiagnostics::supportFiles (dir);
+
+    check (supportFiles.size() == 2 && supportFiles[0] == current
+             && supportFiles[1] == previous,
+           "only the current and previous internally-owned logs are support-bundled");
+
+    ceditor::host::LiveWorkerDiagnostics::append (
+        current, "worker_ready", 42, "Fragile Synth", "2 inputs, 2 outputs, 17 parameters");
+
+    const auto first = juce::JSON::parse (current.loadFileAsString());
+    check (first.isObject()
+             && first.getProperty ("event", {}).toString() == "worker_ready"
+             && (juce::int64) first.getProperty ("generation", {}) == 42
+             && first.getProperty ("plugin", {}).toString() == "Fragile Synth"
+             && first.getProperty ("detail", {}).toString().contains ("17 parameters")
+             && first.getProperty ("at", {}).toString().isNotEmpty(),
+           "each line carries a timestamp, generation, event, plug-in and bounded detail");
+
+    std::vector<char> oversized (512 * 1024, 'x');
+    check (current.replaceWithData (oversized.data(), oversized.size()),
+           "the rotation fixture fills the exact current log");
+    ceditor::host::LiveWorkerDiagnostics::append (
+        current, "launch_failed", 43, "Fragile Synth", "invalid worker handshake");
+
+    const auto afterRotation = juce::JSON::parse (current.loadFileAsString());
+    check (previous.existsAsFile() && previous.getSize() == (juce::int64) oversized.size(),
+           "the previous diagnostic window is retained when the current log reaches 512 KiB");
+    check (afterRotation.getProperty ("event", {}).toString() == "launch_failed"
+             && (juce::int64) afterRotation.getProperty ("generation", {}) == 43,
+           "rotation starts a fresh valid JSON-lines window with the triggering event");
+}
+
 void testSupportBundle()
 {
     std::cout << "\nsupport bundle: what travels, and what must not" << std::endl;
@@ -885,6 +999,27 @@ void testSupportBundle()
     dir.getChildFile ("licence.key").replaceWithText ("LICENCE-AAAA-BBBB-CCCC");
     dir.getChildFile ("account-token.json").replaceWithText ("{\"token\":\"secret\"}");
     dir.getChildFile ("My Notes.txt").replaceWithText ("unrelated document");
+    dir.getChildFile ("logs").createDirectory();
+    dir.getChildFile ("logs").getChildFile ("unrelated-worker-notes.txt")
+       .replaceWithText ("also unrelated");
+    ceditor::host::LiveWorkerDiagnostics::append (
+        ceditor::host::LiveWorkerDiagnostics::currentFile (dir),
+        "worker_exited", 27, "Fragile Synth", "exit code 99");
+    const auto dumpDirectory = ceditor::host::plugin_worker::PluginWorkerCrashDumps::directory (dir);
+    dumpDirectory.createDirectory();
+    const auto workerDump = ceditor::host::plugin_worker::PluginWorkerCrashDumps::slotFile (
+        dumpDirectory, 3);
+    const juce::uint8 dumpFixture[] { 'M', 'D', 'M', 'P', 0, 1, 2, 3 };
+    workerDump.replaceWithData (dumpFixture, sizeof (dumpFixture));
+    const auto workerDumpMetadata =
+        ceditor::host::plugin_worker::PluginWorkerCrashDumps::metadataFile (dumpDirectory, 3);
+    workerDumpMetadata.replaceWithText (
+        "{\"plugin\":\"Fragile Synth\",\"workerSha256\":\""
+        + juce::String::repeatedString ("a", 64) + "\"}");
+    dumpDirectory.getChildFile ("private-investigation.dmp").replaceWithText (
+        "not an internally-owned fixed slot");
+    dumpDirectory.getChildFile ("private-investigation.json").replaceWithText (
+        "{\"workerSha256\":\"not-owned\"}");
 
     Harness h (dir);
     h.cmd ("getState");
@@ -905,17 +1040,29 @@ void testSupportBundle()
     const auto* preview = h.emits.last ("instrumentHostSupportBundle");
     check (preview != nullptr, "the preview answers before anything is written");
 
-    bool sawManifest = false, sawCatalogue = false, sawSession = false, sawLicence = false;
-    juce::String sessionNote;
+    bool sawManifest = false, sawCatalogue = false, sawSession = false, sawWorkerLog = false;
+    bool sawWorkerDump = false, workerDumpIncluded = false, sawWorkerDumpMetadata = false;
+    bool sawLicence = false;
+    juce::String sessionNote, workerDumpNote;
     if (preview != nullptr)
         for (const auto& entry : *preview->getProperty ("entries", {}).getArray())
         {
             const auto name = entry.getProperty ("name", {}).toString();
             sawManifest  = sawManifest  || name == "support-manifest.json";
             sawCatalogue = sawCatalogue || name == "plugin-catalog.json";
+            sawWorkerLog = sawWorkerLog || name == "logs/live-worker-events.jsonl";
+            if (name == "crash-dumps/" + workerDump.getFileName())
+            {
+                sawWorkerDump = true;
+                workerDumpIncluded = (bool) entry.getProperty ("included", false);
+                workerDumpNote = entry.getProperty ("note", {}).toString();
+            }
+            sawWorkerDumpMetadata = sawWorkerDumpMetadata
+                || name == "crash-dumps/" + workerDumpMetadata.getFileName();
             sawLicence   = sawLicence   || name.containsIgnoreCase ("licence")
                                         || name.containsIgnoreCase ("token")
-                                        || name.containsIgnoreCase ("Notes");
+                                        || name.containsIgnoreCase ("Notes")
+                                        || name.containsIgnoreCase ("unrelated-worker");
             if (name == "session-performance.json")
             {
                 sawSession = true;
@@ -923,9 +1070,12 @@ void testSupportBundle()
             }
         }
 
-    check (sawManifest && sawCatalogue && sawSession,
-           "the preview names the manifest, the scan results and the session");
+    check (sawManifest && sawCatalogue && sawSession && sawWorkerLog && sawWorkerDump
+             && sawWorkerDumpMetadata,
+           "the preview names the manifest, scan results, session, log, dump and build sidecar");
     check (! sawLicence, "and never a licence file, a token or an unrelated document");
+    check (! workerDumpIncluded && workerDumpNote.containsIgnoreCase ("excluded by default"),
+           "a binary memory-bearing dump is visible for review but excluded by default");
     check (sessionNote.contains ("state blobs removed"),
            "and says the state blobs are being removed");
 
@@ -948,12 +1098,19 @@ void testSupportBundle()
     check (names.contains ("support-manifest.json"), "the bundle carries its manifest");
     check (names.contains ("plugin-catalog.json"), "and the scan results");
     check (names.contains ("session-performance.json"), "and the rack manifest");
+    check (names.contains ("logs/live-worker-events.jsonl"),
+           "and the explicitly allowlisted live-worker diagnostic log");
+    check (! names.contains ("crash-dumps/" + workerDump.getFileName()),
+           "a worker minidump never travels without its separate explicit opt-in");
+    check (! names.contains ("crash-dumps/" + workerDumpMetadata.getFileName()),
+           "its build fingerprint stays behind the same explicit dump opt-in");
 
     bool carriesSecrets = false;
     for (const auto& name : names)
         carriesSecrets = carriesSecrets || name.containsIgnoreCase ("licence")
                                         || name.containsIgnoreCase ("token")
-                                        || name.containsIgnoreCase ("Notes");
+                                        || name.containsIgnoreCase ("Notes")
+                                        || name.containsIgnoreCase ("unrelated-worker");
     check (! carriesSecrets, "and nothing that was merely sitting in the same directory");
 
     const auto readEntry = [&archive, &names] (const juce::String& name) -> juce::String
@@ -980,12 +1137,21 @@ void testSupportBundle()
     check (manifestText.contains ("\"stateBlobsIncluded\": false")
              || manifestText.contains ("\"stateBlobsIncluded\":false"),
            "and records that the blobs were left out, so absence is not mistaken for emptiness");
+    check (manifestText.contains ("\"workerMinidumpsIncluded\": false")
+             || manifestText.contains ("\"workerMinidumpsIncluded\":false"),
+           "and records that worker minidumps were left out");
+    const auto workerLogText = readEntry ("logs/live-worker-events.jsonl");
+    check (workerLogText.contains ("worker_exited")
+             && workerLogText.contains ("Fragile Synth")
+             && workerLogText.contains ("exit code 99"),
+           "worker lifecycle diagnostics remain structured and useful inside the bundle");
 
     // Explicitly including them is allowed — §17.7 says "unless explicitly included" — and the
     // bundle then says so about itself.
     const auto full = dir.getChildFile ("bundle-full.zip");
     h.cmd ("exportSupportBundle", { { "path", full.getFullPathName() },
-                                    { "includeStateBlobs", true } });
+                                    { "includeStateBlobs", true },
+                                    { "includeWorkerDumps", true } });
 
     juce::ZipFile fullArchive (full);
     juce::StringArray fullNames;
@@ -1003,6 +1169,48 @@ void testSupportBundle()
 
     check (fullSession.contains ("UFJPUFJJRVRBUlktU09VTkQ="),
            "an explicit choice does include the state blobs");
+
+    const auto fullManifestIndex = fullNames.indexOf ("support-manifest.json");
+    juce::String fullManifest;
+    if (fullManifestIndex >= 0)
+    {
+        std::unique_ptr<juce::InputStream> stream (
+            fullArchive.createStreamForEntry (fullManifestIndex));
+        if (stream != nullptr)
+            fullManifest = stream->readEntireStreamAsString();
+    }
+    check (fullManifest.contains ("\"workerMinidumpsIncluded\": true")
+             || fullManifest.contains ("\"workerMinidumpsIncluded\":true"),
+           "the manifest records the separate explicit minidump consent");
+
+    const auto dumpName = "crash-dumps/" + workerDump.getFileName();
+    const auto dumpIndex = fullNames.indexOf (dumpName);
+    check (dumpIndex >= 0 && ! fullNames.contains ("crash-dumps/private-investigation.dmp"),
+           "dump opt-in carries only an exact fixed slot, never another .dmp in the directory");
+    const auto metadataName = "crash-dumps/" + workerDumpMetadata.getFileName();
+    const auto metadataIndex = fullNames.indexOf (metadataName);
+    check (metadataIndex >= 0
+             && ! fullNames.contains ("crash-dumps/private-investigation.json"),
+           "the matching build sidecar is included, while unrelated JSON remains excluded");
+    if (dumpIndex >= 0)
+    {
+        std::unique_ptr<juce::InputStream> stream (fullArchive.createStreamForEntry (dumpIndex));
+        juce::MemoryBlock extracted;
+        if (stream != nullptr)
+            stream->readIntoMemoryBlock (extracted);
+        check (extracted.getSize() == sizeof (dumpFixture)
+                 && std::memcmp (extracted.getData(), dumpFixture, sizeof (dumpFixture)) == 0,
+               "the explicitly included minidump remains binary-exact in the zip");
+    }
+    if (metadataIndex >= 0)
+    {
+        std::unique_ptr<juce::InputStream> stream (
+            fullArchive.createStreamForEntry (metadataIndex));
+        const auto extracted = stream != nullptr ? stream->readEntireStreamAsString()
+                                                 : juce::String();
+        check (extracted.contains (juce::String::repeatedString ("a", 64)),
+               "the exported sidecar retains the exact worker SHA-256 fingerprint");
+    }
 
     bool stillNoSecrets = true;
     for (const auto& name : fullNames)
@@ -1527,6 +1735,19 @@ void testCtrl49Broker()
     broker.tick();
     check (h.service->surfaceTransport().tempo > tempoBefore,
            "a knob turn reaches the service's surface API");
+
+    // The laptop Stage view follows the physical page and focused encoder rather than
+    // keeping a separate software-only selection.
+    fake.feed (0xB0, 0x0C, 0x01); // encoder 2
+    broker.tick();
+    const auto* surfaceStatus = h.emits.last ("instrumentHostSurface");
+    check (surfaceStatus != nullptr
+             && (int) surfaceStatus->getProperty ("pageIndex", -1) == 0
+             && (int) surfaceStatus->getProperty ("activeSlot", -1) == 1
+             && (int) surfaceStatus->getProperty ("padBank", -1) == 0
+             && (int) surfaceStatus->getProperty ("movingSlot", -1) == 1
+             && (juce::int64) surfaceStatus->getProperty ("movementSeq", 0) >= 2,
+           "surface status exposes the page, active encoder, movement and pad bank for Stage");
 
     // The 10 Hz display refresh: bytes travel when due, and only when something changed.
     fakeNow += 150.0;
@@ -2415,9 +2636,15 @@ void testMidiChainCommands()
 
         // Per-slot options reach that slot and nothing else.
         h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", chordId },
-                                       { "chord", "diatonic" } });
-        check (chainOf (h)[1].getProperty ("fx", {}).getProperty ("chord", {}).toString() == "diatonic",
-               "slot options configure the slot they name");
+                                       { "chord", "diatonic" }, { "chordInversion", 2 },
+                                       { "chordVoicing", "drop 2" },
+                                       { "chordVoiceLeading", true } });
+        const auto chordFx = chainOf (h)[1].getProperty ("fx", {});
+        check (chordFx.getProperty ("chord", {}).toString() == "diatonic"
+                 && (int) chordFx.getProperty ("chordInversion", 0) == 2
+                 && chordFx.getProperty ("chordVoicing", {}).toString() == "drop 2"
+                 && (bool) chordFx.getProperty ("chordVoiceLeading", false),
+               "slot options configure the Smart Chorder fields on the slot they name");
 
         h.cmd ("setMidiSlotBypassed", { { "partId", partId }, { "slotId", chordId },
                                         { "bypassed", true } });
@@ -2425,6 +2652,116 @@ void testMidiChainCommands()
                "a module can be bypassed without losing its settings");
         check (chainOf (h)[1].getProperty ("fx", {}).getProperty ("chord", {}).toString() == "diatonic",
                "which is the difference between bypass and remove");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "strum" } });
+        const auto strumId = chainOf (h)[3].getProperty ("slotId", {}).toString();
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", strumId },
+                                       { "strumBeats", 0.5 }, { "strumPattern", "outside in" },
+                                       { "strumCurve", 0.65 }, { "strumVelocityRamp", -24 } });
+        const auto strumMod = chainOf (h)[3].getProperty ("mod", {});
+        check (strumMod.getProperty ("strumPattern", {}).toString() == "outside in"
+                 && juce::approximatelyEqual ((float) (double) strumMod.getProperty ("strumCurve", 0.0), 0.65f)
+                 && (int) strumMod.getProperty ("strumVelocityRamp", 0) == -24,
+               "the Strummer's stroke, timing feel and dynamic sweep reach its own slot");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "mpe" } });
+        const auto mpeId = chainOf (h)[4].getProperty ("slotId", {}).toString();
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", mpeId },
+                                       { "mpeEnabled", true },
+                                       { "mpeInput", "poly aftertouch" },
+                                       { "mpeOutput", "mpe" }, { "mpeOutputAxis", "timbre" },
+                                       { "mpeOutputChannel", 16 }, { "mpeMemberFirst", 15 },
+                                       { "mpeMemberLast", 1 }, { "mpeCollapse", "highest" } });
+        const auto mpeMod = chainOf (h)[4].getProperty ("mod", {});
+        check ((bool) mpeMod.getProperty ("mpeEnabled", false)
+                 && mpeMod.getProperty ("mpeInput", {}).toString() == "poly aftertouch"
+                 && mpeMod.getProperty ("mpeOutput", {}).toString() == "mpe"
+                 && mpeMod.getProperty ("mpeOutputAxis", {}).toString() == "timbre"
+                 && (int) mpeMod.getProperty ("mpeOutputChannel", 0) == 16
+                 && (int) mpeMod.getProperty ("mpeMemberFirst", 0) == 1
+                 && (int) mpeMod.getProperty ("mpeMemberLast", 0) == 15
+                 && mpeMod.getProperty ("mpeCollapse", {}).toString() == "highest",
+               "the MPE format, expression axis, zone and collapse rule reach their slot");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "velocity" } });
+        const auto velocityId = chainOf (h)[5].getProperty ("slotId", {}).toString();
+        juce::Array<juce::var> velocityCurve { 0, 8, 20, 38, 62, 82, 101, 116, 127 };
+        juce::Array<juce::var> expressionCurve { 0, 32, 48, 62, 74, 86, 98, 112, 127 };
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", velocityId },
+                                       { "responseProfileName", "CTRL49 studio" },
+                                       { "velocityCurve", "custom" },
+                                       { "velocityInputMin", 116 }, { "velocityInputMax", 18 },
+                                       { "velocityOutputMin", 120 }, { "velocityOutputMax", 25 },
+                                       { "velocityCurveValues", velocityCurve },
+                                       { "expressionEnabled", true },
+                                       { "expressionSource", "channel pressure" },
+                                       { "expressionCurve", "soft" },
+                                       { "expressionInputMin", 110 }, { "expressionInputMax", 4 },
+                                       { "expressionOutputMin", 118 }, { "expressionOutputMax", 10 },
+                                       { "expressionCurveValues", expressionCurve } });
+        const auto velocityFx = chainOf (h)[5].getProperty ("fx", {});
+        check (velocityFx.getProperty ("responseProfileName", {}).toString() == "CTRL49 studio"
+                 && velocityFx.getProperty ("velocityCurve", {}).toString() == "custom"
+                 && (int) velocityFx.getProperty ("velocityInputMin", 0) == 18
+                 && (int) velocityFx.getProperty ("velocityInputMax", 0) == 116
+                 && (int) velocityFx.getProperty ("velocityOutputMin", 0) == 25
+                 && (int) velocityFx.getProperty ("velocityOutputMax", 0) == 120
+                 && velocityFx.getProperty ("velocityCurveValues", {}).size() == 9
+                 && (bool) velocityFx.getProperty ("expressionEnabled", false)
+                 && velocityFx.getProperty ("expressionSource", {}).toString() == "channel pressure"
+                 && velocityFx.getProperty ("expressionCurve", {}).toString() == "soft"
+                 && (int) velocityFx.getProperty ("expressionInputMin", 0) == 4
+                 && (int) velocityFx.getProperty ("expressionInputMax", 0) == 110
+                 && (int) velocityFx.getProperty ("expressionOutputMin", 0) == 10
+                 && (int) velocityFx.getProperty ("expressionOutputMax", 0) == 118,
+               "the named device calibration, curves and expression source reach their slot");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "humanize" } });
+        const auto humanizeId = chainOf (h)[6].getProperty ("slotId", {}).toString();
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", humanizeId },
+                                       { "humanizeTimingBeats", 0.03 },
+                                       { "humanizeVelocity", 18 },
+                                       { "humanizeGatePercent", 35 },
+                                       { "humanizePreserveChords", true },
+                                       { "humanizeProtectBeats", true } });
+        const auto humanizeMod = chainOf (h)[6].getProperty ("mod", {});
+        check (juce::approximatelyEqual ((double) humanizeMod.getProperty ("humanizeTimingBeats", 0.0), 0.03)
+                 && (int) humanizeMod.getProperty ("humanizeVelocity", 0) == 18
+                 && (int) humanizeMod.getProperty ("humanizeGatePercent", 0) == 35
+                 && (bool) humanizeMod.getProperty ("humanizePreserveChords", false)
+                 && (bool) humanizeMod.getProperty ("humanizeProtectBeats", false),
+               "the Humanizer's gate and musical constraints reach its own slot");
+
+        h.cmd ("addMidiSlot", { { "partId", partId }, { "type", "articulation" } });
+        const auto articulationId = chainOf (h)[7].getProperty ("slotId", {}).toString();
+        auto* spiccato = new juce::DynamicObject();
+        spiccato->setProperty ("articulationId", "spiccato");
+        spiccato->setProperty ("name", "Spiccato");
+        spiccato->setProperty ("triggerNote", 200);
+        spiccato->setProperty ("triggerChannel", 2);
+        spiccato->setProperty ("type", "program change");
+        spiccato->setProperty ("outputChannel", 5);
+        spiccato->setProperty ("program", 16);
+        spiccato->setProperty ("bankMsb", 3);
+        spiccato->setProperty ("bankLsb", 9);
+        juce::Array<juce::var> articulationMap { juce::var (spiccato) };
+        h.cmd ("setMidiSlotOptions", { { "partId", partId }, { "slotId", articulationId },
+                                       { "articulationEnabled", true },
+                                       { "articulationMapName", "Solo strings" },
+                                       { "articulations", articulationMap } });
+        const auto articulationMod = chainOf (h)[7].getProperty ("mod", {});
+        const auto savedMap = articulationMod.getProperty ("articulations", {});
+        check ((bool) articulationMod.getProperty ("articulationEnabled", false)
+                 && articulationMod.getProperty ("articulationMapName", {}).toString() == "Solo strings"
+                 && savedMap.size() == 1
+                 && savedMap[0].getProperty ("name", {}).toString() == "Spiccato"
+                 && (int) savedMap[0].getProperty ("triggerNote", 0) == 127
+                 && savedMap[0].getProperty ("type", {}).toString() == "program change"
+                 && (int) savedMap[0].getProperty ("outputChannel", 0) == 5
+                 && (int) savedMap[0].getProperty ("program", 0) == 16
+                 && (int) savedMap[0].getProperty ("bankMsb", -1) == 3
+                 && (int) savedMap[0].getProperty ("bankLsb", -1) == 9,
+               "the named articulation map and bank/program action reach their control stage");
 
         // Several of a kind, up to the cap, and the cap refuses aloud.
         for (int i = 0; i < 8; ++i)
@@ -3048,11 +3385,18 @@ void testEffectsAndMacros()
     h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partId }, { "parameterId", "cutoff" } });
     h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partB }, { "parameterId", "cutoff" } });
     h.cmd ("setMacroTargetOptions", { { "macroId", macroId }, { "targetId", partB },
-                                      { "parameterId", "cutoff" }, { "inverted", true } });
+                                      { "parameterId", "cutoff" }, { "rangeMin", 0.8 },
+                                      { "rangeMax", 0.2 }, { "inverted", true } });
+
+    const auto configuredMacro = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0];
+    const auto configuredTarget = configuredMacro.getProperty ("targets", {})[1];
+    check (juce::approximatelyEqual ((float) configuredTarget.getProperty ("rangeMin", 0.0), 0.2f)
+             && juce::approximatelyEqual ((float) configuredTarget.getProperty ("rangeMax", 0.0), 0.8f),
+           "macro target bounds stay ordered; inversion remains an explicit option");
 
     h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.25 }, { "final", true } });
     check (juce::approximatelyEqual (synth->cutoff->get(), 0.25f)
-             && juce::approximatelyEqual (synthB->cutoff->get(), 0.75f),
+             && juce::approximatelyEqual (synthB->cutoff->get(), 0.65f),
            "one macro moves several instances, each through its own mapping");
 
     h.cmd ("loadInstrument", { { "partId", partB }, { "ceId", "VST3-other-synth" } });
@@ -3066,6 +3410,383 @@ void testEffectsAndMacros()
     check (juce::approximatelyEqual (synth->cutoff->get(), 1.0f)
              && juce::approximatelyEqual (otherB->cutoff->get(), before),
            "the macro keeps driving resolved targets and skips the unresolved one");
+}
+
+void testModulationMatrix()
+{
+    std::cout << "\nmodulation matrix" << std::endl;
+
+    const auto dir = freshDataDir ("modulation-matrix");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* synth = h.lastStub;
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "cutoff" }, { "value", 0.4 } });
+
+    h.cmd ("addMacro", { { "name", "Motion A" } });
+    h.cmd ("addMacro", { { "name", "Motion B" } });
+    auto macros = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {});
+    const auto macroA = macros[0].getProperty ("macroId", {}).toString();
+    const auto macroB = macros[1].getProperty ("macroId", {}).toString();
+
+    h.cmd ("addModulationRoute", { { "sourceType", "macro" }, { "sourceId", macroA },
+                                    { "targetId", partId }, { "parameterId", "cutoff" },
+                                    { "amount", 0.5 } });
+    auto routes = h.emits.lastState()->getProperty ("rack", {}).getProperty ("modulationRoutes", {});
+    const auto routeA = routes[0].getProperty ("routeId", {}).toString();
+    check (routes.size() == 1 && (bool) routes[0].getProperty ("resolved", false)
+             && juce::approximatelyEqual ((float) (double) routes[0].getProperty ("baseValue", 0.0), 0.4f),
+           "a route captures the unmodulated destination base and resolves by class identity");
+
+    h.cmd ("setMacroValue", { { "macroId", macroA }, { "value", 0.6 }, { "final", true } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.7f,
+                                     juce::absoluteTolerance (0.011f)),
+           "a macro source adds its bipolar depth to the destination base");
+
+    h.cmd ("addModulationRoute", { { "sourceType", "macro" }, { "sourceId", macroB },
+                                    { "targetId", partId }, { "parameterId", "cutoff" },
+                                    { "amount", -0.2 } });
+    routes = h.emits.lastState()->getProperty ("rack", {}).getProperty ("modulationRoutes", {});
+    const auto routeB = routes[1].getProperty ("routeId", {}).toString();
+    h.cmd ("setMacroValue", { { "macroId", macroB }, { "value", 0.5 }, { "final", true } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.6f,
+                                     juce::absoluteTolerance (0.011f)),
+           "several routes to one destination sum rather than overwrite each other");
+
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "cutoff" }, { "value", 0.2 } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.4f,
+                                     juce::absoluteTolerance (0.011f)),
+           "a normal parameter move changes the base while modulation remains on top");
+
+    h.cmd ("setModulationRoute", { { "routeId", routeB }, { "enabled", false } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.5f,
+                                     juce::absoluteTolerance (0.011f)),
+           "disabling a route removes only its contribution");
+    h.cmd ("removeModulationRoute", { { "routeId", routeA } });
+    check (juce::approximatelyEqual (synth->cutoff->get(), 0.2f,
+                                     juce::absoluteTolerance (0.011f)),
+           "removing the last active contribution restores the remembered base");
+    h.cmd ("removeModulationRoute", { { "routeId", routeB } });
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("modulationRoutes", {}).size() == 0
+             && juce::approximatelyEqual (synth->cutoff->get(), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "unplugging the final cable leaves the destination exactly where the player set it");
+}
+
+void testMidiLfos()
+{
+    std::cout << "\nMIDI LFOs" << std::endl;
+
+    const auto dir = freshDataDir ("midi-lfos");
+    seedTwoSynthCatalog (dir);
+    std::vector<juce::MidiMessage> captured;
+    const auto tweak = [&captured] (InstrumentHostService::Options& options)
+    {
+        options.listMidiOutputs = []
+        {
+            juce::StringPairArray outputs;
+            outputs.set ("lfo-port", "LFO Synth");
+            return outputs;
+        };
+        options.openMidiOutput = [&captured] (const juce::String& deviceId, juce::String& errorOut)
+            -> ceditor::host::MidiSendProcessor::Sink
+        {
+            if (deviceId != "lfo-port")
+            {
+                errorOut = "No such MIDI output.";
+                return {};
+            }
+            return [&captured] (const juce::MidiBuffer& messages)
+            {
+                for (const auto metadata : messages)
+                    captured.push_back (metadata.getMessage());
+            };
+        };
+    };
+
+    Harness h (dir, {}, tweak);
+    h.cmd ("getState");
+    h.cmd ("addMacro", { { "name", "LFO Target" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.2 }, { "final", true } });
+
+    h.cmd ("addMidiLfo", { { "name", "Pulse" } });
+    auto lfos = h.emits.lastState()->getProperty ("rack", {}).getProperty ("midiLfos", {});
+    const auto lfoId = lfos[0].getProperty ("lfoId", {}).toString();
+    check (lfos.size() == 1 && lfoId.isNotEmpty()
+             && lfos[0].getProperty ("shape", {}).toString() == "sine",
+           "an LFO is persistent state with a stable identity and ordinary defaults");
+
+    h.cmd ("setMidiLfo", { { "lfoId", lfoId }, { "shape", "square" },
+                             { "sync", false }, { "rateHz", 0.01 },
+                             { "phaseOffset", 0.75 }, { "minimum", 0.0 }, { "maximum", 1.0 } });
+    h.cmd ("addModulationRoute", { { "sourceType", "lfo" }, { "sourceId", lfoId },
+                                    { "targetId", macroId }, { "parameterId", "@macro" },
+                                    { "amount", 0.5 } });
+    auto macros = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {});
+    check (juce::approximatelyEqual ((float) (double) macros[0].getProperty ("value", 0.0), 0.7f,
+                                     juce::absoluteTolerance (0.011f)),
+           "an LFO can drive a macro through the same additive matrix path as plug-in parameters");
+
+    h.cmd ("setMidiLfo", { { "lfoId", lfoId }, { "enabled", false } });
+    macros = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {});
+    check (juce::approximatelyEqual ((float) (double) macros[0].getProperty ("value", 0.0), 0.2f,
+                                     juce::absoluteTolerance (0.011f)),
+           "disabling the generator restores the destination base");
+    h.cmd ("setMidiLfo", { { "lfoId", lfoId }, { "enabled", true } });
+
+    h.cmd ("addPart");
+    const auto hardwareId = h.firstPartId();
+    h.cmd ("setHardwareConfig", { { "partId", hardwareId }, { "midiOutputId", "lfo-port" },
+                                   { "midiOutputName", "LFO Synth" }, { "midiOutChannel", 5 } });
+    captured.clear();
+    h.cmd ("addMidiLfoOutput", { { "lfoId", lfoId }, { "type", "cc" },
+                                  { "targetPartId", hardwareId }, { "channel", 5 }, { "number", 74 } });
+    lfos = h.emits.lastState()->getProperty ("rack", {}).getProperty ("midiLfos", {});
+    const auto outputId = lfos[0].getProperty ("outputs", {})[0]
+                              .getProperty ("outputId", {}).toString();
+    check (! (bool) lfos[0].getProperty ("outputs", {})[0].getProperty ("enabled", true)
+             && captured.empty(),
+           "a hardware stream is born muted and sends nothing until explicitly enabled");
+
+    h.cmd ("setMidiLfoOutput", { { "lfoId", lfoId }, { "outputId", outputId },
+                                  { "enabled", true } });
+    h.service->drainParameterEvents();
+    check (captured.size() == 1 && captured[0].isController()
+             && captured[0].getChannel() == 5 && captured[0].getControllerNumber() == 74
+             && captured[0].getControllerValue() == 127,
+           "a CC output reaches the chosen hardware part and channel");
+
+    captured.clear();
+    h.cmd ("setMidiLfoOutput", { { "lfoId", lfoId }, { "outputId", outputId },
+                                  { "type", "nrpn" }, { "number", 1400 } });
+    h.service->drainParameterEvents();
+    check (captured.size() == 4
+             && captured[0].getControllerNumber() == 99
+             && captured[1].getControllerNumber() == 98
+             && captured[2].getControllerNumber() == 6
+             && captured[3].getControllerNumber() == 38,
+           "an NRPN output sends the standard selector and 14-bit data sequence");
+
+    captured.clear();
+    h.cmd ("setMidiLfoOutput", { { "lfoId", lfoId }, { "outputId", outputId },
+                                  { "type", "sysex" },
+                                  { "sysexTemplate", "F0 7D {value7} F7" } });
+    h.service->drainParameterEvents();
+    check (captured.size() == 1 && captured[0].isSysEx()
+             && captured[0].getSysExDataSize() == 2
+             && captured[0].getSysExData()[0] == 0x7d
+             && captured[0].getSysExData()[1] == 0x7f,
+           "a bounded SysEx template substitutes the live value byte");
+
+    h.cmd ("removeMidiLfo", { { "lfoId", lfoId } });
+    const auto rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("midiLfos", {}).size() == 0
+             && ! (bool) rack.getProperty ("modulationRoutes", {})[0].getProperty ("resolved", true)
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "removing an LFO leaves its cable visible but unresolved and restores the base");
+}
+
+void testEnvelopeGenerators()
+{
+    std::cout << "\nexternal envelope generators" << std::endl;
+
+    const auto dir = freshDataDir ("envelope-generators");
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addMacro", { { "name", "Envelope Target" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.2 }, { "final", true } });
+
+    h.cmd ("addEnvelope", { { "name", "Filter Pluck" } });
+    auto envelopes = h.emits.lastState()->getProperty ("rack", {}).getProperty ("envelopes", {});
+    const auto envelopeId = envelopes[0].getProperty ("envelopeId", {}).toString();
+    check (envelopes.size() == 1 && envelopeId.isNotEmpty()
+             && envelopes[0].getProperty ("stage", {}).toString() == "idle",
+           "an envelope is persistent state with a stable identity and an idle runtime");
+
+    h.cmd ("setEnvelope", { { "envelopeId", envelopeId },
+                              { "channel", 2 }, { "noteLow", 48 }, { "noteHigh", 84 },
+                              { "attackMs", 0.0 }, { "decayMs", 0.0 },
+                              { "sustain", 0.6 }, { "releaseMs", 0.0 },
+                              { "velocityAmount", 1.0 } });
+    h.cmd ("addModulationRoute", { { "sourceType", "envelope" },
+                                     { "sourceId", envelopeId },
+                                     { "targetId", macroId }, { "parameterId", "@macro" },
+                                     { "amount", 0.5 } });
+    h.cmd ("triggerEnvelope", { { "envelopeId", envelopeId },
+                                  { "gate", true }, { "velocity", 0.8 } });
+    auto rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("envelopes", {})[0].getProperty ("stage", {}).toString() == "sustain"
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("envelopes", {})[0]
+                                                   .getProperty ("value", 0.0), 0.48f,
+                                          juce::absoluteTolerance (0.011f))
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.44f,
+                                          juce::absoluteTolerance (0.011f)),
+           "velocity scales the ADSR peak and the matrix adds its sustain level to a macro base");
+
+    h.cmd ("triggerEnvelope", { { "envelopeId", envelopeId }, { "gate", false } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("envelopes", {})[0].getProperty ("stage", {}).toString() == "idle"
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "note release completes the release stage and restores the destination base");
+
+    h.cmd ("setEnvelope", { { "envelopeId", envelopeId }, { "enabled", false } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("envelopes", {})[0].getProperty ("stage", {}).toString() == "idle"
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "disabling an envelope silences it without deleting its route");
+
+    h.cmd ("removeEnvelope", { { "envelopeId", envelopeId } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("envelopes", {}).size() == 0
+             && ! (bool) rack.getProperty ("modulationRoutes", {})[0].getProperty ("resolved", true)
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "removing an envelope leaves its cable repairable and restores the macro base");
+}
+
+void testMsegDesigner()
+{
+    std::cout << "\nMSEG designer" << std::endl;
+
+    Harness h (freshDataDir ("mseg-designer"));
+    h.cmd ("getState");
+    h.cmd ("addMacro", { { "name", "MSEG Target" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.2 }, { "final", true } });
+
+    h.cmd ("addMseg", { { "name", "Motion" } });
+    auto msegs = h.emits.lastState()->getProperty ("rack", {}).getProperty ("msegs", {});
+    const auto msegId = msegs[0].getProperty ("msegId", {}).toString();
+    check (msegs.size() == 1 && msegId.isNotEmpty()
+             && msegs[0].getProperty ("points", {}).size() == 5,
+           "a new MSEG has stable identity and an editable five-point starter curve");
+
+    const auto makePoint = [] (const juce::String& id, float position, float value, float curve)
+    {
+        auto* point = new juce::DynamicObject();
+        point->setProperty ("pointId", id);
+        point->setProperty ("position", position);
+        point->setProperty ("value", value);
+        point->setProperty ("curve", curve);
+        return juce::var (point);
+    };
+    juce::Array<juce::var> points;
+    points.add (makePoint ("start", 0.0f, 0.0f, 0.0f));
+    points.add (makePoint ("end", 1.0f, 1.0f, 1.0f));
+    h.cmd ("setMseg", { { "msegId", msegId }, { "sync", false }, { "rateHz", 0.01 },
+                          { "phaseOffset", 0.5 }, { "points", juce::var (points) } });
+    h.cmd ("resetMseg", { { "msegId", msegId } });
+    h.cmd ("addModulationRoute", { { "sourceType", "mseg" }, { "sourceId", msegId },
+                                     { "targetId", macroId }, { "parameterId", "@macro" },
+                                     { "amount", 0.5 } });
+    auto rack = h.emits.lastState()->getProperty ("rack", {});
+    const auto value = (float) (double) rack.getProperty ("msegs", {})[0]
+                                           .getProperty ("value", 0.0);
+    check (juce::approximatelyEqual (value, 0.0625f, juce::absoluteTolerance (0.012f))
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.23125f,
+                                          juce::absoluteTolerance (0.012f)),
+           "per-segment curvature is evaluated at the live phase and routes to a macro");
+
+    h.cmd ("setMseg", { { "msegId", msegId }, { "enabled", false } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                     juce::absoluteTolerance (0.011f)),
+           "disabling an MSEG restores the destination base");
+
+    h.cmd ("removeMseg", { { "msegId", msegId } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("msegs", {}).size() == 0
+             && ! (bool) rack.getProperty ("modulationRoutes", {})[0].getProperty ("resolved", true)
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "removing an MSEG leaves its cable visible and unresolved without moving the base");
+}
+
+void testRandomProbabilityModulators()
+{
+    std::cout << "\nrandom/probability modulators" << std::endl;
+
+    Harness h (freshDataDir ("random-modulators"));
+    h.cmd ("getState");
+    h.cmd ("addMacro", { { "name", "Random Target" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.2 }, { "final", true } });
+
+    h.cmd ("addRandomModulator", { { "name", "Repeatable Drift" } });
+    auto randoms = h.emits.lastState()->getProperty ("rack", {})
+                         .getProperty ("randomModulators", {});
+    const auto randomId = randoms[0].getProperty ("randomId", {}).toString();
+    check (randoms.size() == 1 && randomId.isNotEmpty()
+             && randoms[0].getProperty ("mode", {}).toString() == "sampleHold",
+           "a new random modulator has stable identity and a safe sample-and-hold default");
+
+    h.cmd ("setRandomModulator", { { "randomId", randomId }, { "mode", "randomWalk" },
+                                      { "sync", false }, { "rateHz", 0.01 }, { "seed", 424242 },
+                                      { "probability", 1.0 }, { "stepSize", 0.3 },
+                                      { "minimum", 0.1 }, { "maximum", 0.9 } });
+    auto rack = h.emits.lastState()->getProperty ("rack", {});
+    const auto firstValue = (float) (double) rack.getProperty ("randomModulators", {})[0]
+                                                .getProperty ("value", 0.0);
+    h.cmd ("resetRandomModulator", { { "randomId", randomId } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    const auto resetValue = (float) (double) rack.getProperty ("randomModulators", {})[0]
+                                                .getProperty ("value", 0.0);
+    check (firstValue >= 0.1f && firstValue <= 0.9f
+             && juce::approximatelyEqual (firstValue, resetValue,
+                                           juce::absoluteTolerance (0.0001f)),
+           "a saved seed makes the bounded walk reproduce exactly after restart");
+
+    h.cmd ("setRandomModulator", { { "randomId", randomId }, { "mode", "sampleHold" },
+                                      { "probability", 0.0 }, { "minimum", 0.1 },
+                                      { "maximum", 0.9 } });
+    h.cmd ("addModulationRoute", { { "sourceType", "random" }, { "sourceId", randomId },
+                                      { "targetId", macroId }, { "parameterId", "@macro" },
+                                      { "amount", 0.5 } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (juce::approximatelyEqual ((float) (double) rack.getProperty ("randomModulators", {})[0]
+                                                   .getProperty ("value", 0.0), 0.5f,
+                                     juce::absoluteTolerance (0.001f))
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.45f,
+                                          juce::absoluteTolerance (0.011f)),
+           "zero probability holds the neutral value and still routes through the matrix");
+
+    h.cmd ("setRandomModulator", { { "randomId", randomId }, { "enabled", false } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                     juce::absoluteTolerance (0.011f)),
+           "disabling a random modulator restores the destination base");
+
+    h.cmd ("removeRandomModulator", { { "randomId", randomId } });
+    rack = h.emits.lastState()->getProperty ("rack", {});
+    check (rack.getProperty ("randomModulators", {}).size() == 0
+             && ! (bool) rack.getProperty ("modulationRoutes", {})[0]
+                              .getProperty ("resolved", true)
+             && juce::approximatelyEqual ((float) (double) rack.getProperty ("macros", {})[0]
+                                                   .getProperty ("value", 0.0), 0.2f,
+                                          juce::absoluteTolerance (0.011f)),
+           "removing a random source leaves its cable repairable and its base intact");
 }
 
 // The enriched Performance round trip: chains, bypass flags, effect state and macros come
@@ -3894,6 +4615,81 @@ void testMidiSourceCommands()
     }
 }
 
+void testLayerGroupCommands()
+{
+    std::cout << "\nlayer group commands" << std::endl;
+
+    const auto dir = freshDataDir ("layer-groups");
+    seedTwoSynthCatalog (dir);
+    juce::String groupId, a, b;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        h.cmd ("addPart");
+        a = h.partIdAt (0);
+        b = h.partIdAt (1);
+        h.cmd ("addLayerGroup", { { "name", "Orchestra" } });
+
+        auto groups = h.emits.lastState()->getProperty ("rack", {})
+                          .getProperty ("layerGroups", {});
+        check (groups.size() == 1 && groups[0].getProperty ("members", {}).size() == 2,
+               "a layer group claims two available keyboard parts and projects them");
+        groupId = groups[0].getProperty ("layerGroupId", {}).toString();
+        check (groups[0].getProperty ("name", {}).toString() == "Orchestra"
+                 && groups[0].getProperty ("allocation", {}).toString() == "all",
+               "the group starts as an all-voices dynamic layer");
+
+        h.cmd ("setLayerGroup", { { "layerGroupId", groupId },
+                                   { "allocation", "roundRobin" }, { "source", "key" } });
+        h.cmd ("setLayerMember", { { "layerGroupId", groupId }, { "partId", a },
+                                    { "minimum", 0.1 }, { "maximum", 0.55 },
+                                    { "crossfade", 0.08 } });
+        groups = h.emits.lastState()->getProperty ("rack", {}).getProperty ("layerGroups", {});
+        check (groups[0].getProperty ("allocation", {}).toString() == "roundRobin"
+                 && groups[0].getProperty ("source", {}).toString() == "key"
+                 && juce::approximatelyEqual (
+                      (float) (double) groups[0].getProperty ("members", {})[0]
+                          .getProperty ("crossfade", 0.0), 0.08f),
+               "allocation, source and member crossfade edits return in state");
+
+        h.cmd ("addMacro", { { "name", "Blend" } });
+        const auto macroId = h.emits.lastState()->getProperty ("rack", {})
+                                 .getProperty ("macros", {})[0]
+                                 .getProperty ("macroId", {}).toString();
+        h.cmd ("setLayerGroup", { { "layerGroupId", groupId }, { "source", "macro" },
+                                   { "macroId", macroId } });
+        groups = h.emits.lastState()->getProperty ("rack", {}).getProperty ("layerGroups", {});
+        check (groups[0].getProperty ("source", {}).toString() == "macro"
+                 && groups[0].getProperty ("macroId", {}).toString() == macroId,
+               "a layer can use a rack macro as a continuous audio crossfade");
+        h.cmd ("removeMacro", { { "macroId", macroId } });
+        groups = h.emits.lastState()->getProperty ("rack", {}).getProperty ("layerGroups", {});
+        check (groups[0].getProperty ("source", {}).toString() == "velocity",
+               "removing its macro returns a group to a safe velocity source");
+
+        h.emits.clear();
+        h.cmd ("setPartMidiSource", { { "partId", b }, { "sourcePartId", a } });
+        check (h.emits.lastError().contains ("Remove that part from its layer"),
+               "a grouped member cannot simultaneously take another part as its MIDI source");
+    }
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        const auto groups = h.emits.lastState()->getProperty ("rack", {})
+                                .getProperty ("layerGroups", {});
+        check (groups.size() == 1 && groups[0].getProperty ("layerGroupId", {}).toString() == groupId
+                 && groups[0].getProperty ("members", {}).size() == 2,
+               "layer groups and their member identities survive the process");
+
+        h.cmd ("removeLayerMember", { { "layerGroupId", groupId }, { "partId", a } });
+        check (h.emits.lastState()->getProperty ("rack", {})
+                   .getProperty ("layerGroups", {}).size() == 0,
+               "removing down to one member dissolves the meaningless group");
+    }
+}
+
 // Patch compare: where two dumps of the same synth differ, without reading either.
 void testPatchCompare()
 {
@@ -4511,6 +5307,17 @@ void testPerformanceSystem()
                  && std::abs ((double) transport.getProperty ("tempo", 0.0) - 120.0) < 1.0e-9,
                "the transport reports itself, stopped and at tempo");
 
+        h.cmd ("setPresetAudition", { { "enabled", true }, { "phrase", "riff" },
+                                       { "rootNote", 48 }, { "velocity", 88 },
+                                       { "noteLengthMs", 240 }, { "gapMs", 60 } });
+        const auto audition = h.emits.lastState()->getProperty ("rack", {})
+                                  .getProperty ("presetAudition", {});
+        check ((bool) audition.getProperty ("enabled", false)
+                 && audition.getProperty ("phrase", {}).toString() == "riff"
+                 && (int) audition.getProperty ("rootNote", -1) == 48
+                 && (int) audition.getProperty ("noteLengthMs", -1) == 240,
+               "the preset audition phrase is configurable native state");
+
         // -- a pattern that reaches a real instrument --------------------------------------
         h.cmd ("addPattern", { { "name", "Riff" } });
         const auto patterns = h.emits.lastState()->getProperty ("performance", {})
@@ -4527,13 +5334,84 @@ void testPerformanceSystem()
                                 { "index", i }, { "active", true },
                                 { "note", 60 + i }, { "velocity", 100 } });
 
+        const auto grooves = h.emits.lastState()->getProperty ("performance", {})
+                                 .getProperty ("grooves", {});
+        check (grooves.size() >= 3
+                 && grooves[0].getProperty ("source", {}).toString() == "factory",
+               "the reusable factory grooves are visible to the pattern editor");
+        h.cmd ("applyGrooveTemplate", { { "patternId", patternId },
+                                         { "grooveId", "@hostage-mpc62" },
+                                         { "amount", 0.5 }, { "applyVelocity", true } });
+        auto groovedPattern = h.emits.lastState()->getProperty ("performance", {})
+                                  .getProperty ("patterns", {})[0];
+        const auto groovedSteps = groovedPattern.getProperty ("lanes", {})[0]
+                                      .getProperty ("steps", {});
+        check (std::abs ((double) groovedSteps[1].getProperty ("microtiming", 0.0) - 0.12) < 1.0e-6
+                 && (int) groovedSteps[0].getProperty ("velocity", 0) == 105
+                 && groovedPattern.getProperty ("appliedGrooveId", {}).toString()
+                      == "@hostage-mpc62",
+               "applying a groove commits scaled timing and velocity accents to real steps");
+
+        juce::Array<juce::var> importedTiming { 0.0, 0.1, -0.05, 0.15 };
+        juce::Array<juce::var> importedVelocity { 1.1, 0.9, 1.0, 0.85 };
+        h.cmd ("importGrooveTemplate", { { "name", "My pocket" }, { "stepsPerBeat", 4 },
+                                          { "timingOffsets", importedTiming },
+                                          { "velocityMultipliers", importedVelocity } });
+        const auto importedGrooves = h.emits.lastState()->getProperty ("performance", {})
+                                         .getProperty ("grooves", {});
+        check (importedGrooves.size() == grooves.size() + 1
+                 && importedGrooves[importedGrooves.size() - 1]
+                      .getProperty ("name", {}).toString() == "My pocket",
+               "an imported JSON-style groove becomes a reusable saved template");
+
+        h.cmd ("createPatternVariations", { { "patternId", patternId }, { "amount", 0.85 } });
+        auto variations = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("patterns", {});
+        juce::String groupId;
+        juce::StringArray labels, generatedIds;
+        for (int i = 0; i < variations.size(); ++i)
+        {
+            labels.add (variations[i].getProperty ("variationLabel", {}).toString());
+            generatedIds.add (variations[i].getProperty ("patternId", {}).toString());
+            if (i == 0)
+                groupId = variations[i].getProperty ("variationGroupId", {}).toString();
+        }
+        check (variations.size() == 4 && labels.contains ("A") && labels.contains ("B")
+                 && labels.contains ("C") && labels.contains ("D") && groupId.isNotEmpty(),
+               "one authored pattern creates a labelled A/B/C/D variation family");
+
+        const auto cIndex = labels.indexOf ("C");
+        h.cmd ("createPatternVariations",
+               { { "patternId", generatedIds[cIndex] }, { "amount", 0.25 } });
+        variations = h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("patterns", {});
+        bool idsSurvivedRegeneration = variations.size() == 4;
+        for (int i = 0; i < variations.size(); ++i)
+            idsSurvivedRegeneration = idsSurvivedRegeneration
+                                      && generatedIds.contains (
+                                           variations[i].getProperty ("patternId", {}).toString());
+        check (idsSurvivedRegeneration,
+               "regenerating from a selected variation preserves every pattern id");
+
         h.cmd ("addClip", { { "patternId", patternId } });
         const auto clips = h.emits.lastState()->getProperty ("performance", {})
                                .getProperty ("clips", {});
-        check (clips.size() == 1, "a clip references the pattern");
+        const auto dPatternId = generatedIds[labels.indexOf ("D")];
+        check (clips.size() == 1 && clips[0].getProperty ("fillPatternId", {}).toString() == dPatternId,
+               "a clip references A and automatically offers its related D as a held fill");
         clipId = clips[0].getProperty ("clipId", {}).toString();
 
-        h.cmd ("setClipOptions", { { "clipId", clipId }, { "launchQuantize", "immediate" } });
+        h.cmd ("setClipOptions", { { "clipId", clipId }, { "launchQuantize", "immediate" },
+                                   { "fillQuantize", "immediate" }, { "fillCc", 80 },
+                                   { "fillChannel", 2 }, { "followAction", "next" },
+                                   { "followAfterLoops", 4 } });
+        const auto configuredClip = h.emits.lastState()->getProperty ("performance", {})
+                                      .getProperty ("clips", {})[0];
+        check (configuredClip.getProperty ("followAction", {}).toString() == "next"
+                 && (int) configuredClip.getProperty ("followAfterLoops", 0) == 4,
+               "clip options expose a Next follow action after a chosen loop count");
+        h.cmd ("setClipOptions", { { "clipId", clipId }, { "followAction", "none" },
+                                   { "followAfterLoops", 0 } });
         h.cmd ("transportPlay");
         h.cmd ("launchClip", { { "clipId", clipId } });
 
@@ -4564,6 +5442,36 @@ void testPerformanceSystem()
                                  .getProperty ("clips", {})[0];
         juce::ignoreUnused (clipRow);
         check (h.service->getEngine().isClipActive (0), "and the clip is running");
+
+        h.cmd ("setPerformanceFill", { { "clipId", clipId }, { "active", true } });
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, midi);
+        h.service->drainParameterEvents();
+        check ((bool) h.emits.lastState()->getProperty ("performance", {})
+                        .getProperty ("clips", {})[0].getProperty ("fillActive", false),
+               "holding the on-screen Fill control substitutes D in the running clip");
+        h.cmd ("setPerformanceFill", { { "clipId", clipId }, { "active", false } });
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, midi);
+        h.service->drainParameterEvents();
+        check (! (bool) h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("clips", {})[0].getProperty ("fillActive", true),
+               "releasing the control returns the clip to A");
+
+        h.service->noteMidiActivity ("Pedal", juce::MidiMessage::controllerEvent (2, 80, 127));
+        h.service->drainParameterEvents();
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, midi);
+        h.service->drainParameterEvents();
+        check (h.service->getEngine().isClipFillActive (0),
+               "an assigned MIDI pedal press reaches the same held-fill path");
+        h.service->noteMidiActivity ("Pedal", juce::MidiMessage::controllerEvent (2, 80, 0));
+        h.service->drainParameterEvents();
+        buffer.clear();
+        h.service->getGraph().processBlock (buffer, midi);
+        h.service->drainParameterEvents();
+        check (! h.service->getEngine().isClipFillActive (0),
+               "and pedal release always returns to the source pattern");
 
         // -- automation on a Stage 2 address ------------------------------------------------
         h.cmd ("addLane", { { "patternId", patternId }, { "type", "parameter" } });
@@ -4597,6 +5505,84 @@ void testPerformanceSystem()
                    .getProperty ("patterns", {})[0].getProperty ("lanes", {})[1]
                    .getProperty ("resolved", false),
                "and resolves again when the original class comes back");
+
+        // -- parameter locks: per-step values without another visible lane ------------------
+        h.cmd ("setStepParameterLock", { { "patternId", patternId }, { "laneId", laneId },
+                                          { "index", 2 }, { "targetId", partA },
+                                          { "parameterId", "cutoff" }, { "value", 0.72 } });
+        h.cmd ("setStepCcLock", { { "patternId", patternId }, { "laneId", laneId },
+                                   { "index", 2 }, { "targetPartId", partA },
+                                   { "channel", 2 }, { "ccNumber", 74 }, { "value", 0.5 } });
+
+        auto lockedLanes = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("patterns", {})[0].getProperty ("lanes", {});
+        int lockCount = 0;
+        bool sawParameterLock = false, sawCcLock = false;
+        juce::String parameterLockId;
+        for (int laneIndex = 0; laneIndex < lockedLanes.size(); ++laneIndex)
+        {
+            const auto lockLane = lockedLanes[laneIndex];
+            if (lockLane.getProperty ("lockSourceLaneId", {}).toString() != laneId)
+                continue;
+            ++lockCount;
+            const auto lockStep = lockLane.getProperty ("steps", {})[2];
+            if (lockLane.getProperty ("type", {}).toString() == "parameter")
+            {
+                parameterLockId = lockLane.getProperty ("laneId", {}).toString();
+                sawParameterLock = lockLane.getProperty ("parameterId", {}).toString() == "cutoff"
+                                   && (bool) lockStep.getProperty ("active", false)
+                                   && std::abs ((double) lockStep.getProperty ("value", 0.0)
+                                               - 0.72) < 0.01;
+            }
+            else if (lockLane.getProperty ("type", {}).toString() == "cc")
+            {
+                sawCcLock = (int) lockLane.getProperty ("channel", 0) == 2
+                            && (int) lockLane.getProperty ("ccNumber", -1) == 74
+                            && (bool) lockStep.getProperty ("active", false)
+                            && std::abs ((double) lockStep.getProperty ("value", 0.0)
+                                        - 0.5) < 0.01;
+            }
+        }
+        check (lockCount == 2 && sawParameterLock && sawCcLock,
+               "a step can lock both a plug-in parameter and a hardware MIDI CC");
+
+        h.cmd ("setStep", { { "patternId", patternId }, { "laneId", laneId },
+                             { "index", 2 }, { "microtiming", 0.125 } });
+        lockedLanes = h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("patterns", {})[0].getProperty ("lanes", {});
+        bool inheritedTiming = true;
+        for (int laneIndex = 0; laneIndex < lockedLanes.size(); ++laneIndex)
+            if (lockedLanes[laneIndex].getProperty ("lockSourceLaneId", {}).toString() == laneId)
+                inheritedTiming = inheritedTiming
+                    && std::abs ((double) lockedLanes[laneIndex].getProperty ("steps", {})[2]
+                                      .getProperty ("microtiming", 0.0) - 0.125) < 0.001;
+        check (inheritedTiming, "locks inherit the source step's musical timing");
+
+        h.cmd ("removeStepLock", { { "patternId", patternId }, { "laneId", laneId },
+                                    { "index", 2 }, { "lockLaneId", parameterLockId } });
+        lockedLanes = h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("patterns", {})[0].getProperty ("lanes", {});
+        int remainingLocks = 0;
+        for (int laneIndex = 0; laneIndex < lockedLanes.size(); ++laneIndex)
+            remainingLocks += lockedLanes[laneIndex].getProperty ("lockSourceLaneId", {}).toString()
+                              == laneId ? 1 : 0;
+        check (remainingLocks == 1, "one lock can be removed without touching its neighbours");
+
+        h.cmd ("clearStepLocks", { { "patternId", patternId }, { "laneId", laneId },
+                                    { "index", 2 } });
+        lockedLanes = h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("patterns", {})[0].getProperty ("lanes", {});
+        bool locksCleared = true;
+        for (int laneIndex = 0; laneIndex < lockedLanes.size(); ++laneIndex)
+            locksCleared = locksCleared
+                && lockedLanes[laneIndex].getProperty ("lockSourceLaneId", {}).toString() != laneId;
+        check (locksCleared, "clearing a step prunes its now-empty hidden lock lanes");
+
+        // Leave one lock in the session so the process round-trip below proves the link and
+        // value are durable rather than just a bridge projection.
+        h.cmd ("setStepParameterLock", { { "patternId", patternId }, { "laneId", laneId },
+                                          { "index", 3 }, { "targetId", partA },
+                                          { "parameterId", "cutoff" }, { "value", 0.64 } });
 
         // -- the arpeggiator and the MIDI FX chain ------------------------------------------
         auto* synth = dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (partA));
@@ -4670,6 +5656,139 @@ void testPerformanceSystem()
         h.cmd ("disarmCapture");
         h.cmd ("stopAllClips");
 
+        // -- retrospective capture: no transport, clip or lane needed in advance -------------
+        h.cmd ("transportStop");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+        juce::MidiBuffer remembered;
+        remembered.addEvent (juce::MidiMessage::noteOn (3, 72, (juce::uint8) 117), 12);
+        remembered.addEvent (juce::MidiMessage::noteOff (3, 72), 180);
+        buffer.clear(); h.service->getGraph().processBlock (buffer, remembered);
+
+        const auto patternsBeforeRetrospective = h.emits.lastState()->getProperty ("performance", {})
+                                                    .getProperty ("patterns", {}).size();
+        h.cmd ("captureRecentMidi", { { "seconds", 30 } });
+        const auto retrospective = h.emits.lastState()->getProperty ("performance", {});
+        check (retrospective.getProperty ("patterns", {}).size() == patternsBeforeRetrospective + 1
+                 && retrospective.getProperty ("capture", {})
+                       .getProperty ("lastPatternId", {}).toString().isNotEmpty(),
+               "retrospective capture creates an editable pattern while transport is stopped");
+
+        bool foundRememberedNote = false;
+        const auto retroPatterns = retrospective.getProperty ("patterns", {});
+        const auto retroLanes = retroPatterns[retroPatterns.size() - 1].getProperty ("lanes", {});
+        for (int laneIndex = 0; laneIndex < retroLanes.size(); ++laneIndex)
+        {
+            const auto steps = retroLanes[laneIndex].getProperty ("steps", {});
+            for (int stepIndex = 0; stepIndex < steps.size(); ++stepIndex)
+            {
+                const auto step = steps[stepIndex];
+                bool noteInChord = false;
+                const auto chordValue = step.getProperty ("chordNotes", {});
+                if (const auto* chord = chordValue.getArray())
+                    for (const auto& note : *chord)
+                        noteInChord = noteInChord || (int) note == 72;
+                foundRememberedNote = foundRememberedNote
+                    || ((bool) step.getProperty ("active", false)
+                        && ((int) step.getProperty ("note", -1) == 72 || noteInChord));
+            }
+        }
+        check (foundRememberedNote,
+               "the recovered clip contains the notes played before Capture was pressed");
+
+        // -- MIDI looper: first pass becomes a running layer, later passes merge --------------
+        h.cmd ("startMidiLoop");
+        check ((bool) h.emits.lastState()->getProperty ("performance", {})
+                   .getProperty ("looper", {}).getProperty ("recording", false)
+                 && (bool) h.emits.lastState()->getProperty ("performance", {})
+                   .getProperty ("transport", {}).getProperty ("playing", false),
+               "starting a loop pass starts the shared transport and reports recording");
+
+        juce::MidiBuffer firstLoopPass;
+        firstLoopPass.addEvent (juce::MidiMessage::noteOn (1, 55, (juce::uint8) 106), 24);
+        firstLoopPass.addEvent (juce::MidiMessage::noteOff (1, 55), 220);
+        buffer.clear(); h.service->getGraph().processBlock (buffer, firstLoopPass);
+        h.cmd ("finishMidiLoop");
+
+        auto loopPerformance = h.emits.lastState()->getProperty ("performance", {});
+        const auto loopClips = loopPerformance.getProperty ("clips", {});
+        const auto loopClipId = loopClips[loopClips.size() - 1].getProperty ("clipId", {}).toString();
+        check ((bool) loopClips[loopClips.size() - 1].getProperty ("looperLayer", false)
+                 && (bool) loopClips[loopClips.size() - 1].getProperty ("loop", false),
+               "closing the first pass creates an independently looping clip layer");
+
+        h.cmd ("startMidiLoop", { { "clipId", loopClipId } });
+        juce::MidiBuffer overdubPass;
+        overdubPass.addEvent (juce::MidiMessage::noteOn (1, 59, (juce::uint8) 99), 40);
+        overdubPass.addEvent (juce::MidiMessage::noteOff (1, 59), 200);
+        buffer.clear(); h.service->getGraph().processBlock (buffer, overdubPass);
+        h.cmd ("finishMidiLoop");
+
+        loopPerformance = h.emits.lastState()->getProperty ("performance", {});
+        const auto afterOverdubClips = loopPerformance.getProperty ("clips", {});
+        check ((int) afterOverdubClips[afterOverdubClips.size() - 1]
+                   .getProperty ("overdubPasses", 0) == 1,
+               "an overdub adds a pass without changing the layer's identity");
+
+        bool foundOverdubNote = false;
+        const auto loopPatterns = loopPerformance.getProperty ("patterns", {});
+        const auto loopLanes = loopPatterns[loopPatterns.size() - 1].getProperty ("lanes", {});
+        for (int laneIndex = 0; laneIndex < loopLanes.size(); ++laneIndex)
+        {
+            const auto steps = loopLanes[laneIndex].getProperty ("steps", {});
+            for (int stepIndex = 0; stepIndex < steps.size(); ++stepIndex)
+            {
+                const auto step = steps[stepIndex];
+                bool inChord = false;
+                const auto chordValue = step.getProperty ("chordNotes", {});
+                if (const auto* chord = chordValue.getArray())
+                    for (const auto& note : *chord)
+                        inChord = inChord || (int) note == 59;
+                foundOverdubNote = foundOverdubNote
+                    || ((bool) step.getProperty ("active", false)
+                        && ((int) step.getProperty ("note", -1) == 59 || inChord));
+            }
+        }
+        check (foundOverdubNote, "the overdub's notes are merged into the editable loop pattern");
+
+        // -- gesture recorder: human control motion becomes gliding automation --------------
+        h.cmd ("startGestureRecording", { { "clipId", loopClipId }, { "mode", "overdub" } });
+        h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.23 } });
+        for (int b = 0; b < 5; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.cmd ("setPartMixer", { { "partId", partA }, { "pan", -0.4 } });
+        for (int b = 0; b < 5; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.81 } });
+        for (int b = 0; b < 2; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.cmd ("finishGestureRecording");
+
+        auto gesturePerformance = h.emits.lastState()->getProperty ("performance", {});
+        const auto gestureLoopClips = gesturePerformance.getProperty ("clips", {});
+        check ((int) gestureLoopClips[gestureLoopClips.size() - 1]
+                   .getProperty ("gesturePasses", 0) == 1,
+               "a gesture pass can be overdubbed into the existing MIDI loop");
+        int recordedParameterLanes = 0;
+        const auto gestureLoopPatterns = gesturePerformance.getProperty ("patterns", {});
+        const auto gestureLoopLanes = gestureLoopPatterns[gestureLoopPatterns.size() - 1]
+                                          .getProperty ("lanes", {});
+        for (int laneIndex = 0; laneIndex < gestureLoopLanes.size(); ++laneIndex)
+            recordedParameterLanes += gestureLoopLanes[laneIndex].getProperty ("type", {}).toString()
+                                      == "parameter" ? 1 : 0;
+        check (recordedParameterLanes == 2,
+               "plug-in and mixer movements become separate editable parameter lanes");
+
+        h.cmd ("startGestureRecording");
+        h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.34 } });
+        for (int b = 0; b < 5; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.cmd ("setParameter", { { "partId", partA }, { "id", "cutoff" }, { "value", 0.68 } });
+        for (int b = 0; b < 2; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.cmd ("finishGestureRecording");
+
+        gesturePerformance = h.emits.lastState()->getProperty ("performance", {});
+        const auto gestureClips = gesturePerformance.getProperty ("clips", {});
+        check ((bool) gestureClips[gestureClips.size() - 1].getProperty ("gestureClip", false)
+                 && (int) gestureClips[gestureClips.size() - 1]
+                      .getProperty ("gesturePasses", 0) == 1,
+               "a standalone take creates a running, reusable gesture clip");
+
         // -- scenes recall through the rack, not a snapshot engine ---------------------------
         h.cmd ("addPart");
         partB = h.partIdAt (1);
@@ -4682,11 +5801,18 @@ void testPerformanceSystem()
         h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.8 }, { "final", true } });
         h.cmd ("setPartMixer", { { "partId", partB }, { "mute", true } });
 
+        h.cmd ("addControlPage", { { "name", "Scene controls" } });
+        const auto scenePageId = h.emits.lastState()->getProperty ("rack", {})
+                                     .getProperty ("pages", {})[0]
+                                     .getProperty ("pageId", {}).toString();
+        h.service->noteSurfacePage (scenePageId);
+
         h.cmd ("addScene", { { "name", "Verse" } });
         const auto scenes = h.emits.lastState()->getProperty ("performance", {})
                                 .getProperty ("scenes", {});
-        check (scenes.size() == 1 && (int) scenes[0].getProperty ("numSlots", 0) == 2,
-               "a new scene captures the rig as it stands");
+        check (scenes.size() == 1 && (int) scenes[0].getProperty ("numSlots", 0) == 2
+                 && scenes[0].getProperty ("pageId", {}).toString() == scenePageId,
+               "a new scene captures the rig and visible CTRL49 page as they stand");
         sceneId = scenes[0].getProperty ("sceneId", {}).toString();
 
         // Change the rig, then recall the scene and watch it come back. The launch is
@@ -4711,6 +5837,50 @@ void testPerformanceSystem()
         check (std::abs ((float) (double) recalled->getProperty ("rack", {})
                              .getProperty ("macros", {})[0].getProperty ("value", 0.0) - 0.8f) < 0.01f,
                "and the macro value through the Stage 5 macro path");
+        check (h.service->consumeSurfacePageRequest() == scenePageId,
+               "and hands its controller-page recall to the CTRL49 broker exactly once");
+        check (h.service->consumeSurfacePageRequest().isEmpty(),
+               "the controller-page request is one-shot so a later physical Page press wins");
+
+        // Snapshot automation: the next recall keeps boolean decisions on the launch edge,
+        // while all continuous values share one beat-defined interpolation position.
+        h.cmd ("setPartMixer", { { "partId", partB }, { "mute", false },
+                                  { "volume", 0.2 }, { "pan", 0.8 } });
+        h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.1 }, { "final", true } });
+        h.cmd ("setSceneOptions", { { "sceneId", sceneId }, { "morphBeats", 0.25 } });
+        h.cmd ("launchScene", { { "sceneId", sceneId } });
+        for (int b = 0; b < 2; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.service->drainParameterEvents();
+
+        auto morphState = h.emits.lastState()->getProperty ("performance", {})
+                              .getProperty ("snapshotMorph", {});
+        check ((bool) morphState.getProperty ("active", false)
+                 && std::abs ((double) morphState.getProperty ("durationBeats", 0.0) - 0.25) < 0.001,
+               "a scene can begin one coherent beat-synchronised snapshot morph");
+        check ((bool) h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[1]
+                   .getProperty ("mute", false),
+               "discrete scene state still lands exactly on the launch boundary");
+
+        for (int b = 0; b < 6; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.service->drainParameterEvents();
+        const auto halfwayMacro = (float) (double) h.emits.lastState()->getProperty ("rack", {})
+                                      .getProperty ("macros", {})[0].getProperty ("value", 0.0);
+        check (halfwayMacro > 0.1f && halfwayMacro < 0.8f,
+               "continuous scene values move between their old and captured states");
+
+        for (int b = 0; b < 12; ++b) { buffer.clear(); h.service->getGraph().processBlock (buffer, midi); }
+        h.service->drainParameterEvents();
+        morphState = h.emits.lastState()->getProperty ("performance", {})
+                       .getProperty ("snapshotMorph", {});
+        const auto landedPart = h.emits.lastState()->getProperty ("rack", {})
+                                  .getProperty ("parts", {})[1];
+        check (! (bool) morphState.getProperty ("active", true)
+                 && std::abs ((float) (double) h.emits.lastState()->getProperty ("rack", {})
+                                   .getProperty ("macros", {})[0].getProperty ("value", 0.0)
+                             - 0.8f) < 0.01f
+                 && std::abs ((float) (double) landedPart.getProperty ("volume", 0.0) - 1.0f) < 0.01f
+                 && std::abs ((float) (double) landedPart.getProperty ("pan", 9.0)) < 0.01f,
+               "the morph lands exactly on the complete captured continuous state");
 
         // -- the setlist ---------------------------------------------------------------------
         h.cmd ("addSetlistItem", { { "sceneId", sceneId }, { "name", "Opener" } });
@@ -4727,6 +5897,57 @@ void testPerformanceSystem()
         check ((int) h.emits.lastState()->getProperty ("performance", {})
                    .getProperty ("setlist", {}).getProperty ("currentIndex", -1) == 0,
                "and leaves the rig on the last item that worked");
+
+        // -- the song/scene arranger: ordered scene blocks, not a second timeline ------------
+        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Intro" },
+                                         { "bars", 2 } });
+        h.cmd ("addArrangementItem", { { "sceneId", sceneId }, { "name", "Verse" } });
+        auto arrangement = h.emits.lastState()->getProperty ("performance", {})
+                               .getProperty ("arrangement", {});
+        const auto secondArrangementId = arrangement.getProperty ("items", {})[1]
+                                           .getProperty ("itemId", {}).toString();
+        h.cmd ("setArrangementItem", { { "itemId", secondArrangementId }, { "bars", 8 } });
+        h.cmd ("moveArrangementItem", { { "itemId", secondArrangementId }, { "index", 0 } });
+        h.cmd ("setArrangementOptions", { { "loop", true } });
+        // This assertion exercises the parked-start path. The looper deliberately started
+        // the shared transport earlier, so park it and let the audio edge consume the stop.
+        h.cmd ("transportStop");
+        buffer.clear(); h.service->getGraph().processBlock (buffer, midi);
+        h.cmd ("startArrangement", { { "index", 0 } });
+        arrangement = h.emits.lastState()->getProperty ("performance", {})
+                          .getProperty ("arrangement", {});
+        check ((bool) arrangement.getProperty ("playing", false)
+                 && (int) arrangement.getProperty ("currentIndex", -1) == 0,
+               "the arranger recalls its first block while parked and arms the shared transport");
+        h.cmd ("stopArrangement");
+
+        // -- MIDI Freeze/Bounce -------------------------------------------------------------
+        h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 12 } });
+        h.cmd ("freezeMidiClip", { { "clipId", clipId }, { "cycles", 2 } });
+        const auto frozenPerformance = h.emits.lastState()->getProperty ("performance", {});
+        const auto frozenClips = frozenPerformance.getProperty ("clips", {});
+        const auto frozenPatterns = frozenPerformance.getProperty ("patterns", {});
+        const auto frozenClip = frozenClips[frozenClips.size() - 1];
+        bool foundRenderedTranspose = false;
+        const auto frozenLanes = frozenPatterns[frozenPatterns.size() - 1].getProperty ("lanes", {});
+        for (int frozenLane = 0; frozenLane < frozenLanes.size(); ++frozenLane)
+            for (const auto& step : *frozenLanes[frozenLane].getProperty ("steps", {}).getArray())
+            {
+                bool chordContainsTranspose = false;
+                if (const auto* chord = step.getProperty ("chordNotes", {}).getArray())
+                    for (const auto& note : *chord)
+                        chordContainsTranspose = chordContainsTranspose || (int) note == 72;
+                foundRenderedTranspose = foundRenderedTranspose
+                  || ((bool) step.getProperty ("active", false)
+                      && ((int) step.getProperty ("note", -1) == 72
+                          || chordContainsTranspose));
+            }
+        check ((bool) frozenClip.getProperty ("frozenMidi", false)
+                 && frozenClip.getProperty ("frozenFromClipId", {}).toString() == clipId
+                 && (int) frozenClip.getProperty ("frozenCycles", 0) == 2
+                 && foundRenderedTranspose,
+               "MIDI Freeze renders the source through its part chain into an editable clip");
+        h.cmd ("setPartMidiFx", { { "partId", partA }, { "transpose", 0 } });
     }
 
     // -- everything survives the process --------------------------------------------------
@@ -4735,11 +5956,24 @@ void testPerformanceSystem()
     const auto* restored = h2.emits.lastState();
     const auto performance = restored->getProperty ("performance", {});
 
-    check (performance.getProperty ("patterns", {}).size() == 2
-             && performance.getProperty ("clips", {}).size() == 2
+    check (performance.getProperty ("patterns", {}).size() == 9
+             && performance.getProperty ("clips", {}).size() == 6
              && performance.getProperty ("scenes", {}).size() == 1
-             && performance.getProperty ("setlist", {}).getProperty ("items", {}).size() == 2,
-           "patterns, clips, scenes and the setlist all come back");
+             && performance.getProperty ("setlist", {}).getProperty ("items", {}).size() == 2
+             && performance.getProperty ("arrangement", {}).getProperty ("items", {}).size() == 2
+             && (bool) performance.getProperty ("arrangement", {}).getProperty ("loop", false),
+           "patterns, clips, scenes, setlist and arrangement all come back");
+    check ((bool) performance.getProperty ("clips", {})[5].getProperty ("frozenMidi", false)
+             && (int) performance.getProperty ("clips", {})[5]
+                  .getProperty ("frozenNoteCount", 0) > 0,
+           "the rendered MIDI clip and its provenance come back too");
+    check ((bool) performance.getProperty ("clips", {})[3].getProperty ("looperLayer", false)
+             && (int) performance.getProperty ("clips", {})[3].getProperty ("overdubPasses", 0) == 1,
+           "the MIDI loop layer and its overdub count come back too");
+    check ((int) performance.getProperty ("clips", {})[3].getProperty ("gesturePasses", 0) == 1
+             && (bool) performance.getProperty ("clips", {})[4]
+                  .getProperty ("gestureClip", false),
+           "its gesture overdub and the standalone gesture clip come back too");
 
     const auto restoredLane = performance.getProperty ("patterns", {})[0]
                                   .getProperty ("lanes", {})[0];
@@ -4748,9 +5982,32 @@ void testPerformanceSystem()
              && (int) restoredSteps[3].getProperty ("note", 0) == 63,
            "with every step exactly as it was written");
 
+    bool restoredParameterLock = false;
+    const auto restoredPatternLanes = performance.getProperty ("patterns", {})[0]
+                                          .getProperty ("lanes", {});
+    for (int laneIndex = 0; laneIndex < restoredPatternLanes.size(); ++laneIndex)
+    {
+        const auto candidate = restoredPatternLanes[laneIndex];
+        if (candidate.getProperty ("lockSourceLaneId", {}).toString() != laneId)
+            continue;
+        const auto step = candidate.getProperty ("steps", {})[3];
+        restoredParameterLock = candidate.getProperty ("type", {}).toString() == "parameter"
+                                && candidate.getProperty ("parameterId", {}).toString() == "cutoff"
+                                && (bool) step.getProperty ("active", false)
+                                && std::abs ((double) step.getProperty ("value", 0.0) - 0.64) < 0.01;
+    }
+    check (restoredParameterLock, "the parameter lock and its source-lane link survive restart");
+
     check (std::abs ((double) performance.getProperty ("transport", {}).getProperty ("tempo", 0.0)
                        - 120.0) < 1.0e-9,
            "and the transport defaults travel with the Performance");
+    const auto restoredAudition = restored->getProperty ("rack", {})
+                                      .getProperty ("presetAudition", {});
+    check ((bool) restoredAudition.getProperty ("enabled", false)
+             && restoredAudition.getProperty ("phrase", {}).toString() == "riff"
+             && (int) restoredAudition.getProperty ("velocity", -1) == 88
+             && (int) restoredAudition.getProperty ("gapMs", -1) == 60,
+           "and the preset audition recipe survives restart");
 
     // The restored song is compiled and ready: launching plays without another edit.
     const auto restoredClipId = performance.getProperty ("clips", {})[0]
@@ -5374,6 +6631,29 @@ void testLibrary()
         check (h.lastStub->patch == 5, "loading onto the same class applies state in place");
         check (h.instantiateCount == instantiationsBefore, "without re-instantiating anything");
 
+        // Audition is not a WebView delay: the native command applies the preset first,
+        // then injects the persisted phrase into that part alone.
+        h.service->prepareRuntime (48000.0, 512);
+        h.cmd ("setPresetAudition", { { "enabled", true }, { "phrase", "single" },
+                                       { "rootNote", 72 }, { "velocity", 88 },
+                                       { "noteLengthMs", 120 } });
+        h.lastStub->received.clear();
+        h.cmd ("auditionLibraryRecord", { { "recordId", userPresetId },
+                                            { "action", "focused" } });
+        juce::AudioBuffer<float> auditionAudio (2, 512);
+        juce::MidiBuffer auditionMidi;
+        h.service->getGraph().processBlock (auditionAudio, auditionMidi);
+        bool heardAudition = false;
+        for (const auto& message : h.lastStub->received)
+            heardAudition = heardAudition
+                         || (message.isNoteOn() && message.getNoteNumber() == 72
+                             && message.getVelocity() == 88);
+        check (heardAudition, "audition starts the configured phrase on the loaded part");
+        check ((bool) h.emits.lastState()->getProperty ("rack", {})
+                    .getProperty ("presetAudition", {}).getProperty ("playing", false),
+               "and reports the phrase while it is active");
+        h.cmd ("setPresetAudition", { { "enabled", false } });
+
         // Add-as-new-part: the transaction builds a second part with the preset's state.
         h.cmd ("loadLibraryRecord", { { "recordId", userPresetId }, { "action", "add" } });
         check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 2,
@@ -5403,6 +6683,33 @@ void testLibrary()
                        "a preset for nothing installed says so, actionably");
             }
         }
+
+        // Sound Comparison Mode is one reversible listening session: candidate changes are
+        // live and auditioned, but Cancel restores the exact state and cursor from entry.
+        juce::Array<juce::var> compareIds;
+        compareIds.add (userPresetId);
+        compareIds.add (vendorId);
+        h.cmd ("setPresetAudition", { { "phrase", "single" }, { "rootNote", 64 } });
+        h.cmd ("startSoundComparison", { { "partId", partId },
+                                           { "recordIds", juce::var (compareIds) } });
+        auto comparison = h.emits.lastState()->getProperty ("rack", {})
+                              .getProperty ("soundComparison", {});
+        check ((bool) comparison.getProperty ("active", false)
+                 && (int) comparison.getProperty ("count", 0) == 2,
+               "comparison opens a bounded preset shortlist");
+        h.cmd ("stepSoundComparison", { { "delta", 1 } });
+        comparison = h.emits.lastState()->getProperty ("rack", {})
+                         .getProperty ("soundComparison", {});
+        check (comparison.getProperty ("name", {}).toString() == "Warm Pad"
+                 && applied.size() == 1,
+               "next applies the other preset through its real loader");
+        h.cmd ("cancelSoundComparison");
+        check (! (bool) h.emits.lastState()->getProperty ("rack", {})
+                       .getProperty ("soundComparison", {}).getProperty ("active", true)
+                 && h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+                       .getProperty ("presetName", {}).toString() == "My Warm Patch",
+               "cancel restores the original sound and preset cursor");
+        applied.clear();
 
         // Vendor preset load: through the transaction, applied after commit.
         h.cmd ("loadLibraryRecord", { { "recordId", vendorId }, { "action", "add" } });
@@ -5458,6 +6765,37 @@ void testLibrary()
             if (r.getProperty ("type", {}).toString() == "rack")
                 rackId = r.getProperty ("recordId", {}).toString();
         check (rackId.isNotEmpty(), "the whole rack captures as one record");
+
+        // A show-level Setlist row can point at that complete capture. Once the current row
+        // is established, the next rack is constructed and prepared without replacing what
+        // is sounding; advancing consumes those exact warm instances.
+        h.cmd ("addScene", { { "name", "Current song" } });
+        const auto currentSceneId = h.emits.lastState()->getProperty ("performance", {})
+                                        .getProperty ("scenes", {})[0]
+                                        .getProperty ("sceneId", {}).toString();
+        h.cmd ("addSetlistItem", { { "sceneId", currentSceneId }, { "name", "Current" } });
+        h.cmd ("setlistGo", { { "index", 0 } });
+        const auto beforeWarm = h.instantiateCount;
+        h.cmd ("addSetlistItem", { { "rackRecordId", rackId }, { "name", "Captured rig" } });
+        auto setlistState = h.emits.lastState()->getProperty ("performance", {})
+                                .getProperty ("setlist", {});
+        const auto preloads = setlistState.getProperty ("preloads", {});
+        check (preloads.size() == 1
+                 && preloads[0].getProperty ("recordId", {}).toString() == rackId
+                 && preloads[0].getProperty ("state", {}).toString() == "ready"
+                 && (int) preloads[0].getProperty ("ready", 0) == 3
+                 && h.instantiateCount == beforeWarm + 3,
+               "the next full rack is warmed and reports exactly what is ready");
+
+        const auto afterWarm = h.instantiateCount;
+        h.cmd ("setlistNext");
+        setlistState = h.emits.lastState()->getProperty ("performance", {})
+                         .getProperty ("setlist", {});
+        check ((int) setlistState.getProperty ("currentIndex", -1) == 1
+                 && h.instantiateCount == afterWarm
+                 && h.emits.lastState()->getProperty ("rack", {})
+                      .getProperty ("parts", {}).size() == 3,
+               "advancing swaps to the captured song by consuming the warm pool, not reloading it");
     }
 
     {
@@ -6715,6 +8053,320 @@ void testHostProject()
         check (builtProject.isVoid(), "and the hook never runs");
     }
 }
+
+void testMicrotuningManager()
+{
+    std::cout << "\nmicrotuning manager" << std::endl;
+
+    const auto dir = freshDataDir ("microtuning");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+
+    const juce::String scala { R"SCL(! Hostage test scale
+Five-limit triad
+3
+5/4
+3/2
+2/1
+)SCL" };
+    h.cmd ("importScalaTuning", { { "text", scala }, { "sourceName", "triad.scl" } });
+    auto rackState = h.emits.lastState()->getProperty ("rack", {});
+    auto tuningState = rackState.getProperty ("microtuning", {});
+    check ((bool) tuningState.getProperty ("enabled", false)
+             && tuningState.getProperty ("name", {}).toString() == "Five-limit triad"
+             && tuningState.getProperty ("sourceName", {}).toString() == "triad.scl"
+             && (int) tuningState.getProperty ("degreeCount", 0) == 3,
+           "a Scala command publishes the parsed shared tuning");
+
+    h.cmd ("setMicrotuning", { { "rootMidiNote", 48 }, { "referenceFrequency", 442.0 },
+                                { "mtsDeviceId", 12 }, { "mtsProgram", 3 } });
+    h.cmd ("setPartMicrotuning", { { "partId", partId }, { "enabled", true } });
+    auto partState = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+    check ((bool) partState.getProperty ("microtuningEnabled", false)
+             && partState.getProperty ("microtuningError", {}).toString().contains ("Load"),
+           "a destination opts in explicitly and says why an empty part cannot receive MTS");
+
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.service->prepareRuntime (48000.0, 512);
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    h.service->getGraph().processBlock (audio, midi);
+    bool receivedMts = false;
+    if (h.lastStub != nullptr)
+        for (const auto& message : h.lastStub->received)
+            receivedMts = receivedMts || (message.isSysEx() && message.getSysExDataSize() > 5
+                                           && message.getSysExData()[2] == 0x08
+                                           && message.getSysExData()[3] == 0x02);
+    partState = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+    check (receivedMts && partState.getProperty ("microtuningError", "x").toString().isEmpty(),
+           "a newly loaded opted-in VST3 receives the two MTS table messages in its MIDI block");
+
+    h.emits.clear();
+    h.cmd ("importScalaTuning", { { "text", "Broken\n2\n100.0\n" },
+                                   { "sourceName", "broken.scl" } });
+    check (h.emits.lastError().contains ("ends before"),
+           "a malformed Scala file is refused aloud without replacing the tuning");
+
+    h.cmd ("resetMicrotuning");
+    tuningState = h.emits.lastState()->getProperty ("rack", {}).getProperty ("microtuning", {});
+    check (! (bool) tuningState.getProperty ("enabled", true)
+             && (int) tuningState.getProperty ("degreeCount", 0) == 12,
+           "reset restores disabled 12-tone equal temperament");
+}
+
+void testWholePerformanceRecorderAndReplay()
+{
+    std::cout << "\nwhole performance recorder and instant replay" << std::endl;
+
+    const auto dir = freshDataDir ("whole-performance-replay");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.service->prepareRuntime (48000.0, 512);
+
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer empty;
+    h.cmd ("startPerformanceRecording", { { "name", "Complete take" } });
+    juce::MidiBuffer played;
+    played.addEvent (juce::MidiMessage::noteOn (2, 65, (juce::uint8) 109), 24);
+    played.addEvent (juce::MidiMessage::noteOff (2, 65), 220);
+    audio.clear(); h.service->getGraph().processBlock (audio, played);
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.3 } });
+    for (int i = 0; i < 2; ++i)
+    {
+        audio.clear(); empty.clear(); h.service->getGraph().processBlock (audio, empty);
+    }
+    h.cmd ("finishPerformanceRecording");
+
+    auto performance = h.emits.lastState()->getProperty ("performance", {});
+    auto takes = performance.getProperty ("performanceTakes", {});
+    check (takes.size() == 1
+             && takes[0].getProperty ("name", {}).toString() == "Complete take"
+             && (int) takes[0].getProperty ("midiEventCount", 0) == 2
+             && (int) takes[0].getProperty ("actionCount", 0) >= 1,
+           "a take keeps raw MIDI and the Hostage actions on one persisted timeline");
+
+    const auto takeId = takes[0].getProperty ("takeId", {}).toString();
+    h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 1.7 } });
+    h.cmd ("replayPerformanceTake", { { "takeId", takeId } });
+    h.service->drainParameterEvents(); // inline stub restore is ready; arm the replay clock
+    if (h.lastStub != nullptr)
+        h.lastStub->received.clear();
+
+    for (int i = 0; i < 8; ++i)
+    {
+        audio.clear(); empty.clear(); h.service->getGraph().processBlock (audio, empty);
+        h.service->drainParameterEvents();
+    }
+
+    bool replayedNote = false;
+    if (h.lastStub != nullptr)
+        for (const auto& message : h.lastStub->received)
+            replayedNote = replayedNote || (message.isNoteOn()
+                                             && message.getChannel() == 2
+                                             && message.getNoteNumber() == 65
+                                             && (int) message.getVelocity() == 109);
+    performance = h.emits.lastState()->getProperty ("performance", {});
+    const auto part = h.emits.lastState()->getProperty ("rack", {})
+                            .getProperty ("parts", {})[0];
+    check (replayedNote && std::abs ((double) part.getProperty ("volume", 0.0) - 0.3) < 0.001
+             && performance.getProperty ("performanceReplay", {})
+                    .getProperty ("state", {}).toString() == "idle",
+           "Instant Replay restores the starting rig, injects notes, then repeats the mixer action");
+
+    h.cmd ("removePerformanceTake", { { "takeId", takeId } });
+    check (h.emits.lastState()->getProperty ("performance", {})
+             .getProperty ("performanceTakes", {}).size() == 0,
+           "a finished take can be removed without touching the performed rig");
+}
+
+void testAutomaticFailover()
+{
+    std::cout << "\nautomatic plug-in failover" << std::endl;
+
+    const auto dir = freshDataDir ("automatic-failover");
+    seedCatalog (dir);
+    int instantiations = 0;
+    SwitchableServiceSynth* latest = nullptr;
+    std::vector<std::pair<juce::String, juce::var>> scriptEvents;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& options)
+    {
+        options.livePluginIsolationAvailable = true;
+        options.instantiate = [&] (const juce::String&, double, int,
+                                   InstrumentHostService::InstantiateCallback callback)
+        {
+            ++instantiations;
+            auto processor = std::make_unique<SwitchableServiceSynth>();
+            processor->throwOnProcess = instantiations == 1;
+            latest = processor.get();
+            callback (std::move (processor), {});
+        };
+        options.scriptEvent = [&] (const juce::String& event, const juce::var& payload)
+        {
+            scriptEvents.push_back ({ event, payload });
+        };
+    });
+
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    check (latest != nullptr, "the deliberately failing instance loads through the normal transaction");
+    if (latest != nullptr)
+        latest->patch = 42;
+    // The policy command below saves the performance, which captures this exact plug-in
+    // state through the same path a real session save uses.
+    h.cmd ("setAutomaticFailover", { { "enabled", true }, { "maxAttempts", 3 },
+                                       { "retryDelayMs", 100 } });
+    h.service->prepareRuntime (48000.0, 512);
+
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    h.service->getGraph().processBlock (audio, midi);
+    h.service->drainParameterEvents();
+
+    auto failover = h.emits.lastState()->getProperty ("reliability", {})
+                        .getProperty ("automaticFailover", {});
+    auto events = failover.getProperty ("events", {});
+    check ((bool) failover.getProperty ("isolationAvailable", false),
+           "the Reliability payload only claims isolation when the runtime found its worker");
+    check (events.size() == 1 && events[0].getProperty ("targetId", {}).toString() == partId
+             && events[0].getProperty ("state", {}).toString() == "waiting",
+           "a processing exception is published as a named, scheduled recovery");
+    check (h.service->getRackHost().getInstrument (partId) == nullptr,
+           "the failed processor is no longer exposed for parameters or editors");
+
+    h.cmd ("setAutomaticFailover", { { "enabled", false } });
+    events = h.emits.lastState()->getProperty ("reliability", {})
+                 .getProperty ("automaticFailover", {}).getProperty ("events", {});
+    check (events.size() == 1 && events[0].getProperty ("state", {}).toString() == "bypassed",
+           "disabling recovery turns a pending retry into an explicit manual-repair state");
+    h.cmd ("setAutomaticFailover", { { "enabled", true } });
+
+    juce::Thread::sleep (120);
+    h.service->drainParameterEvents();
+    failover = h.emits.lastState()->getProperty ("reliability", {})
+                   .getProperty ("automaticFailover", {});
+    events = failover.getProperty ("events", {});
+    check (latest != nullptr && latest->patch == 42 && instantiations == 2,
+           "automatic retry re-instantiates and restores the last captured plug-in state");
+    check (events.size() == 1 && events[0].getProperty ("state", {}).toString() == "recovered"
+             && (int) events[0].getProperty ("attempts", 0) == 1,
+           "successful recovery remains visible with its attempt count");
+
+    bool announcedAutomatically = false;
+    for (const auto& [event, payload] : scriptEvents)
+        announcedAutomatically = announcedAutomatically || (event == "pluginFailover"
+                                      && payload.getProperty ("targetId", {}).toString() == partId
+                                      && (bool) payload.getProperty ("automatic", false));
+    check (announcedAutomatically,
+           "the bounded script surface hears the live failure without vendor data");
+
+    // Switching automation off does not turn the repair button off. Make the replacement
+    // fail once more, then recover it by explicit command without changing the policy.
+    if (latest != nullptr)
+        latest->throwOnProcess = true;
+    h.cmd ("setAutomaticFailover", { { "enabled", false } });
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "cutoff" }, { "value", 0.81 } });
+    juce::MidiBuffer secondFailure;
+    secondFailure.addEvent (juce::MidiMessage::noteOn (1, 62, (juce::uint8) 100), 0);
+    audio.clear();
+    h.service->getGraph().processBlock (audio, secondFailure);
+    h.service->drainParameterEvents();
+    events = h.emits.lastState()->getProperty ("reliability", {})
+                 .getProperty ("automaticFailover", {}).getProperty ("events", {});
+    check (events.size() == 1 && events[0].getProperty ("state", {}).toString() == "bypassed",
+           "turning automatic retry off leaves a failed processor safely bypassed");
+
+    h.cmd ("retryFailedProcessor", { { "targetId", partId } });
+    check (latest != nullptr && ! latest->throwOnProcess && latest->patch == 42
+             && std::abs (latest->cutoff->get() - 0.81f) < 0.001f && instantiations == 3,
+           "Retry now restores the freshest known parameters even when opaque state omits them");
+
+    h.cmd ("dismissFailoverEvent", { { "targetId", partId } });
+    check (h.emits.lastState()->getProperty ("reliability", {})
+             .getProperty ("automaticFailover", {}).getProperty ("events", {}).size() == 0,
+           "a recovered incident can be dismissed without touching the restored processor");
+
+    // A deliberate reload is stronger than a stale incident. It must cancel the recovery entry
+    // immediately so a queued retry can never arrive later and replace the user's choice.
+    if (latest != nullptr)
+        latest->throwOnProcess = true;
+    audio.clear();
+    h.service->getGraph().processBlock (audio, secondFailure);
+    h.service->drainParameterEvents();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    check (h.emits.lastState()->getProperty ("reliability", {})
+             .getProperty ("automaticFailover", {}).getProperty ("events", {}).size() == 0,
+           "a manual replacement cancels its stale automatic failover");
+}
+
+void testAutomaticEffectFailover()
+{
+    std::cout << "\nautomatic effect failover" << std::endl;
+
+    const auto dir = freshDataDir ("automatic-effect-failover");
+    seedTwoSynthCatalog (dir);
+    int effectInstantiations = 0;
+    SwitchableServiceEffect* latestEffect = nullptr;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& options)
+    {
+        options.instantiate = [&] (const juce::String& description, double, int,
+                                   InstrumentHostService::InstantiateCallback callback)
+        {
+            if (description.contains ("Nice Reverb"))
+            {
+                auto processor = std::make_unique<SwitchableServiceEffect>();
+                processor->throwOnProcess = ++effectInstantiations == 1;
+                latestEffect = processor.get();
+                callback (std::move (processor), {});
+            }
+            else
+                callback (std::make_unique<StubSynthProcessor>(), {});
+        };
+    });
+
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addEffect", { { "chainId", partId }, { "ceId", "VST3-nice-reverb" } });
+    const auto effectId = h.emits.lastState()->getProperty ("rack", {})
+                              .getProperty ("parts", {})[0].getProperty ("effects", {})[0]
+                              .getProperty ("effectId", {}).toString();
+    h.cmd ("setAutomaticFailover", { { "enabled", true }, { "retryDelayMs", 100 } });
+    h.cmd ("setParameter", { { "partId", effectId }, { "id", "wet" }, { "value", 0.62 } });
+    h.service->prepareRuntime (48000.0, 512);
+
+    juce::AudioBuffer<float> audio (2, 512);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    h.service->getGraph().processBlock (audio, midi);
+    h.service->drainParameterEvents();
+    auto events = h.emits.lastState()->getProperty ("reliability", {})
+                      .getProperty ("automaticFailover", {}).getProperty ("events", {});
+    check (events.size() == 1 && (bool) events[0].getProperty ("effect", false)
+             && events[0].getProperty ("state", {}).toString() == "waiting",
+           "a failed effect is dry-bypassed and queued independently");
+
+    juce::Thread::sleep (120);
+    h.service->drainParameterEvents();
+    events = h.emits.lastState()->getProperty ("reliability", {})
+                 .getProperty ("automaticFailover", {}).getProperty ("events", {});
+    check (latestEffect != nullptr && ! latestEffect->throwOnProcess
+             && std::abs (latestEffect->wet->get() - 0.62f) < 0.001f
+             && effectInstantiations == 2
+             && events.size() == 1
+             && events[0].getProperty ("state", {}).toString() == "recovered",
+           "the effect worker is recreated with its freshest known parameter value");
+}
 } // namespace
 
 int main (int argc, char* argv[])
@@ -6735,6 +8387,7 @@ int main (int argc, char* argv[])
     std::cout << "InstrumentHostService tests" << std::endl;
 
     testCommandFlow();
+    testStageLock();
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
     testPresetWalking();
@@ -6750,6 +8403,7 @@ int main (int argc, char* argv[])
     testDeadManStartup();
     testSafeStartup();
     testSessionRecovery();
+    testLiveWorkerDiagnostics();
     testSupportBundle();
     testEditionsInTheService();
     testEditorPolicy();
@@ -6759,6 +8413,11 @@ int main (int argc, char* argv[])
     testControlPages();
     testAutoPagesAndSurfaceRuntime();
     testEffectsAndMacros();
+    testModulationMatrix();
+    testMidiLfos();
+    testEnvelopeGenerators();
+    testMsegDesigner();
+    testRandomProbabilityModulators();
     testEnrichedPerformanceRestore();
     testPerformanceSystem();
     testPerformanceSurfaceAndScripting();
@@ -6770,6 +8429,7 @@ int main (int argc, char* argv[])
     testHardwarePatchesInTheLibrary();
     testPadsAndFaders();
     testMidiSourceCommands();
+    testLayerGroupCommands();
     testPatchCompare();
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
@@ -6784,6 +8444,10 @@ int main (int argc, char* argv[])
     testCustomArtwork();
     testParameterLearnAndFavourites();
     testUserDescribedSurface();
+    testMicrotuningManager();
+    testWholePerformanceRecorderAndReplay();
+    testAutomaticFailover();
+    testAutomaticEffectFailover();
     testHostProject();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)

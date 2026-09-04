@@ -3,7 +3,7 @@
 #include "HostRuntimeShared.h"
 #include "PluginEditorHost.h"
 
-// HostPluginProcessor — the generated product's outer VST3 (VIP-successor Stage 1).
+// HostPluginProcessor — the generated Hostage product's outer VST3.
 //
 // The whole rack as one synth plug-in inside a DAW: MIDI in, stereo out, inner VST3
 // instruments hosted through the same InstrumentHostService the standalone and the editor's
@@ -105,7 +105,6 @@ private:
     int lastReportedLatency = -1;
     bool lastOfflineState = false;
 
-    juce::AudioPluginFormatManager formatManager;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
 

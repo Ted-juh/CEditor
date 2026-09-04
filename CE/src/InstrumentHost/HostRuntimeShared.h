@@ -6,12 +6,12 @@
 #include "PluginInstantiator.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (host.html rides in it)
 
-// HostRuntimeShared — the glue both generated targets share (VIP-successor Stage 1).
+// HostRuntimeShared — the glue both generated Hostage targets share.
 //
 // The standalone (HostRuntimeShell) and the outer VST3's editor (HostPluginProcessor) each
 // stand up the same three pieces: a WebView serving host.html out of the embedded bundle, one
-// "instrumentHost" bridge listener feeding an InstrumentHostService, and a real VST3
-// instantiator over an AudioPluginFormatManager. Duplicating that glue is how the two targets
+// "instrumentHost" bridge listener feeding an InstrumentHostService, and an isolated VST3
+// instantiator backed by the live plug-in worker. Duplicating that glue is how the two targets
 // would drift apart — the editor's preview already went through every mistake this file now
 // prevents (the callAsync marshal, the description-XML parse, the worker discovery), so both
 // wrappers read it from here.
@@ -183,14 +183,9 @@ inline juce::File findFactoryPerformance()
 // hand over — the coordinator pre-checks existence and reports "scanner worker not found"
 // instead of blaming a module.
 
-inline juce::File findHostScannerWorker (const juce::Array<juce::File>& extraDirectories = {})
+inline juce::File findHostWorkerNamed (const juce::String& workerName,
+                                       const juce::Array<juce::File>& extraDirectories = {})
 {
-   #if JUCE_WINDOWS
-    const juce::String workerName ("CEditorPluginScanner.exe");
-   #else
-    const juce::String workerName ("CEditorPluginScanner");
-   #endif
-
     // For the standalone this is the exe's directory; for a plug-in JUCE resolves it to the
     // loaded module, so "beside the binary" covers both installs.
     const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
@@ -218,6 +213,24 @@ inline juce::File findHostScannerWorker (const juce::Array<juce::File>& extraDir
             return candidate;
 
     return candidates.getFirst();
+}
+
+inline juce::File findHostScannerWorker (const juce::Array<juce::File>& extraDirectories = {})
+{
+   #if JUCE_WINDOWS
+    return findHostWorkerNamed ("CEditorPluginScanner.exe", extraDirectories);
+   #else
+    return findHostWorkerNamed ("CEditorPluginScanner", extraDirectories);
+   #endif
+}
+
+inline juce::File findHostLiveWorker (const juce::Array<juce::File>& extraDirectories = {})
+{
+   #if JUCE_WINDOWS
+    return findHostWorkerNamed ("CEditorPluginWorker.exe", extraDirectories);
+   #else
+    return findHostWorkerNamed ("CEditorPluginWorker", extraDirectories);
+   #endif
 }
 
 } // namespace ceditor::host

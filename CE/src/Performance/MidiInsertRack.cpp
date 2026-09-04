@@ -18,6 +18,9 @@ namespace
         if (slot.type == "transpose")
         {
             out.transpose = slot.fx.transpose;
+            out.transposeMode = slot.fx.transposeMode;
+            out.scaleType = slot.fx.scaleType;
+            out.scaleRoot = slot.fx.scaleRoot;
         }
         else if (slot.type == "scale")
         {
@@ -28,6 +31,9 @@ namespace
         else if (slot.type == "chord")
         {
             out.chord = slot.fx.chord;
+            out.chordInversion = slot.fx.chordInversion;
+            out.chordVoicing = slot.fx.chordVoicing;
+            out.chordVoiceLeading = slot.fx.chordVoiceLeading;
             out.keyChords = slot.fx.keyChords;
             // Diatonic chords are chosen per scale degree, so the chorder reads the scale
             // even when it is not folding anything into it.
@@ -38,6 +44,22 @@ namespace
         {
             out.velocityFixed = slot.fx.velocityFixed;
             out.velocityScale = slot.fx.velocityScale;
+            out.responseProfileName = slot.fx.responseProfileName;
+            out.velocityCurve = slot.fx.velocityCurve;
+            out.velocityInputMin = slot.fx.velocityInputMin;
+            out.velocityInputMax = slot.fx.velocityInputMax;
+            out.velocityOutputMin = slot.fx.velocityOutputMin;
+            out.velocityOutputMax = slot.fx.velocityOutputMax;
+            out.velocityCurveValues = slot.fx.velocityCurveValues;
+            out.expressionEnabled = slot.fx.expressionEnabled;
+            out.expressionSource = slot.fx.expressionSource;
+            out.expressionCc = slot.fx.expressionCc;
+            out.expressionCurve = slot.fx.expressionCurve;
+            out.expressionInputMin = slot.fx.expressionInputMin;
+            out.expressionInputMax = slot.fx.expressionInputMax;
+            out.expressionOutputMin = slot.fx.expressionOutputMin;
+            out.expressionOutputMax = slot.fx.expressionOutputMax;
+            out.expressionCurveValues = slot.fx.expressionCurveValues;
         }
 
         return out;
@@ -58,6 +80,7 @@ void MidiInsertRack::releaseNoteModules (Module& module, juce::MidiBuffer& out, 
     if (module.chance != nullptr)   module.chance->allNotesOff (out, position);
     if (module.length != nullptr)   module.length->allNotesOff (out, position);
     if (module.latch != nullptr)    module.latch->allNotesOff (out, position);
+    if (module.mpe != nullptr)      module.mpe->allNotesOff (out, position);
 }
 
 std::unique_ptr<MidiInsertRack::Module> MidiInsertRack::build (const MidiSlot& slot)
@@ -73,6 +96,8 @@ std::unique_ptr<MidiInsertRack::Module> MidiInsertRack::build (const MidiSlot& s
     else if (slot.type == "chance")    module->chance   = std::make_unique<ChanceEngine>();
     else if (slot.type == "length")    module->length   = std::make_unique<NoteLengthEngine>();
     else if (slot.type == "latch")     module->latch    = std::make_unique<LatchEngine>();
+    else if (slot.type == "mpe")       module->mpe      = std::make_unique<MpeTransformerEngine>();
+    else if (slot.type == "articulation") {} // the part wrapper owns this control stage
     else                               module->fx       = std::make_unique<MidiFxChain>();
 
     configure (*module, slot);
@@ -101,6 +126,7 @@ void MidiInsertRack::configure (Module& module, const MidiSlot& slot)
         if (module.chance != nullptr)   module.chance->setSettings (slot.mod);
         if (module.length != nullptr)   module.length->setSettings (slot.mod);
         if (module.latch != nullptr)    module.latch->setSettings (slot.mod);
+        if (module.mpe != nullptr)      module.mpe->setSettings (slot.mod);
     }
 }
 
@@ -131,6 +157,12 @@ void MidiInsertRack::setSlots (const juce::Array<MidiSlot>& slots)
 
             if (existing != modules.end())
             {
+                if (! (**existing).bypassed && slot.bypassed)
+                {
+                    if ((**existing).fx != nullptr)  (**existing).fx->allNotesOff (stranded, 0);
+                    if ((**existing).arp != nullptr) (**existing).arp->allNotesOff (stranded, 0);
+                    releaseNoteModules (**existing, stranded, 0);
+                }
                 configure (**existing, slot);
                 rebuilt.push_back (std::move (*existing));
             }
@@ -206,7 +238,7 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
                 continue;
             module->fx->process (front, back);
         }
-        // The six later modules. Every one of them stays in the chain even when it is doing
+        // The later modules. Every one of them stays in the chain even when it is doing
         // nothing, for the arp's reason: each owns notes it emitted or note-offs it swallowed,
         // and a module skipped mid-phrase is a module that never gets to let go.
         else if (module->echo != nullptr)
@@ -221,6 +253,8 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
             module->chance->process (front, back);
         else if (module->latch != nullptr)
             module->latch->process (front, back);
+        else if (module->mpe != nullptr)
+            module->mpe->process (front, back);
         else
         {
             continue;

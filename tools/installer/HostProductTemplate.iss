@@ -1,5 +1,4 @@
-; HostProductTemplate.iss — the generated instrument-host product's installer (VIP-successor
-; Stage 1).
+; HostProductTemplate.iss — the generated Hostage product's installer.
 ;
 ; One template for every Host Project: tools/scripts/build-host-product.mjs stages the built
 ; targets and compiles this with /D switches carrying the project's manifest. Every define is
@@ -11,7 +10,7 @@
 ; and "two half-installed rack products fighting over shortcuts".
 
 #ifndef MyAppName
-  #define MyAppName "CE Instrument Host"
+  #define MyAppName "Hostage"
 #endif
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
@@ -23,13 +22,13 @@
   #define MyAppId "6D2C4E86-0000-4000-8000-000000000000"
 #endif
 #ifndef MyAppExeName
-  #define MyAppExeName "CE Instrument Host.exe"
+  #define MyAppExeName "Hostage.exe"
 #endif
 #ifndef MyVst3BundleName
-  #define MyVst3BundleName "CE Instrument Host.vst3"
+  #define MyVst3BundleName "Hostage.vst3"
 #endif
 #ifndef MySetupBase
-  #define MySetupBase "CEInstrumentHost"
+  #define MySetupBase "Hostage"
 #endif
 #ifndef MySourceDir
   #define MySourceDir "..\\..\\build\\host-product\\stage"
@@ -78,12 +77,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 #if IncludeStandalone == "1"
-; The standalone and its scanner worker, side by side — the runtime looks for the worker
-; beside its own binary first.
+; The standalone and both workers, side by side — the runtime looks for them there first.
 Source: "{#MySourceDir}\Standalone\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
 #if IncludeVst3 == "1"
-; The VST3 bundle is a directory; the scanner worker was staged inside it next to the module,
+; The VST3 bundle is a directory; both workers were staged inside it next to the module,
 ; which is "beside the binary" from the plug-in's point of view.
 Source: "{#MySourceDir}\VST3\{#MyVst3BundleName}\*"; DestDir: "{commoncf64}\VST3\{#MyVst3BundleName}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif

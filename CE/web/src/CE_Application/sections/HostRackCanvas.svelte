@@ -191,7 +191,7 @@
            Both ignores below are the analyser losing a ternary, not a11y being waived: role
            and tabindex are driven by the SAME `isPart`, so the element that carries a
            tabindex is always the one that carries role="button" and the key handler, and a
-           bus, return or master node gets neither. -->
+           bus, return or master node is a plain group. -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class={`node ${node.kind}`}
@@ -204,7 +204,7 @@
            data-testid={`canvas-node-${node.id}`}
            title={label}
            aria-label={label}
-           role={isPart ? 'button' : undefined}
+           role={isPart ? 'button' : 'group'}
            tabindex={isPart ? 0 : undefined}
            draggable="true"
            style={`left:${node.x}px;top:${node.y}px;width:${CANVAS_NODE_W}px;height:${CANVAS_NODE_H}px`}

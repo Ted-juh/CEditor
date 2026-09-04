@@ -2,7 +2,8 @@
   /**
    * HostKeyboard.svelte — the one keyboard on screen, in two sizes.
    *
-   * PLAY: three octaves of playable keys. The host had no way to make a sound without a
+   * PLAY: a selectable span of playable keys, four octaves by default. The host had no way to
+   * make a sound without a
    * hardware MIDI keyboard plugged in, which made "load a synth and hear it" impossible on a
    * laptop lid. This strip sends notes through the SAME native path hardware MIDI takes (the
    * player's collector, ahead of the graph), so zones, splits, the event chain and the arp all
@@ -27,11 +28,14 @@
    */
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
            setPartMidiRules, partColor } from '../stores/instrumentHost.js';
-  import { isBlack, noteName, whiteCount, noteAtFraction, zoneExtent }
+  import { FULL_KEYBOARD, MAX_COMPLETE_OCTAVES, isBlack, noteName, whiteCount,
+           noteAtFraction, zoneExtent, maxPlayBaseOctave, playKeyboardRange,
+           playKeyboardWidthPercent }
     from '../utils/pianoGeometry.js';
 
   let baseOctave = $state(4);   // C4 at the left edge in play mode
-  const PLAY_OCTAVES = 3;
+  let playOctaves = $state(4);
+  const PLAY_OCTAVE_OPTIONS = Array.from({ length: MAX_COMPLETE_OCTAVES }, (_, i) => i + 1);
 
   let mode = $derived($hostKeyboardMode.mode);
   let parts = $derived($hostState.rack.parts);
@@ -44,8 +48,11 @@
 
   // The keys on screen: [low, high], and the white keys among them in order, each with the
   // sharp that rides its right-hand seam (or -1 when there is none, or it is out of range).
-  let low = $derived(mode === 'range' ? 0 : (baseOctave + 1) * 12);
-  let high = $derived(mode === 'range' ? 127 : Math.min(127, (baseOctave + 1) * 12 + PLAY_OCTAVES * 12 - 1));
+  let playRange = $derived(playKeyboardRange(baseOctave, playOctaves));
+  let low = $derived(mode === 'range' ? 0 : playRange.low);
+  let high = $derived(mode === 'range' ? 127 : playRange.high);
+  let playWidth = $derived(playKeyboardWidthPercent(playOctaves));
+  let maxBaseOctave = $derived(maxPlayBaseOctave(playOctaves));
   let whites = $derived(whiteCount(low, high));
   let slots = $derived.by(() => {
     const out = [];
@@ -110,14 +117,25 @@
     if (event.repeat || event.target.closest('input, textarea, select, [contenteditable]')) return;
     const key = event.key.toLowerCase();
     if (key === 'escape' && mode === 'range') { showKeyboardPlay(); return; }
-    if (key === 'z') { baseOctave = Math.max(0, baseOctave - 1); return; }
-    if (key === 'x') { baseOctave = Math.min(7, baseOctave + 1); return; }
+    if (key === 'z') { shiftOctave(-1); return; }
+    if (key === 'x') { shiftOctave(1); return; }
     if (key in KEYMAP) press(noteAt(baseOctave, KEYMAP[key]), 100);
   }
 
   function typeUp(event) {
     const key = event.key.toLowerCase();
     if (key in KEYMAP) release(noteAt(baseOctave, KEYMAP[key]));
+  }
+
+  function shiftOctave(amount) {
+    if (playOctaves === FULL_KEYBOARD) return;
+    baseOctave = Math.max(-1, Math.min(maxBaseOctave, baseOctave + amount));
+  }
+
+  function setPlayOctaves(value) {
+    playOctaves = value === FULL_KEYBOARD ? FULL_KEYBOARD : Number(value);
+    if (playOctaves !== FULL_KEYBOARD)
+      baseOctave = Math.min(baseOctave, maxPlayBaseOctave(playOctaves));
   }
 
   // --- the range, on the rim -------------------------------------------------------------
@@ -168,16 +186,30 @@
 <div class="host-keyboard" class:range={mode === 'range'} data-testid="host-keyboard" data-mode={mode}>
   <div class="side">
     {#if mode === 'play'}
-      <div class="octave-controls">
-        <button type="button" title="Octave down (Z)"
-                onclick={() => (baseOctave = Math.max(0, baseOctave - 1))}>−</button>
-        <span class="octave-label" title="Keys A–K play from this octave; Z and X shift it. Press low on a key for a harder hit.">C{baseOctave}</span>
-        <button type="button" title="Octave up (X)"
-                onclick={() => (baseOctave = Math.min(7, baseOctave + 1))}>+</button>
+      <div class="play-controls">
+        <div class="octave-controls">
+          <button type="button" title="Octave up (X)" aria-label="Octave up"
+                  disabled={playOctaves === FULL_KEYBOARD || baseOctave >= maxBaseOctave}
+                  onclick={() => shiftOctave(1)}>+</button>
+          <span class="octave-label" title="Keys A–K play from this octave; Z and X shift it. Press low on a key for a harder hit.">C{baseOctave}</span>
+          <button type="button" title="Octave down (Z)" aria-label="Octave down"
+                  disabled={playOctaves === FULL_KEYBOARD || baseOctave <= -1}
+                  onclick={() => shiftOctave(-1)}>−</button>
+        </div>
+        <label class="octave-amount" title="Number of visible octaves. Four keeps the normal key size; shorter keyboards are centred and longer keyboards shrink to fit.">
+          <span>Octaves</span>
+          <select aria-label="Visible octaves" value={playOctaves}
+                  onchange={(event) => setPlayOctaves(event.currentTarget.value)}>
+            {#each PLAY_OCTAVE_OPTIONS as count}
+              <option value={count}>{count}</option>
+            {/each}
+            <option value={FULL_KEYBOARD}>Full</option>
+          </select>
+        </label>
       </div>
     {:else}
       <button type="button" class="mode-back" data-testid="host-keyboard-play"
-              title="Back to the three-octave keyboard (Esc). Drag the tabs on the rim to set the range, the strip between them to move it; click a band on the keys to edit another part."
+              title="Back to the playable keyboard (Esc). Drag the tabs on the rim to set the range, the strip between them to move it; click a band on the keys to edit another part."
               onclick={() => showKeyboardPlay()}>Play</button>
       <span class="range-for" style={`--part-color:${rangeColor}`}>
         {rangePart ? `${partLabel(rangePart)} · ${noteName(rangePart.keyLow)}–${noteName(rangePart.keyHigh)}` : 'Key ranges'}
@@ -206,10 +238,11 @@
       </div>
     {/if}
 
-    <div class="keys" role="presentation">
+    <div class="keys" role="presentation"
+         style:width={mode === 'play' ? `${playWidth}%` : '100%'}>
       {#each slots as slot (slot.note)}
         <div class="white-slot">
-          <button type="button" class="white" class:down={pressed.has(slot.note)}
+          <button type="button" class="piano-key white" class:down={pressed.has(slot.note)}
                   class:in-range={inRange(slot.note)}
                   style={inRange(slot.note) ? `--part-color:${rangeColor}` : ''}
                   data-note={slot.note} aria-label={`Note ${slot.note}`}
@@ -230,7 +263,7 @@
             {/if}
           </button>
           {#if slot.sharp >= 0}
-            <button type="button" class="black" class:down={pressed.has(slot.sharp)}
+            <button type="button" class="piano-key black" class:down={pressed.has(slot.sharp)}
                     class:in-range={inRange(slot.sharp)}
                     style={inRange(slot.sharp) ? `--part-color:${rangeColor}` : ''}
                     data-note={slot.sharp} aria-label={`Note ${slot.sharp}`}
@@ -259,6 +292,7 @@
   .host-keyboard.range { border-color: #4a6a7a; }
 
   .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 40px; }
+  .play-controls { display: flex; align-items: center; gap: 7px; }
   .octave-controls { display: flex; flex-direction: column; align-items: center; gap: 2px; justify-content: center; }
   .octave-label { color: #9aa5b1; font-size: 11px; min-width: 24px; text-align: center; }
   .octave-controls button, .mode-back {
@@ -273,6 +307,21 @@
   }
   .octave-controls button { width: 24px; padding: 0 0 2px; }
   .octave-controls button:hover, .mode-back:hover { border-color: #5b9bd5; }
+  .octave-controls button:disabled { opacity: 0.38; cursor: default; border-color: #3b4652; }
+  .octave-amount {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: #9aa5b1; font-size: 10px;
+  }
+  .octave-amount select {
+    width: 48px;
+    background: #232a31;
+    border: 1px solid #3b4652;
+    border-radius: 4px;
+    color: #d6dbe0;
+    padding: 1px 3px;
+    font: inherit;
+  }
+  .octave-amount select:hover, .octave-amount select:focus { border-color: #5b9bd5; }
   .range-for {
     font-size: 11px; max-width: 110px; text-align: center; color: #d6dbe0;
     border-top: 3px solid var(--part-color, #4a6a7a); padding-top: 3px;
@@ -280,7 +329,7 @@
   }
 
   .strip { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .keys { display: flex; height: 74px; min-width: 0; }
+  .keys { display: flex; align-self: center; height: 74px; min-width: 0; }
   .range .keys { height: 64px; }
   .white-slot { position: relative; flex: 1; min-width: 0; }
 

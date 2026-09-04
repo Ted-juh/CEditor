@@ -1,5 +1,5 @@
 /**
- * instrumentHost.js — UI state for the Instrument Host workspace (VIP-successor Stage 1).
+ * instrumentHost.js — UI state for the Hostage workspace.
  *
  * The native side is authoritative: every command answers with a full `instrumentHostState`
  * push and this store just renders the latest one. The pure pieces — payload normalization,
@@ -31,12 +31,28 @@ import {
   onInstrumentHostMidiLearn,
   onInstrumentHostParamLearn,
   onInstrumentHostArpStep,
+  onInstrumentHostLfoActivity,
+  onInstrumentHostEnvelopeActivity,
+  onInstrumentHostMsegActivity,
+  onInstrumentHostRandomModulatorActivity,
   onInstrumentHostChordLearn,
   onInstrumentHostHardwarePatchCapture,
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
   onInstrumentHostPatchCompare,
 } from '../bridge/bridge.js';
+import { stageCommandAllowed } from '../utils/stageLock.js';
+import {
+  RESPONSE_CURVES, normalizeResponseCurvePoints,
+} from '../utils/responseCurve.js';
+
+// Browser-preview entities must be just as addressable as native UUID-backed entities. The
+// clock alone is not an identity source: two button presses, test commands, or linked actions
+// can land in the same millisecond. Keep the readable timestamp, then disambiguate every mint
+// with one session-wide monotonic serial.
+let mockEntitySerial = 0;
+const nextMockSuffix = () => `${Date.now()}-${++mockEntitySerial}`;
+const nextMockId = (prefix) => `${prefix}-${nextMockSuffix()}`;
 
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
@@ -54,7 +70,10 @@ export const hostMidiActivity = writable({ device: '', text: '', cc: -1, note: -
 // The CTRL49 hardware surface as the broker reports it: searching (no device), connecting,
 // connected, heldElsewhere (another instance owns it), failed. Fail-safe like every other
 // host store — a malformed payload lands on 'searching', never a crash.
-export const hostSurface = writable({ state: 'searching', detail: '', device: '' });
+export const hostSurface = writable({
+  state: 'searching', detail: '', device: '', pageIndex: 0, activeSlot: 0, padBank: 0,
+  movementSeq: 0, movingSlot: -1,
+});
 
 // MIDI learn: which slot is armed and listening right now. The bind itself lands in the
 // state (each slot's midiCc/midiChannel); this store only tracks the transient arming.
@@ -71,7 +90,7 @@ export const hostArpStep = writable({});
 // part's midiFx via the state.
 export const hostChordLearn = writable({ armed: false, partId: '', stage: '', key: -1 });
 
-// The one keyboard on screen has two jobs. `play`: three octaves to audition with. `range`: all
+// The one keyboard on screen has two jobs. `play`: a selectable span to audition with. `range`: all
 // 128 keys with every part's key range drawn beneath, for setting a split by dragging — the
 // same picture, grown, rather than a second keyboard somewhere else that never quite lined up
 // with the first. Session state, not document state: which mode you are in is not a setting.
@@ -154,6 +173,11 @@ export function normalizeHostSurface(payload) {
     state: known.includes(state) ? state : 'searching',
     detail: String(payload?.detail ?? ''),
     device: String(payload?.device ?? ''),
+    pageIndex: Math.max(0, Math.min(3, Number(payload?.pageIndex ?? 0) || 0)),
+    activeSlot: Math.max(0, Math.min(7, Number(payload?.activeSlot ?? 0) || 0)),
+    padBank: Math.max(0, Math.min(3, Number(payload?.padBank ?? 0) || 0)),
+    movementSeq: Math.max(0, Math.trunc(Number(payload?.movementSeq ?? 0) || 0)),
+    movingSlot: Math.max(-1, Math.min(7, Math.trunc(Number(payload?.movingSlot ?? -1) || 0))),
   };
 }
 
@@ -299,7 +323,8 @@ export function mockSurfaceLayout() {
 // --- §17.7: the support bundle ------------------------------------------------------------------
 
 export function emptySupportBundle() {
-  return { entries: [], includeStateBlobs: false, written: false, path: '' };
+  return { entries: [], includeStateBlobs: false, includeWorkerDumps: false,
+           written: false, path: '' };
 }
 
 export function normalizeSupportBundle(payload) {
@@ -313,6 +338,7 @@ export function normalizeSupportBundle(payload) {
       note: String(e?.note ?? ''),
     })),
     includeStateBlobs: p.includeStateBlobs === true,
+    includeWorkerDumps: p.includeWorkerDumps === true,
     // Absent means "this was a preview", which is not the same as a failed export — the panel
     // has to be able to tell them apart or it will report a file that does not exist.
     written: p.written === true,
@@ -369,9 +395,11 @@ export function normalizeHostLibrary(payload) {
 export function mockHostLibrary(query = '', type = '') {
   const all = [
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
-      manufacturer: 'Mock Audio', instrument: 'Stage Keys', factory: true, available: true, favourite: true },
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      factory: true, available: true, favourite: true },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
-      manufacturer: 'Mock Audio', instrument: 'Analog One', available: true, tags: ['bass'] },
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      available: true, tags: ['bass'] },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', factory: true,
       available: false, reason: 'Requires Uninstalled Synth, which is not in the catalogue.' },
@@ -511,7 +539,7 @@ export function groupParameters(parameters) {
   return groups;
 }
 
-/** Every parameterId of this target that some control slot or macro drives — the
+/** Every parameterId of this target that some control slot, macro or modulation route drives — the
  *  "assigned" filter's ground truth, read from the same state the panels render. */
 export function assignedParameterIds(state, targetId) {
   const ids = new Set();
@@ -521,6 +549,8 @@ export function assignedParameterIds(state, targetId) {
   for (const macro of state?.rack?.macros ?? [])
     for (const target of macro.targets)
       if (target.targetId === targetId) ids.add(target.parameterId);
+  for (const route of state?.rack?.modulationRoutes ?? [])
+    if (route.targetId === targetId) ids.add(route.parameterId);
   return ids;
 }
 
@@ -682,17 +712,93 @@ export function emptyHostState() {
     modules: [],
     scanPaths: [],
     scanning: false,
+    stageLocked: false,
     editorOpenPartId: '',
     floatingEditorPartIds: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
     rack: { performanceId: '', focusedPartId: '', parts: [], masterEffects: [], returns: [], buses: [],
-            macros: [], pages: [], canvasPositions: [], masterLatencyMs: 0 },
+            macros: [], midiLfos: [], envelopes: [], msegs: [], randomModulators: [],
+            layerGroups: [],
+            modulationRoutes: [], pages: [], canvasPositions: [], masterLatencyMs: 0,
+            microtuning: normalizeMicrotuning(),
+            presetAudition: { enabled: false, phrase: 'chord', rootNote: 60,
+                              velocity: 100, noteLengthMs: 360, gapMs: 90, playing: false },
+            soundComparison: { active: false, partId: '', index: -1, count: 0,
+                               recordId: '', name: '', originalRecordId: '',
+                               originalName: 'Original sound', recordIds: [] } },
     performance: emptyPerformance(),
     product: emptyProduct(),
     reliability: emptyReliability(),
     licence: emptyLicence(),
   };
+}
+
+export function normalizeMicrotuning(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const degrees = (Array.isArray(source.degreesCents) ? source.degreesCents :
+    Array.from({ length: 13 }, (_, degree) => degree * 100))
+    .map(Number).filter(Number.isFinite);
+  const validDegrees = degrees.length >= 2 && degrees.length <= 129 && degrees[0] === 0
+    && degrees.every((degree, index) => degree >= 0 && degree <= 19200
+      && (index === 0 || degree > degrees[index - 1]));
+  const safeDegrees = validDegrees ? degrees : Array.from({ length: 13 }, (_, degree) => degree * 100);
+  return {
+    enabled: source.enabled === true && (!Array.isArray(source.degreesCents) || validDegrees),
+    name: String(source.name ?? '12-tone equal temperament').slice(0, 80) || 'Untitled tuning',
+    sourceName: String(source.sourceName ?? '').slice(0, 260),
+    rootMidiNote: Math.max(0, Math.min(127, Math.round(Number(source.rootMidiNote ?? 60) || 0))),
+    referenceMidiNote: Math.max(0, Math.min(127, Math.round(Number(source.referenceMidiNote ?? 69) || 0))),
+    referenceFrequency: Math.max(1, Math.min(40000, Number(source.referenceFrequency ?? 440) || 440)),
+    mtsDeviceId: Math.max(0, Math.min(127, Math.round(Number(source.mtsDeviceId ?? 127) || 0))),
+    mtsProgram: Math.max(0, Math.min(127, Math.round(Number(source.mtsProgram ?? 0) || 0))),
+    degreeCount: safeDegrees.length - 1,
+    periodCents: safeDegrees[safeDegrees.length - 1],
+    degreesCents: safeDegrees,
+  };
+}
+
+/** Parse the exchange portion of Scala's .scl format for browser preview/tests. The native
+ * parser remains authoritative in the app; this mirror makes the file workflow real in the
+ * standalone browser rather than accepting any text and inventing a result. */
+export function parseScalaTuning(text, sourceName = '') {
+  const meaningful = String(text ?? '').split(/\r?\n/)
+    .map((line) => line.split('!')[0].trim()).filter(Boolean);
+  if (meaningful.length < 2) throw new Error('That Scala file has no description and degree count.');
+  if (!/^\d+$/.test(meaningful[1]))
+    throw new Error('The Scala degree count must be a whole number from 1 to 128.');
+  const count = Number(meaningful[1]);
+  if (count < 1 || count > 128)
+    throw new Error('The Scala degree count must be a whole number from 1 to 128.');
+  if (meaningful.length < count + 2)
+    throw new Error('The Scala file ends before all of its declared degrees are present.');
+
+  const degreesCents = [0];
+  for (let index = 0; index < count; index += 1) {
+    const token = meaningful[index + 2].replace(/\s/g, '');
+    let cents;
+    if (token.includes('/')) {
+      const parts = token.split('/');
+      const numerator = Number(parts[0]);
+      const denominator = Number(parts[1]);
+      if (parts.length !== 2 || !Number.isFinite(numerator) || numerator <= 0
+          || !Number.isFinite(denominator) || denominator <= 0)
+        throw new Error(`Scala degree ${index + 1} has an invalid ratio.`);
+      cents = 1200 * Math.log2(numerator / denominator);
+    } else if (token.includes('.')) {
+      cents = Number(token);
+    } else {
+      const ratio = Number(token);
+      cents = 1200 * Math.log2(ratio);
+    }
+    if (!Number.isFinite(cents) || cents <= degreesCents[degreesCents.length - 1] || cents > 19200)
+      throw new Error('Scala degrees must rise strictly and remain within sixteen octaves.');
+    degreesCents.push(cents);
+  }
+
+  return normalizeMicrotuning({
+    enabled: true, name: meaningful[0], sourceName, degreesCents,
+  });
 }
 
 /** The §19 "Trust" block: which edition is in force, the licence behind it, its seats, and —
@@ -773,6 +879,9 @@ export function emptyReliability() {
       preservedStateFile: '', hasLastKnownGood: false, lastKnownGoodAt: '',
     },
     damagedState: [],
+    automaticFailover: {
+      isolationAvailable: false, enabled: true, maxAttempts: 3, retryDelayMs: 500, events: [],
+    },
   };
 }
 
@@ -780,6 +889,8 @@ export function normalizeReliability(payload) {
   const r = payload && typeof payload === 'object' ? payload : {};
   const safe = r.safeMode && typeof r.safeMode === 'object' ? r.safeMode : {};
   const recovery = r.recovery && typeof r.recovery === 'object' ? r.recovery : {};
+  const failover = r.automaticFailover && typeof r.automaticFailover === 'object'
+    ? r.automaticFailover : {};
 
   // Anything unrecognised reads as normal, exactly as the native side reads it: a state file
   // from a future build must not leave the panel claiming a safe mode it cannot explain.
@@ -811,6 +922,23 @@ export function normalizeReliability(payload) {
       lastKnownGoodAt: String(recovery.lastKnownGoodAt ?? ''),
     },
     damagedState: (Array.isArray(r.damagedState) ? r.damagedState : []).map(String),
+    automaticFailover: {
+      isolationAvailable: failover.isolationAvailable === true,
+      enabled: failover.enabled !== false,
+      maxAttempts: Math.max(1, Math.min(5, Math.round(Number(failover.maxAttempts ?? 3) || 3))),
+      retryDelayMs: Math.max(100, Math.min(10000,
+        Math.round(Number(failover.retryDelayMs ?? 500) || 500))),
+      events: (Array.isArray(failover.events) ? failover.events : []).map((event) => ({
+        targetId: String(event?.targetId ?? ''),
+        name: String(event?.name ?? ''),
+        effect: event?.effect === true,
+        state: ['waiting', 'loading', 'recovered', 'failed', 'bypassed'].includes(event?.state)
+          ? event.state : 'failed',
+        attempts: Math.max(0, Math.round(Number(event?.attempts ?? 0) || 0)),
+        error: String(event?.error ?? ''),
+        nextAttemptMs: Math.max(0, Number(event?.nextAttemptMs ?? 0) || 0),
+      })).filter((event) => event.targetId),
+    },
   };
 }
 
@@ -887,7 +1015,7 @@ export function normalizeProduct(payload) {
 }
 
 /** The Stage 6 half of the state: one transport, the patterns and clips over it, the scenes
- *  that recall whole rigs and the setlist that walks them. */
+ *  that recall whole rigs, the compact arranger that chains them, and the setlist that walks them. */
 export function emptyPerformance() {
   return {
     transport: {
@@ -895,11 +1023,41 @@ export function emptyPerformance() {
       bar: 1, beat: 1, beatFraction: 0, externalClock: false, clockLost: false,
       defaultQuantize: 'bar',
     },
+    grooves: [],
     patterns: [],
     clips: [],
     scenes: [],
-    setlist: { items: [], currentIndex: -1 },
-    capture: { armed: false, clipId: '', laneId: '' },
+    snapshotMorph: {
+      active: false, sceneId: '', name: '', durationBeats: 0, progress: 0, targetCount: 0,
+    },
+    setlist: { items: [], currentIndex: -1, preloadAhead: 1, loadingIndex: -1, preloads: [] },
+    arrangement: {
+      items: [], loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
+      ending: false, progress: 0, bar: 0,
+    },
+    capture: {
+      armed: false, clipId: '', laneId: '',
+      historySeconds: 0, historyEvents: 0, historyHasNotes: false,
+      historyCapacitySeconds: 120,
+      lastPatternId: '', lastClipId: '', lastNoteCount: 0, lastStepCount: 0,
+      lastSeconds: 0, lastTrimmed: false,
+    },
+    looper: {
+      recording: false, overdubbing: false, targetClipId: '',
+      elapsedSeconds: 0, maxLengthBeats: 128,
+    },
+    gestures: {
+      recording: false, mode: 'new', targetClipId: '', pointCount: 0, targetCount: 0,
+      elapsedSeconds: 0, truncated: false, maxPoints: 8192, lastClipId: '',
+    },
+    performanceTakes: [],
+    performanceRecorder: {
+      recording: false, name: '', elapsedSeconds: 0, midiEventCount: 0,
+      actionCount: 0, truncated: false,
+    },
+    performanceReplay: {
+      state: 'idle', takeId: '', name: '', progress: 0, degraded: false,
+    },
     scales: [],
   };
 }
@@ -919,6 +1077,71 @@ const normalizeStep = (s) => ({
   chordNotes: (Array.isArray(s?.chordNotes) ? s.chordNotes : []).map(Number),
 });
 
+export const factoryGrooveTemplates = [
+  {
+    grooveId: '@hostage-mpc54', name: 'MPC-style 54%', source: 'factory', stepsPerBeat: 4,
+    timingOffsets: [0, .08, 0, .08, 0, .08, 0, .08, 0, .08, 0, .08, 0, .08, 0, .08],
+    velocityMultipliers: [1.08, .94, 1, .92, 1.05, .94, .99, .92, 1.08, .94, 1, .92, 1.05, .94, .99, .92],
+  },
+  {
+    grooveId: '@hostage-mpc62', name: 'MPC-style 62%', source: 'factory', stepsPerBeat: 4,
+    timingOffsets: [0, .24, 0, .24, 0, .24, 0, .24, 0, .24, 0, .24, 0, .24, 0, .24],
+    velocityMultipliers: [1.10, .90, 1.01, .88, 1.07, .91, .98, .88, 1.10, .90, 1.01, .88, 1.07, .91, .98, .88],
+  },
+  {
+    grooveId: '@hostage-laidback', name: 'Laid-back pocket', source: 'factory', stepsPerBeat: 4,
+    timingOffsets: [0, .05, -.02, .12, .01, .07, -.01, .10, 0, .06, -.03, .13, .02, .08, -.01, .11],
+    velocityMultipliers: [1.12, .91, .98, .87, 1.07, .92, 1, .88, 1.10, .90, .97, .86, 1.06, .91, .99, .87],
+  },
+];
+
+export const normalizeGrooveTemplate = (groove) => ({
+  grooveId: String(groove?.grooveId ?? ''),
+  name: String(groove?.name ?? 'Imported groove').trim().slice(0, 80) || 'Imported groove',
+  source: groove?.source === 'factory' ? 'factory' : 'imported',
+  stepsPerBeat: clampInt(groove?.stepsPerBeat, 1, 16, 4),
+  timingOffsets: (Array.isArray(groove?.timingOffsets) ? groove.timingOffsets : [])
+    .slice(0, 64).map((value) => clampNumber(value, -.5, .5, 0)),
+  velocityMultipliers: (Array.isArray(groove?.velocityMultipliers)
+    ? groove.velocityMultipliers : []).slice(0, 64)
+    .map((value) => clampNumber(value, .25, 2, 1)),
+});
+
+/** Browser mirror of the native destructive apply: the resulting real step fields are the
+ * playback truth and can be edited immediately after the groove is committed. */
+export function applyGrooveToPattern(pattern, template, amount = 1, applyVelocity = true) {
+  const target = pattern;
+  const groove = normalizeGrooveTemplate(template);
+  if (!target || groove.timingOffsets.length < 2) return target;
+  const strength = clampNumber(amount, 0, 1, 1);
+  for (const lane of target.lanes ?? []) {
+    const laneRate = Math.max(1, Number(lane.stepsPerBeat) || 1);
+    for (let index = 0; index < (lane.steps ?? []).length; index += 1) {
+      const step = lane.steps[index];
+      const grooveIndex = Math.round(index * groove.stepsPerBeat / laneRate)
+        % groove.timingOffsets.length;
+      step.microtiming = Math.max(-.5, Math.min(.5,
+        groove.timingOffsets[grooveIndex] * laneRate / groove.stepsPerBeat * strength));
+      const noteLane = ['note', 'chord', 'drum'].includes(lane.type);
+      if (applyVelocity && noteLane && step.active && groove.velocityMultipliers.length) {
+        const multiplier = groove.velocityMultipliers[grooveIndex % groove.velocityMultipliers.length];
+        step.velocity = Math.max(1, Math.min(127,
+          Math.round(step.velocity * (1 + (multiplier - 1) * strength))));
+      }
+    }
+  }
+  target.appliedGrooveId = groove.grooveId;
+  target.appliedGrooveAmount = strength;
+  return target;
+}
+
+const normalizeFollowAction = (clip) => {
+  const action = String(clip?.followAction ?? '');
+  if (['none', 'clip', 'next', 'random', 'stop'].includes(action)) return action;
+  if (clip?.followClipId) return 'clip';
+  return Number(clip?.followAfterLoops ?? 0) > 0 ? 'stop' : 'none';
+};
+
 const normalizeArp = (a) => ({
   enabled: a?.enabled === true,
   mode: String(a?.mode ?? 'up'),
@@ -936,13 +1159,15 @@ const normalizeArp = (a) => ({
 // One MIDI insert. A slot carries both settings blocks and shows the one its type needs —
 // the same shape the native side keeps, so the UI never has to guess which half is live.
 export const midiSlotTypes = ['arp', 'transpose', 'scale', 'chord', 'velocity', 'fx',
-                              'echo', 'strum', 'humanize', 'chance', 'length', 'latch'];
+                              'echo', 'strum', 'humanize', 'chance', 'length', 'latch', 'mpe',
+                              'articulation'];
 
 export const midiSlotLabels = {
   arp: 'Arpeggiator', transpose: 'Transpose', scale: 'Scale', chord: 'Chorder',
-  velocity: 'Velocity', fx: 'Note shaping',
+  velocity: 'Velocity / Expression', fx: 'Note shaping',
   echo: 'Echo', strum: 'Strum', humanize: 'Humanize', chance: 'Chance',
-  length: 'Note length', latch: 'Latch',
+  length: 'Note length', latch: 'Latch', mpe: 'MPE Transformer',
+  articulation: 'Articulation Manager',
 };
 
 export function normalizeMidiSlot(slot) {
@@ -957,47 +1182,298 @@ export function normalizeMidiSlot(slot) {
   };
 }
 
-/** The six later modules' settings. Every default is transparent, which is the same rule the
+/** The later note modules' settings. Every default is transparent, which is the same rule the
     native side keeps: an inserted module must not change the sound by existing. */
-const normalizeNoteModule = (m) => ({
-  echoRepeats: clampInt(m?.echoRepeats, 0, 8, 0),
-  echoStepBeats: clampNumber(m?.echoStepBeats, 0.03125, 4, 0.5),
-  echoFeedback: clampNumber(m?.echoFeedback, 0.1, 1, 0.7),
-  echoTranspose: clampInt(m?.echoTranspose, -12, 12, 0),
-  strumBeats: clampNumber(m?.strumBeats, 0, 1, 0),
-  strumDown: m?.strumDown === true,
-  humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
-  humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
-  chance: clampNumber(m?.chance, 0, 1, 1),
-  lengthBeats: clampNumber(m?.lengthBeats, 0, 8, 0),
-  legato: m?.legato === true,
-  latchOn: m?.latchOn === true,
-});
+const STRUM_PATTERNS = ['ascending', 'descending', 'alternate', 'outside in', 'inside out', 'random'];
+const MPE_FORMATS = ['mpe', 'poly aftertouch', 'channel pressure', 'cc'];
+const MPE_AXES = ['pressure', 'timbre', 'pitch bend'];
+const MPE_COLLAPSE = ['latest', 'highest', 'average'];
+const ARTICULATION_TYPES = ['keyswitch', 'program change', 'cc'];
+const normalizeArticulations = (entries) => (Array.isArray(entries) ? entries : [])
+  .slice(0, 32)
+  .map((entry, index) => {
+    const type = String(entry?.type ?? 'keyswitch');
+    const triggerNote = clampInt(entry?.triggerNote, 0, 127, 24);
+    return {
+      articulationId: String(entry?.articulationId ?? '') || `articulation-${index + 1}`,
+      name: (String(entry?.name ?? 'Articulation').trim() || 'Articulation').slice(0, 80),
+      triggerNote,
+      triggerChannel: clampInt(entry?.triggerChannel, 0, 16, 0),
+      type: ARTICULATION_TYPES.includes(type) ? type : 'keyswitch',
+      outputChannel: clampInt(entry?.outputChannel, 0, 16, 0),
+      keyswitchNote: clampInt(entry?.keyswitchNote, 0, 127, triggerNote),
+      keyswitchVelocity: clampInt(entry?.keyswitchVelocity, 1, 127, 100),
+      program: clampInt(entry?.program, 0, 127, 0),
+      bankMsb: clampInt(entry?.bankMsb, -1, 127, -1),
+      bankLsb: clampInt(entry?.bankLsb, -1, 127, -1),
+      controller: clampInt(entry?.controller, 0, 127, 0),
+      controllerValue: clampInt(entry?.controllerValue, 0, 127, 127),
+    };
+  });
+const normalizeNoteModule = (m) => {
+  const legacyPattern = m?.strumDown === true ? 'descending' : 'ascending';
+  const strumPattern = STRUM_PATTERNS.includes(String(m?.strumPattern ?? ''))
+    ? String(m.strumPattern) : legacyPattern;
+  return {
+    echoRepeats: clampInt(m?.echoRepeats, 0, 8, 0),
+    echoStepBeats: clampNumber(m?.echoStepBeats, 0.03125, 4, 0.5),
+    echoFeedback: clampNumber(m?.echoFeedback, 0.1, 1, 0.7),
+    echoTranspose: clampInt(m?.echoTranspose, -12, 12, 0),
+    strumBeats: clampNumber(m?.strumBeats, 0, 1, 0),
+    strumDown: strumPattern === 'descending',
+    strumPattern,
+    strumCurve: clampNumber(m?.strumCurve, -1, 1, 0),
+    strumVelocityRamp: clampInt(m?.strumVelocityRamp, -64, 64, 0),
+    humanizeTimingBeats: clampNumber(m?.humanizeTimingBeats, 0, 0.25, 0),
+    humanizeVelocity: clampInt(m?.humanizeVelocity, 0, 64, 0),
+    humanizeGatePercent: clampInt(m?.humanizeGatePercent, 0, 100, 0),
+    humanizePreserveChords: m?.humanizePreserveChords === true,
+    humanizeProtectBeats: m?.humanizeProtectBeats === true,
+    chance: clampNumber(m?.chance, 0, 1, 1),
+    lengthBeats: clampNumber(m?.lengthBeats, 0, 8, 0),
+    legato: m?.legato === true,
+    latchOn: m?.latchOn === true,
+    mpeEnabled: m?.mpeEnabled === true,
+    mpeInput: MPE_FORMATS.includes(String(m?.mpeInput)) ? String(m.mpeInput) : 'mpe',
+    mpeOutput: MPE_FORMATS.includes(String(m?.mpeOutput)) ? String(m.mpeOutput) : 'poly aftertouch',
+    mpeInputAxis: MPE_AXES.includes(String(m?.mpeInputAxis)) ? String(m.mpeInputAxis) : 'pressure',
+    mpeOutputAxis: MPE_AXES.includes(String(m?.mpeOutputAxis)) ? String(m.mpeOutputAxis) : 'pressure',
+    mpeInputCc: clampInt(m?.mpeInputCc, 0, 127, 74),
+    mpeOutputCc: clampInt(m?.mpeOutputCc, 0, 127, 74),
+    mpeOutputChannel: clampInt(m?.mpeOutputChannel, 1, 16, 1),
+    mpeMemberFirst: Math.min(clampInt(m?.mpeMemberFirst, 1, 16, 2),
+                             clampInt(m?.mpeMemberLast, 1, 16, 16)),
+    mpeMemberLast: Math.max(clampInt(m?.mpeMemberFirst, 1, 16, 2),
+                            clampInt(m?.mpeMemberLast, 1, 16, 16)),
+    mpeCollapse: MPE_COLLAPSE.includes(String(m?.mpeCollapse)) ? String(m.mpeCollapse) : 'latest',
+    articulationEnabled: m?.articulationEnabled === true,
+    articulationMapName: String(m?.articulationMapName ?? '').trim().slice(0, 80),
+    articulations: normalizeArticulations(m?.articulations),
+  };
+};
 
 const clampInt = (value, low, high, fallback) =>
   (Number.isFinite(Number(value)) ? Math.min(high, Math.max(low, Math.round(Number(value)))) : fallback);
 const clampNumber = (value, low, high, fallback) =>
   (Number.isFinite(Number(value)) ? Math.min(high, Math.max(low, Number(value))) : fallback);
 
-const normalizeMidiFx = (f) => ({
-  transpose: Number(f?.transpose ?? 0),
-  constrainToScale: f?.constrainToScale === true,
-  scaleRoot: Number(f?.scaleRoot ?? 0),
-  scaleType: String(f?.scaleType ?? 'major'),
-  chord: String(f?.chord ?? 'off'),
-  velocityFixed: Number(f?.velocityFixed ?? 0),
-  velocityScale: Number(f?.velocityScale ?? 1),
-  keyChords: (Array.isArray(f?.keyChords) ? f.keyChords : []).map((kc) => ({
-    key: Number(kc?.key ?? 60),
-    offsets: (Array.isArray(kc?.offsets) ? kc.offsets : []).map(Number),
-  })),
-});
+/** Browser mirror of one articulation action. This is the preview/test vocabulary rather than
+ *  raw MIDI bytes; order is significant, especially bank select before program change. */
+export function buildArticulationMessages(entry, incomingChannel = 1) {
+  const articulation = normalizeArticulations([entry])[0];
+  if (!articulation) return [];
+  const channel = articulation.outputChannel || clampInt(incomingChannel, 1, 16, 1);
+  if (articulation.type === 'program change') {
+    const messages = [];
+    if (articulation.bankMsb >= 0)
+      messages.push({ type: 'cc', channel, controller: 0, value: articulation.bankMsb });
+    if (articulation.bankLsb >= 0)
+      messages.push({ type: 'cc', channel, controller: 32, value: articulation.bankLsb });
+    messages.push({ type: 'program change', channel, program: articulation.program });
+    return messages;
+  }
+  if (articulation.type === 'cc')
+    return [{ type: 'cc', channel, controller: articulation.controller,
+              value: articulation.controllerValue }];
+  return [
+    { type: 'note on', channel, note: articulation.keyswitchNote,
+      velocity: articulation.keyswitchVelocity },
+    { type: 'note off', channel, note: articulation.keyswitchNote, velocity: 0 },
+  ];
+}
+
+/** Pure browser mirror of a Strummer stroke. It returns notes in play order with their
+    relative delay and velocity, so localhost and tests can exercise the same musical rules
+    without pretending to run the native MIDI scheduler. */
+export function buildStrumPlan(inputNotes, options = {}) {
+  const notes = (Array.isArray(inputNotes) ? inputNotes : [])
+    .slice(0, 16)
+    .map((entry) => typeof entry === 'object'
+      ? { note: clampInt(entry.note, 0, 127, 60), velocity: clampInt(entry.velocity, 1, 127, 100) }
+      : { note: clampInt(entry, 0, 127, 60), velocity: 100 })
+    .sort((a, b) => a.note - b.note);
+  if (notes.length === 0) return [];
+
+  let pattern = STRUM_PATTERNS.includes(options.pattern) ? options.pattern : 'ascending';
+  if (pattern === 'alternate') pattern = options.alternateDown === true ? 'descending' : 'ascending';
+  let order = Array.from({ length: notes.length }, (_, i) => i);
+  if (pattern === 'descending') order.reverse();
+  else if (pattern === 'outside in') {
+    let low = 0;
+    let high = notes.length - 1;
+    order = order.map((_, i) => (i % 2 === 0 ? low++ : high--));
+  } else if (pattern === 'inside out') {
+    order = [];
+    let low = Math.floor((notes.length - 1) / 2);
+    let high = Math.floor(notes.length / 2);
+    if (low === high) { order.push(low); low -= 1; high += 1; }
+    while (order.length < notes.length) {
+      if (low >= 0) order.push(low--);
+      if (order.length < notes.length && high < notes.length) order.push(high++);
+    }
+  } else if (pattern === 'random') {
+    let state = (clampInt(options.seed, 1, 0x7fffffff, 0x51f15e1d) >>> 0);
+    const next = () => {
+      state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+      return state >>> 0;
+    };
+    for (let i = order.length - 1; i > 0; i -= 1) {
+      const other = next() % (i + 1);
+      [order[i], order[other]] = [order[other], order[i]];
+    }
+  }
+
+  const spread = clampNumber(options.spread, 0, 1, 0);
+  const curve = clampNumber(options.curve, -1, 1, 0);
+  const velocityRamp = clampInt(options.velocityRamp, -64, 64, 0);
+  const exponent = curve >= 0 ? 1 + 3 * curve : 1 / (1 + 3 * -curve);
+  return order.map((noteIndex, rank) => {
+    const t = notes.length > 1 ? rank / (notes.length - 1) : 0;
+    const position = Math.pow(t, exponent);
+    return {
+      note: notes[noteIndex].note,
+      delayBeats: spread * position,
+      velocity: clampInt(notes[noteIndex].velocity + Math.round(velocityRamp * position), 1, 127, 100),
+    };
+  });
+}
+
+const CHORD_VOICINGS = ['close', 'open', 'drop 2', 'wide'];
+
+/** Browser-side mirror of the native Smart Chorder register rules. Besides making localhost
+    previews truthful, keeping this pure lets the UI explain/test a voicing without running an
+    audio graph. Defaults deliberately preserve the old note order. */
+export function applySmartChordVoicing(inputNotes, options = {}) {
+  const original = (Array.isArray(inputNotes) ? inputNotes : [])
+    .slice(0, 6)
+    .map((note) => clampInt(note, 0, 127, 60));
+  if (original.length < 2) return original;
+
+  const inversion = clampInt(options.inversion, 0, 3, 0);
+  const voicing = CHORD_VOICINGS.includes(options.voicing) ? options.voicing : 'close';
+  const voiceLeading = options.voiceLeading === true;
+  const previous = (Array.isArray(options.previous) ? options.previous : [])
+    .slice(0, 6)
+    .map((note) => clampInt(note, 0, 127, 60))
+    .sort((a, b) => a - b);
+
+  if (inversion === 0 && voicing === 'close' && !voiceLeading)
+    return original;
+
+  let notes = [...original].sort((a, b) => a - b);
+  for (let turn = 0; turn < inversion % notes.length; turn += 1)
+    notes.push(notes.shift() + 12);
+
+  if (voicing === 'open' && notes.length >= 3) notes[1] += 12;
+  else if (voicing === 'drop 2' && notes.length >= 3) notes[notes.length - 2] -= 12;
+  else if (voicing === 'wide') {
+    notes[0] -= 12;
+    notes[notes.length - 1] += 12;
+  }
+  notes.sort((a, b) => a - b);
+  while (notes[0] < 0) notes = notes.map((note) => note + 12);
+  while (notes.at(-1) > 127) notes = notes.map((note) => note - 12);
+  notes = notes.map((note) => Math.min(127, Math.max(0, note)));
+
+  if (!voiceLeading || previous.length === 0) return notes;
+
+  let best = notes;
+  let bestCost = Number.POSITIVE_INFINITY;
+  for (let rotation = 0; rotation < notes.length; rotation += 1) {
+    const base = [];
+    for (let i = 0; i < notes.length; i += 1) {
+      let note = notes[(rotation + i) % notes.length];
+      while (i > 0 && note <= base[i - 1]) note += 12;
+      base.push(note);
+    }
+    for (let octave = -10; octave <= 10; octave += 1) {
+      const candidate = base.map((note) => note + octave * 12);
+      if (candidate[0] < 0 || candidate.at(-1) > 127) continue;
+      const cost = candidate.reduce((sum, note, i) => {
+        const previousIndex = candidate.length === 1 || previous.length === 1 ? 0
+          : Math.round(i * (previous.length - 1) / (candidate.length - 1));
+        return sum + Math.abs(note - previous[previousIndex]);
+      }, 0);
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = candidate;
+      }
+    }
+  }
+  return best;
+}
+
+const orderedResponsePair = (a, b, low, high, fallbackA, fallbackB) => {
+  const first = clampInt(a, low, high, fallbackA);
+  const last = clampInt(b, low, high, fallbackB);
+  return [Math.min(first, last), Math.max(first, last)];
+};
+
+const normalizeMidiFx = (f) => {
+  const velocityInput = orderedResponsePair(
+    f?.velocityInputMin, f?.velocityInputMax, 1, 127, 1, 127);
+  const velocityOutput = orderedResponsePair(
+    f?.velocityOutputMin, f?.velocityOutputMax, 1, 127, 1, 127);
+  const expressionInput = orderedResponsePair(
+    f?.expressionInputMin, f?.expressionInputMax, 0, 127, 0, 127);
+  const expressionOutput = orderedResponsePair(
+    f?.expressionOutputMin, f?.expressionOutputMax, 0, 127, 0, 127);
+  const velocityCurve = RESPONSE_CURVES.includes(String(f?.velocityCurve))
+    ? String(f.velocityCurve) : 'linear';
+  const expressionCurve = RESPONSE_CURVES.includes(String(f?.expressionCurve))
+    ? String(f.expressionCurve) : 'linear';
+  const expressionSources = ['cc', 'channel pressure', 'poly aftertouch'];
+  return {
+    transpose: Number(f?.transpose ?? 0),
+    transposeMode: f?.transposeMode === 'diatonic' ? 'diatonic' : 'chromatic',
+    constrainToScale: f?.constrainToScale === true,
+    scaleRoot: Number(f?.scaleRoot ?? 0),
+    scaleType: String(f?.scaleType ?? 'major'),
+    chord: String(f?.chord ?? 'off'),
+    chordInversion: clampInt(f?.chordInversion, 0, 3, 0),
+    chordVoicing: CHORD_VOICINGS.includes(String(f?.chordVoicing ?? 'close'))
+      ? String(f?.chordVoicing ?? 'close') : 'close',
+    chordVoiceLeading: f?.chordVoiceLeading === true,
+    velocityFixed: clampInt(f?.velocityFixed, 0, 127, 0),
+    velocityScale: clampNumber(f?.velocityScale, 0.1, 2, 1),
+    responseProfileName: String(f?.responseProfileName ?? '').trim().slice(0, 80),
+    velocityCurve,
+    velocityInputMin: velocityInput[0],
+    velocityInputMax: velocityInput[1],
+    velocityOutputMin: velocityOutput[0],
+    velocityOutputMax: velocityOutput[1],
+    velocityCurveValues: normalizeResponseCurvePoints(f?.velocityCurveValues),
+    expressionEnabled: f?.expressionEnabled === true,
+    expressionSource: expressionSources.includes(String(f?.expressionSource))
+      ? String(f.expressionSource) : 'cc',
+    expressionCc: clampInt(f?.expressionCc, 0, 127, 11),
+    expressionCurve,
+    expressionInputMin: expressionInput[0],
+    expressionInputMax: expressionInput[1],
+    expressionOutputMin: expressionOutput[0],
+    expressionOutputMax: expressionOutput[1],
+    expressionCurveValues: normalizeResponseCurvePoints(f?.expressionCurveValues),
+    keyChords: (Array.isArray(f?.keyChords) ? f.keyChords : []).map((kc) => ({
+      key: Number(kc?.key ?? 60),
+      offsets: (Array.isArray(kc?.offsets) ? kc.offsets : []).map(Number),
+    })),
+  };
+};
 
 export function normalizePerformance(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const t = p.transport && typeof p.transport === 'object' ? p.transport : {};
   const setlist = p.setlist && typeof p.setlist === 'object' ? p.setlist : {};
+  const arrangement = p.arrangement && typeof p.arrangement === 'object' ? p.arrangement : {};
   const capture = p.capture && typeof p.capture === 'object' ? p.capture : {};
+  const looper = p.looper && typeof p.looper === 'object' ? p.looper : {};
+  const gestures = p.gestures && typeof p.gestures === 'object' ? p.gestures : {};
+  const performanceRecorder = p.performanceRecorder
+    && typeof p.performanceRecorder === 'object' ? p.performanceRecorder : {};
+  const performanceReplay = p.performanceReplay
+    && typeof p.performanceReplay === 'object' ? p.performanceReplay : {};
+  const snapshotMorph = p.snapshotMorph && typeof p.snapshotMorph === 'object'
+    ? p.snapshotMorph : {};
 
   return {
     transport: {
@@ -1013,11 +1489,21 @@ export function normalizePerformance(payload) {
       clockLost: t.clockLost === true,
       defaultQuantize: String(t.defaultQuantize ?? 'bar'),
     },
+    grooves: (Array.isArray(p.grooves) ? p.grooves : [])
+      .map(normalizeGrooveTemplate).filter((groove) => groove.grooveId && groove.timingOffsets.length >= 2),
     patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((pattern) => ({
       patternId: String(pattern?.patternId ?? ''),
       name: String(pattern?.name ?? ''),
       swing: Number(pattern?.swing ?? 0),
+      seed: Math.max(1, Number(pattern?.seed ?? 1) || 1),
       lengthPpq: Number(pattern?.lengthPpq ?? 4),
+      variationGroupId: String(pattern?.variationGroupId ?? ''),
+      variationLabel: ['A', 'B', 'C', 'D'].includes(String(pattern?.variationLabel))
+        ? String(pattern.variationLabel) : '',
+      variationSourcePatternId: String(pattern?.variationSourcePatternId ?? ''),
+      variationAmount: Math.max(0, Math.min(1, Number(pattern?.variationAmount ?? 0.55))),
+      appliedGrooveId: String(pattern?.appliedGrooveId ?? ''),
+      appliedGrooveAmount: Math.max(0, Math.min(1, Number(pattern?.appliedGrooveAmount ?? 0))),
       lanes: (Array.isArray(pattern?.lanes) ? pattern.lanes : []).map((lane) => ({
         laneId: String(lane?.laneId ?? ''),
         type: String(lane?.type ?? 'note'),
@@ -1034,6 +1520,7 @@ export function normalizePerformance(payload) {
         stepsPerBeat: Number(lane?.stepsPerBeat ?? 4),
         muted: lane?.muted === true,
         glide: lane?.glide === true,
+        lockSourceLaneId: String(lane?.lockSourceLaneId ?? ''),
         euclidPulses: Number(lane?.euclidPulses ?? 0),
         steps: (Array.isArray(lane?.steps) ? lane.steps : []).map(normalizeStep),
       })),
@@ -1046,6 +1533,21 @@ export function normalizePerformance(payload) {
       loop: c?.loop !== false,
       followClipId: String(c?.followClipId ?? ''),
       followAfterLoops: Number(c?.followAfterLoops ?? 0),
+      followAction: normalizeFollowAction(c),
+      looperLayer: c?.looperLayer === true,
+      overdubPasses: Number(c?.overdubPasses ?? 0),
+      gestureClip: c?.gestureClip === true,
+      gesturePasses: Number(c?.gesturePasses ?? 0),
+      frozenMidi: c?.frozenMidi === true,
+      frozenFromClipId: String(c?.frozenFromClipId ?? ''),
+      frozenCycles: Math.max(1, Math.min(8, Number(c?.frozenCycles ?? 1))),
+      frozenNoteCount: Math.max(0, Number(c?.frozenNoteCount ?? 0)),
+      fillPatternId: String(c?.fillPatternId ?? ''),
+      fillQuantize: String(c?.fillQuantize ?? 'beat'),
+      fillCc: Math.max(-1, Math.min(127, Number(c?.fillCc ?? -1))),
+      fillChannel: Math.max(0, Math.min(16, Number(c?.fillChannel ?? 0))),
+      fillActive: c?.fillActive === true,
+      fillPending: c?.fillPending === true,
       active: c?.active === true,
       pending: c?.pending === true,
       phase: Number(c?.phase ?? 0),
@@ -1054,30 +1556,291 @@ export function normalizePerformance(payload) {
       sceneId: String(s?.sceneId ?? ''),
       name: String(s?.name ?? ''),
       clipIds: (Array.isArray(s?.clipIds) ? s.clipIds : []).map(String),
+      slots: (Array.isArray(s?.slots) ? s.slots : []).map((slot) => ({
+        partId: String(slot?.partId ?? ''),
+        enabled: slot?.enabled !== false,
+        mute: slot?.mute === true,
+        volume: Math.max(0, Math.min(2, Number(slot?.volume ?? 1))),
+        applyVolume: slot?.applyVolume === true,
+        pan: Math.max(-1, Math.min(1, Number(slot?.pan ?? 0))),
+        applyPan: slot?.applyPan === true,
+      })),
+      macros: (Array.isArray(s?.macros) ? s.macros : []).map((macro) => ({
+        macroId: String(macro?.macroId ?? ''),
+        value: Math.max(0, Math.min(1, Number(macro?.value ?? 0))),
+      })),
+      parameters: (Array.isArray(s?.parameters) ? s.parameters : []).map((parameter) => ({
+        targetId: String(parameter?.targetId ?? ''),
+        targetCeId: String(parameter?.targetCeId ?? ''),
+        parameterId: String(parameter?.parameterId ?? ''),
+        value: Math.max(0, Math.min(1, Number(parameter?.value ?? 0))),
+      })),
+      focusPartId: String(s?.focusPartId ?? ''),
+      pageId: String(s?.pageId ?? ''),
       launchQuantize: String(s?.launchQuantize ?? 'bar'),
       stopOtherClips: s?.stopOtherClips !== false,
       tempo: Number(s?.tempo ?? 0),
-      numSlots: Number(s?.numSlots ?? 0),
-      numMacros: Number(s?.numMacros ?? 0),
+      morphBeats: Math.max(0, Math.min(32, Number(s?.morphBeats ?? 0))),
+      numSlots: Number(s?.numSlots ?? (Array.isArray(s?.slots) ? s.slots.length : 0)),
+      numMacros: Number(s?.numMacros ?? (Array.isArray(s?.macros) ? s.macros.length : 0)),
+      numParameters: Number(s?.numParameters
+        ?? (Array.isArray(s?.parameters) ? s.parameters.length : 0)),
     })),
+    snapshotMorph: {
+      active: snapshotMorph.active === true,
+      sceneId: String(snapshotMorph.sceneId ?? ''),
+      name: String(snapshotMorph.name ?? ''),
+      durationBeats: Math.max(0, Math.min(32, Number(snapshotMorph.durationBeats ?? 0))),
+      progress: Math.max(0, Math.min(1, Number(snapshotMorph.progress ?? 0))),
+      targetCount: Math.max(0, Number(snapshotMorph.targetCount ?? 0)),
+    },
     setlist: {
       items: (Array.isArray(setlist.items) ? setlist.items : []).map((i) => ({
         itemId: String(i?.itemId ?? ''),
         name: String(i?.name ?? ''),
         sceneId: String(i?.sceneId ?? ''),
+        rackRecordId: String(i?.rackRecordId ?? ''),
+        pageId: String(i?.pageId ?? ''),
         sceneName: String(i?.sceneName ?? ''),
         missing: i?.missing === true,
         notes: String(i?.notes ?? ''),
         tempo: Number(i?.tempo ?? 0),
       })),
       currentIndex: Number(setlist.currentIndex ?? -1),
+      preloadAhead: Math.max(0, Math.min(2, Number(setlist.preloadAhead ?? 1))),
+      loadingIndex: Number(setlist.loadingIndex ?? -1),
+      preloads: (Array.isArray(setlist.preloads) ? setlist.preloads : []).map((preload) => ({
+        recordId: String(preload?.recordId ?? ''),
+        name: String(preload?.name ?? ''),
+        state: String(preload?.state ?? 'loading'),
+        total: Math.max(0, Number(preload?.total ?? 0)),
+        ready: Math.max(0, Number(preload?.ready ?? 0)),
+        failed: Math.max(0, Number(preload?.failed ?? 0)),
+        error: String(preload?.error ?? ''),
+      })),
+    },
+    arrangement: {
+      items: (Array.isArray(arrangement.items) ? arrangement.items : []).map((i) => ({
+        itemId: String(i?.itemId ?? ''),
+        name: String(i?.name ?? ''),
+        sceneId: String(i?.sceneId ?? ''),
+        sceneName: String(i?.sceneName ?? ''),
+        missing: i?.missing === true,
+        bars: Math.max(1, Math.min(128, Number(i?.bars ?? 4))),
+      })),
+      loop: arrangement.loop === true,
+      playing: arrangement.playing === true,
+      currentIndex: Number(arrangement.currentIndex ?? -1),
+      queuedIndex: Number(arrangement.queuedIndex ?? -1),
+      ending: arrangement.ending === true,
+      progress: Math.max(0, Math.min(1, Number(arrangement.progress ?? 0))),
+      bar: Math.max(0, Number(arrangement.bar ?? 0)),
     },
     capture: {
       armed: capture.armed === true,
       clipId: String(capture.clipId ?? ''),
       laneId: String(capture.laneId ?? ''),
+      historySeconds: Number(capture.historySeconds ?? 0),
+      historyEvents: Number(capture.historyEvents ?? 0),
+      historyHasNotes: capture.historyHasNotes === true,
+      historyCapacitySeconds: Number(capture.historyCapacitySeconds ?? 120),
+      lastPatternId: String(capture.lastPatternId ?? ''),
+      lastClipId: String(capture.lastClipId ?? ''),
+      lastNoteCount: Number(capture.lastNoteCount ?? 0),
+      lastStepCount: Number(capture.lastStepCount ?? 0),
+      lastSeconds: Number(capture.lastSeconds ?? 0),
+      lastTrimmed: capture.lastTrimmed === true,
+    },
+    looper: {
+      recording: looper.recording === true,
+      overdubbing: looper.overdubbing === true,
+      targetClipId: String(looper.targetClipId ?? ''),
+      elapsedSeconds: Number(looper.elapsedSeconds ?? 0),
+      maxLengthBeats: Number(looper.maxLengthBeats ?? 128),
+    },
+    gestures: {
+      recording: gestures.recording === true,
+      mode: ['new', 'overdub', 'replace'].includes(String(gestures.mode))
+        ? String(gestures.mode) : 'new',
+      targetClipId: String(gestures.targetClipId ?? ''),
+      pointCount: Number(gestures.pointCount ?? 0),
+      targetCount: Number(gestures.targetCount ?? 0),
+      elapsedSeconds: Number(gestures.elapsedSeconds ?? 0),
+      truncated: gestures.truncated === true,
+      maxPoints: Number(gestures.maxPoints ?? 8192),
+      lastClipId: String(gestures.lastClipId ?? ''),
+    },
+    performanceTakes: (Array.isArray(p.performanceTakes) ? p.performanceTakes : []).map((take) => ({
+      takeId: String(take?.takeId ?? ''),
+      name: String(take?.name ?? ''),
+      createdAt: String(take?.createdAt ?? ''),
+      durationSeconds: Math.max(0, Number(take?.durationSeconds ?? 0)),
+      midiEventCount: Math.max(0, Number(take?.midiEventCount ?? 0)),
+      actionCount: Math.max(0, Number(take?.actionCount ?? 0)),
+      truncated: take?.truncated === true,
+    })),
+    performanceRecorder: {
+      recording: performanceRecorder.recording === true,
+      name: String(performanceRecorder.name ?? ''),
+      elapsedSeconds: Math.max(0, Number(performanceRecorder.elapsedSeconds ?? 0)),
+      midiEventCount: Math.max(0, Number(performanceRecorder.midiEventCount ?? 0)),
+      actionCount: Math.max(0, Number(performanceRecorder.actionCount ?? 0)),
+      truncated: performanceRecorder.truncated === true,
+    },
+    performanceReplay: {
+      state: ['idle', 'restoring', 'playing'].includes(String(performanceReplay.state))
+        ? String(performanceReplay.state) : 'idle',
+      takeId: String(performanceReplay.takeId ?? ''),
+      name: String(performanceReplay.name ?? ''),
+      progress: Math.max(0, Math.min(1, Number(performanceReplay.progress ?? 0))),
+      degraded: performanceReplay.degraded === true,
     },
     scales: (Array.isArray(p.scales) ? p.scales : []).map(String),
+  };
+}
+
+const variationPatternSeed = (pattern) => {
+  if (Number(pattern?.seed) > 0) return Number(pattern.seed) >>> 0;
+  let hash = 0x811c9dc5;
+  for (const character of String(pattern?.patternId ?? 'pattern')) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash || 1;
+};
+
+const variationRandom = (seed, laneIndex, stepIndex, salt) =>
+  deterministicRandomUnit((seed ^ Math.imul(laneIndex + 1, 0x85ebca6b)) >>> 0,
+    stepIndex + 1, salt);
+
+const isNoteVariationLane = (type) => ['note', 'chord', 'drum'].includes(type);
+
+/** Builds one browser-preview B/C/D variation with the same musical contract as native:
+    B changes feel, C thins/revoices, and D adds an ending fill. Generated lanes receive
+    independent ids and lock lanes are remapped to their generated visible lanes. */
+export function makePatternVariation(sourcePattern, requestedLabel, requestedAmount = 0.55,
+  requestedPatternId = '') {
+  const source = sourcePattern && typeof sourcePattern === 'object' ? sourcePattern : {};
+  const label = ['B', 'C', 'D'].includes(String(requestedLabel)) ? String(requestedLabel) : 'B';
+  const amount = Math.max(0, Math.min(1, Number(requestedAmount) || 0));
+  const sourceId = String(source.variationSourcePatternId || source.patternId || 'pattern');
+  const groupId = String(source.variationGroupId || source.patternId || sourceId);
+  const patternId = String(requestedPatternId
+    || nextMockId(`variation-${sourceId}-${label}`));
+  const seed = variationPatternSeed(source);
+  const oldToNewLaneId = new Map();
+
+  const lanes = (Array.isArray(source.lanes) ? source.lanes : []).map((sourceLane, laneIndex) => {
+    const lane = {
+      ...sourceLane,
+      laneId: `${patternId}-lane-${laneIndex + 1}`,
+      steps: (Array.isArray(sourceLane.steps) ? sourceLane.steps : []).map(normalizeStep),
+    };
+    oldToNewLaneId.set(String(sourceLane.laneId ?? ''), lane.laneId);
+    if (lane.lockSourceLaneId) return lane;
+
+    if (label === 'B') {
+      lane.steps.forEach((step, stepIndex) => {
+        if (!step.active) return;
+        const random = variationRandom(seed, laneIndex, stepIndex, 0x42b1d5a7);
+        if (isNoteVariationLane(lane.type)) {
+          step.velocity = Math.max(1, Math.min(127,
+            step.velocity + Math.round((random - 0.42) * 28 * amount)));
+          step.gate = Math.max(0.05, Math.min(4,
+            step.gate + (random - 0.5) * 0.22 * amount));
+          step.microtiming = Math.max(-0.5, Math.min(0.5,
+            step.microtiming + (stepIndex % 2 ? 0.045 : -0.018) * amount));
+        } else {
+          step.value = Math.max(0, Math.min(1, step.value + (random - 0.5) * 0.24 * amount));
+        }
+      });
+    }
+
+    if (label === 'C') {
+      const firstActive = lane.steps.findIndex((step) => step.active);
+      lane.steps.forEach((step, stepIndex) => {
+        if (!step.active) return;
+        if (variationRandom(seed, laneIndex, stepIndex, 0xc2b2ae35) < 0.18 + amount * 0.42) {
+          step.active = false;
+          step.tie = false;
+          return;
+        }
+        if (isNoteVariationLane(lane.type)
+          && variationRandom(seed, laneIndex, stepIndex, 0x27d4eb2f) < amount * 0.24) {
+          const octave = variationRandom(seed, laneIndex, stepIndex, 0x165667b1) < 0.5 ? -12 : 12;
+          step.note = Math.max(0, Math.min(127, step.note + octave));
+          step.chordNotes = step.chordNotes.map((note) => Math.max(0, Math.min(127, note + octave)));
+        }
+      });
+      if (firstActive >= 0 && !lane.steps.some((step) => step.active))
+        lane.steps[firstActive].active = true;
+    }
+
+    if (label === 'D') {
+      const fillStart = Math.max(0, Math.floor(lane.steps.length * 3 / 4));
+      if (!isNoteVariationLane(lane.type)) {
+        lane.steps.forEach((step, stepIndex) => {
+          if (step.active && stepIndex >= fillStart) {
+            const progress = (stepIndex - fillStart + 1) / Math.max(1, lane.steps.length - fillStart);
+            step.value = Math.max(0, Math.min(1, step.value + progress * amount * 0.18));
+          }
+        });
+      } else {
+        const lastActive = lane.steps.findLastIndex((step) => step.active);
+        const stride = amount < 0.34 ? 4 : (amount < 0.67 ? 2 : 1);
+        if (lastActive >= 0) {
+          for (let stepIndex = fillStart; stepIndex < lane.steps.length; stepIndex += 1) {
+            const step = lane.steps[stepIndex];
+            if (!step.active && (stepIndex - fillStart) % stride === stride - 1) {
+              let templateIndex = stepIndex - 1;
+              while (templateIndex >= 0 && !lane.steps[templateIndex].active) templateIndex -= 1;
+              const template = lane.steps[templateIndex >= 0 ? templateIndex : lastActive];
+              lane.steps[stepIndex] = {
+                ...template,
+                chordNotes: [...template.chordNotes],
+                active: true, tie: false,
+                probability: Math.max(template.probability, 85),
+                ratchets: amount > 0.8 ? 3 : 2,
+              };
+            } else if (step.active && stepIndex > fillStart
+              && variationRandom(seed, laneIndex, stepIndex, 0xd3a2646c) < amount * 0.55) {
+              step.ratchets = Math.max(step.ratchets, amount > 0.8 ? 3 : 2);
+            }
+          }
+        }
+      }
+    }
+    return lane;
+  });
+
+  for (const lane of lanes) {
+    if (!lane.lockSourceLaneId) continue;
+    const sourceLaneId = oldToNewLaneId.get(String(lane.lockSourceLaneId));
+    lane.lockSourceLaneId = sourceLaneId ?? '';
+    const triggerLane = lanes.find((candidate) => candidate.laneId === sourceLaneId);
+    if (!triggerLane) continue;
+    lane.steps.forEach((lock, stepIndex) => {
+      const trigger = triggerLane.steps[stepIndex];
+      lock.active = lock.active && trigger?.active === true;
+      if (lock.active) {
+        lock.microtiming = trigger.microtiming;
+        lock.probability = trigger.probability;
+        lock.every = trigger.every;
+        lock.offset = trigger.offset;
+      }
+    });
+  }
+
+  return {
+    ...source,
+    patternId,
+    name: `${String(source.name || 'Pattern')} ${label}`,
+    seed: seed || 1,
+    variationGroupId: groupId,
+    variationLabel: label,
+    variationSourcePatternId: sourceId,
+    variationAmount: amount,
+    lanes,
   };
 }
 
@@ -1523,6 +2286,7 @@ export function normalizeHostState(payload) {
     })),
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
+    stageLocked: p.stageLocked === true,
     editorOpenPartId: String(p.editorOpenPartId ?? ''),
     floatingEditorPartIds: (Array.isArray(p.floatingEditorPartIds) ? p.floatingEditorPartIds : []).map(String),
     audio: {
@@ -1550,6 +2314,30 @@ export function normalizeHostState(payload) {
       })).filter((c) => c.nodeId && Number.isFinite(c.x) && Number.isFinite(c.y)),
       focusedPartId: String(rack.focusedPartId ?? ''),
       masterLatencyMs: Number(rack.masterLatencyMs ?? 0),
+      microtuning: normalizeMicrotuning(rack.microtuning),
+      presetAudition: {
+        enabled: rack.presetAudition?.enabled === true,
+        phrase: ['single', 'chord', 'scale', 'riff'].includes(rack.presetAudition?.phrase)
+          ? rack.presetAudition.phrase : 'chord',
+        rootNote: clampInt(rack.presetAudition?.rootNote, 0, 127, 60),
+        velocity: clampInt(rack.presetAudition?.velocity, 1, 127, 100),
+        noteLengthMs: clampInt(rack.presetAudition?.noteLengthMs, 40, 4000, 360),
+        gapMs: clampInt(rack.presetAudition?.gapMs, 0, 2000, 90),
+        playing: rack.presetAudition?.playing === true,
+      },
+      soundComparison: {
+        active: rack.soundComparison?.active === true,
+        partId: String(rack.soundComparison?.partId ?? ''),
+        index: clampInt(rack.soundComparison?.index, -1, 19, -1),
+        count: clampInt(rack.soundComparison?.count, 0, 20, 0),
+        recordId: String(rack.soundComparison?.recordId ?? ''),
+        name: String(rack.soundComparison?.name ?? ''),
+        originalRecordId: String(rack.soundComparison?.originalRecordId ?? ''),
+        originalName: String(rack.soundComparison?.originalName ?? 'Original sound')
+          || 'Original sound',
+        recordIds: (Array.isArray(rack.soundComparison?.recordIds)
+          ? rack.soundComparison.recordIds : []).map(String).filter(Boolean).slice(0, 20),
+      },
       masterEffects: (Array.isArray(rack.masterEffects) ? rack.masterEffects : []).map(normalizeEffectSlot),
       buses: (Array.isArray(rack.buses) ? rack.buses : []).map((b) => ({
         busId: String(b?.busId ?? ''),
@@ -1569,17 +2357,186 @@ export function normalizeHostState(payload) {
         macroId: String(m?.macroId ?? ''),
         name: String(m?.name ?? ''),
         value: Number(m?.value ?? 0),
-        targets: (Array.isArray(m?.targets) ? m.targets : []).map((t) => ({
-          targetId: String(t?.targetId ?? ''),
-          parameterId: String(t?.parameterId ?? ''),
-          targetName: String(t?.targetName ?? ''),
-          displayName: String(t?.displayName ?? ''),
-          rangeMin: Number(t?.rangeMin ?? 0),
-          rangeMax: Number(t?.rangeMax ?? 1),
-          inverted: t?.inverted === true,
-          resolved: t?.resolved === true,
-        })),
+        targets: (Array.isArray(m?.targets) ? m.targets : []).map((t) => {
+          const a = clampNumber(t?.rangeMin, 0, 1, 0);
+          const b = clampNumber(t?.rangeMax, 0, 1, 1);
+          return {
+            targetId: String(t?.targetId ?? ''),
+            parameterId: String(t?.parameterId ?? ''),
+            targetName: String(t?.targetName ?? ''),
+            displayName: String(t?.displayName ?? ''),
+            rangeMin: Math.min(a, b),
+            rangeMax: Math.max(a, b),
+            inverted: t?.inverted === true,
+            resolved: t?.resolved === true,
+          };
+        }),
       })),
+      midiLfos: (Array.isArray(rack.midiLfos) ? rack.midiLfos : []).map((lfo, index) => ({
+        lfoId: String(lfo?.lfoId ?? ''),
+        name: String(lfo?.name ?? '') || `LFO ${index + 1}`,
+        shape: ['sine', 'triangle', 'sawUp', 'sawDown', 'square', 'sampleHold'].includes(lfo?.shape)
+          ? lfo.shape : 'sine',
+        enabled: lfo?.enabled !== false,
+        sync: lfo?.sync !== false,
+        rateHz: Math.max(0.01, Math.min(40, Number(lfo?.rateHz ?? 1) || 1)),
+        syncBeats: Math.max(0.03125, Math.min(64, Number(lfo?.syncBeats ?? 1) || 1)),
+        phaseOffset: Math.max(0, Math.min(1, Number(lfo?.phaseOffset ?? 0) || 0)),
+        minimum: Math.max(0, Math.min(1, Number(lfo?.minimum ?? 0) || 0)),
+        maximum: Math.max(0, Math.min(1, Number(lfo?.maximum ?? 1) || 0)),
+        phase: Math.max(0, Math.min(1, Number(lfo?.phase ?? 0) || 0)),
+        value: Math.max(0, Math.min(1, Number(lfo?.value ?? 0) || 0)),
+        _cycles: Number.isFinite(Number(lfo?._cycles)) ? Number(lfo._cycles) : 0,
+        outputs: (Array.isArray(lfo?.outputs) ? lfo.outputs : []).map((output) => ({
+          outputId: String(output?.outputId ?? ''),
+          type: ['cc', 'nrpn', 'sysex'].includes(output?.type) ? output.type : 'cc',
+          targetPartId: String(output?.targetPartId ?? ''),
+          targetName: String(output?.targetName ?? ''),
+          channel: Math.max(1, Math.min(16, Number(output?.channel ?? 1) || 1)),
+          number: Math.max(0, Math.min(output?.type === 'nrpn' ? 16383 : 127,
+                                      Number(output?.number ?? 1) || 0)),
+          sysexTemplate: String(output?.sysexTemplate ?? 'F0 7D {value7} F7'),
+          enabled: output?.enabled === true,
+          resolved: output?.resolved !== false,
+        })).filter((output) => output.outputId),
+      })).filter((lfo) => lfo.lfoId).map((lfo) => lfo.minimum <= lfo.maximum
+        ? lfo : { ...lfo, minimum: lfo.maximum, maximum: lfo.minimum }),
+      envelopes: (Array.isArray(rack.envelopes) ? rack.envelopes : []).map((envelope, index) => {
+        const noteLow = Math.max(0, Math.min(127, Number(envelope?.noteLow ?? 0) || 0));
+        const noteHigh = Math.max(0, Math.min(127, Number(envelope?.noteHigh ?? 127) || 0));
+        return {
+          envelopeId: String(envelope?.envelopeId ?? ''),
+          name: String(envelope?.name ?? '') || `Envelope ${index + 1}`,
+          enabled: envelope?.enabled !== false,
+          channel: Math.max(0, Math.min(16, Number(envelope?.channel ?? 0) || 0)),
+          noteLow: Math.min(noteLow, noteHigh),
+          noteHigh: Math.max(noteLow, noteHigh),
+          retrigger: envelope?.retrigger !== false,
+          attackMs: Math.max(0, Math.min(60000, Number(envelope?.attackMs ?? 20) || 0)),
+          decayMs: Math.max(0, Math.min(60000, Number(envelope?.decayMs ?? 180) || 0)),
+          sustain: Math.max(0, Math.min(1, Number(envelope?.sustain ?? 0.65) || 0)),
+          releaseMs: Math.max(0, Math.min(60000, Number(envelope?.releaseMs ?? 350) || 0)),
+          curve: Math.max(-1, Math.min(1, Number(envelope?.curve ?? 0) || 0)),
+          velocityAmount: Math.max(0, Math.min(1, Number(envelope?.velocityAmount ?? 0) || 0)),
+          stage: ['idle', 'attack', 'decay', 'sustain', 'release'].includes(envelope?.stage)
+            ? envelope.stage : 'idle',
+          stageProgress: Math.max(0, Math.min(1, Number(envelope?.stageProgress ?? 0) || 0)),
+          value: Math.max(0, Math.min(1, Number(envelope?.value ?? 0) || 0)),
+          gate: envelope?.gate === true,
+          _stageElapsed: Math.max(0, Number(envelope?._stageElapsed ?? 0) || 0),
+          _stageStartValue: Math.max(0, Math.min(1, Number(envelope?._stageStartValue ?? 0) || 0)),
+          _peak: Math.max(0, Math.min(1, Number(envelope?._peak ?? 1) || 0)),
+        };
+      }).filter((envelope) => envelope.envelopeId),
+      msegs: (Array.isArray(rack.msegs) ? rack.msegs : []).map((mseg, index) => {
+        const rawRateHz = Number(mseg?.rateHz ?? 0.5);
+        const rawSyncBeats = Number(mseg?.syncBeats ?? 4);
+        const seenPointIds = new Set();
+        const points = (Array.isArray(mseg?.points) ? mseg.points : []).map((point) => ({
+          pointId: String(point?.pointId ?? ''),
+          position: Math.max(0, Math.min(1, Number(point?.position ?? 0) || 0)),
+          value: Math.max(0, Math.min(1, Number(point?.value ?? 0) || 0)),
+          curve: Math.max(-1, Math.min(1, Number(point?.curve ?? 0) || 0)),
+        })).filter((point) => {
+          if (!point.pointId || seenPointIds.has(point.pointId)) return false;
+          seenPointIds.add(point.pointId);
+          return true;
+        }).sort((a, b) => a.position - b.position).slice(0, 64);
+        if (points.length >= 2) {
+          points[0].position = 0;
+          points[points.length - 1].position = 1;
+        }
+        return {
+          msegId: String(mseg?.msegId ?? ''),
+          name: String(mseg?.name ?? '') || `MSEG ${index + 1}`,
+          enabled: mseg?.enabled !== false,
+          sync: mseg?.sync !== false,
+          rateHz: Number.isFinite(rawRateHz) ? Math.max(0.01, Math.min(40, rawRateHz)) : 0.5,
+          syncBeats: Number.isFinite(rawSyncBeats)
+            ? Math.max(0.03125, Math.min(64, rawSyncBeats)) : 4,
+          phaseOffset: Math.max(0, Math.min(1, Number(mseg?.phaseOffset ?? 0) || 0)),
+          phase: Math.max(0, Math.min(1, Number(mseg?.phase ?? 0) || 0)),
+          value: Math.max(0, Math.min(1, Number(mseg?.value ?? 0) || 0)),
+          _cycles: Number.isFinite(Number(mseg?._cycles)) ? Number(mseg._cycles) : 0,
+          points,
+        };
+      }).filter((mseg) => mseg.msegId && mseg.points.length >= 2),
+      randomModulators: (Array.isArray(rack.randomModulators)
+        ? rack.randomModulators : []).map((random, index) => {
+          const finite = (value, fallback) => Number.isFinite(Number(value))
+            ? Number(value) : fallback;
+          const minimum = Math.max(0, Math.min(1, finite(random?.minimum, 0)));
+          const maximum = Math.max(0, Math.min(1, finite(random?.maximum, 1)));
+          return {
+            randomId: String(random?.randomId ?? ''),
+            name: String(random?.name ?? '') || `Random ${index + 1}`,
+            mode: ['sampleHold', 'smoothRandom', 'chaos', 'randomWalk'].includes(random?.mode)
+              ? random.mode : 'sampleHold',
+            enabled: random?.enabled !== false,
+            sync: random?.sync !== false,
+            rateHz: Math.max(0.01, Math.min(40, finite(random?.rateHz, 2))),
+            syncBeats: Math.max(0.03125, Math.min(64, finite(random?.syncBeats, 0.5))),
+            seed: Math.max(1, Math.min(0x7fffffff,
+              Math.floor(finite(random?.seed, 1)))),
+            probability: Math.max(0, Math.min(1, finite(random?.probability, 1))),
+            smoothing: Math.max(0, Math.min(1, finite(random?.smoothing, 1))),
+            stepSize: Math.max(0, Math.min(1, finite(random?.stepSize, 0.2))),
+            chaos: Math.max(0, Math.min(1, finite(random?.chaos, 0.85))),
+            minimum: Math.min(minimum, maximum),
+            maximum: Math.max(minimum, maximum),
+            phase: Math.max(0, Math.min(1, finite(random?.phase, 0))),
+            value: Math.max(0, Math.min(1, finite(random?.value, 0))),
+            step: Math.floor(finite(random?.step, -1)),
+            _cycles: Math.max(0, finite(random?._cycles, 0)),
+            _previous: Math.max(0, Math.min(1, finite(random?._previous, 0.5))),
+            _target: Math.max(0, Math.min(1, finite(random?._target, 0.5))),
+            _chaosValue: Math.max(0.0001, Math.min(0.9999,
+              finite(random?._chaosValue, 0.5))),
+            _walkValue: Math.max(0, Math.min(1, finite(random?._walkValue, 0.5))),
+            _initialized: random?._initialized === true,
+          };
+        }).filter((random) => random.randomId),
+      layerGroups: (Array.isArray(rack.layerGroups) ? rack.layerGroups : []).map((group, index) => ({
+        layerGroupId: String(group?.layerGroupId ?? ''),
+        name: String(group?.name ?? '') || `Layer ${index + 1}`,
+        enabled: group?.enabled !== false,
+        allocation: ['all', 'roundRobin', 'leastBusy'].includes(group?.allocation)
+          ? group.allocation : 'all',
+        source: ['velocity', 'key', 'cc', 'expression', 'macro'].includes(group?.source)
+          ? group.source : 'velocity',
+        controller: Math.max(0, Math.min(127, Math.round(Number(group?.controller ?? 11) || 0))),
+        macroId: String(group?.macroId ?? ''),
+        members: (Array.isArray(group?.members) ? group.members : []).map((member) => {
+          const rawMinimum = Math.max(0, Math.min(1, Number(member?.minimum ?? 0) || 0));
+          const rawMaximum = Math.max(0, Math.min(1, Number(member?.maximum ?? 1) || 0));
+          return {
+            partId: String(member?.partId ?? ''),
+            partName: String(member?.partName ?? ''),
+            minimum: Math.min(rawMinimum, rawMaximum),
+            maximum: Math.max(rawMinimum, rawMaximum),
+            crossfade: Math.max(0, Math.min(0.5, Number(member?.crossfade ?? 0) || 0)),
+            resolved: member?.resolved !== false,
+          };
+        }).filter((member) => member.partId).slice(0, 8),
+      })).filter((group) => group.layerGroupId).slice(0, 32),
+      modulationRoutes: (Array.isArray(rack.modulationRoutes) ? rack.modulationRoutes : []).map((r) => ({
+        routeId: String(r?.routeId ?? ''),
+        sourceType: String(r?.sourceType ?? ''),
+        sourceId: String(r?.sourceId ?? ''),
+        sourceChannel: ['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(r?.sourceType) ? 0
+          : Math.max(0, Math.min(16, Number(r?.sourceChannel ?? 0) || 0)),
+        sourceNumber: ['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(r?.sourceType) ? 0
+          : Math.max(0, Math.min(127, Number(r?.sourceNumber ?? 0) || 0)),
+        sourceValue: Math.max(0, Math.min(1, Number(r?.sourceValue ?? (r?.sourceType === 'pitchBend' ? 0.5 : 0)) || 0)),
+        targetId: String(r?.targetId ?? ''),
+        parameterId: String(r?.parameterId ?? ''),
+        targetName: String(r?.targetName ?? ''),
+        displayName: String(r?.displayName ?? ''),
+        amount: Math.max(-1, Math.min(1, Number(r?.amount ?? 0.25) || 0)),
+        baseValue: Math.max(0, Math.min(1, Number(r?.baseValue ?? 0) || 0)),
+        enabled: r?.enabled !== false,
+        resolved: r?.resolved !== false,
+      })).filter((r) => r.routeId),
       pages: (Array.isArray(rack.pages) ? rack.pages : []).map((page) => ({
         pageId: String(page?.pageId ?? ''),
         name: String(page?.name ?? ''),
@@ -1610,6 +2567,8 @@ export function normalizeHostState(payload) {
           midiNote: Number.isInteger(slot?.midiNote) ? Math.max(-1, Math.min(127, slot.midiNote)) : -1,
           toggle: slot?.toggle === true,
           latched: slot?.latched === true,
+          value: Math.max(0, Math.min(1, Number(slot?.value ?? 0) || 0)),
+          valueText: String(slot?.valueText ?? ''),
         })),
       })),
       parts: (Array.isArray(rack.parts) ? rack.parts : []).map((part) => ({
@@ -1649,6 +2608,8 @@ export function normalizeHostState(payload) {
         programBank: Number(part?.programBank ?? -1),
         programNumber: Number(part?.programNumber ?? -1),
         midiOutError: String(part?.midiOutError ?? ''),
+        microtuningEnabled: part?.microtuningEnabled === true,
+        microtuningError: String(part?.microtuningError ?? ''),
         // Where the part's MIDI comes from: '' is the keyboard, else another part's chain.
         midiSourcePartId: String(part?.midiSourcePartId ?? ''),
         deviceProfileId: String(part?.deviceProfileId ?? ''),
@@ -1717,6 +2678,9 @@ export function mockHostState() {
     rack: {
       performanceId: 'mock-performance',
       focusedPartId: 'mock-part-1',
+      presetAudition: { enabled: false, phrase: 'chord', rootNote: 60,
+                        velocity: 100, noteLengthMs: 360, gapMs: 90 },
+      soundComparison: { active: false, index: -1, count: 0 },
       parts: [
         { partId: 'mock-part-1', pluginCeId: 'mock-keys', pluginName: 'Stage Keys', pluginVendor: 'Mock Audio', hasInstrument: true,
           // The two modules a migrated part carries, so the demo shows a real chain.
@@ -1781,9 +2745,13 @@ export function mockHostState() {
         preservedStateFile: '', hasLastKnownGood: false, lastKnownGoodAt: '',
       },
       damagedState: [],
+      automaticFailover: {
+        isolationAvailable: false, enabled: true, maxAttempts: 3, retryDelayMs: 500, events: [],
+      },
     },
     performance: {
       transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
+      grooves: factoryGrooveTemplates,
       patterns: [{
         patternId: 'mock-pattern-1',
         name: 'Riff',
@@ -1802,9 +2770,13 @@ export function mockHostState() {
         }],
       }],
       clips: [{ clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
-                launchQuantize: 'bar', loop: true }],
+                 launchQuantize: 'bar', loop: true }],
       scenes: [],
       setlist: { items: [], currentIndex: -1 },
+      arrangement: {
+        items: [], loop: false, playing: false, currentIndex: -1, queuedIndex: -1,
+        ending: false, progress: 0, bar: 0,
+      },
       scales: ['chromatic', 'major', 'minor', 'dorian', 'pentatonic minor'],
     },
   });
@@ -1820,12 +2792,479 @@ function mockBindingName(parameterId, rack) {
   return id.replace(/^./, (c) => c.toUpperCase());
 }
 
+function writeMockVirtualTarget(rack, targetId, parameterId, value) {
+  const normalized = Math.max(0, Math.min(1, Number(value) || 0));
+  if (parameterId === '@macro') {
+    const macro = rack.macros.find((candidate) => candidate.macroId === targetId);
+    if (!macro) return;
+    macro.value = normalized;
+    const destinations = new Set();
+    for (const route of rack.modulationRoutes)
+      if (route.sourceType === 'macro' && route.sourceId === targetId) {
+        route.sourceValue = normalized;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [nextTargetId, nextParameterId] = destination.split('\n');
+      applyMockModulationTarget(rack, nextTargetId, nextParameterId);
+    }
+    return;
+  }
+  const part = rack.parts.find((candidate) => candidate.partId === targetId);
+  if (!part) return;
+  if (parameterId === '@gain') part.volume = normalized * 2;
+  else if (parameterId === '@pan') part.pan = normalized * 2 - 1;
+  else if (parameterId.startsWith('@send:')) {
+    const returnId = parameterId.slice(6);
+    let send = part.sends.find((candidate) => candidate.returnId === returnId);
+    if (!send) part.sends.push((send = { returnId, level: 0 }));
+    send.level = normalized * 2;
+  }
+}
+
+function applyMockModulationTarget(rack, targetId, parameterId) {
+  const routes = rack.modulationRoutes.filter(
+    (route) => route.targetId === targetId && route.parameterId === parameterId);
+  if (routes.length === 0 || !parameterId.startsWith('@')) return;
+  const contribution = routes.filter((route) => route.enabled && route.resolved)
+    .reduce((sum, route) => sum + route.amount
+      * (route.sourceType === 'pitchBend' ? route.sourceValue * 2 - 1 : route.sourceValue), 0);
+  writeMockVirtualTarget(rack, targetId, parameterId, routes[0].baseValue + contribution);
+}
+
+function mockMidiLfoShape(lfo, phase, cycle) {
+  if (lfo.shape === 'triangle') return 1 - Math.abs(phase * 2 - 1);
+  if (lfo.shape === 'sawUp') return phase;
+  if (lfo.shape === 'sawDown') return 1 - phase;
+  if (lfo.shape === 'square') return phase < 0.5 ? 0 : 1;
+  if (lfo.shape === 'sampleHold') {
+    let hash = 2166136261;
+    for (const ch of `${lfo.lfoId}:${cycle}`) {
+      hash ^= ch.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 8) / 0xffffff;
+  }
+  return 0.5 - 0.5 * Math.cos(Math.PI * 2 * phase);
+}
+
+/** Advances browser-preview LFOs without pretending to transmit hardware MIDI. Native uses
+ *  the shared transport; this pure mirror lets tests and localhost exercise the same shapes,
+ *  ranges and matrix destinations. */
+export function advanceMockMidiLfos(state, elapsedSeconds) {
+  const next = normalizeHostState(state);
+  const elapsed = Math.max(0, Math.min(1, Number(elapsedSeconds) || 0));
+  const tempo = Math.max(20, Math.min(300, Number(next.performance?.transport?.tempo ?? 120) || 120));
+  const destinations = new Set();
+  for (const lfo of next.rack.midiLfos) {
+    if (lfo.enabled) {
+      const cyclesPerSecond = lfo.sync ? tempo / (60 * lfo.syncBeats) : lfo.rateHz;
+      lfo._cycles += elapsed * cyclesPerSecond;
+      const withOffset = lfo._cycles + lfo.phaseOffset;
+      lfo.phase = ((withOffset % 1) + 1) % 1;
+      const shaped = mockMidiLfoShape(lfo, lfo.phase, Math.floor(withOffset));
+      lfo.value = Math.max(0, Math.min(1, lfo.minimum + shaped * (lfo.maximum - lfo.minimum)));
+    } else {
+      lfo.value = 0;
+    }
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'lfo' && route.sourceId === lfo.lfoId) {
+        route.sourceValue = lfo.value;
+        route.resolved = true;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+  }
+  for (const destination of destinations) {
+    const [targetId, parameterId] = destination.split('\n');
+    applyMockModulationTarget(next.rack, targetId, parameterId);
+  }
+  return next;
+}
+
+function mockEnvelopeShape(progress, curve, falling) {
+  const p = Math.max(0, Math.min(1, progress));
+  const exponent = 4 ** Math.max(-1, Math.min(1, curve));
+  return falling ? 1 - ((1 - p) ** exponent) : p ** exponent;
+}
+
+/** Pure browser mirror of the native ADSR control-rate engine. */
+export function advanceMockEnvelopes(state, elapsedSeconds) {
+  const next = normalizeHostState(state);
+  const elapsed = Math.max(0, Math.min(1, Number(elapsedSeconds) || 0));
+  const destinations = new Set();
+  for (const envelope of next.rack.envelopes) {
+    if (!envelope.enabled) {
+      envelope.stage = 'idle';
+      envelope.stageProgress = 0;
+      envelope._stageElapsed = 0;
+      envelope.value = 0;
+      envelope.gate = false;
+    } else {
+      let remaining = elapsed;
+      for (let transitions = 0; transitions < 5; transitions += 1) {
+        if (envelope.stage === 'idle') {
+          envelope.value = 0;
+          envelope.stageProgress = 0;
+          break;
+        }
+        if (envelope.stage === 'sustain') {
+          envelope.value = envelope._peak * envelope.sustain;
+          envelope.stageProgress = 1;
+          break;
+        }
+        const duration = 0.001 * (envelope.stage === 'attack' ? envelope.attackMs
+          : envelope.stage === 'decay' ? envelope.decayMs : envelope.releaseMs);
+        if (duration <= 0) envelope.stageProgress = 1;
+        else {
+          const consumed = Math.min(remaining, Math.max(0, duration - envelope._stageElapsed));
+          envelope._stageElapsed += consumed;
+          remaining -= consumed;
+          envelope.stageProgress = Math.max(0, Math.min(1, envelope._stageElapsed / duration));
+        }
+        if (envelope.stage === 'attack') {
+          const shaped = mockEnvelopeShape(envelope.stageProgress, envelope.curve, false);
+          envelope.value = envelope._stageStartValue
+            + (envelope._peak - envelope._stageStartValue) * shaped;
+          if (envelope.stageProgress >= 1) {
+            envelope.value = envelope._peak;
+            envelope.stage = 'decay';
+            envelope._stageElapsed = 0;
+            envelope._stageStartValue = envelope._peak;
+            envelope.stageProgress = 0;
+            continue;
+          }
+        } else if (envelope.stage === 'decay') {
+          const target = envelope._peak * envelope.sustain;
+          const shaped = mockEnvelopeShape(envelope.stageProgress, envelope.curve, true);
+          envelope.value = envelope._stageStartValue + (target - envelope._stageStartValue) * shaped;
+          if (envelope.stageProgress >= 1) {
+            envelope.value = target;
+            envelope.stage = envelope.gate ? 'sustain' : 'release';
+            envelope._stageElapsed = 0;
+            envelope._stageStartValue = envelope.value;
+            envelope.stageProgress = 0;
+            continue;
+          }
+        } else {
+          const shaped = mockEnvelopeShape(envelope.stageProgress, envelope.curve, true);
+          envelope.value = envelope._stageStartValue * (1 - shaped);
+          if (envelope.stageProgress >= 1) {
+            envelope.value = 0;
+            envelope.stage = 'idle';
+            envelope._stageElapsed = 0;
+            envelope.stageProgress = 0;
+            continue;
+          }
+        }
+        break;
+      }
+    }
+    envelope.value = Math.max(0, Math.min(1, envelope.value));
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'envelope' && route.sourceId === envelope.envelopeId) {
+        route.sourceValue = envelope.value;
+        route.resolved = true;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+  }
+  for (const destination of destinations) {
+    const [targetId, parameterId] = destination.split('\n');
+    applyMockModulationTarget(next.rack, targetId, parameterId);
+  }
+  return next;
+}
+
+function mockMsegValue(mseg, phase) {
+  if (mseg.points.length === 0) return 0;
+  let value = mseg.points[0].value;
+  for (let index = 1; index < mseg.points.length; index += 1) {
+    const left = mseg.points[index - 1];
+    const right = mseg.points[index];
+    if (phase > right.position) {
+      value = right.value;
+      continue;
+    }
+    const span = right.position - left.position;
+    if (span <= 0.000001) return right.value;
+    const progress = Math.max(0, Math.min(1, (phase - left.position) / span));
+    const shaped = progress ** (4 ** right.curve);
+    return Math.max(0, Math.min(1, left.value + (right.value - left.value) * shaped));
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+/** Advances browser-preview MSEGs using the same curved-segment interpolation as native. */
+export function advanceMockMsegs(state, elapsedSeconds) {
+  const next = normalizeHostState(state);
+  const elapsed = Math.max(0, Math.min(1, Number(elapsedSeconds) || 0));
+  const tempo = Math.max(20, Math.min(300, Number(next.performance?.transport?.tempo ?? 120) || 120));
+  const destinations = new Set();
+  for (const mseg of next.rack.msegs) {
+    if (mseg.enabled) {
+      const cyclesPerSecond = mseg.sync ? tempo / (60 * mseg.syncBeats) : mseg.rateHz;
+      mseg._cycles += elapsed * cyclesPerSecond;
+      mseg.phase = ((mseg._cycles + mseg.phaseOffset) % 1 + 1) % 1;
+      mseg.value = mockMsegValue(mseg, mseg.phase);
+    } else {
+      mseg.value = 0;
+    }
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'mseg' && route.sourceId === mseg.msegId) {
+        route.sourceValue = mseg.value;
+        route.resolved = true;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+  }
+  for (const destination of destinations) {
+    const [targetId, parameterId] = destination.split('\n');
+    applyMockModulationTarget(next.rack, targetId, parameterId);
+  }
+  return next;
+}
+
+/** Stable 24-bit unit random matching the native xorshift hash. */
+export function deterministicRandomUnit(seed, step, salt = 0) {
+  let x = ((Number(seed) >>> 0) ^ (Number(salt) >>> 0)
+    ^ Math.imul(Number(step) >>> 0, 0x9e3779b9)) >>> 0;
+  x = (x ^ (x << 13)) >>> 0;
+  x = (x ^ (x >>> 17)) >>> 0;
+  x = (x ^ (x << 5)) >>> 0;
+  return (x & 0x00ffffff) / 16777215;
+}
+
+function resetMockRandomRuntime(random, keepCycles = false) {
+  if (!keepCycles) random._cycles = 0;
+  random.step = -1;
+  random.phase = 0;
+  random._previous = 0.5;
+  random._target = 0.5;
+  random._chaosValue = 0.5;
+  random._walkValue = 0.5;
+  random._initialized = false;
+  random.value = 0;
+}
+
+/** Advances seeded browser-preview random modulators with native-equivalent decisions. */
+export function advanceMockRandomModulators(state, elapsedSeconds) {
+  const next = normalizeHostState(state);
+  const elapsed = Math.max(0, Math.min(1, Number(elapsedSeconds) || 0));
+  const tempo = Math.max(20, Math.min(300,
+    Number(next.performance?.transport?.tempo ?? 120) || 120));
+  const destinations = new Set();
+  for (const random of next.rack.randomModulators) {
+    if (random.enabled) {
+      if (!random._initialized) {
+        random._initialized = true;
+        random._chaosValue = 0.05
+          + 0.9 * deterministicRandomUnit(random.seed, 0, 0x68bc21eb);
+      }
+      const decisionsPerSecond = random.sync
+        ? tempo / (60 * random.syncBeats) : random.rateHz;
+      random._cycles += elapsed * decisionsPerSecond;
+      const stepIndex = Math.floor(Math.max(0, random._cycles));
+      random.phase = Math.max(0, random._cycles) - stepIndex;
+
+      if (stepIndex < random.step || random.step < stepIndex - 4096) {
+        random.step = Math.max(-1, stepIndex - 4096);
+        random._previous = random._target = 0.5;
+        random._walkValue = 0.5;
+        random._chaosValue = 0.05 + 0.9 * deterministicRandomUnit(
+          random.seed, random.step + 1, 0x68bc21eb);
+      }
+      while (random.step < stepIndex) {
+        const nextStep = random.step + 1;
+        const decision = deterministicRandomUnit(random.seed, nextStep, 0xa341316c);
+        const changes = random.probability >= 1 || decision < random.probability;
+        if (random.mode === 'smoothRandom') {
+          random._previous = random._target;
+          if (changes)
+            random._target = deterministicRandomUnit(random.seed, nextStep, 0xc8013ea4);
+        } else if (random.mode === 'chaos') {
+          if (changes) {
+            const intensity = 3.57 + 0.43 * random.chaos;
+            random._chaosValue = Math.max(0.0001, Math.min(0.9999,
+              intensity * random._chaosValue * (1 - random._chaosValue)));
+            random._target = random._chaosValue;
+          }
+          random._previous = random._target;
+        } else if (random.mode === 'randomWalk') {
+          if (changes) {
+            const direction = deterministicRandomUnit(
+              random.seed, nextStep, 0xad90777d) * 2 - 1;
+            let walked = random._walkValue + direction * random.stepSize;
+            if (walked < 0) walked = -walked;
+            if (walked > 1) walked = 2 - walked;
+            random._walkValue = Math.max(0, Math.min(1, walked));
+            random._target = random._walkValue;
+          }
+          random._previous = random._target;
+        } else {
+          if (changes)
+            random._target = deterministicRandomUnit(random.seed, nextStep, 0xc8013ea4);
+          random._previous = random._target;
+        }
+        random.step = nextStep;
+      }
+
+      let normalized = random._target;
+      if (random.mode === 'smoothRandom') {
+        let progress = random.smoothing <= 0 ? 1
+          : Math.max(0, Math.min(1, random.phase / Math.max(0.0001, random.smoothing)));
+        progress = progress * progress * (3 - 2 * progress);
+        normalized = random._previous + (random._target - random._previous) * progress;
+      }
+      random.value = random.minimum + Math.max(0, Math.min(1, normalized))
+        * (random.maximum - random.minimum);
+    } else {
+      random.value = 0;
+    }
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'random' && route.sourceId === random.randomId) {
+        route.sourceValue = random.value;
+        route.resolved = true;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+  }
+  for (const destination of destinations) {
+    const [targetId, parameterId] = destination.split('\n');
+    applyMockModulationTarget(next.rack, targetId, parameterId);
+  }
+  return next;
+}
+
+/** Linear snapshot interpolation is deliberately boring and predictable: all destinations
+ * share one progress value, so a multi-control move arrives as one performance gesture. */
+export function snapshotMorphValue(startValue, endValue, progress) {
+  const start = Math.max(0, Math.min(1, Number(startValue) || 0));
+  const end = Math.max(0, Math.min(1, Number(endValue) || 0));
+  const position = Math.max(0, Math.min(1, Number(progress) || 0));
+  return start + (end - start) * position;
+}
+
+function captureMockSnapshot(scene, state) {
+  scene.slots = state.rack.parts.map((part) => ({
+    partId: part.partId, enabled: part.enabled, mute: part.mute,
+    volume: part.volume, applyVolume: true, pan: part.pan, applyPan: true,
+  }));
+  scene.macros = state.rack.macros.map((macro) => ({
+    macroId: macro.macroId, value: macro.value,
+  }));
+  const seen = new Set();
+  scene.parameters = state.rack.pages.flatMap((page) => page.slots).flatMap((slot) => {
+    const address = `${slot.partId}\n${slot.parameterId}`;
+    if (!slot.assigned || !slot.resolved || seen.has(address)
+        || ['@gain', '@pan', '@macro'].includes(slot.parameterId)) return [];
+    seen.add(address);
+    return [{
+      targetId: slot.partId,
+      targetCeId: state.rack.parts.find((part) => part.partId === slot.partId)?.pluginCeId ?? '',
+      parameterId: slot.parameterId,
+      value: slot.value,
+    }];
+  });
+  scene.numSlots = scene.slots.length;
+  scene.numMacros = scene.macros.length;
+  scene.numParameters = scene.parameters.length;
+}
+
+function applyMockSnapshot(scene, state) {
+  for (const slot of scene.slots) {
+    const target = state.rack.parts.find((part) => part.partId === slot.partId);
+    if (!target) continue;
+    target.enabled = slot.enabled;
+    target.mute = slot.mute;
+    if (slot.applyVolume) target.volume = slot.volume;
+    if (slot.applyPan) target.pan = slot.pan;
+  }
+  for (const macro of scene.macros)
+    writeMockVirtualTarget(state.rack, macro.macroId, '@macro', macro.value);
+  for (const parameter of scene.parameters) {
+    if (parameter.parameterId.startsWith('@')) {
+      writeMockVirtualTarget(state.rack, parameter.targetId, parameter.parameterId, parameter.value);
+      continue;
+    }
+    const target = state.rack.parts.find((part) => part.partId === parameter.targetId);
+    if (!target || target.pluginCeId !== parameter.targetCeId) continue;
+    for (const page of state.rack.pages)
+      for (const slot of page.slots)
+        if (slot.partId === parameter.targetId && slot.parameterId === parameter.parameterId)
+          slot.value = parameter.value;
+  }
+}
+
 /** The mock reducer: applies one command to a normalized state, so the browser-only app
  *  behaves instead of stalling. Deliberately mirrors the native semantics the tests pin. */
 export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
   const part = (id) => next.rack.parts.find((p) => p.partId === id);
+
+  if (cmd === 'setStageLock') {
+    if (payload?.enabled === true) next.stageLocked = true;
+    else if (payload?._unlockAuthorized === true) next.stageLocked = false;
+    return next;
+  }
+  if (cmd === 'beginStageUnlock' || cmd === 'cancelStageUnlock') return next;
+  if (!stageCommandAllowed(next.stageLocked, cmd)) return next;
+
+  if (cmd === 'startPerformanceRecording') {
+    if (next.performance.performanceReplay.state !== 'idle') return next;
+    next.performance.performanceRecorder = {
+      recording: true,
+      name: String(payload.name || `Performance ${next.performance.performanceTakes.length + 1}`),
+      elapsedSeconds: 0, midiEventCount: 0, actionCount: 0, truncated: false,
+    };
+    return next;
+  }
+  if (cmd === 'cancelPerformanceRecording') {
+    next.performance.performanceRecorder = {
+      recording: false, name: '', elapsedSeconds: 0, midiEventCount: 0,
+      actionCount: 0, truncated: false,
+    };
+    return next;
+  }
+  if (cmd === 'finishPerformanceRecording') {
+    const recorder = next.performance.performanceRecorder;
+    if (!recorder.recording) return next;
+    next.performance.performanceTakes.push({
+      takeId: nextMockId('mock-performance-take'),
+      name: recorder.name,
+      createdAt: new Date().toISOString(),
+      durationSeconds: Math.max(0.1, recorder.elapsedSeconds),
+      midiEventCount: recorder.midiEventCount,
+      actionCount: recorder.actionCount,
+      truncated: recorder.truncated,
+    });
+    next.performance.performanceRecorder = {
+      recording: false, name: '', elapsedSeconds: 0, midiEventCount: 0,
+      actionCount: 0, truncated: false,
+    };
+    return next;
+  }
+  if (cmd === 'removePerformanceTake') {
+    next.performance.performanceTakes = next.performance.performanceTakes
+      .filter((take) => take.takeId !== payload.takeId);
+    if (next.performance.performanceReplay.takeId === payload.takeId)
+      next.performance.performanceReplay = {
+        state: 'idle', takeId: '', name: '', progress: 0, degraded: false,
+      };
+    return next;
+  }
+  if (cmd === 'replayPerformanceTake') {
+    const take = next.performance.performanceTakes.find(
+      (candidate) => candidate.takeId === payload.takeId);
+    if (!take || next.performance.performanceRecorder.recording) return next;
+    next.performance.performanceReplay = {
+      state: 'playing', takeId: take.takeId, name: take.name, progress: 0, degraded: false,
+    };
+    return next;
+  }
+  if (cmd === 'stopPerformanceReplay') {
+    next.performance.performanceReplay = {
+      state: 'idle', takeId: '', name: '', progress: 0, degraded: false,
+    };
+    return next;
+  }
 
   if (cmd === 'setPluginArtwork' || cmd === 'clearPluginArtwork') {
     // The mock cannot read a file off disk, so it models the one thing the UI reacts to: who
@@ -1850,7 +3289,7 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'addPart') {
-    const partId = `mock-part-${Date.now()}-${next.rack.parts.length + 1}`;
+    const partId = nextMockId('mock-part');
     // A new part starts with the same two modules the native side mints, both idle.
     next.rack.parts.push(normalizeHostState({ rack: { parts: [{ partId, midiChain: [
       { slotId: `${partId}-fx`, type: 'fx' }, { slotId: `${partId}-arp`, type: 'arp' },
@@ -1858,11 +3297,23 @@ export function applyMockCommand(state, payload) {
     if (!next.rack.focusedPartId) next.rack.focusedPartId = partId;
     return next;
   }
+  if (cmd === 'movePart') {
+    const from = next.rack.parts.findIndex((p) => p.partId === payload.partId);
+    if (from < 0) return next;
+    const to = Math.max(0, Math.min(next.rack.parts.length - 1,
+      Math.round(Number(payload.index) || 0)));
+    const [moved] = next.rack.parts.splice(from, 1);
+    next.rack.parts.splice(to, 0, moved);
+    return next;
+  }
   if (cmd === 'removePart') {
     next.rack.parts = next.rack.parts.filter((p) => p.partId !== payload.partId);
     // Dependents go back to the keyboard rather than staying wired to nothing.
     for (const p of next.rack.parts)
       if (p.midiSourcePartId === payload.partId) p.midiSourcePartId = '';
+    next.rack.layerGroups = next.rack.layerGroups.map((group) => ({
+      ...group, members: group.members.filter((member) => member.partId !== payload.partId),
+    })).filter((group) => group.members.length >= 2);
     if (next.rack.focusedPartId === payload.partId)
       next.rack.focusedPartId = next.rack.parts[0]?.partId ?? '';
     if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
@@ -1954,6 +3405,59 @@ export function applyMockCommand(state, payload) {
         if (payload[key] !== undefined) target[key] = Number(payload[key]);
     return next;
   }
+  if (cmd === 'importScalaTuning') {
+    try {
+      const imported = parseScalaTuning(payload.text, payload.sourceName);
+      const current = next.rack.microtuning;
+      next.rack.microtuning = normalizeMicrotuning({ ...imported,
+        rootMidiNote: current.rootMidiNote,
+        referenceMidiNote: current.referenceMidiNote,
+        referenceFrequency: current.referenceFrequency,
+        mtsDeviceId: current.mtsDeviceId,
+        mtsProgram: current.mtsProgram,
+      });
+      for (const target of next.rack.parts) target.microtuningError = '';
+    } catch { /* The native app reports the parser error; browser preview keeps the old table. */ }
+    return next;
+  }
+  if (cmd === 'resetMicrotuning') {
+    const { mtsDeviceId, mtsProgram } = next.rack.microtuning;
+    next.rack.microtuning = normalizeMicrotuning({ mtsDeviceId, mtsProgram });
+    for (const target of next.rack.parts) target.microtuningError = '';
+    return next;
+  }
+  if (cmd === 'setMicrotuning') {
+    next.rack.microtuning = normalizeMicrotuning({ ...next.rack.microtuning, ...payload,
+      degreesCents: next.rack.microtuning.degreesCents,
+    });
+    for (const target of next.rack.parts) target.microtuningError = '';
+    return next;
+  }
+  if (cmd === 'setPartMicrotuning') {
+    const target = part(payload.partId);
+    if (target) {
+      target.microtuningEnabled = payload.enabled === true;
+      target.microtuningError = target.microtuningEnabled && next.rack.microtuning.enabled
+        && ((!target.hardware && !target.hasInstrument)
+          || (target.hardware && !target.midiOutputId))
+        ? (target.hardware ? 'Choose a MIDI output before sending this tuning.'
+                           : 'Load an instrument before sending this tuning.') : '';
+    }
+    return next;
+  }
+  if (cmd === 'sendMicrotuning') {
+    const targets = payload.partId ? [part(payload.partId)].filter(Boolean)
+      : next.rack.parts.filter((target) => target.microtuningEnabled);
+    for (const target of targets) {
+      target.microtuningError = !target.microtuningEnabled
+        ? 'Microtuning is not enabled for that part.'
+        : target.hardware && !target.midiOutputId
+        ? 'Choose a MIDI output before sending this tuning.'
+        : !target.hardware && !target.hasInstrument
+        ? 'Load an instrument before sending this tuning.' : '';
+    }
+    return next;
+  }
   if (cmd === 'clearQuarantine') {
     const module = next.modules.find((m) => m.path === payload.modulePath);
     if (module) { module.quarantined = false; module.failureCount = 0; module.lastFailureReason = ''; }
@@ -1972,7 +3476,7 @@ export function applyMockCommand(state, payload) {
     const effectClass = next.effectClasses.find((c) => c.ceId === payload.ceId);
     if (!effectClass) return next;
     const slot = normalizeHostState({ rack: { masterEffects: [{
-      effectId: `mock-fx-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      effectId: nextMockId('mock-fx'),
       pluginCeId: effectClass.ceId, pluginName: effectClass.name, pluginVendor: effectClass.vendor,
       hasProcessor: true,
     }] } }).rack.masterEffects[0];
@@ -1997,7 +3501,7 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'addReturn') {
     next.rack.returns.push(normalizeHostState({ rack: { returns: [{
-      returnId: `mock-return-${Date.now()}-${next.rack.returns.length + 1}`,
+      returnId: nextMockId('mock-return'),
       name: payload.name || `Return ${next.rack.returns.length + 1}`,
     }] } }).rack.returns[0]);
     return next;
@@ -2092,15 +3596,105 @@ export function applyMockCommand(state, payload) {
       || cmd === 'sendHardwarePatch') {
     return next; // the sysex itself only exists natively; the arming lives in the store
   }
+  if (cmd === 'addLayerGroup') {
+    if (next.rack.layerGroups.length >= 32) return next;
+    const claimed = new Set(next.rack.layerGroups.flatMap(
+      (group) => group.members.map((member) => member.partId)));
+    const requested = Array.isArray(payload.partIds) ? payload.partIds.map(String) : [];
+    const eligible = (requested.length > 0 ? requested
+      : next.rack.parts.map((candidate) => candidate.partId))
+      .filter((partId, index, all) => all.indexOf(partId) === index && !claimed.has(partId)
+        && !part(partId)?.midiSourcePartId).slice(0, 8);
+    if (eligible.length < 2) return next;
+    next.rack.layerGroups.push(normalizeHostState({ rack: { layerGroups: [{
+      layerGroupId: nextMockId('mock-layer'),
+      name: payload.name || `Layer ${next.rack.layerGroups.length + 1}`,
+      members: eligible.slice(0, requested.length > 0 ? 8 : 2).map((partId) => ({
+        partId, partName: part(partId)?.pluginName || 'Empty part', minimum: 0, maximum: 1,
+      })),
+    }] } }).rack.layerGroups[0]);
+    return next;
+  }
+  if (cmd === 'removeLayerGroup') {
+    next.rack.layerGroups = next.rack.layerGroups.filter(
+      (group) => group.layerGroupId !== payload.layerGroupId);
+    return next;
+  }
+  if (cmd === 'setLayerGroup') {
+    const group = next.rack.layerGroups.find(
+      (candidate) => candidate.layerGroupId === payload.layerGroupId);
+    if (!group) return next;
+    if (payload.name !== undefined) group.name = String(payload.name).slice(0, 80);
+    if (payload.enabled !== undefined) group.enabled = payload.enabled === true;
+    if (['all', 'roundRobin', 'leastBusy'].includes(payload.allocation))
+      group.allocation = payload.allocation;
+    if (['velocity', 'key', 'cc', 'expression', 'macro'].includes(payload.source))
+      group.source = payload.source;
+    if (payload.controller !== undefined)
+      group.controller = Math.max(0, Math.min(127, Math.round(Number(payload.controller) || 0)));
+    if (payload.macroId !== undefined) group.macroId = String(payload.macroId);
+    if (group.source !== 'macro') group.macroId = '';
+    return next;
+  }
+  if (cmd === 'addLayerMember') {
+    const group = next.rack.layerGroups.find(
+      (candidate) => candidate.layerGroupId === payload.layerGroupId);
+    const target = part(payload.partId);
+    const claimedElsewhere = next.rack.layerGroups.some((candidate) => candidate !== group
+      && candidate.members.some((member) => member.partId === payload.partId));
+    if (!group || !target || target.midiSourcePartId || claimedElsewhere
+        || group.members.some((member) => member.partId === payload.partId)
+        || group.members.length >= 8) return next;
+    group.members.push({ partId: target.partId, partName: target.pluginName || 'Empty part',
+                         minimum: 0, maximum: 1, crossfade: 0, resolved: true });
+    return next;
+  }
+  if (cmd === 'removeLayerMember' || cmd === 'setLayerMember') {
+    const group = next.rack.layerGroups.find(
+      (candidate) => candidate.layerGroupId === payload.layerGroupId);
+    const member = group?.members.find((candidate) => candidate.partId === payload.partId);
+    if (!group || !member) return next;
+    if (cmd === 'removeLayerMember') {
+      group.members = group.members.filter((candidate) => candidate.partId !== payload.partId);
+      if (group.members.length < 2)
+        next.rack.layerGroups = next.rack.layerGroups.filter((candidate) => candidate !== group);
+      return next;
+    }
+    if (payload.minimum !== undefined)
+      member.minimum = Math.max(0, Math.min(1, Number(payload.minimum) || 0));
+    if (payload.maximum !== undefined)
+      member.maximum = Math.max(0, Math.min(1, Number(payload.maximum) || 0));
+    if (member.minimum > member.maximum)
+      [member.minimum, member.maximum] = [member.maximum, member.minimum];
+    if (payload.crossfade !== undefined)
+      member.crossfade = Math.max(0, Math.min(0.5, Number(payload.crossfade) || 0));
+    return next;
+  }
   if (cmd === 'addMacro') {
     next.rack.macros.push(normalizeHostState({ rack: { macros: [{
-      macroId: `mock-macro-${Date.now()}-${next.rack.macros.length + 1}`,
+      macroId: nextMockId('mock-macro'),
       name: payload.name || `Macro ${next.rack.macros.length + 1}`,
     }] } }).rack.macros[0]);
     return next;
   }
   if (cmd === 'removeMacro') {
     next.rack.macros = next.rack.macros.filter((m) => m.macroId !== payload.macroId);
+    for (const group of next.rack.layerGroups)
+      if (group.source === 'macro' && group.macroId === payload.macroId)
+        Object.assign(group, { source: 'velocity', macroId: '' });
+    const destinations = new Set();
+    for (const route of next.rack.modulationRoutes)
+      if ((route.sourceType === 'macro' && route.sourceId === payload.macroId)
+          || (route.targetId === payload.macroId && route.parameterId === '@macro')) {
+        route.sourceValue = 0;
+        route.resolved = false;
+        if (route.sourceType === 'macro')
+          destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [targetId, parameterId] = destination.split('\n');
+      applyMockModulationTarget(next.rack, targetId, parameterId);
+    }
     return next;
   }
   if (cmd === 'renameMacro') {
@@ -2110,15 +3704,34 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'setMacroValue') {
     const macro = next.rack.macros.find((m) => m.macroId === payload.macroId);
-    if (macro) macro.value = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+    if (macro) {
+      const value = Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+      const incoming = next.rack.modulationRoutes.filter(
+        (route) => route.targetId === macro.macroId && route.parameterId === '@macro');
+      for (const route of incoming) route.baseValue = value;
+      if (incoming.length > 0) applyMockModulationTarget(next.rack, macro.macroId, '@macro');
+      else writeMockVirtualTarget(next.rack, macro.macroId, '@macro', value);
+    }
     return next;
   }
-  if (cmd === 'addMacroTarget' || cmd === 'removeMacroTarget') {
+  if (cmd === 'addMacroTarget' || cmd === 'removeMacroTarget' || cmd === 'setMacroTargetOptions') {
     const macro = next.rack.macros.find((m) => m.macroId === payload.macroId);
     if (!macro) return next;
     if (cmd === 'removeMacroTarget') {
       macro.targets = macro.targets.filter(
         (t) => !(t.targetId === payload.targetId && t.parameterId === payload.parameterId));
+    } else if (cmd === 'setMacroTargetOptions') {
+      const target = macro.targets.find(
+        (t) => t.targetId === payload.targetId && t.parameterId === payload.parameterId);
+      if (target) {
+        if (payload.rangeMin !== undefined)
+          target.rangeMin = Math.max(0, Math.min(1, Number(payload.rangeMin) || 0));
+        if (payload.rangeMax !== undefined)
+          target.rangeMax = Math.max(0, Math.min(1, Number(payload.rangeMax) || 0));
+        if (payload.inverted !== undefined) target.inverted = payload.inverted === true;
+        if (target.rangeMin > target.rangeMax)
+          [target.rangeMin, target.rangeMax] = [target.rangeMax, target.rangeMin];
+      }
     } else if (!macro.targets.some((t) => t.targetId === payload.targetId && t.parameterId === payload.parameterId)) {
       macro.targets.push({
         targetId: String(payload.targetId ?? ''),
@@ -2134,8 +3747,416 @@ export function applyMockCommand(state, payload) {
     }
     return next;
   }
+  if (cmd === 'addMidiLfo') {
+    if (next.rack.midiLfos.length >= 32) return next;
+    next.rack.midiLfos.push(normalizeHostState({ rack: { midiLfos: [{
+      lfoId: nextMockId('mock-lfo'),
+      name: String(payload.name ?? '') || `LFO ${next.rack.midiLfos.length + 1}`,
+    }] } }).rack.midiLfos[0]);
+    return advanceMockMidiLfos(next, 0);
+  }
+  if (cmd === 'setMidiLfo' || cmd === 'resetMidiLfo') {
+    const lfo = next.rack.midiLfos.find((candidate) => candidate.lfoId === payload.lfoId);
+    if (!lfo) return next;
+    if (cmd === 'resetMidiLfo') {
+      lfo._cycles = 0;
+      lfo.phase = lfo.phaseOffset;
+      return advanceMockMidiLfos(next, 0);
+    }
+    if (payload.name !== undefined && String(payload.name).trim()) lfo.name = String(payload.name).trim();
+    if (payload.shape !== undefined
+        && ['sine', 'triangle', 'sawUp', 'sawDown', 'square', 'sampleHold'].includes(payload.shape))
+      lfo.shape = payload.shape;
+    if (payload.enabled !== undefined) lfo.enabled = payload.enabled === true;
+    if (payload.sync !== undefined) lfo.sync = payload.sync === true;
+    if (payload.rateHz !== undefined) lfo.rateHz = Math.max(0.01, Math.min(40, Number(payload.rateHz) || 1));
+    if (payload.syncBeats !== undefined) lfo.syncBeats = Math.max(0.03125, Math.min(64, Number(payload.syncBeats) || 1));
+    if (payload.phaseOffset !== undefined) lfo.phaseOffset = Math.max(0, Math.min(1, Number(payload.phaseOffset) || 0));
+    if (payload.minimum !== undefined) lfo.minimum = Math.max(0, Math.min(1, Number(payload.minimum) || 0));
+    if (payload.maximum !== undefined) lfo.maximum = Math.max(0, Math.min(1, Number(payload.maximum) || 0));
+    if (lfo.minimum > lfo.maximum) [lfo.minimum, lfo.maximum] = [lfo.maximum, lfo.minimum];
+    return advanceMockMidiLfos(next, 0);
+  }
+  if (cmd === 'removeMidiLfo') {
+    next.rack.midiLfos = next.rack.midiLfos.filter((lfo) => lfo.lfoId !== payload.lfoId);
+    const destinations = new Set();
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'lfo' && route.sourceId === payload.lfoId) {
+        route.sourceValue = 0;
+        route.resolved = false;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [targetId, parameterId] = destination.split('\n');
+      applyMockModulationTarget(next.rack, targetId, parameterId);
+    }
+    return next;
+  }
+  if (cmd === 'addMidiLfoOutput') {
+    const lfo = next.rack.midiLfos.find((candidate) => candidate.lfoId === payload.lfoId);
+    const target = part(payload.targetPartId);
+    if (!lfo || !target?.hardware || lfo.outputs.length >= 32) return next;
+    const type = ['cc', 'nrpn', 'sysex'].includes(payload.type) ? payload.type : 'cc';
+    lfo.outputs.push({
+      outputId: nextMockId('mock-lfo-out'),
+      type,
+      targetPartId: String(payload.targetPartId),
+      targetName: target.midiOutputName || target.pluginName || 'Hardware part',
+      channel: Math.max(1, Math.min(16, Number(payload.channel ?? 1) || 1)),
+      number: Math.max(0, Math.min(type === 'nrpn' ? 16383 : 127,
+                                  Number(payload.number ?? 1) || 0)),
+      sysexTemplate: String(payload.sysexTemplate ?? 'F0 7D {value7} F7'),
+      enabled: false,
+      resolved: true,
+    });
+    return next;
+  }
+  if (cmd === 'setMidiLfoOutput' || cmd === 'removeMidiLfoOutput') {
+    const lfo = next.rack.midiLfos.find((candidate) => candidate.lfoId === payload.lfoId);
+    if (!lfo) return next;
+    if (cmd === 'removeMidiLfoOutput') {
+      lfo.outputs = lfo.outputs.filter((output) => output.outputId !== payload.outputId);
+      return next;
+    }
+    const output = lfo.outputs.find((candidate) => candidate.outputId === payload.outputId);
+    if (!output) return next;
+    if (payload.type !== undefined && ['cc', 'nrpn', 'sysex'].includes(payload.type)) output.type = payload.type;
+    if (payload.targetPartId !== undefined) output.targetPartId = String(payload.targetPartId);
+    if (payload.channel !== undefined) output.channel = Math.max(1, Math.min(16, Number(payload.channel) || 1));
+    if (payload.number !== undefined) output.number = Math.max(0, Math.min(output.type === 'nrpn' ? 16383 : 127,
+                                                                          Number(payload.number) || 0));
+    if (payload.sysexTemplate !== undefined) output.sysexTemplate = String(payload.sysexTemplate);
+    if (payload.enabled !== undefined) output.enabled = payload.enabled === true;
+    const target = part(output.targetPartId);
+    output.resolved = target?.hardware === true;
+    output.targetName = target?.midiOutputName || target?.pluginName || '';
+    return next;
+  }
+  if (cmd === 'addEnvelope') {
+    if (next.rack.envelopes.length >= 32) return next;
+    next.rack.envelopes.push(normalizeHostState({ rack: { envelopes: [{
+      envelopeId: nextMockId('mock-envelope'),
+      name: String(payload.name ?? '') || `Envelope ${next.rack.envelopes.length + 1}`,
+    }] } }).rack.envelopes[0]);
+    return next;
+  }
+  if (cmd === 'setEnvelope') {
+    const envelope = next.rack.envelopes.find((candidate) => candidate.envelopeId === payload.envelopeId);
+    if (!envelope) return next;
+    if (payload.name !== undefined && String(payload.name).trim()) envelope.name = String(payload.name).trim();
+    if (payload.enabled !== undefined) envelope.enabled = payload.enabled === true;
+    if (payload.channel !== undefined) envelope.channel = Math.max(0, Math.min(16, Number(payload.channel) || 0));
+    if (payload.noteLow !== undefined) envelope.noteLow = Math.max(0, Math.min(127, Number(payload.noteLow) || 0));
+    if (payload.noteHigh !== undefined) envelope.noteHigh = Math.max(0, Math.min(127, Number(payload.noteHigh) || 0));
+    if (envelope.noteLow > envelope.noteHigh)
+      [envelope.noteLow, envelope.noteHigh] = [envelope.noteHigh, envelope.noteLow];
+    if (payload.retrigger !== undefined) envelope.retrigger = payload.retrigger === true;
+    if (payload.attackMs !== undefined) envelope.attackMs = Math.max(0, Math.min(60000, Number(payload.attackMs) || 0));
+    if (payload.decayMs !== undefined) envelope.decayMs = Math.max(0, Math.min(60000, Number(payload.decayMs) || 0));
+    if (payload.sustain !== undefined) envelope.sustain = Math.max(0, Math.min(1, Number(payload.sustain) || 0));
+    if (payload.releaseMs !== undefined) envelope.releaseMs = Math.max(0, Math.min(60000, Number(payload.releaseMs) || 0));
+    if (payload.curve !== undefined) envelope.curve = Math.max(-1, Math.min(1, Number(payload.curve) || 0));
+    if (payload.velocityAmount !== undefined)
+      envelope.velocityAmount = Math.max(0, Math.min(1, Number(payload.velocityAmount) || 0));
+    if (!envelope.enabled) {
+      envelope.stage = 'idle'; envelope.value = 0; envelope.gate = false;
+      envelope.stageProgress = 0; envelope._stageElapsed = 0;
+    }
+    return advanceMockEnvelopes(next, 0);
+  }
+  if (cmd === 'triggerEnvelope') {
+    const envelope = next.rack.envelopes.find((candidate) => candidate.envelopeId === payload.envelopeId);
+    if (!envelope || !envelope.enabled) return next;
+    const gate = payload.gate !== false;
+    if (gate) {
+      const wasGated = envelope.gate;
+      envelope.gate = true;
+      if (envelope.retrigger || !wasGated) {
+        envelope.stage = 'attack';
+        envelope.stageProgress = 0;
+        envelope._stageElapsed = 0;
+        envelope._stageStartValue = envelope.value;
+        const velocity = Math.max(0, Math.min(1, Number(payload.velocity ?? 1) || 0));
+        envelope._peak = 1 - envelope.velocityAmount + envelope.velocityAmount * velocity;
+      }
+    } else {
+      envelope.gate = false;
+      if (!['idle', 'release'].includes(envelope.stage)) {
+        envelope.stage = 'release';
+        envelope.stageProgress = 0;
+        envelope._stageElapsed = 0;
+        envelope._stageStartValue = envelope.value;
+      }
+    }
+    return advanceMockEnvelopes(next, 0);
+  }
+  if (cmd === 'resetEnvelope') {
+    const envelope = next.rack.envelopes.find((candidate) => candidate.envelopeId === payload.envelopeId);
+    if (!envelope) return next;
+    envelope.stage = 'idle'; envelope.value = 0; envelope.gate = false;
+    envelope.stageProgress = 0; envelope._stageElapsed = 0; envelope._stageStartValue = 0;
+    return advanceMockEnvelopes(next, 0);
+  }
+  if (cmd === 'removeEnvelope') {
+    next.rack.envelopes = next.rack.envelopes.filter(
+      (envelope) => envelope.envelopeId !== payload.envelopeId);
+    const destinations = new Set();
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'envelope' && route.sourceId === payload.envelopeId) {
+        route.sourceValue = 0;
+        route.resolved = false;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [targetId, parameterId] = destination.split('\n');
+      applyMockModulationTarget(next.rack, targetId, parameterId);
+    }
+    return next;
+  }
+  if (cmd === 'addMseg') {
+    if (next.rack.msegs.length >= 32) return next;
+    const suffix = nextMockSuffix();
+    next.rack.msegs.push({
+      msegId: `mock-mseg-${suffix}`,
+      name: String(payload.name ?? '').trim() || `MSEG ${next.rack.msegs.length + 1}`,
+      enabled: true, sync: true, rateHz: 0.5, syncBeats: 4, phaseOffset: 0,
+      phase: 0, value: 0, _cycles: 0,
+      points: [[0, 0], [0.25, 1], [0.5, 0.2], [0.75, 0.8], [1, 0]].map(
+        ([position, value], index) => ({
+          pointId: `mock-mseg-point-${suffix}-${index + 1}`, position, value, curve: 0,
+        })),
+    });
+    return advanceMockMsegs(next, 0);
+  }
+  if (cmd === 'setMseg') {
+    const mseg = next.rack.msegs.find((candidate) => candidate.msegId === payload.msegId);
+    if (!mseg) return next;
+    if (payload.name !== undefined && String(payload.name).trim()) mseg.name = String(payload.name).trim();
+    if (payload.enabled !== undefined) mseg.enabled = payload.enabled === true;
+    if (payload.sync !== undefined) mseg.sync = payload.sync === true;
+    if (payload.rateHz !== undefined) mseg.rateHz = Math.max(0.01, Math.min(40, Number(payload.rateHz) || 0.01));
+    if (payload.syncBeats !== undefined)
+      mseg.syncBeats = Math.max(0.03125, Math.min(64, Number(payload.syncBeats) || 0.03125));
+    if (payload.phaseOffset !== undefined)
+      mseg.phaseOffset = Math.max(0, Math.min(1, Number(payload.phaseOffset) || 0));
+    if (payload.points !== undefined && Array.isArray(payload.points)
+        && payload.points.length >= 2 && payload.points.length <= 64) {
+      const seen = new Set();
+      const points = payload.points.map((point, index) => {
+        let pointId = String(point?.pointId ?? '');
+        if (!pointId) pointId = nextMockId('mock-mseg-point');
+        if (seen.has(pointId)) return null;
+        seen.add(pointId);
+        return {
+          pointId,
+          position: Math.max(0, Math.min(1, Number(point?.position ?? 0) || 0)),
+          value: Math.max(0, Math.min(1, Number(point?.value ?? 0) || 0)),
+          curve: Math.max(-1, Math.min(1, Number(point?.curve ?? 0) || 0)),
+        };
+      }).filter(Boolean).sort((a, b) => a.position - b.position);
+      if (points.length >= 2) {
+        points[0].position = 0;
+        points[points.length - 1].position = 1;
+        mseg.points = points;
+      }
+    }
+    if (!mseg.enabled) mseg.value = 0;
+    return advanceMockMsegs(next, 0);
+  }
+  if (cmd === 'resetMseg') {
+    const mseg = next.rack.msegs.find((candidate) => candidate.msegId === payload.msegId);
+    if (!mseg) return next;
+    mseg._cycles = 0;
+    return advanceMockMsegs(next, 0);
+  }
+  if (cmd === 'removeMseg') {
+    next.rack.msegs = next.rack.msegs.filter((mseg) => mseg.msegId !== payload.msegId);
+    const destinations = new Set();
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'mseg' && route.sourceId === payload.msegId) {
+        route.sourceValue = 0;
+        route.resolved = false;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [targetId, parameterId] = destination.split('\n');
+      applyMockModulationTarget(next.rack, targetId, parameterId);
+    }
+    return next;
+  }
+  if (cmd === 'addRandomModulator') {
+    if (next.rack.randomModulators.length >= 32) return next;
+    const ordinal = next.rack.randomModulators.length + 1;
+    const mode = ['sampleHold', 'smoothRandom', 'chaos', 'randomWalk'].includes(payload.mode)
+      ? payload.mode : 'sampleHold';
+    const seed = (Math.floor(Date.now() + ordinal * 2654435761) % 0x7ffffffe) + 1;
+    next.rack.randomModulators.push(normalizeHostState({ rack: { randomModulators: [{
+      randomId: nextMockId('mock-random'),
+      name: String(payload.name ?? '').trim() || `Random ${ordinal}`,
+      mode, seed,
+    }] } }).rack.randomModulators[0]);
+    return advanceMockRandomModulators(next, 0);
+  }
+  if (cmd === 'setRandomModulator') {
+    const random = next.rack.randomModulators.find(
+      (candidate) => candidate.randomId === payload.randomId);
+    if (!random) return next;
+    if (payload.name !== undefined && String(payload.name).trim())
+      random.name = String(payload.name).trim();
+    if (payload.mode !== undefined
+        && ['sampleHold', 'smoothRandom', 'chaos', 'randomWalk'].includes(payload.mode))
+      random.mode = payload.mode;
+    if (payload.enabled !== undefined) random.enabled = payload.enabled === true;
+    if (payload.sync !== undefined) random.sync = payload.sync === true;
+    if (payload.rateHz !== undefined)
+      random.rateHz = Math.max(0.01, Math.min(40, Number(payload.rateHz) || 0.01));
+    if (payload.syncBeats !== undefined)
+      random.syncBeats = Math.max(0.03125,
+        Math.min(64, Number(payload.syncBeats) || 0.03125));
+    if (payload.seed !== undefined)
+      random.seed = Math.max(1, Math.min(0x7fffffff,
+        Math.floor(Number(payload.seed) || 1)));
+    for (const field of ['probability', 'smoothing', 'stepSize', 'chaos', 'minimum', 'maximum'])
+      if (payload[field] !== undefined)
+        random[field] = Math.max(0, Math.min(1, Number(payload[field]) || 0));
+    if (random.minimum > random.maximum)
+      [random.minimum, random.maximum] = [random.maximum, random.minimum];
+    resetMockRandomRuntime(random);
+    return advanceMockRandomModulators(next, 0);
+  }
+  if (cmd === 'resetRandomModulator') {
+    const random = next.rack.randomModulators.find(
+      (candidate) => candidate.randomId === payload.randomId);
+    if (!random) return next;
+    resetMockRandomRuntime(random);
+    return advanceMockRandomModulators(next, 0);
+  }
+  if (cmd === 'removeRandomModulator') {
+    next.rack.randomModulators = next.rack.randomModulators.filter(
+      (random) => random.randomId !== payload.randomId);
+    const destinations = new Set();
+    for (const route of next.rack.modulationRoutes)
+      if (route.sourceType === 'random' && route.sourceId === payload.randomId) {
+        route.sourceValue = 0;
+        route.resolved = false;
+        destinations.add(`${route.targetId}\n${route.parameterId}`);
+      }
+    for (const destination of destinations) {
+      const [targetId, parameterId] = destination.split('\n');
+      applyMockModulationTarget(next.rack, targetId, parameterId);
+    }
+    return next;
+  }
+  if (cmd === 'addModulationRoute') {
+    const target = part(payload.targetId);
+    const effects = [...next.rack.masterEffects, ...next.rack.parts.flatMap((p) => p.effects),
+                     ...next.rack.returns.flatMap((r) => r.effects),
+                     ...next.rack.buses.flatMap((b) => b.effects)];
+    const effect = effects.find((e) => e.effectId === payload.targetId);
+    const sourceType = String(payload.sourceType ?? 'velocity');
+    const macro = next.rack.macros.find((m) => m.macroId === payload.sourceId);
+    const lfo = next.rack.midiLfos.find((candidate) => candidate.lfoId === payload.sourceId);
+    const envelope = next.rack.envelopes.find((candidate) => candidate.envelopeId === payload.sourceId);
+    const mseg = next.rack.msegs.find((candidate) => candidate.msegId === payload.sourceId);
+    const random = next.rack.randomModulators.find(
+      (candidate) => candidate.randomId === payload.sourceId);
+    const targetMacro = next.rack.macros.find((candidate) => candidate.macroId === payload.targetId);
+    const existing = next.rack.modulationRoutes.find(
+      (r) => r.targetId === payload.targetId && r.parameterId === payload.parameterId);
+    const baseValue = existing?.baseValue
+      ?? (payload.parameterId === '@macro' ? (targetMacro?.value ?? 0)
+        : payload.parameterId === '@gain' ? (target?.volume ?? 1) / 2
+        : payload.parameterId === '@pan' ? ((target?.pan ?? 0) + 1) / 2 : 0.5);
+    next.rack.modulationRoutes.push({
+      routeId: nextMockId('mock-mod'),
+      sourceType,
+      sourceId: ['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(sourceType) ? String(payload.sourceId ?? '') : '',
+      sourceChannel: ['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(sourceType) ? 0
+        : Math.max(0, Math.min(16, Number(payload.sourceChannel ?? 0) || 0)),
+      sourceNumber: ['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(sourceType) ? 0
+        : Math.max(0, Math.min(127, Number(payload.sourceNumber ?? 0) || 0)),
+      sourceValue: sourceType === 'macro' ? (macro?.value ?? 0)
+        : sourceType === 'lfo' ? (lfo?.value ?? 0)
+        : sourceType === 'envelope' ? (envelope?.value ?? 0)
+        : sourceType === 'mseg' ? (mseg?.value ?? 0)
+        : sourceType === 'random' ? (random?.value ?? 0)
+        : sourceType === 'pitchBend' ? 0.5 : 0,
+      targetId: String(payload.targetId ?? ''),
+      parameterId: String(payload.parameterId ?? ''),
+      targetName: target?.pluginName || effect?.pluginName || '',
+      displayName: mockBindingName(payload.parameterId, next.rack),
+      amount: Math.max(-1, Math.min(1, Number(payload.amount ?? 0.25) || 0)),
+      baseValue,
+      enabled: true,
+      resolved: Boolean((target || effect
+          || (['lfo', 'envelope', 'mseg', 'random'].includes(sourceType) && targetMacro))
+        && (sourceType !== 'macro' || macro) && (sourceType !== 'lfo' || lfo)
+        && (sourceType !== 'envelope' || envelope) && (sourceType !== 'mseg' || mseg)
+        && (sourceType !== 'random' || random)),
+    });
+    applyMockModulationTarget(next.rack, String(payload.targetId ?? ''),
+                              String(payload.parameterId ?? ''));
+    return next;
+  }
+  if (cmd === 'setModulationRoute') {
+    const route = next.rack.modulationRoutes.find((r) => r.routeId === payload.routeId);
+    if (!route) return next;
+    if (payload.amount !== undefined)
+      route.amount = Math.max(-1, Math.min(1, Number(payload.amount) || 0));
+    if (payload.enabled !== undefined) route.enabled = payload.enabled === true;
+    if (payload.sourceChannel !== undefined)
+      route.sourceChannel = Math.max(0, Math.min(16, Number(payload.sourceChannel) || 0));
+    if (payload.sourceNumber !== undefined)
+      route.sourceNumber = Math.max(0, Math.min(127, Number(payload.sourceNumber) || 0));
+    if (payload.sourceType !== undefined) {
+      route.sourceType = String(payload.sourceType);
+      if (!['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(route.sourceType)) route.sourceId = '';
+    }
+    if (payload.sourceId !== undefined) route.sourceId = String(payload.sourceId);
+    if (['macro', 'lfo', 'envelope', 'mseg', 'random'].includes(route.sourceType)) {
+      route.sourceChannel = 0;
+      route.sourceNumber = 0;
+    }
+    const macro = next.rack.macros.find((m) => m.macroId === route.sourceId);
+    const lfo = next.rack.midiLfos.find((candidate) => candidate.lfoId === route.sourceId);
+    const envelope = next.rack.envelopes.find((candidate) => candidate.envelopeId === route.sourceId);
+    const mseg = next.rack.msegs.find((candidate) => candidate.msegId === route.sourceId);
+    const random = next.rack.randomModulators.find(
+      (candidate) => candidate.randomId === route.sourceId);
+    route.sourceValue = route.sourceType === 'macro' ? (macro?.value ?? 0)
+      : route.sourceType === 'lfo' ? (lfo?.value ?? 0)
+      : route.sourceType === 'envelope' ? (envelope?.value ?? 0)
+      : route.sourceType === 'mseg' ? (mseg?.value ?? 0)
+      : route.sourceType === 'random' ? (random?.value ?? 0)
+      : route.sourceType === 'pitchBend' ? 0.5 : route.sourceValue;
+    applyMockModulationTarget(next.rack, route.targetId, route.parameterId);
+    return next;
+  }
+  if (cmd === 'removeModulationRoute') {
+    const removed = next.rack.modulationRoutes.find((r) => r.routeId === payload.routeId);
+    next.rack.modulationRoutes = next.rack.modulationRoutes.filter((r) => r.routeId !== payload.routeId);
+    if (removed) {
+      if (next.rack.modulationRoutes.some(
+        (r) => r.targetId === removed.targetId && r.parameterId === removed.parameterId))
+        applyMockModulationTarget(next.rack, removed.targetId, removed.parameterId);
+      else
+        writeMockVirtualTarget(next.rack, removed.targetId, removed.parameterId, removed.baseValue);
+    }
+    return next;
+  }
+  if (cmd === 'clearModulationRoutes') {
+    const firstByTarget = new Map();
+    for (const route of next.rack.modulationRoutes) {
+      const key = `${route.targetId}\n${route.parameterId}`;
+      if (!firstByTarget.has(key)) firstByTarget.set(key, route);
+    }
+    next.rack.modulationRoutes = [];
+    for (const route of firstByTarget.values())
+      writeMockVirtualTarget(next.rack, route.targetId, route.parameterId, route.baseValue);
+    return next;
+  }
   if (cmd === 'addControlPage') {
-    const pageId = `mock-page-${Date.now()}-${next.rack.pages.length + 1}`;
+    const pageId = nextMockId('mock-page');
     next.rack.pages.push(normalizeHostState({ rack: { pages: [{
       pageId,
       name: payload.name || `Page ${next.rack.pages.length + 1}`,
@@ -2320,7 +4341,7 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'addBus') {
     next.rack.buses.push(normalizeHostState({ rack: { buses: [{
-      busId: `mock-bus-${Date.now()}-${next.rack.buses.length + 1}`,
+      busId: nextMockId('mock-bus'),
       name: payload.name || `Bus ${next.rack.buses.length + 1}`,
     }] } }).rack.buses[0]);
     return next;
@@ -2364,6 +4385,11 @@ export function applyMockCommand(state, payload) {
         : 'That would loop — the source already takes its MIDI from this part.');
       return next;
     }
+    if (sourceId && next.rack.layerGroups.some(
+      (group) => group.members.some((member) => member.partId === payload.partId))) {
+      hostLastError.set('Remove that part from its layer before giving it another MIDI source.');
+      return next;
+    }
     target.midiSourcePartId = sourceId;
     return next;
   }
@@ -2383,6 +4409,11 @@ export function applyMockCommand(state, payload) {
   const perf = next.performance;
   const pattern = (id) => perf.patterns.find((p) => p.patternId === id);
   const lane = (patternId, laneId) => pattern(patternId)?.lanes.find((l) => l.laneId === laneId);
+  const effect = (id) => [...next.rack.masterEffects,
+    ...next.rack.parts.flatMap((candidate) => candidate.effects),
+    ...next.rack.returns.flatMap((candidate) => candidate.effects),
+    ...next.rack.buses.flatMap((candidate) => candidate.effects)]
+    .find((candidate) => candidate.effectId === id);
 
   if (cmd === 'transportPlay' || cmd === 'transportStop' || cmd === 'transportContinue') {
     perf.transport.playing = cmd !== 'transportStop';
@@ -2406,8 +4437,33 @@ export function applyMockCommand(state, payload) {
     perf.transport.externalClock = payload.enabled === true;
     return next;
   }
+  if (cmd === 'importGrooveTemplate') {
+    if (perf.grooves.length >= 32) return next;
+    const imported = normalizeGrooveTemplate({
+      grooveId: nextMockId('mock-groove'),
+      name: payload.name,
+      source: 'imported',
+      stepsPerBeat: payload.stepsPerBeat,
+      timingOffsets: payload.timingOffsets,
+      velocityMultipliers: payload.velocityMultipliers,
+    });
+    if (imported.timingOffsets.length >= 2) perf.grooves.push(imported);
+    return next;
+  }
+  if (cmd === 'removeGrooveTemplate') {
+    perf.grooves = perf.grooves.filter((groove) =>
+      groove.grooveId !== payload.grooveId || groove.source === 'factory');
+    return next;
+  }
+  if (cmd === 'applyGrooveTemplate') {
+    const target = pattern(payload.patternId);
+    const groove = perf.grooves.find((candidate) => candidate.grooveId === payload.grooveId);
+    if (target && groove)
+      applyGrooveToPattern(target, groove, payload.amount, payload.applyVelocity !== false);
+    return next;
+  }
   if (cmd === 'addPattern') {
-    const patternId = `mock-pattern-${Date.now()}`;
+    const patternId = nextMockId('mock-pattern');
     perf.patterns.push(normalizePerformance({ patterns: [{
       patternId,
       name: payload.name || `Pattern ${perf.patterns.length + 1}`,
@@ -2419,9 +4475,46 @@ export function applyMockCommand(state, payload) {
     }] }).patterns[0]);
     return next;
   }
+  if (cmd === 'createPatternVariations') {
+    const selected = pattern(payload.patternId);
+    if (!selected) return next;
+    let source = selected;
+    if (selected.variationSourcePatternId && selected.variationSourcePatternId !== selected.patternId)
+      source = pattern(selected.variationSourcePatternId) ?? selected;
+
+    const amount = Math.max(0, Math.min(1, Number(payload.amount ?? 0.55)));
+    const groupId = source.variationGroupId
+      || nextMockId(`mock-variation-group-${source.patternId}`);
+    source.variationGroupId = groupId;
+    source.variationLabel = 'A';
+    source.variationSourcePatternId = source.patternId;
+    source.variationAmount = amount;
+
+    for (const label of ['B', 'C', 'D']) {
+      const existingIndex = perf.patterns.findIndex((candidate) =>
+        candidate.variationGroupId === groupId && candidate.variationLabel === label);
+      const existingId = existingIndex >= 0 ? perf.patterns[existingIndex].patternId : '';
+      const variation = makePatternVariation(source, label, amount,
+        existingId || nextMockId(`mock-variation-${source.patternId}-${label}`));
+      variation.variationGroupId = groupId;
+      if (existingIndex >= 0) perf.patterns[existingIndex] = variation;
+      else perf.patterns.push(variation);
+    }
+    const defaultFill = perf.patterns.find((candidate) =>
+      candidate.variationGroupId === groupId && candidate.variationLabel === 'D');
+    for (const clip of perf.clips)
+      if (clip.patternId === source.patternId && !clip.fillPatternId)
+        clip.fillPatternId = defaultFill?.patternId ?? '';
+    return next;
+  }
   if (cmd === 'removePattern') {
     perf.patterns = perf.patterns.filter((p) => p.patternId !== payload.patternId);
     perf.clips = perf.clips.filter((c) => c.patternId !== payload.patternId);
+    for (const clip of perf.clips)
+      if (clip.fillPatternId === payload.patternId) {
+        clip.fillPatternId = '';
+        clip.fillActive = false;
+      }
     return next;
   }
   if (cmd === 'renamePattern') {
@@ -2440,7 +4533,7 @@ export function applyMockCommand(state, payload) {
     if (!target) return next;
     const type = String(payload.type ?? 'note');
     target.lanes.push(normalizePerformance({ patterns: [{ patternId: 'x', lanes: [{
-      laneId: `mock-lane-${Date.now()}`,
+      laneId: nextMockId('mock-lane'),
       type,
       name: payload.name || type.charAt(0).toUpperCase() + type.slice(1),
       targetPartId: payload.targetPartId ?? next.rack.focusedPartId,
@@ -2453,7 +4546,8 @@ export function applyMockCommand(state, payload) {
   }
   if (cmd === 'removeLane') {
     const target = pattern(payload.patternId);
-    if (target) target.lanes = target.lanes.filter((l) => l.laneId !== payload.laneId);
+    if (target) target.lanes = target.lanes.filter((l) =>
+      l.laneId !== payload.laneId && l.lockSourceLaneId !== payload.laneId);
     return next;
   }
   if (cmd === 'setLaneOptions') {
@@ -2472,11 +4566,27 @@ export function applyMockCommand(state, payload) {
       while (target.steps.length < target.stepCount) target.steps.push(normalizeStep({}));
       target.steps.length = target.stepCount;
     }
+    const owner = pattern(payload.patternId);
+    for (const lockLane of owner?.lanes.filter((l) => l.lockSourceLaneId === target.laneId) ?? []) {
+      lockLane.stepCount = target.stepCount;
+      lockLane.stepsPerBeat = target.stepsPerBeat;
+      lockLane.muted = target.muted;
+      while (lockLane.steps.length < lockLane.stepCount) lockLane.steps.push(normalizeStep({}));
+      lockLane.steps.length = lockLane.stepCount;
+    }
+    if (owner) owner.lanes = owner.lanes.filter((candidate) =>
+      candidate.lockSourceLaneId !== target.laneId
+      || candidate.steps.some((step) => step.active));
     return next;
   }
   if (cmd === 'clearLane') {
     const target = lane(payload.patternId, payload.laneId);
-    if (target) { target.steps = target.steps.map(() => normalizeStep({})); target.euclidPulses = 0; }
+    if (target) {
+      target.steps = target.steps.map(() => normalizeStep({}));
+      target.euclidPulses = 0;
+      const owner = pattern(payload.patternId);
+      owner.lanes = owner.lanes.filter((l) => l.lockSourceLaneId !== target.laneId);
+    }
     return next;
   }
   if (cmd === 'euclidFill') {
@@ -2516,65 +4626,424 @@ export function applyMockCommand(state, payload) {
     for (const key of ['active', 'tie'])
       if (payload[key] !== undefined) step[key] = payload[key] === true;
     if (Array.isArray(payload.chord)) step.chordNotes = payload.chord.map(Number);
+    for (const lockLane of pattern(payload.patternId)?.lanes
+      .filter((l) => l.lockSourceLaneId === target.laneId) ?? []) {
+      const lockStep = lockLane.steps[Number(payload.index ?? -1)];
+      if (lockStep?.active) {
+        lockStep.microtiming = step.microtiming;
+        lockStep.probability = step.probability;
+        lockStep.every = step.every;
+        lockStep.offset = step.offset;
+      }
+    }
+    return next;
+  }
+  if (cmd === 'setStepParameterLock' || cmd === 'setStepCcLock'
+      || cmd === 'removeStepLock' || cmd === 'clearStepLocks') {
+    const owner = pattern(payload.patternId);
+    const source = lane(payload.patternId, payload.laneId);
+    const index = Number(payload.index ?? -1);
+    const sourceStep = source?.steps[index];
+    if (!owner || !source || source.lockSourceLaneId) return next;
+
+    const pruneEmpty = () => {
+      owner.lanes = owner.lanes.filter((candidate) => !candidate.lockSourceLaneId
+        || candidate.steps.some((candidateStep) => candidateStep.active));
+    };
+    if (cmd === 'clearStepLocks') {
+      if (payload.index === undefined) {
+        owner.lanes = owner.lanes.filter((candidate) => candidate.lockSourceLaneId !== source.laneId);
+      } else if (sourceStep) {
+        for (const lockLane of owner.lanes.filter((candidate) =>
+          candidate.lockSourceLaneId === source.laneId))
+          lockLane.steps[index] = normalizeStep({});
+        pruneEmpty();
+      }
+      return next;
+    }
+    if (!sourceStep) return next;
+    if (cmd === 'removeStepLock') {
+      const lockLane = owner.lanes.find((candidate) => candidate.laneId === payload.lockLaneId
+        && candidate.lockSourceLaneId === source.laneId);
+      if (lockLane) lockLane.steps[index] = normalizeStep({});
+      pruneEmpty();
+      return next;
+    }
+
+    let lockLane;
+    if (cmd === 'setStepParameterLock') {
+      lockLane = owner.lanes.find((candidate) => candidate.type === 'parameter'
+        && candidate.lockSourceLaneId === source.laneId
+        && candidate.targetId === String(payload.targetId ?? '')
+        && candidate.parameterId === String(payload.parameterId ?? ''));
+      if (!lockLane) {
+        lockLane = normalizePerformance({ patterns: [{ patternId: 'lock', lanes: [{
+          laneId: nextMockId('mock-lock'),
+          type: 'parameter',
+          name: `Lock — ${mockBindingName(payload.parameterId, next.rack)}`,
+          targetId: String(payload.targetId ?? ''),
+          parameterId: String(payload.parameterId ?? ''),
+          targetName: part(payload.targetId)?.pluginName ?? effect(payload.targetId)?.pluginName
+            ?? next.rack.macros.find((macro) => macro.macroId === payload.targetId)?.name ?? '',
+          resolved: true,
+          lockSourceLaneId: source.laneId,
+          stepCount: source.stepCount,
+          stepsPerBeat: source.stepsPerBeat,
+          muted: source.muted,
+          glide: false,
+          steps: Array.from({ length: source.stepCount }, () => ({})),
+        }] }] }).patterns[0].lanes[0];
+        owner.lanes.push(lockLane);
+      }
+    } else {
+      const targetPartId = String(payload.targetPartId ?? source.targetPartId);
+      const channel = Number(payload.channel ?? source.channel ?? 1);
+      const ccNumber = Number(payload.ccNumber ?? 74);
+      lockLane = owner.lanes.find((candidate) => candidate.type === 'cc'
+        && candidate.lockSourceLaneId === source.laneId
+        && candidate.targetPartId === targetPartId
+        && candidate.channel === channel && candidate.ccNumber === ccNumber);
+      if (!lockLane) {
+        lockLane = normalizePerformance({ patterns: [{ patternId: 'lock', lanes: [{
+          laneId: nextMockId('mock-lock'),
+          type: 'cc',
+          name: `Lock — CC${ccNumber}`,
+          targetPartId,
+          targetName: part(targetPartId)?.pluginName ?? '',
+          resolved: true,
+          channel,
+          ccNumber,
+          lockSourceLaneId: source.laneId,
+          stepCount: source.stepCount,
+          stepsPerBeat: source.stepsPerBeat,
+          muted: source.muted,
+          glide: false,
+          steps: Array.from({ length: source.stepCount }, () => ({})),
+        }] }] }).patterns[0].lanes[0];
+        owner.lanes.push(lockLane);
+      }
+    }
+    lockLane.steps[index] = normalizeStep({
+      active: true,
+      value: Math.min(1, Math.max(0, Number(payload.value ?? 0))),
+      microtiming: sourceStep.microtiming,
+      probability: sourceStep.probability,
+      every: sourceStep.every,
+      offset: sourceStep.offset,
+    });
     return next;
   }
   if (cmd === 'addClip') {
     const source = pattern(payload.patternId);
     if (!source) return next;
     perf.clips.push(normalizePerformance({ clips: [{
-      clipId: `mock-clip-${Date.now()}`,
+      clipId: nextMockId('mock-clip'),
       name: payload.name || source.name,
       patternId: source.patternId,
       launchQuantize: perf.transport.defaultQuantize,
+      fillPatternId: perf.patterns.find((candidate) =>
+        candidate.variationGroupId && candidate.variationGroupId === source.variationGroupId
+        && candidate.variationLabel === 'D' && candidate.patternId !== source.patternId)?.patternId ?? '',
     }] }).clips[0]);
     return next;
   }
   if (cmd === 'removeClip') {
+    const removed = perf.clips.find((c) => c.clipId === payload.clipId);
     perf.clips = perf.clips.filter((c) => c.clipId !== payload.clipId);
+    if ((removed?.looperLayer || removed?.gestureClip || removed?.frozenMidi)
+        && !perf.clips.some((c) => c.patternId === removed.patternId))
+      perf.patterns = perf.patterns.filter((p) => p.patternId !== removed.patternId);
     for (const scene of perf.scenes)
       scene.clipIds = scene.clipIds.filter((id) => id !== payload.clipId);
+    for (const clip of perf.clips)
+      if (clip.followClipId === payload.clipId) {
+        clip.followClipId = '';
+        if (clip.followAction === 'clip') {
+          clip.followAction = 'none';
+          clip.followAfterLoops = 0;
+        }
+      }
     return next;
   }
   if (cmd === 'setClipOptions') {
     const clip = perf.clips.find((c) => c.clipId === payload.clipId);
     if (!clip) return next;
-    for (const key of ['name', 'launchQuantize', 'followClipId'])
+    for (const key of ['name', 'launchQuantize', 'followClipId', 'followAction',
+      'fillPatternId', 'fillQuantize'])
       if (payload[key] !== undefined) clip[key] = String(payload[key]);
+    if (payload.followClipId !== undefined && payload.followAction === undefined)
+      clip.followAction = String(payload.followClipId) ? 'clip' : 'none';
     if (payload.loop !== undefined) clip.loop = payload.loop === true;
     if (payload.followAfterLoops !== undefined) clip.followAfterLoops = Number(payload.followAfterLoops);
+    if (payload.fillCc !== undefined)
+      clip.fillCc = Math.max(-1, Math.min(127, Number(payload.fillCc)));
+    if (payload.fillChannel !== undefined)
+      clip.fillChannel = Math.max(0, Math.min(16, Number(payload.fillChannel)));
     return next;
   }
   if (cmd === 'launchClip' || cmd === 'stopClip' || cmd === 'stopAllClips') {
     // The mock has no clock, so a launch takes effect at once — the native side waits for the
     // quantization boundary and the UI shows `pending` until it lands.
     for (const clip of perf.clips) {
-      if (cmd === 'stopAllClips') clip.active = false;
-      else if (clip.clipId === payload.clipId) clip.active = cmd === 'launchClip';
+      if (cmd === 'stopAllClips') {
+        clip.active = false;
+        clip.fillActive = false;
+      } else if (clip.clipId === payload.clipId) {
+        clip.active = cmd === 'launchClip';
+        if (!clip.active) clip.fillActive = false;
+      }
     }
     return next;
   }
+  if (cmd === 'setPerformanceFill') {
+    const clip = perf.clips.find((candidate) => candidate.clipId === payload.clipId);
+    if (!clip) return next;
+    if (payload.active === true && (!clip.active || !clip.fillPatternId)) return next;
+    clip.fillActive = payload.active === true;
+    clip.fillPending = false;
+    return next;
+  }
   if (cmd === 'armCapture') {
-    perf.capture = { armed: true, clipId: String(payload.clipId ?? ''), laneId: String(payload.laneId ?? '') };
+    perf.capture = { ...perf.capture, armed: true,
+      clipId: String(payload.clipId ?? ''), laneId: String(payload.laneId ?? '') };
     return next;
   }
   if (cmd === 'disarmCapture') {
-    perf.capture = { armed: false, clipId: '', laneId: '' };
+    perf.capture = { ...perf.capture, armed: false, clipId: '', laneId: '' };
+    return next;
+  }
+  if (cmd === 'captureRecentMidi') {
+    // The browser mock has no MIDI device, so give the control a small, visible phrase. The
+    // native host replaces this with the actual rolling journal and preserves its timing.
+    const suffix = nextMockSuffix();
+    const patternId = `mock-retro-pattern-${suffix}`;
+    const laneId = `mock-retro-lane-${suffix}`;
+    const clipId = `mock-retro-clip-${suffix}`;
+    const notes = [60, 64, 67, 72];
+    const steps = Array.from({ length: 16 }, (_, index) => normalizeStep(
+      index % 4 === 0
+        ? { active: true, note: notes[index / 4], velocity: 104, gate: 0.72,
+            microtiming: index === 4 ? 0.08 : 0 }
+        : {}));
+    const captured = normalizePerformance({ patterns: [{
+      patternId, name: 'Retrospective preview',
+      lanes: [{ laneId, type: 'chord', name: 'Captured notes',
+                targetPartId: next.rack.parts[0]?.partId ?? '', channel: 1,
+                stepCount: 16, stepsPerBeat: 4, steps }],
+    }], clips: [{
+      clipId, patternId, name: 'Retrospective preview', launchQuantize: 'bar',
+    }] });
+    perf.patterns.push(captured.patterns[0]);
+    perf.clips.push(captured.clips[0]);
+    perf.capture = {
+      ...perf.capture,
+      historySeconds: Math.min(120, Number(payload.seconds ?? 30)),
+      historyEvents: 8,
+      historyHasNotes: true,
+      historyCapacitySeconds: 120,
+      lastPatternId: patternId,
+      lastClipId: clipId,
+      lastNoteCount: 4,
+      lastStepCount: 16,
+      lastSeconds: 4,
+      lastTrimmed: false,
+    };
+    return next;
+  }
+  if (cmd === 'freezeMidiClip') {
+    const sourceClip = perf.clips.find((clip) => clip.clipId === payload.clipId);
+    const sourcePattern = sourceClip
+      && perf.patterns.find((pattern) => pattern.patternId === sourceClip.patternId);
+    if (!sourceClip || !sourcePattern || sourceClip.frozenMidi) return next;
+    const cycles = Math.max(1, Math.min(8, Number(payload.cycles ?? 1)));
+    const resultPpq = sourcePattern.lengthPpq * cycles;
+    const suffix = nextMockSuffix();
+    let noteCount = 0;
+    const lanes = sourcePattern.lanes.filter((lane) => lane.type !== 'parameter').map((lane, laneIndex) => {
+      const stepCount = Math.min(128, Math.max(1, Math.round(resultPpq * lane.stepsPerBeat)));
+      const steps = Array.from({ length: stepCount }, (_, index) => {
+        const source = lane.steps[index % Math.max(1, lane.steps.length)] ?? {};
+        if (source.active) noteCount += Math.max(1, source.chordNotes?.length || 1);
+        return normalizeStep({ ...source, probability: 100, every: 1, offset: 0, ratchets: 1 });
+      });
+      return { ...lane, laneId: `mock-frozen-lane-${suffix}-${laneIndex}`,
+        name: `Frozen — ${lane.name || `Lane ${laneIndex + 1}`}`, stepCount, steps };
+    });
+    if (!noteCount || !lanes.length) return next;
+    const patternId = `mock-frozen-pattern-${suffix}`;
+    const clipId = `mock-frozen-clip-${suffix}`;
+    const frozen = normalizePerformance({ patterns: [{
+      patternId, name: `${sourceClip.name} (Frozen MIDI)`, lengthPpq: resultPpq, lanes,
+    }], clips: [{
+      clipId, patternId, name: `${sourceClip.name} (Frozen MIDI)`,
+      launchQuantize: sourceClip.launchQuantize, loop: true, frozenMidi: true,
+      frozenFromClipId: sourceClip.clipId, frozenCycles: cycles, frozenNoteCount: noteCount,
+    }] });
+    perf.patterns.push(frozen.patterns[0]);
+    perf.clips.push(frozen.clips[0]);
+    return next;
+  }
+  if (cmd === 'startMidiLoop') {
+    perf.looper = {
+      ...perf.looper,
+      recording: true,
+      overdubbing: Boolean(payload.clipId),
+      targetClipId: String(payload.clipId ?? ''),
+      elapsedSeconds: 0,
+    };
+    perf.transport.playing = true;
+    return next;
+  }
+  if (cmd === 'cancelMidiLoop') {
+    perf.looper = { ...perf.looper, recording: false, overdubbing: false,
+                    targetClipId: '', elapsedSeconds: 0 };
+    return next;
+  }
+  if (cmd === 'finishMidiLoop') {
+    if (!perf.looper.recording) return next;
+    if (perf.looper.overdubbing) {
+      const target = perf.clips.find((clip) => clip.clipId === perf.looper.targetClipId);
+      if (target?.looperLayer) target.overdubPasses += 1;
+    } else {
+      const suffix = nextMockSuffix();
+      const layerNumber = perf.clips.filter((clip) => clip.looperLayer).length + 1;
+      const patternId = `mock-loop-pattern-${suffix}`;
+      const laneId = `mock-loop-lane-${suffix}`;
+      const clipId = `mock-loop-clip-${suffix}`;
+      const steps = Array.from({ length: 16 }, (_, index) => normalizeStep(
+        [0, 3, 8, 11].includes(index)
+          ? { active: true, note: [60, 67, 64, 72][[0, 3, 8, 11].indexOf(index)],
+              velocity: 106, gate: 0.7 }
+          : {}));
+      const layer = normalizePerformance({ patterns: [{
+        patternId, name: `Loop layer ${layerNumber}`,
+        lanes: [{ laneId, type: 'chord', name: 'Captured notes',
+                  targetPartId: next.rack.parts[0]?.partId ?? '', channel: 1,
+                  stepCount: 16, stepsPerBeat: 4, steps }],
+      }], clips: [{
+        clipId, patternId, name: `Loop layer ${layerNumber}`, launchQuantize: 'immediate',
+        loop: true, looperLayer: true, overdubPasses: 0, active: true,
+      }] });
+      perf.patterns.push(layer.patterns[0]);
+      perf.clips.push(layer.clips[0]);
+    }
+    perf.looper = { ...perf.looper, recording: false, overdubbing: false,
+                    targetClipId: '', elapsedSeconds: 0 };
+    return next;
+  }
+  if (cmd === 'removeMidiLoop') {
+    const target = perf.clips.find((clip) => clip.clipId === payload.clipId && clip.looperLayer);
+    if (!target) return next;
+    perf.clips = perf.clips.filter((clip) => clip.clipId !== target.clipId);
+    if (!perf.clips.some((clip) => clip.patternId === target.patternId))
+      perf.patterns = perf.patterns.filter((pattern) => pattern.patternId !== target.patternId);
+    for (const scene of perf.scenes)
+      scene.clipIds = scene.clipIds.filter((id) => id !== target.clipId);
+    return next;
+  }
+  if (cmd === 'startGestureRecording') {
+    perf.gestures = {
+      ...perf.gestures,
+      recording: true,
+      mode: payload.clipId ? (payload.mode === 'replace' ? 'replace' : 'overdub') : 'new',
+      targetClipId: String(payload.clipId ?? ''),
+      pointCount: 0,
+      targetCount: 0,
+      elapsedSeconds: 0,
+      truncated: false,
+    };
+    perf.transport.playing = true;
+    return next;
+  }
+  if (cmd === 'cancelGestureRecording') {
+    perf.gestures = { ...perf.gestures, recording: false, mode: 'new', targetClipId: '',
+                      pointCount: 0, targetCount: 0, elapsedSeconds: 0, truncated: false };
+    return next;
+  }
+  if (cmd === 'finishGestureRecording') {
+    if (!perf.gestures.recording) return next;
+    const suffix = nextMockSuffix();
+    const makePreviewLane = (stepCount = 16, stepsPerBeat = 4) => ({
+      laneId: `mock-gesture-lane-${suffix}`,
+      type: 'parameter',
+      name: 'Level',
+      targetId: next.rack.parts[0]?.partId ?? '',
+      parameterId: '@gain',
+      targetName: next.rack.parts[0]?.name ?? 'Part',
+      resolved: true,
+      stepCount,
+      stepsPerBeat,
+      glide: true,
+      steps: Array.from({ length: stepCount }, (_, index) => normalizeStep(
+        [0, 4, 8, 12].includes(index)
+          ? { active: true, value: [0.3, 0.82, 0.48, 0.7][index / 4] }
+          : {})),
+    });
+
+    if (perf.gestures.targetClipId) {
+      const target = perf.clips.find((clip) => clip.clipId === perf.gestures.targetClipId);
+      const targetPattern = target && perf.patterns.find((p) => p.patternId === target.patternId);
+      if (target && targetPattern) {
+        const existing = targetPattern.lanes.find((lane) => lane.type === 'parameter'
+          && !lane.lockSourceLaneId
+          && lane.targetId === (next.rack.parts[0]?.partId ?? '') && lane.parameterId === '@gain');
+        if (existing && perf.gestures.mode === 'replace') {
+          const replacement = makePreviewLane(existing.stepCount, existing.stepsPerBeat);
+          existing.steps = replacement.steps;
+          existing.glide = true;
+        } else if (!existing) {
+          const source = targetPattern.lanes[0];
+          targetPattern.lanes.push(makePreviewLane(source?.stepCount ?? 16,
+                                                    source?.stepsPerBeat ?? 4));
+        }
+        target.gesturePasses += 1;
+        perf.gestures.lastClipId = target.clipId;
+      }
+    } else {
+      const gestureNumber = perf.clips.filter((clip) => clip.gestureClip).length + 1;
+      const patternId = `mock-gesture-pattern-${suffix}`;
+      const clipId = `mock-gesture-clip-${suffix}`;
+      const recorded = normalizePerformance({ patterns: [{
+        patternId, name: `Gesture ${gestureNumber}`, lanes: [makePreviewLane()],
+      }], clips: [{
+        clipId, patternId, name: `Gesture ${gestureNumber}`, launchQuantize: 'immediate',
+        loop: true, gestureClip: true, gesturePasses: 1, active: true,
+      }] });
+      perf.patterns.push(recorded.patterns[0]);
+      perf.clips.push(recorded.clips[0]);
+      perf.gestures.lastClipId = clipId;
+    }
+    perf.gestures = { ...perf.gestures, recording: false, mode: 'new', targetClipId: '',
+                      pointCount: 0, targetCount: 0, elapsedSeconds: 0 };
+    return next;
+  }
+  if (cmd === 'clearGestureLanes') {
+    const target = perf.clips.find((clip) => clip.clipId === payload.clipId);
+    const targetPattern = target && perf.patterns.find((p) => p.patternId === target.patternId);
+    if (!target || !targetPattern) return next;
+    const sourceIds = new Set(targetPattern.lanes
+      .filter((lane) => lane.type === 'parameter' && !lane.lockSourceLaneId)
+      .map((lane) => lane.laneId));
+    targetPattern.lanes = targetPattern.lanes.filter((lane) =>
+      !sourceIds.has(lane.laneId) && !sourceIds.has(lane.lockSourceLaneId));
+    target.gesturePasses = 0;
     return next;
   }
   if (cmd === 'addScene') {
-    perf.scenes.push(normalizePerformance({ scenes: [{
-      sceneId: `mock-scene-${Date.now()}`,
+    const scene = normalizePerformance({ scenes: [{
+      sceneId: nextMockId('mock-scene'),
       name: payload.name || `Scene ${perf.scenes.length + 1}`,
       clipIds: perf.clips.filter((c) => c.active).map((c) => c.clipId),
       launchQuantize: perf.transport.defaultQuantize,
-      numSlots: next.rack.parts.length,
-      numMacros: next.rack.macros.length,
-    }] }).scenes[0]);
+    }] }).scenes[0];
+    captureMockSnapshot(scene, next);
+    perf.scenes.push(scene);
     return next;
   }
   if (cmd === 'removeScene') {
     perf.scenes = perf.scenes.filter((s) => s.sceneId !== payload.sceneId);
     perf.setlist.items = perf.setlist.items.filter((i) => i.sceneId !== payload.sceneId);
+    perf.arrangement.items = perf.arrangement.items.filter((i) => i.sceneId !== payload.sceneId);
     return next;
   }
   if (cmd === 'renameScene' || cmd === 'captureScene' || cmd === 'setSceneOptions'
@@ -2584,8 +5053,7 @@ export function applyMockCommand(state, payload) {
     if (cmd === 'renameScene') scene.name = String(payload.name ?? scene.name);
     else if (cmd === 'captureScene') {
       scene.clipIds = perf.clips.filter((c) => c.active).map((c) => c.clipId);
-      scene.numSlots = next.rack.parts.length;
-      scene.numMacros = next.rack.macros.length;
+      captureMockSnapshot(scene, next);
     } else if (cmd === 'setSceneClip') {
       const included = payload.included === true;
       scene.clipIds = scene.clipIds.filter((id) => id !== payload.clipId);
@@ -2594,6 +5062,9 @@ export function applyMockCommand(state, payload) {
       if (payload.launchQuantize !== undefined) scene.launchQuantize = String(payload.launchQuantize);
       if (payload.stopOtherClips !== undefined) scene.stopOtherClips = payload.stopOtherClips === true;
       if (payload.tempo !== undefined) scene.tempo = Number(payload.tempo);
+      if (payload.pageId !== undefined) scene.pageId = String(payload.pageId);
+      if (payload.morphBeats !== undefined)
+        scene.morphBeats = Math.max(0, Math.min(32, Number(payload.morphBeats) || 0));
     }
     return next;
   }
@@ -2606,19 +5077,34 @@ export function applyMockCommand(state, payload) {
       else if (scene.stopOtherClips) clip.active = false;
     }
     if (scene.tempo > 0) perf.transport.tempo = scene.tempo;
+    applyMockSnapshot(scene, next);
+    perf.snapshotMorph = {
+      active: false, sceneId: scene.sceneId, name: scene.name,
+      durationBeats: scene.morphBeats, progress: 1,
+      targetCount: scene.slots.reduce((count, slot) => count
+        + (slot.applyVolume ? 1 : 0) + (slot.applyPan ? 1 : 0), 0)
+        + scene.macros.length + scene.parameters.length,
+    };
     return next;
   }
   if (cmd === 'addSetlistItem') {
     const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
     perf.setlist.items.push({
-      itemId: `mock-item-${Date.now()}`,
+      itemId: nextMockId('mock-item'),
       name: payload.name || scene?.name || `Item ${perf.setlist.items.length + 1}`,
       sceneId: String(payload.sceneId ?? ''),
+      rackRecordId: String(payload.rackRecordId ?? ''),
+      pageId: String(payload.pageId ?? scene?.pageId ?? ''),
       sceneName: scene?.name ?? '',
       missing: !!payload.sceneId && !scene,
       notes: '',
       tempo: 0,
     });
+    return next;
+  }
+  if (cmd === 'setSetlistOptions') {
+    if (payload.preloadAhead !== undefined)
+      perf.setlist.preloadAhead = Math.max(0, Math.min(2, Number(payload.preloadAhead ?? 0)));
     return next;
   }
   if (cmd === 'removeSetlistItem' || cmd === 'setSetlistItem' || cmd === 'moveSetlistItem') {
@@ -2633,7 +5119,7 @@ export function applyMockCommand(state, payload) {
                                          Math.max(0, Number(payload.index ?? index))), 0, item);
     } else {
       const item = perf.setlist.items[index];
-      for (const key of ['name', 'notes'])
+      for (const key of ['name', 'notes', 'rackRecordId', 'pageId'])
         if (payload[key] !== undefined) item[key] = String(payload[key]);
       if (payload.tempo !== undefined) item.tempo = Number(payload.tempo);
       if (payload.sceneId !== undefined) {
@@ -2652,7 +5138,74 @@ export function applyMockCommand(state, payload) {
     // The native rule, mirrored: an item whose scene is gone leaves the rig where it was.
     if (!item || item.missing) return next;
     perf.setlist.currentIndex = target;
+    perf.setlist.loadingIndex = -1;
     if (item.sceneId) return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
+    return next;
+  }
+  if (cmd === 'addArrangementItem') {
+    const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
+    if (!scene || perf.arrangement.playing) return next;
+    perf.arrangement.items.push({
+      itemId: nextMockId('mock-arrangement'),
+      name: String(payload.name || scene.name),
+      sceneId: scene.sceneId,
+      sceneName: scene.name,
+      missing: false,
+      bars: Math.max(1, Math.min(128, Number(payload.bars ?? 4))),
+    });
+    return next;
+  }
+  if (cmd === 'removeArrangementItem' || cmd === 'setArrangementItem'
+      || cmd === 'moveArrangementItem') {
+    if (perf.arrangement.playing) return next;
+    const index = perf.arrangement.items.findIndex((i) => i.itemId === payload.itemId);
+    if (index < 0) return next;
+    if (cmd === 'removeArrangementItem') {
+      perf.arrangement.items.splice(index, 1);
+    } else if (cmd === 'moveArrangementItem') {
+      const [item] = perf.arrangement.items.splice(index, 1);
+      perf.arrangement.items.splice(Math.min(perf.arrangement.items.length,
+        Math.max(0, Number(payload.index ?? index))), 0, item);
+    } else {
+      const item = perf.arrangement.items[index];
+      if (payload.name !== undefined) item.name = String(payload.name);
+      if (payload.bars !== undefined)
+        item.bars = Math.max(1, Math.min(128, Number(payload.bars)));
+      if (payload.sceneId !== undefined) {
+        const scene = perf.scenes.find((s) => s.sceneId === payload.sceneId);
+        if (!scene) return next;
+        item.sceneId = scene.sceneId;
+        item.sceneName = scene.name;
+        item.missing = false;
+      }
+    }
+    return next;
+  }
+  if (cmd === 'setArrangementOptions') {
+    if (payload.loop !== undefined) perf.arrangement.loop = payload.loop === true;
+    return next;
+  }
+  if (cmd === 'startArrangement') {
+    const index = Math.max(0, Number(payload.index ?? 0));
+    const item = perf.arrangement.items[index];
+    if (!item || item.missing) return next;
+    perf.arrangement.playing = true;
+    perf.arrangement.currentIndex = index;
+    perf.arrangement.queuedIndex = -1;
+    perf.arrangement.ending = false;
+    perf.arrangement.progress = 0;
+    perf.arrangement.bar = 1;
+    perf.transport.playing = true;
+    return applyMockCommand(next, { cmd: 'launchScene', sceneId: item.sceneId });
+  }
+  if (cmd === 'stopArrangement') {
+    perf.arrangement.playing = false;
+    perf.arrangement.currentIndex = -1;
+    perf.arrangement.queuedIndex = -1;
+    perf.arrangement.ending = false;
+    perf.arrangement.progress = 0;
+    perf.arrangement.bar = 0;
+    for (const clip of perf.clips) clip.active = false;
     return next;
   }
   if (cmd === 'hostNote') {
@@ -2738,6 +5291,47 @@ export function applyMockCommand(state, payload) {
     next.reliability.damagedState = [];
     return next;
   }
+  if (cmd === 'setAutomaticFailover') {
+    const failover = next.reliability.automaticFailover;
+    if (Object.hasOwn(payload, 'enabled')) failover.enabled = payload.enabled === true;
+    if (Object.hasOwn(payload, 'maxAttempts'))
+      failover.maxAttempts = Math.max(1, Math.min(5, Math.round(Number(payload.maxAttempts) || 3)));
+    if (Object.hasOwn(payload, 'retryDelayMs'))
+      failover.retryDelayMs = Math.max(100, Math.min(10000,
+        Math.round(Number(payload.retryDelayMs) || 500)));
+    if (failover.enabled) {
+      for (const event of failover.events) {
+        if (event.state === 'failed' || event.state === 'bypassed') {
+          event.state = 'waiting';
+          event.attempts = 0;
+        }
+      }
+    } else {
+      for (const event of failover.events) {
+        if (event.state === 'waiting') {
+          event.state = 'bypassed';
+          event.nextAttemptMs = 0;
+        }
+      }
+    }
+    return next;
+  }
+  if (cmd === 'retryFailedProcessor') {
+    const event = next.reliability.automaticFailover.events
+      .find((candidate) => candidate.targetId === payload.targetId);
+    if (event) {
+      event.state = 'recovered';
+      event.attempts = 1;
+      event.error = '';
+      event.nextAttemptMs = 0;
+    }
+    return next;
+  }
+  if (cmd === 'dismissFailoverEvent') {
+    next.reliability.automaticFailover.events = next.reliability.automaticFailover.events
+      .filter((event) => event.targetId !== payload.targetId);
+    return next;
+  }
   if (cmd === 'addMidiSlot' || cmd === 'removeMidiSlot' || cmd === 'moveMidiSlot'
       || cmd === 'setMidiSlotBypassed' || cmd === 'setMidiSlotOptions') {
     const target = part(payload.partId);
@@ -2747,7 +5341,7 @@ export function applyMockCommand(state, payload) {
 
     if (cmd === 'addMidiSlot') {
       if (!midiSlotTypes.includes(payload.type) || chain.length >= 8) return next;
-      chain.push(normalizeMidiSlot({ slotId: `mock-slot-${Date.now()}-${chain.length}`,
+      chain.push(normalizeMidiSlot({ slotId: nextMockId('mock-slot'),
                                      type: payload.type }));
       return next;
     }
@@ -2761,19 +5355,31 @@ export function applyMockCommand(state, payload) {
       chain[index].bypassed = payload.bypassed === true;
     } else {
       // Which settings block a module edits follows its type, exactly as the native side
-      // decides it: the arp has its own, the six later ones share `mod`, everything else is
+      // decides it: the arp has its own, the later note modules share `mod`, everything else is
       // a note shaper.
-      const laterModules = ['echo', 'strum', 'humanize', 'chance', 'length', 'latch'];
+      const laterModules = ['echo', 'strum', 'humanize', 'chance', 'length', 'latch', 'mpe',
+                            'articulation'];
       const block = chain[index].type === 'arp' ? chain[index].arp
         : laterModules.includes(chain[index].type) ? chain[index].mod
         : chain[index].fx;
       for (const [key, value] of Object.entries(payload)) {
         if (['cmd', 'partId', 'slotId'].includes(key) || !(key in block)) continue;
-        block[key] = typeof block[key] === 'boolean' ? value === true
+        block[key] = key === 'articulations'
+          ? (Array.isArray(value) ? value.map((entry) => ({ ...entry })) : block[key])
+          : typeof block[key] === 'boolean' ? value === true
           : typeof block[key] === 'number' ? Number(value)
           : Array.isArray(block[key]) ? (Array.isArray(value) ? value.map(Number) : block[key])
           : String(value);
       }
+      if (chain[index].type === 'strum') {
+        if ('strumDown' in payload && !('strumPattern' in payload))
+          block.strumPattern = payload.strumDown === true ? 'descending' : 'ascending';
+        if ('strumPattern' in payload)
+          block.strumDown = payload.strumPattern === 'descending';
+      }
+      // Native commands clamp and order calibration ranges immediately. Re-normalize the
+      // edited slot here too, so localhost never previews an impossible device profile.
+      chain[index] = normalizeMidiSlot(chain[index]);
     }
     return next;
   }
@@ -2793,7 +5399,7 @@ export function applyMockCommand(state, payload) {
     const wantsArp = cmd === 'setPartArp';
     let slot = target.midiChain.find((s) => (s.type === 'arp') === wantsArp);
     if (!slot) {
-      slot = normalizeMidiSlot({ slotId: `mock-slot-${Date.now()}`, type: wantsArp ? 'arp' : 'fx' });
+      slot = normalizeMidiSlot({ slotId: nextMockId('mock-slot'), type: wantsArp ? 'arp' : 'fx' });
       target.midiChain[wantsArp ? 'push' : 'unshift'](slot);
     }
     if (wantsArp) slot.arp = { ...block };
@@ -2805,6 +5411,7 @@ export function applyMockCommand(state, payload) {
 }
 
 let initialized = false;
+let mockLfoTimer = 0;
 
 /** Wires the bridge listeners (or seeds mock state) and asks for the first snapshot.
  *  Idempotent; the workspace calls it on mount. */
@@ -2816,6 +5423,21 @@ export function initInstrumentHostBridge() {
     hostState.set(mockHostState());
     hostAudioDevices.set(mockAudioDevices());
     hostProject.set(mockHostProject());
+    let lastLfoTick = globalThis.performance?.now?.() ?? Date.now();
+    mockLfoTimer = window.setInterval(() => {
+      const now = globalThis.performance?.now?.() ?? Date.now();
+      const elapsed = (now - lastLfoTick) / 1000;
+      lastLfoTick = now;
+      hostState.update((state) => {
+        let next = state;
+        if (next.rack.midiLfos.length > 0) next = advanceMockMidiLfos(next, elapsed);
+        if (next.rack.envelopes.length > 0) next = advanceMockEnvelopes(next, elapsed);
+        if (next.rack.msegs.length > 0) next = advanceMockMsegs(next, elapsed);
+        if (next.rack.randomModulators.length > 0)
+          next = advanceMockRandomModulators(next, elapsed);
+        return next;
+      });
+    }, 50);
     return;
   }
 
@@ -2852,6 +5474,123 @@ export function initInstrumentHostBridge() {
     ...steps,
     [String(payload?.partId ?? '')]: Number.isInteger(payload?.step) ? payload.step : -1,
   })));
+  onInstrumentHostLfoActivity((payload) => hostState.update((state) => {
+    const values = new Map((Array.isArray(payload?.lfos) ? payload.lfos : []).map((lfo) => [
+      String(lfo?.lfoId ?? ''),
+      {
+        phase: Math.max(0, Math.min(1, Number(lfo?.phase ?? 0) || 0)),
+        value: Math.max(0, Math.min(1, Number(lfo?.value ?? 0) || 0)),
+      },
+    ]));
+    const macroValues = new Map((Array.isArray(payload?.macros) ? payload.macros : []).map((macro) => [
+      String(macro?.macroId ?? ''),
+      Math.max(0, Math.min(1, Number(macro?.value ?? 0) || 0)),
+    ]));
+    if (values.size === 0) return state;
+    return {
+      ...state,
+      rack: {
+        ...state.rack,
+        midiLfos: state.rack.midiLfos.map((lfo) => ({ ...lfo, ...(values.get(lfo.lfoId) ?? {}) })),
+        macros: state.rack.macros.map((macro) => macroValues.has(macro.macroId)
+          ? { ...macro, value: macroValues.get(macro.macroId) } : macro),
+        modulationRoutes: state.rack.modulationRoutes.map((route) => route.sourceType === 'lfo'
+          && values.has(route.sourceId)
+          ? { ...route, sourceValue: values.get(route.sourceId).value }
+          : route),
+      },
+    };
+  }));
+  onInstrumentHostEnvelopeActivity((payload) => hostState.update((state) => {
+    const values = new Map((Array.isArray(payload?.envelopes) ? payload.envelopes : []).map((envelope) => [
+      String(envelope?.envelopeId ?? ''),
+      {
+        stage: ['idle', 'attack', 'decay', 'sustain', 'release'].includes(envelope?.stage)
+          ? envelope.stage : 'idle',
+        stageProgress: Math.max(0, Math.min(1, Number(envelope?.progress ?? 0) || 0)),
+        value: Math.max(0, Math.min(1, Number(envelope?.value ?? 0) || 0)),
+        gate: envelope?.gate === true,
+      },
+    ]));
+    const macroValues = new Map((Array.isArray(payload?.macros) ? payload.macros : []).map((macro) => [
+      String(macro?.macroId ?? ''),
+      Math.max(0, Math.min(1, Number(macro?.value ?? 0) || 0)),
+    ]));
+    if (values.size === 0) return state;
+    return {
+      ...state,
+      rack: {
+        ...state.rack,
+        envelopes: state.rack.envelopes.map((envelope) => ({
+          ...envelope, ...(values.get(envelope.envelopeId) ?? {}),
+        })),
+        macros: state.rack.macros.map((macro) => macroValues.has(macro.macroId)
+          ? { ...macro, value: macroValues.get(macro.macroId) } : macro),
+        modulationRoutes: state.rack.modulationRoutes.map((route) => route.sourceType === 'envelope'
+          && values.has(route.sourceId)
+          ? { ...route, sourceValue: values.get(route.sourceId).value }
+          : route),
+      },
+    };
+  }));
+  onInstrumentHostMsegActivity((payload) => hostState.update((state) => {
+    const values = new Map((Array.isArray(payload?.msegs) ? payload.msegs : []).map((mseg) => [
+      String(mseg?.msegId ?? ''),
+      {
+        phase: Math.max(0, Math.min(1, Number(mseg?.phase ?? 0) || 0)),
+        value: Math.max(0, Math.min(1, Number(mseg?.value ?? 0) || 0)),
+      },
+    ]));
+    const macroValues = new Map((Array.isArray(payload?.macros) ? payload.macros : []).map((macro) => [
+      String(macro?.macroId ?? ''),
+      Math.max(0, Math.min(1, Number(macro?.value ?? 0) || 0)),
+    ]));
+    if (values.size === 0) return state;
+    return {
+      ...state,
+      rack: {
+        ...state.rack,
+        msegs: state.rack.msegs.map((mseg) => ({ ...mseg, ...(values.get(mseg.msegId) ?? {}) })),
+        macros: state.rack.macros.map((macro) => macroValues.has(macro.macroId)
+          ? { ...macro, value: macroValues.get(macro.macroId) } : macro),
+        modulationRoutes: state.rack.modulationRoutes.map((route) => route.sourceType === 'mseg'
+          && values.has(route.sourceId)
+          ? { ...route, sourceValue: values.get(route.sourceId).value }
+          : route),
+      },
+    };
+  }));
+  onInstrumentHostRandomModulatorActivity((payload) => hostState.update((state) => {
+    const values = new Map((Array.isArray(payload?.randomModulators)
+      ? payload.randomModulators : []).map((random) => [
+        String(random?.randomId ?? ''),
+        {
+          phase: Math.max(0, Math.min(1, Number(random?.phase ?? 0) || 0)),
+          value: Math.max(0, Math.min(1, Number(random?.value ?? 0) || 0)),
+          step: Math.floor(Number(random?.step ?? -1) || 0),
+        },
+      ]));
+    const macroValues = new Map((Array.isArray(payload?.macros) ? payload.macros : []).map((macro) => [
+      String(macro?.macroId ?? ''),
+      Math.max(0, Math.min(1, Number(macro?.value ?? 0) || 0)),
+    ]));
+    if (values.size === 0) return state;
+    return {
+      ...state,
+      rack: {
+        ...state.rack,
+        randomModulators: state.rack.randomModulators.map((random) => ({
+          ...random, ...(values.get(random.randomId) ?? {}),
+        })),
+        macros: state.rack.macros.map((macro) => macroValues.has(macro.macroId)
+          ? { ...macro, value: macroValues.get(macro.macroId) } : macro),
+        modulationRoutes: state.rack.modulationRoutes.map((route) => route.sourceType === 'random'
+          && values.has(route.sourceId)
+          ? { ...route, sourceValue: values.get(route.sourceId).value }
+          : route),
+      },
+    };
+  }));
   onInstrumentHostChordLearn((payload) => hostChordLearn.set({
     armed: payload?.armed === true,
     partId: String(payload?.partId ?? ''),
@@ -2921,6 +5660,7 @@ const mockPatchBytes = 296;
 let mockOwnSurface = null;
 let mockSurfaceLearning = false;
 let mockSurfaceHeard = 0;
+let mockStageUnlockStartedAt = 0;
 
 const mockOwnSurfaceFields = () => ({
   userSurface: mockOwnSurface?.name ?? '',
@@ -2963,6 +5703,34 @@ function mockGenericLayout(own) {
 
 function send(payload) {
   if (!isJuceAvailable()) {
+    if (payload?.cmd === 'beginStageUnlock') {
+      if (get(hostState).stageLocked && mockStageUnlockStartedAt <= 0)
+        mockStageUnlockStartedAt = Date.now();
+      return;
+    }
+    if (payload?.cmd === 'cancelStageUnlock') {
+      mockStageUnlockStartedAt = 0;
+      return;
+    }
+    if (payload?.cmd === 'setStageLock') {
+      const requested = payload.enabled === true;
+      const unlockAuthorized = !requested && get(hostState).stageLocked
+        && mockStageUnlockStartedAt > 0 && Date.now() - mockStageUnlockStartedAt >= 900;
+      mockStageUnlockStartedAt = 0;
+      if (!requested && get(hostState).stageLocked && !unlockAuthorized) {
+        hostLastError.set('Hold Build for one second to leave Stage Lock.');
+        return;
+      }
+      hostState.set(applyMockCommand(get(hostState), {
+        ...payload, _unlockAuthorized: unlockAuthorized,
+      }));
+      return;
+    }
+    if (!stageCommandAllowed(get(hostState).stageLocked, payload?.cmd)) {
+      hostLastError.set(`Stage Lock blocked '${String(payload?.cmd ?? '')}'. Hold Build for one second before changing the rig.`);
+      return;
+    }
+
     // Device commands mutate the device store, everything else the host state.
     if (payload?.cmd === 'setAudioDevice') {
       hostAudioDevices.update((d) => ({ ...d, current: String(payload.name ?? d.current) }));
@@ -3030,7 +5798,8 @@ function send(payload) {
         return;
       }
       const effect = [...state.rack.masterEffects, ...state.rack.parts.flatMap((p) => p.effects),
-                      ...state.rack.returns.flatMap((r) => r.effects)]
+                      ...state.rack.returns.flatMap((r) => r.effects),
+                      ...state.rack.buses.flatMap((b) => b.effects)]
         .find((e) => e.effectId === payload.partId);
       hostParameters.set(effect?.hasProcessor
         ? normalizeHostParameters({ partId: payload.partId, parameters: [
@@ -3160,7 +5929,7 @@ function send(payload) {
                              preset: hardwarePatch
                                ? (part.hardwarePatchName || `${hardwareName} patch`)
                                : `${part?.pluginName ?? 'Instrument'} preset` }[kind];
-      const recordId = `lib-user-${Date.now()}`;
+      const recordId = nextMockId('lib-user');
       hostLibrary.update((lib) => normalizeHostLibrary({
         ...lib,
         records: [...lib.records, {
@@ -3204,7 +5973,84 @@ function send(payload) {
       }));
       return;
     }
-    if (payload?.cmd === 'loadLibraryRecord') {
+    if (payload?.cmd === 'setPresetAudition') {
+      hostState.update((st) => normalizeHostState({
+        ...st,
+        rack: {
+          ...st.rack,
+          presetAudition: { ...st.rack.presetAudition, ...payload, playing: false },
+        },
+      }));
+      return;
+    }
+    if (payload?.cmd === 'startSoundComparison') {
+      const library = get(hostLibrary);
+      hostState.update((state) => {
+        const next = normalizeHostState(state);
+        const target = next.rack.parts.find((p) => p.partId
+          === (payload.partId || next.rack.focusedPartId));
+        if (!target?.hasInstrument || target.hardware) {
+          hostLastError.set('Focus a software instrument before starting Sound Comparison Mode.');
+          return next;
+        }
+        const requested = Array.isArray(payload.recordIds) ? payload.recordIds.map(String) : [];
+        const candidates = library.records.filter((record) => record.type === 'preset'
+          && record.available && record.sourceType !== 'hardwarePatch'
+          && record.targetCeId === target.pluginCeId
+          && (requested.length === 0 || requested.includes(record.recordId))).slice(0, 20);
+        if (candidates.length < 2) {
+          hostLastError.set(`Sound Comparison Mode needs at least two available presets for ${target.pluginName}.`);
+          return next;
+        }
+        const originalRecordId = target.presetRecordId;
+        const originalName = target.presetName || 'Original sound';
+        let index = candidates.findIndex((record) => record.recordId === target.presetRecordId);
+        if (index < 0) index = 0;
+        const current = candidates[index];
+        Object.assign(target, { presetRecordId: current.recordId, presetName: current.name });
+        next.rack.soundComparison = {
+          active: true, partId: target.partId, index, count: candidates.length,
+          recordId: current.recordId, name: current.name,
+          originalRecordId, originalName, recordIds: candidates.map((record) => record.recordId),
+        };
+        return next;
+      });
+      return;
+    }
+    if (payload?.cmd === 'stepSoundComparison') {
+      hostState.update((state) => {
+        const next = normalizeHostState(state);
+        const comparison = next.rack.soundComparison;
+        if (!comparison.active || comparison.recordIds.length === 0) return next;
+        const delta = Number(payload.delta) < 0 ? -1 : 1;
+        const index = (comparison.index + delta + comparison.recordIds.length)
+          % comparison.recordIds.length;
+        const record = get(hostLibrary).records.find((r) => r.recordId
+          === comparison.recordIds[index]);
+        const target = next.rack.parts.find((p) => p.partId === comparison.partId);
+        if (!record || !target) return next;
+        Object.assign(target, { presetRecordId: record.recordId, presetName: record.name });
+        Object.assign(comparison, { index, recordId: record.recordId, name: record.name });
+        return next;
+      });
+      return;
+    }
+    if (payload?.cmd === 'keepSoundComparison' || payload?.cmd === 'cancelSoundComparison') {
+      hostState.update((state) => {
+        const next = normalizeHostState(state);
+        const comparison = next.rack.soundComparison;
+        if (!comparison.active) return next;
+        const target = next.rack.parts.find((p) => p.partId === comparison.partId);
+        if (target && payload.cmd === 'cancelSoundComparison')
+          Object.assign(target, { presetRecordId: comparison.originalRecordId,
+                                  presetName: comparison.originalName === 'Original sound'
+                                    ? '' : comparison.originalName });
+        next.rack.soundComparison = normalizeHostState({}).rack.soundComparison;
+        return next;
+      });
+      return;
+    }
+    if (payload?.cmd === 'loadLibraryRecord' || payload?.cmd === 'auditionLibraryRecord') {
       // Mirrors the visible half: an added part appears; a focused load leaves structure alone.
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record?.available) return;
@@ -3299,6 +6145,9 @@ function send(payload) {
 }
 
 export const requestHostState = () => send({ cmd: 'getState' });
+export const setStageLock = (enabled) => send({ cmd: 'setStageLock', enabled: enabled === true });
+export const beginStageUnlock = () => send({ cmd: 'beginStageUnlock' });
+export const cancelStageUnlock = () => send({ cmd: 'cancelStageUnlock' });
 export const scanForInstruments = () => send({ cmd: 'scan' });
 export const addScanPath = (path) => send({ cmd: 'addScanPath', path });
 export const browseScanPath = () => send({ cmd: 'browseScanPath' });
@@ -3312,6 +6161,14 @@ export const loadInstrument = (partId, ceId) => send({ cmd: 'loadInstrument', pa
 export const unloadInstrument = (partId) => send({ cmd: 'unloadInstrument', partId });
 export const setPartMixer = (partId, fields) => send({ cmd: 'setPartMixer', partId, ...fields });
 export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRules', partId, ...fields });
+export const importScalaTuning = (text, sourceName = '') =>
+  send({ cmd: 'importScalaTuning', text: String(text ?? ''), sourceName });
+export const resetMicrotuning = () => send({ cmd: 'resetMicrotuning' });
+export const setMicrotuning = (fields) => send({ cmd: 'setMicrotuning', ...fields });
+export const setPartMicrotuning = (partId, enabled) =>
+  send({ cmd: 'setPartMicrotuning', partId, enabled: enabled === true });
+export const sendMicrotuning = (partId = '') =>
+  send(partId ? { cmd: 'sendMicrotuning', partId } : { cmd: 'sendMicrotuning' });
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
 export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
 export const closeEditor = () => send({ cmd: 'closeEditor' });
@@ -3352,6 +6209,19 @@ export const setBusDestination = (busId, destinationBusId) =>
 /** One part driving another: '' hands the part back to the keyboard. */
 export const setPartMidiSource = (partId, sourcePartId) =>
   send({ cmd: 'setPartMidiSource', partId, sourcePartId: sourcePartId ?? '' });
+export const addLayerGroup = (name = '', partIds = []) => send({
+  cmd: 'addLayerGroup', ...(name ? { name } : {}), ...(partIds.length ? { partIds } : {}),
+});
+export const removeLayerGroup = (layerGroupId) =>
+  send({ cmd: 'removeLayerGroup', layerGroupId });
+export const setLayerGroup = (layerGroupId, fields) =>
+  send({ cmd: 'setLayerGroup', layerGroupId, ...fields });
+export const addLayerMember = (layerGroupId, partId) =>
+  send({ cmd: 'addLayerMember', layerGroupId, partId });
+export const removeLayerMember = (layerGroupId, partId) =>
+  send({ cmd: 'removeLayerMember', layerGroupId, partId });
+export const setLayerMember = (layerGroupId, partId, fields) =>
+  send({ cmd: 'setLayerMember', layerGroupId, partId, ...fields });
 export const setPartDestination = (partId, busId) =>
   send({ cmd: 'setPartDestination', partId, busId });
 export const setSendLevel = (partId, returnId, level) =>
@@ -3418,6 +6288,45 @@ export const addMacroTarget = (macroId, targetId, parameterId) =>
   send({ cmd: 'addMacroTarget', macroId, targetId, parameterId });
 export const removeMacroTarget = (macroId, targetId, parameterId) =>
   send({ cmd: 'removeMacroTarget', macroId, targetId, parameterId });
+export const setMacroTargetOptions = (macroId, targetId, parameterId, fields) =>
+  send({ cmd: 'setMacroTargetOptions', macroId, targetId, parameterId, ...fields });
+export const addModulationRoute = (source, targetId, parameterId, amount = 0.25) =>
+  send({ cmd: 'addModulationRoute', ...source, targetId, parameterId, amount });
+export const setModulationRoute = (routeId, fields) =>
+  send({ cmd: 'setModulationRoute', routeId, ...fields });
+export const removeModulationRoute = (routeId) =>
+  send({ cmd: 'removeModulationRoute', routeId });
+export const clearModulationRoutes = () => send({ cmd: 'clearModulationRoutes' });
+export const addMidiLfo = (name = '') => send(name ? { cmd: 'addMidiLfo', name } : { cmd: 'addMidiLfo' });
+export const setMidiLfo = (lfoId, fields) => send({ cmd: 'setMidiLfo', lfoId, ...fields });
+export const resetMidiLfo = (lfoId) => send({ cmd: 'resetMidiLfo', lfoId });
+export const removeMidiLfo = (lfoId) => send({ cmd: 'removeMidiLfo', lfoId });
+export const addMidiLfoOutput = (lfoId, fields) => send({ cmd: 'addMidiLfoOutput', lfoId, ...fields });
+export const setMidiLfoOutput = (lfoId, outputId, fields) =>
+  send({ cmd: 'setMidiLfoOutput', lfoId, outputId, ...fields });
+export const removeMidiLfoOutput = (lfoId, outputId) =>
+  send({ cmd: 'removeMidiLfoOutput', lfoId, outputId });
+export const addEnvelope = (name = '') =>
+  send(name ? { cmd: 'addEnvelope', name } : { cmd: 'addEnvelope' });
+export const setEnvelope = (envelopeId, fields) =>
+  send({ cmd: 'setEnvelope', envelopeId, ...fields });
+export const triggerEnvelope = (envelopeId, gate, velocity = 1) =>
+  send({ cmd: 'triggerEnvelope', envelopeId, gate, velocity });
+export const resetEnvelope = (envelopeId) => send({ cmd: 'resetEnvelope', envelopeId });
+export const removeEnvelope = (envelopeId) => send({ cmd: 'removeEnvelope', envelopeId });
+export const addMseg = (name = '') => send(name ? { cmd: 'addMseg', name } : { cmd: 'addMseg' });
+export const setMseg = (msegId, fields) => send({ cmd: 'setMseg', msegId, ...fields });
+export const resetMseg = (msegId) => send({ cmd: 'resetMseg', msegId });
+export const removeMseg = (msegId) => send({ cmd: 'removeMseg', msegId });
+export const addRandomModulator = (name = '', mode = '') => send({
+  cmd: 'addRandomModulator', ...(name ? { name } : {}), ...(mode ? { mode } : {}),
+});
+export const setRandomModulator = (randomId, fields) =>
+  send({ cmd: 'setRandomModulator', randomId, ...fields });
+export const resetRandomModulator = (randomId) =>
+  send({ cmd: 'resetRandomModulator', randomId });
+export const removeRandomModulator = (randomId) =>
+  send({ cmd: 'removeRandomModulator', randomId });
 export const addControlPage = (name) => send(name ? { cmd: 'addControlPage', name } : { cmd: 'addControlPage' });
 export const generateControlPages = (partId) => send({ cmd: 'generateControlPages', partId });
 export const removeControlPage = (pageId) => send({ cmd: 'removeControlPage', pageId });
@@ -3460,6 +6369,15 @@ export const cancelLearnControlSlotParameter = () => send({ cmd: 'cancelLearnCon
 export const toggleParameterFavourite = (partId, parameterId) =>
   send({ cmd: 'toggleParameterFavourite', partId, parameterId });
 export const walkPartPreset = (partId, delta = 1) => send({ cmd: 'walkPartPreset', partId, delta });
+export const setPresetAudition = (fields) => send({ cmd: 'setPresetAudition', ...fields });
+export const auditionLibraryRecord = (recordId, action = 'focused', partId) =>
+  send(partId ? { cmd: 'auditionLibraryRecord', recordId, action, partId }
+              : { cmd: 'auditionLibraryRecord', recordId, action });
+export const startSoundComparison = (partId, recordIds = []) =>
+  send({ cmd: 'startSoundComparison', partId, recordIds });
+export const stepSoundComparison = (delta = 1) => send({ cmd: 'stepSoundComparison', delta });
+export const keepSoundComparison = () => send({ cmd: 'keepSoundComparison' });
+export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' });
 export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
 export const clearKeyChord = (partId, key) => send({ cmd: 'clearKeyChord', partId, key });
@@ -3501,6 +6419,12 @@ export const removePattern = (patternId) => send({ cmd: 'removePattern', pattern
 export const renamePattern = (patternId, name) => send({ cmd: 'renamePattern', patternId, name });
 export const setPatternOptions = (patternId, fields) =>
   send({ cmd: 'setPatternOptions', patternId, ...fields });
+export const createPatternVariations = (patternId, amount = 0.55) =>
+  send({ cmd: 'createPatternVariations', patternId, amount });
+export const importGrooveTemplate = (fields) => send({ cmd: 'importGrooveTemplate', ...fields });
+export const removeGrooveTemplate = (grooveId) => send({ cmd: 'removeGrooveTemplate', grooveId });
+export const applyGrooveTemplate = (patternId, grooveId, amount = 1, applyVelocity = true) =>
+  send({ cmd: 'applyGrooveTemplate', patternId, grooveId, amount, applyVelocity });
 export const addLane = (patternId, fields = {}) => send({ cmd: 'addLane', patternId, ...fields });
 export const removeLane = (patternId, laneId) => send({ cmd: 'removeLane', patternId, laneId });
 export const setLaneOptions = (patternId, laneId, fields) =>
@@ -3512,6 +6436,15 @@ export const setStep = (patternId, laneId, index, fields) =>
   send({ cmd: 'setStep', patternId, laneId, index, ...fields });
 export const toggleStep = (patternId, laneId, index) =>
   send({ cmd: 'toggleStep', patternId, laneId, index });
+export const setStepParameterLock = (patternId, laneId, index, targetId, parameterId, value) =>
+  send({ cmd: 'setStepParameterLock', patternId, laneId, index, targetId, parameterId, value });
+export const setStepCcLock = (patternId, laneId, index, targetPartId, channel, ccNumber, value) =>
+  send({ cmd: 'setStepCcLock', patternId, laneId, index, targetPartId, channel, ccNumber, value });
+export const removeStepLock = (patternId, laneId, index, lockLaneId) =>
+  send({ cmd: 'removeStepLock', patternId, laneId, index, lockLaneId });
+export const clearStepLocks = (patternId, laneId, index) =>
+  send(index === undefined ? { cmd: 'clearStepLocks', patternId, laneId }
+                           : { cmd: 'clearStepLocks', patternId, laneId, index });
 export const addClip = (patternId, name) =>
   send(name ? { cmd: 'addClip', patternId, name } : { cmd: 'addClip', patternId });
 export const removeClip = (clipId) => send({ cmd: 'removeClip', clipId });
@@ -3519,8 +6452,29 @@ export const setClipOptions = (clipId, fields) => send({ cmd: 'setClipOptions', 
 export const launchClip = (clipId) => send({ cmd: 'launchClip', clipId });
 export const stopClip = (clipId) => send({ cmd: 'stopClip', clipId });
 export const stopAllClips = () => send({ cmd: 'stopAllClips' });
+export const setPerformanceFill = (clipId, active) =>
+  send({ cmd: 'setPerformanceFill', clipId, active });
 export const armCapture = (clipId, laneId) => send({ cmd: 'armCapture', clipId, laneId });
 export const disarmCapture = () => send({ cmd: 'disarmCapture' });
+export const captureRecentMidi = (seconds = 30) => send({ cmd: 'captureRecentMidi', seconds });
+export const freezeMidiClip = (clipId, cycles = 1) => send({ cmd: 'freezeMidiClip', clipId, cycles });
+export const startMidiLoop = (clipId = '') =>
+  send(clipId ? { cmd: 'startMidiLoop', clipId } : { cmd: 'startMidiLoop' });
+export const finishMidiLoop = () => send({ cmd: 'finishMidiLoop' });
+export const cancelMidiLoop = () => send({ cmd: 'cancelMidiLoop' });
+export const removeMidiLoop = (clipId) => send({ cmd: 'removeMidiLoop', clipId });
+export const startGestureRecording = (clipId = '', mode = 'overdub') =>
+  send(clipId ? { cmd: 'startGestureRecording', clipId, mode } : { cmd: 'startGestureRecording' });
+export const finishGestureRecording = () => send({ cmd: 'finishGestureRecording' });
+export const cancelGestureRecording = () => send({ cmd: 'cancelGestureRecording' });
+export const clearGestureLanes = (clipId) => send({ cmd: 'clearGestureLanes', clipId });
+export const startPerformanceRecording = (name = '') =>
+  send(name ? { cmd: 'startPerformanceRecording', name } : { cmd: 'startPerformanceRecording' });
+export const finishPerformanceRecording = () => send({ cmd: 'finishPerformanceRecording' });
+export const cancelPerformanceRecording = () => send({ cmd: 'cancelPerformanceRecording' });
+export const removePerformanceTake = (takeId) => send({ cmd: 'removePerformanceTake', takeId });
+export const replayPerformanceTake = (takeId) => send({ cmd: 'replayPerformanceTake', takeId });
+export const stopPerformanceReplay = () => send({ cmd: 'stopPerformanceReplay' });
 export const addScene = (name) => send(name ? { cmd: 'addScene', name } : { cmd: 'addScene' });
 export const removeScene = (sceneId) => send({ cmd: 'removeScene', sceneId });
 export const renameScene = (sceneId, name) => send({ cmd: 'renameScene', sceneId, name });
@@ -3533,9 +6487,21 @@ export const addSetlistItem = (sceneId, name) => send({ cmd: 'addSetlistItem', s
 export const removeSetlistItem = (itemId) => send({ cmd: 'removeSetlistItem', itemId });
 export const setSetlistItem = (itemId, fields) => send({ cmd: 'setSetlistItem', itemId, ...fields });
 export const moveSetlistItem = (itemId, index) => send({ cmd: 'moveSetlistItem', itemId, index });
+export const setSetlistOptions = (fields) => send({ cmd: 'setSetlistOptions', ...fields });
 export const setlistGo = (index) => send({ cmd: 'setlistGo', index });
 export const setlistNext = () => send({ cmd: 'setlistNext' });
 export const setlistPrev = () => send({ cmd: 'setlistPrev' });
+export const addArrangementItem = (sceneId, name) =>
+  send(name ? { cmd: 'addArrangementItem', sceneId, name }
+            : { cmd: 'addArrangementItem', sceneId });
+export const removeArrangementItem = (itemId) => send({ cmd: 'removeArrangementItem', itemId });
+export const setArrangementItem = (itemId, fields) =>
+  send({ cmd: 'setArrangementItem', itemId, ...fields });
+export const moveArrangementItem = (itemId, index) =>
+  send({ cmd: 'moveArrangementItem', itemId, index });
+export const setArrangementOptions = (fields) => send({ cmd: 'setArrangementOptions', ...fields });
+export const startArrangement = (index = 0) => send({ cmd: 'startArrangement', index });
+export const stopArrangement = () => send({ cmd: 'stopArrangement' });
 export const setPartArp = (partId, fields) => send({ cmd: 'setPartArp', partId, ...fields });
 export const addMidiSlot = (partId, type) => send({ cmd: 'addMidiSlot', partId, type });
 export const removeMidiSlot = (partId, slotId) => send({ cmd: 'removeMidiSlot', partId, slotId });
@@ -3561,6 +6527,9 @@ export const clearSafeModeSuspect = (modulePath) => send({ cmd: 'clearSafeModeSu
 export const clearAllSafeModeSuspects = () => send({ cmd: 'clearAllSafeModeSuspects' });
 export const acknowledgeRecovery = () => send({ cmd: 'acknowledgeRecovery' });
 export const restoreLastKnownGood = () => send({ cmd: 'restoreLastKnownGood' });
+export const setAutomaticFailover = (fields) => send({ cmd: 'setAutomaticFailover', ...fields });
+export const retryFailedProcessor = (targetId) => send({ cmd: 'retryFailedProcessor', targetId });
+export const dismissFailoverEvent = (targetId) => send({ cmd: 'dismissFailoverEvent', targetId });
 export const installLicence = (text) => send({ cmd: 'installLicence', text });
 export const removeLicence = () => send({ cmd: 'removeLicence' });
 export const activateLicenceHere = () => send({ cmd: 'activateLicenceHere' });
@@ -3574,7 +6543,8 @@ export const exportSupportBundle = (options = {}) =>
 /** The on-screen keyboard. One command both ways: on=true is note-on with the velocity the
  *  key position gave, on=false is the release. Goes through the same native path as hardware
  *  MIDI, so the browser preview can only acknowledge it. */
-export const hostNote = (note, velocity, on) => send({ cmd: 'hostNote', note, velocity, on });
+export const hostNote = (note, velocity, on, channel = 1) =>
+  send({ cmd: 'hostNote', note, velocity, on, channel });
 
 export const requestHostProject = () => send({ cmd: 'getHostProject' });
 export const setHostProject = (fields) => send({ cmd: 'setHostProject', ...fields });

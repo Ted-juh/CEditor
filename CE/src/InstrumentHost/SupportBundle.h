@@ -48,6 +48,10 @@ struct SupportBundleContents
 
     /** Log files the caller wants carried. Named individually — never a directory sweep. */
     juce::Array<juce::File> logFiles;
+    /** Fixed-slot worker minidumps. Binary and potentially memory-bearing, so separately gated. */
+    juce::Array<juce::File> crashDumpFiles;
+    /** Safe JSON identities paired to fixed-slot dumps; kept behind the same explicit choice. */
+    juce::Array<juce::File> crashDumpMetadataFiles;
 };
 
 struct SupportBundleOptions
@@ -57,6 +61,7 @@ struct SupportBundleOptions
     bool includeStateBlobs = false;
     bool includeCrashStates = true;
     bool includeLogs = true;
+    bool includeWorkerDumps = false;
 };
 
 class SupportBundle

@@ -459,7 +459,7 @@ export const editorTabs = derived(
       tabs.push({
         id: 'instrumentHost',
         tabType: 'instrumentHost',
-        name: 'Instrument Host',
+        name: 'Hostage',
         modified: false,
       });
     }
@@ -569,7 +569,7 @@ export function openSettingsTab() {
   clearSelection();
 }
 
-/** Open the global Instrument Host workspace tab and activate it */
+/** Open the global Hostage workspace tab and activate it */
 export function openInstrumentHostTab() {
   instrumentHostTabOpen.set(true);
   activeEditorTab.set({ type: 'instrumentHost', id: 'instrumentHost' });
@@ -577,7 +577,7 @@ export function openInstrumentHostTab() {
   clearSelection();
 }
 
-/** Close the global Instrument Host workspace tab */
+/** Close the global Hostage workspace tab */
 export function closeInstrumentHostTab() {
   instrumentHostTabOpen.set(false);
 

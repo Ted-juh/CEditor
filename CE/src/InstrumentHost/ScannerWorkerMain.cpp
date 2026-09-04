@@ -1,4 +1,4 @@
-// CEditorPluginScanner — the out-of-process VST3 scan worker (VIP-successor Stage 1).
+// CEditorPluginScanner — Hostage's out-of-process VST3 scan worker.
 //
 // This executable is the ONE place a third-party VST3 module gets loaded to ask what it
 // contains. It is short-lived by design: one module per invocation, so a module that crashes

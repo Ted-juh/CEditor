@@ -38,10 +38,12 @@ with an *as built* section per phase.
 
 | Document | What it is |
 |---|---|
-| [Instrument Host integration audit](instrument-host-integration-audit.md) | The VIP-successor baseline's required first task: what the host builder reuses (bridge, documents, settings, pages, CTRL49, export identity, installer route), what is genuinely new (hosting, the audio path, the scanner helper), and the documented deviations. |
+| [Hostage integration audit](instrument-host-integration-audit.md) | The Hostage baseline's required first task: what the host builder reuses (bridge, documents, settings, pages, CTRL49, export identity, installer route), what is genuinely new (hosting, the audio path, the scanner helper), and the documented deviations. |
 | [Generated instrument-host product](instrument-host-product.md) | Stage 1 as built: one service under four consumers (editor tab, `CEHostStandalone`, `CEHostVST3`, tests), the Host Project manifest with its minted-once installer identity, and the assemble-don't-compile build pipeline (`tools/scripts/build-host-product.mjs` + `tools/installer/HostProductTemplate.iss`). Ends with what Stage 1 leaves open. |
 | [The modular chain](modular-chain.md) | *As built.* Instruments, MIDI modules and inserts as separate things: the per-part MIDI insert chain that replaced the welded FX-into-arp pair (with its migration), group buses where several parts become one signal that keeps going, and chain presets that keep a whole voice — instrument, modules, inserts and zone — as one library record. Ends with what it deliberately does not do. |
 | [Reliability, diagnostics and the support bundle](instrument-host-reliability.md) | The baseline's §17 layer, built after the seven functionality stages: the architecture check that keeps an unloadable module out of the browser without calling it broken, safe startup after a plug-in takes the process down, a last-known-good session that is not the crash, and a support bundle gathered by allowlist. Carries the §18.12 handover material for the host as a whole — compatibility matrix, known limitations, failure fixtures and a manual test plan. |
+| [Feature-list completion audit](hostage-feature-completion-audit.md) | Evidence matrix for the 36 requested Hostage additions: persistent/native/UI/test ownership per item, permitted browser verification, and the two remaining completion gates (native rebuild and real out-of-process crash isolation). |
+| [Live plug-in process isolation](plugin-process-isolation.md) | Concrete worker/proxy, real-time IPC, recovery and acceptance-test contract required before Automatic Failover can claim native-crash containment. |
 
 ## Controls and components
 

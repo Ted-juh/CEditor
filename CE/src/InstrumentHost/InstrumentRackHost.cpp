@@ -1,10 +1,223 @@
 #include "InstrumentRackHost.h"
+#include "PluginWorkerBoundary.h"
+
+#include <atomic>
+#include <exception>
 
 namespace ceditor::host
 {
 
 using IOProcessor = juce::AudioProcessorGraph::AudioGraphIOProcessor;
 constexpr int midiChannel = juce::AudioProcessorGraph::midiChannelIndex;
+
+namespace
+{
+/** A deliberately small exception boundary around vendor code. It cannot make an in-process
+    access violation safe — only process isolation can do that — but it prevents ordinary C++
+    exceptions from escaping the audio callback and gives the controlling thread a lock-free
+    fault edge from which it can restore the last captured state into a fresh instance. */
+class GuardedPluginProcessor final : public juce::AudioProcessor
+{
+    static BusesProperties busesOf (juce::AudioProcessor& processor)
+    {
+        BusesProperties buses;
+        for (int i = 0; i < processor.getBusCount (true); ++i)
+            if (const auto* bus = processor.getBus (true, i))
+                buses = buses.withInput (bus->getName(), bus->getCurrentLayout(), bus->isEnabled());
+        for (int i = 0; i < processor.getBusCount (false); ++i)
+            if (const auto* bus = processor.getBus (false, i))
+                buses = buses.withOutput (bus->getName(), bus->getCurrentLayout(), bus->isEnabled());
+        return buses;
+    }
+
+public:
+    GuardedPluginProcessor (std::unique_ptr<juce::AudioProcessor> processor, bool isEffect)
+        : juce::AudioProcessor (busesOf (*processor)), inner (std::move (processor)), effect (isEffect)
+    {
+        setLatencySamples (inner->getLatencySamples());
+    }
+
+    juce::AudioProcessor* getInner() const noexcept { return inner.get(); }
+    bool isDisabled() const noexcept { return disabled.load (std::memory_order_acquire); }
+    bool takeFailure() noexcept
+    {
+        if (! disabled.load (std::memory_order_acquire))
+            if (const auto* worker = dynamic_cast<const PluginWorkerBoundary*> (inner.get());
+                worker != nullptr && ! worker->workerIsRunning())
+                trip();
+        if (! failed.exchange (false, std::memory_order_acq_rel))
+            return false;
+        // This runs on the rack's controlling thread, never the audio callback. A disabled
+        // automatic-retry policy must not leave a vendor process hung forever in the background.
+        if (auto* worker = dynamic_cast<PluginWorkerBoundary*> (inner.get()))
+            worker->terminateWorker();
+        return true;
+    }
+
+    void prepareToPlay (double rate, int blockSize) override
+    {
+        dryFloat.setSize (juce::jmax (1, getTotalNumInputChannels()), juce::jmax (1, blockSize),
+                          false, false, true);
+        dryDouble.setSize (juce::jmax (1, getTotalNumInputChannels()), juce::jmax (1, blockSize),
+                           false, false, true);
+        guarded ([&] { inner->setProcessingPrecision (getProcessingPrecision());
+                       inner->setNonRealtime (isNonRealtime());
+                       inner->setPlayHead (getPlayHead());
+                       inner->setRateAndBufferSizeDetails (rate, blockSize);
+                       inner->prepareToPlay (rate, blockSize);
+                       setLatencySamples (inner->getLatencySamples()); });
+    }
+
+    void releaseResources() override { guarded ([&] { inner->releaseResources(); }); }
+    void reset() override { guarded ([&] { inner->reset(); }); }
+    void setPlayHead (juce::AudioPlayHead* playHead) override
+    {
+        juce::AudioProcessor::setPlayHead (playHead);
+        guarded ([&] { inner->setPlayHead (playHead); });
+    }
+    void setNonRealtime (bool nonRealtime) noexcept override
+    {
+        juce::AudioProcessor::setNonRealtime (nonRealtime);
+        // JUCE declares this callback noexcept, so vendors must not throw from it. Keep the
+        // inner processor's mode in step with the graph before its next process callback.
+        if (! disabled.load (std::memory_order_acquire))
+            inner->setNonRealtime (nonRealtime);
+    }
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        process (audio, midi, dryFloat);
+    }
+    void processBlock (juce::AudioBuffer<double>& audio, juce::MidiBuffer& midi) override
+    {
+        process (audio, midi, dryDouble);
+    }
+
+    const juce::String getName() const override
+    {
+        return guardedResult (juce::String ("Failed plug-in"), [&] { return inner->getName(); });
+    }
+    bool acceptsMidi() const override { return guardedResult (false, [&] { return inner->acceptsMidi(); }); }
+    bool producesMidi() const override { return guardedResult (false, [&] { return inner->producesMidi(); }); }
+    bool isMidiEffect() const override { return guardedResult (false, [&] { return inner->isMidiEffect(); }); }
+    bool supportsDoublePrecisionProcessing() const override
+    {
+        return guardedResult (false, [&] { return inner->supportsDoublePrecisionProcessing(); });
+    }
+    double getTailLengthSeconds() const override
+    {
+        return guardedResult (0.0, [&] { return inner->getTailLengthSeconds(); });
+    }
+    bool hasEditor() const override { return guardedResult (false, [&] { return inner->hasEditor(); }); }
+    juce::AudioProcessorEditor* createEditor() override
+    {
+        return guardedResult<juce::AudioProcessorEditor*> (nullptr,
+                                                           [&] { return inner->createEditor(); });
+    }
+    int getNumPrograms() override { return guardedResult (1, [&] { return inner->getNumPrograms(); }); }
+    int getCurrentProgram() override { return guardedResult (0, [&] { return inner->getCurrentProgram(); }); }
+    void setCurrentProgram (int index) override { guarded ([&] { inner->setCurrentProgram (index); }); }
+    const juce::String getProgramName (int index) override
+    {
+        return guardedResult (juce::String(), [&] { return inner->getProgramName (index); });
+    }
+    void changeProgramName (int index, const juce::String& name) override
+    {
+        guarded ([&] { inner->changeProgramName (index, name); });
+    }
+    void getStateInformation (juce::MemoryBlock& state) override
+    {
+        guarded ([&] { inner->getStateInformation (state); });
+    }
+    void setStateInformation (const void* data, int size) override
+    {
+        guarded ([&] { inner->setStateInformation (data, size); });
+    }
+
+private:
+    template <typename Value, typename Fn>
+    Value guardedResult (Value fallback, Fn&& fn) const noexcept
+    {
+        if (disabled.load (std::memory_order_acquire))
+            return fallback;
+        try { return fn(); }
+        catch (...) { const_cast<GuardedPluginProcessor*> (this)->trip(); }
+        return fallback;
+    }
+
+    template <typename Fn>
+    void guarded (Fn&& fn) noexcept
+    {
+        if (disabled.load (std::memory_order_acquire))
+            return;
+        try { fn(); }
+        catch (...) { trip(); }
+    }
+
+    template <typename Sample>
+    void process (juce::AudioBuffer<Sample>& audio, juce::MidiBuffer& midi,
+                  juce::AudioBuffer<Sample>& dry) noexcept
+    {
+        if (effect)
+            for (int channel = 0; channel < juce::jmin (audio.getNumChannels(), dry.getNumChannels()); ++channel)
+                dry.copyFrom (channel, 0, audio, channel, 0, audio.getNumSamples());
+
+        if (! disabled.load (std::memory_order_acquire))
+            try
+            {
+                // The graph owns the wrapper, so mirror the host context into the vendor
+                // processor immediately before every callback. A guard that lost tempo or
+                // offline-render state would keep audio alive by changing how it sounds.
+                inner->setPlayHead (getPlayHead());
+                inner->setNonRealtime (isNonRealtime());
+                inner->processBlock (audio, midi);
+            }
+            catch (...) { trip(); }
+
+        if (! disabled.load (std::memory_order_acquire))
+            return;
+        if (effect)
+        {
+            for (int channel = 0; channel < audio.getNumChannels(); ++channel)
+                if (channel < dry.getNumChannels())
+                    audio.copyFrom (channel, 0, dry, channel, 0, audio.getNumSamples());
+                else
+                    audio.clear (channel, 0, audio.getNumSamples());
+        }
+        else
+        {
+            audio.clear();
+        }
+    }
+
+    void trip() noexcept
+    {
+        disabled.store (true, std::memory_order_release);
+        failed.store (true, std::memory_order_release);
+    }
+
+    std::unique_ptr<juce::AudioProcessor> inner;
+    const bool effect;
+    std::atomic<bool> disabled { false };
+    std::atomic<bool> failed { false };
+    juce::AudioBuffer<float> dryFloat;
+    juce::AudioBuffer<double> dryDouble;
+};
+
+juce::AudioProcessor* unwrap (juce::AudioProcessor* processor)
+{
+    if (auto* guarded = dynamic_cast<GuardedPluginProcessor*> (processor))
+        return guarded->getInner();
+    return processor;
+}
+
+juce::AudioProcessor* unwrapAvailable (juce::AudioProcessor* processor)
+{
+    if (auto* guarded = dynamic_cast<GuardedPluginProcessor*> (processor))
+        return guarded->isDisabled() ? nullptr : guarded->getInner();
+    return processor;
+}
+} // namespace
 
 InstrumentRackHost::InstrumentRackHost()
 {
@@ -15,7 +228,7 @@ InstrumentRackHost::InstrumentRackHost()
 
     // The engine sits between the MIDI input and every part, so the graph's own ordering
     // makes "the engine has already run" a structural fact rather than a convention.
-    engineNode = graph.addNode (std::make_unique<PerformanceEngineProcessor> (engine));
+    engineNode = graph.addNode (std::make_unique<PerformanceEngineProcessor> (engine, layerRouter));
     graph.addConnection ({ { midiInNode->nodeID, midiChannel },
                            { engineNode->nodeID, midiChannel } });
 
@@ -35,6 +248,7 @@ void InstrumentRackHost::prepare (double sampleRate, int blockSize, int numInput
                                 juce::jlimit (2, 16, model.outputPairs * 2), sampleRate, blockSize);
     graph.prepareToPlay (sampleRate, blockSize);
     engine.prepare (sampleRate, blockSize, perf::PerformanceEngine::maxParts);
+    layerRouter.prepare (blockSize);
     prepared = true;
 
     // The input IO node only knows its channels once prepared, and a hardware part's return
@@ -74,9 +288,81 @@ void InstrumentRackHost::syncEngineBindings()
         if (auto* lp = findLive (part.partId))
         {
             lp->filter->setEngine (&engine, i < perf::PerformanceEngine::maxParts ? i : -1);
-            lp->filter->getMidiInserts().setSlots (part.midiChain);
+            lp->filter->setLayerRouter (&layerRouter,
+                                        i < LayerRouter::maxParts ? i : -1);
+            lp->gain->setLayerRouter (&layerRouter,
+                                      i < LayerRouter::maxParts ? i : -1);
+            lp->filter->setMidiChain (part.midiChain);
         }
     }
+    refreshLayerRouting();
+}
+
+void InstrumentRackHost::refreshLayerRouting()
+{
+    LayerRouter::Configuration config;
+
+    for (const auto& stored : model.layerGroups)
+    {
+        if (! stored.enabled || config.groupCount >= LayerRouter::maxGroups)
+            continue;
+
+        LayerRouter::Group group;
+        group.allocation = stored.allocation == "roundRobin" ? LayerRouter::Allocation::roundRobin
+                         : stored.allocation == "leastBusy"  ? LayerRouter::Allocation::leastBusy
+                                                               : LayerRouter::Allocation::all;
+        group.source = stored.source == "key"        ? LayerRouter::Source::key
+                     : stored.source == "cc"         ? LayerRouter::Source::cc
+                     : stored.source == "expression" ? LayerRouter::Source::expression
+                     : stored.source == "macro"      ? LayerRouter::Source::macro
+                                                       : LayerRouter::Source::velocity;
+        group.controller = juce::jlimit (0, 127, stored.controller);
+        group.macroKey = LayerRouter::macroKeyFor (stored.macroId);
+        if (group.source == LayerRouter::Source::macro)
+            if (const auto* macro = model.findMacro (stored.macroId))
+                group.initialSourceValue = macro->value;
+
+        for (const auto& storedMember : stored.members)
+        {
+            if (group.memberCount >= LayerRouter::maxMembers)
+                break;
+            const auto* part = model.findPart (storedMember.partId);
+            const auto partIndex = model.indexOfPart (storedMember.partId);
+            if (part == nullptr || part->midiSourcePartId.isNotEmpty()
+                || ! juce::isPositiveAndBelow (partIndex, LayerRouter::maxParts))
+                continue;
+
+            auto& member = group.members[(size_t) group.memberCount++];
+            member.partIndex = partIndex;
+            member.minimum = juce::jlimit (0.0f, 1.0f, storedMember.minimum);
+            member.maximum = juce::jlimit (member.minimum, 1.0f, storedMember.maximum);
+            member.crossfade = juce::jlimit (0.0f, 0.5f, storedMember.crossfade);
+        }
+
+        if (group.memberCount < 2)
+            continue;
+        for (int member = 0; member < group.memberCount; ++member)
+            config.routed[(size_t) group.members[(size_t) member].partIndex] = true;
+        config.groups[(size_t) config.groupCount++] = std::move (group);
+    }
+
+    // Changing the destination set while a chord is down must not strand its old voices.
+    // An identical snapshot is common here (loading an instrument, changing a MIDI source,
+    // removing an ungrouped part) and must not silence unrelated held notes.
+    if (layerRouter.setConfiguration (std::move (config)))
+    {
+        engine.panic();
+        for (auto& [partId, lp] : live)
+        {
+            juce::ignoreUnused (partId);
+            lp.filter->getCore().requestPanic();
+        }
+    }
+}
+
+void InstrumentRackHost::setLayerMacroValue (const juce::String& macroId, float value)
+{
+    layerRouter.setMacroSourceValue (macroId, value);
 }
 
 bool InstrumentRackHost::setPartMidiChain (const juce::String& partId,
@@ -91,7 +377,7 @@ bool InstrumentRackHost::setPartMidiChain (const juce::String& partId,
         chain.removeLast();
 
     part->midiChain = std::move (chain);
-    lp->filter->getMidiInserts().setSlots (part->midiChain);
+    lp->filter->setMidiChain (part->midiChain);
     return true;
 }
 
@@ -205,7 +491,7 @@ void InstrumentRackHost::destroyEffectNode (const juce::String& effectId)
         if (it->second.node != nullptr)
         {
             if (onInstrumentWillBeRemoved != nullptr)
-                onInstrumentWillBeRemoved (effectId, *it->second.node->getProcessor());
+                onInstrumentWillBeRemoved (effectId, *unwrap (it->second.node->getProcessor()));
             graph.removeNode (it->second.node->nodeID);
         }
         liveEffects.erase (it);
@@ -379,6 +665,8 @@ bool InstrumentRackHost::commitEffectLoad (const juce::String& effectId, int gen
     if (generation == 0 || generation != it->second.loadGeneration)
         return false;
 
+    effect = std::make_unique<GuardedPluginProcessor> (std::move (effect), true);
+
     // Same restore rule as instruments: state only re-enters the same class identity.
     if (info.ceId == slot->pluginCeId && slot->stateBlobBase64.isNotEmpty())
     {
@@ -386,15 +674,17 @@ bool InstrumentRackHost::commitEffectLoad (const juce::String& effectId, int gen
         if (juce::Base64::convertFromBase64 (decoded, slot->stateBlobBase64))
             effect->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
     }
-    else if (info.ceId != slot->pluginCeId)
-    {
+
+    if (static_cast<GuardedPluginProcessor*> (effect.get())->isDisabled())
+        return false;
+
+    if (info.ceId != slot->pluginCeId)
         slot->stateBlobBase64 = {};
-    }
 
     if (it->second.node != nullptr)
     {
         if (onInstrumentWillBeRemoved != nullptr)
-            onInstrumentWillBeRemoved (effectId, *it->second.node->getProcessor());
+            onInstrumentWillBeRemoved (effectId, *unwrap (it->second.node->getProcessor()));
         graph.removeNode (it->second.node->nodeID);
     }
 
@@ -415,13 +705,36 @@ bool InstrumentRackHost::commitEffectLoad (const juce::String& effectId, int gen
 juce::AudioProcessor* InstrumentRackHost::getEffect (const juce::String& effectId) const
 {
     const auto it = liveEffects.find (effectId);
-    return it != liveEffects.end() && it->second.node != nullptr ? it->second.node->getProcessor()
-                                                                 : nullptr;
+    return it != liveEffects.end() && it->second.node != nullptr
+             ? unwrapAvailable (it->second.node->getProcessor()) : nullptr;
 }
 
 bool InstrumentRackHost::effectHasProcessor (const juce::String& effectId) const
 {
     return getEffect (effectId) != nullptr;
+}
+
+juce::Array<InstrumentRackHost::ProcessorFailure> InstrumentRackHost::takeProcessorFailures()
+{
+    juce::Array<ProcessorFailure> failures;
+    for (auto& [partId, livePart] : live)
+        if (livePart.instrumentNode != nullptr)
+            if (auto* guarded = dynamic_cast<GuardedPluginProcessor*> (
+                    livePart.instrumentNode->getProcessor());
+                guarded != nullptr && guarded->takeFailure())
+            {
+                const auto* part = model.findPart (partId);
+                failures.add ({ partId, part != nullptr ? part->pluginName : juce::String(), false });
+            }
+    for (auto& [effectId, liveEffect] : liveEffects)
+        if (liveEffect.node != nullptr)
+            if (auto* guarded = dynamic_cast<GuardedPluginProcessor*> (liveEffect.node->getProcessor());
+                guarded != nullptr && guarded->takeFailure())
+            {
+                const auto* slot = model.findEffect (effectId);
+                failures.add ({ effectId, slot != nullptr ? slot->pluginName : juce::String(), true });
+            }
+    return failures;
 }
 
 juce::String InstrumentRackHost::addBus (const juce::String& name)
@@ -711,8 +1024,14 @@ bool InstrumentRackHost::setPartMidiSource (const juce::String& partId, const ju
         return false;
     if (model.midiRoutingWouldLoop (partId, sourcePartId))
         return false;
+    if (sourcePartId.isNotEmpty())
+        for (const auto& group : model.layerGroups)
+            for (const auto& member : group.members)
+                if (member.partId == partId)
+                    return false;
 
     part->midiSourcePartId = sourcePartId;
+    refreshLayerRouting();
     rewireAudio();
     return true;
 }
@@ -791,6 +1110,21 @@ bool InstrumentRackHost::sendHardwareMidi (const juce::String& partId,
         return false;
 
     lp->midiSend->sendNow (messages);
+    return true;
+}
+
+bool InstrumentRackHost::sendPartMidi (const juce::String& partId,
+                                       const juce::MidiBuffer& messages)
+{
+    const auto* part = model.findPart (partId);
+    auto* lp = findLive (partId);
+    if (part == nullptr || lp == nullptr || messages.isEmpty())
+        return false;
+    if (part->hardware)
+        return sendHardwareMidi (partId, messages);
+    if (lp->instrumentNode == nullptr || lp->filter == nullptr)
+        return false;
+    lp->filter->queueMessages (messages);
     return true;
 }
 
@@ -1093,6 +1427,7 @@ bool InstrumentRackHost::setMidiRules (const juce::String& partId, const PartMid
 
     part->midi = clamped;
     lp->filter->getCore().setRules (clamped);
+    lp->filter->setPartInputChannel (clamped.channel);
     return true;
 }
 
@@ -1104,7 +1439,7 @@ bool InstrumentRackHost::setEnabled (const juce::String& partId, bool enabled)
         return false;
 
     part->enabled = enabled;
-    lp->filter->getCore().setEnabled (enabled);   // disabling panics the part's notes
+    lp->filter->setPartEnabled (enabled);   // disabling panics the part's notes
     applyMixerState();
     return true;
 }
@@ -1176,6 +1511,8 @@ bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
     if (generation == 0 || generation != lp->loadGeneration)
         return false;
 
+    instrument = std::make_unique<GuardedPluginProcessor> (std::move (instrument), false);
+
     // Restore before insertion, and only into the same class identity — state blobs do not
     // transfer between different instruments.
     if (info.ceId == part->pluginCeId && part->stateBlobBase64.isNotEmpty())
@@ -1184,10 +1521,12 @@ bool InstrumentRackHost::commitLoad (const juce::String& partId, int generation,
         if (juce::Base64::convertFromBase64 (decoded, part->stateBlobBase64))
             instrument->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
     }
-    else if (info.ceId != part->pluginCeId)
-    {
+
+    if (static_cast<GuardedPluginProcessor*> (instrument.get())->isDisabled())
+        return false;
+
+    if (info.ceId != part->pluginCeId)
         part->stateBlobBase64 = {};
-    }
 
     // Replacement: the old destination is going away, so its tracked notes are forgotten,
     // not forwarded — the incoming instrument never played them.
@@ -1230,15 +1569,14 @@ bool InstrumentRackHost::unloadInstrument (const juce::String& partId)
 
 bool InstrumentRackHost::partHasInstrument (const juce::String& partId) const
 {
-    const auto* lp = findLive (partId);
-    return lp != nullptr && lp->instrumentNode != nullptr;
+    return getInstrument (partId) != nullptr;
 }
 
 juce::AudioProcessor* InstrumentRackHost::getInstrument (const juce::String& partId) const
 {
     const auto* lp = findLive (partId);
-    return lp != nullptr && lp->instrumentNode != nullptr ? lp->instrumentNode->getProcessor()
-                                                          : nullptr;
+    return lp != nullptr && lp->instrumentNode != nullptr
+             ? unwrapAvailable (lp->instrumentNode->getProcessor()) : nullptr;
 }
 
 Performance InstrumentRackHost::captureState()
@@ -1261,10 +1599,20 @@ Performance InstrumentRackHost::captureState()
 void InstrumentRackHost::refreshEffectBlobs (juce::Array<EffectSlot>& effects)
 {
     for (auto& slot : effects)
-        if (auto* processor = getEffect (slot.effectId))
+        if (const auto it = liveEffects.find (slot.effectId);
+            it != liveEffects.end() && it->second.node != nullptr)
         {
+            auto* wrapper = it->second.node->getProcessor();
+            const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (wrapper);
+            if (guarded != nullptr && guarded->isDisabled())
+                continue;
+            auto* processor = unwrap (wrapper);
+            if (processor == nullptr)
+                continue;
             juce::MemoryBlock state;
-            processor->getStateInformation (state);
+            wrapper->getStateInformation (state);
+            if (guarded != nullptr && guarded->isDisabled())
+                continue;
             slot.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
         }
 }
@@ -1767,7 +2115,8 @@ void InstrumentRackHost::rewireAudio()
 void InstrumentRackHost::applyPartToLive (const RackPart& part, LivePart& lp)
 {
     lp.filter->getCore().setRules (part.midi);
-    lp.filter->getCore().setEnabled (part.enabled);
+    lp.filter->setPartInputChannel (part.midi.channel);
+    lp.filter->setPartEnabled (part.enabled);
 }
 
 void InstrumentRackHost::applyMixerState()
@@ -1789,15 +2138,23 @@ void InstrumentRackHost::applyMixerState()
 void InstrumentRackHost::notifyInstrumentWillBeRemoved (const juce::String& partId, const LivePart& lp)
 {
     if (onInstrumentWillBeRemoved != nullptr && lp.instrumentNode != nullptr)
-        onInstrumentWillBeRemoved (partId, *lp.instrumentNode->getProcessor());
+        onInstrumentWillBeRemoved (partId, *unwrap (lp.instrumentNode->getProcessor()));
 }
 
 void InstrumentRackHost::refreshStateBlob (RackPart& part)
 {
     if (auto* lp = findLive (part.partId); lp != nullptr && lp->instrumentNode != nullptr)
     {
+        if (const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (
+                lp->instrumentNode->getProcessor());
+            guarded != nullptr && guarded->isDisabled())
+            return;
         juce::MemoryBlock state;
         lp->instrumentNode->getProcessor()->getStateInformation (state);
+        if (const auto* guarded = dynamic_cast<GuardedPluginProcessor*> (
+                lp->instrumentNode->getProcessor());
+            guarded != nullptr && guarded->isDisabled())
+            return;
         part.stateBlobBase64 = juce::Base64::toBase64 (state.getData(), state.getSize());
     }
 }

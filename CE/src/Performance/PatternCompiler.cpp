@@ -1,5 +1,6 @@
 #include "CompiledPattern.h"
 #include <algorithm>
+#include <cstdlib>
 
 namespace ceditor::perf
 {
@@ -175,9 +176,20 @@ std::unique_ptr<CompiledSong> compileSong (const juce::Array<Pattern>& patterns,
         CompiledClip compiled;
         compiled.clipId = clip.clipId;
         compiled.patternIndex = song->indexOfPattern (clip.patternId);
+        compiled.fillPatternIndex = song->indexOfPattern (clip.fillPatternId);
         compiled.launchQuantize = clip.launchQuantize;
         compiled.loop = clip.loop;
+        compiled.bypassMidiFx = clip.frozenMidi;
         compiled.followAfterLoops = clip.followAfterLoops;
+        const auto action = (clip.followAction.isEmpty() || clip.followAction == "none")
+                              && clip.followClipId.isNotEmpty() && clip.followAfterLoops > 0
+                              ? juce::String ("clip") : clip.followAction;
+        if (action == "clip")        compiled.followAction = CompiledClip::FollowAction::clip;
+        else if (action == "next")   compiled.followAction = CompiledClip::FollowAction::next;
+        else if (action == "random") compiled.followAction = CompiledClip::FollowAction::random;
+        else if (action == "stop" || (action.isEmpty() && clip.followAfterLoops > 0))
+            compiled.followAction = CompiledClip::FollowAction::stop;
+        compiled.followSeed = (juce::uint32) juce::jmax (1, std::abs (clip.clipId.hashCode()));
         song->clips.push_back (std::move (compiled));
     }
 

@@ -89,6 +89,7 @@ juce::var SupportBundle::manifestVar (const SupportBundleOptions& options) const
     choices->setProperty ("stateBlobsIncluded", options.includeStateBlobs);
     choices->setProperty ("crashStatesIncluded", options.includeCrashStates);
     choices->setProperty ("logsIncluded", options.includeLogs);
+    choices->setProperty ("workerMinidumpsIncluded", options.includeWorkerDumps);
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("generatedAt", juce::Time::getCurrentTime().toISO8601 (true));
@@ -167,6 +168,29 @@ juce::Array<SupportBundle::Entry> SupportBundle::preview (const SupportBundleOpt
             entries.add ({ "logs/", "No log files were offered by this build.", 0, false, {} });
     }
 
+    if (contents.crashDumpFiles.isEmpty())
+    {
+        entries.add ({ "crash-dumps/", "No live-worker minidumps have been recorded.",
+                       0, false, {} });
+    }
+    else
+    {
+        for (const auto& dump : contents.crashDumpFiles)
+            entries.add ({ "crash-dumps/" + dump.getFileName(),
+                           "A Windows live-worker minidump for stack and module diagnosis.",
+                           sizeOf (dump), options.includeWorkerDumps && dump.existsAsFile(),
+                           options.includeWorkerDumps
+                             ? "explicitly included; may contain stack memory and local paths"
+                             : "excluded by default; may contain stack memory and local paths" });
+        for (const auto& metadata : contents.crashDumpMetadataFiles)
+            entries.add ({ "crash-dumps/" + metadata.getFileName(),
+                           "Build fingerprint and plug-in identity paired with a worker dump.",
+                           sizeOf (metadata), options.includeWorkerDumps && metadata.existsAsFile(),
+                           options.includeWorkerDumps
+                             ? "included with its explicitly selected minidump"
+                             : "excluded with its minidump by default" });
+    }
+
     return entries;
 }
 
@@ -228,6 +252,16 @@ juce::String SupportBundle::writeTo (const juce::File& destination,
         for (const auto& log : contents.logFiles)
             if (log.existsAsFile())
                 addText ("logs/" + log.getFileName(), log.loadFileAsString());
+
+    if (options.includeWorkerDumps)
+    {
+        for (const auto& dump : contents.crashDumpFiles)
+            if (dump.existsAsFile())
+                builder.addFile (dump, 0, "crash-dumps/" + dump.getFileName());
+        for (const auto& metadata : contents.crashDumpMetadataFiles)
+            if (metadata.existsAsFile())
+                addJsonFile (metadata, "crash-dumps/" + metadata.getFileName());
+    }
 
     destination.getParentDirectory().createDirectory();
     destination.deleteFile();

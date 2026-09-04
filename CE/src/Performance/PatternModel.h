@@ -73,6 +73,7 @@ struct Lane
     int stepsPerBeat = 4;           // rate: 4 = sixteenths, 6 = sextuplets, 2 = eighths
     bool muted = false;
     bool glide = false;             // cc/parameter lanes: interpolate between steps
+    juce::String lockSourceLaneId;  // non-empty: hidden lane carrying per-step parameter locks
     juce::Array<PatternStep> steps;
 
     // Euclidean generation is a fill button, not a mode: it writes real steps the user can
@@ -88,6 +89,21 @@ struct Lane
     double lengthPpq() const noexcept;
 };
 
+/** A reusable groove cycle. Timing values are fractions of the template's own step and
+    velocity values are multipliers, so the same feel can be mapped onto lanes at different
+    rates without assuming every pattern is a sixteenth-note drum grid. */
+struct GrooveTemplate
+{
+    juce::String grooveId;
+    juce::String name;
+    juce::String source { "imported" }; // factory | imported
+    int stepsPerBeat = 4;
+    juce::Array<float> timingOffsets;    // -0.5..+0.5 template steps
+    juce::Array<float> velocityMultipliers; // 0.25..2.0; empty keeps dynamics
+
+    static juce::Array<GrooveTemplate> factoryTemplates();
+};
+
 struct Pattern
 {
     juce::String patternId;
@@ -96,12 +112,34 @@ struct Pattern
     float swing = 0.0f;             // 0..0.75: how late every second step lands
     juce::uint32 seed = 1;          // deterministic randomness (§18.8.13)
 
+    // Pattern Variations. A is the authored source; B/C/D are generated, editable patterns
+    // with their own stable ids. The group/source fields make regeneration explicit and let
+    // the service replace generated contents without invalidating clips which reference them.
+    juce::String variationGroupId;
+    juce::String variationLabel;    // empty for an ordinary pattern, otherwise A | B | C | D
+    juce::String variationSourcePatternId;
+    float variationAmount = 0.55f;  // 0..1, the intensity used for the last generation
+
+    // The last groove committed to the editable steps. Informational only: playback reads
+    // the real microtiming/velocity fields, so later hand edits remain authoritative.
+    juce::String appliedGrooveId;
+    float appliedGrooveAmount = 0.0f;
+
     static Pattern create (const juce::String& name);
     Lane* findLane (const juce::String& laneId);
     const Lane* findLane (const juce::String& laneId) const;
     /** The pattern's own loop: the longest lane. Shorter lanes repeat inside it. */
     double lengthPpq() const noexcept;
 };
+
+/** Creates one deterministic, musically related B/C/D pattern. It remints lane ids and
+    rewrites parameter-lock links so the result is a self-contained editable pattern. */
+Pattern makePatternVariation (const Pattern& source, char label, float amount = 0.55f);
+
+/** Commits a reusable groove into the pattern's real step data. Timing is replaced; optional
+    velocity accents are blended into active note/chord/drum steps. */
+void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
+                          float amount = 1.0f, bool applyVelocity = true);
 
 /** A clip is a launchable reference to a pattern (§18.8.8): what plays, when it may start,
     whether it loops, and what follows it. */
@@ -114,6 +152,26 @@ struct Clip
     bool loop = true;
     juce::String followClipId;      // what to launch when this one has run its course
     int followAfterLoops = 0;       // 0 = never follow
+    juce::String followAction { "none" }; // none | clip | next | random | stop
+    bool looperLayer = false;       // created as one independently looping performance layer
+    int overdubPasses = 0;          // completed additions after the first recorded pass
+    bool gestureClip = false;       // created by the gesture recorder as an automation performance
+    int gesturePasses = 0;          // completed gesture takes written into this clip
+
+    // MIDI Freeze/Bounce. The stored steps are the already-rendered output of the source
+    // clip's per-part MIDI chain, so replay joins after that chain instead of applying its
+    // chorder, arpeggiator or echo a second time.
+    bool frozenMidi = false;
+    juce::String frozenFromClipId;
+    int frozenCycles = 1;
+    int frozenNoteCount = 0;
+
+    // Held Fill System. The clip keeps playing and keeps its phase; the engine temporarily
+    // renders this related pattern until the button/pedal is released.
+    juce::String fillPatternId;
+    Quantize fillQuantize = Quantize::beat;
+    int fillCc = -1;                // -1 = no pedal/controller assigned
+    int fillChannel = 0;            // 0 = any channel, otherwise 1..16
 };
 
 /** One part's state inside a scene — the same fields the mixer already owns, recalled
@@ -125,11 +183,24 @@ struct SceneSlot
     bool mute = false;
     float volume = 1.0f;
     bool applyVolume = false;       // a scene may recall mute without touching levels
+    float pan = 0.0f;
+    bool applyPan = false;
 };
 
 struct SceneMacroValue
 {
     juce::String macroId;
+    float value = 0.0f;
+};
+
+/** A parameter exposed on a control page when a scene was captured. Keeping the class
+    identity beside the address makes an old snapshot refuse a replacement plug-in rather
+    than moving an unrelated parameter that happens to reuse the same id. */
+struct SceneParameterValue
+{
+    juce::String targetId;
+    juce::String targetCeId;
+    juce::String parameterId;
     float value = 0.0f;
 };
 
@@ -140,26 +211,47 @@ struct Scene
     juce::StringArray clipIds;      // launched together, on the scene's quantization
     juce::Array<SceneSlot> slots;
     juce::Array<SceneMacroValue> macros;
+    juce::Array<SceneParameterValue> parameters; // resolved control-page destinations
     juce::String focusPartId;       // hardware/editor focus travels with the scene
     juce::String pageId;            // the control page the surface should show
     Quantize launchQuantize = Quantize::bar;
     bool stopOtherClips = true;     // a scene is a state, so by default it silences what it omits
     double tempo = 0.0;             // 0 = keep the current tempo
+    double morphBeats = 0.0;        // 0 = cut; continuous values may morph for up to 32 beats
 };
 
 struct SetlistItem
 {
     juce::String itemId;
-    juce::String name;
-    juce::String sceneId;           // the scene this item recalls
-    juce::String notes;             // what the player needs to read on stage
-    double tempo = 0.0;             // 0 = the scene's or the current tempo
+    juce::String name;               // song / performance name shown on stage
+    juce::String sceneId;            // the scene this item recalls
+    juce::String rackRecordId;       // optional full-rack Library capture for another song
+    juce::String pageId;             // CTRL49 control page recalled with the song
+    juce::String notes;              // what the player needs to read on stage
+    double tempo = 0.0;              // 0 = the scene's or the current tempo
 };
 
 struct Setlist
 {
     juce::Array<SetlistItem> items;
     int currentIndex = -1;          // -1 = nothing recalled yet
+    int preloadAhead = 1;            // 0=off, 1=next song, 2=next two songs
+};
+
+/** One block in the deliberately small song arranger. It sequences existing scenes for an
+    integer number of bars; it does not duplicate clips or introduce a DAW-style timeline. */
+struct ArrangementItem
+{
+    juce::String itemId;
+    juce::String name;
+    juce::String sceneId;
+    int bars = 4;                   // 1..128 bars before the following scene
+};
+
+struct Arrangement
+{
+    juce::Array<ArrangementItem> items;
+    bool loop = false;
 };
 
 /** Per-part arpeggiator settings (§18.8.5). The arp is a mode over the shared engine, not a
@@ -198,6 +290,9 @@ struct MidiFxSettings
 {
     enum class ChordType { off = 0, powerFifth, triad, triadFirstInversion, seventh,
                            octaveDouble, diatonic, diatonicSeventh, keyChords };
+    enum class ChordVoicing { close = 0, open, drop2, wide };
+    enum class ResponseCurve { linear = 0, soft, hard, sCurve, custom };
+    static constexpr int responseCurvePoints = 9;
 
     /** One learned chord: pressing `key` plays key+each offset (offset 0 = the key itself).
         Captured by the learn flow — arm, tap the target key, play the chord — and only in
@@ -208,22 +303,52 @@ struct MidiFxSettings
         juce::Array<int> offsets;
     };
 
-    int transpose = 0;              // semitones, -48..48
+    int transpose = 0;              // semitones or scale steps, -48..48
+    juce::String transposeMode = "chromatic"; // chromatic | diatonic
     bool constrainToScale = false;
     int scaleRoot = 0;              // 0..11, C..B
     juce::String scaleType = "major";
     ChordType chord = ChordType::off;
+    int chordInversion = 0;         // 0 = root position, then rotate bottom voices upward
+    ChordVoicing chordVoicing = ChordVoicing::close;
+    bool chordVoiceLeading = false; // choose the nearest inversion/octave to the last chord
     juce::Array<KeyChord> keyChords;
     int velocityFixed = 0;          // 0 = keep played velocity, else 1..127
     float velocityScale = 1.0f;     // 0.1..2.0 applied before the fixed override
 
+    // Velocity / Expression Designer. The input window is the measured useful range of the
+    // named controller; the output window is the range this instrument responds to well.
+    // Nine evenly spaced Y points make a custom response curve without putting arbitrary
+    // scripts on the real-time path. Empty custom arrays read as an identity line.
+    juce::String responseProfileName;  // e.g. "CTRL49 studio"; identity/documentation only
+    ResponseCurve velocityCurve = ResponseCurve::linear;
+    int velocityInputMin = 1;
+    int velocityInputMax = 127;
+    int velocityOutputMin = 1;
+    int velocityOutputMax = 127;
+    juce::Array<int> velocityCurveValues;
+
+    bool expressionEnabled = false;
+    juce::String expressionSource = "cc";  // cc | channel pressure | poly aftertouch
+    int expressionCc = 11;
+    ResponseCurve expressionCurve = ResponseCurve::linear;
+    int expressionInputMin = 0;
+    int expressionInputMax = 127;
+    int expressionOutputMin = 0;
+    int expressionOutputMax = 127;
+    juce::Array<int> expressionCurveValues;
+
     static const char* chordTypeName (ChordType type) noexcept;
     static ChordType chordTypeFromName (const juce::String& name) noexcept;
+    static const char* chordVoicingName (ChordVoicing voicing) noexcept;
+    static ChordVoicing chordVoicingFromName (const juce::String& name) noexcept;
+    static const char* responseCurveName (ResponseCurve curve) noexcept;
+    static ResponseCurve responseCurveFromName (const juce::String& name) noexcept;
 };
 
-/** What the six later MIDI modules need, all in one block for the same reason MidiFxSettings
+/** What the later MIDI note modules need, all in one block for the same reason MidiFxSettings
     is one: a slot carries one settings object per family, and a struct per module would mean
-    six more fields on every slot, six more serializers, and six more things to forget.
+    separate fields on every slot, separate serializers, and more things to forget.
 
     EVERY TIME HERE IS IN BEATS, not milliseconds. The obvious alternative needs a sample rate
     this layer does not have, and would make a strum that is right at 90bpm wrong at 160 —
@@ -231,6 +356,29 @@ struct MidiFxSettings
     share, which is the one timing authority the baseline insists on. */
 struct NoteModuleSettings
 {
+    enum class StrumPattern { ascending = 0, descending, alternate,
+                              outsideIn, insideOut, random };
+
+    /** One named articulation selected by an incoming trigger note. The output channel is
+        zero when the message should follow the trigger channel; bank values are -1 when that
+        half of bank select is intentionally omitted. */
+    struct Articulation
+    {
+        juce::String articulationId;
+        juce::String name { "Articulation" };
+        int triggerNote = 24;
+        int triggerChannel = 0;       // 0 = the part's input channel (or any when the part is omni)
+        juce::String type { "keyswitch" }; // keyswitch | program change | cc
+        int outputChannel = 0;        // 0 = same as the incoming trigger
+        int keyswitchNote = 24;
+        int keyswitchVelocity = 100;
+        int program = 0;              // MIDI value 0..127 (shown as 1..128 in the editor)
+        int bankMsb = -1;             // -1 = do not send CC 0
+        int bankLsb = -1;             // -1 = do not send CC 32
+        int controller = 0;
+        int controllerValue = 127;
+    };
+
     // EVERY DEFAULT HERE IS TRANSPARENT, which is a rule this file already had and these
     // modules nearly broke: an inserted module must not change the sound by existing. So a
     // fresh echo repeats nothing, a fresh strum spreads nothing, a fresh latch latches
@@ -245,11 +393,17 @@ struct NoteModuleSettings
     // Strum: a chord spread in pitch order. 0 = off, and off means the collection window is
     // skipped too — a strum of nothing must not cost the latency of one.
     double strumBeats = 0.0;         // total spread, 0 .. one beat
-    bool strumDown = false;          // false = low note first
+    bool strumDown = false;          // legacy session/command compatibility
+    StrumPattern strumPattern = StrumPattern::ascending;
+    float strumCurve = 0.0f;         // -1 slow start, 0 even, +1 quick start
+    int strumVelocityRamp = 0;       // velocity change from first to last note, -64..64
 
     // Humanize: bounded jitter. Notes move LATER only — earlier would need the future.
     double humanizeTimingBeats = 0.0;
     int humanizeVelocity = 0;        // +/- this much, 0..64
+    int humanizeGatePercent = 0;     // +/- percentage of the played duration, 0..100
+    bool humanizePreserveChords = false; // simultaneous notes share one timing offset
+    bool humanizeProtectBeats = false;   // whole-beat attacks remain on the grid
 
     // Chance: the probability a note passes at all. 1 = everything does.
     float chance = 1.0f;
@@ -262,6 +416,31 @@ struct NoteModuleSettings
     // Latch: the only module that cannot be transparent by doing its job, so it has a switch
     // of its own and starts off.
     bool latchOn = false;
+
+    // MPE transformer: one chosen expression stream enters, one leaves. MPE uses the
+    // standard member-channel axes (bend, CC74 timbre, channel pressure); non-MPE formats
+    // make the lossy poly-to-mono choice explicit through mpeCollapse.
+    bool mpeEnabled = false;
+    juce::String mpeInput = "mpe";              // mpe | poly aftertouch | channel pressure | cc
+    juce::String mpeOutput = "poly aftertouch";
+    juce::String mpeInputAxis = "pressure";     // pressure | timbre | pitch bend
+    juce::String mpeOutputAxis = "pressure";
+    int mpeInputCc = 74;
+    int mpeOutputCc = 74;
+    int mpeOutputChannel = 1;                   // base/manager channel
+    int mpeMemberFirst = 2;
+    int mpeMemberLast = 16;
+    juce::String mpeCollapse = "latest";        // latest | highest | average
+
+    // Articulation manager. It is represented beside the other MIDI modules in the document,
+    // but runs as a control stage around the note chain: triggers are consumed before the zone
+    // and generated messages bypass transpose/chord/scale processors on their way out.
+    bool articulationEnabled = false;
+    juce::String articulationMapName;
+    juce::Array<Articulation> articulations;
+
+    static const char* strumPatternName (StrumPattern pattern) noexcept;
+    static StrumPattern strumPatternFromName (const juce::String& name) noexcept;
 };
 
 // One insert in a part's MIDI chain (the Stage 8 decoupling). The event chain used to be
@@ -279,7 +458,7 @@ struct MidiSlot
     juce::String slotId;
     /** "arp" | "transpose" | "scale" | "chord" | "velocity" | "fx" (the combined legacy
         block, which is what a pre-chain session migrates into) | "echo" | "strum" |
-        "humanize" | "chance" | "length" | "latch". */
+        "humanize" | "chance" | "length" | "latch" | "mpe" | "articulation". */
     juce::String type { "arp" };
     bool bypassed = false;
     ArpSettings arp;
@@ -335,6 +514,9 @@ juce::Array<bool> euclideanPattern (int steps, int pulses, int rotation);
 juce::var patternToVar (const Pattern& pattern);
 bool patternFromVar (const juce::var& stored, Pattern& out);
 
+juce::var grooveTemplateToVar (const GrooveTemplate& groove);
+bool grooveTemplateFromVar (const juce::var& stored, GrooveTemplate& out);
+
 juce::var clipToVar (const Clip& clip);
 bool clipFromVar (const juce::var& stored, Clip& out);
 
@@ -343,6 +525,9 @@ bool sceneFromVar (const juce::var& stored, Scene& out);
 
 juce::var setlistToVar (const Setlist& setlist);
 bool setlistFromVar (const juce::var& stored, Setlist& out);
+
+juce::var arrangementToVar (const Arrangement& arrangement);
+bool arrangementFromVar (const juce::var& stored, Arrangement& out);
 
 juce::var arpToVar (const ArpSettings& arp);
 void arpFromVar (const juce::var& stored, ArpSettings& out);

@@ -159,6 +159,37 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
     }
 }
 
+function Archive-PrivateWorkerSymbols([string]$BuildDir, [string]$SymbolsRoot,
+                                      [string]$Version, [string]$Configuration) {
+    # These files are for support/development only. They deliberately live beside the packaging
+    # tree rather than below StageDir, so neither cmake --install nor Inno can ship them by accident.
+    $workerExe = Join-Path $BuildDir "$Configuration\CEditorPluginWorker.exe"
+    $workerPdb = Join-Path $BuildDir "symbols\$Configuration\CEditorPluginWorker.pdb"
+    if (-not (Test-Path -LiteralPath $workerExe)) {
+        throw "Could not archive worker symbols: $workerExe is missing."
+    }
+    if (-not (Test-Path -LiteralPath $workerPdb)) {
+        throw "Could not archive worker symbols: $workerPdb is missing."
+    }
+
+    $exeHash = (Get-FileHash -LiteralPath $workerExe -Algorithm SHA256).Hash.ToLowerInvariant()
+    $pdbHash = (Get-FileHash -LiteralPath $workerPdb -Algorithm SHA256).Hash.ToLowerInvariant()
+    $archiveDir = Join-Path (Join-Path $SymbolsRoot $Version) $exeHash.Substring(0, 16)
+    New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
+    Copy-Item -LiteralPath $workerPdb -Destination (Join-Path $archiveDir "CEditorPluginWorker.pdb") -Force
+
+    $manifest = [ordered]@{
+        schemaVersion = 1
+        visibility = "private-not-shipped"
+        product = [ordered]@{ name = "CEditor"; version = $Version }
+        binary = [ordered]@{ name = "CEditorPluginWorker.exe"; sha256 = $exeHash }
+        symbols = [ordered]@{ name = "CEditorPluginWorker.pdb"; sha256 = $pdbHash }
+    }
+    $manifest | ConvertTo-Json -Depth 4 |
+        Set-Content -LiteralPath (Join-Path $archiveDir "symbols.json") -Encoding UTF8
+    Write-Host "Archived private worker symbols: $archiveDir (not staged)"
+}
+
 function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string]$Configuration) {
     # The prebuilt player templates -- what makes the installed app able to export with no compiler.
     #
@@ -299,6 +330,7 @@ $repoRoot = Get-RepoRoot
 #   build\package\installer      - the final CEditor-Setup-<ver>.exe
 $stageDir = Join-Path $repoRoot "build\package\stage\CEditor"
 $outputDir = Join-Path $repoRoot "build\package\installer"
+$privateSymbolsDir = Join-Path $repoRoot "build\package\private-symbols"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = Get-ProjectVersion
@@ -309,6 +341,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Build-Frontend -RepoRoot $repoRoot
 Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
+Archive-PrivateWorkerSymbols -BuildDir (Join-Path $repoRoot "build\package\build") `
+    -SymbolsRoot $privateSymbolsDir -Version $Version -Configuration $Configuration
 Build-And-Stage-Templates -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
 Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
 Stage-NodeRuntime -StageDir $stageDir

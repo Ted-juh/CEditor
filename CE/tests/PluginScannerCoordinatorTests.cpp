@@ -1,4 +1,4 @@
-// PluginScannerCoordinatorTests — the out-of-process scan loop (VIP-successor Stage 1).
+// PluginScannerCoordinatorTests — Hostage's out-of-process scan loop.
 //
 // Driven against the stub worker (ScannerStubMain.cpp), whose path arrives as argv[1] from
 // CTest, so every hostile worker behaviour — hang, death, garbage, reported error — runs on

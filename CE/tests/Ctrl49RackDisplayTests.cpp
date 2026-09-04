@@ -1,5 +1,5 @@
 // Ctrl49RackDisplayTests — the rack surface's display payloads and the reducer's normalized
-// control events (VIP-successor Stage 3).
+// Hostage control events.
 //
 // The payloads follow contracts proven live on hardware — set_labels' length-prefixed ASCII
 // strings and the 22-byte set_values state — so what these tests pin is byte positions, caps

@@ -57,6 +57,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#MySourceDir}\CEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MySourceDir}\CEditorPluginScanner.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MySourceDir}\CEditorPluginWorker.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\web\dist\*"; DestDir: "{app}\web\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; The export pipeline + toolchain provisioning scripts, AND a bundled Node runtime (tools\node\node.exe)
 ; so toolchain provisioning/management works with no system Node. Toolchain BINARIES are downloaded on

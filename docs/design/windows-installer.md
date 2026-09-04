@@ -12,6 +12,7 @@ build/
     stage/CEditor/        the assembled install tree — exactly what ships (CEditor.exe, web/dist,
                           tools/node, toolchain scripts, prereq installers)
     installer/            the final CEditor-Setup-<ver>.exe
+    private-symbols/      content-addressed worker PDB archives for support; never shipped
 ```
 
 `native` = the compiled dev build; the `package/` subtree is the release pipeline: **build → stage →
@@ -64,9 +65,16 @@ What the script does:
 2. Configures CMake with `CEDITOR_DEV_MODE=OFF`.
 3. Builds the Release native app.
 4. Stages the install tree into `build\package\stage\CEditor` using `cmake --install`.
-5. Copies `vc_redist.x64.exe` into the staging folder if Visual Studio provides it locally.
-6. Copies `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` into the staging folder if you placed it in `tools\installer\thirdparty\`.
-7. Compiles `tools/installer/CEditor.iss` with Inno Setup 6 if `ISCC.exe` is installed.
+5. Hashes the live-worker executable and matching PDB into
+   `build\package\private-symbols\<version>\<worker-hash>\`; this is outside the install tree.
+6. Copies `vc_redist.x64.exe` into the staging folder if Visual Studio provides it locally.
+7. Copies `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` into the staging folder if you placed it in `tools\installer\thirdparty\`.
+8. Compiles `tools/installer/CEditor.iss` with Inno Setup 6 if `ISCC.exe` is installed.
+
+The symbol archive contains `CEditorPluginWorker.pdb` and a `symbols.json` manifest with SHA-256
+hashes for both the PDB and its exact executable. Keep this directory with release artefacts: it is
+what turns an opted-in worker minidump into symbolic stack frames. It is intentionally absent from
+`stage/CEditor` and from `CEditor.iss`.
 
 If you only want the staged files and not the final installer executable:
 
@@ -79,6 +87,8 @@ powershell -ExecutionPolicy Bypass -File .\tools\scripts\package-installer.ps1 -
 `tools/installer/CEditor.iss` installs:
 
 - `CEditor.exe`
+- `CEditorPluginScanner.exe`
+- `CEditorPluginWorker.exe`
 - `web\dist\...`
 - optional `vc_redist.x64.exe`
 - optional `MicrosoftEdgeWebView2RuntimeInstallerX64.exe`

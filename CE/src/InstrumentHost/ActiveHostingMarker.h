@@ -2,24 +2,21 @@
 
 #include <juce_core/juce_core.h>
 
-// ActiveHostingMarker — evidence, deliberately NOT isolation (Stage 7, §18.9.8).
+// ActiveHostingMarker — startup evidence beside live failover, not process isolation.
 //
-// The baseline is explicit here and it is worth quoting, because the temptation runs the other
-// way: "Active-processing isolation is added only if field crash data justifies real-time
-// audio/MIDI IPC, state recovery and editor forwarding. Do not build it speculatively."
-//
-// So this builds the thing that would justify it, and nothing more. Scanning already has a
-// dead-man marker (PluginScannerCoordinator) that names the module on the plate when a scan
-// died; ACTIVE hosting had none, so a plug-in that crashed the host while playing left no
-// trace beyond the user's memory. This writes the same kind of marker around instantiation and
-// the first moments of a live plug-in's life, and reads it back at the next start.
+// Scanning already has a dead-man marker (PluginScannerCoordinator) that names the module on
+// the plate when a scan died; ACTIVE hosting needs the same evidence when failure happens
+// outside a recoverable C++ exception. This writes that marker around instantiation and the
+// first moments of a live plug-in's life, and reads it back at the next start.
 //
 // What it produces is a count per module: "this one was live when we died, three times". That
 // is the field data §18.9.8 asks for. It is also immediately useful on its own — the same
 // safe-startup story scanning already has — which is why it is not speculative work.
 //
 // What it deliberately does NOT do: move processing out of process, forward editors, or
-// recover state across a boundary. None of that is justified yet, and the baseline says so.
+// recover state across a boundary. Those belong to the live worker/proxy described in
+// docs/design/plugin-process-isolation.md. Until that exists, this marker remains the fallback
+// for failures that terminate the entire host rather than reaching GuardedPluginProcessor.
 
 namespace ceditor::host
 {

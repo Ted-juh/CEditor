@@ -3,7 +3,7 @@
 #include "PluginCatalog.h"
 #include <functional>
 
-// PluginScannerCoordinator — runs the out-of-process VST3 scan (VIP-successor Stage 1).
+// PluginScannerCoordinator — runs Hostage's out-of-process VST3 scan.
 //
 // VST3 modules are third-party executable code, so the editor process never loads one to ask
 // what it contains. The coordinator hands each module to a helper executable

@@ -1,8 +1,8 @@
 <script>
   /**
-   * HostRuntime.svelte — the generated product's whole page (VIP-successor Stage 1).
+   * HostRuntime.svelte — the generated Hostage product's whole page.
    *
-   * One full-viewport Instrument Host workspace over the same bridge events the editor's
+   * One full-viewport Hostage workspace over the same bridge events the editor's
    * preview uses. No tabs, no menus, no authoring chrome: the runtime interface is what the
    * Host Project enables, and in Stage 1 that is the rack.
    */

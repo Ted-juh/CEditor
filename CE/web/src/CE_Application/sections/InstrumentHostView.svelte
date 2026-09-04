@@ -1,6 +1,8 @@
 <script>
+  import '../styles/hostage-theme.css';
+  import HostageLogo from '../components/HostageLogo.svelte';
   /**
-   * InstrumentHostView.svelte — the Instrument Host workspace (VIP-successor Stage 1).
+   * InstrumentHostView.svelte — the Hostage workspace.
    *
    * Left column: the rack — parts in order, click to focus, per-part mixer and the focused
    * part's MIDI zone. Right column: the instrument browser over the native catalogue, the
@@ -11,26 +13,28 @@
    * The native plug-in editor pane is the NEXT increment — loading works from here already,
    * the vendor UI does not show yet.
    */
+  import { onDestroy, tick } from 'svelte';
   import {
     hostState,
     hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, filterEffects, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
-    addRackPart, removeRackPart, focusRackPart, loadInstrument, unloadInstrument,
+    addRackPart, removeRackPart, moveRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
     requestAudioDevices, setAudioDevice, setMidiInputEnabled,
     hostProject, hostBuild, requestHostProject, setHostProject, buildHostProduct,
     hostParameters, emptyHostParameters, filterParameters, requestParameters,
     parameterControlKind, setParameterText, groupParameters, assignedParameterIds, quickLearnParameter,
     setParameter, resetParameter, beginParameterGesture, endParameterGesture,
-    addControlPage, removeControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
+    addControlPage, removeControlPage, renameControlPage, assignControlSlot, clearControlSlot, setControlSlotValue,
     hostMidiLearn, learnControlSlotMidi, cancelMidiLearn, clearControlSlotMidi,
     hostParamLearn, learnControlSlotParameter, cancelLearnControlSlotParameter,
     toggleParameterFavourite, parameterShortlist,
     hostArpStep,
     hostCanvasDrag,
     hostChordLearn, learnKeyChord, cancelKeyChordLearn, clearKeyChord,
-    hostNote,
     walkPartPreset,
+    setPresetAudition, auditionLibraryRecord,
+    startSoundComparison, stepSoundComparison, keepSoundComparison, cancelSoundComparison,
     generateControlPages,
     hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
     saveUserPreset, saveRackToLibrary, saveChainToLibrary,
@@ -38,55 +42,157 @@
     addEffect, removeEffect, moveEffect, setEffectBypassed, openEffectEditor,
     reorderIndexForDrop, setPluginArtwork, clearPluginArtwork, customArtworkIds,
     hostParamDrag,
-    addMacro, removeMacro, setMacroValue, addMacroTarget, removeMacroTarget,
-    addReturn, removeReturn, setReturnLevel, setSendLevel,
+    addMacro, removeMacro, renameMacro, setMacroValue, addMacroTarget, removeMacroTarget, setMacroTargetOptions,
+    addReturn, removeReturn, renameReturn, setReturnLevel, setSendLevel,
     setExtraOut, removeExtraOut, setHardwareConfig, clearHardware, sendHardwareProgram,
     setPartMidiSource, hostKeyboardMode, showPartRange, showKeyboardPlay, partColor, midiSourceWouldLoop,
     captureHardwarePatch, cancelHardwarePatchCapture, finishHardwarePatchCapture,
     clearHardwarePatch, sendHardwarePatch, setHardwareRestorePolicy,
     hostPatchCapture, hostPatchSends, hostPatchPrompt,
     hostPatchCompare, compareHardwarePatch, clearPatchCompare, hostLibrary as hostLibraryStore,
-    transportPlay, transportStop, setTempo, setTimeSignature, setExternalClock,
+    transportPlay, transportContinue, transportStop, setTransportPosition,
+    setTempo, setTimeSignature, setExternalClock,
     setPartArp, setPartMidiFx,
     midiSlotTypes, midiSlotLabels,
     addMidiSlot, removeMidiSlot, moveMidiSlot, setMidiSlotBypassed, setMidiSlotOptions,
+    setStageLock, beginStageUnlock, cancelStageUnlock,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PerformancePanel from './PerformancePanel.svelte';
   import HostMixerPanel from './HostMixerPanel.svelte';
-    import MidiChainPanel from './MidiChainPanel.svelte';
+  import LayerGroupsPanel from './LayerGroupsPanel.svelte';
+  import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
-  import AppWindow from 'lucide-svelte/icons/app-window';
-  import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
-  import Unplug from 'lucide-svelte/icons/unplug';
-  import Trash2 from 'lucide-svelte/icons/trash-2';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
   import LicencePanel from './LicencePanel.svelte';
   import HostKeyboard from './HostKeyboard.svelte';
+  import StageView from './StageView.svelte';
   import { noteName } from '../utils/pianoGeometry.js';
+  import {
+    restoreHostNavigation,
+    storeHostNavigation,
+    toggleHostUtility,
+  } from '../utils/hostNavigation.js';
+  import {
+    clampDockHeight,
+    preferredDockHeight,
+    restoreDockHeights,
+    storeDockHeights,
+  } from '../utils/hostDockSizing.js';
 
   initInstrumentHostBridge();
 
   let search = $state('');
   let newScanPath = $state('');
-  let devicesOpen = $state(false);
-  let projectOpen = $state(false);
   let paramSearch = $state('');
   let paramDiagnostics = $state(false);
-  let libraryOpen = $state(false);
-  // Audition: when on, one click on a library row loads the sound into the focused part AND
-  // plays a short note through the host, so browsing with the mouse is browsing with ears.
-  let auditionOn = $state(false);
+  // Persisted with the Performance: the native side waits for the actual preset commit and
+  // plays the configured phrase into that part alone. This view only edits the recipe.
+  let audition = $derived($hostState.rack.presetAudition);
   let libraryQuery = $state('');
   let libraryType = $state('');
-  let performanceOpen = $state(false);
-  let mixerOpen = $state(false);
-  let productOpen = $state(false);
-  let reliabilityOpen = $state(false);
-  let licenceOpen = $state(false);
+  let hostMode = $state('build');
+  let buildHold = $state(false);
+  let unlockRequested = $state(false);
+  let buildHoldTimer;
+  let pendingDestructive = $state('');
+  let destructiveTimer;
+  const restoredNavigation = restoreHostNavigation();
+  let buildWorkspace = $state(restoredNavigation.workspace);
+  let activeUtility = $state(restoredNavigation.utility);
+
+  const buildWorkspaces = [
+    { id: 'rack', label: 'Rack' },
+    { id: 'performance', label: 'Performance' },
+    { id: 'mixer', label: 'Mixer' },
+    { id: 'layers', label: 'Layers' },
+    { id: 'controller', label: 'Controller' },
+  ];
+  const hostUtilities = [
+    { id: 'library', label: 'Library' },
+    { id: 'devices', label: 'Audio & MIDI' },
+    { id: 'project', label: 'Project' },
+    { id: 'product', label: 'Product' },
+    { id: 'health', label: 'Health' },
+    { id: 'licence', label: 'Edition' },
+  ];
+
+  $effect(() => storeHostNavigation({ workspace: buildWorkspace, utility: activeUtility }));
+  $effect(() => {
+    const lockError = $hostLastError;
+    if ($hostState.stageLocked) {
+      hostMode = 'stage';
+      if (unlockRequested && lockError.includes('Hold Build')) unlockRequested = false;
+    }
+    else if (unlockRequested) {
+      unlockRequested = false;
+      buildHold = false;
+      hostMode = 'build';
+    }
+  });
+
+  function enterStage() {
+    if (hostMode === 'stage') return;
+    hostLastError.set('');
+    hostMode = 'stage';
+    setStageLock(true);
+  }
+
+  function beginBuildHold(event) {
+    if (hostMode !== 'stage' || buildHold) return;
+    if (event?.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+    event?.preventDefault();
+    hostLastError.set('');
+    unlockRequested = false;
+    buildHold = true;
+    beginStageUnlock();
+    clearTimeout(buildHoldTimer);
+    buildHoldTimer = setTimeout(() => {
+      if (!buildHold) return;
+      buildHold = false;
+      unlockRequested = true;
+      setStageLock(false);
+    }, 1000);
+  }
+
+  function cancelBuildHold(event) {
+    if (event?.type === 'keyup' && event.key !== 'Enter' && event.key !== ' ') return;
+    if (!buildHold) return;
+    clearTimeout(buildHoldTimer);
+    buildHold = false;
+    cancelStageUnlock();
+  }
+
+  function guardedAction(key, action) {
+    if (pendingDestructive === key) {
+      clearTimeout(destructiveTimer);
+      pendingDestructive = '';
+      action();
+      return;
+    }
+    pendingDestructive = key;
+    clearTimeout(destructiveTimer);
+    destructiveTimer = setTimeout(() => (pendingDestructive = ''), 5000);
+  }
+
+  onDestroy(() => {
+    clearTimeout(buildHoldTimer);
+    clearTimeout(destructiveTimer);
+    if (buildHold) cancelStageUnlock();
+  });
+  let preparedUtility = '';
+  $effect(() => {
+    const utility = activeUtility;
+    if (!utility) { preparedUtility = ''; return; }
+    if (utility === preparedUtility) return;
+    preparedUtility = utility;
+    if (utility === 'library') requestLibrary(libraryQuery, libraryType);
+    else if (utility === 'devices') requestAudioDevices();
+    else if (utility === 'project') requestHostProject();
+  });
 
   // The rack column has two readings of the same thing: the list you edit from, and the
   // picture of where the sound goes. A toggle rather than a replacement — the list is
@@ -111,7 +217,12 @@
   const hex = (b) => (b < 0 ? '—' : b.toString(16).toUpperCase().padStart(2, '0') + 'h');
   // Which saved patch to compare the part's against.
   let compareRecordId = $state('');
-  let dockHeight = $state(340);   // enough for the arp's two grids without a scrollbar
+  const restoredDockHeights = restoreDockHeights();
+  let dockHeights = $state(restoredDockHeights);
+  let dockHeight = $state(preferredDockHeight('midi'));
+  let buildContentHeight = $state(0);
+  let dockContentElement = $state(null);
+  let dockFitRequest = 0;
   let gripping = $state(false);
   let gripStartY = 0;
   let gripStartHeight = 0;
@@ -125,9 +236,31 @@
   function gripMove(event) {
     if (!gripping) return;
     // Dragging up grows the dock, which is why the delta is inverted.
-    dockHeight = Math.max(140, Math.min(720, gripStartHeight + (gripStartY - event.clientY)));
+    dockHeight = clampDockHeight(gripStartHeight + (gripStartY - event.clientY), buildContentHeight);
   }
-  function gripUp() { gripping = false; }
+  function gripUp() {
+    if (!gripping) return;
+    gripping = false;
+    dockHeights = { ...dockHeights, [dockTab]: dockHeight };
+  }
+
+  async function fitDock(tab = dockTab, forgetManualHeight = false) {
+    if (forgetManualHeight && dockHeights[tab] !== undefined) {
+      const next = { ...dockHeights };
+      delete next[tab];
+      dockHeights = next;
+    }
+    const request = ++dockFitRequest;
+    await tick();
+    if (request !== dockFitRequest || tab !== dockTab || !dockOpen) return;
+    const remembered = dockHeights[tab];
+    const preferred = preferredDockHeight(tab, dockContentElement?.scrollHeight ?? 0, buildContentHeight);
+    dockHeight = clampDockHeight(remembered ?? preferred, buildContentHeight);
+  }
+
+  function resetDockHeight() { void fitDock(dockTab, true); }
+
+  $effect(() => storeDockHeights(dockHeights));
 
   function selectDockTab(id) {
     // Clicking the tab you are on collapses the dock — the same gesture that opened it.
@@ -137,28 +270,14 @@
   }
 
 
-  function playAuditionNote() {
-    // A note the focused part will actually voice: the centre of its key zone, clamped —
-    // middle C is no use to a bass split that ends at B2.
-    const part = focusedPart;
-    const note = part ? Math.round((part.keyLow + part.keyHigh) / 2) : 60;
-    hostNote(note, 100, true);
-    setTimeout(() => hostNote(note, 0, false), 600);
-  }
-
   function clickLibraryRow(record) {
     if (record.type === 'rack' || !record.available) return;
     // One click, loaded: into the focused part, or as the first part of an empty rack.
-    loadLibraryRecord(record.recordId, focusedPart ? 'focused' : 'add');
-    // The common browse case (same plug-in, next sound) applies synchronously, so a short
-    // beat later the note plays the NEW sound. A cross-class load may still be
-    // instantiating — the note then auditions nothing, which is harmless and honest.
-    if (auditionOn) setTimeout(playAuditionNote, 250);
-  }
-
-  function toggleLibrary() {
-    libraryOpen = !libraryOpen;
-    if (libraryOpen) requestLibrary(libraryQuery, libraryType);
+    const action = focusedPart ? 'focused' : 'add';
+    if (audition.enabled && record.type === 'preset')
+      auditionLibraryRecord(record.recordId, action);
+    else
+      loadLibraryRecord(record.recordId, action);
   }
 
   function setLibraryFilter(query, type) {
@@ -167,14 +286,8 @@
     requestLibrary(query, type);
   }
 
-  function toggleDevices() {
-    devicesOpen = !devicesOpen;
-    if (devicesOpen) requestAudioDevices();
-  }
-
-  function toggleProject() {
-    projectOpen = !projectOpen;
-    if (projectOpen) requestHostProject();
+  function chooseUtility(id) {
+    activeUtility = toggleHostUtility(activeUtility, id);
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
@@ -289,6 +402,11 @@
   let scales = $derived($hostState.performance.scales);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
+  let soundComparison = $derived($hostState.rack.soundComparison);
+  let comparisonCandidates = $derived($hostLibrary.records.filter((record) =>
+    record.type === 'preset' && record.available && record.sourceType !== 'hardwarePatch'
+      && focusedPart?.hasInstrument && !focusedPart.hardware
+      && record.targetCeId === focusedPart.pluginCeId).slice(0, 20));
   let lastScanLine = $derived($hostScanLog.at(-1) ?? '');
   let audioLine = $derived(
     $hostState.audio.running
@@ -312,13 +430,11 @@
           : []),
     ...(paramTargetId ? [{ id: 'params', label: 'Params' }] : []),
     { id: 'rack', label: 'Rack' },
-    { id: 'surface', label: 'Surface' },
   ]);
 
   // What the dock is editing, on the tab bar, so the answer is in one fixed place however far
   // the body has been scrolled.
-  let dockSubject = $derived(dockTab === 'surface' ? 'The controller'
-                             : dockTab === 'rack' ? 'Master, returns and macros'
+  let dockSubject = $derived(dockTab === 'rack' ? 'Master, returns and macros'
                              : dockTab === 'params' ? (paramTargetName || 'Parameters')
                              : focusedPart ? partTitle(focusedPart) : 'Nothing focused');
 
@@ -327,6 +443,22 @@
   $effect(() => {
     if (!dockTabs.some((tab) => tab.id === dockTab))
       dockTab = dockTabs[0]?.id ?? 'rack';
+  });
+
+  $effect(() => {
+    if (!dockOpen) return;
+    // These are the changes that materially alter a tab's natural height. Transport pushes do
+    // not belong here: measuring the dock on every beat would turn layout into a metronome.
+    const contentStamp = [
+      dockTab, buildContentHeight, focusedPartId, paramTargetId,
+      focusedPart?.midiSlots?.length ?? 0,
+      focusedPart?.effects?.length ?? 0,
+      visibleParameters.length,
+      $hostState.rack.returns.length,
+      $hostState.rack.macros.length,
+    ].join(':');
+    contentStamp;
+    void fitDock(dockTab);
   });
 
   function toggleEditor(part) {
@@ -402,82 +534,122 @@
 
 <div class="host-workspace" data-testid="instrument-host-workspace">
   <header class="host-header">
-    <div class="host-title">
-      <strong>Instrument Host</strong>
-      <span class="host-subtitle">{audioLine}</span>
+    <div class="host-brand">
+      <span class="host-logo-frame">
+        <HostageLogo />
+      </span>
+      <span class="host-purpose">PLUG-IN HOST · LIVE STAGE</span>
+      <span class="host-audio-status" class:on={$hostState.audio.running} title={audioLine}>
+        <span class="host-status-dot"></span>{audioLine}
+      </span>
     </div>
-    <div class="host-actions">
-      {#if $hostState.scanning}
-        <span class="scan-status" role="status">Scanning… {lastScanLine}</span>
-      {:else if lastScanLine}
-        <span class="scan-status">{lastScanLine}</span>
-      {/if}
-      <button type="button" onclick={() => scanForInstruments()} disabled={$hostState.scanning}
-              data-testid="host-scan">
-        {$hostState.scanning ? 'Scanning…' : 'Scan for instruments'}
-      </button>
+
+    <div class="host-mode" role="group" aria-label="Workspace mode">
+      <button type="button" class="mode-button" class:on={hostMode === 'build'} class:holding={buildHold}
+              title={hostMode === 'stage' ? 'Hold for one second to leave Stage Lock' : 'Build workspace'}
+              aria-label={hostMode === 'stage' ? 'Hold for one second to leave Stage Lock' : 'Build workspace'}
+              onpointerdown={beginBuildHold} onpointerup={cancelBuildHold}
+              onpointerleave={cancelBuildHold} onpointercancel={cancelBuildHold}
+              onkeydown={beginBuildHold} onkeyup={cancelBuildHold}
+              onclick={() => { if (hostMode !== 'stage') hostMode = 'build'; }}
+              data-testid="host-mode-build">{buildHold ? 'Hold…' : 'Build'}</button>
+      <button type="button" class="mode-button" class:on={hostMode === 'stage'}
+              onclick={enterStage} data-testid="host-mode-stage">Stage</button>
+    </div>
+
+    {#if hostMode === 'build'}
+      <div class="host-command-area">
       <!-- The transport is always visible: it is the one clock everything else follows,
            and a player needs to see whether it is running without opening a panel. -->
-      <span class="transport" data-testid="host-transport">
-        <button type="button" class="toggle" class:on={transport.playing}
-                title={transport.playing ? 'Stop' : 'Play'}
-                onclick={() => (transport.playing ? transportStop() : transportPlay())}
-                data-testid="host-transport-play">{transport.playing ? '■' : '▶'}</button>
-        <input type="number" class="tempo" min="20" max="300" step="0.1" value={transport.tempo}
-               aria-label="Tempo" title="Tempo"
-               onchange={(e) => setTempo(Number(e.currentTarget.value))} />
-        <span class="transport-position" title="Bar and beat">{transport.bar}.{transport.beat}</span>
-        <input type="number" class="ts" min="1" max="32" value={transport.numerator}
-               aria-label="Time signature numerator"
-               onchange={(e) => setTimeSignature(Number(e.currentTarget.value), transport.denominator)} />
-        <span class="ts-slash">/</span>
-        <select class="ts" value={transport.denominator} aria-label="Time signature denominator"
-                onchange={(e) => setTimeSignature(transport.numerator, Number(e.currentTarget.value))}>
-          {#each [2, 4, 8, 16] as d (d)}<option value={d}>{d}</option>{/each}
-        </select>
-        <button type="button" class="toggle" class:on={transport.externalClock}
-                class:warn={transport.clockLost}
-                title={transport.clockLost
-                         ? 'External clock selected, but nothing is sending one'
-                         : 'Follow an external MIDI clock'}
-                onclick={() => setExternalClock(!transport.externalClock)}>EXT</button>
-      </span>
-      <button type="button" class="toggle" class:on={performanceOpen}
-              onclick={() => (performanceOpen = !performanceOpen)}
-              data-testid="host-performance">Performance</button>
-      <button type="button" class="toggle" class:on={mixerOpen}
-              onclick={() => (mixerOpen = !mixerOpen)}
-              data-testid="host-mixer-toggle">Mixer</button>
-      <button type="button" class="toggle" class:on={productOpen}
-              onclick={() => (productOpen = !productOpen)}
-              data-testid="host-product">Product</button>
-      <button type="button" class="toggle" class:on={reliabilityOpen}
-              class:warn={$hostState.reliability.recovery.interrupted
-                          || $hostState.reliability.safeMode.level !== 'normal'}
-              title={$hostState.reliability.recovery.interrupted
-                       ? 'The last run stopped without finishing'
-                       : $hostState.reliability.safeMode.level !== 'normal'
-                         ? 'Safe startup is on'
-                         : 'Safe startup, recovery and the support bundle'}
-              onclick={() => (reliabilityOpen = !reliabilityOpen)}
-              data-testid="host-reliability">Health</button>
-      <button type="button" class="toggle" class:on={licenceOpen}
-              title="What this edition includes, and what it never takes away"
-              onclick={() => (licenceOpen = !licenceOpen)}
-              data-testid="host-licence">{$hostState.licence.editionLabel}</button>
-      <button type="button" class="toggle" class:on={libraryOpen} onclick={toggleLibrary}
-              data-testid="host-library">Library</button>
-      <button type="button" class="toggle" class:on={devicesOpen} onclick={toggleDevices}
-              data-testid="host-devices">Audio &amp; MIDI</button>
-      <button type="button" class="toggle" class:on={projectOpen} onclick={toggleProject}
-              data-testid="host-project">Project</button>
-      <button type="button" class="panic" title="All notes off, every part" onclick={() => hostPanic()}>
-        Panic
-      </button>
-    </div>
+        <div class="host-transport-group">
+          <span class="header-group-label">Transport</span>
+          <span class="transport" data-testid="host-transport">
+            <button type="button" class="toggle" class:on={transport.playing}
+                    title={transport.playing ? 'Stop' : 'Play from the beginning'}
+                    onclick={() => (transport.playing ? transportStop() : transportPlay())}
+                    data-testid="host-transport-play">{transport.playing ? '■' : '▶'}</button>
+            <button type="button" class="ghost transport-action" disabled={transport.playing}
+                    title="Continue from the current position" aria-label="Continue playback"
+                    onclick={() => transportContinue()}>▷</button>
+            <button type="button" class="ghost transport-action"
+                    title="Return to the beginning" aria-label="Return transport to start"
+                    onclick={() => setTransportPosition(0)}>↤</button>
+            <input type="number" class="tempo" min="20" max="300" step="0.1" value={transport.tempo}
+                   aria-label="Tempo" title="Tempo"
+                   onchange={(e) => setTempo(Number(e.currentTarget.value))} />
+            <span class="transport-position" title="Bar and beat">{transport.bar}.{transport.beat}</span>
+            <input type="number" class="ts" min="1" max="32" value={transport.numerator}
+                   aria-label="Time signature numerator"
+                   onchange={(e) => setTimeSignature(Number(e.currentTarget.value), transport.denominator)} />
+            <span class="ts-slash">/</span>
+            <select class="ts" value={transport.denominator} aria-label="Time signature denominator"
+                    onchange={(e) => setTimeSignature(transport.numerator, Number(e.currentTarget.value))}>
+              {#each [2, 4, 8, 16] as d (d)}<option value={d}>{d}</option>{/each}
+            </select>
+            <button type="button" class="toggle" class:on={transport.externalClock}
+                    class:warn={transport.clockLost}
+                    title={transport.clockLost
+                             ? 'External clock selected, but nothing is sending one'
+                             : 'Follow an external MIDI clock'}
+                    onclick={() => setExternalClock(!transport.externalClock)}>EXT</button>
+          </span>
+        </div>
+        <div class="host-global-actions">
+          {#if $hostState.scanning}
+            <span class="scan-status" role="status">Scanning plug-ins… {lastScanLine}</span>
+          {:else if lastScanLine}
+            <span class="scan-status">{lastScanLine}</span>
+          {/if}
+          <button type="button" class="panic" title="All notes off, every part" onclick={() => hostPanic()}>
+            Panic
+          </button>
+        </div>
+      </div>
+    {:else}
+      <div class="stage-header-actions">
+        <span class="stage-header-hint">
+          {$hostState.stageLocked ? 'Stage Lock active · hold Build to edit' : 'Engaging Stage Lock…'}
+        </span>
+      </div>
+    {/if}
   </header>
 
-  {#if devicesOpen}
+  {#if hostMode === 'stage'}
+    <StageView />
+  {:else}
+  <nav class="build-navigation" aria-label="Build navigation">
+    <div class="workspace-tabs" role="group" aria-label="Primary workspace">
+      {#each buildWorkspaces as workspace (workspace.id)}
+        <button type="button" class="navigation-tab" class:on={buildWorkspace === workspace.id}
+                aria-current={buildWorkspace === workspace.id ? 'page' : undefined}
+                data-testid={`host-workspace-${workspace.id}`}
+                onclick={() => (buildWorkspace = workspace.id)}>{workspace.label}</button>
+      {/each}
+    </div>
+    <div class="utility-tabs" role="group" aria-label="Utilities">
+      <span class="navigation-label">Utilities</span>
+      {#each hostUtilities as utility (utility.id)}
+        <button type="button" class="utility-tab" class:on={activeUtility === utility.id}
+                class:warn={utility.id === 'health'
+                            && ($hostState.reliability.recovery.interrupted
+                                || $hostState.reliability.safeMode.level !== 'normal')}
+                data-testid={`host-utility-${utility.id}`}
+                onclick={() => chooseUtility(utility.id)}>{utility.label}</button>
+      {/each}
+    </div>
+  </nav>
+
+  <div class="build-content" bind:clientHeight={buildContentHeight}>
+  {#if activeUtility}
+  <aside class="utility-drawer" data-testid="host-utility-drawer"
+         aria-label={`${hostUtilities.find((utility) => utility.id === activeUtility)?.label ?? 'Utility'} drawer`}>
+    <div class="utility-drawer-head">
+      <strong>{hostUtilities.find((utility) => utility.id === activeUtility)?.label}</strong>
+      <button type="button" class="ghost utility-close" aria-label="Close utility drawer"
+              data-testid="host-utility-close" onclick={() => (activeUtility = '')}>×</button>
+    </div>
+    <div class="utility-drawer-body">
+  {#if activeUtility === 'devices'}
     <div class="device-panel" aria-label="Audio and MIDI devices">
       <label class="device-output">Output
         <select value={$hostAudioDevices.current}
@@ -536,29 +708,19 @@
     </div>
   {/if}
 
-  {#if performanceOpen}
-    <PerformancePanel />
-  {/if}
-
-  {#if mixerOpen}
-    <HostMixerPanel />
-  {/if}
-
-  {#if productOpen}
+  {#if activeUtility === 'product'}
     <ProductPanel />
   {/if}
 
-  {#if reliabilityOpen}
+  {#if activeUtility === 'health'}
     <ReliabilityPanel />
   {/if}
 
-  {#if licenceOpen}
+  {#if activeUtility === 'licence'}
     <LicencePanel />
   {/if}
 
-  <HostKeyboard />
-
-  {#if libraryOpen}
+  {#if activeUtility === 'library'}
     <div class="library-panel" data-testid="host-library-panel" aria-label="Library">
       <div class="library-head">
         <input type="search" placeholder="Search sounds, chains and racks…" value={libraryQuery}
@@ -569,13 +731,79 @@
                     onclick={() => setLibraryFilter(libraryQuery, value)}>{label}</button>
           {/each}
         </span>
-        <button type="button" class="toggle" class:on={auditionOn} data-testid="host-audition"
-                title="When on, clicking a sound loads it into the focused part and plays a short note"
-                onclick={() => (auditionOn = !auditionOn)}>♪ Audition</button>
+        <button type="button" class="toggle" class:on={audition.enabled}
+                class:playing={audition.playing} data-testid="host-audition"
+                title="When on, clicking a preset loads it and plays the configured phrase on that part"
+                onclick={() => setPresetAudition({ enabled: !audition.enabled })}>
+          {audition.playing ? '♪ Playing…' : '♪ Audition'}
+        </button>
+        <button type="button" onclick={() => scanForInstruments()} disabled={$hostState.scanning}
+                data-testid="host-scan">
+          {$hostState.scanning ? 'Scanning plug-ins…' : 'Scan plug-ins'}
+        </button>
         <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
         <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
         <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.chains} chains · {$hostLibrary.counts.racks} racks</span>
       </div>
+
+      {#if audition.enabled}
+        <div class="audition-config" data-testid="host-audition-config">
+          <strong>Audition phrase</strong>
+          <label>Phrase
+            <select value={audition.phrase}
+                    onchange={(e) => setPresetAudition({ phrase: e.currentTarget.value })}>
+              <option value="single">Single note</option>
+              <option value="chord">Major chord</option>
+              <option value="scale">Major scale</option>
+              <option value="riff">Short riff</option>
+            </select>
+          </label>
+          <label>Root
+            <span class="number-with-note">
+              <input type="number" min="0" max="127" value={audition.rootNote}
+                     onchange={(e) => setPresetAudition({ rootNote: Number(e.currentTarget.value) })} />
+              <small>{noteName(audition.rootNote)}</small>
+            </span>
+          </label>
+          <label>Velocity
+            <input type="number" min="1" max="127" value={audition.velocity}
+                   onchange={(e) => setPresetAudition({ velocity: Number(e.currentTarget.value) })} />
+          </label>
+          <label>Length
+            <span class="number-unit"><input type="number" min="40" max="4000" step="10"
+                     value={audition.noteLengthMs}
+                     onchange={(e) => setPresetAudition({ noteLengthMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
+          </label>
+          {#if audition.phrase === 'scale' || audition.phrase === 'riff'}
+            <label>Gap
+              <span class="number-unit"><input type="number" min="0" max="2000" step="10"
+                       value={audition.gapMs}
+                       onchange={(e) => setPresetAudition({ gapMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
+            </label>
+          {/if}
+          <span class="audition-help">Click a preset name to load and hear it.</span>
+        </div>
+      {/if}
+
+      {#if soundComparison.active}
+        <div class="sound-compare" data-testid="host-sound-comparison">
+          <span class="compare-slot">{soundComparison.index + 1}<small>/{soundComparison.count}</small></span>
+          <span class="compare-copy">
+            <small>Sound Comparison · original: {soundComparison.originalName}</small>
+            <strong>{soundComparison.name || 'Preset unavailable'}</strong>
+          </span>
+          <button type="button" class="ghost" title="Previous preset"
+                  onclick={() => stepSoundComparison(-1)}>‹ Previous</button>
+          <button type="button" class="ghost" title="Next preset"
+                  onclick={() => stepSoundComparison(1)}>Next ›</button>
+          <button type="button" class="compare-keep" onclick={() => keepSoundComparison()}>
+            Keep this sound
+          </button>
+          <button type="button" class="ghost" onclick={() => cancelSoundComparison()}>
+            Cancel · restore original
+          </button>
+        </div>
+      {/if}
 
       <div class="library-capture">
         <!-- A hardware part saves the patch it captured. The Library is where a sound lives
@@ -601,13 +829,26 @@
         <button type="button" onclick={() => saveRackToLibrary()} data-testid="host-save-rack">
           Save rack to library
         </button>
+        <button type="button" data-testid="host-start-sound-comparison"
+                disabled={soundComparison.active || comparisonCandidates.length < 2}
+                title={comparisonCandidates.length >= 2
+                  ? `Compare ${comparisonCandidates.length} visible presets with the audition phrase`
+                  : 'Show at least two presets for the focused instrument'}
+                onclick={() => startSoundComparison(focusedPart.partId,
+                  comparisonCandidates.map((record) => record.recordId))}>
+          Compare visible ({comparisonCandidates.length})
+        </button>
       </div>
 
       {#if $hostLibrary.paths.length > 0}
         <div class="library-paths">
           {#each $hostLibrary.paths as path (path)}
             <span class="scan-path"><span>{path}</span>
-              <button type="button" class="ghost danger" onclick={() => removeLibraryPath(path)}>×</button></span>
+            <button type="button" class="ghost danger" class:confirming={pendingDestructive === `library-path:${path}`}
+                    title={pendingDestructive === `library-path:${path}` ? 'Click again to confirm' : 'Remove this library folder'}
+                    onclick={() => guardedAction(`library-path:${path}`, () => removeLibraryPath(path))}>
+              {pendingDestructive === `library-path:${path}` ? 'Confirm' : '×'}
+            </button></span>
           {/each}
         </div>
       {/if}
@@ -622,7 +863,8 @@
 
       <div class="library-list">
         {#each $hostLibrary.records as record (record.recordId)}
-          <div class="library-row" class:unavailable={!record.available}>
+          <div class="library-row" class:unavailable={!record.available}
+               class:comparing={soundComparison.active && soundComparison.recordId === record.recordId}>
             <button type="button" class="ghost star" class:on={record.favourite}
                     title={record.favourite ? 'Unfavourite' : 'Favourite'}
                     onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>
@@ -637,7 +879,8 @@
                  title={record.type === 'rack' ? undefined
                         : record.type === 'chain'
                           ? 'Click: load the whole chain into the focused part'
-                          : auditionOn ? 'Click: load into the focused part and audition'
+                          : audition.enabled && record.type === 'preset'
+                            ? 'Click: load into the focused part and audition'
                                        : 'Click: load into the focused part'}
                  onclick={() => clickLibraryRow(record)}
                  onkeydown={(e) => e.key === 'Enter' && clickLibraryRow(record)}>
@@ -667,8 +910,12 @@
                       onclick={() => loadLibraryRecord(record.recordId, 'add')}>+ Part</button>
             {/if}
             {#if !record.factory}
-              <button type="button" class="ghost danger" title="Remove this record"
-                      onclick={() => removeLibraryRecord(record.recordId)}>×</button>
+              <button type="button" class="ghost danger" class:confirming={pendingDestructive === `library-record:${record.recordId}`}
+                      title={pendingDestructive === `library-record:${record.recordId}` ? 'Click again to confirm' : 'Remove this record'}
+                      onclick={() => guardedAction(`library-record:${record.recordId}`,
+                        () => removeLibraryRecord(record.recordId))}>
+                {pendingDestructive === `library-record:${record.recordId}` ? 'Confirm' : '×'}
+              </button>
             {/if}
           </div>
         {/each}
@@ -676,7 +923,7 @@
     </div>
   {/if}
 
-  {#if projectOpen}
+  {#if activeUtility === 'project'}
     <div class="project-panel" aria-label="Host Project">
       <div class="project-fields">
         <label class="project-field">Product name
@@ -710,6 +957,9 @@
       {/if}
     </div>
   {/if}
+    </div>
+  </aside>
+  {/if}
 
   {#if $hostLastError}
     <div class="host-error" role="alert">
@@ -737,6 +987,27 @@
     </div>
   {/if}
 
+  {#if buildWorkspace === 'rack' || buildWorkspace === 'mixer' || buildWorkspace === 'layers'}
+    <HostKeyboard />
+  {/if}
+
+  {#if buildWorkspace === 'performance'}
+    <main class="primary-workspace" data-testid="host-primary-performance">
+      <PerformancePanel />
+    </main>
+  {:else if buildWorkspace === 'mixer'}
+    <main class="primary-workspace" data-testid="host-primary-mixer">
+      <HostMixerPanel />
+    </main>
+  {:else if buildWorkspace === 'layers'}
+    <main class="primary-workspace" data-testid="host-primary-layers">
+      <LayerGroupsPanel />
+    </main>
+  {:else if buildWorkspace === 'controller'}
+    <main class="primary-workspace controller-workspace" data-testid="host-primary-controller">
+      <HostSurfacePanel />
+    </main>
+  {:else}
   <div class="host-columns">
     <section class="rack-column" aria-label="Instrument rack">
       <div class="column-head">
@@ -773,30 +1044,73 @@
             </button>
           {/if}
           <div class="part-body">
-          <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
-            <span class="part-name">{partTitle(part)}</span>
-            <span class="part-vendor">{part.pluginVendor}</span>
-          </button>
-          {#if (part.hasInstrument && !part.hardware) || part.hardware}
-            <!-- The VIP front-panel walk: every library preset for this plug-in — factory
-                 program list, vendor files, captured state — in one order, wrapping. A
-                 hardware part walks the patches captured from the same synth, which is a
-                 preset browser on a box that never had one. -->
-            <span class="preset-walk" data-testid="part-preset-walk">
-              <button type="button" class="ghost" title={part.hardware ? 'Previous patch' : 'Previous preset'}
-                      onclick={() => walkPartPreset(part.partId, -1)}>‹</button>
-              <span class="preset-name" title={part.presetName
-                      ? `Loaded ${part.hardware ? 'patch' : 'preset'}: ${part.presetName}`
-                      : part.hardware
-                        ? 'No library patch loaded yet — capture one, save it, then walk'
-                        : 'No preset loaded yet — walk or pick one from the library'}>
-                {part.presetName || (part.hardware ? '— no patch —' : '— no preset —')}
-              </span>
-              <button type="button" class="ghost" title={part.hardware ? 'Next patch' : 'Next preset'}
-                      onclick={() => walkPartPreset(part.partId, 1)}>›</button>
+          <div class="part-head">
+            <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
+              <span class="part-name">{partTitle(part)}</span>
+              <span class="part-vendor">{part.pluginVendor || (part.hardware ? part.midiOutputName : 'Ready for an instrument')}</span>
+            </button>
+            <span class="part-states" aria-label="Part state">
+              {#if part.unresolved}<span class="part-state problem">Missing</span>{/if}
+              {#if !part.enabled}<span class="part-state off">Off</span>{/if}
+              {#if part.mute}<span class="part-state muted">Muted</span>{/if}
+              {#if part.solo}<span class="part-state soloed">Solo</span>{/if}
             </span>
-          {/if}
-          <div class="part-controls">
+            <details class="part-actions" data-testid="part-actions">
+              <summary title="Editor and part actions" aria-label={`Actions for ${partTitle(part)}`}>•••</summary>
+              <div class="part-action-menu">
+                <button type="button" class="ghost" disabled={partIndex === 0}
+                        onclick={() => moveRackPart(part.partId, partIndex - 1)}>Move up</button>
+                <button type="button" class="ghost" disabled={partIndex === parts.length - 1}
+                        onclick={() => moveRackPart(part.partId, partIndex + 1)}>Move down</button>
+                {#if part.hasInstrument}
+                  <button type="button" class="toggle" class:on={$hostState.editorOpenPartId === part.partId}
+                          title="Show the plug-in's own interface in the native pane"
+                          onclick={() => toggleEditor(part)}>Editor</button>
+                  <button type="button" class="toggle"
+                          class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
+                          data-testid="part-float-editor"
+                          title="Pop the plug-in's interface out into its own window"
+                          onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
+                                            ? closeEditorWindow(part.partId)
+                                            : floatEditor(part.partId))}>Floating editor</button>
+                  <button type="button" class="ghost" class:confirming={pendingDestructive === `unload:${part.partId}`}
+                          title={pendingDestructive === `unload:${part.partId}`
+                            ? 'Click again to confirm unload' : 'Unload the instrument, keep the part'}
+                          onclick={() => guardedAction(`unload:${part.partId}`,
+                            () => unloadInstrument(part.partId))}>
+                    {pendingDestructive === `unload:${part.partId}` ? 'Confirm unload' : 'Unload instrument'}
+                  </button>
+                {/if}
+                <button type="button" class="ghost danger" class:confirming={pendingDestructive === `part:${part.partId}`}
+                        title={pendingDestructive === `part:${part.partId}`
+                          ? 'Click again to confirm removal' : 'Remove this part'}
+                        onclick={() => guardedAction(`part:${part.partId}`,
+                          () => removeRackPart(part.partId))}>
+                  {pendingDestructive === `part:${part.partId}` ? 'Confirm remove' : 'Remove part'}
+                </button>
+              </div>
+            </details>
+          </div>
+          <div class="part-performance">
+            {#if (part.hasInstrument && !part.hardware) || part.hardware}
+              <!-- Preset walking stays in the performance layer: it changes the sound, but not
+                   the rack structure. Its fixed centre prevents a long preset name from
+                   pushing Mute, Solo or the faders away. -->
+              <span class="preset-walk" data-testid="part-preset-walk">
+                <button type="button" class="ghost" title={part.hardware ? 'Previous patch' : 'Previous preset'}
+                        onclick={() => walkPartPreset(part.partId, -1)}>‹</button>
+                <span class="preset-name" title={part.presetName
+                        ? `Loaded ${part.hardware ? 'patch' : 'preset'}: ${part.presetName}`
+                        : part.hardware
+                          ? 'No library patch loaded yet — capture one, save it, then walk'
+                          : 'No preset loaded yet — walk or pick one from the library'}>
+                  {part.presetName || (part.hardware ? '— no patch —' : '— no preset —')}
+                </span>
+                <button type="button" class="ghost" title={part.hardware ? 'Next patch' : 'Next preset'}
+                        onclick={() => walkPartPreset(part.partId, 1)}>›</button>
+              </span>
+            {/if}
+            <div class="part-controls">
             <button type="button" class="toggle range-button"
                     class:on={$hostKeyboardMode.mode === 'range' && $hostKeyboardMode.partId === part.partId}
                     style={`--part-color:${partColor(partIndex)}`}
@@ -807,11 +1121,11 @@
               {noteName(part.keyLow)}–{noteName(part.keyHigh)}
             </button>
             <button type="button" class="toggle" class:on={part.enabled} title="Part enabled (off panics its notes)"
-                    onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>On</button>
+                    onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>Active</button>
             <button type="button" class="toggle" class:on={part.mute} title="Mute (audio only; notes keep running)"
-                    onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>M</button>
+                    onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>Mute</button>
             <button type="button" class="toggle" class:on={part.solo} title="Solo"
-                    onclick={() => setPartMixer(part.partId, { solo: !part.solo })}>S</button>
+                    onclick={() => setPartMixer(part.partId, { solo: !part.solo })}>Solo</button>
             <!-- Two sliders with nothing written on them were two sliders nobody could name.
                  The word is the label; the number is in the tooltip, where it is wanted
                  while dragging and not otherwise. -->
@@ -825,63 +1139,8 @@
               <input type="range" min="-1" max="1" step="0.01" value={part.pan} aria-label="Pan"
                      oninput={(e) => setPartMixer(part.partId, { pan: Number(e.currentTarget.value) })} />
             </label>
+            </div>
           </div>
-          </div>
-          <!-- The four things you came to the rack to press, in a strip of their own outside
-               the part's body. They used to be the last items INSIDE .part-controls, behind
-               the range button, On/M/S and two sliders — in a wrapping flex sharing the window
-               50/50 with the browser column, so on a narrow enough one they dropped to a
-               second line, at a different x on every row depending on how long the plug-in was
-               called and whether the preset walk was showing. Nothing was ever collapsed into
-               a menu, but a control that moves every row is a control you have to hunt for,
-               which is the same cost.
-
-               Out here they cannot wrap and cannot be pushed: same place, every row. That is
-               the rule the insert rows already state further down ("Controls first, name
-               after … the mouse travels a fixed short distance"), applied to the surface it
-               matters most on.
-
-               Icons, not words: "Editor" and "Unload" were the two widest things in the row,
-               and ⧉ for the floating window was a glyph nobody could be expected to read.
-               The words all survive in the tooltips and the aria-labels.
-
-               The first one is a WINDOW, not a row of sliders. It was lucide's
-               sliders-horizontal for about an hour — three horizontal lines with a dot on
-               each — and at 15px that is a three-dot menu button to every eye that has ever
-               used software. Reintroducing the affordance this change exists to remove is a
-               bug however good the metaphor was, so the pair is now a window shown here and
-               a window popped out, which is the actual difference between the two.
-
-               A part with no instrument still draws all four, disabled rather than absent — a
-               strip whose width depends on the row is a strip you have to find again on the
-               next one. -->
-          <div class="part-actions" data-testid="part-actions">
-            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
-                    class:on={$hostState.editorOpenPartId === part.partId}
-                    data-testid="part-open-editor"
-                    aria-label={`Show ${partTitle(part)}'s own interface in the host`}
-                    title="Show the plug-in's own interface in the native pane"
-                    onclick={() => toggleEditor(part)}><AppWindow size={15} strokeWidth={1.8} /></button>
-            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
-                    class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
-                    data-testid="part-float-editor"
-                    aria-label={`Pop ${partTitle(part)}'s interface out into its own window`}
-                    title="Pop the plug-in's interface out into its own window — several parts can float at once"
-                    onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
-                                      ? closeEditorWindow(part.partId)
-                                      : floatEditor(part.partId))}><PictureInPicture2 size={15} strokeWidth={1.8} /></button>
-            <button type="button" class="toggle icon" disabled={!part.hasInstrument}
-                    data-testid="part-unload"
-                    aria-label={`Unload ${partTitle(part)}'s instrument, keep the part`}
-                    title="Unload the instrument, keep the part"
-                    onclick={() => unloadInstrument(part.partId)}><Unplug size={15} strokeWidth={1.8} /></button>
-            <!-- The one that destroys work does not sit flush against the three that do not. -->
-            <span class="action-sep" aria-hidden="true"></span>
-            <button type="button" class="toggle icon danger"
-                    data-testid="part-remove"
-                    aria-label={`Remove ${partTitle(part)} from the rack`}
-                    title="Remove this part"
-                    onclick={() => removeRackPart(part.partId)}><Trash2 size={15} strokeWidth={1.8} /></button>
           </div>
         </div>
       {/each}
@@ -1010,7 +1269,11 @@
         {#each $hostState.scanPaths as path (path)}
           <div class="scan-path">
             <span>{path}</span>
-            <button type="button" class="ghost danger" onclick={() => removeScanPath(path)}>×</button>
+              <button type="button" class="ghost danger" class:confirming={pendingDestructive === `scan-path:${path}`}
+                      title={pendingDestructive === `scan-path:${path}` ? 'Click again to confirm' : 'Remove this scan folder'}
+                      onclick={() => guardedAction(`scan-path:${path}`, () => removeScanPath(path))}>
+                {pendingDestructive === `scan-path:${path}` ? 'Confirm' : '×'}
+              </button>
           </div>
         {/each}
       </div>
@@ -1035,12 +1298,18 @@
           <div class="page-tabs">
             {#each pages as page (page.pageId)}
               <span class="page-tab" class:on={selectedPage?.pageId === page.pageId}>
-                <button type="button" class="page-name" onclick={() => (selectedPageId = page.pageId)}
-                        title={page.generated ? 'Generated — regenerating replaces this page' : undefined}>
-                  {page.name}{#if page.generated}<span class="page-auto"> · auto</span>{/if}
+                <input type="text" class="page-name" value={page.name}
+                       aria-label="Control page name"
+                       title={page.generated ? 'Generated — regenerating replaces this page' : 'Rename control page'}
+                       onfocus={() => (selectedPageId = page.pageId)}
+                       onclick={() => (selectedPageId = page.pageId)}
+                       onchange={(e) => renameControlPage(page.pageId, e.currentTarget.value)} />
+                {#if page.generated}<span class="page-auto">auto</span>{/if}
+                <button type="button" class="ghost danger" class:confirming={pendingDestructive === `page:${page.pageId}`}
+                        title={pendingDestructive === `page:${page.pageId}` ? 'Click again to confirm' : 'Remove this page'}
+                        onclick={() => guardedAction(`page:${page.pageId}`, () => removeControlPage(page.pageId))}>
+                  {pendingDestructive === `page:${page.pageId}` ? 'Confirm' : '×'}
                 </button>
-                <button type="button" class="ghost danger" title="Remove this page"
-                        onclick={() => removeControlPage(page.pageId)}>×</button>
               </span>
             {/each}
           </div>
@@ -1059,8 +1328,12 @@
                     {:else}
                       <span class="slot-warning">unresolved — the part no longer carries this plug-in</span>
                     {/if}
-                    <button type="button" class="ghost danger" title="Clear this slot"
-                            onclick={() => clearControlSlot(selectedPage.pageId, slot.slotId)}>×</button>
+                    <button type="button" class="ghost danger" class:confirming={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}`}
+                            title={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to confirm' : 'Clear this slot'}
+                            onclick={() => guardedAction(`slot:${selectedPage.pageId}:${slot.slotId}`,
+                              () => clearControlSlot(selectedPage.pageId, slot.slotId))}>
+                      {pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Confirm' : '×'}
+                    </button>
                   {:else}
                     <span class="slot-empty">empty — assign from the parameter list (→)</span>
                   {/if}
@@ -1077,8 +1350,12 @@
                       <span class="midi-cc"
                             title={`This slot follows CC ${slot.midiCc}${slot.midiChannel ? ` on channel ${slot.midiChannel}` : ' on any channel'}`}>
                         CC {slot.midiCc}{slot.midiChannel ? ` · ch ${slot.midiChannel}` : ''}
-                        <button type="button" class="ghost danger" title="Remove the MIDI binding"
-                                onclick={() => clearControlSlotMidi(selectedPage.pageId, slot.slotId)}>×</button>
+                        <button type="button" class="ghost danger" class:confirming={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}`}
+                                title={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to confirm' : 'Remove the MIDI binding'}
+                                onclick={() => guardedAction(`midi-slot:${selectedPage.pageId}:${slot.slotId}`,
+                                  () => clearControlSlotMidi(selectedPage.pageId, slot.slotId))}>
+                          {pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}` ? 'Confirm' : '×'}
+                        </button>
                       </span>
                     {/if}
                     <button type="button" class="ghost midi-learn"
@@ -1121,9 +1398,11 @@
        style={dockOpen ? `height:${dockHeight}px` : null} aria-label="Editor dock">
     {#if dockOpen}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="dock-grip" role="separator" aria-label="Resize the dock"
+      <div class="dock-grip" role="separator" aria-label="Resize the dock" aria-orientation="horizontal"
+           title="Drag to resize · double-click to fit this tab"
            onpointerdown={gripDown} onpointermove={gripMove}
-           onpointerup={gripUp} onpointercancel={gripUp}></div>
+           onpointerup={gripUp} onpointercancel={gripUp}
+           ondblclick={resetDockHeight}></div>
     {/if}
 
     <div class="dock-tabs">
@@ -1140,6 +1419,7 @@
 
     {#if dockOpen}
       <div class="dock-body" data-testid="dock-body">
+        <div class="dock-body-content" bind:this={dockContentElement}>
         <!-- Declared before anything renders it: the insert chain is drawn three times
              here (a part, the master, each return) and it is one shape. -->
           {#snippet effectChain(chain, chainId, title, testId)}
@@ -1198,8 +1478,11 @@
                           class:on={paramTargetId === effect.effectId}
                           title="Inspect this effect's parameters"
                           onclick={() => { paramTargetId = effect.effectId; selectDockTab('params'); }}>P</button>
-                  <button type="button" class="ghost danger" title="Remove this effect"
-                          onclick={() => removeEffect(effect.effectId)}>×</button>
+                  <button type="button" class="ghost danger" class:confirming={pendingDestructive === `effect:${effect.effectId}`}
+                          title={pendingDestructive === `effect:${effect.effectId}` ? 'Click again to confirm' : 'Remove this effect'}
+                          onclick={() => guardedAction(`effect:${effect.effectId}`, () => removeEffect(effect.effectId))}>
+                    {pendingDestructive === `effect:${effect.effectId}` ? 'Confirm' : '×'}
+                  </button>
                   <span class="fx-name" title={effect.pluginVendor}>
                     {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
                   </span>
@@ -1542,6 +1825,7 @@
                      hardware is spatial work, and "this knob" is a position rather than a row
                      in a list. The row keeps working exactly as it did for everything else. -->
                 <div class="param-row" class:assigned={assignedIds.has(parameter.id)}
+                     role="group" aria-label={`${parameter.name} parameter`}
                      draggable="true"
                      ondragstart={(e) => {
                        hostParamDrag.set({ partId: paramTargetId, parameterId: parameter.id,
@@ -1666,8 +1950,6 @@
             </div>
           </div>
         {/if}
-        {:else if dockTab === 'surface'}
-          <HostSurfacePanel />
         {:else if dockTab === 'rack'}
         {@render effectChain($hostState.rack.masterEffects, 'master',
                              `Master effects${latencySuffix($hostState.rack.masterLatencyMs)}`)}
@@ -1681,14 +1963,19 @@
           {#each $hostState.rack.returns as ret (ret.returnId)}
             <div class="return-block">
               <div class="fx-head">
-                <span class="send-name">{ret.name}</span>
+                <input type="text" class="send-name editable-name" value={ret.name}
+                       aria-label="Return name" title="Rename return"
+                       onchange={(e) => renameReturn(ret.returnId, e.currentTarget.value)} />
                 <label class="mini return-level" title="Return level">
                   <input type="range" min="0" max="2" step="0.01" value={ret.level}
                          aria-label={`${ret.name} level`}
                          oninput={(e) => setReturnLevel(ret.returnId, Number(e.currentTarget.value))} />
                 </label>
-                <button type="button" class="ghost danger" title="Remove this return (its sends go with it)"
-                        onclick={() => removeReturn(ret.returnId)}>×</button>
+                <button type="button" class="ghost danger" class:confirming={pendingDestructive === `return:${ret.returnId}`}
+                        title={pendingDestructive === `return:${ret.returnId}` ? 'Click again to confirm' : 'Remove this return (its sends go with it)'}
+                        onclick={() => guardedAction(`return:${ret.returnId}`, () => removeReturn(ret.returnId))}>
+                  {pendingDestructive === `return:${ret.returnId}` ? 'Confirm' : '×'}
+                </button>
               </div>
               {@render effectChain(ret.effects, ret.returnId, `${ret.name} effects`, 'host-return-fx')}
             </div>
@@ -1703,13 +1990,19 @@
           </div>
           {#each $hostState.rack.macros as macro (macro.macroId)}
             <div class="macro-row" class:on={selectedMacro?.macroId === macro.macroId}>
-              <button type="button" class="ghost macro-name" title="Select for target assignment"
-                      onclick={() => (selectedMacroId = macro.macroId)}>{macro.name}</button>
+              <input type="text" class="macro-name" value={macro.name}
+                     aria-label="Macro name" title="Select or rename this macro"
+                     onfocus={() => (selectedMacroId = macro.macroId)}
+                     onclick={() => (selectedMacroId = macro.macroId)}
+                     onchange={(e) => renameMacro(macro.macroId, e.currentTarget.value)} />
               <input type="range" min="0" max="1" step="0.001" value={macro.value} aria-label={macro.name}
                      oninput={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value))}
                      onchange={(e) => setMacroValue(macro.macroId, Number(e.currentTarget.value), true)} />
-              <button type="button" class="ghost danger" title="Remove this macro"
-                      onclick={() => removeMacro(macro.macroId)}>×</button>
+              <button type="button" class="ghost danger" class:confirming={pendingDestructive === `macro:${macro.macroId}`}
+                      title={pendingDestructive === `macro:${macro.macroId}` ? 'Click again to confirm' : 'Remove this macro'}
+                      onclick={() => guardedAction(`macro:${macro.macroId}`, () => removeMacro(macro.macroId))}>
+                {pendingDestructive === `macro:${macro.macroId}` ? 'Confirm' : '×'}
+              </button>
             </div>
             {#if macro.targets.length > 0}
               <div class="macro-targets">
@@ -1717,9 +2010,41 @@
                   <span class="macro-target" class:unresolved={!target.resolved}
                         title={target.resolved ? `${target.displayName} on ${target.targetName}`
                                                : 'unresolved — the target no longer carries this plug-in'}>
-                    {target.displayName}{target.inverted ? ' ⇄' : ''} — {target.targetName || 'missing'}
+                    <span class="macro-target-name">
+                      {target.displayName} — {target.targetName || 'missing'}
+                    </span>
+                    <label class="macro-bound" title="Output when the macro is at minimum">
+                      <span>Min</span>
+                      <input type="number" min="0" max={target.rangeMax} step="0.01" value={target.rangeMin}
+                             aria-label={`${target.displayName} minimum`}
+                             onchange={(e) => setMacroTargetOptions(
+                               macro.macroId, target.targetId, target.parameterId,
+                               { rangeMin: Number(e.currentTarget.value) })} />
+                    </label>
+                    <label class="macro-bound" title="Output when the macro is at maximum">
+                      <span>Max</span>
+                      <input type="number" min={target.rangeMin} max="1" step="0.01" value={target.rangeMax}
+                             aria-label={`${target.displayName} maximum`}
+                             onchange={(e) => setMacroTargetOptions(
+                               macro.macroId, target.targetId, target.parameterId,
+                               { rangeMax: Number(e.currentTarget.value) })} />
+                    </label>
+                    <span class="macro-invert">
+                      <PropertyToggle value={target.inverted} label="Inv" compact
+                                      title="Reverse this target's response"
+                                      ariaLabel={`Invert ${target.displayName}`}
+                                      onchange={(inverted) => setMacroTargetOptions(
+                                        macro.macroId, target.targetId, target.parameterId,
+                                        { inverted })} />
+                    </span>
                     <button type="button" class="ghost danger"
-                            onclick={() => removeMacroTarget(macro.macroId, target.targetId, target.parameterId)}>×</button>
+                            class:confirming={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`}
+                            title={pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`
+                              ? 'Click again to confirm' : 'Remove this macro target'}
+                            onclick={() => guardedAction(`macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}`,
+                              () => removeMacroTarget(macro.macroId, target.targetId, target.parameterId))}>
+                      {pendingDestructive === `macro-target:${macro.macroId}:${target.targetId}:${target.parameterId}` ? 'Confirm' : '×'}
+                    </button>
                   </span>
                 {/each}
               </div>
@@ -1727,9 +2052,13 @@
           {/each}
         </div>
         {/if}
+        </div>
       </div>
     {/if}
   </div>
+  {/if}
+  </div>
+  {/if}
 </div>
 
 <style>
@@ -1738,25 +2067,236 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    background: #1e1e1e;
-    color: #d6dbe0;
+    position: relative;
+    overflow: hidden;
+    background: var(--host-bg);
+    color: var(--host-text);
     font-size: 13px;
+    line-height: 1.35;
   }
 
   .host-header {
+    flex: none;
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto minmax(430px, 1.35fr);
+    align-items: center;
+    gap: 14px;
+    min-height: 60px;
+    padding: 8px 14px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--host-line);
+    background: var(--host-surface);
+  }
+
+  .host-brand {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 174px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    align-items: center;
+  }
+  .host-logo-frame {
+    grid-row: 1 / 3;
+    display: block;
+    width: 174px;
+    height: 36px;
+  }
+  .host-purpose {
+    color: var(--host-text-dim);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.11em;
+    white-space: nowrap;
+  }
+  .host-audio-status {
+    grid-column: 2;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--host-text-soft);
+    font-family: var(--host-font-mono);
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .host-status-dot { flex: none; width: 6px; height: 6px; background: var(--host-text-dim); }
+  .host-audio-status.on .host-status-dot { background: var(--host-active); box-shadow: 0 0 7px color-mix(in srgb, var(--host-active) 60%, transparent); }
+  .host-mode { display: inline-flex; align-items: center; padding: 2px; border: 1px solid #35424d; border-radius: 6px; background: #111519; }
+  .mode-button { min-width: 58px; border: none; border-radius: 4px; background: transparent; color: #929da7; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+  .mode-button.on { background: #2b5270; color: #f0f6fa; }
+  .mode-button.holding {
+    color: #f0f6fa;
+    animation: build-unlock-hold 1s linear forwards;
+  }
+  @keyframes build-unlock-hold {
+    from { box-shadow: inset 0 0 #4a7b5e; }
+    to { box-shadow: inset 72px 0 #4a7b5e; }
+  }
+  button.confirming {
+    border-color: #c57575;
+    background: #51282c;
+    color: #ffd8d8;
+  }
+  .host-command-area { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+  .host-transport-group { display: flex; align-items: center; gap: 7px; }
+  .header-group-label {
+    color: var(--host-text-dim);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .host-global-actions { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .host-global-actions .panic { flex: none; }
+  .stage-header-actions { justify-self: end; display: flex; align-items: center; gap: 12px; }
+  .stage-header-hint { color: #8b99a4; font-size: 12px; }
+  .scan-status { color: #96a2ad; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (max-width: 1120px) {
+    .host-header { grid-template-columns: minmax(260px, 1fr) auto; }
+    .host-command-area {
+      grid-column: 1 / -1;
+      justify-content: space-between;
+      padding-top: 7px;
+      border-top: 1px solid var(--host-line-soft);
+    }
+    .stage-header-actions { grid-column: 1 / -1; justify-self: stretch; justify-content: flex-end; }
+  }
+
+  @media (max-width: 720px) {
+    .host-header { gap: 9px; padding-inline: 10px; }
+    .host-purpose, .header-group-label, .scan-status { display: none; }
+    .host-command-area { overflow-x: auto; }
+    .host-global-actions { margin-left: auto; }
+  }
+
+  .build-navigation {
+    flex: none;
+    min-height: 42px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 10px 14px;
-    border-bottom: 1px solid #3b4652;
-    background: #171a1d;
+    gap: 18px;
+    padding: 6px 14px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--host-line-soft);
+    background: var(--host-bg-deep);
+    overflow-x: auto;
   }
+  .workspace-tabs, .utility-tabs { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .navigation-label {
+    margin-right: 3px;
+    color: #8795a0;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  button.navigation-tab, button.utility-tab {
+    padding: 4px 10px;
+    border-color: transparent;
+    background: transparent;
+    color: #9aa6b0;
+    font-size: 12px;
+  }
+  button.navigation-tab:hover:not(:disabled), button.utility-tab:hover:not(:disabled) {
+    border-color: #3b4652;
+    color: #d6dbe0;
+  }
+  button.navigation-tab.on {
+    border-color: #456b89;
+    background: #21394b;
+    color: #edf5fa;
+  }
+  button.utility-tab.on {
+    border-color: #4b5966;
+    background: #242b31;
+    color: #dce4ea;
+  }
+  button.utility-tab.warn { color: #e4b3b3; }
 
-  .host-title { display: flex; flex-direction: column; gap: 2px; }
-  .host-subtitle { color: #7d8894; font-size: 11px; }
-  .host-actions { display: flex; align-items: center; gap: 8px; }
-  .scan-status { color: #7d8894; font-size: 11px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .build-content {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .primary-workspace {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    overflow: auto;
+  }
+  .primary-workspace :global(.perf-panel) {
+    min-height: 100%;
+    max-height: none;
+    margin: 0;
+    box-sizing: border-box;
+  }
+  .primary-workspace :global(.mixer) { min-height: 100%; box-sizing: border-box; }
+  .controller-workspace { display: flex; overflow: hidden; }
+
+  .utility-drawer {
+    position: absolute;
+    z-index: 20;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: clamp(380px, 40vw, 560px);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--host-line);
+    background: var(--host-surface);
+    box-shadow: -14px 0 28px #080a0c99;
+  }
+  .utility-drawer-head {
+    flex: none;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px 7px 14px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--host-line-soft);
+    background: var(--host-bg-deep);
+  }
+  .utility-drawer-head strong { flex: 1; font-size: 13px; }
+  button.utility-close { padding: 2px 7px; font-size: 18px; line-height: 1; }
+  .utility-drawer-body { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+  .utility-drawer .device-panel,
+  .utility-drawer .library-panel,
+  .utility-drawer .project-panel {
+    margin: 0;
+    max-height: none;
+    box-sizing: border-box;
+  }
+  .utility-drawer .device-panel { flex-direction: column; gap: 16px; }
+  .utility-drawer .device-output { min-width: 0; width: 100%; }
+  .utility-drawer .library-panel { height: 100%; }
+  .utility-drawer :global(.product-panel),
+  .utility-drawer :global(.reliability-panel),
+  .utility-drawer :global(.licence-panel) {
+    margin: 0;
+    max-height: none;
+    box-sizing: border-box;
+  }
+  .utility-drawer :global(.product-grid),
+  .utility-drawer :global(.reliability-grid),
+  .utility-drawer :global(.licence-grid) { grid-template-columns: 1fr; }
+  .utility-drawer :global(.note),
+  .utility-drawer :global(.label),
+  .utility-drawer :global(.field),
+  .utility-drawer :global(.check),
+  .utility-drawer :global(.detail),
+  .utility-drawer :global(.never) { font-size: 12px; }
+  .utility-drawer :global(.matrix-row),
+  .utility-drawer :global(.readout) { min-height: 26px; line-height: 1.45; }
 
   .device-panel {
     display: flex;
@@ -1769,12 +2309,12 @@
     background: #171a1d;
     flex-wrap: wrap;
   }
-  .device-output { display: flex; flex-direction: column; gap: 4px; color: #9aa5b1; font-size: 11px; min-width: 260px; }
+  .device-output { display: flex; flex-direction: column; gap: 5px; color: #aab4bd; font-size: 12px; min-width: 260px; }
   .device-midi { display: flex; flex-direction: column; gap: 4px; }
   .midi-activity {
     margin-left: 10px;
-    color: #9fd6a3;
-    font-size: 11px;
+    color: #a9dfad;
+    font-size: 12px;
     font-weight: normal;
     text-transform: none;
     letter-spacing: normal;
@@ -1794,8 +2334,8 @@
     to { box-shadow: none; opacity: 0.55; }
   }
 
-  .device-midi-title { color: #9aa5b1; font-size: 11px; }
-  .surface-row { color: #9aa5b1; font-size: 11px; align-items: center; }
+  .device-midi-title { color: #aab4bd; font-size: 12px; }
+  .surface-row { color: #aab4bd; font-size: 12px; align-items: center; }
   .surface-dot { width: 7px; height: 7px; border-radius: 50%; background: #5c6672;
                  display: inline-block; flex: 0 0 auto; }
   .surface-dot.connected { background: #35c46f; }
@@ -1803,7 +2343,7 @@
   .surface-dot.heldElsewhere { background: #d9a13c; }
   .surface-dot.failed { background: #e05656; }
   .device-midi-empty { color: #7d8894; font-size: 12px; }
-  .device-midi-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d6dbe0; }
+  .device-midi-row { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 12px; color: #d6dbe0; }
 
   .project-panel {
     display: flex;
@@ -1816,10 +2356,10 @@
     background: #171a1d;
   }
   .project-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-  .project-field { display: flex; flex-direction: column; gap: 4px; color: #9aa5b1; font-size: 11px; }
+  .project-field { display: flex; flex-direction: column; gap: 5px; color: #aab4bd; font-size: 12px; }
   .project-field input { width: 180px; }
   .project-target { display: flex; align-items: center; gap: 6px; padding-bottom: 2px; }
-  .project-appid { color: #7d8894; font-size: 11px; }
+  .project-appid { color: #96a2ad; font-size: 12px; }
   .project-build-log {
     margin: 0;
     padding: 8px;
@@ -1848,17 +2388,50 @@
   .library-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .library-head input { flex: 1; min-width: 180px; }
   .library-filters { display: flex; gap: 4px; }
-  .library-counts { color: #7d8894; font-size: 11px; }
+  .library-head .playing { border-color: #ef8b35; color: #ffd3ab; }
+  .audition-config {
+    display: flex; align-items: end; gap: 10px; flex-wrap: wrap;
+    padding: 7px 9px;
+    border: 1px solid #3b4652;
+    background: #171c21;
+  }
+  .audition-config strong { align-self: center; color: #d7dde3; font-size: 12px; }
+  .audition-config label {
+    display: flex; flex-direction: column; gap: 3px;
+    color: #96a2ad; font-size: 10px; text-transform: uppercase;
+  }
+  .audition-config select { width: 112px; }
+  .audition-config input[type="number"] { width: 66px; }
+  .number-with-note, .number-unit { display: inline-flex; align-items: center; gap: 4px; }
+  .number-with-note small, .number-unit small { color: #b7c1ca; font-size: 11px; text-transform: none; }
+  .audition-help { align-self: center; color: #78848f; font-size: 11px; }
+  .sound-compare {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 10px;
+    border: 1px solid #d66f24;
+    background: linear-gradient(90deg, #2a1c13, #171c21 42%);
+  }
+  .compare-slot {
+    display: inline-flex; align-items: baseline; justify-content: center;
+    min-width: 44px; color: #ff9a47; font-size: 22px; font-weight: 750;
+  }
+  .compare-slot small { color: #a87955; font-size: 11px; }
+  .compare-copy { display: flex; flex: 1 1 180px; min-width: 150px; flex-direction: column; }
+  .compare-copy small { color: #9f8877; font-size: 10px; }
+  .compare-copy strong { color: #f1f3f5; font-size: 13px; }
+  .compare-keep { border-color: #d66f24; color: #ffd7b7; }
+  .library-counts { color: #96a2ad; font-size: 12px; }
   .library-capture { display: flex; gap: 8px; }
   .library-paths { display: flex; flex-direction: column; gap: 4px; }
   .library-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-  .library-row { display: flex; align-items: center; gap: 8px; }
+  .library-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+  .library-row.comparing { outline: 1px solid #d66f24; background: #241b15; }
   .library-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .library-name { font-weight: 600; font-size: 12px; }
   .library-id.clickable { cursor: pointer; }
   .library-id.clickable:hover .library-name { color: #7fb4e0; }
-  .library-detail { color: #7d8894; font-size: 11px; }
-  .library-reason { color: #d6a3a3; font-size: 11px; }
+  .library-detail { color: #96a2ad; font-size: 12px; }
+  .library-reason { color: #e1aaaa; font-size: 12px; }
   .library-row.unavailable .library-name { color: #8a939d; }
   button.star { padding: 2px 4px; font-size: 14px; color: #7d8894; }
   button.star.on { color: #d5a93a; }
@@ -1887,16 +2460,17 @@
   /* The dock: a strip of its own, never part of the columns' scroll. Collapsed it is just
      the tab bar, so the gesture that opened it is the gesture that gets the space back. */
   .host-dock {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    border-top: 1px solid #3b4652;
-    background: #171a1d;
+    border-top: 1px solid var(--host-line);
+    background: var(--host-surface);
   }
   .host-dock.collapsed { height: auto; }
   .dock-grip {
-    height: 6px;
-    margin-top: -3px;
+    height: 10px;
+    margin-top: -5px;
     cursor: ns-resize;
     touch-action: none;
     background: transparent;
@@ -1923,8 +2497,8 @@
   .dock-subject {
     flex: 1;
     text-align: right;
-    color: #7d8894;
-    font-size: 11px;
+    color: #96a2ad;
+    font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1934,19 +2508,22 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    padding: 10px 14px 12px;
+  }
+  .dock-body-content {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 10px 14px 12px;
+    min-width: 0;
   }
   /* Inside the dock these blocks are the content, not one more section in a stack: the rule
      that separated them from what came above has nothing above it any more. */
-  .dock-body > .fx-chain:first-of-type,
-  .dock-body > .macros:first-of-type,
-  .dock-body > .returns:first-of-type,
-  .dock-body > .sends:first-of-type,
-  .dock-body > .outputs:first-of-type,
-  .dock-body > .hw-config:first-of-type { border-top: none; padding-top: 0; }
+  .dock-body-content > .fx-chain:first-of-type,
+  .dock-body-content > .macros:first-of-type,
+  .dock-body-content > .returns:first-of-type,
+  .dock-body-content > .sends:first-of-type,
+  .dock-body-content > .outputs:first-of-type,
+  .dock-body-content > .hw-config:first-of-type { border-top: none; padding-top: 0; }
 
   .rack-column, .browser-column {
     flex: 1;
@@ -1976,9 +2553,10 @@
     max-width: 260px;
   }
 
-  .empty-hint { color: #7d8894; padding: 12px 4px; }
+  .empty-hint { color: #96a2ad; padding: 12px 4px; }
 
   .part {
+    position: relative;
     display: flex;
     flex-direction: row;
     align-items: stretch;
@@ -1988,15 +2566,17 @@
     padding: 8px;
     background: #1c2126;
   }
-  .part.focused { border-color: #5b9bd5; }
-  .part.disabled { opacity: 0.55; }
+  .part.focused { border-color: #67abe3; box-shadow: inset 0 0 0 1px #3d81c4; }
+  .part.disabled { background: #181c20; }
+  .part.disabled .part-main, .part.disabled .part-performance { opacity: 0.68; }
+  .part:has(.part-actions[open]) { z-index: 5; }
   /* The face on the left, the row's full height; the three lines to its right. */
   .part-art {
     flex: none;
     position: relative;      /* the tile inside is absolute: it fills this, it never sizes it */
     align-self: stretch;
-    width: 84px;             /* a little wider than a two-line row is tall: a window's proportion */
-    min-height: 52px;
+    width: 96px;             /* a recognisable plug-in face beside two predictable rows */
+    min-height: 78px;
     padding: 0;
     border: none;
     background: none;
@@ -2005,18 +2585,22 @@
     overflow: hidden;
   }
   .part-art :global(.plugin-tile) { border-radius: 4px; }
-  .part-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .part-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .part-head { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
   .mini { display: inline-flex; align-items: center; gap: 4px; }
   /* The part's range, as a button: it says where the part plays and opens the keyboard to
      change it, which is the same thing said twice in the right order. */
   .range-button { font-variant-numeric: tabular-nums; min-width: 64px; border-left: 4px solid var(--part-color, #3b4652); }
-  .mini-label { font-size: 10px; color: #9aa5b1; letter-spacing: 0.3px; }
+  .mini-label { font-size: 11px; color: #aab4bd; letter-spacing: 0.3px; }
 
   .part-main {
+    flex: 1;
+    min-width: 0;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
     background: none;
     border: none;
     color: inherit;
@@ -2025,38 +2609,53 @@
     padding: 0;
     font: inherit;
   }
-  .part-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preset-walk { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; }
-  .preset-walk .ghost { padding: 0 6px; font-size: 13px; line-height: 1.2; }
-  .preset-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                 font-size: 11px; color: #9aa5b1; }
-  .part-vendor { color: #7d8894; }
-
-  .part-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  /* Outside .part-body on purpose: it is not in the wrapping flex, so nothing above it
-     can push it to a second line, and it lands at the same x on every row. */
-  .part-actions {
-    flex: none;
-    align-self: center;
+  .part-name { max-width: 100%; font-weight: 650; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .part-states { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
+  .part-state { padding: 2px 6px; border: 1px solid #46515b; background: #20262c; color: #b5c0c8; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+  .part-state.problem, .part-state.muted { border-color: #7a4a4a; background: #2a1d1d; color: #e8b5b5; }
+  .part-state.off { border-color: #626a72; background: #25292d; color: #b4bbc1; }
+  .part-state.soloed { border-color: #806d36; background: #2a2618; color: #ead58f; }
+  .part-actions { position: relative; flex: none; }
+  .part-actions summary {
+    width: 34px;
+    min-height: 30px;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    border: 1px solid #3b4652;
+    background: #20262c;
+    color: #aab4bd;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .part-actions summary::-webkit-details-marker { display: none; }
+  .part-actions[open] summary { border-color: #67abe3; color: #edf5fa; background: #24384c; }
+  .part-action-menu {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 4px);
+    right: 0;
+    width: 170px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 4px;
-    padding-left: 6px;
+    padding: 6px;
+    border: 1px solid #46515b;
+    background: #151a1f;
+    box-shadow: 0 8px 18px #080a0caa;
   }
-  .action-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: #2c343d; }
-  /* Square, so four of them read as one strip rather than four words of four lengths.
-     The double class beats plain `button.toggle` further down, which sets the padding. */
-  button.toggle.icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-  }
-  button.toggle.icon.danger { color: #8d7b7b; }
-  button.toggle.icon.danger:hover:not(:disabled) { color: #e4b3b3; border-color: #7a4a4a; }
-  .mini input[type="range"] { width: 70px; }
+  .part-action-menu button { width: 100%; justify-content: flex-start; text-align: left; white-space: nowrap; }
+  .part-performance { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+  .preset-walk { flex: 0 1 220px; min-width: 150px; display: inline-flex; align-items: center; gap: 3px; }
+  .preset-walk .ghost { flex: none; padding: 0 8px; font-size: 16px; line-height: 1; }
+  .preset-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                 font-size: 12px; color: #aab4bd; }
+  .part-vendor { color: #96a2ad; font-size: 12px; }
+
+  .part-controls { flex: 1; min-width: 290px; display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+  .mini input[type="range"] { width: 84px; }
 
   .midi-zone {
     border: 1px solid #2c343d;
@@ -2088,7 +2687,7 @@
   }
   .instrument-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .instrument-name { font-weight: 600; }
-  .instrument-vendor { color: #7d8894; font-size: 11px; }
+  .instrument-vendor { color: #96a2ad; font-size: 12px; }
 
   .scan-paths {
     display: flex;
@@ -2108,7 +2707,7 @@
     font-size: 12px;
     overflow-wrap: anywhere;
   }
-  .dim { color: #7d8894; font-size: 11px; }
+  .dim { color: #96a2ad; font-size: 12px; }
 
   .param-view {
     display: flex;
@@ -2126,12 +2725,12 @@
     border-radius: 4px;
     background: #2a2618;
     color: #e0cf9a;
-    font-size: 11px;
+    font-size: 12px;
   }
   .param-list { overflow-y: auto; max-height: 260px; display: flex; flex-direction: column; gap: 4px; }
   .param-group { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
                  background: #161e27; border: 1px solid #232c36; border-radius: 4px;
-                 color: #9aa5b1; font-size: 11px; font-weight: 600; padding: 4px 8px;
+                 color: #aab4bd; font-size: 12px; font-weight: 600; padding: 4px 8px;
                  cursor: pointer; }
   .param-row { display: flex; align-items: center; gap: 8px; }
   .param-pin { flex: none; padding: 0 3px; color: #6d7883; font-size: 12px; line-height: 16px; }
@@ -2141,12 +2740,12 @@
      group headings below. */
   .param-shortlist { display: flex; flex-direction: column; gap: 2px; padding-bottom: 4px;
                      margin-bottom: 4px; border-bottom: 1px solid #2c343d; }
-  .param-shortlist-head { color: #7d8894; font-size: 10px; text-transform: uppercase;
+  .param-shortlist-head { color: #96a2ad; font-size: 11px; text-transform: uppercase;
                           letter-spacing: 0.06em; }
   .param-segments { display: inline-flex; gap: 2px; flex: 1; min-width: 0; }
   .param-segments button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-                           white-space: nowrap; font-size: 10px; padding: 2px 4px;
-                           background: #1c2630; color: #9aa5b1; border: 1px solid #2c3742;
+                           white-space: nowrap; font-size: 11px; padding: 3px 5px;
+                           background: #1c2630; color: #aab4bd; border: 1px solid #2c3742;
                            border-radius: 3px; cursor: pointer; }
   .param-segments button.on { background: #2c6ca8; color: #fff; border-color: #2c6ca8; }
   .param-stepper { display: inline-flex; gap: 2px; }
@@ -2163,10 +2762,12 @@
                 border: 1px solid #3d81c4; border-radius: 3px; padding: 1px 4px; }
   .param-name { flex: 0 0 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
   .param-row input[type='range'] { flex: 1; min-width: 60px; }
-  .param-value { flex: 0 0 84px; text-align: right; color: #9aa5b1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .param-diag { color: #66707b; font-size: 10px; margin: -2px 0 0 138px; }
+  .param-value { flex: 0 0 92px; text-align: right; color: #aab4bd; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .param-diag { color: #8795a0; font-size: 11px; margin: -2px 0 0 138px; }
 
   .transport { display: flex; align-items: center; gap: 4px; }
+  .transport-action { min-width: 26px; padding: 2px 5px; }
+  .transport-action:disabled { opacity: 0.35; cursor: default; }
   .transport .tempo { width: 62px; }
   .transport .ts { width: 44px; }
   .ts-slash { color: #7d8894; }
@@ -2186,6 +2787,7 @@
   }
   .send-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .send-name { flex: 0 0 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  input.editable-name { box-sizing: border-box; min-width: 0; }
   .send-row input[type='range'] { flex: 1; min-width: 60px; }
   .return-block { display: flex; flex-direction: column; gap: 4px; }
   .return-block .fx-chain { border-top: none; padding-top: 0; margin-left: 8px; }
@@ -2279,7 +2881,7 @@
     user-select: none;
   }
   .fx-grip:hover { color: #d6dbe0; }
-  .fx-row .ghost { flex: none; padding: 0 4px; font-size: 10px; line-height: 16px; }
+  .fx-row .ghost { flex: none; padding: 2px 6px; font-size: 11px; line-height: 18px; }
   /* Running is green, bypassed is red. Struck-through text said "deleted" — the one state
      this row can never be in — and it took reading the Byp button to find out otherwise. */
   .fx-name { flex: 1; color: #8fc4a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2287,7 +2889,7 @@
   .fx-row.unresolved .fx-name { color: #d6a3a3; font-style: italic; }
   .macro-row { display: flex; align-items: center; gap: 8px; }
   .macro-row.on .macro-name { color: #d6dbe0; border-color: #5b9bd5; }
-  .macro-name { font-size: 12px; }
+  .macro-name { box-sizing: border-box; flex: 0 0 112px; min-width: 0; font-size: 12px; }
   .macro-row input[type='range'] { flex: 1; min-width: 60px; }
   .macro-targets { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
   .macro-target {
@@ -2300,6 +2902,20 @@
     font-size: 11px;
     color: #9aa5b1;
   }
+  .macro-target-name { white-space: nowrap; }
+  .macro-bound, .macro-invert { display: inline-flex; align-items: center; gap: 2px; }
+  .macro-bound span, .macro-invert span { color: #74808b; font-size: 9px; text-transform: uppercase; }
+  .macro-bound input[type='number'] {
+    width: 42px;
+    min-width: 42px;
+    height: 20px;
+    padding: 1px 3px;
+    border: 1px solid #46515d;
+    border-radius: 2px;
+    background: #171c21;
+    color: #cbd2d8;
+    font-size: 10px;
+  }
   .macro-target.unresolved { color: #d6a3a3; border-color: #7a4a4a; }
 
   .pages {
@@ -2311,11 +2927,12 @@
   }
   .pages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .pages-actions { display: flex; gap: 6px; }
-  .page-auto { color: #7d8894; font-size: 10px; }
+  .page-auto { color: #96a2ad; font-size: 11px; }
   .page-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
   .page-tab { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #3b4652; border-radius: 4px; padding: 0 2px; }
   .page-tab.on { border-color: #5b9bd5; background: #24313d; }
-  .page-name { background: none; border: none; padding: 3px 6px; }
+  .page-name { box-sizing: border-box; width: 104px; min-width: 0; background: none; color: inherit;
+               border: none; padding: 3px 6px; }
   .slot-list { display: flex; flex-direction: column; gap: 4px; }
   .slot-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .slot-id { flex: 0 0 20px; color: #7d8894; font-size: 11px; }
@@ -2331,32 +2948,4 @@
   .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
              background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
 
-  button {
-    background: #232a31;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 4px 10px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  button:hover:not(:disabled) { border-color: #5b9bd5; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  button.toggle { padding: 3px 7px; color: #7d8894; }
-  button.toggle.on { color: #d6dbe0; border-color: #5b9bd5; background: #24313d; }
-  button.ghost { background: none; border-color: transparent; color: #7d8894; }
-  button.ghost:hover { color: #d6dbe0; border-color: #3b4652; }
-  button.ghost.danger:hover { color: #e4b3b3; border-color: #7a4a4a; }
-  button.panic { border-color: #7a4a4a; color: #e4b3b3; }
-
-  input, select {
-    background: #14171a;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 6px;
-    font: inherit;
-    font-size: 12px;
-  }
 </style>

@@ -309,7 +309,7 @@ private:
 
 /**
  * Streams a `node tools/scripts/build-host-product.mjs` run — the Host Project build
- * (VIP-successor Stage 1). Same shape as VstBuildJob/ToolchainJob above; the events ride the
+ * (Hostage). Same shape as VstBuildJob/ToolchainJob above; the events ride the
  * instrument host's own channel: every line -> "instrumentHostBuildProgress" { line, done:false },
  * terminal -> { line: summary, done:true, ok }. One event stream, one UI listener, mirroring how
  * the scanner reports.
@@ -1689,14 +1689,27 @@ static juce::File findScannerWorker()
                  .getChildFile (workerName);
 }
 
+static juce::File findLivePluginWorker()
+{
+   #if JUCE_WINDOWS
+    const juce::String workerName ("CEditorPluginWorker.exe");
+   #else
+    const juce::String workerName ("CEditorPluginWorker");
+   #endif
+
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
+                            .getParentDirectory();
+    const auto installed = exeDir.getChildFile (workerName);
+    if (installed.existsAsFile())
+        return installed;
+    return exeDir.getParentDirectory().getParentDirectory()
+                 .getChildFile (exeDir.getFileName()).getChildFile (workerName);
+}
+
 void ValueTreeBridge::ensureInstrumentHost()
 {
     if (instrumentHost != nullptr)
         return;
-
-    // The UI-capable registration path, as the audit requires — editor creation stays possible.
-    pluginFormatManager = std::make_unique<juce::AudioPluginFormatManager>();
-    pluginFormatManager->addFormat (new juce::VST3PluginFormat());
 
     ceditor::host::InstrumentHostService::Options options;
 
@@ -1788,9 +1801,12 @@ void ValueTreeBridge::ensureInstrumentHost()
             });
     };
 
-    // The same instantiator the generated wrappers use (PluginInstantiator.h); the manager
-    // member outlives the service that holds this function.
-    options.instantiate = ceditor::host::makePluginInstantiator (*pluginFormatManager);
+    // The same isolated instantiator the generated wrappers use (PluginInstantiator.h). The
+    // returned factory captures only worker/staging paths and outlives this command safely.
+    const auto liveWorker = findLivePluginWorker();
+    options.livePluginIsolationAvailable = liveWorker.existsAsFile();
+    options.instantiate = ceditor::host::makeIsolatedPluginInstantiator (
+        liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
     options.applyVstPreset = ceditor::host::applyVstPresetFile;
 
     // The Host Project build: the node pipeline as a streamed child process, one at a time.
@@ -1895,11 +1911,14 @@ void ValueTreeBridge::ensureInstrumentHost()
                     browser->emitEventIfBrowserIsVisible (eventName, payload);
             });
         };
-        surfaceOptions.pageLua.assign (surface::assets::kKnobPageLua,
-                                       surface::assets::kKnobPageLua + surface::assets::kKnobPageLuaSize);
+        surfaceOptions.pageLua.assign (surface::assets::kHostagePageLua,
+                                       surface::assets::kHostagePageLua + surface::assets::kHostagePageLuaSize);
         surfaceOptions.pngAssets.push_back ({ 0x0200,
             surface::Bytes (surface::assets::kKnobStripPng,
                             surface::assets::kKnobStripPng + surface::assets::kKnobStripPngSize) });
+        surfaceOptions.pngAssets.push_back ({ 0x0210,
+            surface::Bytes (surface::assets::kHostageLogoPng,
+                            surface::assets::kHostageLogoPng + surface::assets::kHostageLogoPngSize) });
         instrumentSurfaceBroker = std::make_unique<surface::Ctrl49SurfaceBroker> (*instrumentHost,
                                                                                   std::move (surfaceOptions));
     }

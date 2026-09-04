@@ -1,6 +1,6 @@
 # The generated instrument-host product (Stage 1, as built)
 
-The record for the VIP-successor's first shippable shape: what CEditor's Instrument Host tab
+The record for Hostage's first shippable shape: what CEditor's Hostage tab
 authors, what the two generated targets are, and where the installer comes from. Written as the
 Stage 1 code landed — per this directory's rule, when this document and the code disagree, the
 code is right.
@@ -45,12 +45,20 @@ product all you like; upgrades keep finding it.
 toolchain jobs) → `instrumentHostBuildProgress` lines into the workspace's Project panel.
 
 The script does **assembly, not compilation**: find what CMake already built
-(`CEHostStandalone`, `CEHostVST3`, `CEditorPluginScanner` — the scanner ships beside every
-target, inside the VST3 bundle next to the module), stage it as the installer's source tree,
+(`CEHostStandalone`, `CEHostVST3`, `CEditorPluginScanner` and `CEditorPluginWorker` — both
+workers ship beside every target, inside the VST3 bundle next to the module), stage it as the installer's source tree,
 and compile `tools/installer/HostProductTemplate.iss` with the manifest as `/D` switches.
 Per-product *binary* identity (`CE_HOST_PRODUCT_NAME`, `CE_HOST_PLUGIN_CODE`, …) is CMake cache
 territory — a rebuild, deliberately not this script's job, the same split the panel export
 pipeline settled first.
+
+The live worker's optimized Release build also emits `CEditorPluginWorker.pdb` under the native
+build's private `symbols/Release` directory. Assembly requires it, hashes both the worker executable
+and PDB, and copies the PDB plus `symbols.json` into
+`build/host-product/private-symbols/<version>/<worker-hash>/`. That directory is deliberately a
+sibling of `stage`, never a child: matching symbols survive for dump analysis without entering the
+customer installer. Rebuilding the same product version with different bytes creates a different
+hash directory instead of overwriting the symbols for an earlier release.
 
 Without ISCC the script stages everything, prints the exact ISCC invocation it would have run,
 and exits 0 saying so — staging is verifiable on any machine, and only the installer compile is

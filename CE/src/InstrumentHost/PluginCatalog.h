@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
-// PluginCatalog — the persistent, class-level VST3 catalogue (VIP-successor Stage 1).
+// PluginCatalog — Hostage's persistent, class-level VST3 catalogue.
 //
 // Reuse rulings and the reasoning behind this file's shape are in
 // docs/design/instrument-host-integration-audit.md. The two that matter here:

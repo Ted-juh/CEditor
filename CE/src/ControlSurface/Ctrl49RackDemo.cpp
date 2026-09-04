@@ -1,4 +1,4 @@
-// CTRL49 rack demo (VIP-successor Stage 3): the keyboard as a native front end for the
+// CTRL49 rack demo: the keyboard as a native front end for the Hostage rack.
 // instrument-host rack. Eight encoders drive the ACTIVE CONTROL PAGE of the same
 // InstrumentHostService the editor, standalone and outer VST3 run — real VST3 instruments,
 // the Stage 2 parameter model, relative jump-free nudges, and the display showing each
@@ -12,7 +12,7 @@
 // (CEditorInstrumentHost), so whatever was scanned and saved there is what plays here.
 // With no control pages saved, it auto-generates pages for the focused part's instrument.
 // Page Left/Right and the mode buttons switch pages; encoders and the data dial nudge;
-// Ctrl-C panics the rack and releases the session. Windows-only. Close VIP / your DAW.
+// Ctrl-C panics the rack and releases the session. Windows-only. Close other CTRL49 owners first.
 
 #ifdef _WIN32
 
@@ -55,15 +55,15 @@ Bytes loadFileBytes (const juce::File& file)
     return Bytes (data, data + block.getSize());
 }
 
-juce::File findScannerWorkerForDemo()
+juce::File findWorkerForDemo (const juce::String& name)
 {
     const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
                             .getParentDirectory();
-    for (const auto& candidate : { exeDir.getChildFile ("CEditorPluginScanner.exe"),
-                                   exeDir.getParentDirectory().getChildFile ("CEditorPluginScanner.exe") })
+    for (const auto& candidate : { exeDir.getChildFile (name),
+                                   exeDir.getParentDirectory().getChildFile (name) })
         if (candidate.existsAsFile())
             return candidate;
-    return exeDir.getChildFile ("CEditorPluginScanner.exe");
+    return exeDir.getChildFile (name);
 }
 } // namespace
 
@@ -85,12 +85,9 @@ int wmain (int argc, wchar_t** argv)
         if (std::wstring (argv[i]) == L"--data")
             dataDir = juce::File (juce::String (argv[i + 1]));
 
-    juce::AudioPluginFormatManager formatManager;
-    formatManager.addFormat (new juce::VST3PluginFormat());
-
     ceditor::host::InstrumentHostService::Options options;
     options.dataDirectory = dataDir;
-    options.workerExecutable = findScannerWorkerForDemo();
+    options.workerExecutable = findWorkerForDemo ("CEditorPluginScanner.exe");
     options.enableAudio = true;
     options.emit = [] (const juce::String& eventName, const juce::var& payload)
     {
@@ -99,22 +96,10 @@ int wmain (int argc, wchar_t** argv)
         else if (eventName == "instrumentHostScanProgress")
             logLine ("[scan] " + payload.getProperty ("line", {}).toString().toStdString());
     };
-    // Synchronous instantiation: this tool has no UI waiting, and the main loop is the
-    // message thread, so the blocking create is legal and by far the simplest honest path.
-    options.instantiate = [&formatManager] (const juce::String& descriptionXml, double sampleRate,
-                                            int blockSize,
-                                            ceditor::host::InstrumentHostService::InstantiateCallback done)
-    {
-        juce::PluginDescription description;
-        const auto parsed = juce::XmlDocument::parse (descriptionXml);
-        if (parsed == nullptr || ! description.loadFromXml (*parsed))
-        {
-            done (nullptr, "unreadable plugin description");
-            return;
-        }
-        juce::String error;
-        done (formatManager.createPluginInstance (description, sampleRate, blockSize, error), error);
-    };
+    const auto liveWorker = findWorkerForDemo ("CEditorPluginWorker.exe");
+    options.livePluginIsolationAvailable = liveWorker.existsAsFile();
+    options.instantiate = ceditor::host::makeIsolatedPluginInstantiator (
+        liveWorker, dataDir.getChildFile ("worker-staging"));
 
     options.applyVstPreset = ceditor::host::applyVstPresetFile;
 

@@ -1,5 +1,4 @@
-// RackHostTests — the live multi-part rack over the real AudioProcessorGraph (VIP-successor
-// Stage 1).
+// RackHostTests — Hostage's live multi-part rack over the real AudioProcessorGraph.
 //
 // These drive the PRODUCTION graph host — the same topology, connections, transactions and
 // mixer the app will run — with stub instruments instead of real VST3s, so the whole thing is
@@ -12,8 +11,10 @@
 // one settle block before asserting a level — the same thing a listener's ear would do.
 
 #include "InstrumentHost/InstrumentRackHost.h"
+#include "InstrumentHost/PluginWorkerBoundary.h"
 #include "StubSynthProcessor.h"
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 
 namespace
@@ -34,7 +35,37 @@ bool near (float value, float wanted, float tolerance = 0.001f)
 using ceditor::host::InstrumentRackHost;
 using ceditor::host::Performance;
 using ceditor::host::PartMidiRules;
+using ceditor::host::LayerGroup;
 using StubSynth = ceditor::test::StubSynthProcessor;   // shared with InstrumentHostServiceTests
+
+struct ThrowingWorkerSynth final : StubSynth, ceditor::host::PluginWorkerBoundary
+{
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override
+    {
+        throw std::runtime_error ("test isolated-worker failure");
+    }
+
+    void terminateWorker() noexcept override { terminated = true; }
+    bool workerIsRunning() const noexcept override { return running; }
+
+    bool terminated = false;
+    bool running = true;
+};
+
+struct StoppedWorkerSynth final : StubSynth, ceditor::host::PluginWorkerBoundary
+{
+    bool workerIsRunning() const noexcept override { return false; }
+    void terminateWorker() noexcept override { terminated = true; }
+    bool terminated = false;
+};
+
+struct ThrowingEffect final : ceditor::test::StubEffectProcessor
+{
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override
+    {
+        throw std::runtime_error ("test effect failure");
+    }
+};
 
 int noteOnsIn (const StubSynth& stub)
 {
@@ -644,6 +675,204 @@ void testLatencyCompensation()
            "exactly what the product used to hand the DAW");
 }
 
+void testConfigurationMidiDelivery()
+{
+    std::cout << "\nconfiguration MIDI delivery" << std::endl;
+
+    juce::uint8 payload[] { 0x7f, 0x7f, 0x08, 0x02, 0x00, 0x00 };
+    juce::MidiBuffer messages;
+    messages.addEvent (juce::MidiMessage::createSysExMessage (payload, 6), 0);
+
+    Rig software;
+    const auto softwarePart = software.host.addPart();
+    auto* stub = software.load (softwarePart);
+    check (stub != nullptr && software.host.sendPartMidi (softwarePart, messages),
+           "configuration MIDI queues for a loaded software instrument");
+    check (stub != nullptr && stub->received.empty(), "the controlling thread does not call the plug-in directly");
+    software.process();
+    check (stub != nullptr && stub->received.size() == 1 && stub->received[0].isSysEx(),
+           "the queued MTS message reaches the instrument in its next audio block");
+
+    Rig hardware;
+    const auto hardwarePart = hardware.host.addPart();
+    InstrumentRackHost::HardwareConfig config;
+    config.midiOutputId = "capture";
+    config.midiOutputName = "Capture output";
+    check (hardware.host.setHardwareConfig (hardwarePart, config), "a hardware destination configures");
+    std::vector<juce::MidiMessage> captured;
+    hardware.host.setHardwareMidiSink (hardwarePart, [&captured] (const juce::MidiBuffer& buffer)
+    {
+        for (const auto metadata : buffer)
+            captured.push_back (metadata.getMessage());
+    });
+    check (hardware.host.sendPartMidi (hardwarePart, messages)
+             && captured.size() == 1 && captured[0].isSysEx(),
+           "the same configuration path sends immediately to hardware");
+}
+
+void testProcessorFailureContainment()
+{
+    std::cout << "\nprocessor failure containment" << std::endl;
+
+    {
+        Rig rig;
+        const auto broken = rig.host.addPart();
+        const auto healthy = rig.host.addPart();
+        const auto generation = rig.host.beginLoad (broken);
+        auto worker = std::make_unique<ThrowingWorkerSynth>();
+        auto* workerBoundary = worker.get();
+        check (rig.host.commitLoad (broken, generation, std::move (worker),
+                                    { "throwing-synth", {}, "Throwing Synth", "Test" }),
+               "a throwing instrument commits behind the guard");
+        rig.load (healthy, 0.5f);
+
+        rig.noteOn (1, 60);
+        rig.process();
+        check (near (rig.level(), 0.5f),
+               "an instrument exception is silenced while another part keeps sounding");
+        check (! rig.host.partHasInstrument (broken),
+               "the failed instrument is no longer exposed to the editor or parameter path");
+        const auto incidents = rig.host.takeProcessorFailures();
+        check (incidents.size() == 1 && incidents[0].targetId == broken
+                 && incidents[0].name == "Throwing Synth" && ! incidents[0].effect,
+               "the controlling thread receives one named instrument incident");
+        check (workerBoundary->terminated,
+               "the controlling thread terminates a failed isolated worker even without retry");
+        check (rig.host.takeProcessorFailures().isEmpty(),
+               "the incident edge is consumed once rather than reported every block");
+    }
+
+    {
+        Rig rig;
+        const auto part = rig.host.addPart();
+        auto worker = std::make_unique<StoppedWorkerSynth>();
+        auto* workerBoundary = worker.get();
+        check (rig.host.commitLoad (part, rig.host.beginLoad (part), std::move (worker),
+                                    { "stopped-worker", {}, "Stopped Worker", "Test" }),
+               "a worker fixture commits without starting transport");
+        const auto incidents = rig.host.takeProcessorFailures();
+        check (incidents.size() == 1 && incidents[0].targetId == part,
+               "control-thread polling detects a worker that died while transport was stopped");
+        check (workerBoundary->terminated,
+               "the stopped worker is terminated through the same failure boundary");
+    }
+
+    {
+        Rig rig;
+        const auto part = rig.host.addPart();
+        rig.load (part, 0.25f);
+        const auto effectId = rig.host.addEffectSlot (part);
+        const auto generation = rig.host.beginEffectLoad (effectId);
+        check (rig.host.commitEffectLoad (effectId, generation,
+                                          std::make_unique<ThrowingEffect>(),
+                                          { "throwing-effect", {}, "Throwing Effect", "Test" }),
+               "a throwing effect commits behind the guard");
+
+        rig.noteOn (1, 60);
+        rig.process();
+        check (near (rig.level(), 0.25f),
+               "an effect exception restores the dry block instead of interrupting the part");
+        check (! rig.host.effectHasProcessor (effectId),
+               "the failed effect is no longer exposed for direct calls");
+        const auto incidents = rig.host.takeProcessorFailures();
+        check (incidents.size() == 1 && incidents[0].targetId == effectId
+                 && incidents[0].name == "Throwing Effect" && incidents[0].effect,
+               "the controlling thread receives one named effect incident");
+    }
+}
+
+void testLayerVoiceAllocationAndCrossfade()
+{
+    std::cout << "\nlayer voice allocation, dynamic layers and crossfade" << std::endl;
+
+    {
+        Rig rig;
+        const auto a = rig.host.addPart();
+        const auto b = rig.host.addPart();
+        const auto ordinary = rig.host.addPart();
+        auto* stubA = rig.load (a);
+        auto* stubB = rig.load (b);
+        auto* stubOrdinary = rig.load (ordinary);
+
+        LayerGroup group;
+        group.layerGroupId = "voices";
+        group.allocation = "roundRobin";
+        group.members.add ({ a, 0.0f, 1.0f, 0.0f });
+        group.members.add ({ b, 0.0f, 1.0f, 0.0f });
+        const_cast<Performance&> (rig.host.getPerformance()).layerGroups.add (group);
+        rig.host.refreshLayerRouting();
+
+        rig.noteOn (1, 60);
+        rig.process();
+        rig.noteOn (1, 64);
+        rig.process();
+        check (stubA->activeNotes == 1 && stubB->activeNotes == 1,
+               "round-robin assigns successive notes to successive layer members");
+        check (stubOrdinary->activeNotes == 2,
+               "an ungrouped part retains the ordinary keyboard fan-out");
+
+        rig.noteOff (1, 60);
+        rig.noteOff (1, 64);
+        rig.process();
+        check (stubA->activeNotes == 0 && stubB->activeNotes == 0,
+               "note-offs return to the destinations chosen by their note-ons");
+    }
+
+    {
+        Rig rig;
+        const auto soft = rig.host.addPart();
+        const auto hard = rig.host.addPart();
+        auto* softStub = rig.load (soft);
+        auto* hardStub = rig.load (hard);
+
+        LayerGroup group;
+        group.layerGroupId = "velocity";
+        group.source = "velocity";
+        group.members.add ({ soft, 0.0f, 0.49f, 0.0f });
+        group.members.add ({ hard, 0.5f, 1.0f, 0.0f });
+        const_cast<Performance&> (rig.host.getPerformance()).layerGroups.add (group);
+        rig.host.refreshLayerRouting();
+
+        rig.noteOn (1, 60, 30);
+        rig.process();
+        check (softStub->activeNotes == 1 && hardStub->activeNotes == 0,
+               "a soft strike reaches only the soft velocity layer");
+        rig.noteOff (1, 60);
+        rig.process();
+        rig.noteOn (1, 62, 110);
+        rig.process();
+        check (softStub->activeNotes == 0 && hardStub->activeNotes == 1,
+               "a hard strike reaches only the hard velocity layer");
+    }
+
+    {
+        Rig rig;
+        const auto left = rig.host.addPart();
+        const auto right = rig.host.addPart();
+        rig.load (left, 0.25f);
+        rig.load (right, 0.5f);
+        const auto macroId = rig.host.addMacro ("Blend");
+
+        LayerGroup group;
+        group.layerGroupId = "morph";
+        group.source = "macro";
+        group.macroId = macroId;
+        group.members.add ({ left, 0.0f, 0.45f, 0.05f });
+        group.members.add ({ right, 0.55f, 1.0f, 0.05f });
+        const_cast<Performance&> (rig.host.getPerformance()).layerGroups.add (group);
+        rig.host.refreshLayerRouting();
+
+        rig.noteOn (1, 60);
+        rig.settle();
+        check (near (rig.level(), 0.25f),
+               "a macro crossfade starts on the first instrument while both hold the note");
+        rig.host.setLayerMacroValue (macroId, 1.0f);
+        rig.settle();
+        check (near (rig.level(), 0.5f),
+               "moving the macro morphs held audio to the second instrument");
+    }
+}
+
 int main()
 {
     std::cout << "RackHost tests" << std::endl;
@@ -657,6 +886,9 @@ int main()
     testUnloadAndRemove();
     testMidiRouting();
     testLatencyCompensation();
+    testConfigurationMidiDelivery();
+    testProcessorFailureContainment();
+    testLayerVoiceAllocationAndCrossfade();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

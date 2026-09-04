@@ -4,7 +4,7 @@
 #include <atomic>
 #include "PartMidiRules.h"
 
-// PartMidiFilterCore — one rack part's real-time MIDI gate (VIP-successor Stage 1).
+// PartMidiFilterCore — one Hostage rack part's real-time MIDI gate.
 //
 // Pulled out of the AudioProcessor shell (RackProcessors.h) for the same reason the repo
 // pulled RestorePolicy out of PluginProcessor: everything hard in here is ordering, and

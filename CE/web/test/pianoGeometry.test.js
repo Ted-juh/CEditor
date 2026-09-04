@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  isBlack, noteName, whiteIndexOf, whiteCount, keySpan, noteAtFraction, zoneExtent,
+  FULL_KEYBOARD, isBlack, noteName, whiteIndexOf, whiteCount, keySpan, noteAtFraction,
+  zoneExtent, maxPlayBaseOctave, playKeyboardRange, playKeyboardWidthPercent,
 } from '../src/CE_Application/utils/pianoGeometry.js';
 
 test('a full keyboard has 75 white keys and C4 is the 36th', () => {
@@ -15,6 +16,23 @@ test('a full keyboard has 75 white keys and C4 is the 36th', () => {
   assert.equal(noteName(60), 'C4');
   assert.equal(noteName(61), 'C#4');
   assert.equal(noteName(0), 'C-1');
+});
+
+test('the playable keyboard keeps four-octave key size, centres shorter spans and fits longer ones', () => {
+  assert.deepEqual(playKeyboardRange(4, 4), { low: 60, high: 107 });
+  assert.equal(playKeyboardWidthPercent(1), 25);
+  assert.equal(playKeyboardWidthPercent(3), 75);
+  assert.equal(playKeyboardWidthPercent(4), 100);
+  assert.equal(playKeyboardWidthPercent(5), 100);
+  assert.equal(playKeyboardWidthPercent(FULL_KEYBOARD), 100);
+});
+
+test('playable octave spans stay complete and Full reaches every MIDI note', () => {
+  assert.equal(maxPlayBaseOctave(4), 5);
+  assert.deepEqual(playKeyboardRange(8, 4), { low: 72, high: 119 },
+    'a requested span near the top shifts down rather than being clipped');
+  assert.deepEqual(playKeyboardRange(-1, 10), { low: 0, high: 119 });
+  assert.deepEqual(playKeyboardRange(4, FULL_KEYBOARD), { low: 0, high: 127 });
 });
 
 test('black keys ride the seam to the right of their white neighbour', () => {

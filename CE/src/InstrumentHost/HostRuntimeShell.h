@@ -4,7 +4,7 @@
 #include "FloatingEditorWindows.h"
 #include "PluginEditorHost.h"
 
-// HostRuntimeShell — the generated standalone's whole window content (VIP-successor Stage 1).
+// HostRuntimeShell — the generated Hostage standalone's whole window content.
 //
 // The same split WebViewHost gives the editor, without any of the editor: host.html in a
 // WebView on the left, the native PluginEditorHost pane on the right, one
@@ -40,7 +40,6 @@ private:
     void timerCallback() override;
     void emitToWebView (const juce::String& eventName, const juce::var& payload);
 
-    juce::AudioPluginFormatManager formatManager;
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<InstrumentHostService> service;
     // Floating vendor-editor windows — declared after the service so they are destroyed

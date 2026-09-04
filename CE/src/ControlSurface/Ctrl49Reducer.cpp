@@ -1,5 +1,7 @@
 #include "Ctrl49Reducer.h"
 
+#include <algorithm>
+
 namespace ceditor::ctrl49
 {
 
@@ -26,6 +28,16 @@ void Ctrl49Reducer::setPageCount (int count)
     pageCount_ = count < 1 ? 1 : (count > kPageCount ? kPageCount : count);
     if (page_ >= pageCount_)
         page_ = pageCount_ - 1;
+}
+
+bool Ctrl49Reducer::setPage (int page)
+{
+    const auto next = std::clamp (page, 0, pageCount_ - 1);
+    if (next == page_)
+        return false;
+    page_ = next;
+    activeSlot_ = 0;
+    return true;
 }
 
 int Ctrl49Reducer::clamp (int value)

@@ -938,7 +938,7 @@ export function onFontsImported(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
-// --- Instrument Host (VIP-successor Stage 1) ---
+// --- Hostage ---
 // One command event in ({ cmd, ... }), three events out. The whole surface is
 // CE/src/InstrumentHost/InstrumentHostService.h — its header comment is the contract.
 
@@ -1056,6 +1056,36 @@ export function onInstrumentHostArpStep(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Lightweight control-rate meter updates for MIDI LFOs. The full rack stays authoritative;
+    this event only replaces each oscillator's transient phase and value. */
+export function onInstrumentHostLfoActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLfoActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Lightweight ADSR stage/value updates; authored envelope settings still arrive in state. */
+export function onInstrumentHostEnvelopeActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostEnvelopeActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Lightweight MSEG playhead/value updates; the breakpoint curve remains authored state. */
+export function onInstrumentHostMsegActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMsegActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Lightweight seeded-random phase/value updates; authored settings remain in full state. */
+export function onInstrumentHostRandomModulatorActivity(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener(
+    'instrumentHostRandomModulatorActivity', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostChordLearn(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostChordLearn', callback);
@@ -1104,7 +1134,8 @@ export function onInstrumentHostLicenceReceipt(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
-/** The §17.7 support-bundle answer ({ entries, includeStateBlobs, written?, path? }). The same
+/** The §17.7 support-bundle answer
+    ({ entries, includeStateBlobs, includeWorkerDumps, written?, path? }). The same
     event carries the preview and the export, because they are the same list — the difference
     is only whether a file was written, which the payload says. */
 export function onInstrumentHostSupportBundle(callback) {

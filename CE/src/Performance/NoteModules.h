@@ -2,6 +2,9 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
+#include <limits>
+#include <utility>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "PatternModel.h"
 #include "Transport.h"
@@ -202,7 +205,7 @@ private:
 };
 
 //==================================================================================================
-/** Strum — a chord spread over a moment, in pitch order.
+/** Strum — a chord spread over a moment, with playable stroke patterns and dynamics.
 
     The catch this is built around: you cannot strum a chord you have not finished hearing. The
     notes of a chord arrive over a few milliseconds, so emitting each one as it lands can only
@@ -217,7 +220,13 @@ public:
     void setSettings (const NoteModuleSettings& settings) noexcept
     {
         spreadPpq.store (juce::jlimit (0.0, 1.0, settings.strumBeats));
-        downwards.store (settings.strumDown);
+        auto chosenPattern = settings.strumPattern;
+        // An in-memory caller from before StrumPattern existed may still set only this bool.
+        if (chosenPattern == NoteModuleSettings::StrumPattern::ascending && settings.strumDown)
+            chosenPattern = NoteModuleSettings::StrumPattern::descending;
+        pattern.store ((int) chosenPattern);
+        curve.store (juce::jlimit (-1.0f, 1.0f, settings.strumCurve));
+        velocityRamp.store (juce::jlimit (-64, 64, settings.strumVelocityRamp));
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -229,7 +238,8 @@ public:
 
         // Spreading nothing must not cost the collection window's latency. A strum turned off
         // is a wire, not a very fast strum.
-        if (spreadPpq.load() <= 0.0 && collecting == 0)
+        if (spreadPpq.load() <= 0.0 && collecting == 0 && trackedNotes == 0
+            && pending.isEmpty())
         {
             for (const auto metadata : in)
                 out.addEvent (metadata.getMessage(), metadata.samplePosition);
@@ -258,11 +268,24 @@ public:
             if (message.isNoteOff())
             {
                 for (int i = 0; i < collecting; ++i)
-                    if (collected[(size_t) i].message.getNoteNumber() == message.getNoteNumber())
+                    if (collected[(size_t) i].message.getChannel() == message.getChannel()
+                          && collected[(size_t) i].message.getNoteNumber() == message.getNoteNumber())
                     {
-                        pending.add (collectUntil + spreadPpq.load(), message);
+                        collected[(size_t) i].noteOff = message;
+                        collected[(size_t) i].offAt = at;
+                        collected[(size_t) i].hasNoteOff = true;
                         goto nextEvent;
                     }
+
+                double releaseDelay = 0.0;
+                if (takeReleaseDelay (message.getChannel(), message.getNoteNumber(), releaseDelay))
+                {
+                    if (releaseDelay <= 0.0)
+                        out.addEvent (message, metadata.samplePosition);
+                    else
+                        pending.add (at + releaseDelay, message);
+                    goto nextEvent;
+                }
             }
 
             out.addEvent (message, metadata.samplePosition);
@@ -271,6 +294,9 @@ public:
 
         if (collecting > 0 && window.end >= collectUntil)
             dealOut (out, block, numSamples, window);
+
+        // An off delayed by less than this block belongs in this block, not one buffer late.
+        pending.flushDue (out, window.start, window.end, block, numSamples);
     }
 
     void allNotesOff (juce::MidiBuffer& out, int position) noexcept
@@ -278,10 +304,127 @@ public:
         collecting = 0;
         pending.dropNoteOns();
         pending.flushAll (out, position);
+        for (int channel = 0; channel < 16; ++channel)
+            for (int note = 0; note < 128; ++note)
+            {
+                auto& entry = releaseDelays[(size_t) channel][(size_t) note];
+                if (entry.active)
+                    out.addEvent (juce::MidiMessage::noteOff (channel + 1, note), position);
+                entry.active = false;
+            }
+        trackedNotes = 0;
     }
 
 private:
-    struct Waiting { juce::MidiMessage message; double at; };
+    struct Waiting
+    {
+        juce::MidiMessage message;
+        double at = 0.0;
+        juce::MidiMessage noteOff;
+        double offAt = 0.0;
+        bool hasNoteOff = false;
+    };
+
+    struct ReleaseDelay
+    {
+        double ppq = 0.0;
+        bool active = false;
+    };
+
+    static double strokePosition (int rank, int count, float amount) noexcept
+    {
+        if (count <= 1)
+            return 0.0;
+        const auto t = (double) rank / (double) (count - 1);
+        const auto exponent = amount >= 0.0f ? 1.0 + 3.0 * (double) amount
+                                             : 1.0 / (1.0 + 3.0 * (double) -amount);
+        return std::pow (t, exponent);
+    }
+
+    juce::uint32 nextRandom() noexcept
+    {
+        randomState ^= randomState << 13;
+        randomState ^= randomState >> 17;
+        randomState ^= randomState << 5;
+        return randomState;
+    }
+
+    void makeOrder (NoteModuleSettings::StrumPattern stroke, int count,
+                    int (&order)[maxChord]) noexcept
+    {
+        for (int i = 0; i < count; ++i)
+            order[i] = i;
+
+        if (stroke == NoteModuleSettings::StrumPattern::alternate)
+        {
+            stroke = alternateDescending ? NoteModuleSettings::StrumPattern::descending
+                                         : NoteModuleSettings::StrumPattern::ascending;
+            alternateDescending = ! alternateDescending;
+        }
+
+        if (stroke == NoteModuleSettings::StrumPattern::descending)
+        {
+            for (int i = 0; i < count; ++i)
+                order[i] = count - 1 - i;
+        }
+        else if (stroke == NoteModuleSettings::StrumPattern::outsideIn)
+        {
+            auto low = 0;
+            auto high = count - 1;
+            for (int i = 0; i < count; ++i)
+                order[i] = (i % 2 == 0) ? low++ : high--;
+        }
+        else if (stroke == NoteModuleSettings::StrumPattern::insideOut)
+        {
+            auto low = (count - 1) / 2;
+            auto high = count / 2;
+            auto cursor = 0;
+            if (low == high)
+            {
+                order[cursor++] = low;
+                --low;
+                ++high;
+            }
+            while (cursor < count)
+            {
+                if (low >= 0)
+                    order[cursor++] = low--;
+                if (cursor < count && high < count)
+                    order[cursor++] = high++;
+            }
+        }
+        else if (stroke == NoteModuleSettings::StrumPattern::random)
+        {
+            for (int i = count - 1; i > 0; --i)
+            {
+                const auto other = (int) (nextRandom() % (juce::uint32) (i + 1));
+                std::swap (order[i], order[other]);
+            }
+        }
+    }
+
+    void rememberReleaseDelay (int channel, int note, double ppq) noexcept
+    {
+        if (channel < 1 || channel > 16 || ! juce::isPositiveAndBelow (note, 128))
+            return;
+        auto& entry = releaseDelays[(size_t) (channel - 1)][(size_t) note];
+        if (! entry.active)
+            ++trackedNotes;
+        entry = { ppq, true };
+    }
+
+    bool takeReleaseDelay (int channel, int note, double& ppq) noexcept
+    {
+        if (channel < 1 || channel > 16 || ! juce::isPositiveAndBelow (note, 128))
+            return false;
+        auto& entry = releaseDelays[(size_t) (channel - 1)][(size_t) note];
+        if (! entry.active)
+            return false;
+        ppq = entry.ppq;
+        entry.active = false;
+        trackedNotes = juce::jmax (0, trackedNotes - 1);
+        return true;
+    }
 
     void dealOut (juce::MidiBuffer& out, const Transport::BlockTime& block, int numSamples,
                   ModuleClock::Window window) noexcept
@@ -301,13 +444,33 @@ private:
         }
 
         const auto spread = spreadPpq.load();
-        const auto down = downwards.load();
-        const auto gap = collecting > 1 ? spread / (double) (collecting - 1) : 0.0;
+        const auto shape = curve.load();
+        const auto velocityChange = velocityRamp.load();
+        int order[maxChord] {};
+        makeOrder ((NoteModuleSettings::StrumPattern) pattern.load(), collecting, order);
 
-        for (int i = 0; i < collecting; ++i)
+        for (int rank = 0; rank < collecting; ++rank)
         {
-            const auto order = down ? (collecting - 1 - i) : i;
-            pending.add (collectUntil + (double) order * gap, collected[(size_t) i].message);
+            auto& waiting = collected[(size_t) order[rank]];
+            const auto position = strokePosition (rank, collecting, shape);
+            const auto strokeDelay = spread * position;
+            const auto totalDelay = juce::jmax (0.0, collectUntil - waiting.at) + strokeDelay;
+            auto noteOn = waiting.message;
+            const auto velocity = juce::jlimit (1, 127,
+                (int) noteOn.getVelocity() + juce::roundToInt ((double) velocityChange * position));
+            noteOn = juce::MidiMessage::noteOn (noteOn.getChannel(), noteOn.getNoteNumber(),
+                                                 (juce::uint8) velocity);
+
+            if (pending.add (collectUntil + strokeDelay, noteOn))
+            {
+                rememberReleaseDelay (noteOn.getChannel(), noteOn.getNoteNumber(), totalDelay);
+                if (waiting.hasNoteOff)
+                {
+                    pending.add (waiting.offAt + totalDelay, waiting.noteOff);
+                    double ignored = 0.0;
+                    takeReleaseDelay (noteOn.getChannel(), noteOn.getNoteNumber(), ignored);
+                }
+            }
         }
 
         collecting = 0;
@@ -317,24 +480,32 @@ private:
     ModuleClock clock;
     PendingEvents pending;
     std::array<Waiting, maxChord> collected {};
+    std::array<std::array<ReleaseDelay, 128>, 16> releaseDelays {};
     int collecting = 0;
+    int trackedNotes = 0;
     double collectUntil = 0.0;
     /** A sixty-fourth note. Long enough that a hand-played chord arrives inside it, short
         enough that nobody feels it. */
     static constexpr double collectPpq = 0.0625;
     std::atomic<double> spreadPpq { 0.125 };
-    std::atomic<bool> downwards { false };
+    std::atomic<int> pattern { (int) NoteModuleSettings::StrumPattern::ascending };
+    std::atomic<float> curve { 0.0f };
+    std::atomic<int> velocityRamp { 0 };
+    bool alternateDescending = false;
+    juce::uint32 randomState = 0x51f15e1du;
 };
 
 //==================================================================================================
-/** Humanize — bounded jitter on when a note lands and how hard.
+/** Humanize — bounded jitter on when a note lands, how hard, and how long it lasts.
 
     Notes can only be pushed LATER. Playing one earlier than it arrived would need to know the
     future, so the module delays within a window instead of centring on the original — which
     means it adds a little latency by construction, and says so rather than pretending.
 
-    A note-off is delayed by exactly what its note-on was, so the length you played survives.
-    Getting that wrong is what makes a naive humanizer chop notes in half. */
+    Gate variation is based on the played duration. A shortened gate can never be scheduled in
+    the past or before its delayed note-on, which is what prevents tiny notes becoming stuck or
+    inverted. Chord lock shares timing between notes at the same source position; beat protect
+    keeps exact whole-beat attacks on the grid. */
 class HumanizeEngine
 {
 public:
@@ -342,6 +513,9 @@ public:
     {
         timingPpq.store (juce::jlimit (0.0, 0.25, settings.humanizeTimingBeats));
         velocityAmount.store (juce::jlimit (0, 64, settings.humanizeVelocity));
+        gateAmount.store (juce::jlimit (0, 100, settings.humanizeGatePercent));
+        preserveChords.store (settings.humanizePreserveChords);
+        protectBeats.store (settings.humanizeProtectBeats);
     }
 
     void process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
@@ -353,6 +527,11 @@ public:
 
         const auto jitter = timingPpq.load();
         const auto velocityJitter = velocityAmount.load();
+        const auto gateJitter = (double) gateAmount.load() / 100.0;
+        const auto keepChordsTogether = preserveChords.load();
+        const auto keepBeatAnchors = protectBeats.load();
+        auto lastAttackAt = std::numeric_limits<double>::lowest();
+        auto lastAttackDelay = 0.0;
 
         for (const auto metadata : in)
         {
@@ -361,10 +540,21 @@ public:
 
             if (message.isNoteOn())
             {
-                const auto delay = jitter * random.nextDouble();
+                const auto onBeat = std::abs (at - std::round (at))
+                                      <= block.ppqPerSample * 0.5;
+                auto delay = keepBeatAnchors && onBeat ? 0.0 : jitter * random.nextDouble();
+                if (keepChordsTogether
+                    && std::abs (at - lastAttackAt) <= block.ppqPerSample * 0.5)
+                    delay = lastAttackDelay;
+                else
+                {
+                    lastAttackAt = at;
+                    lastAttackDelay = delay;
+                }
                 const auto index = slotFor (message.getChannel(), message.getNoteNumber());
                 if (index >= 0)
-                    delays[(size_t) index] = { message.getChannel(), message.getNoteNumber(), delay };
+                    delays[(size_t) index] = { message.getChannel(), message.getNoteNumber(),
+                                              delay, at, at + delay };
 
                 auto velocity = (int) message.getVelocity();
                 if (velocityJitter > 0)
@@ -379,7 +569,22 @@ public:
 
             if (message.isNoteOff())
             {
-                pending.add (at + takeDelay (message.getChannel(), message.getNoteNumber()), message);
+                const auto timing = takeTiming (message.getChannel(), message.getNoteNumber());
+                if (timing.note < 0)
+                {
+                    pending.add (at, message);
+                    continue;
+                }
+
+                const auto playedDuration = juce::jmax (0.0, at - timing.sourceOnPpq);
+                const auto gateScale = gateJitter > 0.0
+                    ? (random.nextDouble() * 2.0 - 1.0) * gateJitter : 0.0;
+                auto releaseAt = at + timing.delayPpq + playedDuration * gateScale;
+                // The source release has arrived, so this is the earliest real-time-safe
+                // shortening. The delayed on must still sound for at least one sample.
+                releaseAt = juce::jmax (at, timing.scheduledOnPpq + block.ppqPerSample,
+                                        releaseAt);
+                pending.add (releaseAt, message);
                 continue;
             }
 
@@ -398,34 +603,47 @@ public:
     }
 
 private:
-    struct Delay { int channel = 0; int note = -1; double ppq = 0.0; };
+    struct Delay
+    {
+        int channel = 0;
+        int note = -1;
+        double delayPpq = 0.0;
+        double sourceOnPpq = 0.0;
+        double scheduledOnPpq = 0.0;
+    };
 
     int slotFor (int channel, int note) noexcept
     {
         for (int i = 0; i < (int) delays.size(); ++i)
-            if (delays[(size_t) i].note < 0
-                  || (delays[(size_t) i].channel == channel && delays[(size_t) i].note == note))
+            if (delays[(size_t) i].channel == channel && delays[(size_t) i].note == note)
+                return i;
+        for (int i = 0; i < (int) delays.size(); ++i)
+            if (delays[(size_t) i].note < 0)
                 return i;
         return -1;
     }
 
-    double takeDelay (int channel, int note) noexcept
+    Delay takeTiming (int channel, int note) noexcept
     {
         for (auto& entry : delays)
             if (entry.note == note && entry.channel == channel)
             {
+                const auto found = entry;
                 entry.note = -1;
-                return entry.ppq;
+                return found;
             }
-        return 0.0;      // never heard its note-on: send it now rather than not at all
+        return {};      // never heard its note-on: send its off now rather than not at all
     }
 
     ModuleClock clock;
     PendingEvents pending;
     std::array<Delay, 32> delays {};
     juce::Random random { 0x5eed1234 };
-    std::atomic<double> timingPpq { 0.02 };
-    std::atomic<int> velocityAmount { 12 };
+    std::atomic<double> timingPpq { 0.0 };
+    std::atomic<int> velocityAmount { 0 };
+    std::atomic<int> gateAmount { 0 };
+    std::atomic<bool> preserveChords { false };
+    std::atomic<bool> protectBeats { false };
 };
 
 //==================================================================================================

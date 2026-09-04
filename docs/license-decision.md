@@ -44,7 +44,7 @@ to match the business model.
 
 ## Update, 2026-08-27: the mechanism now exists, the decision still does not
 
-The §19 "Trust" block of the VIP-successor baseline has been implemented — perpetual licences,
+The §19 "Trust" block of the Hostage baseline has been implemented — perpetual licences,
 offline signature verification, seat records, the sunset key — and is documented for users in
 [Licence, updates and the sunset promise](licence-and-sunset-policy.md).
 

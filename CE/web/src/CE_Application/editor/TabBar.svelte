@@ -47,7 +47,7 @@
     script: 'Script Workspace',
     settings: 'Settings',
     screen: 'Screen',
-    instrumentHost: 'Instrument Host',
+    instrumentHost: 'Hostage',
   };
 
   function tabTooltip(tab) {

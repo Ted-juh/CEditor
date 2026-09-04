@@ -132,6 +132,8 @@ private:
     std::unique_ptr<Ctrl49SurfaceEndpoints> endpoints;
     std::unique_ptr<Ctrl49Session> session;
     Ctrl49Reducer reducer;
+    juce::int64 movementSequence = 0;
+    int movingSlot = -1;
     Bytes lastLabels, lastState;
 };
 

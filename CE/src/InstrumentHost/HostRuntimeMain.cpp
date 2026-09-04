@@ -5,7 +5,7 @@
  #include <dwmapi.h>
 #endif
 
-// HostRuntimeMain — the generated standalone target (VIP-successor Stage 1).
+// HostRuntimeMain — the generated Hostage standalone target.
 //
 // A window around HostRuntimeShell and nothing else; everything the product does lives in the
 // shell and the service. The product name and version arrive from CMake (CEHOST_PRODUCT_NAME /
@@ -13,7 +13,7 @@
 // binary shape ships under whatever name the project chose.
 
 #ifndef CEHOST_PRODUCT_NAME
- #define CEHOST_PRODUCT_NAME "CE Instrument Host"
+ #define CEHOST_PRODUCT_NAME "Hostage"
 #endif
 #ifndef CEHOST_PRODUCT_VERSION
  #define CEHOST_PRODUCT_VERSION "0.1.0"

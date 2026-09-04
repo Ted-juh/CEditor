@@ -4,8 +4,7 @@
 #include "RackModel.h"
 #include "RackProcessors.h"
 
-// InstrumentRackHost — the live multi-part rack over one AudioProcessorGraph (VIP-successor
-// Stage 1).
+// InstrumentRackHost — Hostage's live multi-part rack over one AudioProcessorGraph.
 //
 // Owns the Performance document (RackModel.h) and keeps the graph matched to it: per part a
 // PartMidiFilterProcessor and a GainPanProcessor around an optional instrument node, all
@@ -93,6 +92,17 @@ public:
     juce::AudioProcessor* getEffect (const juce::String& effectId) const;
     bool effectHasProcessor (const juce::String& effectId) const;
 
+    struct ProcessorFailure
+    {
+        juce::String targetId;
+        juce::String name;
+        bool effect = false;
+    };
+    /** Message-thread poll of guarded processors that threw during prepare/process/state.
+        Each failure is delivered once; the failed wrapper remains silent/bypassed until the
+        service replaces it through the normal generation-ticket transaction. */
+    juce::Array<ProcessorFailure> takeProcessorFailures();
+
     // -- send/return chains (Stage 5) ---------------------------------------------------
     // Shared buses through the same graph and the same effect transaction: every part gets a
     // post-fader send gain per return, the chain's effects process the sum, and the chain's
@@ -156,6 +166,12 @@ public:
         part's id takes that part's chain output. Refused when it would loop, or names a part
         that does not exist. */
     bool setPartMidiSource (const juce::String& partId, const juce::String& sourcePartId);
+    /** Rebuilds the audio-thread layer snapshot after the service edits layerGroups. Invalid
+        or internally-routed members are omitted. The edit is followed by a complete note
+        release so no old allocation can remain held under the new rules. */
+    void refreshLayerRouting();
+    /** Updates every macro-sourced layer without rebuilding the configuration. */
+    void setLayerMacroValue (const juce::String& macroId, float value);
     /** Hands the part's sender its device sink — empty disconnects. */
     bool setHardwareMidiSink (const juce::String& partId, MidiSendProcessor::Sink sink);
     /** Sends the configured bank select / program change through the sink, now. False when
@@ -172,6 +188,9 @@ public:
         NOT rechannelled: a system-exclusive message has no channel to rewrite, and rewriting
         one would corrupt the very bytes the synth sent us. */
     bool sendHardwareMidi (const juce::String& partId, const juce::MidiBuffer& messages);
+    /** Sends configuration MIDI to either kind of part: directly to a hardware sink, or
+        queued into a software instrument's next process block. */
+    bool sendPartMidi (const juce::String& partId, const juce::MidiBuffer& messages);
 
     // -- master level and output pairs (Stage 7) ----------------------------------------
     /** The Performance-wide fader, 0..2 linear. The one control the generated product hands
@@ -400,6 +419,7 @@ private:
 
     Performance model;
     perf::PerformanceEngine engine;
+    LayerRouter layerRouter;
     std::map<juce::String, LivePart> live;
     std::map<juce::String, LiveEffect> liveEffects;   // keyed by effectId, every chain kind
     std::map<juce::String, juce::AudioProcessorGraph::Node::Ptr> returnLevelNodes;   // per returnId

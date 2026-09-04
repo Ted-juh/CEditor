@@ -1,4 +1,4 @@
-// PartMidiFilterTests — the per-part MIDI gate's ordering rules (VIP-successor Stage 1).
+// PartMidiFilterTests — Hostage's per-part MIDI gate ordering rules.
 //
 // The invariant under test is the baseline's note-safety rule: acceptance is decided at
 // note-on time and remembered, so a note-off always reaches the destination that got the

@@ -1,14 +1,14 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "IsolatedPluginProxy.h"
 #include "InstrumentHostService.h"
 
-// PluginInstantiator — the one real instantiator, shared by everything that hosts (VIP-successor
-// Stage 1).
+// PluginInstantiator — the one real instantiator shared by every Hostage runtime.
 //
 // The editor's bridge glue and both generated wrappers hand InstrumentHostService the same
-// behaviour: parse the catalogue's stored PluginDescription XML, refuse it readably, and let
-// JUCE's async path deliver the instance on the message thread. In its own header rather than
+// behaviour: launch one live worker over the catalogue's stored PluginDescription XML and let
+// its async handshake deliver the proxy on the message thread. In its own header rather than
 // HostRuntimeShared.h because THAT file needs the embedded web bundle (PlayerWebData) — and the
 // editor target embeds a different BinaryData, so including it there would collide. This one
 // needs juce_audio_processors and nothing else.
@@ -16,40 +16,29 @@
 namespace ceditor::host
 {
 
-/** Builds the service's instantiate function over a format manager, which must outlive the
-    returned function. */
+/** Builds the crash-isolated instantiator. No format manager is needed in the Hostage process:
+    the real AudioPluginInstance is created by CEditorPluginWorker. */
 inline std::function<void (const juce::String&, double, int, InstrumentHostService::InstantiateCallback)>
-makePluginInstantiator (juce::AudioPluginFormatManager& manager)
+makeIsolatedPluginInstantiator (const juce::File& liveWorkerExecutable,
+                                const juce::File& temporaryDirectory)
 {
-    return [&manager] (const juce::String& descriptionXml, double sampleRate, int blockSize,
-                       InstrumentHostService::InstantiateCallback done)
+    return [liveWorkerExecutable, temporaryDirectory]
+           (const juce::String& descriptionXml, double sampleRate, int blockSize,
+            InstrumentHostService::InstantiateCallback done)
     {
-        juce::PluginDescription description;
-        const auto parsed = juce::XmlDocument::parse (descriptionXml);
-        if (parsed == nullptr || ! description.loadFromXml (*parsed))
-        {
-            done (nullptr, "unreadable plugin description");
-            return;
-        }
-
-        manager.createPluginInstanceAsync (description, sampleRate, blockSize,
-            [done] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
-            {
-                done (std::move (instance), error);
-            });
+        IsolatedPluginProxy::launchAsync (liveWorkerExecutable, temporaryDirectory,
+                                          descriptionXml, sampleRate, blockSize,
+                                          std::move (done));
     };
 }
 
-/** The vendor .vstpreset loader for Options::applyVstPreset — JUCE's own, which re-validates
-    the class id inside the file against the live instance, so a mismatched preset fails
-    here instead of half-applying. Requires JUCE_PLUGINHOST_VST3, like everything hosting. */
+/** Vendor .vstpreset loading stays on the isolated instance. The worker uses JUCE's loader,
+    which re-validates the class id against the real instance before applying it. */
 inline bool applyVstPresetFile (juce::AudioProcessor& processor, const juce::File& presetFile)
 {
-    auto* instance = dynamic_cast<juce::AudioPluginInstance*> (&processor);
-    juce::MemoryBlock data;
-    if (instance == nullptr || ! presetFile.loadFileAsData (data))
-        return false;
-    return juce::VST3PluginFormat::setStateFromVSTPresetFile (instance, data);
+    if (auto* isolated = dynamic_cast<IsolatedPluginProxy*> (&processor))
+        return isolated->applyVstPreset (presetFile);
+    return false;
 }
 
 } // namespace ceditor::host

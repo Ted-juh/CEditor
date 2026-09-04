@@ -7,14 +7,15 @@
    * much if the person in front of it cannot see that it happened and cannot get back out —
    * a safe mode nobody can find is indistinguishable from a broken install.
    *
-   * Four blocks, in the order somebody in trouble needs them: what happened, what is being
-   * skipped because of it, what came back damaged, and how to hand the whole picture to
-   * somebody else.
+   * Five blocks, in the order somebody in trouble needs them: what happened, what was kept
+   * alive in this run, what is skipped on startup, what came back damaged, and how to hand
+   * the whole picture to somebody else.
    */
   import {
     hostState, hostSupportBundle,
     setSafeMode, clearSafeModeSuspect, clearAllSafeModeSuspects,
     acknowledgeRecovery, restoreLastKnownGood,
+    setAutomaticFailover, retryFailedProcessor, dismissFailoverEvent,
     previewSupportBundle, exportSupportBundle, clearQuarantine,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -22,6 +23,7 @@
   let reliability = $derived($hostState.reliability);
   let safeMode = $derived(reliability.safeMode);
   let recovery = $derived(reliability.recovery);
+  let failover = $derived(reliability.automaticFailover);
   let bundle = $derived($hostSupportBundle);
 
   // Every module the scan touched that produced nothing loadable, and why. This is the whole
@@ -44,8 +46,11 @@
   let includeStateBlobs = $state(false);
   let includeCrashStates = $state(true);
   let includeLogs = $state(true);
+  let includeWorkerDumps = $state(false);
 
-  const bundleOptions = () => ({ includeStateBlobs, includeCrashStates, includeLogs });
+  const bundleOptions = () => ({
+    includeStateBlobs, includeCrashStates, includeLogs, includeWorkerDumps,
+  });
 
   const levelLabel = {
     normal: 'Loading everything',
@@ -58,6 +63,14 @@
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function failoverState(event) {
+    if (event.state === 'waiting') return 'retry queued';
+    if (event.state === 'loading') return 'restoring now';
+    if (event.state === 'recovered') return 'restored';
+    if (event.state === 'bypassed') return event.effect ? 'dry-bypassed' : 'silenced';
+    return 'needs attention';
   }
 </script>
 
@@ -109,6 +122,85 @@
           Go back to it
         </button>
       {/if}
+    </section>
+
+    <section class="block" data-testid="reliability-live-failover">
+      <strong>Live plug-in failover</strong>
+      {#if failover.isolationAvailable}
+        <p class="note">
+          Each plug-in runs in its own worker process. If it crashes, disconnects or stops meeting
+          audio deadlines, Hostage removes only that instance from the audio path. Effects pass dry
+          audio and instruments fall silent while a fresh worker receives the last saved state.
+          Other parts keep playing; Hostage never silently reloads the plug-in in its own process.
+        </p>
+      {:else}
+        <p class="note warn" data-testid="reliability-isolation-unavailable">
+          The isolated live-worker executable is not available in this build. Plug-in loading will
+          refuse safely instead of falling back to running third-party code inside Hostage.
+        </p>
+      {/if}
+      <span class="check">
+        <PropertyToggle compact value={failover.enabled}
+                        ariaLabel="Automatically restore failed plug-ins"
+                        onchange={(enabled) => setAutomaticFailover({ enabled })} />
+        Restore failed plug-ins automatically
+      </span>
+      <div class="policy-row">
+        <label class="field">Attempts
+          <select value={failover.maxAttempts}
+                  onchange={(e) => setAutomaticFailover({ maxAttempts: Number(e.currentTarget.value) })}
+                  data-testid="reliability-failover-attempts">
+            {#each [1, 2, 3, 4, 5] as attempts (attempts)}
+              <option value={attempts}>{attempts}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="field">First retry
+          <select value={failover.retryDelayMs}
+                  onchange={(e) => setAutomaticFailover({ retryDelayMs: Number(e.currentTarget.value) })}
+                  data-testid="reliability-failover-delay">
+            <option value={100}>0.1 s</option>
+            <option value={250}>0.25 s</option>
+            <option value={500}>0.5 s</option>
+            <option value={1000}>1 s</option>
+            <option value={2000}>2 s</option>
+          </select>
+        </label>
+      </div>
+
+      {#if failover.events.length === 0}
+        <p class="note quiet">No plug-in has been removed from this run.</p>
+      {:else}
+        <div class="failover-events" data-testid="reliability-failover-events">
+          {#each failover.events as event (event.targetId)}
+            <div class:recovered={event.state === 'recovered'} class="failover-event">
+              <div class="event-line">
+                <span class="suspect-name">{event.name || event.targetId}</span>
+                <span class="status">{failoverState(event)}</span>
+              </div>
+              <span class="detail wide">
+                {event.effect ? 'Effect' : 'Instrument'}
+                {event.attempts > 0 ? ` · ${event.attempts}/${failover.maxAttempts} attempts` : ''}
+                {event.error ? ` · ${event.error}` : ''}
+              </span>
+              <div class="alert-actions">
+                {#if event.state === 'failed' || event.state === 'bypassed'}
+                  <button type="button" class="ghost"
+                          onclick={() => retryFailedProcessor(event.targetId)}>Retry now</button>
+                {/if}
+                {#if event.state !== 'loading'}
+                  <button type="button" class="ghost"
+                          onclick={() => dismissFailoverEvent(event.targetId)}>Dismiss</button>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      <p class="note quiet">
+        Safe startup remains the backstop for an interrupted session and for plug-ins that fail
+        repeatedly after being restored.
+      </p>
     </section>
 
     <section class="block">
@@ -213,6 +305,18 @@
                         onchange={(v) => (includeLogs = v)} />
         Include logs
       </span>
+      <span class="check" data-testid="reliability-include-worker-dumps">
+        <PropertyToggle compact value={includeWorkerDumps}
+                        ariaLabel="Include live plug-in worker minidumps"
+                        onchange={(v) => (includeWorkerDumps = v)} />
+        Include live plug-in worker minidumps
+      </span>
+      {#if includeWorkerDumps}
+        <p class="note warn">
+          Minidumps help diagnose native plug-in crashes, but can contain stack memory and
+          local file paths. Inspect the preview and include them only when support asks.
+        </p>
+      {/if}
       <span class="check" data-testid="reliability-include-blobs">
         <PropertyToggle compact value={includeStateBlobs}
                         ariaLabel="Include each plug-in's own saved state"
@@ -257,9 +361,9 @@
   .reliability-panel {
     margin: 8px 14px 0;
     padding: 10px;
-    border: 1px solid #3b4652;
-    border-radius: 6px;
-    background: #171a1d;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-surface);
     max-height: 420px;
     overflow-y: auto;
   }
@@ -283,6 +387,7 @@
 
   .field { display: flex; align-items: center; gap: 8px; color: #9aa5b1; font-size: 11px; }
   .check { display: flex; align-items: center; gap: 6px; color: #9aa5b1; font-size: 11px; }
+  .policy-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
   .alert {
     border: 1px solid #7a4a4a;
@@ -307,6 +412,21 @@
   }
   .suspect-name { color: #d6dbe0; font-size: 12px; }
 
+  .failover-events { display: flex; flex-direction: column; gap: 5px; }
+  .failover-event {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid #7a4a4a;
+    border-radius: 3px;
+    padding: 5px 7px;
+    background: #241b1b;
+  }
+  .failover-event.recovered { border-color: #3e6548; background: #19221b; }
+  .event-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .status { color: var(--host-accent); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  .detail.wide { max-width: none; white-space: normal; }
+
   .matrix { display: flex; flex-direction: column; gap: 3px; }
   /* The bundle list wants its sizes in a right-hand column; a reason wants to sit next to the
      name it explains, or a wide panel strands it half a screen away from what it is about. */
@@ -329,27 +449,5 @@
 
   .bundle-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-  button {
-    background: #232a31;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 8px;
-    cursor: pointer;
-    font: inherit;
-    font-size: 12px;
-  }
-  button:hover { border-color: #5b9bd5; }
-  button.ghost { background: none; border-color: transparent; color: #7d8894; align-self: flex-start; }
-  button.ghost:hover { color: #d6dbe0; border-color: #3b4652; }
-
-  select {
-    background: #14171a;
-    border: 1px solid #3b4652;
-    border-radius: 4px;
-    color: #d6dbe0;
-    padding: 3px 6px;
-    font: inherit;
-    font-size: 12px;
-  }
+  button.ghost { align-self: flex-start; }
 </style>
