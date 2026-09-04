@@ -39,6 +39,9 @@ test('rack parts separate identity, live controls and secondary actions', () => 
   assert.match(strip, /Click again to confirm removal/);
   assert.match(strip, /class:confirming=\{pendingDestructive === `part:\$\{part\.partId\}`\}/);
   assert.match(source, /\.part-actions button\.icon\.confirming \{[^}]*--host-danger/);
+  // The theme pads every button 4px 10px at (0,2,1); anything weaker leaves 8px for the
+  // glyph inside a 30px square. The strip's rule has to outrank it, and is asserted to.
+  assert.match(source, /\.host-workspace\.host-workspace \.part-actions button\.icon \{[^}]*padding: 0/);
 });
 
 test('rack parts expose plain-language performance controls and exception states', () => {

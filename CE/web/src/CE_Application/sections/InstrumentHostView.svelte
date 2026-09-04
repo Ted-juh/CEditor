@@ -1078,18 +1078,18 @@
               <button type="button" class="ghost icon" disabled={partIndex === 0}
                       data-testid="part-move-up"
                       aria-label={`Move ${partTitle(part)} up`} title="Move up"
-                      onclick={() => moveRackPart(part.partId, partIndex - 1)}><ChevronUp size={16} strokeWidth={2} /></button>
+                      onclick={() => moveRackPart(part.partId, partIndex - 1)}><ChevronUp size={20} strokeWidth={2} /></button>
               <button type="button" class="ghost icon" disabled={partIndex === parts.length - 1}
                       data-testid="part-move-down"
                       aria-label={`Move ${partTitle(part)} down`} title="Move down"
-                      onclick={() => moveRackPart(part.partId, partIndex + 1)}><ChevronDown size={16} strokeWidth={2} /></button>
+                      onclick={() => moveRackPart(part.partId, partIndex + 1)}><ChevronDown size={20} strokeWidth={2} /></button>
               <span class="action-sep" aria-hidden="true"></span>
               <button type="button" class="toggle icon" disabled={!part.hasInstrument}
                       class:on={$hostState.editorOpenPartId === part.partId}
                       data-testid="part-open-editor"
                       aria-label={`Show ${partTitle(part)}'s own interface in the host`}
                       title="Show the plug-in's own interface in the native pane"
-                      onclick={() => toggleEditor(part)}><AppWindow size={15} strokeWidth={1.8} /></button>
+                      onclick={() => toggleEditor(part)}><AppWindow size={19} strokeWidth={1.75} /></button>
               <button type="button" class="toggle icon" disabled={!part.hasInstrument}
                       class:on={$hostState.floatingEditorPartIds.includes(part.partId)}
                       data-testid="part-float-editor"
@@ -1097,7 +1097,7 @@
                       title="Pop the plug-in's interface out into its own window"
                       onclick={() => ($hostState.floatingEditorPartIds.includes(part.partId)
                                         ? closeEditorWindow(part.partId)
-                                        : floatEditor(part.partId))}><PictureInPicture2 size={15} strokeWidth={1.8} /></button>
+                                        : floatEditor(part.partId))}><PictureInPicture2 size={19} strokeWidth={1.75} /></button>
               <button type="button" class="ghost icon" disabled={!part.hasInstrument}
                       class:confirming={pendingDestructive === `unload:${part.partId}`}
                       data-testid="part-unload"
@@ -1107,7 +1107,7 @@
                       title={pendingDestructive === `unload:${part.partId}`
                         ? 'Click again to confirm unload' : 'Unload the instrument, keep the part'}
                       onclick={() => guardedAction(`unload:${part.partId}`,
-                        () => unloadInstrument(part.partId))}><Unplug size={15} strokeWidth={1.8} /></button>
+                        () => unloadInstrument(part.partId))}><Unplug size={19} strokeWidth={1.75} /></button>
               <span class="action-sep" aria-hidden="true"></span>
               <button type="button" class="ghost icon danger"
                       class:confirming={pendingDestructive === `part:${part.partId}`}
@@ -1118,7 +1118,7 @@
                       title={pendingDestructive === `part:${part.partId}`
                         ? 'Click again to confirm removal' : 'Remove this part'}
                       onclick={() => guardedAction(`part:${part.partId}`,
-                        () => removeRackPart(part.partId))}><Trash2 size={15} strokeWidth={1.8} /></button>
+                        () => removeRackPart(part.partId))}><Trash2 size={19} strokeWidth={1.75} /></button>
             </div>
           </div>
           <div class="part-performance">
@@ -2651,8 +2651,15 @@
   .part-actions { flex: none; display: flex; align-items: center; gap: 3px; }
   .action-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--host-line-soft); }
   /* Square, at the control height, so six of them read as one strip rather than six
-     words of six lengths. */
-  .part-actions button.icon {
+     words of six lengths. The glyph fills two thirds of the square.
+
+     The doubled root is not decoration. hostage-theme.css styles every button as
+     `.host-workspace.host-workspace button` with `padding: 4px 10px`, and a plain
+     `.part-actions button.icon` loses to it — which left 8px of content width inside a
+     30px button, and a 19px icon squashed to 8px wide. "The squares are big enough but the
+     icons are quite small" was the exact report. Out-specifying the theme the way the
+     theme out-specifies everything else is the fix, and a size prop alone is not. */
+  .host-workspace.host-workspace .part-actions button.icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2660,10 +2667,10 @@
     height: var(--host-control-height);
     padding: 0;
   }
-  .part-actions button.icon:disabled { opacity: 0.35; }
+  .host-workspace.host-workspace .part-actions button.icon:disabled { opacity: 0.35; }
   /* The confirm state on an icon has no words to change, so it changes colour instead —
      the same red the menu's "Confirm remove" wore — and the tooltip says the rest. */
-  .part-actions button.icon.confirming { border-color: var(--host-danger); background: var(--host-danger-surface); color: var(--host-danger); }
+  .host-workspace.host-workspace .part-actions button.icon.confirming { border-color: var(--host-danger); background: var(--host-danger-surface); color: var(--host-danger); }
   .part-performance { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
   .preset-walk { flex: 0 1 220px; min-width: 150px; display: inline-flex; align-items: center; gap: 3px; }
   .preset-walk .ghost { flex: none; padding: 0 8px; font-size: 16px; line-height: 1; }
