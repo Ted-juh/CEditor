@@ -117,11 +117,34 @@ disabled, and replaces it when retry is enabled.
 
 ## Native editor boundary
 
-An editor window belongs to the worker process. On Windows the first implementation should use a
+An editor window belongs to the worker process. On Windows the first implementation uses a
 worker-owned top-level editor window positioned and focused by Hostage. Cross-process child-HWND
 embedding is fragile across plug-in toolkits and DPI modes and is not required for the first
 safe release. The Hostage parameter editor continues to work through mirrored parameter
 metadata even when a vendor editor cannot be shown.
+
+"Positioned and focused by Hostage" is three things, and for a while it was none of them — the
+worker centred its window and called `toFront`, Windows ignored the `toFront` because a
+background process may not take the foreground, and Hostage then centred a placeholder window
+of its own on the same spot, on top. What it is now:
+
+- **Focused.** The worker reports its process id in the create reply. Before every
+  `editorOpen`, the proxy calls `AllowSetForegroundWindow` for that process (on the message
+  thread, from the click — the one moment the host is entitled to grant it), so the worker's
+  `toFront` is honoured.
+- **Positioned.** `editorOpen` may carry an anchor — where `FloatingEditorWindows` would have
+  put a window of its own, i.e. the part's remembered bounds. The worker honours it when the
+  window is first created and ignores it after; between closes it remembers its own last
+  position, which outranks the anchor. The reply carries the window's bounds, which the host
+  remembers as it does its own windows'.
+- **No placeholder window.** For an isolated part, "float" asks the worker to show its window
+  and counts the part as floated; no `DocumentWindow` is made. The pane still shows a stand-in,
+  because the pane cannot hold the editor: one line saying so and a button that shows the
+  worker's window again — the worker's close button only hides it.
+
+The pane's stand-in and the floated state hold the worker window open by count
+(`acquireRemoteEditor` / `releaseRemoteEditor`), so closing the pane cannot take a floated
+window with it.
 
 ## Delivery slices
 

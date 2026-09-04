@@ -56,6 +56,22 @@ public:
     /** Used by the vendor-preset loader without exposing worker details to the service. */
     bool applyVstPreset (const juce::File& presetFile);
 
+    /** The vendor editor lives in the worker's own top-level window; these are Hostage's
+        handle on it. Message thread only.
+
+        acquire/release count who wants it open — the pane's placeholder while it exists,
+        FloatingEditorWindows while the part is floated — and the window closes when the last
+        one lets go, so closing the pane cannot take a floated window with it. show() brings
+        it forward without changing the count; it is what the placeholder's button does.
+
+        `anchor` is where Hostage would have put a window of its own, honoured the first time
+        the worker creates the window and ignored after: see WorkerEditorController. */
+    bool acquireRemoteEditor (juce::Rectangle<int> anchor);
+    void releaseRemoteEditor() noexcept;
+    bool showRemoteEditor (juce::Rectangle<int> anchor);
+    /** Where the worker last reported its window, empty until it has. */
+    juce::Rectangle<int> lastRemoteEditorBounds() const noexcept { return remoteEditorBounds; }
+
     /** Called by the rack guard on its controlling thread after the audio thread reports a
         failure. This also releases a worker that is hung inside vendor code when retries are off. */
     bool workerIsRunning() const noexcept override;
@@ -89,6 +105,7 @@ private:
         bool crashDumpsAvailable = false;
         juce::String crashDumpError;
         juce::String workerBuildSha256;
+        juce::uint32 workerProcessId = 0;
         int latencySamples = 0;
         double tailSeconds = 0.0;
         int currentProgram = 0;
@@ -123,8 +140,8 @@ private:
     void applyWorkerParameterEvents (const plugin_worker::PluginWorkerBlockBridge::Result&) noexcept;
     juce::String parameterText (int index, float value, int maximumLength);
     float parameterValueFromText (int index, const juce::String& text);
-    bool openRemoteEditor();
-    void closeRemoteEditor() noexcept;
+    bool sendEditorOpen (juce::Rectangle<int> anchor);
+    void sendEditorClose() noexcept;
     void logDiagnostic (const juce::String& event, const juce::String& detail = {}) const;
     [[noreturn]] static void throwFailure (const juce::String&);
 
@@ -141,6 +158,8 @@ private:
     std::atomic<juce::int64> nextRequestId { 1 };
     std::atomic<bool> controlFailed { false };
     juce::CriticalSection requestLock;
+    int remoteEditorHolders = 0;                // message thread only
+    juce::Rectangle<int> remoteEditorBounds;    // message thread only
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IsolatedPluginProxy)
 };

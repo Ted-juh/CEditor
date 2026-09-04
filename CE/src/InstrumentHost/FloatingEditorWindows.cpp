@@ -1,5 +1,6 @@
 #include "FloatingEditorWindows.h"
 #include "EditorSnapshot.h"
+#include "IsolatedPluginProxy.h"
 
 namespace ceditor::host
 {
@@ -111,6 +112,32 @@ void FloatingEditorWindows::show (const juce::String& partId, juce::AudioProcess
         return;
     }
 
+    if (auto* isolated = dynamic_cast<IsolatedPluginProxy*> (&processor))
+    {
+        if (remote.count (partId) > 0)
+        {
+            isolated->showRemoteEditor ({});
+            return;
+        }
+
+        // The worker's window goes where this part's own window last was, if it ever had
+        // one; the worker centres it otherwise, and keeps its own memory after that.
+        juce::Rectangle<int> anchor;
+        if (const auto remembered = rememberedBounds.find (partId); remembered != rememberedBounds.end())
+            anchor = remembered->second;
+
+        if (isolated->acquireRemoteEditor (anchor))
+        {
+            remote[partId] = isolated;
+            return;
+        }
+        // The worker would not open its window (no vendor editor, or a control failure).
+        // Let go of the hold that acquire took — nothing here will release it later — and
+        // fall through to a window of our own around the placeholder, whose button retries
+        // and whose own lifetime holds the count from here on.
+        isolated->releaseRemoteEditor();
+    }
+
     auto window = std::make_unique<EditorWindow> (*this, partId, processor, title);
 
     if (const auto remembered = rememberedBounds.find (partId); remembered != rememberedBounds.end())
@@ -124,6 +151,15 @@ void FloatingEditorWindows::show (const juce::String& partId, juce::AudioProcess
 
 void FloatingEditorWindows::close (const juce::String& partId)
 {
+    if (const auto it = remote.find (partId); it != remote.end())
+    {
+        if (const auto bounds = it->second->lastRemoteEditorBounds(); ! bounds.isEmpty())
+            rememberedBounds[partId] = bounds;
+        it->second->releaseRemoteEditor();
+        remote.erase (it);
+        return;
+    }
+
     const auto it = windows.find (partId);
     if (it == windows.end())
         return;
@@ -134,6 +170,14 @@ void FloatingEditorWindows::close (const juce::String& partId)
 
 void FloatingEditorWindows::closeAll()
 {
+    for (auto& [partId, proxy] : remote)
+    {
+        if (const auto bounds = proxy->lastRemoteEditorBounds(); ! bounds.isEmpty())
+            rememberedBounds[partId] = bounds;
+        proxy->releaseRemoteEditor();
+    }
+    remote.clear();
+
     for (auto& [partId, window] : windows)
         rememberedBounds[partId] = window->getBounds();
     windows.clear();

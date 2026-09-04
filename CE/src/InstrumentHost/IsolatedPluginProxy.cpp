@@ -111,28 +111,48 @@ private:
     std::atomic<juce::uint32> revision { 1 };
 };
 
+// What stands in the pane, or in a host window, for an editor that cannot be there: the
+// vendor's interface is drawn by another process, in a window of its own. Creating this opens
+// that window (and brings it forward); destroying it lets go. The button is for the case the
+// user closed the worker's window with its X, which only hides it — a placeholder that
+// announced an isolated window and offered no way to reach it was the previous version of
+// this class, and the report it drew was the word "AGAIN" in capitals.
 class IsolatedPluginProxy::RemoteEditor final : public juce::AudioProcessorEditor
 {
 public:
     explicit RemoteEditor (IsolatedPluginProxy& ownerToUse)
         : juce::AudioProcessorEditor (&ownerToUse), owner (ownerToUse)
     {
-        setSize (380, 96);
+        showButton.setButtonText ("Show editor window");
+        showButton.onClick = [this] { owner.showRemoteEditor ({}); };
+        addAndMakeVisible (showButton);
+        setSize (380, 124);
+        owner.acquireRemoteEditor ({});
     }
 
-    ~RemoteEditor() override { owner.closeRemoteEditor(); }
+    ~RemoteEditor() override { owner.releaseRemoteEditor(); }
 
     void paint (juce::Graphics& graphics) override
     {
         graphics.fillAll (juce::Colour (0xff171a1d));
-        graphics.setColour (juce::Colour (0xffff8a18));
-        graphics.setFont (15.0f);
-        graphics.drawFittedText ("Vendor editor is running in its isolated window",
-                                 getLocalBounds().reduced (18), juce::Justification::centred, 2);
+        graphics.setColour (juce::Colour (0xffd9e0e6));
+        graphics.setFont (14.0f);
+        graphics.drawFittedText (owner.getName()
+                                     + " runs in its own process, so its interface is a window "
+                                       "of its own.",
+                                 getLocalBounds().reduced (18).removeFromTop (52),
+                                 juce::Justification::centred, 2);
+    }
+
+    void resized() override
+    {
+        showButton.setBounds (getLocalBounds().reduced (18).removeFromBottom (30)
+                                  .withSizeKeepingCentre (190, 30));
     }
 
 private:
     IsolatedPluginProxy& owner;
+    juce::TextButton showButton;
 };
 
 juce::AudioProcessor::BusesProperties IsolatedPluginProxy::busesFor (const Metadata& metadata)
@@ -170,6 +190,8 @@ IsolatedPluginProxy::Metadata IsolatedPluginProxy::parseMetadata (const juce::va
     result.crashDumpsAvailable = value.getProperty ("crashDumpsAvailable", false);
     result.crashDumpError = value.getProperty ("crashDumpError", {}).toString().substring (0, 512);
     result.workerBuildSha256 = value.getProperty ("workerBuildSha256", {}).toString().toLowerCase();
+    result.workerProcessId = static_cast<juce::uint32> (
+        juce::jmax ((juce::int64) 0, (juce::int64) value.getProperty ("pid", 0)));
     result.latencySamples = juce::jmax (0, (int) value.getProperty ("latencySamples", 0));
     result.tailSeconds = juce::jmax (0.0, (double) value.getProperty ("tailSeconds", 0.0));
 
@@ -832,17 +854,68 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
 
 juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
 {
-    return metadata.hasEditor && openRemoteEditor() ? new RemoteEditor (*this) : nullptr;
+    // The placeholder is returned even if the worker refuses to open its window: it carries
+    // the button that tries again, and a pane with nothing in it says less.
+    return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
 }
 
-bool IsolatedPluginProxy::openRemoteEditor()
+bool IsolatedPluginProxy::acquireRemoteEditor (juce::Rectangle<int> anchor)
 {
+    ++remoteEditorHolders;
+    return showRemoteEditor (anchor);
+}
+
+void IsolatedPluginProxy::releaseRemoteEditor() noexcept
+{
+    if (remoteEditorHolders <= 0)
+        return;
+    if (--remoteEditorHolders == 0)
+        sendEditorClose();
+}
+
+bool IsolatedPluginProxy::showRemoteEditor (juce::Rectangle<int> anchor)
+{
+#if JUCE_WINDOWS
+    // Windows lets a process hand the foreground to another only while it holds the
+    // foreground itself, and this runs on the message thread from a click — exactly that
+    // moment. Without the grant the worker's toFront is ignored and its window opens behind
+    // Hostage, which is where every vendor editor went until now. Named process when the
+    // worker told us its id; any process otherwise, briefly, rather than nobody.
+    ::AllowSetForegroundWindow (metadata.workerProcessId != 0
+                                    ? static_cast<DWORD> (metadata.workerProcessId)
+                                    : static_cast<DWORD> (ASFW_ANY));
+#endif
+    return sendEditorOpen (anchor);
+}
+
+bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor)
+{
+    auto* object = new juce::DynamicObject();
+    if (! anchor.isEmpty())
+    {
+        object->setProperty ("x", anchor.getX());
+        object->setProperty ("y", anchor.getY());
+        object->setProperty ("width", anchor.getWidth());
+        object->setProperty ("height", anchor.getHeight());
+    }
     juce::MemoryBlock reply;
     juce::String error;
-    return request (MessageType::editorOpen, {}, MessageType::editorOpen, reply, 3000, error);
+    if (! request (MessageType::editorOpen, jsonPayload (juce::var (object)),
+                   MessageType::editorOpen, reply, 3000, error))
+        return false;
+
+    Message message;
+    message.payload = reply;
+    juce::String jsonError;
+    const auto json = decodeJsonPayload (message, jsonError);
+    if (jsonError.isEmpty() && json.isObject())
+        remoteEditorBounds = { (int) json.getProperty ("x", 0), (int) json.getProperty ("y", 0),
+                               (int) json.getProperty ("width", 0),
+                               (int) json.getProperty ("height", 0) };
+    return true;
 }
 
-void IsolatedPluginProxy::closeRemoteEditor() noexcept
+void IsolatedPluginProxy::sendEditorClose() noexcept
 {
     try
     {

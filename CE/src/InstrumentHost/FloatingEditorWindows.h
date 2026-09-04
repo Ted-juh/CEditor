@@ -21,9 +21,18 @@
 // the service stays authoritative and the WebView's toggles keep telling the truth — the
 // same discipline as the pane's own close button. Bounds are remembered per part for the
 // life of the run, so re-floating a part puts its window back where it was.
+//
+// AN ISOLATED PLUG-IN HAS NO EDITOR TO PUT IN A WINDOW. Its interface is drawn by its worker
+// process, in a top-level window that process owns. For those parts "float" means: ask the
+// worker to show that window, where this manager would have put one of its own, and count
+// the part as open until the service closes it. No DocumentWindow is made — the old one held
+// a placeholder saying the editor was elsewhere, centred exactly over the window it was
+// talking about.
 
 namespace ceditor::host
 {
+
+class IsolatedPluginProxy;
 
 class FloatingEditorWindows
 {
@@ -45,7 +54,10 @@ public:
 
     void closeAll();
 
-    bool isOpen (const juce::String& partId) const  { return windows.count (partId) > 0; }
+    bool isOpen (const juce::String& partId) const
+    {
+        return windows.count (partId) > 0 || remote.count (partId) > 0;
+    }
 
     /** The window's own close button, routed out — the service decides, never the window. */
     std::function<void (const juce::String& partId)> onCloseRequested;
@@ -60,6 +72,10 @@ private:
     class EditorWindow;
 
     std::map<juce::String, std::unique_ptr<EditorWindow>> windows;
+    // Parts whose window lives in a worker process. A raw pointer under the same invariant
+    // the windows above rely on: the service closes a part's window before it removes or
+    // replaces that part's instrument, so a proxy here is alive until close() lets it go.
+    std::map<juce::String, IsolatedPluginProxy*> remote;
     std::map<juce::String, juce::Rectangle<int>> rememberedBounds;
 };
 

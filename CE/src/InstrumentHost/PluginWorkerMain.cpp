@@ -80,6 +80,13 @@ juce::var createMetadata (juce::AudioProcessor& processor, bool crashDumpsAvaila
     object->setProperty ("crashDumpsAvailable", crashDumpsAvailable);
     object->setProperty ("crashDumpError", crashDumpError.substring (0, 512));
     object->setProperty ("workerBuildSha256", workerBuildSha256);
+    // Hostage needs this to hand the foreground to this process before the editor opens:
+    // Windows only lets the foreground owner grant it, and only to a named process or all.
+#if JUCE_WINDOWS
+    object->setProperty ("pid", static_cast<juce::int64> (GetCurrentProcessId()));
+#else
+    object->setProperty ("pid", 0);
+#endif
     object->setProperty ("programNames", programNames);
     object->setProperty ("parameters", parameterMetadata (processor));
     return juce::var (object);
@@ -354,45 +361,76 @@ public:
     explicit WorkerEditorController (juce::AudioProcessor& processorToUse)
         : processor (processorToUse) {}
 
-    bool open()
+    /** Shows the vendor editor in this process's own top-level window.
+
+        `anchor` is where Hostage would have put a window of its own — its remembered bounds
+        for the part, or nothing. It is honoured when the window is first created and ignored
+        once it exists: by then the user may have moved it, and a button that snaps a window
+        back to where it started is a button people learn not to press. Between a close and
+        the next open this process remembers the last position itself, which outranks the
+        anchor for the same reason.
+
+        Bringing the window forward only works because Hostage granted the foreground to this
+        process before asking (AllowSetForegroundWindow, on the proxy side). Without that grant
+        Windows ignores toFront from a background process and the editor opens behind the host
+        — which is where every vendor editor went until the grant existed.
+
+        The window's bounds come back so Hostage can remember them as it does its own. */
+    bool open (juce::Rectangle<int> anchor, juce::Rectangle<int>& boundsOut)
     {
-        if (window != nullptr)
+        if (window == nullptr)
         {
-            window->setVisible (true);
-            window->toFront (true);
-            return true;
-        }
-        auto* editor = processor.createEditorIfNeeded();
-        if (editor == nullptr)
-            return false;
+            auto* editor = processor.createEditorIfNeeded();
+            if (editor == nullptr)
+                return false;
 
-        class Window final : public juce::DocumentWindow
-        {
-        public:
-            Window (const juce::String& title, juce::AudioProcessorEditor* editorToOwn)
-                : juce::DocumentWindow (title, juce::Colour (0xff171a1d),
-                                        juce::DocumentWindow::allButtons, true)
+            class Window final : public juce::DocumentWindow
             {
-                setUsingNativeTitleBar (true);
-                setContentOwned (editorToOwn, true);
-                centreWithSize (juce::jmax (320, editorToOwn->getWidth()),
-                                juce::jmax (120, editorToOwn->getHeight()));
-                setResizable (true, false);
-            }
-            void closeButtonPressed() override { setVisible (false); }
-        };
+            public:
+                Window (const juce::String& title, juce::AudioProcessorEditor* editorToOwn)
+                    : juce::DocumentWindow (title, juce::Colour (0xff171a1d),
+                                            juce::DocumentWindow::allButtons, true)
+                {
+                    setUsingNativeTitleBar (true);
+                    setContentOwned (editorToOwn, true);
+                    centreWithSize (juce::jmax (320, editorToOwn->getWidth()),
+                                    juce::jmax (120, editorToOwn->getHeight()));
+                    setResizable (true, false);
+                }
+                // Hide, never destroy: the editor's state and position survive, and the
+                // host's button brings it back. Hostage owns the window's life through
+                // editorClose; this button only owns whether it is on screen.
+                void closeButtonPressed() override { setVisible (false); }
+            };
 
-        window = std::make_unique<Window> (processor.getName(), editor);
+            window = std::make_unique<Window> (processor.getName(), editor);
+
+            // Position precedence: where this process last had it, then where Hostage asks,
+            // then centred (what centreWithSize already did). Constrained so a position
+            // remembered from a monitor that is no longer there cannot put it out of reach.
+            const auto position = ! lastBounds.isEmpty() ? lastBounds.getPosition()
+                                : ! anchor.isEmpty()     ? anchor.getPosition()
+                                                         : window->getPosition();
+            window->setBoundsConstrained (window->getBounds().withPosition (position));
+        }
+
         window->setVisible (true);
         window->toFront (true);
+        boundsOut = window->getBounds();
         return true;
     }
 
-    void close() { window.reset(); }
+    void close()
+    {
+        if (window != nullptr)
+            lastBounds = window->getBounds();
+        window.reset();
+    }
 
 private:
     juce::AudioProcessor& processor;
     std::unique_ptr<juce::DocumentWindow> window;
+    juce::Rectangle<int> lastBounds;
 };
 
 class WorkerControlThread final : public juce::Thread
@@ -629,11 +667,31 @@ public:
                 }
                 else if (received.message.type == MessageType::editorOpen)
                 {
+                    // The payload is optional and so is everything in it: an empty message
+                    // is the pre-anchor request and still opens the editor, centred.
+                    juce::String jsonError;
+                    const auto json = decodeJsonPayload (received.message, jsonError);
+                    juce::Rectangle<int> anchor;
+                    if (jsonError.isEmpty() && json.isObject())
+                        anchor = { (int) json.getProperty ("x", 0), (int) json.getProperty ("y", 0),
+                                   (int) json.getProperty ("width", 0),
+                                   (int) json.getProperty ("height", 0) };
+                    juce::Rectangle<int> bounds;
                     bool opened = false;
-                    invokeProcessor ([&] { opened = editor.open(); });
+                    invokeProcessor ([&] { opened = editor.open (anchor, bounds); });
                     if (! opened)
                         reply = errorReply (generation, received.message.requestId,
                                             "plug-in did not create a vendor editor");
+                    else
+                    {
+                        auto* object = new juce::DynamicObject();
+                        object->setProperty ("x", bounds.getX());
+                        object->setProperty ("y", bounds.getY());
+                        object->setProperty ("width", bounds.getWidth());
+                        object->setProperty ("height", bounds.getHeight());
+                        reply = makeJsonMessage (MessageType::editorOpen, generation,
+                                                 received.message.requestId, juce::var (object));
+                    }
                 }
                 else if (received.message.type == MessageType::editorClose)
                 {
