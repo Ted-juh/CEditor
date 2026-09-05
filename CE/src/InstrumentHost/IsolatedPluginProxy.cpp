@@ -460,6 +460,22 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
                     connection->names = SharedMemoryNames::createUnique();
                     connection->mapping = std::make_unique<SharedDataPlaneMapping>();
                     connection->control = std::make_unique<PluginWorkerControlChannel>();
+                   #if JUCE_WINDOWS
+                    // While this process waits on the worker, keep answering the window
+                    // messages the worker's embedded editor sends it synchronously — the
+                    // reason is written above PluginWorkerControlChannel::serviceWhileWaiting.
+                    // Sent messages only, and only on the message thread: a request made
+                    // from any other thread has nothing to answer.
+                    connection->control->serviceWhileWaiting = []
+                    {
+                        if (auto* manager = juce::MessageManager::getInstanceWithoutCreating();
+                            manager != nullptr && manager->isThisTheMessageThread())
+                        {
+                            MSG message;
+                            PeekMessageW (&message, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+                        }
+                    };
+                   #endif
                     connection->job = std::make_unique<PluginWorkerJob>();
                     connection->process = std::make_unique<juce::ChildProcess>();
                     connection->diagnosticLog = diagnosticLog;

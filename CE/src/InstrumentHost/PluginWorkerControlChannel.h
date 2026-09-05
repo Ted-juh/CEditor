@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <limits>
 
 // Framed, duplex, message-thread control channel. Audio/MIDI never travels here. A single
@@ -16,6 +17,21 @@ namespace ceditor::host::plugin_worker
 class PluginWorkerControlChannel
 {
 public:
+    /** Called repeatedly while a receive() is waiting, at most every waitSliceMs, when set.
+
+        This exists for one reason. The worker's editor window is a CHILD of a Hostage window,
+        and Windows delivers some messages about a child to its ancestors synchronously —
+        WM_PARENTNOTIFY when the child is created or destroyed, WM_MOUSEACTIVATE and
+        WM_SETCURSOR as the user reaches it — by blocking the sending thread until the
+        receiving thread answers. The receiving thread is Hostage's message thread, and
+        during a control request that thread is here, blocked on the pipe, waiting for a
+        reply that the worker's message thread will not produce until its SendMessage
+        returns. Each side waits for the other until the request times out, and a timed-out
+        request is treated as a dead worker. Hostage sets this hook to service pending SENT
+        messages only (PeekMessage with PM_QS_SENDMESSAGE | PM_NOREMOVE), which answers the
+        worker without dispatching anything queued: no timers, no paint, no re-entry into
+        another request. The worker leaves it unset; its control thread is not a UI thread. */
+    std::function<void()> serviceWhileWaiting;
     bool createHost (const juce::String& pipeName, juce::String& error)
     {
         close();
@@ -146,14 +162,28 @@ private:
             // cancellation reports no partial progress. Matching the pipe quantum lets each
             // completed piece become resumable state before the polling deadline expires.
             const auto wanted = juce::jmin (pipeTransferChunkBytes, bytes - received);
-            const auto chunk = pipe.read (write + received, wanted,
-                                          remaining);
-            if (chunk <= 0)
+            // With a hook set, wait in slices so it runs between them. A slice that produces
+            // nothing is not a failure until the deadline is: JUCE's pipe read returns 0 on its
+            // own timeout as well as on disconnect, and the deadline is what tells them apart.
+            const auto sliceLimited = serviceWhileWaiting != nullptr;
+            const auto slice = sliceLimited && (remaining < 0 || remaining > waitSliceMs)
+                                   ? waitSliceMs : remaining;
+            const auto chunk = pipe.read (write + received, wanted, slice);
+            if (chunk < 0)
                 return false;
+            if (chunk == 0)
+            {
+                if (! sliceLimited)
+                    return false;
+                serviceWhileWaiting();
+                continue;
+            }
             received += chunk;
         }
         return true;
     }
+
+    static constexpr int waitSliceMs = 20;
 
     void resetReceiveState()
     {
