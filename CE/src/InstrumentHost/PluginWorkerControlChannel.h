@@ -162,16 +162,17 @@ private:
             // cancellation reports no partial progress. Matching the pipe quantum lets each
             // completed piece become resumable state before the polling deadline expires.
             const auto wanted = juce::jmin (pipeTransferChunkBytes, bytes - received);
-            // With a hook set, wait in slices so it runs between them. A slice that produces
-            // nothing is not a failure until the deadline is: JUCE's pipe read returns 0 on its
-            // own timeout as well as on disconnect, and the deadline is what tells them apart.
+            // With a hook set, wait in slices so it runs between them. JUCE's pipe read
+            // returns -1 for BOTH "nothing arrived before my timeout" and "the other end is
+            // gone", so with a sliced timeout a negative result is not a verdict: only the
+            // deadline is. Without the hook the read waits the whole deadline and -1 keeps
+            // its old meaning. (The first version of this slicing returned on the first -1,
+            // and every worker was declared dead 20 ms after it started.)
             const auto sliceLimited = serviceWhileWaiting != nullptr;
             const auto slice = sliceLimited && (remaining < 0 || remaining > waitSliceMs)
                                    ? waitSliceMs : remaining;
             const auto chunk = pipe.read (write + received, wanted, slice);
-            if (chunk < 0)
-                return false;
-            if (chunk == 0)
+            if (chunk <= 0)
             {
                 if (! sliceLimited)
                     return false;
@@ -183,7 +184,10 @@ private:
         return true;
     }
 
-    static constexpr int waitSliceMs = 20;
+    // Long enough that the cancel-and-retry a slice boundary implies is rare, short enough
+    // that a worker blocked on a synchronous window message is answered before anyone
+    // notices. The worker's own control loop already polls this pipe at 100 ms.
+    static constexpr int waitSliceMs = 50;
 
     void resetReceiveState()
     {
