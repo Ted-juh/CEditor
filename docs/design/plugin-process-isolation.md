@@ -117,40 +117,30 @@ disabled, and replaces it when retry is enabled.
 
 ## Native editor boundary
 
-An editor window belongs to the worker process. On Windows the first implementation uses a
-worker-owned top-level editor window positioned and focused by Hostage. Cross-process child-HWND
-embedding is fragile across plug-in toolkits and DPI modes and is not required for the first
-safe release. The Hostage parameter editor continues to work through mirrored parameter
-metadata even when a vendor editor cannot be shown.
+An editor window belongs to the worker process, and it appears INSIDE Hostage's window: the
+worker creates it as a child window of whichever Hostage window the editor is shown in — the
+pane's, or a floating editor window's — with `CreateWindowEx` and a parent in another process,
+which Windows allows and which is how WebView2 sits in the same window. On the Hostage side the
+`AudioProcessorEditor` the proxy hands out is the component that child covers; it keeps the
+child positioned over itself (the arithmetic `juce::HWNDComponent` uses, without
+`HWNDComponent` itself, whose destructor destroys and reparents the window it hosts) and polls
+the worker for the editor's size so a vendor GUI that resizes itself is followed. Creation and
+destruction are the worker's; position is Hostage's. The Hostage parameter editor continues to
+work through mirrored parameter metadata even when a vendor editor cannot be shown.
 
-"Positioned and focused by Hostage" is three things, and for a while it was none of them — the
-worker centred its window and called `toFront`, Windows ignored the `toFront` because a
-background process may not take the foreground, and Hostage then centred a placeholder window
-of its own on the same spot, on top. What it is now:
+Two earlier shapes are recorded here so they are not tried again:
 
-- **In front, by ownership.** `editorOpen` carries the native handle of Hostage's own window
-  and the worker makes its editor window an *owned* window of it (`GWLP_HWNDPARENT`). An owned
-  window sits above its owner in the z-order by rule, minimises with it, and has no taskbar
-  button of its own — a plug-in window's normal manners. Nobody has to win the foreground.
-  The pane's stand-in passes the window it is actually in, which inside a DAW is the DAW's
-  plug-in window. The first attempt at this was `AllowSetForegroundWindow` + the worker's
-  `SetForegroundWindow`; it failed on the desk because the click lands in WebView2, a separate
-  process, so Hostage is not reliably the foreground process when it tries to grant. The
-  grant is kept as a lesser measure that sometimes also activates the window; ownership is
-  what is relied on.
-- **Positioned.** `editorOpen` may carry an anchor — where `FloatingEditorWindows` would have
-  put a window of its own, i.e. the part's remembered bounds. The worker honours it when the
-  window is first created and ignores it after; between closes it remembers its own last
-  position, which outranks the anchor. The reply carries the window's bounds, which the host
-  remembers as it does its own windows'.
-- **No placeholder window.** For an isolated part, "float" asks the worker to show its window
-  and counts the part as floated; no `DocumentWindow` is made. The pane still shows a stand-in,
-  because the pane cannot hold the editor: one line saying so and a button that shows the
-  worker's window again — the worker's close button only hides it.
+- A worker-owned **top-level** window, with Hostage showing a placeholder. The window opened
+  behind Hostage every time, because a background process may not take the foreground; the
+  placeholder was centred over the very window it announced.
+- The same, with Hostage granting the foreground (`AllowSetForegroundWindow`) and then making
+  the window an **owned** window of its own (`GWLP_HWNDPARENT`). Still behind. The click that
+  starts it lands in WebView2, a separate process, so Hostage is not reliably the foreground
+  process when it acts, and neither measure took.
 
-The pane's stand-in and the floated state hold the worker window open by count
-(`acquireRemoteEditor` / `releaseRemoteEditor`), so closing the pane cannot take a floated
-window with it.
+A child window has none of these problems by construction, and the earlier note's concern —
+that cross-process embedding is fragile across plug-in toolkits and DPI modes — is the right
+one to watch for per plug-in, not a reason to leave every editor behind the host.
 
 ## Delivery slices
 

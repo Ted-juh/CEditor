@@ -7,7 +7,6 @@
 #include "PluginWorkerControlChannel.h"
 #include "PluginWorkerCrashReporter.h"
 #include "PluginWorkerJob.h"
-#include "ControlSurface/Ctrl49EmbeddedAssets.h"
 #include "PluginWorkerSharedMemory.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -81,13 +80,6 @@ juce::var createMetadata (juce::AudioProcessor& processor, bool crashDumpsAvaila
     object->setProperty ("crashDumpsAvailable", crashDumpsAvailable);
     object->setProperty ("crashDumpError", crashDumpError.substring (0, 512));
     object->setProperty ("workerBuildSha256", workerBuildSha256);
-    // Hostage needs this to hand the foreground to this process before the editor opens:
-    // Windows only lets the foreground owner grant it, and only to a named process or all.
-#if JUCE_WINDOWS
-    object->setProperty ("pid", static_cast<juce::int64> (GetCurrentProcessId()));
-#else
-    object->setProperty ("pid", 0);
-#endif
     object->setProperty ("programNames", programNames);
     object->setProperty ("parameters", parameterMetadata (processor));
     return juce::var (object);
@@ -362,102 +354,100 @@ public:
     explicit WorkerEditorController (juce::AudioProcessor& processorToUse)
         : processor (processorToUse) {}
 
-    /** Shows the vendor editor in this process's own top-level window.
+    /** Puts the vendor editor on screen INSIDE Hostage's window.
 
-        `anchor` is where Hostage would have put a window of its own — its remembered bounds
-        for the part, or nothing. It is honoured when the window is first created and ignored
-        once it exists: by then the user may have moved it, and a button that snaps a window
-        back to where it started is a button people learn not to press. Between a close and
-        the next open this process remembers the last position itself, which outranks the
-        anchor for the same reason.
+        `hostWindow` is the native handle of the Hostage window the editor is to appear in —
+        the pane's, or a floating editor window's. The editor is wrapped in a plain component
+        and that component is put on the desktop as a CHILD of that handle: CreateWindowEx with
+        a parent in another process, which Windows allows and WebView2 relies on. A child
+        window cannot be behind its parent, cannot have a taskbar button, and needs nobody to
+        win the foreground, which is the whole of what two earlier attempts (a foreground
+        grant; an owned top-level window) were trying to arrange and could not.
 
-        Bringing the window forward only works because Hostage granted the foreground to this
-        process before asking (AllowSetForegroundWindow, on the proxy side). Without that grant
-        Windows ignores toFront from a background process and the editor opens behind the host
-        — which is where every vendor editor went until the grant existed.
-
-        `owner` is the native handle of Hostage's own window, and it is what actually keeps
-        this window in front. An OWNED window sits above its owner in the z-order by rule,
-        with nobody having to win the foreground: the earlier attempt — Hostage granting the
-        foreground to this process with AllowSetForegroundWindow, this process calling
-        SetForegroundWindow — worked on paper and not on the desk, because the click that
-        starts all this lands in WebView2, a separate process, so Hostage is not necessarily
-        the foreground process at that moment and its grant is refused. Ownership does not
-        care who is foreground. It also gives the window Hostage's behaviour for free: it
-        minimises with Hostage and has no taskbar button of its own — the generic-iconed
-        "window" in the taskbar is gone, which is a plug-in window's normal manners.
-
-        The window's bounds come back so Hostage can remember them as it does its own. */
-    bool open (juce::Rectangle<int> anchor, juce::int64 owner, juce::Rectangle<int>& boundsOut)
+        The handle of the child comes back so Hostage can place it; its size comes back so
+        Hostage can size the component that stands for it. Hostage moves the child itself
+        (SetWindowPos on a child of its own window) — this process only ever creates and
+        destroys it, and follows the editor's own size changes, which Hostage polls for. */
+    bool open (juce::int64 hostWindow, juce::int64& nativeHandleOut, int& widthOut, int& heightOut)
     {
-        if (window == nullptr)
+        if (hostWindow == 0)
+            return false;
+
+        if (frame == nullptr)
         {
             auto* editor = processor.createEditorIfNeeded();
             if (editor == nullptr)
                 return false;
-
-            class Window final : public juce::DocumentWindow
-            {
-            public:
-                Window (const juce::String& title, juce::AudioProcessorEditor* editorToOwn)
-                    : juce::DocumentWindow (title, juce::Colour (0xff171a1d),
-                                            juce::DocumentWindow::allButtons, true)
-                {
-                    setUsingNativeTitleBar (true);
-                    setContentOwned (editorToOwn, true);
-                    centreWithSize (juce::jmax (320, editorToOwn->getWidth()),
-                                    juce::jmax (120, editorToOwn->getHeight()));
-                    setResizable (true, false);
-                }
-                // Hide, never destroy: the editor's state and position survive, and the
-                // host's button brings it back. Hostage owns the window's life through
-                // editorClose; this button only owns whether it is on screen.
-                void closeButtonPressed() override { setVisible (false); }
-            };
-
-            window = std::make_unique<Window> (processor.getName(), editor);
-            if (const auto logo = juce::ImageFileFormat::loadFrom (
-                    ceditor::ctrl49::assets::kHostageLogoPng,
-                    ceditor::ctrl49::assets::kHostageLogoPngSize); logo.isValid())
-                window->setIcon (logo);
-
-            // Position precedence: where this process last had it, then where Hostage asks,
-            // then centred (what centreWithSize already did). Constrained so a position
-            // remembered from a monitor that is no longer there cannot put it out of reach.
-            const auto position = ! lastBounds.isEmpty() ? lastBounds.getPosition()
-                                : ! anchor.isEmpty()     ? anchor.getPosition()
-                                                         : window->getPosition();
-            window->setBoundsConstrained (window->getBounds().withPosition (position));
+            frame = std::make_unique<Frame> (editor);
+            frame->addToDesktop (0, reinterpret_cast<void*> (
+                static_cast<juce::pointer_sized_int> (hostWindow)));
+            frame->setVisible (true);
         }
 
-        // Applied on every open, not just the first: the pane's stand-in learns its own
-        // window only once it is on screen, so the owner can arrive a call later.
-       #if JUCE_WINDOWS
-        if (owner != 0)
-            if (auto* peer = window->getPeer())
-                ::SetWindowLongPtrW (static_cast<HWND> (peer->getNativeHandle()), GWLP_HWNDPARENT,
-                                     static_cast<LONG_PTR> (owner));
-       #else
-        juce::ignoreUnused (owner);
-       #endif
-
-        window->setVisible (true);
-        window->toFront (true);
-        boundsOut = window->getBounds();
+        auto* peer = frame->getPeer();
+        if (peer == nullptr)
+        {
+            frame.reset();
+            return false;
+        }
+        nativeHandleOut = static_cast<juce::int64> (
+            reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
+        size (widthOut, heightOut);
         return true;
     }
 
-    void close()
+    bool size (int& widthOut, int& heightOut) const
     {
-        if (window != nullptr)
-            lastBounds = window->getBounds();
-        window.reset();
+        if (frame == nullptr)
+            return false;
+        widthOut = frame->getWidth();
+        heightOut = frame->getHeight();
+        return true;
     }
 
+    void close() { frame.reset(); }
+
 private:
+    // The editor's frame: sized BY the editor, never the other way round. A vendor GUI that
+    // resizes itself takes the frame with it, and Hostage reads the new size on its next
+    // poll. Hostage may also size the child window directly, which reaches this component
+    // as a resize; the editor is left at its own size and clipped rather than squeezed,
+    // because a plug-in told to be a size it did not choose is a plug-in drawn wrong.
+    class Frame final : public juce::Component, private juce::ComponentListener
+    {
+    public:
+        explicit Frame (juce::AudioProcessorEditor* editorToOwn) : editor (editorToOwn)
+        {
+            setOpaque (true);
+            addAndMakeVisible (*editor);
+            setSize (juce::jmax (1, editor->getWidth()), juce::jmax (1, editor->getHeight()));
+            editor->addComponentListener (this);
+        }
+
+        ~Frame() override
+        {
+            // The editor dies before the frame it sits in, and before the processor that
+            // created it — the same ordering the host's own editor windows keep.
+            editor->removeComponentListener (this);
+            removeChildComponent (editor.get());
+            editor.reset();
+        }
+
+        void paint (juce::Graphics& graphics) override { graphics.fillAll (juce::Colours::black); }
+        void resized() override { editor->setTopLeftPosition (0, 0); }
+
+    private:
+        void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
+        {
+            if (wasResized)
+                setSize (juce::jmax (1, editor->getWidth()), juce::jmax (1, editor->getHeight()));
+        }
+
+        std::unique_ptr<juce::AudioProcessorEditor> editor;
+    };
+
     juce::AudioProcessor& processor;
-    std::unique_ptr<juce::DocumentWindow> window;
-    juce::Rectangle<int> lastBounds;
+    std::unique_ptr<Frame> frame;
 };
 
 class WorkerControlThread final : public juce::Thread
@@ -694,33 +684,44 @@ public:
                 }
                 else if (received.message.type == MessageType::editorOpen)
                 {
-                    // The payload is optional and so is everything in it: an empty message
-                    // is the pre-anchor request and still opens the editor, centred.
                     juce::String jsonError;
                     const auto json = decodeJsonPayload (received.message, jsonError);
-                    juce::Rectangle<int> anchor;
-                    juce::int64 owner = 0;
-                    if (jsonError.isEmpty() && json.isObject())
-                    {
-                        anchor = { (int) json.getProperty ("x", 0), (int) json.getProperty ("y", 0),
-                                   (int) json.getProperty ("width", 0),
-                                   (int) json.getProperty ("height", 0) };
-                        owner = (juce::int64) json.getProperty ("owner", 0);
-                    }
-                    juce::Rectangle<int> bounds;
+                    const auto hostWindow = jsonError.isEmpty() && json.isObject()
+                        ? (juce::int64) json.getProperty ("hostWindow", 0) : (juce::int64) 0;
+                    juce::int64 nativeHandle = 0;
+                    int width = 0, height = 0;
                     bool opened = false;
-                    invokeProcessor ([&] { opened = editor.open (anchor, owner, bounds); });
+                    invokeProcessor ([&] { opened = editor.open (hostWindow, nativeHandle, width, height); });
                     if (! opened)
                         reply = errorReply (generation, received.message.requestId,
-                                            "plug-in did not create a vendor editor");
+                                            hostWindow == 0 ? "no host window to show the editor in"
+                                                            : "plug-in did not create a vendor editor");
                     else
                     {
                         auto* object = new juce::DynamicObject();
-                        object->setProperty ("x", bounds.getX());
-                        object->setProperty ("y", bounds.getY());
-                        object->setProperty ("width", bounds.getWidth());
-                        object->setProperty ("height", bounds.getHeight());
+                        object->setProperty ("hwnd", nativeHandle);
+                        object->setProperty ("width", width);
+                        object->setProperty ("height", height);
                         reply = makeJsonMessage (MessageType::editorOpen, generation,
+                                                 received.message.requestId, juce::var (object));
+                    }
+                }
+                else if (received.message.type == MessageType::editorResize)
+                {
+                    // Hostage asking, not telling: the editor's current size, so the component
+                    // standing for it can follow a vendor GUI that resized itself.
+                    int width = 0, height = 0;
+                    bool present = false;
+                    invokeProcessor ([&] { present = editor.size (width, height); });
+                    if (! present)
+                        reply = errorReply (generation, received.message.requestId,
+                                            "no vendor editor is open");
+                    else
+                    {
+                        auto* object = new juce::DynamicObject();
+                        object->setProperty ("width", width);
+                        object->setProperty ("height", height);
+                        reply = makeJsonMessage (MessageType::editorResize, generation,
                                                  received.message.requestId, juce::var (object));
                     }
                 }

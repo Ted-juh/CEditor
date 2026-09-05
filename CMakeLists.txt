@@ -1448,9 +1448,6 @@ if (CEDITOR_PLUGIN_WORKER AND WIN32)
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerMain.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerCrashReporter.cpp"
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
-        # The embedded Hostage logo, for the vendor editor window's icon: it is the one
-        # window this process puts on screen, and without an icon it wore Windows' generic one.
-        "${CTRL49_EMBED_OUT}"
     )
     target_compile_features(CEditorPluginWorker PRIVATE cxx_std_23)
     target_compile_definitions(CEditorPluginWorker PRIVATE

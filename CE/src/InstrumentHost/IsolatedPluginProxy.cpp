@@ -29,24 +29,6 @@ juce::uint32 currentProcessId() noexcept
 #endif
 }
 
-/** The native handle of a top-level window of Hostage's own, for the worker to make its
-    editor window an owned window of. The active one when there is one, else the first that is
-    showing, else 0 — which is the outer VST3 inside a DAW, where the plug-in window belongs to
-    the DAW and the pane's stand-in supplies its own peer instead. */
-juce::int64 hostWindowHandle()
-{
-    auto* window = juce::TopLevelWindow::getActiveTopLevelWindow();
-    for (int i = 0; window == nullptr && i < juce::TopLevelWindow::getNumTopLevelWindows(); ++i)
-        if (auto* candidate = juce::TopLevelWindow::getTopLevelWindow (i);
-            candidate != nullptr && candidate->isShowing())
-            window = candidate;
-    if (window == nullptr)
-        return 0;
-    if (auto* peer = window->getPeer())
-        return static_cast<juce::int64> (reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
-    return 0;
-}
-
 juce::MemoryBlock jsonPayload (const juce::var& value)
 {
     const auto json = juce::JSON::toString (value, true);
@@ -129,56 +111,154 @@ private:
     std::atomic<juce::uint32> revision { 1 };
 };
 
-// What stands in the pane, or in a host window, for an editor that cannot be there: the
-// vendor's interface is drawn by another process, in a window of its own. Creating this opens
-// that window (and brings it forward); destroying it lets go. The button is for the case the
-// user closed the worker's window with its X, which only hides it — a placeholder that
-// announced an isolated window and offered no way to reach it was the previous version of
-// this class, and the report it drew was the word "AGAIN" in capitals.
-class IsolatedPluginProxy::RemoteEditor final : public juce::AudioProcessorEditor
+// The vendor editor, inside Hostage's window, drawn by another process.
+//
+// This component is what the pane and the floating windows are handed for an isolated
+// plug-in, and on screen it is COVERED by the plug-in's real interface: the worker creates
+// its editor window as a child of whichever Hostage window this component is showing in,
+// and this component keeps that child exactly over itself. A child window cannot be behind
+// its parent, has no taskbar button, and needs nobody to win the foreground — which is the
+// whole of what two earlier versions of this class were trying to arrange with a placeholder
+// and a separate top-level window, and could not. This is how WebView2 sits in the same
+// window, and how JUCE itself hosts an in-process VST3's view.
+//
+// The child is created when this component first has a peer to be a child of, not in the
+// constructor, because the editor is built before it is placed. Its size is the worker's to
+// decide: a vendor GUI that resizes itself changes the child, and a poll asks for the new
+// size and resizes this component to match, which the pane and the floating window already
+// follow. Position is Hostage's: the same arithmetic juce::HWNDComponent uses, without
+// HWNDComponent itself, whose destructor destroys the window it hosts and reparents it to
+// the desktop first — right for a window this process created, wrong for one it borrowed.
+class IsolatedPluginProxy::RemoteEditor final : public juce::AudioProcessorEditor,
+                                                private juce::Timer
 {
 public:
     explicit RemoteEditor (IsolatedPluginProxy& ownerToUse)
         : juce::AudioProcessorEditor (&ownerToUse), owner (ownerToUse)
     {
-        showButton.setButtonText ("Show editor window");
-        // From here the stand-in is on screen, so the window it lives in is known — inside a
-        // DAW that is the DAW's plug-in window, which nothing else in this process can name.
-        showButton.onClick = [this]
-        {
-            auto* peer = getPeer();
-            owner.showRemoteEditor ({}, peer != nullptr
-                ? static_cast<juce::int64> (reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()))
-                : 0);
-        };
-        addAndMakeVisible (showButton);
-        setSize (380, 124);
-        owner.acquireRemoteEditor ({});
+        setOpaque (true);
+        setSize (420, 240);     // until the worker says what the editor measures
+        watcher = std::make_unique<Watcher> (*this);
     }
 
-    ~RemoteEditor() override { owner.releaseRemoteEditor(); }
+    ~RemoteEditor() override
+    {
+        stopTimer();
+        watcher.reset();
+        if (child != 0)
+            owner.sendEditorClose();
+    }
 
     void paint (juce::Graphics& graphics) override
     {
         graphics.fillAll (juce::Colour (0xff171a1d));
-        graphics.setColour (juce::Colour (0xffd9e0e6));
+        if (child != 0)
+            return;         // the plug-in's own window is over this
+        graphics.setColour (juce::Colour (0xff9aa5b1));
         graphics.setFont (14.0f);
-        graphics.drawFittedText (owner.getName()
-                                     + " runs in its own process, so its interface is a window "
-                                       "of its own.",
-                                 getLocalBounds().reduced (18).removeFromTop (52),
-                                 juce::Justification::centred, 2);
-    }
-
-    void resized() override
-    {
-        showButton.setBounds (getLocalBounds().reduced (18).removeFromBottom (30)
-                                  .withSizeKeepingCentre (190, 30));
+        graphics.drawFittedText (failure.isNotEmpty() ? failure
+                                                       : "Opening " + owner.getName() + "…",
+                                 getLocalBounds().reduced (18), juce::Justification::centred, 3);
     }
 
 private:
+    // Movement, visibility and peer changes of this component and every ancestor — a
+    // scrolled pane, a dragged window — all reach here. Kept as a separate object rather
+    // than a second base class so nothing observes this component before it is whole.
+    class Watcher final : public juce::ComponentMovementWatcher
+    {
+    public:
+        explicit Watcher (RemoteEditor& editorToWatch)
+            : juce::ComponentMovementWatcher (&editorToWatch), editor (editorToWatch) {}
+        void componentMovedOrResized (bool, bool) override { editor.place(); }
+        void componentPeerChanged() override { editor.peerChanged(); }
+        void componentVisibilityChanged() override { editor.place(); }
+    private:
+        RemoteEditor& editor;
+    };
+
+    juce::int64 currentPeerHandle() const
+    {
+        if (auto* peer = getPeer())
+            return static_cast<juce::int64> (
+                reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
+        return 0;
+    }
+
+    // A new peer means a new parent for the child. In practice there is never a second one
+    // — the service builds a fresh editor for a fresh place — so this closes and reopens
+    // rather than reparenting a window across processes.
+    void peerChanged()
+    {
+        const auto handle = currentPeerHandle();
+        if (handle == hostWindow)
+        {
+            place();
+            return;
+        }
+        if (child != 0)
+        {
+            stopTimer();
+            owner.sendEditorClose();
+            child = 0;
+        }
+        hostWindow = handle;
+        if (hostWindow == 0)
+        {
+            repaint();
+            return;
+        }
+
+        juce::int64 nativeHandle = 0;
+        int width = 0, height = 0;
+        if (owner.sendEditorOpen (hostWindow, nativeHandle, width, height) && nativeHandle != 0)
+        {
+            child = nativeHandle;
+            failure.clear();
+            setSize (juce::jmax (1, width), juce::jmax (1, height));
+            place();
+            startTimer (250);
+        }
+        else
+        {
+            failure = owner.getName() + " did not open its interface.";
+        }
+        repaint();
+    }
+
+    void timerCallback() override
+    {
+        int width = 0, height = 0;
+        if (child != 0 && owner.sendEditorSize (width, height) && width > 0 && height > 0
+            && (width != getWidth() || height != getHeight()))
+            setSize (width, height);
+    }
+
+    // The child over this component, in the peer's physical pixels: the peer's own account
+    // of where this component is, scaled as juce::HWNDComponent scales it. Shown or hidden
+    // with this component, and never activated or reordered from here.
+    void place()
+    {
+       #if JUCE_WINDOWS
+        if (child == 0)
+            return;
+        auto* peer = getPeer();
+        if (peer == nullptr)
+            return;
+        const auto area = (peer->getAreaCoveredBy (*this).toFloat()
+                           * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
+        const auto hwnd = reinterpret_cast<HWND> (static_cast<juce::pointer_sized_int> (child));
+        ::SetWindowPos (hwnd, nullptr, area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                        SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+        ::ShowWindow (hwnd, isShowing() ? SW_SHOWNA : SW_HIDE);
+       #endif
+    }
+
     IsolatedPluginProxy& owner;
-    juce::TextButton showButton;
+    std::unique_ptr<Watcher> watcher;
+    juce::int64 hostWindow = 0;   // the peer the child was created in
+    juce::int64 child = 0;        // the worker's window, 0 until it exists
+    juce::String failure;
 };
 
 juce::AudioProcessor::BusesProperties IsolatedPluginProxy::busesFor (const Metadata& metadata)
@@ -216,8 +296,6 @@ IsolatedPluginProxy::Metadata IsolatedPluginProxy::parseMetadata (const juce::va
     result.crashDumpsAvailable = value.getProperty ("crashDumpsAvailable", false);
     result.crashDumpError = value.getProperty ("crashDumpError", {}).toString().substring (0, 512);
     result.workerBuildSha256 = value.getProperty ("workerBuildSha256", {}).toString().toLowerCase();
-    result.workerProcessId = static_cast<juce::uint32> (
-        juce::jmax ((juce::int64) 0, (juce::int64) value.getProperty ("pid", 0)));
     result.latencySamples = juce::jmax (0, (int) value.getProperty ("latencySamples", 0));
     result.tailSeconds = juce::jmax (0.0, (double) value.getProperty ("tailSeconds", 0.0));
 
@@ -880,53 +958,16 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
 
 juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
 {
-    // The placeholder is returned even if the worker refuses to open its window: it carries
-    // the button that tries again, and a pane with nothing in it says less.
     return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
 }
 
-bool IsolatedPluginProxy::acquireRemoteEditor (juce::Rectangle<int> anchor)
+bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow, juce::int64& nativeHandleOut,
+                                          int& widthOut, int& heightOut)
 {
-    ++remoteEditorHolders;
-    return showRemoteEditor (anchor);
-}
-
-void IsolatedPluginProxy::releaseRemoteEditor() noexcept
-{
-    if (remoteEditorHolders <= 0)
-        return;
-    if (--remoteEditorHolders == 0)
-        sendEditorClose();
-}
-
-bool IsolatedPluginProxy::showRemoteEditor (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle)
-{
-#if JUCE_WINDOWS
-    // What keeps the worker's window in front is OWNERSHIP (the handle sent below): an owned
-    // window sits above its owner by rule. This grant is the lesser measure that lets the
-    // worker also ACTIVATE its window, and it only takes when this process is the foreground
-    // process at the time — which, with the click landing in WebView2's own process, it is
-    // not always. Kept because it costs nothing and sometimes gives the window focus too;
-    // not relied on, because it demonstrably could not be.
-    ::AllowSetForegroundWindow (metadata.workerProcessId != 0
-                                    ? static_cast<DWORD> (metadata.workerProcessId)
-                                    : static_cast<DWORD> (ASFW_ANY));
-#endif
-    return sendEditorOpen (anchor, ownerWindowHandle != 0 ? ownerWindowHandle : hostWindowHandle());
-}
-
-bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor, juce::int64 ownerWindowHandle)
-{
+    nativeHandleOut = 0;
+    widthOut = heightOut = 0;
     auto* object = new juce::DynamicObject();
-    if (! anchor.isEmpty())
-    {
-        object->setProperty ("x", anchor.getX());
-        object->setProperty ("y", anchor.getY());
-        object->setProperty ("width", anchor.getWidth());
-        object->setProperty ("height", anchor.getHeight());
-    }
-    if (ownerWindowHandle != 0)
-        object->setProperty ("owner", ownerWindowHandle);
+    object->setProperty ("hostWindow", hostWindow);
     juce::MemoryBlock reply;
     juce::String error;
     if (! request (MessageType::editorOpen, jsonPayload (juce::var (object)),
@@ -937,10 +978,29 @@ bool IsolatedPluginProxy::sendEditorOpen (juce::Rectangle<int> anchor, juce::int
     message.payload = reply;
     juce::String jsonError;
     const auto json = decodeJsonPayload (message, jsonError);
-    if (jsonError.isEmpty() && json.isObject())
-        remoteEditorBounds = { (int) json.getProperty ("x", 0), (int) json.getProperty ("y", 0),
-                               (int) json.getProperty ("width", 0),
-                               (int) json.getProperty ("height", 0) };
+    if (jsonError.isNotEmpty() || ! json.isObject())
+        return false;
+    nativeHandleOut = (juce::int64) json.getProperty ("hwnd", 0);
+    widthOut = (int) json.getProperty ("width", 0);
+    heightOut = (int) json.getProperty ("height", 0);
+    return nativeHandleOut != 0;
+}
+
+bool IsolatedPluginProxy::sendEditorSize (int& widthOut, int& heightOut)
+{
+    widthOut = heightOut = 0;
+    juce::MemoryBlock reply;
+    juce::String error;
+    if (! request (MessageType::editorResize, {}, MessageType::editorResize, reply, 1000, error))
+        return false;
+    Message message;
+    message.payload = reply;
+    juce::String jsonError;
+    const auto json = decodeJsonPayload (message, jsonError);
+    if (jsonError.isNotEmpty() || ! json.isObject())
+        return false;
+    widthOut = (int) json.getProperty ("width", 0);
+    heightOut = (int) json.getProperty ("height", 0);
     return true;
 }
 
