@@ -244,6 +244,8 @@ private:
             if (child != nativeHandle)
             {
                 child = nativeHandle;
+                placedArea = {};
+                placedShowing = false;
                 startTimer (250);
                 repaint();
             }
@@ -284,10 +286,21 @@ private:
             return;
         const auto area = (peer->getAreaCoveredBy (*this).toFloat()
                            * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
+        const auto showing = isShowing();
+        // Only when something changed. Every SetWindowPos and ShowWindow is a synchronous
+        // message into the worker's message thread, and this was being called on every
+        // poll tick — four times a second — with nothing to say, which is four interruptions
+        // a second of a thread that is trying to draw a plug-in.
+        if (area == placedArea && showing == placedShowing)
+            return;
         const auto hwnd = reinterpret_cast<HWND> (static_cast<juce::pointer_sized_int> (child));
-        ::SetWindowPos (hwnd, nullptr, area.getX(), area.getY(), area.getWidth(), area.getHeight(),
-                        SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
-        ::ShowWindow (hwnd, isShowing() ? SW_SHOWNA : SW_HIDE);
+        if (area != placedArea)
+            ::SetWindowPos (hwnd, nullptr, area.getX(), area.getY(), area.getWidth(), area.getHeight(),
+                            SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+        if (showing != placedShowing)
+            ::ShowWindow (hwnd, showing ? SW_SHOWNA : SW_HIDE);
+        placedArea = area;
+        placedShowing = showing;
        #endif
     }
 
@@ -295,6 +308,8 @@ private:
     std::unique_ptr<Watcher> watcher;
     juce::int64 hostWindow = 0;   // the peer the child was created in
     juce::int64 child = 0;        // the worker's window, 0 until it exists
+    juce::Rectangle<int> placedArea;   // what the child was last told, so it is not told again
+    bool placedShowing = false;
     juce::String failure;
 };
 
@@ -719,7 +734,8 @@ bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& pa
                 waitAnsweringWindowMessages (busyRetryDelayMs);
                 continue;
             }
-            logDiagnostic ("worker_operation_failed", error);
+            logDiagnostic ("worker_operation_failed",
+                           error + " (message type " + juce::String ((int) type) + ")");
             return false;
         }
         if (response.message.type != expectedReply)
@@ -1009,12 +1025,15 @@ juce::String IsolatedPluginProxy::parameterText (int index, float value, int max
     object->setProperty ("index", index);
     object->setProperty ("value", juce::jlimit (0.0f, 1.0f, value));
     object->setProperty ("maximumLength", juce::jlimit (1, 4096, maximumLength));
+    // A label is decoration. The worker is told to wait almost no time for its message
+    // thread — a busy plug-in costs a blank label, not the 400 ms per label that froze the
+    // host in bursts of five while Spire's window was working — and the budget here is
+    // short for the same reason.
+    object->setProperty ("pickUpMs", 40);
     juce::MemoryBlock reply;
     juce::String error;
-    // A short budget: this is a label, asked for on hover and per row, and a worker busy
-    // building its editor should cost a blank label, not a frozen host.
     if (request (MessageType::parameterText, jsonPayload (juce::var (object)),
-                 MessageType::parameterText, reply, 300, error))
+                 MessageType::parameterText, reply, 250, error))
     {
         Message message;
         message.payload = reply;
@@ -1032,6 +1051,7 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
     auto* object = new juce::DynamicObject();
     object->setProperty ("index", index);
     object->setProperty ("text", text.substring (0, 4096));
+    object->setProperty ("pickUpMs", 40);
     juce::MemoryBlock reply;
     juce::String error;
     if (request (MessageType::parameterValueFromText, jsonPayload (juce::var (object)),

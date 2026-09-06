@@ -428,6 +428,10 @@ private:
                 return;
             }
             frame = std::make_unique<Frame> (*this, editor);
+            // Off-screen until Hostage places it: the window exists at the plug-in's size
+            // the moment it is created, and without this it appeared at the host window's
+            // origin for up to a poll tick before jumping to where it belonged.
+            frame->setTopLeftPosition (-32000, -32000);
             // CreateWindowEx with a parent in another process: allowed, and how WebView2 sits
             // inside the same window. A child cannot be behind its parent, has no taskbar
             // button, and needs nobody to win the foreground.
@@ -623,10 +627,11 @@ public:
                     else
                     {
                         juce::String formatted;
+                        // Hostage says how long a label is worth waiting for: almost nothing.
                         invokeProcessor ([&]
                         {
                             formatted = parameters[index]->getText (value, maximumLength);
-                        });
+                        }, juce::jlimit (10, 2000, (int) json.getProperty ("pickUpMs", 400)));
                         auto* object = new juce::DynamicObject();
                         object->setProperty ("text", formatted);
                         reply = makeJsonMessage (MessageType::parameterText, generation,
@@ -649,7 +654,7 @@ public:
                         invokeProcessor ([&]
                         {
                             parsed = parameters[index]->getValueForText (text);
-                        });
+                        }, juce::jlimit (10, 2000, (int) json.getProperty ("pickUpMs", 400)));
                         auto* object = new juce::DynamicObject();
                         object->setProperty ("value", juce::jlimit (0.0f, 1.0f, parsed));
                         reply = makeJsonMessage (MessageType::parameterValueFromText, generation,
