@@ -2,6 +2,7 @@
 #include "PatchDiff.h"
 #include "EditorSnapshot.h"
 #include "LiveWorkerDiagnostics.h"
+#include "PluginWorkerBoundary.h"
 #include "PluginWorkerCrashDumps.h"
 #include "Performance/MicrotuningMidi.h"
 
@@ -15,6 +16,16 @@
 
 namespace ceditor::host
 {
+
+namespace
+{
+bool prewarmWorkerEditorIfIdle (juce::AudioProcessor* processor, int quietMs)
+{
+    if (auto* worker = dynamic_cast<PluginWorkerBoundary*> (processor))
+        return worker->prewarmEditorIfIdle (quietMs);
+    return true;
+}
+}
 
 InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
@@ -6465,6 +6476,7 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 completion (true, {});
             savePerformance();
             emitState();
+            scheduleEditorPrewarm (partId);
         };
 
     if (preloaded != nullptr)
@@ -6598,6 +6610,7 @@ void InstrumentHostService::requestEffect (
                 completion (true, {});
             savePerformance();
             emitState();
+            scheduleEditorPrewarm (effectId);
         };
 
     if (preloaded != nullptr)
@@ -6624,6 +6637,26 @@ juce::AudioProcessor* InstrumentHostService::targetProcessor (const juce::String
     if (auto* instrument = rack.getInstrument (targetId))
         return instrument;
     return rack.getEffect (targetId);
+}
+
+void InstrumentHostService::scheduleEditorPrewarm (const juce::String& targetId)
+{
+    // attachParameters and emitState can leave delayed parameter snapshots and label requests
+    // behind the load callback. Give that tail time to arrive, then require the control pipe to
+    // have been quiet too. A retry is cheap and avoids making ordinary setup calls report busy
+    // while a vendor GUI spends roughly half a second constructing on its message thread.
+    auto attempt = std::make_shared<std::function<void()>>();
+    const std::weak_ptr<std::function<void()>> weakAttempt = attempt;
+    *attempt = [this, aliveToken = alive, targetId, weakAttempt]
+    {
+        if (! aliveToken->load())
+            return;
+        if (prewarmWorkerEditorIfIdle (targetProcessor (targetId), 500))
+            return;
+        if (auto next = weakAttempt.lock())
+            juce::Timer::callAfterDelay (500, [next] { (*next)(); });
+    };
+    juce::Timer::callAfterDelay (2500, [attempt] { (*attempt)(); });
 }
 
 juce::String InstrumentHostService::targetClassCeId (const juce::String& targetId) const
@@ -9252,6 +9285,7 @@ void InstrumentHostService::pumpSetlistPreloadQueue()
                                                                     options.blockSize);
                             processor->prepareToPlay (options.sampleRate, options.blockSize);
                             processor->suspendProcessing (true);
+                            prewarmWorkerEditorIfIdle (processor.get(), 0);
                         }
                     }
                 }

@@ -47,13 +47,14 @@ enum class MessageType : juce::uint16
     ping,
     pong,
     shutdown,
-    error
+    error,
+    editorPrewarm
 };
 
 inline bool isKnownType (juce::uint16 raw) noexcept
 {
     return raw >= static_cast<juce::uint16> (MessageType::hello)
-        && raw <= static_cast<juce::uint16> (MessageType::error);
+        && raw <= static_cast<juce::uint16> (MessageType::editorPrewarm);
 }
 
 struct Message

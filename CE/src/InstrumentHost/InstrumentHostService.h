@@ -750,6 +750,9 @@ private:
                         bool failoverAttempt = false);
     /** The live processor behind any target id — a part's instrument or an effect. */
     juce::AudioProcessor* targetProcessor (const juce::String& targetId) const;
+    /** After initial parameter/state traffic settles, asks an idle isolated worker to construct
+        its editor invisibly. The target is looked up again whenever the timer retries. */
+    void scheduleEditorPrewarm (const juce::String& targetId);
     /** The class identity any target currently carries (for binding capture/resolution). */
     juce::String targetClassCeId (const juce::String& targetId) const;
     juce::String targetDisplayName (const juce::String& targetId) const;

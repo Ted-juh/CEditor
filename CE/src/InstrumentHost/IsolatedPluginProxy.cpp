@@ -216,7 +216,7 @@ private:
         if (owner.sendEditorOpen (hostWindow))
         {
             failure.clear();
-            startTimer (100);       // until it is there; slower once it is
+            startTimer (20);        // until it is there; slower once it is
         }
         else
         {
@@ -226,8 +226,8 @@ private:
     }
 
     // The worker builds the editor in the background and this asks how it is going. Before
-    // it is there: 10 times a second, so it appears within a tenth of a second of being
-    // ready. After: 4 times a second, to follow a vendor GUI that resizes itself. Each ask
+    // it is there: 50 times a second, so a prewarmed editor appears in about one frame.
+    // After: 4 times a second, to follow a vendor GUI that resizes itself. Each ask
     // returns in well under a millisecond — the worker answers from what its message thread
     // last published, without waiting for that thread — so the host is never parked on the
     // pipe while a plug-in spends seconds drawing its skin.
@@ -235,11 +235,18 @@ private:
     {
         juce::String state;
         juce::int64 nativeHandle = 0;
-        int width = 0, height = 0, stallMs = 0, workerOpenMs = 0;
-        bool reused = false;
+        int width = 0, height = 0, stallMs = 0, workerOpenMs = 0, prewarmMs = 0;
+        bool reused = false, prewarmed = false;
         if (! owner.sendEditorStatus (state, nativeHandle, width, height, stallMs,
-                                      workerOpenMs, reused))
+                                      workerOpenMs, reused, prewarmMs, prewarmed))
             return;             // a control failure is the guard's business, not this timer's
+        if (prewarmed && ! prewarmReported)
+        {
+            prewarmReported = true;
+            owner.logDiagnostic ("editor_prewarmed",
+                                 "constructed by worker in " + juce::String (prewarmMs)
+                                     + " ms before it was requested");
+        }
         // The worker measures the longest single turn of its message loop. Logged when it
         // is long and getting longer, so a plug-in whose window hogs that thread is named
         // in the same log as everything else, rather than inferred from "busy" replies.
@@ -247,7 +254,8 @@ private:
         {
             reportedStallMs = stallMs;
             owner.logDiagnostic ("worker_message_thread_stall",
-                                 "longest dispatch " + juce::String (stallMs) + " ms with the editor open");
+                                 "longest dispatch " + juce::String (stallMs)
+                                     + " ms while constructing or showing the editor");
         }
 
         if (state == "ready" && nativeHandle != 0)
@@ -285,7 +293,7 @@ private:
             if (child != 0)
             {
                 child = 0;
-                startTimer (100);
+                startTimer (20);
                 repaint();
             }
         }
@@ -338,6 +346,7 @@ private:
     int reportedStallMs = 0;
     double openRequestedMs = 0.0;
     bool readyReported = false;
+    bool prewarmReported = false;
     juce::String failure;
 };
 
@@ -676,6 +685,15 @@ bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& pa
                                    int timeoutMs, juce::String& error, bool retryBusy)
 {
     const juce::ScopedLock lock (requestLock);
+    struct ActivityEndStamp
+    {
+        std::atomic<juce::int64>& destination;
+        ~ActivityEndStamp()
+        {
+            destination.store (juce::Time::currentTimeMillis(), std::memory_order_release);
+        }
+    } activityEndStamp { lastControlActivityMs };
+    lastControlActivityMs.store (juce::Time::currentTimeMillis(), std::memory_order_release);
     error.clear();
     const auto deadline = juce::Time::getMillisecondCounterHiRes() + timeoutMs;
     const auto remaining = [deadline]
@@ -1135,6 +1153,28 @@ juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
     return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
 }
 
+bool IsolatedPluginProxy::prewarmEditorIfIdle (int quietMs) noexcept
+{
+    if (! metadata.hasEditor)
+        return true;
+    try
+    {
+        // Re-check under the same recursive lock used by request(). If another control call was
+        // in flight while the timer fired, its completion stamp wins and this attempt backs off.
+        const juce::ScopedLock lock (requestLock);
+        if (juce::Time::currentTimeMillis()
+                - lastControlActivityMs.load (std::memory_order_acquire)
+            < juce::jmax (0, quietMs))
+            return false;
+
+        juce::MemoryBlock reply;
+        juce::String error;
+        return request (MessageType::editorPrewarm, {}, MessageType::editorPrewarm,
+                        reply, 1000, error);
+    }
+    catch (...) { return true; }
+}
+
 bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow)
 {
     auto* object = new juce::DynamicObject();
@@ -1151,12 +1191,14 @@ bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow)
 
 bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
                                             int& widthOut, int& heightOut, int& stallMsOut,
-                                            int& workerOpenMsOut, bool& reusedOut)
+                                            int& workerOpenMsOut, bool& reusedOut,
+                                            int& prewarmMsOut, bool& prewarmedOut)
 {
     stateOut.clear();
     nativeHandleOut = 0;
-    widthOut = heightOut = stallMsOut = workerOpenMsOut = 0;
+    widthOut = heightOut = stallMsOut = workerOpenMsOut = prewarmMsOut = 0;
     reusedOut = false;
+    prewarmedOut = false;
     juce::MemoryBlock reply;
     juce::String error;
     if (! request (MessageType::editorResize, {}, MessageType::editorResize, reply, 1000, error))
@@ -1174,6 +1216,8 @@ bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64&
     stallMsOut = (int) json.getProperty ("stallMs", 0);
     workerOpenMsOut = (int) json.getProperty ("openDurationMs", 0);
     reusedOut = (bool) json.getProperty ("reused", false);
+    prewarmMsOut = (int) json.getProperty ("prewarmDurationMs", 0);
+    prewarmedOut = (bool) json.getProperty ("prewarmed", false);
     return true;
 }
 

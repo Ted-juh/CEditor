@@ -58,6 +58,9 @@ public:
     /** Used by the vendor-preset loader without exposing worker details to the service. */
     bool applyVstPreset (const juce::File& presetFile);
 
+    /** Starts hidden editor construction after the control pipe has been quiet long enough. */
+    bool prewarmEditorIfIdle (int quietMs) noexcept override;
+
     /** Called by the rack guard on its controlling thread after the audio thread reports a
         failure. This also releases a worker that is hung inside vendor code when retries are off. */
     bool workerIsRunning() const noexcept override;
@@ -130,7 +133,8 @@ private:
     bool sendEditorOpen (juce::int64 hostWindow);
     bool sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
                            int& widthOut, int& heightOut, int& stallMsOut,
-                           int& workerOpenMsOut, bool& reusedOut);
+                           int& workerOpenMsOut, bool& reusedOut,
+                           int& prewarmMsOut, bool& prewarmedOut);
     void sendEditorClose() noexcept;
     plugin_worker::DecodeResult
         receiveWhileAnsweringWindowMessages (int timeoutMs);
@@ -150,6 +154,7 @@ private:
     std::vector<plugin_worker::ParameterEvent> pendingParameterEvents;
     size_t parameterScanCursor = 0;
     std::atomic<juce::int64> nextRequestId { 1 };
+    std::atomic<juce::int64> lastControlActivityMs { juce::Time::currentTimeMillis() };
     std::atomic<bool> controlFailed { false };
     std::atomic<int> workerFailureReason { 0 };
     juce::CriticalSection requestLock;

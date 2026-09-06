@@ -357,6 +357,18 @@ public:
 
     enum class State : int { idle = 0, opening, ready, failed };
 
+    /** Control thread, after Hostage has finished preparing and restoring the processor.
+        Construct the expensive vendor GUI under a message-only window before Hostage asks
+        to see it. The first visible open can then use the same cheap reparent path as every
+        later open, without putting a window on screen. */
+    void prewarm()
+    {
+       #if JUCE_WINDOWS
+        if (processor.hasEditor())
+            juce::MessageManager::callAsync ([this] { prewarmOnMessageThread(); });
+       #endif
+    }
+
     /** Control thread. Starts building the vendor editor inside `hostWindow` — a Hostage
         window, which the editor's own window becomes a CHILD of — and returns at once;
         status() says how it went.
@@ -389,7 +401,8 @@ public:
 
     /** Control thread. Reads what the message thread last published; never blocks. */
     void status (State& stateOut, juce::int64& handleOut, int& widthOut, int& heightOut,
-                 int& openDurationOut, bool& reusedOut) const noexcept
+                 int& openDurationOut, bool& reusedOut, int& prewarmDurationOut,
+                 bool& prewarmedOut) const noexcept
     {
         stateOut = state.load (std::memory_order_acquire);
         handleOut = handle.load (std::memory_order_acquire);
@@ -397,6 +410,8 @@ public:
         heightOut = height.load (std::memory_order_acquire);
         openDurationOut = openDurationMs.load (std::memory_order_acquire);
         reusedOut = reused.load (std::memory_order_acquire);
+        prewarmDurationOut = prewarmDurationMs.load (std::memory_order_acquire);
+        prewarmedOut = prewarmed.load (std::memory_order_acquire);
     }
 
     void closeNow() { closeOnMessageThread(); }
@@ -409,6 +424,54 @@ public:
     }
 
 private:
+    void prewarmOnMessageThread()
+    {
+       #if JUCE_WINDOWS
+        if (frame != nullptr)
+            return;
+        const auto started = juce::Time::getMillisecondCounterHiRes();
+        try
+        {
+            const auto parkingWindow = static_cast<juce::int64> (
+                reinterpret_cast<juce::pointer_sized_int> (HWND_MESSAGE));
+            if (! createFrame (parkingWindow))
+                return;
+            frameHostWindow = 0;  // parked, not owned by any Hostage peer
+            prewarmDurationMs.store (static_cast<int> (
+                juce::Time::getMillisecondCounterHiRes() - started), std::memory_order_release);
+            prewarmed.store (true, std::memory_order_release);
+        }
+        catch (...)
+        {
+            frame.reset();
+        }
+       #endif
+    }
+
+    bool createFrame (juce::int64 parentWindow)
+    {
+        auto* editor = processor.createEditorIfNeeded();
+        if (editor == nullptr)
+            return false;
+        frame = std::make_unique<Frame> (*this, editor);
+        // Off-screen until Hostage places it: the window exists at the plug-in's size
+        // the moment it is created, and without this it appeared at the host window's
+        // origin for up to a poll tick before jumping to where it belonged.
+        frame->setTopLeftPosition (-32000, -32000);
+        // On the prewarm path the parent is HWND_MESSAGE; on a cold explicit open it is
+        // the Hostage peer. Both make a child with no taskbar button or foreground claim.
+        frame->addToDesktop (0, reinterpret_cast<void*> (
+            static_cast<juce::pointer_sized_int> (parentWindow)));
+        frame->setVisible (true);
+        if (frame->getPeer() == nullptr)
+        {
+            frame.reset();
+            return false;
+        }
+        publishSize();
+        return true;
+    }
+
     void openOnMessageThread (juce::int64 hostWindow)
     {
         const auto started = juce::Time::getMillisecondCounterHiRes();
@@ -438,32 +501,13 @@ private:
         }
         try
         {
-            auto* editor = processor.createEditorIfNeeded();
-            if (editor == nullptr)
+            if (! createFrame (hostWindow))
             {
-                state.store (State::failed, std::memory_order_release);
-                return;
-            }
-            frame = std::make_unique<Frame> (*this, editor);
-            // Off-screen until Hostage places it: the window exists at the plug-in's size
-            // the moment it is created, and without this it appeared at the host window's
-            // origin for up to a poll tick before jumping to where it belonged.
-            frame->setTopLeftPosition (-32000, -32000);
-            // CreateWindowEx with a parent in another process: allowed, and how WebView2 sits
-            // inside the same window. A child cannot be behind its parent, has no taskbar
-            // button, and needs nobody to win the foreground.
-            frame->addToDesktop (0, reinterpret_cast<void*> (
-                static_cast<juce::pointer_sized_int> (hostWindow)));
-            frame->setVisible (true);
-            if (frame->getPeer() == nullptr)
-            {
-                frame.reset();
                 state.store (State::failed, std::memory_order_release);
                 return;
             }
             frameHostWindow = hostWindow;
             publishHandle();
-            publishSize();
             openDurationMs.store (static_cast<int> (
                 juce::Time::getMillisecondCounterHiRes() - started), std::memory_order_release);
             reused.store (false, std::memory_order_release);
@@ -583,6 +627,8 @@ private:
     std::atomic<int> height { 0 };
     std::atomic<int> openDurationMs { 0 };
     std::atomic<bool> reused { false };
+    std::atomic<int> prewarmDurationMs { 0 };
+    std::atomic<bool> prewarmed { false };
 };
 
 /** The longest single turn of the message loop, in milliseconds, since the last time it was
@@ -867,6 +913,12 @@ public:
                         reply = errorReply (generation, received.message.requestId,
                                             "no host window to show the editor in");
                 }
+                else if (received.message.type == MessageType::editorPrewarm)
+                {
+                    // Acknowledge the scheduling, never the construction. Like editorOpen,
+                    // the expensive work belongs to the message thread after this reply.
+                    editor.prewarm();
+                }
                 else if (received.message.type == MessageType::editorResize)
                 {
                     // Hostage asking, not telling: is the editor there yet, where, how big.
@@ -874,9 +926,10 @@ public:
                     // which may be busy building the very thing being asked about.
                     WorkerEditorController::State state {};
                     juce::int64 handle = 0;
-                    int width = 0, height = 0, openDurationMs = 0;
-                    bool reused = false;
-                    editor.status (state, handle, width, height, openDurationMs, reused);
+                    int width = 0, height = 0, openDurationMs = 0, prewarmDurationMs = 0;
+                    bool reused = false, prewarmed = false;
+                    editor.status (state, handle, width, height, openDurationMs, reused,
+                                   prewarmDurationMs, prewarmed);
                     auto* object = new juce::DynamicObject();
                     object->setProperty ("state", state == WorkerEditorController::State::ready   ? "ready"
                                                 : state == WorkerEditorController::State::opening ? "opening"
@@ -887,6 +940,8 @@ public:
                     object->setProperty ("height", height);
                     object->setProperty ("openDurationMs", openDurationMs);
                     object->setProperty ("reused", reused);
+                    object->setProperty ("prewarmDurationMs", prewarmDurationMs);
+                    object->setProperty ("prewarmed", prewarmed);
                     object->setProperty ("stallMs", longestDispatchMs.exchange (0, std::memory_order_acq_rel));
                     reply = makeJsonMessage (MessageType::editorResize, generation,
                                              received.message.requestId, juce::var (object));
