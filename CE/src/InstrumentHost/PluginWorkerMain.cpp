@@ -509,6 +509,14 @@ private:
     std::atomic<int> height { 0 };
 };
 
+/** Thrown by invokeProcessor when the message thread did not pick the job up in time. It is
+    a reply, not a failure: the control loop answers it with a "busy:" error and carries on,
+    and Hostage retries. Everything else thrown from a handler still stops the worker. */
+struct WorkerBusy final : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
 class WorkerControlThread final : public juce::Thread
 {
 public:
@@ -790,6 +798,13 @@ public:
                                         "unsupported plug-in worker control command");
                 }
             }
+            catch (const WorkerBusy& busy)
+            {
+                // Not a failure and not a reason to stop: the worker is fine, its message
+                // thread is busy, and Hostage retries a "busy:" reply.
+                reply = errorReply (generation, received.message.requestId,
+                                    juce::String::fromUTF8 (busy.what()));
+            }
             catch (...)
             {
                 reply = errorReply (generation, received.message.requestId,
@@ -801,27 +816,65 @@ public:
     }
 
 private:
+    /** Runs `function` on the message thread under the processor's callback lock, waiting a
+        BOUNDED time for that thread to pick it up.
+
+        The bound is the point. The message thread can be busy for seconds — building the
+        vendor editor is the case that found this — and while it is, every control request
+        that needs it used to queue behind it here, unbounded, so the control thread answered
+        nothing at all: Hostage's requests timed out one after another and a worker that was
+        merely busy was torn down as dead. Now a job the message thread has not STARTED
+        within `pickUpMs` is abandoned and reported as WorkerBusy, which the control loop
+        turns into a "busy:" reply Hostage knows to retry. A job that has started is waited
+        for however long it takes: `function` refers to this thread's stack, so it must never
+        run once this call has returned — the lock below is what guarantees that. */
     template <typename Function>
-    void invokeProcessor (Function&& function)
+    void invokeProcessor (Function&& function, int pickUpMs = 400)
     {
-        std::exception_ptr thrown;
-        const auto invoked = juce::MessageManager::callSync (
-            [this, function = std::forward<Function> (function), &thrown]() mutable
+        struct Job
+        {
+            juce::CriticalSection lock;
+            bool started = false;
+            bool abandoned = false;
+            juce::WaitableEvent done;
+            std::exception_ptr thrown;
+        };
+        auto job = std::make_shared<Job>();
+        juce::MessageManager::callAsync ([this, job, &function]
+        {
             {
-                try
+                const juce::ScopedLock lock (job->lock);
+                if (job->abandoned)
+                    return;
+                job->started = true;
+            }
+            try
+            {
+                const juce::ScopedLock lock (processor.getCallbackLock());
+                function();
+            }
+            catch (...)
+            {
+                job->thrown = std::current_exception();
+            }
+            job->done.signal();
+        });
+
+        if (! job->done.wait (pickUpMs))
+        {
+            {
+                const juce::ScopedLock lock (job->lock);
+                if (! job->started)
                 {
-                    const juce::ScopedLock lock (processor.getCallbackLock());
-                    function();
+                    job->abandoned = true;
+                    throw WorkerBusy ("busy: the plug-in's message thread is occupied"
+                                      " (building its editor, most likely)");
                 }
-                catch (...)
-                {
-                    thrown = std::current_exception();
-                }
-            });
-        if (! invoked)
-            throw std::runtime_error ("worker message thread is unavailable");
-        if (thrown)
-            std::rethrow_exception (thrown);
+            }
+            job->done.wait();       // it started: let it finish, whatever it takes
+        }
+        if (job->thrown)
+            std::rethrow_exception (job->thrown);
     }
 
     void send (const Message& message)

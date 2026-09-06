@@ -133,6 +133,8 @@ private:
     void sendEditorClose() noexcept;
     plugin_worker::DecodeResult
         receiveWhileAnsweringWindowMessages (int timeoutMs);
+    void waitAnsweringWindowMessages (int milliseconds);
+    void refreshStateCache() noexcept;
     void logDiagnostic (const juce::String& event, const juce::String& detail = {}) const;
     [[noreturn]] static void throwFailure (const juce::String&);
 
@@ -149,6 +151,11 @@ private:
     std::atomic<juce::int64> nextRequestId { 1 };
     std::atomic<bool> controlFailed { false };
     juce::CriticalSection requestLock;
+    // The last opaque state fetched from or applied to the worker. What getStateInformation
+    // hands out when the worker is merely busy — building its editor — rather than throwing,
+    // which the rack guard would read as a failure and answer by tearing the worker down.
+    juce::MemoryBlock lastKnownState;
+    bool hasLastKnownState = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IsolatedPluginProxy)
 };

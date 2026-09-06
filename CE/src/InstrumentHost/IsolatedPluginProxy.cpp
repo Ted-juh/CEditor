@@ -617,59 +617,107 @@ bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& pa
 {
     const juce::ScopedLock lock (requestLock);
     error.clear();
-    if (connection == nullptr || connection->control == nullptr
-        || connection->process == nullptr || ! connection->process->isRunning())
+    const auto deadline = juce::Time::getMillisecondCounterHiRes() + timeoutMs;
+    const auto remaining = [deadline]
     {
-        controlFailed.store (true, std::memory_order_release);
-        error = "plug-in worker is not running";
-        logDiagnostic ("control_unavailable", error);
-        return false;
-    }
-    Message requestMessage;
-    requestMessage.type = type;
-    requestMessage.generation = connection->generation;
-    requestMessage.requestId = nextRequestId.fetch_add (1, std::memory_order_relaxed);
-    requestMessage.payload = payload;
-    if (! connection->control->send (requestMessage, timeoutMs, error))
+        return static_cast<int> (std::ceil (deadline - juce::Time::getMillisecondCounterHiRes()));
+    };
+    constexpr int busyRetryDelayMs = 100;
+    bool loggedBusy = false;
+
+    // The whole of `timeoutMs` is a budget, not one wait: a "busy:" reply spends a little of
+    // it and tries again with a fresh request, and a reply to a request this side had already
+    // given up on is discarded rather than mistaken for this one. Both are the worker being
+    // slow, which is not the worker being dead — and only the deadline decides dead.
+    for (;;)
     {
-        controlFailed.store (true, std::memory_order_release);
-        logDiagnostic ("control_send_failed", error);
-        return false;
+        if (connection == nullptr || connection->control == nullptr
+            || connection->process == nullptr || ! connection->process->isRunning())
+        {
+            controlFailed.store (true, std::memory_order_release);
+            error = "plug-in worker is not running";
+            logDiagnostic ("control_unavailable", error);
+            return false;
+        }
+        Message requestMessage;
+        requestMessage.type = type;
+        requestMessage.generation = connection->generation;
+        requestMessage.requestId = nextRequestId.fetch_add (1, std::memory_order_relaxed);
+        requestMessage.payload = payload;
+        if (! connection->control->send (requestMessage, juce::jmax (1, remaining()), error))
+        {
+            controlFailed.store (true, std::memory_order_release);
+            logDiagnostic ("control_send_failed", error);
+            return false;
+        }
+
+        DecodeResult response;
+        for (;;)
+        {
+            response = receiveWhileAnsweringWindowMessages (juce::jmax (1, remaining()));
+            if (! response)
+            {
+                controlFailed.store (true, std::memory_order_release);
+                error = response.error;
+                logDiagnostic ("control_receive_failed",
+                               error + " (message type " + juce::String ((int) type) + ", budget "
+                                   + juce::String (timeoutMs) + " ms)");
+                return false;
+            }
+            if (! belongsToGeneration (response.message, connection->generation))
+            {
+                controlFailed.store (true, std::memory_order_release);
+                error = "stale or mismatched plug-in worker reply";
+                logDiagnostic ("control_reply_mismatch", error + " (wrong generation)");
+                return false;
+            }
+            if (response.message.requestId == requestMessage.requestId)
+                break;
+            if (response.message.requestId < requestMessage.requestId)
+            {
+                // Answered after its deadline. Nobody is waiting for it any more; the one
+                // being waited for is still coming.
+                logDiagnostic ("stale_reply_discarded",
+                               "request " + juce::String (response.message.requestId)
+                                   + " answered after its deadline");
+                continue;
+            }
+            controlFailed.store (true, std::memory_order_release);
+            error = "stale or mismatched plug-in worker reply";
+            logDiagnostic ("control_reply_mismatch", error);
+            return false;
+        }
+
+        if (response.message.type == MessageType::error)
+        {
+            juce::String jsonError;
+            const auto json = decodeJsonPayload (response.message, jsonError);
+            error = jsonError.isNotEmpty() ? jsonError
+                                           : json.getProperty ("error", "worker operation failed").toString();
+            if (error.startsWith ("busy:") && remaining() > busyRetryDelayMs * 2)
+            {
+                if (! loggedBusy)
+                {
+                    loggedBusy = true;
+                    logDiagnostic ("worker_busy_retrying",
+                                   error + " (message type " + juce::String ((int) type) + ")");
+                }
+                waitAnsweringWindowMessages (busyRetryDelayMs);
+                continue;
+            }
+            logDiagnostic ("worker_operation_failed", error);
+            return false;
+        }
+        if (response.message.type != expectedReply)
+        {
+            controlFailed.store (true, std::memory_order_release);
+            error = "unexpected plug-in worker reply";
+            logDiagnostic ("control_reply_unexpected", error);
+            return false;
+        }
+        reply = response.message.payload;
+        return true;
     }
-    const auto response = receiveWhileAnsweringWindowMessages (timeoutMs);
-    if (! response)
-    {
-        controlFailed.store (true, std::memory_order_release);
-        error = response.error;
-        logDiagnostic ("control_receive_failed", error);
-        return false;
-    }
-    if (! belongsToGeneration (response.message, connection->generation)
-        || response.message.requestId != requestMessage.requestId)
-    {
-        controlFailed.store (true, std::memory_order_release);
-        error = "stale or mismatched plug-in worker reply";
-        logDiagnostic ("control_reply_mismatch", error);
-        return false;
-    }
-    if (response.message.type == MessageType::error)
-    {
-        juce::String jsonError;
-        const auto json = decodeJsonPayload (response.message, jsonError);
-        error = jsonError.isNotEmpty() ? jsonError
-                                       : json.getProperty ("error", "worker operation failed").toString();
-        logDiagnostic ("worker_operation_failed", error);
-        return false;
-    }
-    if (response.message.type != expectedReply)
-    {
-        controlFailed.store (true, std::memory_order_release);
-        error = "unexpected plug-in worker reply";
-        logDiagnostic ("control_reply_unexpected", error);
-        return false;
-    }
-    reply = response.message.payload;
-    return true;
 }
 
 void IsolatedPluginProxy::logDiagnostic (const juce::String& event,
@@ -768,6 +816,11 @@ void IsolatedPluginProxy::prepareToPlay (double sampleRate, int blockSize)
     requestOrThrow (MessageType::prepare, jsonPayload (juce::var (object)),
                     MessageType::prepare, 5000);
     setLatencySamples (metadata.latencySamples + blockSize);
+    // Seed the fallback now, while the worker's message thread is certainly free: the first
+    // session save can otherwise land while an editor is being built, with nothing to hand
+    // it but a failure.
+    if (! hasLastKnownState)
+        refreshStateCache();
 }
 
 void IsolatedPluginProxy::releaseResources()
@@ -944,8 +997,10 @@ juce::String IsolatedPluginProxy::parameterText (int index, float value, int max
     object->setProperty ("maximumLength", juce::jlimit (1, 4096, maximumLength));
     juce::MemoryBlock reply;
     juce::String error;
+    // A short budget: this is a label, asked for on hover and per row, and a worker busy
+    // building its editor should cost a blank label, not a frozen host.
     if (request (MessageType::parameterText, jsonPayload (juce::var (object)),
-                 MessageType::parameterText, reply, 1000, error))
+                 MessageType::parameterText, reply, 300, error))
     {
         Message message;
         message.payload = reply;
@@ -966,7 +1021,7 @@ float IsolatedPluginProxy::parameterValueFromText (int index, const juce::String
     juce::MemoryBlock reply;
     juce::String error;
     if (request (MessageType::parameterValueFromText, jsonPayload (juce::var (object)),
-                 MessageType::parameterValueFromText, reply, 1000, error))
+                 MessageType::parameterValueFromText, reply, 300, error))
     {
         Message message;
         message.payload = reply;
@@ -1016,6 +1071,31 @@ bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64&
     widthOut = (int) json.getProperty ("width", 0);
     heightOut = (int) json.getProperty ("height", 0);
     return true;
+}
+
+void IsolatedPluginProxy::waitAnsweringWindowMessages (int milliseconds)
+{
+   #if JUCE_WINDOWS
+    // The same discipline as the receive below, for a plain delay: on the message thread,
+    // sent window messages are answered the moment they arrive; nothing queued runs.
+    if (auto* manager = juce::MessageManager::getInstanceWithoutCreating();
+        manager != nullptr && manager->isThisTheMessageThread())
+    {
+        const auto until = juce::Time::getMillisecondCounterHiRes() + milliseconds;
+        for (;;)
+        {
+            const auto left = static_cast<int> (std::ceil (until - juce::Time::getMillisecondCounterHiRes()));
+            if (left <= 0)
+                return;
+            if (MsgWaitForMultipleObjectsEx (0, nullptr, static_cast<DWORD> (left), QS_SENDMESSAGE, 0)
+                    != WAIT_OBJECT_0)
+                return;
+            MSG message;
+            PeekMessageW (&message, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+        }
+    }
+   #endif
+    juce::Thread::sleep (milliseconds);
 }
 
 DecodeResult
@@ -1081,10 +1161,24 @@ void IsolatedPluginProxy::getStateInformation (juce::MemoryBlock& state)
     // Audio-plane parameter changes may still be pending while transport is stopped. Push the
     // proxy's authoritative values first so the opaque state describes what Hostage is showing,
     // rather than the worker's preceding block.
-    if (! flushParameterValues (3000, error))
-        throwFailure (error);
-    if (! request (MessageType::getState, {}, MessageType::stateReply, state, 3000, error))
-        throwFailure (error);
+    if (flushParameterValues (3000, error)
+        && request (MessageType::getState, {}, MessageType::stateReply, state, 3000, error))
+    {
+        lastKnownState = state;
+        hasLastKnownState = true;
+        return;
+    }
+    // A worker whose message thread is busy — building its editor, which can take longer
+    // than this budget — is not a dead worker, and throwing here would tell the rack guard
+    // it was. The session save that asked gets the last state this side saw; the next save
+    // gets the real one.
+    if (error.startsWith ("busy:") && hasLastKnownState)
+    {
+        state = lastKnownState;
+        logDiagnostic ("state_from_cache", error);
+        return;
+    }
+    throwFailure (error);
 }
 
 void IsolatedPluginProxy::setStateInformation (const void* data, int size)
@@ -1095,6 +1189,23 @@ void IsolatedPluginProxy::setStateInformation (const void* data, int size)
     juce::String error;
     if (! requestAndSyncParameters (MessageType::setState, payload, 3000, error))
         throwFailure (error);
+    lastKnownState = payload;
+    hasLastKnownState = true;
+}
+
+void IsolatedPluginProxy::refreshStateCache() noexcept
+{
+    try
+    {
+        juce::MemoryBlock state;
+        juce::String error;
+        if (request (MessageType::getState, {}, MessageType::stateReply, state, 3000, error))
+        {
+            lastKnownState = state;
+            hasLastKnownState = true;
+        }
+    }
+    catch (...) {}
 }
 
 bool IsolatedPluginProxy::applyVstPreset (const juce::File& presetFile)
@@ -1104,8 +1215,11 @@ bool IsolatedPluginProxy::applyVstPreset (const juce::File& presetFile)
     auto* object = new juce::DynamicObject();
     object->setProperty ("path", presetFile.getFullPathName());
     juce::String error;
-    return requestAndSyncParameters (MessageType::applyVstPreset,
-                                     jsonPayload (juce::var (object)), 5000, error);
+    const auto applied = requestAndSyncParameters (MessageType::applyVstPreset,
+                                                   jsonPayload (juce::var (object)), 5000, error);
+    if (applied)
+        refreshStateCache();    // the cached state just went stale; best effort, never fatal
+    return applied;
 }
 
 [[noreturn]] void IsolatedPluginProxy::throwFailure (const juce::String& error)
