@@ -232,9 +232,18 @@ private:
     {
         juce::String state;
         juce::int64 nativeHandle = 0;
-        int width = 0, height = 0;
-        if (! owner.sendEditorStatus (state, nativeHandle, width, height))
+        int width = 0, height = 0, stallMs = 0;
+        if (! owner.sendEditorStatus (state, nativeHandle, width, height, stallMs))
             return;             // a control failure is the guard's business, not this timer's
+        // The worker measures the longest single turn of its message loop. Logged when it
+        // is long and getting longer, so a plug-in whose window hogs that thread is named
+        // in the same log as everything else, rather than inferred from "busy" replies.
+        if (stallMs >= 250 && stallMs > reportedStallMs)
+        {
+            reportedStallMs = stallMs;
+            owner.logDiagnostic ("worker_message_thread_stall",
+                                 "longest dispatch " + juce::String (stallMs) + " ms with the editor open");
+        }
 
         if (state == "ready" && nativeHandle != 0)
         {
@@ -310,6 +319,7 @@ private:
     juce::int64 child = 0;        // the worker's window, 0 until it exists
     juce::Rectangle<int> placedArea;   // what the child was last told, so it is not told again
     bool placedShowing = false;
+    int reportedStallMs = 0;
     juce::String failure;
 };
 
@@ -870,10 +880,22 @@ void IsolatedPluginProxy::reset()
 void IsolatedPluginProxy::setNonRealtime (bool nonRealtime) noexcept
 {
     juce::AudioProcessor::setNonRealtime (nonRealtime);
+
+    // The rack guard calls this before EVERY audio block, to keep the vendor processor's
+    // mode in step with the graph. For an in-process plug-in that is a flag write. For
+    // this proxy it was a synchronous pipe round-trip on the audio thread, every block,
+    // with a 500 ms budget — invisible while the worker's message thread was idle, and the
+    // whole of the "slow motion" once that thread had a plug-in window to draw: each block
+    // waited for the worker to say it was busy, the audio thread stalled, and everything
+    // behind the request lock stalled with it. The worker is told once, and again only when
+    // the answer changes, which is a render-mode switch and never per block.
+    const int wanted = nonRealtime ? 1 : 0;
+    if (lastSentNonRealtime.exchange (wanted, std::memory_order_acq_rel) == wanted)
+        return;
     try
     {
         juce::MemoryBlock payload (1, false);
-        *static_cast<juce::uint8*> (payload.getData()) = nonRealtime ? 1 : 0;
+        *static_cast<juce::uint8*> (payload.getData()) = static_cast<juce::uint8> (wanted);
         juce::MemoryBlock reply;
         juce::String error;
         request (MessageType::setNonRealtime, payload, MessageType::setNonRealtime,
@@ -1085,11 +1107,11 @@ bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow)
 }
 
 bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
-                                            int& widthOut, int& heightOut)
+                                            int& widthOut, int& heightOut, int& stallMsOut)
 {
     stateOut.clear();
     nativeHandleOut = 0;
-    widthOut = heightOut = 0;
+    widthOut = heightOut = stallMsOut = 0;
     juce::MemoryBlock reply;
     juce::String error;
     if (! request (MessageType::editorResize, {}, MessageType::editorResize, reply, 1000, error))
@@ -1104,6 +1126,7 @@ bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64&
     nativeHandleOut = (juce::int64) json.getProperty ("hwnd", 0);
     widthOut = (int) json.getProperty ("width", 0);
     heightOut = (int) json.getProperty ("height", 0);
+    stallMsOut = (int) json.getProperty ("stallMs", 0);
     return true;
 }
 

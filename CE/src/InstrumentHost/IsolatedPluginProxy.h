@@ -129,7 +129,7 @@ private:
     // build in the worker; status reports whether it is there yet, where and how big.
     bool sendEditorOpen (juce::int64 hostWindow);
     bool sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
-                           int& widthOut, int& heightOut);
+                           int& widthOut, int& heightOut, int& stallMsOut);
     void sendEditorClose() noexcept;
     plugin_worker::DecodeResult
         receiveWhileAnsweringWindowMessages (int timeoutMs);
@@ -156,6 +156,9 @@ private:
     // which the rack guard would read as a failure and answer by tearing the worker down.
     juce::MemoryBlock lastKnownState;
     bool hasLastKnownState = false;
+    // What the worker was last told about realtime mode, so the rack guard's per-block
+    // setNonRealtime is a no-op here and not a pipe round-trip on the audio thread.
+    std::atomic<int> lastSentNonRealtime { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IsolatedPluginProxy)
 };

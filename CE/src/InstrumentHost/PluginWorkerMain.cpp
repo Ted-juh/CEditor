@@ -532,6 +532,12 @@ private:
     std::atomic<int> height { 0 };
 };
 
+/** The longest single turn of the message loop, in milliseconds, since the last time it was
+    read. Reported to Hostage with the editor status and logged there: when a plug-in's window
+    hogs this thread, the log names the length of the hog instead of leaving it to be inferred
+    from "busy" replies. Reset on read, so each report is the worst since the last. */
+static std::atomic<int> longestDispatchMs { 0 };
+
 /** Thrown by invokeProcessor when the message thread did not pick the job up in time. It is
     a reply, not a failure: the control loop answers it with a "busy:" error and carries on,
     and Hostage retries. Everything else thrown from a handler still stops the worker. */
@@ -710,7 +716,8 @@ public:
                 {
                     const auto nonRealtime = ! received.message.payload.isEmpty()
                         && *static_cast<const juce::uint8*> (received.message.payload.getData()) != 0;
-                    invokeProcessor ([&] { processor.setNonRealtime (nonRealtime); });
+                    // A mode hint: not worth holding the control thread for a busy plug-in.
+                    invokeProcessor ([&] { processor.setNonRealtime (nonRealtime); }, 40);
                 }
                 else if (received.message.type == MessageType::setProgram)
                 {
@@ -801,6 +808,7 @@ public:
                     object->setProperty ("hwnd", handle);
                     object->setProperty ("width", width);
                     object->setProperty ("height", height);
+                    object->setProperty ("stallMs", longestDispatchMs.exchange (0, std::memory_order_acq_rel));
                     reply = makeJsonMessage (MessageType::editorResize, generation,
                                              received.message.requestId, juce::var (object));
                 }
@@ -1146,7 +1154,16 @@ int main (int argc, char* argv[])
 
     while (! quit.load (std::memory_order_acquire) && ! audio.processorFailed()
            && parent.isAlive())
+    {
+        // One turn is meant to be about 20 ms. A turn that takes much longer is one message
+        // handler — a plug-in window painting, most likely — holding the thread, and its
+        // length is what Hostage's log needs to know.
+        const auto started = juce::Time::getMillisecondCounterHiRes();
         juce::MessageManager::getInstance()->runDispatchLoopUntil (20);
+        const auto took = static_cast<int> (juce::Time::getMillisecondCounterHiRes() - started);
+        if (took > longestDispatchMs.load (std::memory_order_relaxed))
+            longestDispatchMs.store (took, std::memory_order_relaxed);
+    }
 
     quit.store (true, std::memory_order_release);
     commands.signalThreadShouldExit();

@@ -147,6 +147,13 @@ Two timing rules make this hold, both learned from the live-worker log:
   from the request thread but always lets the message thread run the (already posted) close
   first and then the open, publishing a new window handle. Hostage treats a changed handle as a
   rebuilt window.
+- **Nothing per audio block crosses the control pipe.** The rack guard mirrors the host
+  context into the vendor processor before every block — `setNonRealtime` among it — which is a
+  flag write in-process and was a synchronous control request on the audio thread for the
+  proxy. It was invisible while the worker's message thread was idle and became "slow motion"
+  the moment that thread had a plug-in window to draw. The proxy now sends a mode change only
+  when the mode changes. Any new per-block call the guard grows must be checked against the
+  proxy the same way.
 - **Hostage keeps answering while it waits.** Windows delivers some messages about a child to
   its ancestors synchronously — `WM_PARENTNOTIFY`, `WM_MOUSEACTIVATE`, `WM_SETCURSOR` — so a
   control request made on Hostage's message thread reads the pipe on a helper thread and waits
