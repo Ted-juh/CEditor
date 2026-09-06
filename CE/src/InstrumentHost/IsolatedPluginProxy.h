@@ -125,11 +125,14 @@ private:
     void applyWorkerParameterEvents (const plugin_worker::PluginWorkerBlockBridge::Result&) noexcept;
     juce::String parameterText (int index, float value, int maximumLength);
     float parameterValueFromText (int index, const juce::String& text);
-    // The editor protocol, used by RemoteEditor only. Message thread.
-    bool sendEditorOpen (juce::int64 hostWindow, juce::int64& nativeHandleOut,
-                         int& widthOut, int& heightOut);
-    bool sendEditorSize (int& widthOut, int& heightOut);
+    // The editor protocol, used by RemoteEditor only. Message thread. Open only STARTS the
+    // build in the worker; status reports whether it is there yet, where and how big.
+    bool sendEditorOpen (juce::int64 hostWindow);
+    bool sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
+                           int& widthOut, int& heightOut);
     void sendEditorClose() noexcept;
+    plugin_worker::DecodeResult
+        receiveWhileAnsweringWindowMessages (int timeoutMs);
     void logDiagnostic (const juce::String& event, const juce::String& detail = {}) const;
     [[noreturn]] static void throwFailure (const juce::String&);
 

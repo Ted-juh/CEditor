@@ -354,69 +354,120 @@ public:
     explicit WorkerEditorController (juce::AudioProcessor& processorToUse)
         : processor (processorToUse) {}
 
-    /** Puts the vendor editor on screen INSIDE Hostage's window.
+    enum class State : int { idle = 0, opening, ready, failed };
 
-        `hostWindow` is the native handle of the Hostage window the editor is to appear in —
-        the pane's, or a floating editor window's. The editor is wrapped in a plain component
-        and that component is put on the desktop as a CHILD of that handle: CreateWindowEx with
-        a parent in another process, which Windows allows and WebView2 relies on. A child
-        window cannot be behind its parent, cannot have a taskbar button, and needs nobody to
-        win the foreground, which is the whole of what two earlier attempts (a foreground
-        grant; an owned top-level window) were trying to arrange and could not.
+    /** Control thread. Starts building the vendor editor inside `hostWindow` — a Hostage
+        window, which the editor's own window becomes a CHILD of — and returns at once;
+        status() says how it went.
 
-        The handle of the child comes back so Hostage can place it; its size comes back so
-        Hostage can size the component that stands for it. Hostage moves the child itself
-        (SetWindowPos on a child of its own window) — this process only ever creates and
-        destroys it, and follows the editor's own size changes, which Hostage polls for. */
-    bool open (juce::int64 hostWindow, juce::int64& nativeHandleOut, int& widthOut, int& heightOut)
+        Nothing here waits for the message thread, and that is the design, not a shortcut.
+        Building a vendor GUI can take seconds, and while it is being built inside Hostage's
+        window it sends Hostage synchronous window messages that Hostage can only answer if
+        its own message thread is free. The first version did the build inside the control
+        request, so Hostage's thread was blocked on the pipe for the whole of it: every
+        editor open took longer than the request's deadline, the late reply landed on the
+        next request as "stale", and the worker was torn down for it — an editor that
+        flashed on screen and a part marked Missing. So the request only STARTS the build;
+        the message thread publishes progress into atomics; status() reads those from the
+        control thread; and Hostage polls with requests that return in under a millisecond. */
+    bool open (juce::int64 hostWindow)
     {
         if (hostWindow == 0)
             return false;
+        const auto current = state.load (std::memory_order_acquire);
+        if (current == State::opening || current == State::ready)
+            return true;
+        state.store (State::opening, std::memory_order_release);
+        juce::MessageManager::callAsync ([this, hostWindow] { openOnMessageThread (hostWindow); });
+        return true;
+    }
 
-        if (frame == nullptr)
+    /** Control thread. Reads what the message thread last published; never blocks. */
+    void status (State& stateOut, juce::int64& handleOut, int& widthOut, int& heightOut) const noexcept
+    {
+        stateOut = state.load (std::memory_order_acquire);
+        handleOut = handle.load (std::memory_order_acquire);
+        widthOut = width.load (std::memory_order_acquire);
+        heightOut = height.load (std::memory_order_acquire);
+    }
+
+    /** Control thread: the close is posted behind whatever the message thread is doing,
+        which may be the open it is closing. Message-thread callers use closeNow(). */
+    void close()
+    {
+        juce::MessageManager::callAsync ([this] { closeOnMessageThread(); });
+    }
+
+    void closeNow() { closeOnMessageThread(); }
+
+private:
+    void openOnMessageThread (juce::int64 hostWindow)
+    {
+        if (frame != nullptr)
+        {
+            publishSize();
+            state.store (State::ready, std::memory_order_release);
+            return;
+        }
+        try
         {
             auto* editor = processor.createEditorIfNeeded();
             if (editor == nullptr)
-                return false;
-            frame = std::make_unique<Frame> (editor);
+            {
+                state.store (State::failed, std::memory_order_release);
+                return;
+            }
+            frame = std::make_unique<Frame> (*this, editor);
+            // CreateWindowEx with a parent in another process: allowed, and how WebView2 sits
+            // inside the same window. A child cannot be behind its parent, has no taskbar
+            // button, and needs nobody to win the foreground.
             frame->addToDesktop (0, reinterpret_cast<void*> (
                 static_cast<juce::pointer_sized_int> (hostWindow)));
             frame->setVisible (true);
+            auto* peer = frame->getPeer();
+            if (peer == nullptr)
+            {
+                frame.reset();
+                state.store (State::failed, std::memory_order_release);
+                return;
+            }
+            handle.store (static_cast<juce::int64> (
+                reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle())),
+                std::memory_order_release);
+            publishSize();
+            state.store (State::ready, std::memory_order_release);   // last: it gates the rest
         }
-
-        auto* peer = frame->getPeer();
-        if (peer == nullptr)
+        catch (...)
         {
             frame.reset();
-            return false;
+            state.store (State::failed, std::memory_order_release);
         }
-        nativeHandleOut = static_cast<juce::int64> (
-            reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()));
-        size (widthOut, heightOut);
-        return true;
     }
 
-    bool size (int& widthOut, int& heightOut) const
+    void closeOnMessageThread()
+    {
+        frame.reset();
+        handle.store (0, std::memory_order_release);
+        state.store (State::idle, std::memory_order_release);
+    }
+
+    void publishSize()
     {
         if (frame == nullptr)
-            return false;
-        widthOut = frame->getWidth();
-        heightOut = frame->getHeight();
-        return true;
+            return;
+        width.store (frame->getWidth(), std::memory_order_release);
+        height.store (frame->getHeight(), std::memory_order_release);
     }
 
-    void close() { frame.reset(); }
-
-private:
     // The editor's frame: sized BY the editor, never the other way round. A vendor GUI that
-    // resizes itself takes the frame with it, and Hostage reads the new size on its next
-    // poll. Hostage may also size the child window directly, which reaches this component
-    // as a resize; the editor is left at its own size and clipped rather than squeezed,
-    // because a plug-in told to be a size it did not choose is a plug-in drawn wrong.
+    // resizes itself takes the frame with it and the new size is published for Hostage's
+    // next poll. Hostage may also size the child window directly, which reaches here as a
+    // resize; the editor is left at its own size and clipped rather than squeezed.
     class Frame final : public juce::Component, private juce::ComponentListener
     {
     public:
-        explicit Frame (juce::AudioProcessorEditor* editorToOwn) : editor (editorToOwn)
+        Frame (WorkerEditorController& ownerToUse, juce::AudioProcessorEditor* editorToOwn)
+            : owner (ownerToUse), editor (editorToOwn)
         {
             setOpaque (true);
             addAndMakeVisible (*editor);
@@ -440,14 +491,22 @@ private:
         void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
         {
             if (wasResized)
+            {
                 setSize (juce::jmax (1, editor->getWidth()), juce::jmax (1, editor->getHeight()));
+                owner.publishSize();
+            }
         }
 
+        WorkerEditorController& owner;
         std::unique_ptr<juce::AudioProcessorEditor> editor;
     };
 
     juce::AudioProcessor& processor;
-    std::unique_ptr<Frame> frame;
+    std::unique_ptr<Frame> frame;            // message thread only
+    std::atomic<State> state { State::idle };
+    std::atomic<juce::int64> handle { 0 };
+    std::atomic<int> width { 0 };
+    std::atomic<int> height { 0 };
 };
 
 class WorkerControlThread final : public juce::Thread
@@ -688,46 +747,34 @@ public:
                     const auto json = decodeJsonPayload (received.message, jsonError);
                     const auto hostWindow = jsonError.isEmpty() && json.isObject()
                         ? (juce::int64) json.getProperty ("hostWindow", 0) : (juce::int64) 0;
-                    juce::int64 nativeHandle = 0;
-                    int width = 0, height = 0;
-                    bool opened = false;
-                    invokeProcessor ([&] { opened = editor.open (hostWindow, nativeHandle, width, height); });
-                    if (! opened)
+                    // The bare acknowledgement means "started"; editorResize reports the outcome.
+                    if (! editor.open (hostWindow))
                         reply = errorReply (generation, received.message.requestId,
-                                            hostWindow == 0 ? "no host window to show the editor in"
-                                                            : "plug-in did not create a vendor editor");
-                    else
-                    {
-                        auto* object = new juce::DynamicObject();
-                        object->setProperty ("hwnd", nativeHandle);
-                        object->setProperty ("width", width);
-                        object->setProperty ("height", height);
-                        reply = makeJsonMessage (MessageType::editorOpen, generation,
-                                                 received.message.requestId, juce::var (object));
-                    }
+                                            "no host window to show the editor in");
                 }
                 else if (received.message.type == MessageType::editorResize)
                 {
-                    // Hostage asking, not telling: the editor's current size, so the component
-                    // standing for it can follow a vendor GUI that resized itself.
+                    // Hostage asking, not telling: is the editor there yet, where, how big.
+                    // Answered from the control thread without touching the message thread,
+                    // which may be busy building the very thing being asked about.
+                    WorkerEditorController::State state {};
+                    juce::int64 handle = 0;
                     int width = 0, height = 0;
-                    bool present = false;
-                    invokeProcessor ([&] { present = editor.size (width, height); });
-                    if (! present)
-                        reply = errorReply (generation, received.message.requestId,
-                                            "no vendor editor is open");
-                    else
-                    {
-                        auto* object = new juce::DynamicObject();
-                        object->setProperty ("width", width);
-                        object->setProperty ("height", height);
-                        reply = makeJsonMessage (MessageType::editorResize, generation,
-                                                 received.message.requestId, juce::var (object));
-                    }
+                    editor.status (state, handle, width, height);
+                    auto* object = new juce::DynamicObject();
+                    object->setProperty ("state", state == WorkerEditorController::State::ready   ? "ready"
+                                                : state == WorkerEditorController::State::opening ? "opening"
+                                                : state == WorkerEditorController::State::failed  ? "failed"
+                                                                                                   : "idle");
+                    object->setProperty ("hwnd", handle);
+                    object->setProperty ("width", width);
+                    object->setProperty ("height", height);
+                    reply = makeJsonMessage (MessageType::editorResize, generation,
+                                             received.message.requestId, juce::var (object));
                 }
                 else if (received.message.type == MessageType::editorClose)
                 {
-                    invokeProcessor ([&] { editor.close(); });
+                    editor.close();     // posted behind whatever the message thread is doing
                 }
                 else if (received.message.type == MessageType::ping)
                 {
@@ -1030,7 +1077,7 @@ int main (int argc, char* argv[])
 
     commands.stopThread (100);
     audio.stopThread (1500);
-    editor.close();
+    editor.closeNow();      // message thread, and the loop is over: no posting now
     {
         const juce::ScopedLock lock (processor->getCallbackLock());
         processor->releaseResources();

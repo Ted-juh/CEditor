@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <thread>
 
 #if JUCE_WINDOWS
  #ifndef NOMINMAX
@@ -209,15 +210,10 @@ private:
             return;
         }
 
-        juce::int64 nativeHandle = 0;
-        int width = 0, height = 0;
-        if (owner.sendEditorOpen (hostWindow, nativeHandle, width, height) && nativeHandle != 0)
+        if (owner.sendEditorOpen (hostWindow))
         {
-            child = nativeHandle;
             failure.clear();
-            setSize (juce::jmax (1, width), juce::jmax (1, height));
-            place();
-            startTimer (250);
+            startTimer (100);       // until it is there; slower once it is
         }
         else
         {
@@ -226,12 +222,39 @@ private:
         repaint();
     }
 
+    // The worker builds the editor in the background and this asks how it is going. Before
+    // it is there: 10 times a second, so it appears within a tenth of a second of being
+    // ready. After: 4 times a second, to follow a vendor GUI that resizes itself. Each ask
+    // returns in well under a millisecond — the worker answers from what its message thread
+    // last published, without waiting for that thread — so the host is never parked on the
+    // pipe while a plug-in spends seconds drawing its skin.
     void timerCallback() override
     {
+        juce::String state;
+        juce::int64 nativeHandle = 0;
         int width = 0, height = 0;
-        if (child != 0 && owner.sendEditorSize (width, height) && width > 0 && height > 0
-            && (width != getWidth() || height != getHeight()))
-            setSize (width, height);
+        if (! owner.sendEditorStatus (state, nativeHandle, width, height))
+            return;             // a control failure is the guard's business, not this timer's
+
+        if (state == "ready" && nativeHandle != 0)
+        {
+            if (child == 0)
+            {
+                child = nativeHandle;
+                startTimer (250);
+                repaint();
+            }
+            if (width > 0 && height > 0 && (width != getWidth() || height != getHeight()))
+                setSize (width, height);
+            place();
+        }
+        else if (state == "failed")
+        {
+            stopTimer();
+            child = 0;
+            failure = owner.getName() + " did not open its interface.";
+            repaint();
+        }
     }
 
     // The child over this component, in the peer's physical pixels: the peer's own account
@@ -460,22 +483,6 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
                     connection->names = SharedMemoryNames::createUnique();
                     connection->mapping = std::make_unique<SharedDataPlaneMapping>();
                     connection->control = std::make_unique<PluginWorkerControlChannel>();
-                   #if JUCE_WINDOWS
-                    // While this process waits on the worker, keep answering the window
-                    // messages the worker's embedded editor sends it synchronously — the
-                    // reason is written above PluginWorkerControlChannel::serviceWhileWaiting.
-                    // Sent messages only, and only on the message thread: a request made
-                    // from any other thread has nothing to answer.
-                    connection->control->serviceWhileWaiting = []
-                    {
-                        if (auto* manager = juce::MessageManager::getInstanceWithoutCreating();
-                            manager != nullptr && manager->isThisTheMessageThread())
-                        {
-                            MSG message;
-                            PeekMessageW (&message, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
-                        }
-                    };
-                   #endif
                     connection->job = std::make_unique<PluginWorkerJob>();
                     connection->process = std::make_unique<juce::ChildProcess>();
                     connection->diagnosticLog = diagnosticLog;
@@ -629,7 +636,7 @@ bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& pa
         logDiagnostic ("control_send_failed", error);
         return false;
     }
-    const auto response = connection->control->receive (timeoutMs);
+    const auto response = receiveWhileAnsweringWindowMessages (timeoutMs);
     if (! response)
     {
         controlFailed.store (true, std::memory_order_release);
@@ -977,33 +984,22 @@ juce::AudioProcessorEditor* IsolatedPluginProxy::createEditor()
     return metadata.hasEditor ? new RemoteEditor (*this) : nullptr;
 }
 
-bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow, juce::int64& nativeHandleOut,
-                                          int& widthOut, int& heightOut)
+bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow)
 {
-    nativeHandleOut = 0;
-    widthOut = heightOut = 0;
     auto* object = new juce::DynamicObject();
     object->setProperty ("hostWindow", hostWindow);
     juce::MemoryBlock reply;
     juce::String error;
-    if (! request (MessageType::editorOpen, jsonPayload (juce::var (object)),
-                   MessageType::editorOpen, reply, 3000, error))
-        return false;
-
-    Message message;
-    message.payload = reply;
-    juce::String jsonError;
-    const auto json = decodeJsonPayload (message, jsonError);
-    if (jsonError.isNotEmpty() || ! json.isObject())
-        return false;
-    nativeHandleOut = (juce::int64) json.getProperty ("hwnd", 0);
-    widthOut = (int) json.getProperty ("width", 0);
-    heightOut = (int) json.getProperty ("height", 0);
-    return nativeHandleOut != 0;
+    // Acknowledged the moment the worker has STARTED; the build itself is not waited for.
+    return request (MessageType::editorOpen, jsonPayload (juce::var (object)),
+                    MessageType::editorOpen, reply, 3000, error);
 }
 
-bool IsolatedPluginProxy::sendEditorSize (int& widthOut, int& heightOut)
+bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
+                                            int& widthOut, int& heightOut)
 {
+    stateOut.clear();
+    nativeHandleOut = 0;
     widthOut = heightOut = 0;
     juce::MemoryBlock reply;
     juce::String error;
@@ -1015,9 +1011,57 @@ bool IsolatedPluginProxy::sendEditorSize (int& widthOut, int& heightOut)
     const auto json = decodeJsonPayload (message, jsonError);
     if (jsonError.isNotEmpty() || ! json.isObject())
         return false;
+    stateOut = json.getProperty ("state", "idle").toString();
+    nativeHandleOut = (juce::int64) json.getProperty ("hwnd", 0);
     widthOut = (int) json.getProperty ("width", 0);
     heightOut = (int) json.getProperty ("height", 0);
     return true;
+}
+
+DecodeResult
+IsolatedPluginProxy::receiveWhileAnsweringWindowMessages (int timeoutMs)
+{
+   #if JUCE_WINDOWS
+    // The worker's editor is a child of a Hostage window, and Windows delivers some messages
+    // about a child to its ancestors SYNCHRONOUSLY — WM_PARENTNOTIFY as it is created,
+    // WM_MOUSEACTIVATE and WM_SETCURSOR as the user reaches it — blocking the worker's
+    // thread until Hostage's message thread answers. If that thread is the one waiting here,
+    // it must keep answering or the two block each other until this times out and a
+    // healthy worker is declared dead. So on the message thread the pipe is read by a helper
+    // thread while this one waits with MsgWaitForMultipleObjectsEx for EITHER the reply or a
+    // pending sent message, and answers the latter with PeekMessage(PM_QS_SENDMESSAGE |
+    // PM_NOREMOVE): sent messages only, delivered the instant they arrive, nothing queued —
+    // no timers, no paint, no re-entry into another request. Other threads read directly.
+    if (auto* manager = juce::MessageManager::getInstanceWithoutCreating();
+        manager != nullptr && manager->isThisTheMessageThread())
+    {
+        DecodeResult result;
+        HANDLE done = CreateEventW (nullptr, TRUE, FALSE, nullptr);
+        if (done != nullptr)
+        {
+            std::thread reader ([&]
+            {
+                result = connection->control->receive (timeoutMs);
+                SetEvent (done);
+            });
+            for (;;)
+            {
+                const auto wait = MsgWaitForMultipleObjectsEx (1, &done, INFINITE, QS_SENDMESSAGE, 0);
+                if (wait == WAIT_OBJECT_0 + 1)
+                {
+                    MSG message;
+                    PeekMessageW (&message, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+                    continue;
+                }
+                break;      // the reply, or a wait failure — either way the reader ends by itself
+            }
+            reader.join();
+            CloseHandle (done);
+            return result;
+        }
+    }
+   #endif
+    return connection->control->receive (timeoutMs);
 }
 
 void IsolatedPluginProxy::sendEditorClose() noexcept

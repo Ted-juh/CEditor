@@ -128,6 +128,20 @@ the worker for the editor's size so a vendor GUI that resizes itself is followed
 destruction are the worker's; position is Hostage's. The Hostage parameter editor continues to
 work through mirrored parameter metadata even when a vendor editor cannot be shown.
 
+Two timing rules make this hold, both learned from the live-worker log:
+
+- **Nobody waits for the build.** `editorOpen` only starts the build; the worker's message
+  thread does it and publishes progress into atomics, and `editorResize` (the status poll) is
+  answered from the control thread without touching the message thread. Building a vendor GUI
+  can take seconds; the first version built it inside the request, every open outran the
+  3-second deadline, the late reply landed on the next request as "stale", and the worker was
+  torn down for it.
+- **Hostage keeps answering while it waits.** Windows delivers some messages about a child to
+  its ancestors synchronously — `WM_PARENTNOTIFY`, `WM_MOUSEACTIVATE`, `WM_SETCURSOR` — so a
+  control request made on Hostage's message thread reads the pipe on a helper thread and waits
+  with `MsgWaitForMultipleObjectsEx(QS_SENDMESSAGE)`, answering sent messages the instant they
+  arrive and dispatching nothing queued.
+
 Two earlier shapes are recorded here so they are not tried again:
 
 - A worker-owned **top-level** window, with Hostage showing a placeholder. The window opened

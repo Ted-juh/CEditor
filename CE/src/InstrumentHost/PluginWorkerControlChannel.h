@@ -4,7 +4,6 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <functional>
 #include <limits>
 
 // Framed, duplex, message-thread control channel. Audio/MIDI never travels here. A single
@@ -17,21 +16,6 @@ namespace ceditor::host::plugin_worker
 class PluginWorkerControlChannel
 {
 public:
-    /** Called repeatedly while a receive() is waiting, at most every waitSliceMs, when set.
-
-        This exists for one reason. The worker's editor window is a CHILD of a Hostage window,
-        and Windows delivers some messages about a child to its ancestors synchronously —
-        WM_PARENTNOTIFY when the child is created or destroyed, WM_MOUSEACTIVATE and
-        WM_SETCURSOR as the user reaches it — by blocking the sending thread until the
-        receiving thread answers. The receiving thread is Hostage's message thread, and
-        during a control request that thread is here, blocked on the pipe, waiting for a
-        reply that the worker's message thread will not produce until its SendMessage
-        returns. Each side waits for the other until the request times out, and a timed-out
-        request is treated as a dead worker. Hostage sets this hook to service pending SENT
-        messages only (PeekMessage with PM_QS_SENDMESSAGE | PM_NOREMOVE), which answers the
-        worker without dispatching anything queued: no timers, no paint, no re-entry into
-        another request. The worker leaves it unset; its control thread is not a UI thread. */
-    std::function<void()> serviceWhileWaiting;
     bool createHost (const juce::String& pipeName, juce::String& error)
     {
         close();
@@ -162,32 +146,14 @@ private:
             // cancellation reports no partial progress. Matching the pipe quantum lets each
             // completed piece become resumable state before the polling deadline expires.
             const auto wanted = juce::jmin (pipeTransferChunkBytes, bytes - received);
-            // With a hook set, wait in slices so it runs between them. JUCE's pipe read
-            // returns -1 for BOTH "nothing arrived before my timeout" and "the other end is
-            // gone", so with a sliced timeout a negative result is not a verdict: only the
-            // deadline is. Without the hook the read waits the whole deadline and -1 keeps
-            // its old meaning. (The first version of this slicing returned on the first -1,
-            // and every worker was declared dead 20 ms after it started.)
-            const auto sliceLimited = serviceWhileWaiting != nullptr;
-            const auto slice = sliceLimited && (remaining < 0 || remaining > waitSliceMs)
-                                   ? waitSliceMs : remaining;
-            const auto chunk = pipe.read (write + received, wanted, slice);
+            const auto chunk = pipe.read (write + received, wanted,
+                                          remaining);
             if (chunk <= 0)
-            {
-                if (! sliceLimited)
-                    return false;
-                serviceWhileWaiting();
-                continue;
-            }
+                return false;
             received += chunk;
         }
         return true;
     }
-
-    // Long enough that the cancel-and-retry a slice boundary implies is rare, short enough
-    // that a worker blocked on a synchronous window message is answered before anyone
-    // notices. The worker's own control loop already polls this pipe at 100 ms.
-    static constexpr int waitSliceMs = 50;
 
     void resetReceiveState()
     {
