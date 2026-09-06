@@ -374,9 +374,13 @@ public:
     {
         if (hostWindow == 0)
             return false;
-        const auto current = state.load (std::memory_order_acquire);
-        if (current == State::opening || current == State::ready)
-            return true;
+        // Always posted, never short-circuited on "already ready": the pane's editor closes
+        // and a floating one opens in the same instant, and the close is a posted message
+        // still in flight. Answering "ready" from here handed Hostage the OLD window, which
+        // the close then destroyed — "Opening…" for ever, the first time. Posting the open
+        // behind the close, and publishing nothing until it has run, makes the sequence the
+        // message thread's, in order.
+        handle.store (0, std::memory_order_release);
         state.store (State::opening, std::memory_order_release);
         juce::MessageManager::callAsync ([this, hostWindow] { openOnMessageThread (hostWindow); });
         return true;
@@ -403,8 +407,14 @@ public:
 private:
     void openOnMessageThread (juce::int64 hostWindow)
     {
+        // A frame that exists in a different Hostage window than the one asked for is
+        // rebuilt there: a window cannot be re-parented across processes, and the editor
+        // it held belongs to that window.
+        if (frame != nullptr && frameHostWindow != hostWindow)
+            frame.reset();
         if (frame != nullptr)
         {
+            publishHandle();
             publishSize();
             state.store (State::ready, std::memory_order_release);
             return;
@@ -424,16 +434,14 @@ private:
             frame->addToDesktop (0, reinterpret_cast<void*> (
                 static_cast<juce::pointer_sized_int> (hostWindow)));
             frame->setVisible (true);
-            auto* peer = frame->getPeer();
-            if (peer == nullptr)
+            if (frame->getPeer() == nullptr)
             {
                 frame.reset();
                 state.store (State::failed, std::memory_order_release);
                 return;
             }
-            handle.store (static_cast<juce::int64> (
-                reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle())),
-                std::memory_order_release);
+            frameHostWindow = hostWindow;
+            publishHandle();
             publishSize();
             state.store (State::ready, std::memory_order_release);   // last: it gates the rest
         }
@@ -447,8 +455,18 @@ private:
     void closeOnMessageThread()
     {
         frame.reset();
+        frameHostWindow = 0;
         handle.store (0, std::memory_order_release);
         state.store (State::idle, std::memory_order_release);
+    }
+
+    void publishHandle()
+    {
+        auto* peer = frame != nullptr ? frame->getPeer() : nullptr;
+        handle.store (peer != nullptr
+                          ? static_cast<juce::int64> (reinterpret_cast<juce::pointer_sized_int> (peer->getNativeHandle()))
+                          : (juce::int64) 0,
+                      std::memory_order_release);
     }
 
     void publishSize()
@@ -503,6 +521,7 @@ private:
 
     juce::AudioProcessor& processor;
     std::unique_ptr<Frame> frame;            // message thread only
+    juce::int64 frameHostWindow = 0;         // message thread only: which Hostage window it is in
     std::atomic<State> state { State::idle };
     std::atomic<juce::int64> handle { 0 };
     std::atomic<int> width { 0 };
@@ -967,6 +986,16 @@ int main (int argc, char* argv[])
 {
     if (argc != 15 || juce::String (argv[1]) != "--run")
         return 64;
+
+    // JUCE makes a process per-monitor-DPI aware only when it believes it is a standalone
+    // application, and the test for that is "has a JUCEApplication instance function", not
+    // any compile-time define. This process has a plain main(), so without this line it stays
+    // DPI-unaware, every JUCE scale factor in it is 1.0, and its editor window — a child of a
+    // Hostage window at 125% — draws the plug-in at 100% in the top-left of a frame that
+    // Hostage sized for 125%: the black margin. The function is never called; its being
+    // non-null is the whole effect, and it must be set before ScopedJuceInitialiser_GUI, which
+    // is when JUCE decides.
+    juce::JUCEApplicationBase::createInstance = [] () -> juce::JUCEApplicationBase* { return nullptr; };
 
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     const auto generation = static_cast<juce::uint32> (juce::String (argv[2]).getLargeIntValue());

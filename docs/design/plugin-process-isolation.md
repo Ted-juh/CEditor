@@ -136,6 +136,17 @@ Two timing rules make this hold, both learned from the live-worker log:
   can take seconds; the first version built it inside the request, every open outran the
   3-second deadline, the late reply landed on the next request as "stale", and the worker was
   torn down for it.
+- **The worker is per-monitor DPI aware, explicitly.** JUCE only makes a process DPI aware when
+  `JUCEApplicationBase::isStandaloneApp()` is true, which tests for an application-instance
+  function, not a define. The worker has a plain `main()`, so it sets `createInstance` to a
+  never-called stub before `ScopedJuceInitialiser_GUI`. Without it every JUCE scale factor in the
+  worker is 1.0 and its window inside a 125% Hostage window draws the plug-in at 100% in the
+  corner of a frame sized for 125%.
+- **Open is posted behind a pending close.** Moving the editor from the pane to a floating
+  window closes one and opens the other in the same instant; the worker never answers "ready"
+  from the request thread but always lets the message thread run the (already posted) close
+  first and then the open, publishing a new window handle. Hostage treats a changed handle as a
+  rebuilt window.
 - **Hostage keeps answering while it waits.** Windows delivers some messages about a child to
   its ancestors synchronously — `WM_PARENTNOTIFY`, `WM_MOUSEACTIVATE`, `WM_SETCURSOR` — so a
   control request made on Hostage's message thread reads the pipe on a helper thread and waits

@@ -238,7 +238,10 @@ private:
 
         if (state == "ready" && nativeHandle != 0)
         {
-            if (child == 0)
+            // A different handle than last time is a rebuilt window — the worker recreates
+            // it when the editor moves between the pane and a floating window — and the old
+            // one is gone; place the new one and forget the old.
+            if (child != nativeHandle)
             {
                 child = nativeHandle;
                 startTimer (250);
@@ -247,6 +250,17 @@ private:
             if (width > 0 && height > 0 && (width != getWidth() || height != getHeight()))
                 setSize (width, height);
             place();
+        }
+        else if (state == "opening" || state == "idle")
+        {
+            // Being rebuilt (or a close still in flight ahead of the open): the old window,
+            // if any, is no longer ours to place. Keep asking.
+            if (child != 0)
+            {
+                child = 0;
+                startTimer (100);
+                repaint();
+            }
         }
         else if (state == "failed")
         {
