@@ -5308,6 +5308,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 {
                     retry.state = "waiting";
                     retry.attempts = 0;
+                    retry.recoveredAtMs = 0.0;
                     retry.nextAttemptMs = juce::Time::getMillisecondCounterHiRes();
                 }
             }
@@ -9400,14 +9401,24 @@ void InstrumentHostService::drainProcessorFailures()
         }
 
         auto& retry = failovers[failure.targetId];
+        const auto failedCeId = targetClassCeId (failure.targetId);
+        constexpr double recoveryStabilityWindowMs = 10000.0;
+        const auto repeatedImmediateFailure = retry.targetId == failure.targetId
+            && retry.ceId == failedCeId && retry.state == "recovered"
+            && retry.recoveredAtMs > 0.0
+            && now - retry.recoveredAtMs < recoveryStabilityWindowMs;
+        const auto precedingAttempts = retry.attempts;
         retry.targetId = failure.targetId;
-        retry.ceId = targetClassCeId (failure.targetId);
+        retry.ceId = failedCeId;
         retry.name = failure.name.isNotEmpty() ? failure.name : failure.targetId;
         retry.effect = failure.effect;
         retry.error = "The processor failed, disconnected or missed its audio deadline and was taken out of the audio path.";
-        retry.attempts = 0;
-        retry.state = settings.enabled ? "waiting" : "bypassed";
-        retry.nextAttemptMs = now + settings.retryDelayMs;
+        retry.attempts = repeatedImmediateFailure ? precedingAttempts : 0;
+        retry.recoveredAtMs = 0.0;
+        retry.state = ! settings.enabled ? "bypassed"
+                    : retry.attempts >= settings.maxAttempts ? "failed"
+                                                             : "waiting";
+        retry.nextAttemptMs = retry.state == "waiting" ? now + settings.retryDelayMs : 0.0;
         retry.parameterValues = std::move (lastKnownValues);
 
         auto* event = new juce::DynamicObject();
@@ -9485,6 +9496,7 @@ void InstrumentHostService::beginFailoverAttempt (const juce::String& targetId)
             }
             state.state = "recovered";
             state.error.clear();
+            state.recoveredAtMs = juce::Time::getMillisecondCounterHiRes();
         }
         else
         {
@@ -9524,6 +9536,7 @@ void InstrumentHostService::retryFailedProcessor (const juce::String& targetId)
     }
     found->second.state = "waiting";
     found->second.attempts = 0;
+    found->second.recoveredAtMs = 0.0;
     found->second.nextAttemptMs = juce::Time::getMillisecondCounterHiRes();
     // A manual retry remains available when automatic attempts are disabled. Turning the
     // policy off means "do not keep trying on your own", not "disable the repair button".

@@ -300,7 +300,8 @@ private:
         auto output = block.outputParameterCapacity();
         juce::uint32 count = 0;
         size_t inspected = 0;
-        while (inspected < static_cast<size_t> (parameters.size())
+        while (inspected < juce::jmin (static_cast<size_t> (parameters.size()),
+                                      maxParameterInspectionsPerBlock)
                && count < static_cast<juce::uint32> (output.size()))
         {
             const auto index = parameterScanCursor;
@@ -387,35 +388,51 @@ public:
     }
 
     /** Control thread. Reads what the message thread last published; never blocks. */
-    void status (State& stateOut, juce::int64& handleOut, int& widthOut, int& heightOut) const noexcept
+    void status (State& stateOut, juce::int64& handleOut, int& widthOut, int& heightOut,
+                 int& openDurationOut, bool& reusedOut) const noexcept
     {
         stateOut = state.load (std::memory_order_acquire);
         handleOut = handle.load (std::memory_order_acquire);
         widthOut = width.load (std::memory_order_acquire);
         heightOut = height.load (std::memory_order_acquire);
-    }
-
-    /** Control thread: the close is posted behind whatever the message thread is doing,
-        which may be the open it is closing. Message-thread callers use closeNow(). */
-    void close()
-    {
-        juce::MessageManager::callAsync ([this] { closeOnMessageThread(); });
+        openDurationOut = openDurationMs.load (std::memory_order_acquire);
+        reusedOut = reused.load (std::memory_order_acquire);
     }
 
     void closeNow() { closeOnMessageThread(); }
+    void destroyNow()
+    {
+        frame.reset();
+        frameHostWindow = 0;
+        handle.store (0, std::memory_order_release);
+        state.store (State::idle, std::memory_order_release);
+    }
 
 private:
     void openOnMessageThread (juce::int64 hostWindow)
     {
-        // A frame that exists in a different Hostage window than the one asked for is
-        // rebuilt there: a window cannot be re-parented across processes, and the editor
-        // it held belongs to that window.
+        const auto started = juce::Time::getMillisecondCounterHiRes();
+       #if JUCE_WINDOWS
+        if (frame != nullptr && ! hasValidNativeWindow())
+            frame.reset();
+        if (frame != nullptr && frameHostWindow != hostWindow
+            && ! setNativeParent (reinterpret_cast<HWND> (
+                static_cast<juce::pointer_sized_int> (hostWindow))))
+            frame.reset();
+       #else
         if (frame != nullptr && frameHostWindow != hostWindow)
             frame.reset();
+       #endif
         if (frame != nullptr)
         {
+            frameHostWindow = hostWindow;
+            frame->setTopLeftPosition (-32000, -32000);
+            frame->setVisible (true);
             publishHandle();
             publishSize();
+            openDurationMs.store (static_cast<int> (
+                juce::Time::getMillisecondCounterHiRes() - started), std::memory_order_release);
+            reused.store (true, std::memory_order_release);
             state.store (State::ready, std::memory_order_release);
             return;
         }
@@ -447,6 +464,9 @@ private:
             frameHostWindow = hostWindow;
             publishHandle();
             publishSize();
+            openDurationMs.store (static_cast<int> (
+                juce::Time::getMillisecondCounterHiRes() - started), std::memory_order_release);
+            reused.store (false, std::memory_order_release);
             state.store (State::ready, std::memory_order_release);   // last: it gates the rest
         }
         catch (...)
@@ -458,11 +478,42 @@ private:
 
     void closeOnMessageThread()
     {
-        frame.reset();
+        if (frame != nullptr)
+        {
+            frame->setVisible (false);
+           #if JUCE_WINDOWS
+            // Keep the vendor editor alive while Hostage destroys the pane or floating parent.
+            // HWND_MESSAGE is process-neutral parking: the same child can later be reparented
+            // into the next Hostage peer without re-running createEditorIfNeeded().
+            if (! setNativeParent (HWND_MESSAGE))
+                frame.reset();
+           #else
+            frame.reset();
+           #endif
+        }
         frameHostWindow = 0;
         handle.store (0, std::memory_order_release);
         state.store (State::idle, std::memory_order_release);
     }
+
+   #if JUCE_WINDOWS
+    bool hasValidNativeWindow() const
+    {
+        const auto* peer = frame != nullptr ? frame->getPeer() : nullptr;
+        return peer != nullptr && IsWindow (static_cast<HWND> (peer->getNativeHandle())) != FALSE;
+    }
+
+    bool setNativeParent (HWND parent)
+    {
+        if (! hasValidNativeWindow())
+            return false;
+        auto* peer = frame->getPeer();
+        auto hwnd = static_cast<HWND> (peer->getNativeHandle());
+        SetLastError (ERROR_SUCCESS);
+        const auto previous = SetParent (hwnd, parent);
+        return previous != nullptr || GetLastError() == ERROR_SUCCESS;
+    }
+   #endif
 
     void publishHandle()
     {
@@ -530,6 +581,8 @@ private:
     std::atomic<juce::int64> handle { 0 };
     std::atomic<int> width { 0 };
     std::atomic<int> height { 0 };
+    std::atomic<int> openDurationMs { 0 };
+    std::atomic<bool> reused { false };
 };
 
 /** The longest single turn of the message loop, in milliseconds, since the last time it was
@@ -582,18 +635,41 @@ public:
             {
                 if (received.message.type == MessageType::getState)
                 {
-                    invokeProcessor ([&] { processor.getStateInformation (reply.payload); });
-                    if (reply.payload.getSize() > maxPayloadBytes)
+                    int pickUpMs = 400;
+                    bool valid = true;
+                    if (! received.message.payload.isEmpty())
+                    {
+                        juce::String jsonError;
+                        const auto json = decodeJsonPayload (received.message, jsonError);
+                        valid = jsonError.isEmpty() && json.isObject();
+                        if (valid)
+                            pickUpMs = juce::jlimit (
+                                10, 2000, (int) json.getProperty ("pickUpMs", 400));
+                    }
+                    if (! valid)
                         reply = errorReply (generation, received.message.requestId,
-                                            "plug-in state exceeds the 64 MiB worker limit");
+                                            "invalid worker state request");
                     else
-                        reply.type = MessageType::stateReply;
+                    {
+                        invokeProcessor ([&] { processor.getStateInformation (reply.payload); },
+                                         pickUpMs);
+                        if (reply.payload.getSize() > maxPayloadBytes)
+                            reply = errorReply (generation, received.message.requestId,
+                                                "plug-in state exceeds the 64 MiB worker limit");
+                        else
+                            reply.type = MessageType::stateReply;
+                    }
                 }
                 else if (received.message.type == MessageType::setParameter)
                 {
                     juce::String jsonError;
                     const auto json = decodeJsonPayload (received.message, jsonError);
-                    const auto* values = json.getArray();
+                    const auto valuesValue = json.isObject()
+                        ? json.getProperty ("values", {}) : json;
+                    const auto* values = valuesValue.getArray();
+                    const auto pickUpMs = json.isObject()
+                        ? juce::jlimit (10, 2000, (int) json.getProperty ("pickUpMs", 400))
+                        : 400;
                     const auto parameters = processor.getParameters();
                     bool valid = jsonError.isEmpty() && values != nullptr
                               && values->size() == parameters.size();
@@ -614,7 +690,7 @@ public:
                                         values->getReference (index)))));
                             reply = makeJsonMessage (MessageType::setParameter, generation,
                                 received.message.requestId, processorSnapshot (processor));
-                        });
+                        }, pickUpMs);
                     }
                 }
                 else if (received.message.type == MessageType::parameterText)
@@ -798,8 +874,9 @@ public:
                     // which may be busy building the very thing being asked about.
                     WorkerEditorController::State state {};
                     juce::int64 handle = 0;
-                    int width = 0, height = 0;
-                    editor.status (state, handle, width, height);
+                    int width = 0, height = 0, openDurationMs = 0;
+                    bool reused = false;
+                    editor.status (state, handle, width, height, openDurationMs, reused);
                     auto* object = new juce::DynamicObject();
                     object->setProperty ("state", state == WorkerEditorController::State::ready   ? "ready"
                                                 : state == WorkerEditorController::State::opening ? "opening"
@@ -808,13 +885,17 @@ public:
                     object->setProperty ("hwnd", handle);
                     object->setProperty ("width", width);
                     object->setProperty ("height", height);
+                    object->setProperty ("openDurationMs", openDurationMs);
+                    object->setProperty ("reused", reused);
                     object->setProperty ("stallMs", longestDispatchMs.exchange (0, std::memory_order_acq_rel));
                     reply = makeJsonMessage (MessageType::editorResize, generation,
                                              received.message.requestId, juce::var (object));
                 }
                 else if (received.message.type == MessageType::editorClose)
                 {
-                    editor.close();     // posted behind whatever the message thread is doing
+                    // The acknowledgement means the native child is no longer owned by the
+                    // Hostage window. This must complete before that parent is destroyed.
+                    invokeMessageThread ([&] { editor.closeNow(); }, 400, false);
                 }
                 else if (received.message.type == MessageType::ping)
                 {
@@ -848,8 +929,8 @@ public:
     }
 
 private:
-    /** Runs `function` on the message thread under the processor's callback lock, waiting a
-        BOUNDED time for that thread to pick it up.
+    /** Runs `function` on the message thread, optionally under the processor's callback lock,
+        waiting a BOUNDED time for that thread to pick it up.
 
         The bound is the point. The message thread can be busy for seconds — building the
         vendor editor is the case that found this — and while it is, every control request
@@ -861,7 +942,7 @@ private:
         for however long it takes: `function` refers to this thread's stack, so it must never
         run once this call has returned — the lock below is what guarantees that. */
     template <typename Function>
-    void invokeProcessor (Function&& function, int pickUpMs = 400)
+    void invokeMessageThread (Function&& function, int pickUpMs, bool lockProcessor)
     {
         struct Job
         {
@@ -872,7 +953,7 @@ private:
             std::exception_ptr thrown;
         };
         auto job = std::make_shared<Job>();
-        juce::MessageManager::callAsync ([this, job, &function]
+        juce::MessageManager::callAsync ([this, job, &function, lockProcessor]
         {
             {
                 const juce::ScopedLock lock (job->lock);
@@ -882,8 +963,15 @@ private:
             }
             try
             {
-                const juce::ScopedLock lock (processor.getCallbackLock());
-                function();
+                if (lockProcessor)
+                {
+                    const juce::ScopedLock lock (processor.getCallbackLock());
+                    function();
+                }
+                else
+                {
+                    function();
+                }
             }
             catch (...)
             {
@@ -907,6 +995,12 @@ private:
         }
         if (job->thrown)
             std::rethrow_exception (job->thrown);
+    }
+
+    template <typename Function>
+    void invokeProcessor (Function&& function, int pickUpMs = 400)
+    {
+        invokeMessageThread (std::forward<Function> (function), pickUpMs, true);
     }
 
     void send (const Message& message)
@@ -1181,7 +1275,7 @@ int main (int argc, char* argv[])
 
     commands.stopThread (100);
     audio.stopThread (1500);
-    editor.closeNow();      // message thread, and the loop is over: no posting now
+    editor.destroyNow();    // message thread, and the loop is over: release the parked editor
     {
         const juce::ScopedLock lock (processor->getCallbackLock());
         processor->releaseResources();

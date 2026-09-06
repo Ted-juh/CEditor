@@ -146,7 +146,9 @@ public:
     {
         stopTimer();
         watcher.reset();
-        if (child != 0)
+        // Close also cancels/parks an editor that is still opening and has not published its
+        // child handle yet. Otherwise the worker can finish into a parent that has just died.
+        if (hostWindow != 0)
             owner.sendEditorClose();
     }
 
@@ -186,9 +188,8 @@ private:
         return 0;
     }
 
-    // A new peer means a new parent for the child. In practice there is never a second one
-    // — the service builds a fresh editor for a fresh place — so this closes and reopens
-    // rather than reparenting a window across processes.
+    // A new peer means a new parent for the child. Close asks the worker to park the native
+    // window before the old parent disappears; open reparents that same window to this peer.
     void peerChanged()
     {
         const auto handle = currentPeerHandle();
@@ -197,7 +198,7 @@ private:
             place();
             return;
         }
-        if (child != 0)
+        if (hostWindow != 0)
         {
             stopTimer();
             owner.sendEditorClose();
@@ -210,6 +211,8 @@ private:
             return;
         }
 
+        openRequestedMs = juce::Time::getMillisecondCounterHiRes();
+        readyReported = false;
         if (owner.sendEditorOpen (hostWindow))
         {
             failure.clear();
@@ -232,8 +235,10 @@ private:
     {
         juce::String state;
         juce::int64 nativeHandle = 0;
-        int width = 0, height = 0, stallMs = 0;
-        if (! owner.sendEditorStatus (state, nativeHandle, width, height, stallMs))
+        int width = 0, height = 0, stallMs = 0, workerOpenMs = 0;
+        bool reused = false;
+        if (! owner.sendEditorStatus (state, nativeHandle, width, height, stallMs,
+                                      workerOpenMs, reused))
             return;             // a control failure is the guard's business, not this timer's
         // The worker measures the longest single turn of its message loop. Logged when it
         // is long and getting longer, so a plug-in whose window hogs that thread is named
@@ -247,9 +252,8 @@ private:
 
         if (state == "ready" && nativeHandle != 0)
         {
-            // A different handle than last time is a rebuilt window — the worker recreates
-            // it when the editor moves between the pane and a floating window — and the old
-            // one is gone; place the new one and forget the old.
+            // A handle can be reused after the worker parked/reparented it, or replaced if a
+            // vendor invalidated its window. Either way, forget the old placement geometry.
             if (child != nativeHandle)
             {
                 child = nativeHandle;
@@ -257,6 +261,18 @@ private:
                 placedShowing = false;
                 startTimer (250);
                 repaint();
+            }
+            if (! readyReported)
+            {
+                readyReported = true;
+                const auto elapsed = juce::jmax (
+                    0, static_cast<int> (std::round (
+                        juce::Time::getMillisecondCounterHiRes() - openRequestedMs)));
+                owner.logDiagnostic ("editor_ready",
+                                     "visible after " + juce::String (elapsed) + " ms; "
+                                         + (reused ? "reparented" : "constructed") + " by worker in "
+                                         + juce::String (workerOpenMs) + " ms; "
+                                         + juce::String (width) + "x" + juce::String (height));
             }
             if (width > 0 && height > 0 && (width != getWidth() || height != getHeight()))
                 setSize (width, height);
@@ -320,6 +336,8 @@ private:
     juce::Rectangle<int> placedArea;   // what the child was last told, so it is not told again
     bool placedShowing = false;
     int reportedStallMs = 0;
+    double openRequestedMs = 0.0;
+    bool readyReported = false;
     juce::String failure;
 };
 
@@ -446,8 +464,11 @@ void IsolatedPluginProxy::terminateWorker() noexcept
         return;
     if (connection->process->isRunning())
     {
+        const auto reason = static_cast<PluginWorkerBlockBridge::FailureReason> (
+            workerFailureReason.load (std::memory_order_acquire));
         logDiagnostic ("failed_worker_terminated",
-                       "the rack consumed this worker's failure edge");
+                       "the rack consumed this worker's failure edge; "
+                           + PluginWorkerBlockBridge::failureReasonText (reason));
         connection->process->kill();
     }
     else
@@ -652,7 +673,7 @@ void IsolatedPluginProxy::launchAsync (const juce::File& workerExecutable,
 
 bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& payload,
                                    MessageType expectedReply, juce::MemoryBlock& reply,
-                                   int timeoutMs, juce::String& error)
+                                   int timeoutMs, juce::String& error, bool retryBusy)
 {
     const juce::ScopedLock lock (requestLock);
     error.clear();
@@ -733,7 +754,8 @@ bool IsolatedPluginProxy::request (MessageType type, const juce::MemoryBlock& pa
             const auto json = decodeJsonPayload (response.message, jsonError);
             error = jsonError.isNotEmpty() ? jsonError
                                            : json.getProperty ("error", "worker operation failed").toString();
-            if (error.startsWith ("busy:") && remaining() > busyRetryDelayMs * 2)
+            if (retryBusy && error.startsWith ("busy:")
+                && remaining() > busyRetryDelayMs * 2)
             {
                 if (! loggedBusy)
                 {
@@ -815,9 +837,22 @@ bool IsolatedPluginProxy::flushParameterValues (int timeoutMs, juce::String& err
     for (const auto* parameter : remoteParameters)
         values.add (parameter->getValue());
 
+    juce::var payload (values);
+    // Once an opaque state has been cached, a session save has a safe fallback. Ask a worker
+    // whose message thread is drawing an editor to decline this preparatory snapshot quickly,
+    // rather than retrying it for most of three seconds on Hostage's message thread.
+    if (hasLastKnownState)
+    {
+        auto* object = new juce::DynamicObject();
+        object->setProperty ("values", values);
+        object->setProperty ("pickUpMs", 40);
+        payload = juce::var (object);
+    }
+
     juce::MemoryBlock reply;
-    if (! request (MessageType::setParameter, jsonPayload (juce::var (values)),
-                   MessageType::setParameter, reply, timeoutMs, error))
+    if (! request (MessageType::setParameter, jsonPayload (payload),
+                   MessageType::setParameter, reply, timeoutMs, error,
+                   ! hasLastKnownState))
         return false;
     // This is a one-way snapshot for serialization. Applying the echo here could overwrite a
     // newer parameter edit that arrived while the control round-trip was in flight; normal
@@ -911,7 +946,8 @@ std::span<const ParameterEvent> IsolatedPluginProxy::collectParameterEvents() no
 
     size_t count = 0;
     size_t inspected = 0;
-    while (inspected < remoteParameters.size() && count < pendingParameterEvents.size())
+    while (inspected < juce::jmin (remoteParameters.size(), maxParameterInspectionsPerBlock)
+           && count < pendingParameterEvents.size())
     {
         const auto index = parameterScanCursor;
         parameterScanCursor = (parameterScanCursor + 1) % remoteParameters.size();
@@ -978,7 +1014,11 @@ void IsolatedPluginProxy::process (juce::AudioBuffer<Sample>& audio, juce::MidiB
         [this] { return connection->mapping->signalInputReady(); });
     applyWorkerParameterEvents (result);
     if (result.workerFailed)
+    {
+        workerFailureReason.store (static_cast<int> (result.failureReason),
+                                   std::memory_order_release);
         throwFailure ("live plug-in worker crashed, disconnected or missed its deadline");
+    }
 }
 
 void IsolatedPluginProxy::processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi)
@@ -1102,16 +1142,21 @@ bool IsolatedPluginProxy::sendEditorOpen (juce::int64 hostWindow)
     juce::MemoryBlock reply;
     juce::String error;
     // Acknowledged the moment the worker has STARTED; the build itself is not waited for.
-    return request (MessageType::editorOpen, jsonPayload (juce::var (object)),
-                    MessageType::editorOpen, reply, 3000, error);
+    const auto accepted = request (MessageType::editorOpen, jsonPayload (juce::var (object)),
+                                   MessageType::editorOpen, reply, 3000, error);
+    if (accepted)
+        logDiagnostic ("editor_open_requested", "worker accepted the new parent");
+    return accepted;
 }
 
 bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
-                                            int& widthOut, int& heightOut, int& stallMsOut)
+                                            int& widthOut, int& heightOut, int& stallMsOut,
+                                            int& workerOpenMsOut, bool& reusedOut)
 {
     stateOut.clear();
     nativeHandleOut = 0;
-    widthOut = heightOut = stallMsOut = 0;
+    widthOut = heightOut = stallMsOut = workerOpenMsOut = 0;
+    reusedOut = false;
     juce::MemoryBlock reply;
     juce::String error;
     if (! request (MessageType::editorResize, {}, MessageType::editorResize, reply, 1000, error))
@@ -1127,6 +1172,8 @@ bool IsolatedPluginProxy::sendEditorStatus (juce::String& stateOut, juce::int64&
     widthOut = (int) json.getProperty ("width", 0);
     heightOut = (int) json.getProperty ("height", 0);
     stallMsOut = (int) json.getProperty ("stallMs", 0);
+    workerOpenMsOut = (int) json.getProperty ("openDurationMs", 0);
+    reusedOut = (bool) json.getProperty ("reused", false);
     return true;
 }
 
@@ -1207,7 +1254,9 @@ void IsolatedPluginProxy::sendEditorClose() noexcept
     {
         juce::MemoryBlock reply;
         juce::String error;
-        request (MessageType::editorClose, {}, MessageType::editorClose, reply, 1000, error);
+        if (! request (MessageType::editorClose, {}, MessageType::editorClose,
+                       reply, 3000, error))
+            logDiagnostic ("editor_close_failed", error);
     }
     catch (...) {}
 }
@@ -1215,11 +1264,19 @@ void IsolatedPluginProxy::sendEditorClose() noexcept
 void IsolatedPluginProxy::getStateInformation (juce::MemoryBlock& state)
 {
     juce::String error;
+    juce::MemoryBlock getStatePayload;
+    if (hasLastKnownState)
+    {
+        auto* object = new juce::DynamicObject();
+        object->setProperty ("pickUpMs", 40);
+        getStatePayload = jsonPayload (juce::var (object));
+    }
     // Audio-plane parameter changes may still be pending while transport is stopped. Push the
     // proxy's authoritative values first so the opaque state describes what Hostage is showing,
     // rather than the worker's preceding block.
     if (flushParameterValues (3000, error)
-        && request (MessageType::getState, {}, MessageType::stateReply, state, 3000, error))
+        && request (MessageType::getState, getStatePayload, MessageType::stateReply,
+                    state, 3000, error, ! hasLastKnownState))
     {
         lastKnownState = state;
         hasLastKnownState = true;

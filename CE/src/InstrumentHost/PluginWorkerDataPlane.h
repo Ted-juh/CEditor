@@ -27,6 +27,10 @@ inline constexpr juce::uint32 maxSupportedChannels = 64;
 // This is a per-audio-block transport capacity, not a limit on how many parameters a
 // plug-in may expose. Larger inventories are drained across successive blocks.
 inline constexpr juce::uint32 maxParameterEventsPerBlock = 4'096;
+// Polling a large inventory is also real-time work even when no values changed. Spread that
+// inspection across blocks so a 4,000-parameter instrument cannot consume an audio deadline
+// merely by answering thousands of getValue() calls on both sides of the bridge.
+inline constexpr size_t maxParameterInspectionsPerBlock = 1'024;
 inline constexpr juce::uint32 maxSupportedMidiBytes = 256 * 1024;
 
 inline constexpr size_t alignUp (size_t value, size_t alignment) noexcept

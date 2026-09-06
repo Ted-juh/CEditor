@@ -1,4 +1,5 @@
 #include "ParameterModel.h"
+#include <set>
 
 namespace ceditor::host
 {
@@ -30,7 +31,7 @@ ParameterInventory describeParameters (juce::AudioProcessor& processor)
     std::map<const juce::AudioProcessorParameter*, juce::String> groups;
     collectGroups (processor.getParameterTree(), {}, groups);
 
-    juce::StringArray seen;
+    std::set<juce::String> seen;
     for (auto* parameter : processor.getParameters())
     {
         ParameterDescriptor d;
@@ -52,7 +53,7 @@ ParameterInventory describeParameters (juce::AudioProcessor& processor)
                                     + " addressed as \"" + d.definitionId + "#" + juce::String (d.index) + "\"");
             d.definitionId += "#" + juce::String (d.index);
         }
-        seen.add (d.definitionId);
+        seen.insert (d.definitionId);
 
         d.name          = parameter->getName (128);
         d.label         = parameter->getLabel();

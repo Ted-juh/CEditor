@@ -108,7 +108,7 @@ private:
     static BusesProperties busesFor (const Metadata&);
     bool request (plugin_worker::MessageType type, const juce::MemoryBlock& payload,
                   plugin_worker::MessageType expectedReply, juce::MemoryBlock& reply,
-                  int timeoutMs, juce::String& error);
+                  int timeoutMs, juce::String& error, bool retryBusy = true);
     bool applyParameterValues (const juce::MemoryBlock& payload, juce::String& error);
     bool flushParameterValues (int timeoutMs, juce::String& error);
     bool requestAndSyncParameters (plugin_worker::MessageType type,
@@ -129,7 +129,8 @@ private:
     // build in the worker; status reports whether it is there yet, where and how big.
     bool sendEditorOpen (juce::int64 hostWindow);
     bool sendEditorStatus (juce::String& stateOut, juce::int64& nativeHandleOut,
-                           int& widthOut, int& heightOut, int& stallMsOut);
+                           int& widthOut, int& heightOut, int& stallMsOut,
+                           int& workerOpenMsOut, bool& reusedOut);
     void sendEditorClose() noexcept;
     plugin_worker::DecodeResult
         receiveWhileAnsweringWindowMessages (int timeoutMs);
@@ -150,6 +151,7 @@ private:
     size_t parameterScanCursor = 0;
     std::atomic<juce::int64> nextRequestId { 1 };
     std::atomic<bool> controlFailed { false };
+    std::atomic<int> workerFailureReason { 0 };
     juce::CriticalSection requestLock;
     // The last opaque state fetched from or applied to the worker. What getStateInformation
     // hands out when the worker is merely busy — building its editor — rather than throwing,

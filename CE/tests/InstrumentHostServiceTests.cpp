@@ -8308,6 +8308,64 @@ void testAutomaticFailover()
            "a manual replacement cancels its stale automatic failover");
 }
 
+void testAutomaticFailoverStopsImmediateCrashLoop()
+{
+    std::cout << "\nautomatic failover retry ceiling" << std::endl;
+
+    const auto dir = freshDataDir ("automatic-failover-retry-ceiling");
+    seedCatalog (dir);
+    int instantiations = 0;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& options)
+    {
+        options.livePluginIsolationAvailable = true;
+        options.instantiate = [&] (const juce::String&, double, int,
+                                   InstrumentHostService::InstantiateCallback callback)
+        {
+            ++instantiations;
+            auto processor = std::make_unique<SwitchableServiceSynth>();
+            processor->throwOnProcess = true;
+            callback (std::move (processor), {});
+        };
+    });
+
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("setAutomaticFailover", { { "enabled", true }, { "maxAttempts", 3 },
+                                       { "retryDelayMs", 100 } });
+    h.service->prepareRuntime (48000.0, 512);
+
+    juce::AudioBuffer<float> audio (2, 512);
+    const auto failCurrentInstance = [&]
+    {
+        juce::MidiBuffer midi;
+        audio.clear();
+        h.service->getGraph().processBlock (audio, midi);
+        h.service->drainParameterEvents();
+    };
+
+    failCurrentInstance();
+    for (int attempt = 1; attempt <= 3; ++attempt)
+    {
+        juce::Thread::sleep (120);
+        h.service->drainParameterEvents();
+        failCurrentInstance();
+    }
+
+    auto events = h.emits.lastState()->getProperty ("reliability", {})
+                      .getProperty ("automaticFailover", {}).getProperty ("events", {});
+    check (instantiations == 4 && events.size() == 1
+             && events[0].getProperty ("state", {}).toString() == "failed"
+             && (int) events[0].getProperty ("attempts", 0) == 3,
+           "an immediately failing replacement consumes its retry instead of starting a new incident");
+
+    juce::Thread::sleep (140);
+    h.service->drainParameterEvents();
+    check (instantiations == 4,
+           "the automatic failover ceiling prevents an endless worker relaunch loop");
+}
+
 void testAutomaticEffectFailover()
 {
     std::cout << "\nautomatic effect failover" << std::endl;
@@ -8447,6 +8505,7 @@ int main (int argc, char* argv[])
     testMicrotuningManager();
     testWholePerformanceRecorderAndReplay();
     testAutomaticFailover();
+    testAutomaticFailoverStopsImmediateCrashLoop();
     testAutomaticEffectFailover();
     testHostProject();
 

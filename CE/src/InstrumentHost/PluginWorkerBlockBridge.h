@@ -16,6 +16,35 @@ namespace ceditor::host::plugin_worker
 class PluginWorkerBlockBridge
 {
 public:
+    enum class FailureReason : int
+    {
+        none = 0,
+        unavailableDataPlane,
+        slotStillOwned,
+        invalidInputBlock,
+        inputSignalFailed,
+        processorException,
+        invalidWorkerBlock,
+        missedDeadline
+    };
+
+    static juce::String failureReasonText (FailureReason reason)
+    {
+        switch (reason)
+        {
+            case FailureReason::none:                 return "none";
+            case FailureReason::unavailableDataPlane: return "unavailable_data_plane";
+            case FailureReason::slotStillOwned:       return "slot_still_owned";
+            case FailureReason::invalidInputBlock:    return "invalid_input_block";
+            case FailureReason::inputSignalFailed:    return "input_signal_failed";
+            case FailureReason::processorException:   return "processor_exception";
+            case FailureReason::invalidWorkerBlock:   return "invalid_worker_block";
+            case FailureReason::missedDeadline:       return "missed_deadline";
+        }
+
+        return "unknown";
+    }
+
     struct ChannelCounts
     {
         juce::uint32 inputs = 0;
@@ -40,6 +69,7 @@ public:
         bool inputParameterOverflow = false;
         juce::uint32 outputParameterEvents = 0;
         bool workerFailed = false;
+        FailureReason failureReason = FailureReason::none;
     };
 
     PluginWorkerBlockBridge (DataPlaneView planeToUse, bool effectToUse,
@@ -94,10 +124,11 @@ public:
         Result result;
         if (! plane)
         {
-            trip();
+            trip (FailureReason::unavailableDataPlane);
             applyImmediateFailure (audio, midi);
             result.fallbackUsed = true;
             result.workerFailed = true;
+            result.failureReason = currentFailureReason();
             return result;
         }
 
@@ -106,6 +137,7 @@ public:
             applyImmediateFailure (audio, midi);
             result.fallbackUsed = true;
             result.workerFailed = true;
+            result.failureReason = currentFailureReason();
             return result;
         }
 
@@ -130,20 +162,22 @@ public:
             const auto oldOutput = reused->outputSequence.load (std::memory_order_acquire);
             if (oldInput != 0 && oldOutput != oldInput)
             {
-                trip();
+                trip (FailureReason::slotStillOwned);
                 applyImmediateFailure (audio, midi);
                 result.fallbackUsed = true;
                 result.workerFailed = true;
+                result.failureReason = currentFailureReason();
                 return result;
             }
         }
         if (! current.beginInput (sequence, static_cast<juce::uint32> (audio.getNumSamples()),
                                   activeChannels.inputs, activeChannels.outputs))
         {
-            trip();
+            trip (FailureReason::invalidInputBlock);
             applyImmediateFailure (audio, midi);
             result.fallbackUsed = true;
             result.workerFailed = true;
+            result.failureReason = currentFailureReason();
             return result;
         }
 
@@ -165,10 +199,11 @@ public:
         std::atomic_thread_fence (std::memory_order_release);
         if (! static_cast<bool> (signalInput()))
         {
-            trip();
+            trip (FailureReason::inputSignalFailed);
             applyImmediateFailure (audio, midi);
             result.fallbackUsed = true;
             result.workerFailed = true;
+            result.failureReason = currentFailureReason();
             return result;
         }
 
@@ -197,10 +232,13 @@ public:
                         consecutiveMisses = 0;
                     }
                 }
-                else if (status == BlockStatus::processorException
-                         || status == BlockStatus::invalidBlock)
+                else if (status == BlockStatus::processorException)
                 {
-                    trip();
+                    trip (FailureReason::processorException);
+                }
+                else if (status == BlockStatus::invalidBlock)
+                {
+                    trip (FailureReason::invalidWorkerBlock);
                 }
             }
         }
@@ -212,10 +250,11 @@ public:
             result.fallbackUsed = true;
             if (expected != 0 && ! failed.load (std::memory_order_acquire)
                 && ++consecutiveMisses >= missedBlocksBeforeFailure)
-                trip();
+                trip (FailureReason::missedDeadline);
         }
 
         result.workerFailed = failed.load (std::memory_order_acquire);
+        result.failureReason = currentFailureReason();
         return result;
     }
 
@@ -312,11 +351,17 @@ private:
         // immediately: its current input is already the correct dry/bypassed block.
     }
 
-    void trip() noexcept
+    FailureReason currentFailureReason() const noexcept
+    {
+        return static_cast<FailureReason> (failureReason.load (std::memory_order_acquire));
+    }
+
+    void trip (FailureReason reason) noexcept
     {
         bool expected = false;
         if (failed.compare_exchange_strong (expected, true, std::memory_order_acq_rel))
         {
+            failureReason.store (static_cast<int> (reason), std::memory_order_release);
             failurePending.store (true, std::memory_order_release);
         }
     }
@@ -336,6 +381,7 @@ private:
     juce::uint64 nextSequence = 0;
     int consecutiveMisses = 0;
     std::atomic<bool> failed { false };
+    std::atomic<int> failureReason { static_cast<int> (FailureReason::none) };
     std::atomic<bool> failurePending { false };
 };
 

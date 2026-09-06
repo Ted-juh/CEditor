@@ -142,7 +142,8 @@ void testFailureEdges()
     bridge.process (two, midi, noOutput, signal);
     auto three = audioBlock (0.3f);
     const auto failed = bridge.process (three, midi, noOutput, signal);
-    check (failed.workerFailed && bridge.hasFailed(),
+    check (failed.workerFailed && bridge.hasFailed()
+             && failed.failureReason == PluginWorkerBlockBridge::FailureReason::slotStillOwned,
            "the bridge fails before reusing a slot still owned by a hung worker");
     check (bridge.takeFailure() && ! bridge.takeFailure(),
            "failure is exposed as one consumable edge");
@@ -157,14 +158,16 @@ void testFailureEdges()
     output = true;
     auto second = audioBlock (0.2f);
     const auto exception = exceptionBridge.process (second, midi, poll, signal);
-    check (exception.workerFailed && exceptionBridge.takeFailure(),
+    check (exception.workerFailed && exceptionBridge.takeFailure()
+             && exception.failureReason == PluginWorkerBlockBridge::FailureReason::processorException,
            "a reported processor exception trips immediately");
 
     Fixture signalFixture;
     PluginWorkerBlockBridge signalBridge (signalFixture.plane, true);
     auto block = audioBlock (0.5f);
     const auto disconnected = signalBridge.process (block, midi, noOutput, [] { return false; });
-    check (disconnected.workerFailed && signalBridge.takeFailure(),
+    check (disconnected.workerFailed && signalBridge.takeFailure()
+             && disconnected.failureReason == PluginWorkerBlockBridge::FailureReason::inputSignalFailed,
            "a broken input wake connection trips immediately");
 }
 

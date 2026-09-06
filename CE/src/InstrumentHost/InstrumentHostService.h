@@ -1174,6 +1174,7 @@ private:
         juce::String state { "waiting" }; // waiting | loading | recovered | failed | bypassed
         int attempts = 0;
         double nextAttemptMs = 0.0;
+        double recoveredAtMs = 0.0;
         // The most recent values observed by the controlling thread. The opaque state is still
         // authoritative, but many plug-ins do not serialize every automatable value promptly;
         // replaying this stable-ID overlay avoids jumping back to an older captured sound.
