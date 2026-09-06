@@ -52,6 +52,18 @@ test('rack parts expose plain-language performance controls and exception states
   assert.match(source, /part-state off">Off/);
 });
 
+test('rack parts reflow deliberately beside a wide native editor', () => {
+  // The pane narrows the WebView, then the rack is only one column inside that WebView. The
+  // rack therefore needs both a larger share than the catalogue and a container-local card
+  // layout; a viewport query alone cannot see the width of an individual rack card.
+  assert.match(source, /\.rack-column \{ container-name: rack; container-type: inline-size; \}/);
+  assert.match(source, /\.rack-column \{ flex-grow: 1\.65; \}/);
+  assert.match(source, /@container rack \(max-width: 620px\)/);
+  assert.match(source, /\.part-performance \{\s*display: grid;/);
+  assert.match(source, /\.part-art \{[\s\S]{0,500}max-height: 96px/);
+  assert.match(source, /@media \(max-width: 900px\) \{[\s\S]{0,160}\.host-columns \{ flex-direction: column; \}/);
+});
+
 test('host sliders use rectangular tracks and fader caps', () => {
   assert.match(theme, /slider-runnable-track[\s\S]{0,180}border-radius: 0/);
   assert.match(theme, /slider-thumb[\s\S]{0,220}border-radius: 0/);

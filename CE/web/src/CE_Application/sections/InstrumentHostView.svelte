@@ -2568,6 +2568,10 @@
     background: #171a1d;
     padding: 10px;
   }
+  /* The native editor can leave Hostage exactly half a desktop window. Name the rack's
+     remaining inline space so its cards respond to the width they actually receive, not to
+     the still-wide top-level window. */
+  .rack-column { container-name: rack; container-type: inline-size; }
 
   .view-switch { display: flex; gap: 4px; margin-left: auto; }
 
@@ -2606,6 +2610,7 @@
     align-self: stretch;
     width: 96px;             /* a recognisable plug-in face beside two predictable rows */
     min-height: 78px;
+    max-height: 96px;        /* wrapping controls must not turn a landscape face into a tower */
     padding: 0;
     border: none;
     background: none;
@@ -2971,5 +2976,33 @@
   @keyframes midi-learn-pulse { 50% { opacity: 0.45; } }
   .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
              background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
+
+  /* A wide vendor editor takes at most half of CEditor, leaving Hostage about 1024px on a
+     common 2048px desktop. The catalogue tolerates the smaller share; rack cards do not —
+     their identity, six actions and performance controls need the extra room. */
+  @media (max-width: 1120px) {
+    .rack-column { flex-grow: 1.65; }
+    .browser-column { flex-grow: 1; }
+  }
+
+  /* At that split the rack is around 600px wide. Give the preset and live controls their own
+     deliberate rows instead of letting flexbox repeatedly squeeze and wrap both groups. */
+  @container rack (max-width: 620px) {
+    .part-performance {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+    }
+    .preset-walk { width: 100%; min-width: 0; }
+    .part-controls { width: 100%; min-width: 0; justify-content: flex-start; gap: 5px; }
+    .mini input[type="range"] { width: 64px; }
+  }
+
+  /* Below this, even an asymmetric pair cannot give a useful width to both columns. Keep
+     both available, but stack them and let each retain its own vertical scroll. */
+  @media (max-width: 900px) {
+    .host-columns { flex-direction: column; }
+    .rack-column, .browser-column { flex: 1 1 0; }
+  }
 
 </style>
