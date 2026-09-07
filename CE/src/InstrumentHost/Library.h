@@ -24,6 +24,53 @@
 namespace ceditor::host
 {
 
+// -- what a sound measured like ----------------------------------------------------------------
+//
+// The library's answer to the question a name cannot answer. Every field here was measured from
+// one render of the sound itself (SonicProbe.h) rather than read off a vendor's tin, which is the
+// whole difference between this browser and the one it succeeds: tags disagree between companies
+// because different people typed them, and a spectral centroid does not.
+//
+// Every measurement is kept twice: normalised 0..1 for the browser's range sliders, and in its own
+// unit beside it so the inspector can say what the number means. A slider over "0.34" that cannot
+// tell you it means 1.9 kHz is a number nobody can argue with, which is not a virtue.
+//
+// This is data only — no FFT, no AudioBuffer, no juce_dsp — so Library.h stays in the juce_core
+// tier a plain test executable can prove. The measuring lives in SonicProbe.h, which needs the
+// audio modules; the two meet at this struct.
+
+/** Points in a record's drawn envelope. Enough for a 190px tile to read as a shape, and small
+    enough (48 floats) that carrying one on every record of a 12,000-preset library is nothing. */
+inline constexpr int sonicEnvelopePoints = 48;
+
+struct SonicProfile
+{
+    bool measured = false;
+    bool silent = false;          // the probe played the note and nothing came out
+
+    float brightness = 0;         // 0..1 over 120 Hz .. 9 kHz, logarithmic
+    float centroidHz = 0;
+    float attack = 0;             // 0..1 over 1 ms .. 2 s, logarithmic
+    float attackSeconds = 0;
+    float tail = 0;               // 0..1 over 50 ms .. 10 s, logarithmic
+    float tailSeconds = 0;
+    float width = 0;              // 0 mono .. 1 fully decorrelated
+    float noisiness = 0;          // 0 tonal .. 1 noise-like
+    float dynamics = 0;           // 0..1: how much harder velocity 100 hit than velocity 40
+    float peak = 0;               // linear, 0..1
+    float cost = 0;               // 0..1 over 0 .. 25% of one core
+    float costPercent = 0;
+    int   latencySamples = 0;
+
+    juce::Array<float> envelope;  // sonicEnvelopePoints peaks, 0..1 — the tile's waveform
+};
+
+/** How far apart two sounds are, 0 (indistinguishable on these axes) to 1. Weighted, because the
+    axes are not equally telling: brightness and attack are what somebody means by "like this
+    one", and a peak level is not. Unmeasured profiles are maximally far from everything, so a
+    library half-probed never claims a match it cannot support. */
+float sonicDistance (const SonicProfile& a, const SonicProfile& b);
+
 struct LibraryRecord
 {
     juce::String recordId;        // stable, minted once
@@ -42,6 +89,11 @@ struct LibraryRecord
     juce::String fingerprint;     // content identity for change detection and matching
     bool factory = false;         // vendor-derived (true) vs CEditor-captured (false)
     bool missing = false;         // the source vanished; the record and its metadata stay
+
+    // What it sounded like when the auditioner last played it. Keyed to `fingerprint` by
+    // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
+    SonicProfile sonic;
+    juce::String sonicFingerprint;
 
     struct UserMetadata
     {
@@ -82,6 +134,16 @@ struct LibraryFacetSelection
                                                     return admits (one); }
 };
 
+/** A measured axis, narrowed. Inactive until somebody moves a handle, because a range that
+    defaults to "all of it" would still refuse every record the auditioner has not reached yet. */
+struct LibraryRange
+{
+    float min = 0.0f, max = 1.0f;
+    bool active = false;
+
+    bool admits (float value) const { return ! active || (value >= min && value <= max); }
+};
+
 struct LibraryQuery
 {
     juce::String text;          // the free-text box; same fields searchLibrary() reads
@@ -93,6 +155,20 @@ struct LibraryQuery
     bool favouritesOnly = false;
     int  minRating = 0;         // 0 = unrated included
     bool availableOnly = false; // see the availability hook below
+
+    // The measured half. A range that is active refuses anything unmeasured, because an unknown
+    // brightness is not a dark one — the browser says how many records that is rather than
+    // quietly dropping them.
+    LibraryRange brightness, attack, tail, width, cost;
+    bool measuredOnly = false;
+
+    /** True when any measured axis is narrowed — what the browser gates its "unmeasured" notice
+        on, and what tells the service the analysis is worth offering. */
+    bool usesMeasurements() const
+    {
+        return measuredOnly || brightness.active || attack.active || tail.active
+                 || width.active || cost.active;
+    }
 };
 
 /** Whether a record can be loaded right now. The library itself only knows whether the SOURCE
@@ -193,6 +269,26 @@ LibraryFacets libraryFacets (const Library& library, const LibraryQuery& query,
 
 juce::var libraryQueryToVar (const LibraryQuery& query);
 LibraryQuery libraryQueryFromVar (const juce::var& stored);
+
+/** A set of records that are the same sound. Folding these is the single most-asked-for thing
+    about a big preset library, and the reason it is worth being careful: forty plug-ins each
+    shipping an "Init" is forty DIFFERENT sounds with one name, and folding those would lose
+    thirty-nine of them. So a set is only ever
+
+      - the same bytes: identical, non-empty `fingerprint` — certainly one file, copied; or
+      - the same name, the same target plug-in, and a measured distance under `tolerance` —
+        the same preset saved twice, edited trivially or re-exported.
+
+    Two records from different plug-ins are never folded, however alike they measure. */
+struct LibraryDuplicateSet
+{
+    juce::String keyRecordId;      // the one to keep: whichever carries user metadata
+    juce::StringArray recordIds;   // every member, the key included
+    bool identical = false;        // matched on fingerprint rather than on measurement
+};
+
+juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library,
+                                                    float tolerance = 0.04f);
 
 
 // -- the .vstpreset container ------------------------------------------------------------------

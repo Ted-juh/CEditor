@@ -40,6 +40,7 @@ import {
   onInstrumentHostHardwarePatchSend,
   onInstrumentHostHardwarePatchPrompt,
   onInstrumentHostPatchCompare,
+  onInstrumentHostAnalysisProgress,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import {
@@ -57,6 +58,7 @@ const nextMockId = (prefix) => `${prefix}-${nextMockSuffix()}`;
 // The library's facet names, declared before the stores because emptyHostLibrary()
 // runs at module load and builds an empty list per facet from them.
 export const LIBRARY_FACETS = ['categories', 'tags', 'instruments', 'manufacturers', 'sources'];
+export const MEASURED_AXES = ['brightness', 'attack', 'tail', 'width', 'cost'];
 
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
@@ -66,6 +68,9 @@ export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
 export const hostLibrary = writable(emptyHostLibrary());
+/** What the auditioner is doing, if anything. `running` is what the browser gates its
+ *  Listen button on; `total` of 0 with running false is the idle state. */
+export const hostAnalysis = writable({ done: 0, total: 0, what: '', running: false });
 export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
@@ -359,6 +364,47 @@ export function normalizeSupportBundle(payload) {
 // do not want, and it is the one the product this succeeds could never express. Mirrors
 // LibraryQuery in CE/src/InstrumentHost/Library.h; the shape is the wire format both ways.
 
+// The measured scales, mirroring SonicProbe.cpp. They live here as well as there because a
+// slider that maps its handle differently from the filter behind it is a slider that lies —
+// and the C++ test and the JS test check the same two constants per axis.
+const LOG_SCALES = {
+  brightness: [120, 9000],     // Hz
+  attack: [0.001, 2],          // seconds
+  tail: [0.05, 10],            // seconds
+};
+
+/** A normalised 0..1 position back into the unit the inspector shows. */
+export function measuredValue(axis, normalised) {
+  const t = Math.min(1, Math.max(0, Number(normalised) || 0));
+  if (axis === 'cost') return t * 25;              // percent of one core
+  if (axis === 'width') return t;                  // already a ratio
+  const [low, high] = LOG_SCALES[axis] ?? [0, 1];
+  return Math.exp(Math.log(low) + t * (Math.log(high) - Math.log(low)));
+}
+
+/** And back, so a filter built from a real value lands on the same handle. */
+export function measuredNormalised(axis, value) {
+  const v = Number(value) || 0;
+  if (axis === 'cost') return Math.min(1, Math.max(0, v / 25));
+  if (axis === 'width') return Math.min(1, Math.max(0, v));
+  const [low, high] = LOG_SCALES[axis] ?? [0, 1];
+  if (!(v > 0)) return 0;
+  const t = (Math.log(Math.min(high, Math.max(low, v))) - Math.log(low))
+            / (Math.log(high) - Math.log(low));
+  return Math.min(1, Math.max(0, t));
+}
+
+/** What a handle is worth, in words, on each axis. */
+export function measuredLabel(axis, normalised) {
+  const v = measuredValue(axis, normalised);
+  if (axis === 'brightness') return v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`;
+  if (axis === 'attack' || axis === 'tail') {
+    return v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms`;
+  }
+  if (axis === 'cost') return `${v.toFixed(1)}%`;
+  return v < 0.05 ? 'mono' : v.toFixed(2);
+}
+
 export function emptyLibraryQuery() {
   return {
     text: '',
@@ -368,6 +414,10 @@ export function emptyLibraryQuery() {
     minRating: 0,
     availableOnly: false,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
+    // A measured range is inactive until somebody moves a handle, because a range that defaults
+    // to "all of it" would still refuse every record the auditioner has not reached yet.
+    ranges: Object.fromEntries(MEASURED_AXES.map((a) => [a, { min: 0, max: 1, active: false }])),
+    measuredOnly: false,
   };
 }
 
@@ -390,6 +440,13 @@ export function normalizeLibraryQuery(payload) {
       include: strings(facets[f]?.include),
       exclude: strings(facets[f]?.exclude),
     }])),
+    ranges: Object.fromEntries(MEASURED_AXES.map((axis) => {
+      const r = p.ranges && typeof p.ranges === 'object' ? (p.ranges[axis] ?? {}) : {};
+      const min = Math.min(1, Math.max(0, Number(r.min ?? 0)));
+      const max = Math.min(1, Math.max(0, Number(r.max ?? 1)));
+      return [axis, { min: Math.min(min, max), max: Math.max(min, max), active: r.active === true }];
+    })),
+    measuredOnly: p.measuredOnly === true,
   };
 }
 
@@ -397,7 +454,8 @@ export function normalizeLibraryQuery(payload) {
 export function libraryQueryIsEmpty(query) {
   const q = normalizeLibraryQuery(query);
   return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
-    && q.minRating === 0 && !q.availableOnly
+    && q.minRating === 0 && !q.availableOnly && !q.measuredOnly
+    && MEASURED_AXES.every((a) => !q.ranges[a].active)
     && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
 }
 
@@ -424,7 +482,9 @@ export function cycleLibraryFacet(query, facet, value, straightToExclude = false
 export function emptyHostLibrary() {
   return {
     records: [],
-    counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0 },
+    counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
+              measured: 0, measurable: 0 },
+    duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
     smartCollections: [],
     collections: [],
@@ -455,6 +515,26 @@ export function normalizeHostLibrary(payload) {
       rating: Number(r?.rating ?? 0),
       notes: String(r?.notes ?? ''),
       tags: (Array.isArray(r?.tags) ? r.tags : []).map(String),
+      collections: (Array.isArray(r?.collections) ? r.collections : []).map(String),
+      // Absent, not zeroed: "not measured yet" and "measured and dark" are not the same thing,
+      // and a browser that cannot tell them apart draws a flat line for both.
+      sonic: r?.sonic && typeof r.sonic === 'object' ? {
+        silent: r.sonic.silent === true,
+        brightness: Number(r.sonic.brightness ?? 0),
+        centroidHz: Number(r.sonic.centroidHz ?? 0),
+        attack: Number(r.sonic.attack ?? 0),
+        attackSeconds: Number(r.sonic.attackSeconds ?? 0),
+        tail: Number(r.sonic.tail ?? 0),
+        tailSeconds: Number(r.sonic.tailSeconds ?? 0),
+        width: Number(r.sonic.width ?? 0),
+        noisiness: Number(r.sonic.noisiness ?? 0),
+        dynamics: Number(r.sonic.dynamics ?? 0),
+        cost: Number(r.sonic.cost ?? 0),
+        costPercent: Number(r.sonic.costPercent ?? 0),
+        latencySamples: Number(r.sonic.latencySamples ?? 0),
+        envelope: (Array.isArray(r.sonic.envelope) ? r.sonic.envelope : [])
+                    .map((v) => Math.min(1, Math.max(0, Number(v) || 0))),
+      } : null,
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -463,7 +543,15 @@ export function normalizeHostLibrary(payload) {
       chains: Number(p.counts?.chains ?? 0),
       missing: Number(p.counts?.missing ?? 0),
       matched: Number(p.counts?.matched ?? (Array.isArray(p.records) ? p.records.length : 0)),
+      measured: Number(p.counts?.measured ?? 0),
+      measurable: Number(p.counts?.measurable ?? 0),
     },
+    duplicates: (Array.isArray(p.duplicates) ? p.duplicates : []).map((d) => ({
+      keyRecordId: String(d?.keyRecordId ?? ''),
+      name: String(d?.name ?? ''),
+      identical: d?.identical === true,
+      recordIds: (Array.isArray(d?.recordIds) ? d.recordIds : []).map(String),
+    })).filter((d) => d.keyRecordId !== ''),
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f,
       (Array.isArray(p.facets?.[f]) ? p.facets[f] : []).map((v) => ({
         value: String(v?.value ?? ''),
@@ -515,6 +603,17 @@ export function matchesLibraryQuery(record, query) {
   if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
   if (q.collection && !(record.collections ?? []).includes(q.collection)) return false;
   if (q.availableOnly && record.available !== true) return false;
+
+  // The measured half. An active range refuses anything the auditioner has not reached, because
+  // an unknown brightness is not a dark one.
+  if (q.measuredOnly && !record.sonic) return false;
+  for (const axis of MEASURED_AXES) {
+    const range = q.ranges[axis];
+    if (!range.active) continue;
+    const value = record.sonic ? Number(record.sonic[axis] ?? 0) : null;
+    if (value === null || value < range.min || value > range.max) return false;
+  }
+
   for (const facet of LIBRARY_FACETS)
     if (!admits(q.facets[facet], recordFacetValues(record, facet)))
       return false;
@@ -565,20 +664,48 @@ export function computeLibraryFacets(records, query) {
   };
 }
 
+/** A measured profile for the browser demo, with an envelope shaped by its own attack and tail
+    so the tiles draw as different sounds rather than as one repeated squiggle. */
+function mockSonic(brightness, attack, tail, width, cost) {
+  const points = 48;
+  const envelope = Array.from({ length: points }, (_, i) => {
+    const x = i / (points - 1);
+    const rise = Math.max(0.02, attack * 0.5);
+    const value = x < rise ? Math.pow(x / rise, 0.7)
+                           : Math.exp(-((x - rise) / (1 - rise)) * (1.2 + (1 - tail) * 4));
+    return Math.min(1, Math.max(0, value * (0.72 + 0.28 * Math.sin(i * 1.7))));
+  });
+  return {
+    silent: false, brightness, attack, tail, width, cost,
+    centroidHz: measuredValue('brightness', brightness),
+    attackSeconds: measuredValue('attack', attack),
+    tailSeconds: measuredValue('tail', tail),
+    noisiness: 0.2, dynamics: 0.4,
+    costPercent: measuredValue('cost', cost), latencySamples: 0,
+    envelope,
+  };
+}
+
 let mockSmartCollections = [];
 // The browser demo remembers its view for the same reason the service does: a mutation must
 // not silently drop you back to the whole library while the chips on screen still filter.
 let mockLibraryView = emptyLibraryQuery();
+let mockMeasuredEverything = false;
 
 export function mockHostLibrary(query = '', type = '') {
   const all = [
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
-      tags: ['warm', 'wide'] },
+      tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10) },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
-      category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'] },
+      category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'],
+      sonic: mockSonic(0.62, 0.08, 0.24, 0.05, 0.35) },
+    { recordId: 'lib-6', type: 'preset', sourceType: 'vstpreset', name: 'Never Heard',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Keys', factory: true, available: true, tags: ['glassy'],
+      sonic: mockMeasuredEverything ? mockSonic(0.55, 0.18, 0.40, 0.30, 0.14) : null },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -602,8 +729,11 @@ export function mockHostLibrary(query = '', type = '') {
 
   return normalizeHostLibrary({
     records,
-    counts: { total: all.length, presets: 3, racks: 1, chains: 1, missing: 0,
-              matched: records.length },
+    counts: { total: all.length, presets: 4, racks: 1, chains: 1, missing: 0,
+              matched: records.length,
+              measured: all.filter((r) => r.sonic).length,
+              measurable: all.filter((r) => !r.sonic && r.type === 'preset'
+                                              && r.available !== false).length },
     facets: computeLibraryFacets(all, request),
     smartCollections: mockSmartCollections.map((c) => ({
       ...c, count: all.filter((r) => matchesLibraryQuery(r, c.query)).length })),
@@ -5673,6 +5803,12 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
+  onInstrumentHostAnalysisProgress((payload) => hostAnalysis.set({
+    done: Number(payload?.done ?? 0),
+    total: Number(payload?.total ?? 0),
+    what: String(payload?.what ?? ''),
+    running: payload?.running === true,
+  }));
   onInstrumentHostSupportBundle((payload) => hostSupportBundle.set(normalizeSupportBundle(payload)));
   onInstrumentHostLicenceReceipt((payload) => hostLicenceReceipt.set(String(payload?.receipt ?? '')));
   onInstrumentHostMidiActivity((payload) => hostMidiActivity.update((a) => ({
@@ -6138,6 +6274,25 @@ function send(payload) {
       mockLibraryView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
                                                      : mockLibraryView;
       hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'analyseLibrary') {
+      // The demo has no plug-ins to play, so it measures the one record that has no profile and
+      // reports the same shape the native side does — enough for the browser's own behaviour
+      // (the button, the progress, the "nothing left" answer) to be exercised without JUCE.
+      const before = get(hostLibrary);
+      const todo = before.counts.measurable;
+      if (todo === 0 && payload.all !== true) {
+        hostAnalysis.set({ done: 0, total: 0, what: 'Nothing left to measure.', running: false });
+        return;
+      }
+      hostAnalysis.set({ done: todo, total: todo, what: `Done — ${todo} measured.`, running: false });
+      mockMeasuredEverything = true;
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'cancelAnalysis') {
+      hostAnalysis.set({ done: 0, total: 0, what: 'Stopped.', running: false });
       return;
     }
     if (payload?.cmd === 'saveSmartCollection') {
@@ -6645,6 +6800,12 @@ export const saveSmartCollection = (name, query) =>
              : { cmd: 'saveSmartCollection', name });
 export const removeSmartCollection = (collectionId) =>
   send({ cmd: 'removeSmartCollection', collectionId });
+
+/** Play everything once and write down what came out. `all` re-measures what has already been
+    measured; without it the auditioner skips anything whose bytes have not changed. */
+export const analyseLibrary = (all = false) => send(all ? { cmd: 'analyseLibrary', all: true }
+                                                        : { cmd: 'analyseLibrary' });
+export const cancelAnalysis = () => send({ cmd: 'cancelAnalysis' });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });

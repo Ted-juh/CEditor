@@ -49,6 +49,12 @@ import {
   saveSmartCollection,
   removeSmartCollection,
   setMockSmartCollections,
+  measuredValue,
+  measuredNormalised,
+  measuredLabel,
+  MEASURED_AXES,
+  analyseLibrary,
+  hostAnalysis,
   hostLibrary,
   requestLibrary,
   saveUserPreset,
@@ -561,7 +567,7 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 5);
+  assert.equal(get(hostLibrary).records.length, 6);
 
   requestLibrary('warm', '');
   assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
@@ -570,7 +576,7 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 6, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 7, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -687,7 +693,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 5);
+  assert.equal(get(hostLibrary).counts.matched, 6);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -702,13 +708,13 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   const saved = get(hostLibrary).smartCollections;
   assert.equal(saved.length, 1);
   assert.equal(saved[0].name, 'Not mine');
-  assert.equal(saved[0].count, 4, 'a saved search reports its own count, run fresh');
+  assert.equal(saved[0].count, 5, 'a saved search reports its own count, run fresh');
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 5);
+  assert.equal(get(hostLibrary).records.length, 6);
   requestLibrary(saved[0].query);
-  assert.equal(get(hostLibrary).records.length, 4, 'and re-running it restores the view');
+  assert.equal(get(hostLibrary).records.length, 5, 'and re-running it restores the view');
 
   removeSmartCollection(saved[0].collectionId);
   assert.equal(get(hostLibrary).smartCollections.length, 0);
@@ -719,12 +725,93 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 3);
+  assert.equal(get(hostLibrary).records.length, 4);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 3,
+  assert.equal(get(hostLibrary).records.length, 4,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
+});
+
+// --- the auditioner's measurements ---------------------------------------------------------------
+
+test('the measured scales are the same function the native side uses, both ways', () => {
+  // The two constants per axis are the contract with SonicProbe.cpp: a slider that maps its
+  // handle differently from the filter behind it is a slider that lies.
+  assert.equal(Math.round(measuredValue('brightness', 0)), 120);
+  assert.equal(Math.round(measuredValue('brightness', 1)), 9000);
+  assert.equal(Math.round(measuredValue('attack', 0) * 1000), 1);
+  assert.equal(Math.round(measuredValue('attack', 1)), 2);
+  assert.equal(Math.round(measuredValue('tail', 0) * 1000), 50);
+  assert.equal(Math.round(measuredValue('tail', 1)), 10);
+  assert.equal(measuredValue('cost', 1), 25);
+
+  for (const axis of MEASURED_AXES)
+    for (const t of [0, 0.13, 0.5, 0.87, 1])
+      assert.ok(Math.abs(measuredNormalised(axis, measuredValue(axis, t)) - t) < 1e-6,
+        `${axis} round-trips at ${t}`);
+
+  assert.equal(measuredLabel('brightness', 1), '9.0 kHz');
+  assert.equal(measuredLabel('attack', 0), '1 ms');
+  assert.equal(measuredLabel('width', 0), 'mono', 'a mono sound is not "0.00 wide"');
+});
+
+test('an active measured range refuses what has never been listened to', () => {
+  const measured = { name: 'a', type: 'preset', available: true,
+                     sonic: { brightness: 0.5, attack: 0.2, tail: 0.4, width: 0.1, cost: 0.1 } };
+  const unheard = { name: 'b', type: 'preset', available: true, sonic: null };
+
+  const wide = { ...emptyLibraryQuery() };
+  wide.ranges.brightness = { min: 0, max: 1, active: true };
+  assert.equal(matchesLibraryQuery(measured, wide), true);
+  assert.equal(matchesLibraryQuery(unheard, wide), false,
+    'an unknown brightness is not a dark one — the range refuses it rather than guessing');
+
+  const inactive = { ...emptyLibraryQuery() };
+  assert.equal(matchesLibraryQuery(unheard, inactive), true,
+    'while an untouched range has no opinion at all');
+
+  const narrow = { ...emptyLibraryQuery() };
+  narrow.ranges.brightness = { min: 0.6, max: 1, active: true };
+  assert.equal(matchesLibraryQuery(measured, narrow), false, 'and a narrowed one narrows');
+
+  const only = { ...emptyLibraryQuery(), measuredOnly: true };
+  assert.equal(matchesLibraryQuery(measured, only), true);
+  assert.equal(matchesLibraryQuery(unheard, only), false);
+});
+
+test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"', () => {
+  const shaped = normalizeHostLibrary({
+    records: [{ recordId: 'a' },
+              { recordId: 'b', sonic: { brightness: '0.5', envelope: [0, '0.5', 2, -1] } }],
+    duplicates: [{ keyRecordId: 'a', name: 'Init', identical: true, recordIds: ['a', 'b'] },
+                 { keyRecordId: '', name: 'dropped' }],
+    counts: { measured: '1', measurable: 4 },
+  });
+  assert.equal(shaped.records[0].sonic, null, 'an unmeasured record carries no profile at all');
+  assert.equal(shaped.records[1].sonic.brightness, 0.5);
+  assert.deepEqual(shaped.records[1].sonic.envelope, [0, 0.5, 1, 0], 'envelope points clamp to 0..1');
+  assert.equal(shaped.counts.measured, 1);
+  assert.equal(shaped.counts.measurable, 4);
+  assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
+});
+
+test('mock reducer: the auditioner measures what has no profile, once', () => {
+  hostStateStore.set(mockHostState());
+  requestLibrary(emptyLibraryQuery());
+  const before = get(hostLibrary);
+  assert.ok(before.counts.measurable > 0, 'something starts out unheard');
+  assert.equal(before.records.find((r) => r.recordId === 'lib-6').sonic, null);
+
+  analyseLibrary();
+  assert.equal(get(hostAnalysis).running, false);
+  assert.equal(get(hostLibrary).counts.measurable, 0, 'and afterwards there is nothing left');
+  assert.ok(get(hostLibrary).records.find((r) => r.recordId === 'lib-6').sonic,
+    'the record that had no profile has one');
+
+  analyseLibrary();
+  assert.match(get(hostAnalysis).what, /Nothing left/,
+    'a second run says so rather than spinning');
 });
 
 test('mock reducer: a chain record captures a whole voice and lands as one', () => {

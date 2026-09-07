@@ -965,6 +965,13 @@ export function onInstrumentHostScanProgress(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Auditioner progress ({ done, total, what, running }) while it plays the library. */
+export function onInstrumentHostAnalysisProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostAnalysisProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Refused or failed commands ({ message }). */
 export function onInstrumentHostError(callback) {
   if (!isJuceAvailable()) return () => {};

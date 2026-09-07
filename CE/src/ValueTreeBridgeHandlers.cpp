@@ -1811,6 +1811,15 @@ void ValueTreeBridge::ensureInstrumentHost()
         liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
     options.applyVstPreset = ceditor::host::applyVstPresetFile;
 
+    // The auditioner's two rules: it runs off the controlling thread, and the two things that
+    // must NOT happen there — destroying a plug-in instance and writing findings into the
+    // library — come back through here. Left unset, the default runs them inline on the
+    // auditioner's own thread, which is exactly what a plug-in does not expect.
+    options.onControlThread = [] (std::function<void()> work)
+    {
+        juce::MessageManager::callAsync (std::move (work));
+    };
+
     // The Host Project build: the node pipeline as a streamed child process, one at a time.
     // The service already validated the manifest; the persisted file is what the script reads,
     // and every manifest mutation saves before this can run.

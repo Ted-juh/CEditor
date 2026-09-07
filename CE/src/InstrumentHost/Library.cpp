@@ -202,6 +202,30 @@ juce::var Library::toVar() const
         r->setProperty ("factory",         record.factory);
         r->setProperty ("missing",         record.missing);
         r->setProperty ("user",            juce::var (u));
+
+        if (record.sonic.measured)
+        {
+            auto* m = new juce::DynamicObject();
+            m->setProperty ("silent",     record.sonic.silent);
+            m->setProperty ("brightness", record.sonic.brightness);
+            m->setProperty ("centroidHz", record.sonic.centroidHz);
+            m->setProperty ("attack",     record.sonic.attack);
+            m->setProperty ("attackSeconds", record.sonic.attackSeconds);
+            m->setProperty ("tail",       record.sonic.tail);
+            m->setProperty ("tailSeconds", record.sonic.tailSeconds);
+            m->setProperty ("width",      record.sonic.width);
+            m->setProperty ("noisiness",  record.sonic.noisiness);
+            m->setProperty ("dynamics",   record.sonic.dynamics);
+            m->setProperty ("peak",       record.sonic.peak);
+            m->setProperty ("cost",       record.sonic.cost);
+            m->setProperty ("costPercent", record.sonic.costPercent);
+            m->setProperty ("latencySamples", record.sonic.latencySamples);
+            m->setProperty ("envelope", [&record] { juce::Array<juce::var> a;
+                                                    for (auto v : record.sonic.envelope) a.add (v);
+                                                    return a; }());
+            r->setProperty ("sonic", juce::var (m));
+            r->setProperty ("sonicFingerprint", record.sonicFingerprint);
+        }
         recordVars.add (juce::var (r));
     }
 
@@ -262,6 +286,30 @@ Library Library::fromVar (const juce::var& stored)
         record.factory         = (bool) r.getProperty ("factory", false);
         record.missing         = (bool) r.getProperty ("missing", false);
 
+        if (const auto m = r.getProperty ("sonic", {}); m.isObject())
+        {
+            auto& sonic = record.sonic;
+            sonic.measured   = true;
+            sonic.silent     = (bool) m.getProperty ("silent", false);
+            sonic.brightness = (float) (double) m.getProperty ("brightness", 0.0);
+            sonic.centroidHz = (float) (double) m.getProperty ("centroidHz", 0.0);
+            sonic.attack     = (float) (double) m.getProperty ("attack", 0.0);
+            sonic.attackSeconds = (float) (double) m.getProperty ("attackSeconds", 0.0);
+            sonic.tail       = (float) (double) m.getProperty ("tail", 0.0);
+            sonic.tailSeconds = (float) (double) m.getProperty ("tailSeconds", 0.0);
+            sonic.width      = (float) (double) m.getProperty ("width", 0.0);
+            sonic.noisiness  = (float) (double) m.getProperty ("noisiness", 0.0);
+            sonic.dynamics   = (float) (double) m.getProperty ("dynamics", 0.0);
+            sonic.peak       = (float) (double) m.getProperty ("peak", 0.0);
+            sonic.cost       = (float) (double) m.getProperty ("cost", 0.0);
+            sonic.costPercent = (float) (double) m.getProperty ("costPercent", 0.0);
+            sonic.latencySamples = (int) m.getProperty ("latencySamples", 0);
+            if (const auto* envelope = m.getProperty ("envelope", {}).getArray())
+                for (const auto& v : *envelope)
+                    sonic.envelope.add (juce::jlimit (0.0f, 1.0f, (float) (double) v));
+            record.sonicFingerprint = r.getProperty ("sonicFingerprint", {}).toString();
+        }
+
         const auto u = r.getProperty ("user", {});
         record.user.favourite = (bool) u.getProperty ("favourite", false);
         record.user.rating    = juce::jlimit (0, 5, (int) u.getProperty ("rating", 0));
@@ -319,6 +367,34 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
     }
 
     return out;
+}
+
+float sonicDistance (const SonicProfile& a, const SonicProfile& b)
+{
+    // Nothing to compare is not "identical", and saying so is what keeps a half-probed library
+    // from claiming matches it cannot support.
+    if (! a.measured || ! b.measured)
+        return 1.0f;
+
+    // Weighted, because the axes are not equally telling. Brightness and attack are most of what
+    // somebody means by "like this one"; how loud it happened to be is not.
+    const std::pair<float, float> axes[] {
+        { a.brightness - b.brightness, 1.00f },
+        { a.attack     - b.attack,     0.85f },
+        { a.tail       - b.tail,       0.55f },
+        { a.width      - b.width,      0.40f },
+        { a.noisiness  - b.noisiness,  0.45f },
+        { a.dynamics   - b.dynamics,   0.25f },
+    };
+
+    float sum = 0.0f, weights = 0.0f;
+    for (const auto& [delta, weight] : axes)
+    {
+        sum += weight * delta * delta;
+        weights += weight;
+    }
+
+    return juce::jlimit (0.0f, 1.0f, std::sqrt (sum / weights));
 }
 
 bool LibraryFacetSelection::admits (const juce::StringArray& values) const
@@ -398,6 +474,23 @@ bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
         if (! available)
             return false;
     }
+
+    // The measured half. An active range refuses anything the auditioner has not reached, because
+    // an unknown brightness is not a dark one.
+    if (query.measuredOnly && ! record.sonic.measured)
+        return false;
+
+    const std::pair<const LibraryRange*, float> ranges[] {
+        { &query.brightness, record.sonic.brightness },
+        { &query.attack,     record.sonic.attack },
+        { &query.tail,       record.sonic.tail },
+        { &query.width,      record.sonic.width },
+        { &query.cost,       record.sonic.cost },
+    };
+
+    for (const auto& [range, value] : ranges)
+        if (range->active && ! (record.sonic.measured && range->admits (value)))
+            return false;
 
     const std::pair<const char*, const LibraryFacetSelection*> facets[] {
         { "categories",    &query.categories },
@@ -566,7 +659,23 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("favouritesOnly", query.favouritesOnly);
     o->setProperty ("minRating",      query.minRating);
     o->setProperty ("availableOnly",  query.availableOnly);
+    o->setProperty ("measuredOnly",   query.measuredOnly);
     o->setProperty ("facets",         juce::var (facets));
+
+    auto* ranges = new juce::DynamicObject();
+    const std::pair<const char*, const LibraryRange*> named[] {
+        { "brightness", &query.brightness }, { "attack", &query.attack },
+        { "tail", &query.tail }, { "width", &query.width }, { "cost", &query.cost },
+    };
+    for (const auto& [name, range] : named)
+    {
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("min",    range->min);
+        r->setProperty ("max",    range->max);
+        r->setProperty ("active", range->active);
+        ranges->setProperty (name, juce::var (r));
+    }
+    o->setProperty ("ranges", juce::var (ranges));
     return juce::var (o);
 }
 
@@ -583,6 +692,22 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     query.favouritesOnly = (bool) stored.getProperty ("favouritesOnly", false);
     query.minRating = juce::jlimit (0, 5, (int) stored.getProperty ("minRating", 0));
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
+    query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
+
+    const auto ranges = stored.getProperty ("ranges", {});
+    const std::pair<const char*, LibraryRange*> named[] {
+        { "brightness", &query.brightness }, { "attack", &query.attack },
+        { "tail", &query.tail }, { "width", &query.width }, { "cost", &query.cost },
+    };
+    for (const auto& [name, range] : named)
+    {
+        const auto stored2 = ranges.getProperty (name, {});
+        range->min = juce::jlimit (0.0f, 1.0f, (float) (double) stored2.getProperty ("min", 0.0));
+        range->max = juce::jlimit (0.0f, 1.0f, (float) (double) stored2.getProperty ("max", 1.0));
+        range->active = (bool) stored2.getProperty ("active", false);
+        if (range->min > range->max)
+            std::swap (range->min, range->max);
+    }
 
     const auto facets = stored.getProperty ("facets", {});
     query.categories    = selectionFromVar (facets.getProperty ("categories", {}));
@@ -591,6 +716,76 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     query.manufacturers = selectionFromVar (facets.getProperty ("manufacturers", {}));
     query.sources       = selectionFromVar (facets.getProperty ("sources", {}));
     return query;
+}
+
+juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library, float tolerance)
+{
+    const auto& records = library.allRecords();
+    juce::Array<LibraryDuplicateSet> sets;
+    juce::StringArray claimed;
+
+    // Whichever member carries user metadata is the one to keep, because folding must never be
+    // the thing that loses somebody's rating. A tie goes to the first, which is library order.
+    const auto weight = [] (const LibraryRecord& r)
+    {
+        return (r.user.favourite ? 4 : 0) + (r.user.rating > 0 ? 3 : 0)
+             + (r.user.notes.isNotEmpty() ? 2 : 0) + (r.user.tags.isEmpty() ? 0 : 2)
+             + (r.user.collections.isEmpty() ? 0 : 1) + (r.factory ? 0 : 1);
+    };
+
+    for (int i = 0; i < records.size(); ++i)
+    {
+        const auto& a = records.getReference (i);
+        if (claimed.contains (a.recordId))
+            continue;
+
+        LibraryDuplicateSet set;
+        set.recordIds.add (a.recordId);
+        bool anyByFingerprint = false;
+
+        for (int j = i + 1; j < records.size(); ++j)
+        {
+            const auto& b = records.getReference (j);
+            if (claimed.contains (b.recordId))
+                continue;
+
+            const auto sameBytes = a.fingerprint.isNotEmpty() && a.fingerprint == b.fingerprint;
+
+            // Forty plug-ins each shipping an "Init" is forty different sounds with one name, so
+            // a measured match has to agree about the plug-in as well as about the sound.
+            const auto sameSound = ! sameBytes
+                                    && a.name.equalsIgnoreCase (b.name)
+                                    && a.targetCeId.isNotEmpty() && a.targetCeId == b.targetCeId
+                                    && a.sonic.measured && b.sonic.measured
+                                    && sonicDistance (a.sonic, b.sonic) <= tolerance;
+
+            if (! sameBytes && ! sameSound)
+                continue;
+
+            anyByFingerprint = anyByFingerprint || sameBytes;
+            set.recordIds.add (b.recordId);
+            claimed.add (b.recordId);
+        }
+
+        if (set.recordIds.size() < 2)
+            continue;
+
+        claimed.add (a.recordId);
+        set.identical = anyByFingerprint;
+
+        int best = -1;
+        for (const auto& id : set.recordIds)
+            if (const auto* record = library.find (id); record != nullptr)
+                if (const auto w = weight (*record); w > best)
+                {
+                    best = w;
+                    set.keyRecordId = id;
+                }
+
+        sets.add (std::move (set));
+    }
+
+    return sets;
 }
 
 VstPresetHeader parseVstPresetHeader (const void* data, size_t size)

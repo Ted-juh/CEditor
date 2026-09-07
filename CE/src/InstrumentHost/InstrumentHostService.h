@@ -88,6 +88,9 @@
 //      in all mode crossfade live audio; key/velocity sources shape incoming note velocity.)
 //   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
 //   saveSmartCollection {collectionId?,name,query?} | removeSmartCollection {collectionId}
+//   analyseLibrary {all?} | cancelAnalysis
+//     (the auditioner: plays every preset once and writes down what came out. Answers with
+//      instrumentHostAnalysisProgress as it goes and instrumentHostLibrary when it lands.)
 //   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
 //     (getLibrary takes the full LibraryQuery — text/type/collection/facets with their
 //      include and exclude lists/favouritesOnly/minRating/availableOnly — and the older
@@ -308,6 +311,14 @@ public:
         // Runs the scan body. Default (nullptr) = the service's own background thread;
         // tests pass [] (auto fn) { fn(); } to run inline.
         std::function<void (std::function<void()>)> scanExecutor;
+        // The same, for the auditioner (analyseLibrary). Separate because the two must be able
+        // to run at once: a scan finds plug-ins, the auditioner plays what they hold.
+        std::function<void (std::function<void()>)> analysisExecutor;
+        // Runs something back on the controlling thread. The auditioner needs it for the two
+        // things that must not happen on its own thread: destroying a plug-in instance, and
+        // writing its findings into the library. Default (nullptr) = run it inline, which is
+        // what a test with an inline executor wants and what an app must NOT leave unset.
+        std::function<void (std::function<void()>)> onControlThread;
         // Launches the Host Project build pipeline (the app streams a node child process;
         // tests capture the call). Absent = building is not available in this build, and
         // buildHostProduct says so instead of doing nothing.
@@ -729,6 +740,22 @@ private:
     void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
     void ensureLibrary();
+
+    /** One record's worth of work for the auditioner, copied off the library on the controlling
+        thread so the job never reads a structure somebody else is editing. */
+    struct AnalysisTask
+    {
+        juce::String recordId, name, targetCeId, sourceType, sourceLocator, stateBlobBase64,
+                     fingerprint, descriptionXml;
+    };
+
+    juce::Array<AnalysisTask> analysisBacklog (bool remeasureEverything) const;
+    void runAnalysisNow (juce::Array<AnalysisTask> tasks);
+    void emitAnalysisProgress (int done, int total, const juce::String& what, bool running);
+    /** Applies a record's stored state to a live processor. Empty return = it took; otherwise
+        the sentence to show. One definition, because loading a preset onto a part and playing
+        it to measure it are the same operation with different reasons. */
+    juce::String applyRecordState (juce::AudioProcessor& instrument, const LibraryRecord& record) const;
     void emitLibrary (const LibraryQuery& query);
     void scanVstPresets();
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
@@ -1487,6 +1514,10 @@ private:
     std::thread scanThread;
     std::atomic<bool> scanBusy { false };
     std::atomic<bool> stopRequested { false };
+
+    std::thread analysisThread;
+    std::atomic<bool> analysisBusy { false };
+    std::atomic<bool> analysisStopRequested { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InstrumentHostService)
 };

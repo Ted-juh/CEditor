@@ -1,6 +1,6 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stage A is built** (2026-09-07); B–F are a plan, not a commitment. The mockups it describes are in
+Status: **Stages A and B are built** (2026-09-07); C–F are a plan, not a commitment. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -124,8 +124,8 @@ which instruments are indexed that way.
 Each stage ships something on its own.
 
 - ~~**A — the workspace.**~~ **Built, 2026-09-07** — see *Stage A, as built* below.
-- **B — the auditioner.** The scanner worker learns to render a probe. Descriptors on the record,
-  thumbprints, measured ranges, duplicate folding. The expensive stage, and the one the rest needs.
+- ~~**B — the auditioner.**~~ **Built, 2026-09-07** — see *Stage B, as built* below. Out-of-process
+  hardening is what remains of it, and it is now B2 rather than a precondition.
 - **C — instant audition.** Snapshot cache, live handoff at the note boundary, the rolling eight-bar
   buffer, auditioning through the part's chain.
 - **D — versions and diff.** Independent of B; could come earlier if saving-over is the louder
@@ -175,6 +175,75 @@ instantly until Stage B renders the snapshots), thumbprints, the Atlas, versions
 The audition toggle that already existed — load into the focused part and play a note — moved
 across unchanged.
 
+## Stage B, as built
+
+`SonicProbe.h/.cpp` plays a sound and writes down what came out; `SonicProfile` in `Library.h`
+is what it wrote. Everything the browser does with measurements is a face on that one struct.
+
+**The probe is fixed on purpose.** C3, velocity 100, held 1.2 s, 0.8 s of tail, then a second
+pass at velocity 40. Every sound has to be measured the same way or the numbers cannot be
+compared, so the note and the timings are constants rather than settings. The quiet pass is
+half the cost of the probe and it is the only way to know whether a sound answers touch, which
+is most of what separates a playable instrument from a pad.
+
+**What it measures, and how each one is checked.** Brightness is a spectral centroid taken from
+the *sustain*, not from the transient — a transient's spectrum is every frequency at once, which
+is why a naive "FFT the whole render" reads every plucked sound as bright. Attack is the time
+from the sound leaving the noise floor to nine-tenths of its peak, deliberately not from
+note-on, so a plug-in that reports latency it does not remove is not credited with a slow attack
+it does not have. Tail is measured from the release to 60 dB below the held level and is bounded
+by the probe, so a pad that outlasts it reports the probe rather than a wrong number. Width is
+inter-channel correlation, so the same signal twice is not wide however loud. Every one of them
+is checked against a test instrument built to have it — a tone at a known frequency, a ramp of a
+known length, two decorrelated channels — rather than against itself.
+
+**Every value is kept twice**: normalised 0..1 for the sliders, and in its own unit beside it so
+the inspector can say `438 Hz centroid` rather than `0.34`. The mapping lives in one place per
+side and the two are pinned to the same constants, because a slider that maps its handle
+differently from the filter behind it is a slider that lies.
+
+**Never measured twice.** A profile is keyed to the fingerprint it was measured from, so a
+rescan that finds the same bytes never re-renders them: the second run of a twelve-thousand
+preset library takes no time at all, and `analyseLibrary {all:true}` is how you ask anyway.
+
+**Absent is not zero.** An unmeasured record carries no profile at all rather than a profile of
+zeroes, because "not listened to yet" and "measured and dark" are not the same thing. An active
+range therefore refuses anything unmeasured — an unknown brightness is not a dark one — and the
+browser says how many that is instead of quietly dropping them.
+
+**Folding is deliberately timid.** Forty plug-ins each shipping an "Init" is forty *different*
+sounds with one name, and folding those would lose thirty-nine of them. So a duplicate set is
+only ever the same bytes (identical fingerprint) or the same name, the same plug-in and a
+measured distance under tolerance. Records from different plug-ins are never folded, however
+alike they measure — and there is a test that three identically-measuring presets of one
+plug-in with three different names are three sounds.
+
+**Threading, and what is honestly still missing.** The job runs off the controlling thread
+through `Options::analysisExecutor`, the same shape the scan already used. Two things come back
+through `Options::onControlThread`: destroying a plug-in instance, and writing findings into the
+library. Instances are borrowed one per plug-in and every preset that plug-in holds is played
+before the next one is made, because instantiating is the expensive part and playing is not.
+A plug-in that will not load is skipped with its reason, never fatal.
+
+It is still **in process**, and that is the gap. §17's whole argument is that a plug-in which
+takes the process down must not take the editor with it, and the scanner is out of process for
+exactly that reason. The argument for running the auditioner in process is real but partial:
+these classes have already been vetted by the out-of-process scan, and the host loads them into
+the rack anyway. It is not the same as crash isolation. **B2 is moving the job behind the
+scanner's worker**, and the shape above was chosen so that is a different `analysisExecutor`
+and instantiation hook rather than a rewrite.
+
+**What rendering it found.** The range inputs arrived wearing the browser's own chrome — a light
+track and a default thumb inside a dark tool — because `accent-color` colours the fill and
+nothing else; they take the workspace's colours through the `-webkit-` track and thumb now.
+And tiles without a measurement had no thumbprint, so the grid reflowed as the auditioner worked
+through it: an unheard sound now draws the space and says *not heard yet*, which is a different
+statement from drawing a flat sound.
+
+**Not in Stage B:** the snapshots that make audition instant (that is C, and it is the feature
+people will notice first), the Atlas, "sounds like" in the inspector, and the substitutes. The
+distance function they all share is built and tested.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -193,6 +262,11 @@ across unchanged.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage B built; see *Stage B, as built* above. The one thing worth carrying
+  forward: the spectral centroid had to come from the sustain rather than the whole render, or
+  every plucked sound measures bright. That was not obvious until two sounds that plainly differ
+  came back with the same number.
 
 - **2026-09-07** — Stage A built; see *Stage A, as built* above for what rendering found.
 

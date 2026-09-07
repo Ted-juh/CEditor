@@ -201,6 +201,15 @@ HostPluginProcessor::HostPluginProcessor()
     options.instantiate = makeIsolatedPluginInstantiator (
         liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
     options.applyVstPreset = applyVstPresetFile;
+
+    // The auditioner's two rules: it runs off the controlling thread, and the two things that
+    // must NOT happen there — destroying a plug-in instance and writing findings into the
+    // library — come back through here. Left unset, the default runs them inline on the
+    // auditioner's own thread, which is exactly what a plug-in does not expect.
+    options.onControlThread = [] (std::function<void()> work)
+    {
+        juce::MessageManager::callAsync (std::move (work));
+    };
     options.enableAudio = false;    // the DAW owns the device
     options.persistSession = false; // the DAW owns the session (get/setStateInformation)
 

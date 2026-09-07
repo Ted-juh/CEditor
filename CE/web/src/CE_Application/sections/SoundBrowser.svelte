@@ -28,6 +28,8 @@
     setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     saveSmartCollection, removeSmartCollection,
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
+    hostAnalysis, analyseLibrary, cancelAnalysis,
+    MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
 
@@ -63,6 +65,36 @@
     chainCapture: 'Chain capture',
   };
   const sourceLabel = (value) => SOURCE_LABELS[value] ?? value;
+
+  const AXIS_LABELS = {
+    brightness: 'Brightness', attack: 'Attack', tail: 'Tail', width: 'Width', cost: 'Cost',
+  };
+
+  /** A record's own waveform, drawn from the envelope the auditioner measured. Mirrored around
+      the middle and stretched to the tile, so the SHAPE reads at 190 pixels — a slow pad and a
+      plucked bass are different objects before you read either name. */
+  function thumbPoints(envelope) {
+    const n = envelope.length;
+    if (n === 0) return '';
+    const top = envelope.map((v, i) => `${((i / (n - 1)) * 100).toFixed(1)},${(12 - v * 11).toFixed(1)}`);
+    const bottom = envelope.map((v, i) => `${(((n - 1 - i) / (n - 1)) * 100).toFixed(1)},${(12 + v * 11).toFixed(1)}`);
+    return [...top, ...bottom].join(' ');
+  }
+
+  function setRange(axis, key, value) {
+    const next = normalizeLibraryQuery(query);
+    const range = next.ranges[axis];
+    range[key] = Math.min(1, Math.max(0, Number(value)));
+    if (range.min > range.max) range[key === 'min' ? 'max' : 'min'] = range[key];
+    range.active = true;
+    ask(next);
+  }
+
+  function toggleRange(axis) {
+    const next = normalizeLibraryQuery(query);
+    next.ranges[axis].active = !next.ranges[axis].active;
+    ask(next);
+  }
 
   let records = $derived($hostLibrary.records);
   let selected = $derived(records.find((r) => r.recordId === selectedId) ?? records[0] ?? null);
@@ -182,6 +214,54 @@
         {/each}
       {/if}
 
+      <div class="rail-head">The auditioner</div>
+      {#if $hostAnalysis.running}
+        <div class="listen-progress" data-testid="analysis-progress">
+          <div class="bar"><i style={`width:${$hostAnalysis.total > 0
+            ? Math.round(100 * $hostAnalysis.done / $hostAnalysis.total) : 0}%`}></i></div>
+          <span class="listen-what">{$hostAnalysis.done} of {$hostAnalysis.total} · {$hostAnalysis.what}</span>
+        </div>
+        <button type="button" class="rail-action" onclick={() => cancelAnalysis()}>Stop listening</button>
+      {:else}
+        <button type="button" class="rail-action" data-testid="host-analyse"
+                disabled={$hostLibrary.counts.measurable === 0}
+                title={$hostLibrary.counts.measurable === 0
+                       ? 'Everything with a plug-in behind it has been measured'
+                       : 'Play each of these once and write down what came out'}
+                onclick={() => analyseLibrary()}>
+          {$hostLibrary.counts.measurable === 0
+            ? 'Nothing left to measure'
+            : `Listen to ${$hostLibrary.counts.measurable} sound${$hostLibrary.counts.measurable === 1 ? '' : 's'}`}
+        </button>
+        {#if $hostAnalysis.what}
+          <span class="listen-what">{$hostAnalysis.what}</span>
+        {/if}
+      {/if}
+      <button type="button" class="rail-item" class:on={query.measuredOnly}
+              title="Only sounds the auditioner has played"
+              onclick={() => ask({ ...query, measuredOnly: !query.measuredOnly })}>
+        <span>Measured</span><span class="n">{$hostLibrary.counts.measured}</span>
+      </button>
+
+      {#if $hostLibrary.duplicates.length > 0}
+        <div class="rail-head">Housekeeping</div>
+        <div class="rail-row">
+          <span class="dup-note" data-testid="duplicate-note">
+            {$hostLibrary.duplicates.length} duplicate
+            {$hostLibrary.duplicates.length === 1 ? 'set' : 'sets'} —
+            {$hostLibrary.duplicates.reduce((n, d) => n + d.recordIds.length - 1, 0)} copies
+          </span>
+        </div>
+        {#each $hostLibrary.duplicates.slice(0, 6) as set (set.keyRecordId)}
+          <button type="button" class="rail-item" data-testid="duplicate-set"
+                  title={set.identical ? 'The same bytes, filed more than once'
+                                       : 'The same name, plug-in and measurement'}
+                  onclick={() => ask({ ...emptyLibraryQuery(), text: set.name })}>
+            <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
+          </button>
+        {/each}
+      {/if}
+
       <div class="rail-head">Capture</div>
       <!-- A hardware part saves the patch it captured. The library is where a sound lives
            whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
@@ -238,6 +318,33 @@
           {/if}
         {/each}
 
+        {#if $hostLibrary.counts.measured > 0}
+          <div class="measured" data-testid="measured-strip">
+            <span class="flabel">Measured</span>
+            {#each MEASURED_AXES as axis (axis)}
+              {@const range = query.ranges[axis]}
+              <div class="axis" class:on={range.active}>
+                <button type="button" class="axis-name" data-testid="axis-toggle"
+                        title={range.active ? 'Stop filtering on this' : 'Filter on this'}
+                        onclick={() => toggleRange(axis)}>
+                  {AXIS_LABELS[axis]}
+                  <span class="axis-value">
+                    {range.active
+                      ? `${measuredLabel(axis, range.min)} – ${measuredLabel(axis, range.max)}`
+                      : 'any'}
+                  </span>
+                </button>
+                <input type="range" min="0" max="1" step="0.01" value={range.min}
+                       aria-label={`${AXIS_LABELS[axis]} minimum`}
+                       oninput={(e) => setRange(axis, 'min', e.currentTarget.value)} />
+                <input type="range" min="0" max="1" step="0.01" value={range.max}
+                       aria-label={`${AXIS_LABELS[axis]} maximum`}
+                       oninput={(e) => setRange(axis, 'max', e.currentTarget.value)} />
+              </div>
+            {/each}
+          </div>
+        {/if}
+
         <div class="frow actions">
           <span class="hint">Click a chip to keep only those; alt-click to refuse them.</span>
           {#if filtered}
@@ -268,6 +375,20 @@
           {#each records as record (record.recordId)}
             <div class="tile" class:sel={record.recordId === selected?.recordId}
                  class:unavailable={!record.available}>
+              <!-- Every tile keeps the thumbprint's space whether or not there is one yet, so
+                   the grid does not reflow as the auditioner works through it. An unheard sound
+                   draws the line and says so, which is different from drawing a flat sound. -->
+              {#if record.sonic}
+                <svg class="thumb" viewBox="0 0 100 24" preserveAspectRatio="none"
+                     data-testid="tile-thumb" aria-hidden="true">
+                  <polygon points={thumbPoints(record.sonic.envelope)} />
+                  <line x1="0" y1="12" x2="100" y2="12" />
+                </svg>
+              {:else}
+                <div class="thumb unheard" title="Not listened to yet">
+                  <span>not heard yet</span>
+                </div>
+              {/if}
               <button type="button" class="tile-body" data-testid="browser-tile"
                       title={record.available ? detailLine(record) : record.reason}
                       onclick={() => clickTile(record)}>
@@ -332,6 +453,34 @@
             </span>
           </div>
         </div>
+
+        {#if selected.sonic}
+          <div class="insp-block">
+            <div class="insp-head">What it measured like</div>
+            {#if selected.sonic.silent}
+              <div class="notes">The probe played a note and nothing came out. That is worth
+                knowing rather than hiding — it usually means the sound needs a pedal, or the
+                plug-in refused the state.</div>
+            {:else}
+              <div class="kv">
+                <span class="k">Brightness</span>
+                <span class="v">{measuredLabel('brightness', selected.sonic.brightness)} centroid</span>
+                <span class="k">Attack</span>
+                <span class="v">{measuredLabel('attack', selected.sonic.attack)}</span>
+                <span class="k">Tail</span>
+                <span class="v">{measuredLabel('tail', selected.sonic.tail)}</span>
+                <span class="k">Width</span>
+                <span class="v">{selected.sonic.width < 0.05 ? 'mono'
+                                  : `${selected.sonic.width.toFixed(2)} stereo`}</span>
+                <span class="k">Touch</span>
+                <span class="v">{selected.sonic.dynamics < 0.05 ? 'ignores velocity'
+                                  : selected.sonic.dynamics.toFixed(2)}</span>
+                <span class="k">Cost</span>
+                <span class="v">{selected.sonic.costPercent.toFixed(1)}% of one core</span>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <div class="insp-block">
           <div class="insp-head">Yours</div>
@@ -452,6 +601,55 @@
   .facets { display: flex; flex-direction: column; gap: 5px; }
   .frow { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .frow.actions { margin-top: 2px; }
+
+  .measured { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  .axis {
+    display: flex; flex-direction: column; gap: 2px; min-width: 132px;
+    padding: 4px 6px; border: 1px solid #2a333d; border-radius: 4px; background: #14181b;
+  }
+  .axis.on { border-color: #4a86bd; background: #7fb4e00f; }
+  button.axis-name {
+    display: flex; align-items: baseline; gap: 5px; background: none; border: 0; padding: 0;
+    color: #9aa5b1; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  button.axis-name:hover:not(:disabled) { color: #d6dbe0; border-color: transparent; }
+  .axis.on button.axis-name { color: #7fb4e0; }
+  .axis-value { text-transform: none; letter-spacing: 0; color: #66707b; font-size: 10px; }
+  .axis.on .axis-value { color: #9aa5b1; }
+  /* The range inputs wear the workspace, not the browser: WebView2 is Chromium, so the
+     -webkit- track and thumb are the ones that apply, and the bare rule keeps a plain browser
+     from drawing a default control beside a styled one. */
+  .axis input[type='range'] {
+    width: 100%; height: 12px; margin: 0; padding: 0;
+    -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+  }
+  .axis input[type='range']::-webkit-slider-runnable-track {
+    height: 3px; border-radius: 2px; background: #2a333d;
+  }
+  .axis input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 9px; height: 12px; margin-top: -4.5px; border-radius: 2px;
+    background: #7d8894; border: 1px solid #101315;
+  }
+  .axis.on input[type='range']::-webkit-slider-runnable-track { background: #24313d; }
+  .axis.on input[type='range']::-webkit-slider-thumb { background: #7fb4e0; }
+
+  .thumb { display: block; width: 100%; height: 22px; background: #101315; border-radius: 3px; }
+  .thumb.unheard {
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed #2a333d; color: #4d565f; font-size: 9px; letter-spacing: 0.06em;
+  }
+  .thumb polygon { fill: #6fb0c9; fill-opacity: 0.85; }
+  .thumb line { stroke: #7fb4e0; stroke-opacity: 0.3; stroke-width: 0.4; }
+
+  .listen-progress { display: flex; flex-direction: column; gap: 3px; padding: 2px 0; }
+  .listen-progress .bar {
+    height: 4px; border-radius: 2px; background: #101315; border: 1px solid #2a333d;
+    overflow: hidden;
+  }
+  .listen-progress .bar i { display: block; height: 100%; background: #4a86bd; }
+  .listen-what { color: #7d8894; font-size: 10px; padding: 2px 0; }
+  .dup-note { color: #d9a13c; font-size: 10.5px; padding: 2px 0; }
   .hint { color: #66707b; font-size: 10.5px; margin-right: auto; }
   .flabel {
     color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;

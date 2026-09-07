@@ -22,6 +22,7 @@
 #include "InstrumentHost/LiveWorkerDiagnostics.h"
 #include "InstrumentHost/PatchDiff.h"
 #include "InstrumentHost/PluginWorkerCrashDumps.h"
+#include "InstrumentHost/SonicProbe.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
@@ -347,6 +348,11 @@ struct Harness
             lastStub = stub.get();
             callback (std::move (stub), {});
         };
+        // The auditioner runs inline here, and its control-thread hook runs inline too: in the
+        // app those are a background thread and the message thread, and the job is written so
+        // the difference is the executor and nothing else.
+        options.analysisExecutor = [] (std::function<void()> body) { body(); };
+        options.onControlThread = [] (std::function<void()> work) { work(); };
         options.scanExecutor = [this] (std::function<void()> body)
         {
             if (captureScanBody)
@@ -1580,6 +1586,314 @@ void testTwinPresetsKeepTheirOwnRecords()
            "a renamed twin still keeps its record through the fingerprint");
     check (library.find (lostId) != nullptr && library.find (lostId)->missing,
            "while the missing twin stays itself");
+}
+
+// A test instrument whose sound is known exactly, so the measurements can be checked against
+// what went in rather than against themselves. Every knob here exists because one number in
+// SonicProfile depends on it: the frequency for brightness, the ramps for attack and tail, the
+// channel mode for width, the noise mix for noisiness, and the velocity curve for touch.
+struct ToneProbeProcessor : juce::AudioProcessor
+{
+    ToneProbeProcessor()
+        : juce::AudioProcessor (BusesProperties()
+                                    .withOutput ("Out", juce::AudioChannelSet::stereo(), true)) {}
+
+    float frequency = 440.0f;
+    float attackSeconds = 0.005f;
+    float releaseSeconds = 0.05f;   // exponential time constant
+    float noiseMix = 0.0f;          // 0 pure tone .. 1 pure noise
+    float velocityDepth = 0.0f;     // 0 = deaf to velocity, 1 = level tracks it
+    bool  stereoDecorrelated = false;
+    bool  mute = false;
+
+    void prepareToPlay (double rate, int) override
+    {
+        sampleRate = rate;
+        phase = 0.0;
+        level = 0.0f;
+        held = false;
+        random.setSeed (20260907);
+    }
+    void releaseResources() override {}
+
+    void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+    {
+        audio.clear();
+        if (mute)
+            return;
+
+        int next = 0;
+        for (const auto metadata : midi)
+        {
+            render (audio, next, metadata.samplePosition - next);
+            next = metadata.samplePosition;
+            const auto message = metadata.getMessage();
+            if (message.isNoteOn())
+            {
+                held = true;
+                target = 1.0f - velocityDepth * (1.0f - message.getFloatVelocity());
+            }
+            else if (message.isNoteOff())
+            {
+                held = false;
+            }
+        }
+        render (audio, next, audio.getNumSamples() - next);
+    }
+
+    void render (juce::AudioBuffer<float>& audio, int start, int length)
+    {
+        if (length <= 0)
+            return;
+
+        const auto attackStep = attackSeconds > 0.0f
+                                  ? (float) (1.0 / (attackSeconds * sampleRate)) : 1.0f;
+        const auto releaseCoefficient = releaseSeconds > 0.0f
+                                          ? (float) std::exp (-1.0 / (releaseSeconds * sampleRate))
+                                          : 0.0f;
+        const auto delta = juce::MathConstants<double>::twoPi * frequency / sampleRate;
+
+        for (int i = 0; i < length; ++i)
+        {
+            level = held ? juce::jmin (target, level + attackStep * target)
+                         : level * releaseCoefficient;
+            phase += delta;
+
+            const auto tone = (float) std::sin (phase);
+            const auto sample = level * 0.5f * ((1.0f - noiseMix) * tone
+                                                  + noiseMix * (random.nextFloat() * 2.0f - 1.0f));
+            audio.setSample (0, start + i, sample);
+            if (audio.getNumChannels() > 1)
+            {
+                const auto other = stereoDecorrelated
+                                     ? level * 0.5f * (random.nextFloat() * 2.0f - 1.0f)
+                                     : sample;
+                audio.setSample (1, start + i, other);
+            }
+        }
+    }
+
+    const juce::String getName() const override                 { return "ToneProbe"; }
+    double getTailLengthSeconds() const override                { return 0.0; }
+    bool acceptsMidi() const override                           { return true; }
+    bool producesMidi() const override                          { return false; }
+    bool isMidiEffect() const override                          { return false; }
+    juce::AudioProcessorEditor* createEditor() override         { return nullptr; }
+    bool hasEditor() const override                             { return false; }
+    int getNumPrograms() override                               { return 1; }
+    int getCurrentProgram() override                            { return 0; }
+    void setCurrentProgram (int) override                       {}
+    const juce::String getProgramName (int) override            { return {}; }
+    void changeProgramName (int, const juce::String&) override  {}
+    void getStateInformation (juce::MemoryBlock&) override      {}
+    void setStateInformation (const void*, int) override        {}
+
+    double sampleRate = 44100.0, phase = 0.0;
+    float level = 0.0f, target = 1.0f;
+    bool held = false;
+    juce::Random random { 20260907 };
+};
+
+// The auditioner: playing every sound once and writing down what came out.
+//
+// The measurements are the whole difference between this browser and the one it succeeds — tags
+// disagree between companies because different people typed them, and a spectral centroid does
+// not. So each number is checked against a sound built to have it, rather than against itself.
+void testSonicProbe()
+{
+    std::cout << "\nthe auditioner: what a sound measured like" << std::endl;
+
+    using namespace ceditor::host;
+
+    ProbeSpec spec;
+    spec.sampleRate = 44100.0;
+    spec.blockSize = 256;
+
+    const auto probe = [&spec] (auto&& configure)
+    {
+        ToneProbeProcessor processor;
+        configure (processor);
+        return probeProcessor (processor, spec);
+    };
+
+    // The transport first: the note goes on at the top and off where the hold ends, and the
+    // render is exactly as long as the spec says.
+    {
+        ToneProbeProcessor processor;
+        const auto render = renderProbe (processor, spec, 100);
+        check (render.audio.getNumSamples() == spec.totalSamples()
+                 && render.noteOffSample == spec.holdSamples(),
+               "the probe renders hold plus tail, releasing where the hold ends");
+    }
+
+    // BRIGHTNESS is a spectral centroid, so a sound an octave and a half up must measure
+    // brighter, and the centroid must land on the tone that produced it.
+    const auto dark = probe ([] (auto& p) { p.frequency = 220.0f; });
+    const auto bright = probe ([] (auto& p) { p.frequency = 3520.0f; });
+    check (dark.measured && ! dark.silent && bright.measured, "both probes measured something");
+    check (bright.brightness > dark.brightness + 0.3f,
+           "a sound four octaves up measures brighter");
+    check (std::abs (dark.centroidHz - 220.0f) < 40.0f
+             && std::abs (bright.centroidHz - 3520.0f) < 400.0f,
+           "and the centroid lands on the tone that produced it, in Hz the inspector can show");
+    check (std::abs (normaliseBrightness (brightnessToHz (0.42f)) - 0.42f) < 0.01f,
+           "the slider's mapping and the filter's are the same function, both ways");
+
+    // ATTACK is the time from the sound arriving to nine-tenths of its peak — deliberately not
+    // from note-on, so a plug-in that reports latency it does not remove is not credited with a
+    // slow attack it does not have.
+    const auto fast = probe ([] (auto& p) { p.attackSeconds = 0.002f; });
+    const auto slow = probe ([] (auto& p) { p.attackSeconds = 0.400f; });
+    check (fast.attackSeconds < 0.02f, "an instant onset measures as one");
+    check (slow.attackSeconds > 0.28f && slow.attackSeconds < 0.45f,
+           "and a 400 ms ramp measures as roughly 400 ms");
+    check (slow.attack > fast.attack + 0.3f, "which separates them on the slider's scale");
+
+    // TAIL is measured from the release to 60 dB below what the note was holding at.
+    const auto shortTail = probe ([] (auto& p) { p.releaseSeconds = 0.010f; });
+    const auto longTail = probe ([] (auto& p) { p.releaseSeconds = 0.090f; });
+    check (longTail.tailSeconds > shortTail.tailSeconds * 2.0f,
+           "a longer release measures a longer tail");
+    check (longTail.tailSeconds < (float) spec.tailSeconds + 0.01f,
+           "bounded by the probe, so a pad that outlasts it reports the probe rather than a lie");
+
+    // WIDTH is how much the two sides disagree, so the same signal twice is not wide however
+    // loud it is.
+    const auto mono = probe ([] (auto& p) { p.stereoDecorrelated = false; });
+    const auto wide = probe ([] (auto& p) { p.stereoDecorrelated = true; p.noiseMix = 1.0f; });
+    check (mono.width < 0.05f, "the same signal in both channels is not wide");
+    check (wide.width > 0.3f, "and two unrelated ones are");
+
+    // NOISINESS separates a tone from a hiss; TOUCH separates an instrument from a pad.
+    const auto tonal = probe ([] (auto& p) { p.noiseMix = 0.0f; });
+    const auto noisy = probe ([] (auto& p) { p.noiseMix = 1.0f; });
+    check (noisy.noisiness > tonal.noisiness + 0.15f, "noise measures noisier than a tone");
+
+    const auto deaf = probe ([] (auto& p) { p.velocityDepth = 0.0f; });
+    const auto touched = probe ([] (auto& p) { p.velocityDepth = 1.0f; });
+    check (deaf.dynamics < 0.05f, "a sound that ignores velocity reports no touch");
+    check (touched.dynamics > 0.15f, "and one that follows it reports some");
+
+    // Silence is a finding, not a failure: a preset that needs a pedal, or one whose plug-in
+    // refused the state, is worth listing rather than dropping.
+    const auto silent = probe ([] (auto& p) { p.mute = true; });
+    check (silent.measured && silent.silent && silent.envelope.size() == sonicEnvelopePoints,
+           "a probe that made no sound says so, and still draws (flat)");
+
+    // The drawing: the shape, not the level. A slow attack rises across its buckets.
+    check (slow.envelope.size() == sonicEnvelopePoints, "every profile carries its envelope");
+    check (slow.envelope.getFirst() < 0.25f && slow.envelope[sonicEnvelopePoints / 3] > 0.5f,
+           "and a slow attack draws as one");
+
+    // DISTANCE, which "sounds like", the duplicate fold and (later) the substitutes all read.
+    check (sonicDistance (dark, dark) < 0.001f, "a sound is identical to itself");
+    check (sonicDistance (dark, bright) > sonicDistance (dark, tonal),
+           "and further from a sound four octaves away than from one beside it");
+    check (juce::approximatelyEqual (sonicDistance (dark, SonicProfile{}), 1.0f),
+           "an unmeasured profile is maximally far from everything, rather than a false match");
+}
+
+// The auditioner at the command surface: what it measures, what it skips, and what it never
+// measures twice.
+void testAuditioner()
+{
+    std::cout << "\nthe auditioner, over the command surface" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Init", 0.50f }, { "Bright", 0.90f }, { "Dark", 0.10f } };
+
+    const auto dir = freshDataDir ("auditioner");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+    const auto library = [&h] { return h.emits.last ("instrumentHostLibrary"); };
+    const auto counts = [&library] (const char* key)
+    {
+        return (int) library()->getProperty ("counts", {}).getProperty (key, 0);
+    };
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (counts ("measured") == 0 && counts ("measurable") == 3,
+           "the three ingested programs are measurable and unmeasured");
+
+    h.emits.clear();
+    h.cmd ("analyseLibrary");
+
+    const auto* progress = h.emits.last ("instrumentHostAnalysisProgress");
+    check (progress != nullptr && ! (bool) progress->getProperty ("running", true)
+             && (int) progress->getProperty ("done", 0) == 3,
+           "the run reports itself finished, having got through all three");
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (counts ("measured") == 3 && counts ("measurable") == 0,
+           "and every one of them is measured, leaving nothing to do");
+
+    int withEnvelope = 0;
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (const auto sonic = r.getProperty ("sonic", {}); sonic.isObject())
+            if (sonic.getProperty ("envelope", {}).size() == ceditor::host::sonicEnvelopePoints)
+                ++withEnvelope;
+    check (withEnvelope == 3, "each record carries its own drawn envelope to the browser");
+
+    // Measured against the bytes it was measured from, which is what makes the second run of a
+    // twelve-thousand-preset library take no time at all.
+    h.emits.clear();
+    h.cmd ("analyseLibrary");
+    const auto* second = h.emits.last ("instrumentHostAnalysisProgress");
+    check (second != nullptr && (int) second->getProperty ("total", -1) == 0
+             && second->getProperty ("what", {}).toString().contains ("Nothing left"),
+           "a second run measures nothing again, and says so rather than spinning");
+
+    h.emits.clear();
+    h.cmd ("analyseLibrary", { { "all", true } });
+    check ((int) h.emits.last ("instrumentHostAnalysisProgress")->getProperty ("done", 0) == 3,
+           "and asking for all of it again does re-measure");
+
+    // A measured range is a filter like any other, except that it refuses anything unmeasured —
+    // an unknown brightness is not a dark one.
+    // Held in a var rather than rebuilt from the raw pointer each time: a var OWNS the
+    // DynamicObject it was handed, so the first temporary would take the object with it and the
+    // second use would read freed memory. (It did, once.)
+    juce::var rangesVar;
+    {
+        auto* cost = new juce::DynamicObject();
+        cost->setProperty ("min", 0.0);
+        cost->setProperty ("max", 1.0);
+        cost->setProperty ("active", true);
+        auto* ranges = new juce::DynamicObject();
+        ranges->setProperty ("cost", juce::var (cost));
+        rangesVar = juce::var (ranges);
+    }
+
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "ranges", rangesVar } });
+    check (library()->getProperty ("records", {}).size() == 3,
+           "a range over the whole scale keeps everything that was measured");
+
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Never played" } });
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "ranges", rangesVar } });
+    check (library()->getProperty ("records", {}).size() == 3,
+           "and refuses the one nothing has listened to yet");
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("records", {}).size() == 4,
+           "which is a filter, not a deletion — it is still there unfiltered");
+
+    // Folding. The stub plays the same DC whatever program is selected, so all three programs
+    // measure identically — and they are still THREE SOUNDS, because they are three different
+    // presets of one plug-in with three different names. Folding on measurement alone would
+    // lose two of them.
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("duplicates", {}).size() == 0,
+           "three identically-measuring presets with different names are not duplicates");
 }
 
 // Browsing: the facets, the refusals, and the counts that have to predict the click.
@@ -8796,6 +9110,8 @@ int main (int argc, char* argv[])
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
     testLibrary();
+    testSonicProbe();
+    testAuditioner();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

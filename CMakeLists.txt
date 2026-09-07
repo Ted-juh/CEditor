@@ -252,6 +252,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -310,6 +311,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_devices
         juce::juce_audio_processors
         juce::juce_audio_utils
+        juce::juce_dsp           # the auditioner's FFT: SonicProbe's spectral centroid
         juce::juce_midi_ci
         juce::juce_data_structures
         juce::juce_events
@@ -567,6 +569,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -629,6 +632,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_devices
         juce::juce_audio_processors
         juce::juce_audio_utils
+        juce::juce_dsp           # the auditioner's FFT: SonicProbe's spectral centroid
         juce::juce_data_structures
         juce::juce_events
         juce::juce_graphics
@@ -685,6 +689,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_audio_devices
         juce::juce_audio_processors
         juce::juce_audio_utils
+        juce::juce_dsp           # the auditioner's FFT: SonicProbe's spectral centroid
         juce::juce_data_structures
         juce::juce_events
         juce::juce_graphics
@@ -1041,6 +1046,7 @@ if(WIN32)
         "${CE_ROOT}/src/InstrumentHost/PluginWorkerSharedMemory.cpp"
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -1060,7 +1066,8 @@ if(WIN32)
         JUCE_STANDALONE_APPLICATION=1
     )
     target_include_directories(Ctrl49RackDemo PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils)
+    target_link_libraries(Ctrl49RackDemo PRIVATE juce::juce_cryptography winmm juce::juce_audio_utils
+                                            juce::juce_dsp)
 
     add_executable(Ctrl49BridgeDemo
         "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
@@ -1400,6 +1407,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
@@ -1408,6 +1416,7 @@ target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE
     juce::juce_core
     juce::juce_cryptography
     juce::juce_audio_utils   # AudioProcessorPlayer for the service's preview audio engine
+    juce::juce_dsp           # the auditioner's FFT: SonicProbe's spectral centroid
     # The CTRL49 Windows transports (WinMmOutput/PrivateInput) ride along with the broker's
     # endpoint factory in every target that compiles it; on Windows they need the multimedia
     # library. Found by the owner's linker: LNK2019 on Ctrl49PrivateInput — the factory's

@@ -1,6 +1,7 @@
 #include "InstrumentHostService.h"
 
 #include "PatchDiff.h"
+#include "SonicProbe.h"
 #include "EditorSnapshot.h"
 #include "LiveWorkerDiagnostics.h"
 #include "PluginWorkerBoundary.h"
@@ -10,11 +11,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <iterator>
 #include <map>
+#include <mutex>
 #include <set>
 #include <utility>
+#include <vector>
 
 namespace ceditor::host
 {
@@ -75,6 +79,10 @@ InstrumentHostService::~InstrumentHostService()
     stopRequested.store (true);
     if (scanThread.joinable())
         scanThread.join();
+
+    analysisStopRequested = true;
+    if (analysisThread.joinable())
+        analysisThread.join();
 }
 
 namespace
@@ -5467,6 +5475,44 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "analyseLibrary")
+    {
+        ensureLibrary();
+
+        if (analysisBusy.load())
+        {
+            emitError ("The auditioner is already running.");
+            return;
+        }
+
+        auto tasks = analysisBacklog ((bool) payload.getProperty ("all", false));
+        if (tasks.isEmpty())
+        {
+            // Not an error: the usual reason is that everything with a plug-in behind it has
+            // already been measured, and the browser should say so rather than spin.
+            emitAnalysisProgress (0, 0, "Nothing left to measure.", false);
+            return;
+        }
+
+        analysisBusy = true;
+        analysisStopRequested = false;
+        if (analysisThread.joinable())
+            analysisThread.join();   // a finished previous run; reclaim it
+
+        auto body = [this, tasks = std::move (tasks)]() mutable { runAnalysisNow (std::move (tasks)); };
+        if (options.analysisExecutor != nullptr)
+            options.analysisExecutor (std::move (body));
+        else
+            analysisThread = std::thread (std::move (body));
+        return;
+    }
+
+    if (cmd == "cancelAnalysis")
+    {
+        analysisStopRequested = true;
+        return;
+    }
+
     if (cmd == "saveSmartCollection")
     {
         ensureLibrary();
@@ -8412,6 +8458,236 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
     return {};
 }
 
+juce::String InstrumentHostService::applyRecordState (juce::AudioProcessor& instrument,
+                                                      const LibraryRecord& record) const
+{
+    if (record.sourceType == "vstpreset")
+    {
+        if (options.applyVstPreset == nullptr)
+            return "Vendor preset loading is not available in this build.";
+        if (! options.applyVstPreset (instrument, juce::File (record.sourceLocator)))
+            return "The plug-in refused this preset: " + record.name;
+        return {};
+    }
+
+    if (record.sourceType == "programList")
+    {
+        const auto index = record.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue();
+        if (index < 0 || index >= instrument.getNumPrograms())
+            // The plug-in changed its list since ingestion; a stale index must refuse, not
+            // select whatever now sits at that position.
+            return "The plug-in no longer has this program: " + record.name;
+        instrument.setCurrentProgram (index);
+        return {};
+    }
+
+    juce::MemoryOutputStream decoded;
+    if (! juce::Base64::convertFromBase64 (decoded, record.stateBlobBase64))
+        return "The captured state for " + record.name + " is damaged.";
+    instrument.setStateInformation (decoded.getData(), (int) decoded.getDataSize());
+    return {};
+}
+
+juce::Array<InstrumentHostService::AnalysisTask>
+InstrumentHostService::analysisBacklog (bool remeasureEverything) const
+{
+    juce::Array<AnalysisTask> tasks;
+
+    for (const auto& record : library.allRecords())
+    {
+        // Only things a plug-in can be asked to play. A rack is many sounds at once, a hardware
+        // patch is bytes going down a cable to a box this process cannot hear, and a chain is
+        // its instrument plus effects — measuring the instrument alone would describe something
+        // the chain does not sound like, so chains wait for a stage that renders the chain.
+        if (record.type != "preset" || record.sourceType == "hardwarePatch")
+            continue;
+        if (record.missing || record.targetCeId.isEmpty())
+            continue;
+
+        // Measured against the bytes it was measured from: a rescan that finds the same content
+        // never re-renders it, which is what makes the second run of a 12,000-preset library
+        // take no time at all.
+        if (! remeasureEverything && record.sonic.measured
+            && record.sonicFingerprint == record.fingerprint)
+            continue;
+
+        AnalysisTask task;
+        task.recordId = record.recordId;
+        task.name = record.name;
+        task.targetCeId = record.targetCeId;
+        task.sourceType = record.sourceType;
+        task.sourceLocator = record.sourceLocator;
+        task.stateBlobBase64 = record.stateBlobBase64;
+        task.fingerprint = record.fingerprint;
+
+        {
+            const std::scoped_lock lock (catalogLock);
+            const ModuleRecord* module = nullptr;
+            const auto* classRecord = findClass (record.targetCeId, &module);
+            if (classRecord == nullptr || module == nullptr
+                || module->unavailableReason().isNotEmpty())
+                continue;   // nothing installed to play it with; not a failure, just not now
+            task.descriptionXml = classRecord->descriptionXml;
+        }
+
+        tasks.add (std::move (task));
+    }
+
+    // Grouped by plug-in, because instantiating one is the expensive part and playing its
+    // presets afterwards is not: one instance, then every preset it holds, then the next.
+    std::stable_sort (tasks.begin(), tasks.end(),
+                      [] (const AnalysisTask& a, const AnalysisTask& b)
+                      { return a.targetCeId.compare (b.targetCeId) < 0; });
+    return tasks;
+}
+
+void InstrumentHostService::emitAnalysisProgress (int done, int total, const juce::String& what,
+                                                  bool running)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("done", done);
+    payload->setProperty ("total", total);
+    payload->setProperty ("what", what);
+    payload->setProperty ("running", running);
+    options.emit ("instrumentHostAnalysisProgress", juce::var (payload));
+}
+
+void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
+{
+    // Everything below runs off the controlling thread. It touches no member the command
+    // surface touches: the work list was copied before it started, the findings go back through
+    // onControlThread, and the only shared things are the two atomics and the emit hook.
+    struct Finding { juce::String recordId, fingerprint; SonicProfile profile; };
+    std::vector<Finding> findings;
+
+    const auto marshal = [this] (std::function<void()> work)
+    {
+        if (options.onControlThread != nullptr)
+            options.onControlThread (std::move (work));
+        else
+            work();
+    };
+
+    ProbeSpec spec;
+    int done = 0;
+    const auto total = tasks.size();
+    emitAnalysisProgress (0, total, "Listening…", true);
+
+    for (int i = 0; i < tasks.size();)
+    {
+        if (analysisStopRequested.load())
+            break;
+
+        const auto ceId = tasks.getReference (i).targetCeId;
+
+        // One instance, borrowed for as long as this plug-in's presets last. Instantiation goes
+        // through the same hook everything else uses, so it lands wherever the host puts it —
+        // the message thread in the app — and this thread waits for it rather than making one
+        // itself.
+        std::unique_ptr<juce::AudioProcessor> instrument;
+        juce::String instantiationError;
+        {
+            std::mutex mutex;
+            std::condition_variable ready;
+            bool answered = false;
+
+            if (options.instantiate == nullptr)
+            {
+                instantiationError = "no instantiator";
+            }
+            else
+            {
+                options.instantiate (tasks.getReference (i).descriptionXml, spec.sampleRate,
+                                     spec.blockSize,
+                    [&] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
+                    {
+                        const std::scoped_lock lock (mutex);
+                        instrument = std::move (made);
+                        instantiationError = error;
+                        answered = true;
+                        ready.notify_all();
+                    });
+
+                std::unique_lock lock (mutex);
+                ready.wait (lock, [&answered] { return answered; });
+            }
+        }
+
+        if (instrument == nullptr)
+        {
+            // A plug-in that will not load is not a reason to stop: every other plug-in's
+            // presets are still measurable, and the browser says which ones were skipped.
+            while (i < tasks.size() && tasks.getReference (i).targetCeId == ceId)
+            {
+                ++i;
+                ++done;
+            }
+            emitAnalysisProgress (done, total,
+                                  "Skipped " + ceId + (instantiationError.isEmpty()
+                                                         ? juce::String() : " — " + instantiationError),
+                                  true);
+            continue;
+        }
+
+        while (i < tasks.size() && tasks.getReference (i).targetCeId == ceId
+               && ! analysisStopRequested.load())
+        {
+            const auto& task = tasks.getReference (i);
+
+            LibraryRecord asRecord;
+            asRecord.name = task.name;
+            asRecord.sourceType = task.sourceType;
+            asRecord.sourceLocator = task.sourceLocator;
+            asRecord.stateBlobBase64 = task.stateBlobBase64;
+
+            if (applyRecordState (*instrument, asRecord).isEmpty())
+            {
+                Finding finding;
+                finding.recordId = task.recordId;
+                finding.fingerprint = task.fingerprint;
+                finding.profile = probeProcessor (*instrument, spec);
+                findings.push_back (std::move (finding));
+            }
+
+            ++i;
+            ++done;
+            if (done % 8 == 0 || i == tasks.size())
+                emitAnalysisProgress (done, total, task.name, true);
+        }
+
+        // Handing the instance back is the other thing that must not happen here: a plug-in
+        // expects to be destroyed where it was made. Shared rather than unique only because a
+        // std::function has to be copyable — nothing else ever holds a second reference.
+        marshal ([held = std::shared_ptr<juce::AudioProcessor> (std::move (instrument))]
+                 { (void) held; });
+    }
+
+    const auto cancelled = analysisStopRequested.load();
+
+    marshal ([this, findings = std::move (findings), done, total, cancelled]
+    {
+        for (const auto& finding : findings)
+            if (auto* record = library.find (finding.recordId))
+            {
+                record->sonic = finding.profile;
+                record->sonicFingerprint = finding.fingerprint;
+            }
+
+        if (! findings.empty())
+            library.saveTo (libraryFile());
+
+        analysisBusy = false;
+        emitAnalysisProgress (done, total,
+                              cancelled ? "Stopped." : "Done — " + juce::String (findings.size())
+                                                         + " measured.",
+                              false);
+        emitLibrary (libraryView);
+    });
+}
+
 LibraryAvailability InstrumentHostService::libraryAvailability() const
 {
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
@@ -8452,6 +8728,31 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("collections",  [record] { juce::Array<juce::var> a;
                                                    for (const auto& c : record->user.collections) a.add (c);
                                                    return a; }());
+
+        // The measured half, only when there is one. An absent `sonic` is how the browser tells
+        // "not measured yet" from "measured and dark", which are not the same thing.
+        if (record->sonic.measured)
+        {
+            const auto& sonic = record->sonic;
+            auto* m = new juce::DynamicObject();
+            m->setProperty ("silent",        sonic.silent);
+            m->setProperty ("brightness",    sonic.brightness);
+            m->setProperty ("centroidHz",    sonic.centroidHz);
+            m->setProperty ("attack",        sonic.attack);
+            m->setProperty ("attackSeconds", sonic.attackSeconds);
+            m->setProperty ("tail",          sonic.tail);
+            m->setProperty ("tailSeconds",   sonic.tailSeconds);
+            m->setProperty ("width",         sonic.width);
+            m->setProperty ("noisiness",     sonic.noisiness);
+            m->setProperty ("dynamics",      sonic.dynamics);
+            m->setProperty ("cost",          sonic.cost);
+            m->setProperty ("costPercent",   sonic.costPercent);
+            m->setProperty ("latencySamples", sonic.latencySamples);
+            m->setProperty ("envelope", [&sonic] { juce::Array<juce::var> a;
+                                                   for (auto v : sonic.envelope) a.add (v);
+                                                   return a; }());
+            r->setProperty ("sonic", juce::var (m));
+        }
         recordVars.add (juce::var (r));
     }
 
@@ -8470,6 +8771,11 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
     counts->setProperty ("chains",  chains);
     counts->setProperty ("missing", missing);
     counts->setProperty ("matched", recordVars.size());
+    counts->setProperty ("measured", [this] { int n = 0;
+                                              for (const auto& r : library.allRecords())
+                                                  if (r.sonic.measured) ++n;
+                                              return n; }());
+    counts->setProperty ("measurable", analysisBacklog (false).size());
 
     // Every facet, with its own selection lifted while counting — see Library.h. The browser
     // draws these as chips and never invents a value the library does not hold.
@@ -8528,8 +8834,28 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         staticVars.add (juce::var (c));
     }
 
+    // The same sound, filed twice. Computed on every answer rather than cached, because the
+    // set changes the moment anything is measured or removed, and a stale fold is worse than
+    // none: it hides records that are no longer duplicates of anything.
+    juce::Array<juce::var> duplicateVars;
+    for (const auto& set : libraryDuplicates (library))
+    {
+        auto* d = new juce::DynamicObject();
+        d->setProperty ("keyRecordId", set.keyRecordId);
+        d->setProperty ("identical",   set.identical);
+        d->setProperty ("recordIds",   [&set] { juce::Array<juce::var> a;
+                                                for (const auto& id : set.recordIds) a.add (id);
+                                                return a; }());
+        juce::String name;
+        if (const auto* key = library.find (set.keyRecordId))
+            name = key->name;
+        d->setProperty ("name", name);
+        duplicateVars.add (juce::var (d));
+    }
+
     auto* root = new juce::DynamicObject();
     root->setProperty ("records", recordVars);
+    root->setProperty ("duplicates", duplicateVars);
     // `query` and `type` stay the flat strings the command surface has always echoed; `request`
     // is the whole query, so a page can restore its chips from the answer alone.
     root->setProperty ("query",   query.text);
@@ -9018,33 +9344,10 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         // §18.6.7's cheap path: the right processor is already live, so the state applies
         // in place and nothing is torn down.
         auto* instrument = rack.getInstrument (partId);
-        if (record.sourceType == "vstpreset")
+        if (const auto refusal = applyRecordState (*instrument, record); refusal.isNotEmpty())
         {
-            if (! applyVendorPreset (*instrument))
-                return;
-        }
-        else if (record.sourceType == "programList")
-        {
-            const auto index = record.sourceLocator.fromLastOccurrenceOf ("/", false, false)
-                                     .getIntValue();
-            if (index < 0 || index >= instrument->getNumPrograms())
-            {
-                // The plug-in changed its list since ingestion; a stale index must refuse,
-                // not select whatever now sits at that position.
-                emitError ("The plug-in no longer has this program: " + record.name);
-                return;
-            }
-            instrument->setCurrentProgram (index);
-        }
-        else
-        {
-            juce::MemoryOutputStream decoded;
-            if (! juce::Base64::convertFromBase64 (decoded, record.stateBlobBase64))
-            {
-                emitError ("The captured state for " + record.name + " is damaged.");
-                return;
-            }
-            instrument->setStateInformation (decoded.getData(), (int) decoded.getDataSize());
+            emitError (refusal);
+            return;
         }
 
         // The part's place in the walk moves only once the preset actually applied.
