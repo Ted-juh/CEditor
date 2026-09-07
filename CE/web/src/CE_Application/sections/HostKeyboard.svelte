@@ -20,15 +20,14 @@
    * should keep doing that — you can hear which side of a split a key falls on. Every other
    * part is a thin band along the top of the keys it covers, stacked where they overlap, so a
    * six-way split reads as six bands on one keyboard rather than six lanes; click a band to
-   * switch to that part. A drag paints locally and sends at most one lightweight native
-   * preview per animation frame; releasing it sends the ordinary persistent command once.
+   * switch to that part. A drag paints entirely locally; releasing it sends one persistent
+   * command. No native or plug-in work is allowed between the pointer and its pixels.
    *
    * There used to be a second keyboard for this under the rack, linear in semitones, which
    * never lined up with the piano above it. One keyboard, one geometry (pianoGeometry.js).
    */
-  import { onDestroy } from 'svelte';
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
-           previewPartMidiRules, setPartMidiRules, partColor } from '../stores/instrumentHost.js';
+           setPartMidiRules, partColor } from '../stores/instrumentHost.js';
   import { FULL_KEYBOARD, MAX_COMPLETE_OCTAVES, isBlack, noteName, whiteCount,
            noteAtFraction, zoneExtent, maxPlayBaseOctave, playKeyboardRange,
            playKeyboardWidthPercent }
@@ -149,7 +148,6 @@
   // started on instead of snapping the range's left edge to the pointer.
   let rimEl = $state(null);
   let drag = $state(null);
-  let previewFrame = 0;
 
   $effect(() => {
     // Keep the optimistic drawing after pointer-up until the committed native snapshot arrives.
@@ -169,40 +167,24 @@
     if (!rangePart) return;
     event.preventDefault();
     event.stopPropagation();
+    // A second gesture may begin before the first one's native acknowledgement arrives.
+    // Continue from what is visibly on screen, not from the older store snapshot.
+    const start = displayedRange?.partId === rangePart.partId ? displayedRange : rangePart;
     rangeDraft = {
       partId: rangePart.partId,
-      keyLow: rangePart.keyLow,
-      keyHigh: rangePart.keyHigh,
+      keyLow: start.keyLow,
+      keyHigh: start.keyHigh,
     };
     drag = {
       handle,
       partId: rangePart.partId,
-      originalLow: rangePart.keyLow,
-      originalHigh: rangePart.keyHigh,
-      grabOffset: keyAtClientX(event.clientX) - rangePart.keyLow,
+      grabOffset: keyAtClientX(event.clientX) - start.keyLow,
     };
     rimEl.setPointerCapture?.(event.pointerId);
   }
 
-  function schedulePreview() {
-    if (previewFrame) return;
-    previewFrame = requestAnimationFrame(() => {
-      previewFrame = 0;
-      if (drag && rangeDraft?.partId === drag.partId)
-        previewPartMidiRules(drag.partId,
-          { keyLow: rangeDraft.keyLow, keyHigh: rangeDraft.keyHigh });
-    });
-  }
-
-  function cancelPreviewFrame() {
-    if (!previewFrame) return;
-    cancelAnimationFrame(previewFrame);
-    previewFrame = 0;
-  }
-
   function moveDrag(event) {
     if (!drag || !rangeDraft || rangeDraft.partId !== rangePart?.partId) {
-      cancelPreviewFrame();
       drag = null;
       rangeDraft = null;
       return;
@@ -224,36 +206,21 @@
 
     if (nextLow === rangeDraft.keyLow && nextHigh === rangeDraft.keyHigh) return;
     rangeDraft = { ...rangeDraft, keyLow: nextLow, keyHigh: nextHigh };
-    schedulePreview();
   }
 
   function endDrag() {
     if (!drag || !rangeDraft) return;
     const final = rangeDraft;
-    cancelPreviewFrame();
     drag = null;
-    // This is the only full-state rebuild and disk save in the entire gesture.
+    // This is the only native command in the entire gesture.
     setPartMidiRules(final.partId, { keyLow: final.keyLow, keyHigh: final.keyHigh });
   }
 
   function cancelRangeDrag() {
     if (!drag) return;
-    const original = drag;
-    cancelPreviewFrame();
     drag = null;
     rangeDraft = null;
-    // A preview may already have reached the live MIDI filter; cancellation restores it
-    // without turning the cancelled gesture into a saved edit.
-    previewPartMidiRules(original.partId,
-      { keyLow: original.originalLow, keyHigh: original.originalHigh });
   }
-
-  onDestroy(() => {
-    if (drag)
-      previewPartMidiRules(drag.partId,
-        { keyLow: drag.originalLow, keyHigh: drag.originalHigh });
-    cancelPreviewFrame();
-  });
 
   const pct = (fraction) => `${(fraction * 100).toFixed(3)}%`;
   const partLabel = (part) => part.pluginName || (part.hardware ? part.midiOutputName || 'hardware' : 'empty');
@@ -288,7 +255,7 @@
     {:else}
       <button type="button" class="mode-back" data-testid="host-keyboard-play"
               title="Back to the playable keyboard (Esc). Drag the tabs on the rim to set the range, the strip between them to move it; click a band on the keys to edit another part."
-              onclick={() => showKeyboardPlay()}>Play</button>
+              onclick={() => { cancelRangeDrag(); showKeyboardPlay(); }}>Play</button>
       <span class="range-for" style={`--part-color:${rangeColor}`}>
         {rangePart && displayedRange ? `${partLabel(rangePart)} · ${noteName(displayedRange.keyLow)}–${noteName(displayedRange.keyHigh)}` : 'Key ranges'}
       </span>
@@ -369,7 +336,13 @@
   }
   .host-keyboard.range { border-color: #4a6a7a; }
 
-  .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 40px; }
+  /* Fixed geometry is essential here: note names change width while a range moves. Letting
+     that text size this column moved the keyboard under the pointer and made the whole row,
+     including the octave selector, visibly shake. */
+  .side {
+    display: flex; flex: 0 0 112px; width: 112px; min-width: 0;
+    flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
   .play-controls { display: flex; align-items: center; gap: 7px; }
   .octave-controls { display: flex; flex-direction: column; align-items: center; gap: 2px; justify-content: center; }
   .octave-label { color: #9aa5b1; font-size: 11px; min-width: 24px; text-align: center; }
@@ -401,7 +374,8 @@
   }
   .octave-amount select:hover, .octave-amount select:focus { border-color: #5b9bd5; }
   .range-for {
-    font-size: 11px; max-width: 110px; text-align: center; color: #d6dbe0;
+    box-sizing: border-box; width: 100%; max-width: 110px;
+    font-size: 11px; text-align: center; color: #d6dbe0;
     border-top: 3px solid var(--part-color, #4a6a7a); padding-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }

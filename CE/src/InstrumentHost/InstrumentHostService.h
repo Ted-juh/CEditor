@@ -47,8 +47,7 @@
 //     (browseScanPath opens the native directory picker through Options::pickDirectory and
 //      adds whatever the user chose; cancelling chooses nothing and changes nothing)
 //   addPart | removePart {partId} | movePart {partId,index} | focusPart {partId}
-//   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose,preview?}
-//     (preview applies to the live MIDI filter without saving or emitting a full state snapshot)
+//   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
 //   importScalaTuning {text,sourceName?} | resetMicrotuning
 //   setMicrotuning {enabled?,name?,rootMidiNote?,referenceMidiNote?,referenceFrequency?,
 //     mtsDeviceId?,mtsProgram?} | setPartMicrotuning {partId,enabled}
@@ -1065,6 +1064,9 @@ private:
     juce::var licencePayload();
 
     void savePerformance();
+    /** Persists Hostage-only metadata using the already-captured plug-in blobs. Use for
+        changes such as focus and MIDI zones that must never call into every VST. */
+    void savePerformanceModel();
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
         current file is copied into the revisions directory when the newest copy there is
         older than the snapshot interval, and the directory is pruned to a fixed count. A

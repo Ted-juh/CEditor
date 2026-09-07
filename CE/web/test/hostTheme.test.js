@@ -44,6 +44,12 @@ test('piano keys keep their authored white and black appearance', () => {
     'piano keys must not inherit the standard dark button palette');
 });
 
+test('changing range labels cannot resize the keyboard under the pointer', () => {
+  const keyboard = section('HostKeyboard.svelte');
+  assert.match(keyboard, /\.side \{[\s\S]*?flex: 0 0 112px; width: 112px;/);
+  assert.match(keyboard, /\.range-for \{[\s\S]*?width: 100%;/);
+});
+
 test('child panels no longer copy a private standard-control theme', () => {
   for (const name of [
     'InstrumentHostView.svelte', 'PerformancePanel.svelte', 'ProductPanel.svelte',

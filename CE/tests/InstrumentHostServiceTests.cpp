@@ -463,34 +463,29 @@ void testCommandFlow()
     check (h.lastDescriptionXml.contains ("Good Synth"),
            "the instantiator received the catalogue's description");
 
+    const auto capturesBeforeFocus = h.lastStub->stateCaptureCount;
+    h.cmd ("focusPart", { { "partId", partId }, { "followEditor", false } });
+    check (h.lastStub->stateCaptureCount == capturesBeforeFocus,
+           "metadata-only focus does not ask the VST to capture its state");
+
     h.cmd ("setPartMixer", { { "partId", partId }, { "mute", true } });
     const auto muted = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
     check ((bool) muted.getProperty ("mute", false)
              && juce::approximatelyEqual ((float) (double) muted.getProperty ("volume", 0.0), 1.0f),
            "setPartMixer touches only the fields it names");
 
+    const auto capturesBeforeRules = h.lastStub->stateCaptureCount;
     h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 59 } });
     const auto ruled = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
     check ((int) ruled.getProperty ("keyHigh", -1) == 59
              && (int) ruled.getProperty ("keyLow", -1) == 0,
            "setPartMidiRules keeps the fields it does not name");
-
-    const auto sessionFile = dir.getChildFile ("session-performance.json");
-    const auto persistedRules = sessionFile.loadFileAsString();
-    h.emits.clear();
-    h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 71 }, { "preview", true } });
-    check (h.emits.entries.empty(), "a MIDI-rule preview emits no full state snapshot");
-    check (sessionFile.loadFileAsString() == persistedRules,
-           "a MIDI-rule preview does not save the performance");
-
-    h.cmd ("getState");
-    const auto previewed = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
-    check ((int) previewed.getProperty ("keyHigh", -1) == 71,
-           "a MIDI-rule preview reaches the live rack model");
-
-    h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 71 } });
-    check (sessionFile.loadFileAsString() != persistedRules,
-           "the release command persists the previewed MIDI rules");
+    check (h.lastStub->stateCaptureCount == capturesBeforeRules,
+           "a MIDI-rule edit does not ask the VST to capture its state");
+    const auto savedRules = juce::JSON::parse (
+        dir.getChildFile ("session-performance.json").loadFileAsString());
+    check ((int) savedRules.getProperty ("parts", {})[0].getProperty ("keyHigh", -1) == 59,
+           "the metadata-only MIDI-rule edit is still persisted");
 
     h.emits.clear();
     h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "no-such-instrument" } });

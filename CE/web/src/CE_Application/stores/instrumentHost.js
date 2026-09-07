@@ -101,7 +101,9 @@ export const partColor = (index) =>
   ['#3d81c4', '#4aa88c', '#b4854a', '#9a6bbf', '#c46a6a', '#6a94c4'][((index % 6) + 6) % 6];
 export function showPartRange(partId) {
   hostKeyboardMode.set({ mode: 'range', partId: String(partId ?? '') });
-  if (partId) focusRackPart(partId);
+  // Range editing selects the part but must not replace/open a plug-in editor. A VST editor
+  // can block its message thread while opening, which has nothing to do with setting a split.
+  if (partId) focusRackPart(partId, { followEditor: false });
 }
 export function showKeyboardPlay() {
   hostKeyboardMode.set({ mode: 'play', partId: '' });
@@ -6155,13 +6157,11 @@ export const removeScanPath = (path) => send({ cmd: 'removeScanPath', path });
 export const clearQuarantine = (modulePath) => send({ cmd: 'clearQuarantine', modulePath });
 export const addRackPart = () => send({ cmd: 'addPart' });
 export const removeRackPart = (partId) => send({ cmd: 'removePart', partId });
-export const focusRackPart = (partId) => send({ cmd: 'focusPart', partId });
+export const focusRackPart = (partId, fields = {}) => send({ cmd: 'focusPart', partId, ...fields });
 export const moveRackPart = (partId, index) => send({ cmd: 'movePart', partId, index });
 export const loadInstrument = (partId, ceId) => send({ cmd: 'loadInstrument', partId, ceId });
 export const unloadInstrument = (partId) => send({ cmd: 'unloadInstrument', partId });
 export const setPartMixer = (partId, fields) => send({ cmd: 'setPartMixer', partId, ...fields });
-export const previewPartMidiRules = (partId, fields) =>
-  send({ cmd: 'setPartMidiRules', partId, ...fields, preview: true });
 export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRules', partId, ...fields });
 export const importScalaTuning = (text, sourceName = '') =>
   send({ cmd: 'importScalaTuning', text: String(text ?? ''), sourceName });

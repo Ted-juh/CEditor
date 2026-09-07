@@ -59,6 +59,7 @@ struct StubSynthProcessor : juce::AudioProcessor
 
     void getStateInformation (juce::MemoryBlock& dest) override
     {
+        ++stateCaptureCount;
         juce::MemoryOutputStream stream (dest, false);
         stream.writeInt (patch);
     }
@@ -107,6 +108,7 @@ struct StubSynthProcessor : juce::AudioProcessor
     juce::AudioParameterChoice* wave = nullptr;
     juce::AudioParameterBool* drive = nullptr;
     int patch = 0;
+    int stateCaptureCount = 0;
     static inline std::vector<std::pair<juce::String, float>> factoryPrograms;
     std::vector<std::pair<juce::String, float>> programs;
     int currentProgram = 0;

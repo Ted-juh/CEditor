@@ -826,11 +826,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         // pane when the newly focused part has nothing to show. An EFFECT editor stays put —
         // the focus model distinguishes focused part from focused processor (§18.7.8), and
         // yanking an effect editor away on part focus would fight the mixing workflow.
-        if (editorTargetId.isNotEmpty() && editorTargetId != partId
+        const auto followEditor = (bool) payload.getProperty ("followEditor", true);
+        if (followEditor && editorTargetId.isNotEmpty() && editorTargetId != partId
             && rack.getPerformance().findPart (editorTargetId) != nullptr)
             showEditorFor (partId);
 
-        savePerformance();
+        savePerformanceModel();
         emitState();
         return;
     }
@@ -971,7 +972,6 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "setPartMidiRules")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
-        const auto preview = (bool) payload.getProperty ("preview", false);
         const auto* part = rack.getPerformance().findPart (partId);
         if (part == nullptr)
         {
@@ -989,11 +989,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         rules.transpose    = (int) payload.getProperty ("transpose",    rules.transpose);
 
         rack.setMidiRules (partId, rules);
-        if (! preview)
-        {
-            savePerformance();
-            emitState();
-        }
+        // A zone edit changes Hostage metadata, not the sound inside any VST. Asking every
+        // plug-in for its opaque state here can block the UI for seconds (Spire included).
+        savePerformanceModel();
+        emitState();
         return;
     }
 
@@ -15052,6 +15051,15 @@ void InstrumentHostService::savePerformance()
 
     maybeSnapshotRevision();
     performanceFile().replaceWithText (juce::JSON::toString (rack.captureState().toVar()));
+}
+
+void InstrumentHostService::savePerformanceModel()
+{
+    if (! options.persistSession)
+        return;
+
+    maybeSnapshotRevision();
+    performanceFile().replaceWithText (juce::JSON::toString (rack.getPerformance().toVar()));
 }
 
 void InstrumentHostService::maybeSnapshotRevision()
