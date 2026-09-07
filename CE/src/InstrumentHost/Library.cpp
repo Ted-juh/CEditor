@@ -1,6 +1,9 @@
 #include "Library.h"
 
+#include <algorithm>
 #include <cstring>
+#include <map>
+#include <utility>
 
 namespace ceditor::host
 {
@@ -34,6 +37,35 @@ bool Library::removeRecord (const juce::String& recordId)
         if (records.getReference (i).recordId == recordId)
         {
             records.remove (i);
+            return true;
+        }
+    return false;
+}
+
+juce::String Library::putSmartCollection (SmartCollection collection)
+{
+    if (collection.collectionId.isEmpty())
+        collection.collectionId = juce::Uuid().toDashedString();
+
+    for (auto& existing : smartCollections)
+        if (existing.collectionId == collection.collectionId)
+        {
+            const auto id = collection.collectionId;
+            existing = std::move (collection);
+            return id;
+        }
+
+    const auto id = collection.collectionId;
+    smartCollections.add (std::move (collection));
+    return id;
+}
+
+bool Library::removeSmartCollection (const juce::String& collectionId)
+{
+    for (int i = 0; i < smartCollections.size(); ++i)
+        if (smartCollections.getReference (i).collectionId == collectionId)
+        {
+            smartCollections.remove (i);
             return true;
         }
     return false;
@@ -173,14 +205,37 @@ juce::var Library::toVar() const
         recordVars.add (juce::var (r));
     }
 
+    juce::Array<juce::var> collectionVars;
+    for (const auto& collection : smartCollections)
+    {
+        auto* c = new juce::DynamicObject();
+        c->setProperty ("collectionId", collection.collectionId);
+        c->setProperty ("name",         collection.name);
+        c->setProperty ("query",        libraryQueryToVar (collection.query));
+        collectionVars.add (juce::var (c));
+    }
+
     auto* root = new juce::DynamicObject();
     root->setProperty ("records", recordVars);
+    root->setProperty ("smartCollections", collectionVars);
     return juce::var (root);
 }
 
 Library Library::fromVar (const juce::var& stored)
 {
     Library library;
+
+    if (const auto* collections = stored.getProperty ("smartCollections", {}).getArray())
+        for (const auto& c : *collections)
+        {
+            SmartCollection collection;
+            collection.collectionId = c.getProperty ("collectionId", {}).toString();
+            collection.name         = c.getProperty ("name", {}).toString();
+            collection.query        = libraryQueryFromVar (c.getProperty ("query", {}));
+            if (collection.collectionId.isNotEmpty())
+                library.smartCollections.add (std::move (collection));
+        }
+
     const auto* array = stored.getProperty ("records", {}).getArray();
     if (array == nullptr)
         return library;
@@ -264,6 +319,278 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
     }
 
     return out;
+}
+
+bool LibraryFacetSelection::admits (const juce::StringArray& values) const
+{
+    for (const auto& value : values)
+        if (exclude.contains (value, true))
+            return false;
+
+    if (include.isEmpty())
+        return true;
+
+    for (const auto& value : values)
+        if (include.contains (value, true))
+            return true;
+
+    return false;
+}
+
+namespace
+{
+
+/** The record's values for one facet. A record has exactly one category, instrument,
+    manufacturer, source type and record type, and any number of tags — so the facet test is
+    written once against an array and the single-valued facets pass an array of one. */
+juce::StringArray facetValues (const LibraryRecord& record, const juce::String& facet)
+{
+    juce::StringArray values;
+    if (facet == "tags")               values = record.user.tags;
+    else if (facet == "categories")    values.add (record.category);
+    else if (facet == "instruments")   values.add (record.instrument);
+    else if (facet == "manufacturers") values.add (record.manufacturer);
+    else if (facet == "sources")       values.add (record.sourceType);
+    else if (facet == "types")         values.add (record.type);
+
+    values.removeEmptyStrings();
+    values.removeDuplicates (true);
+    return values;
+}
+
+bool matchesText (const LibraryRecord& record, const juce::String& lowered)
+{
+    if (lowered.isEmpty())
+        return true;
+
+    if (record.name.toLowerCase().contains (lowered)
+        || record.instrument.toLowerCase().contains (lowered)
+        || record.manufacturer.toLowerCase().contains (lowered)
+        || record.category.toLowerCase().contains (lowered))
+        return true;
+
+    for (const auto& tag : record.user.tags)
+        if (tag.toLowerCase().contains (lowered))
+            return true;
+
+    return false;
+}
+
+/** One record against one query. */
+bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
+                   const juce::String& lowered, const LibraryAvailability& isAvailable)
+{
+    if (query.type.isNotEmpty() && record.type != query.type)
+        return false;
+
+    if (query.favouritesOnly && ! record.user.favourite)
+        return false;
+
+    if (query.minRating > 0 && record.user.rating < query.minRating)
+        return false;
+
+    if (query.collection.isNotEmpty() && ! record.user.collections.contains (query.collection, true))
+        return false;
+
+    if (query.availableOnly)
+    {
+        const auto available = isAvailable ? isAvailable (record) : ! record.missing;
+        if (! available)
+            return false;
+    }
+
+    const std::pair<const char*, const LibraryFacetSelection*> facets[] {
+        { "categories",    &query.categories },
+        { "tags",          &query.tags },
+        { "instruments",   &query.instruments },
+        { "manufacturers", &query.manufacturers },
+        { "sources",       &query.sources },
+    };
+
+    for (const auto& [name, selection] : facets)
+        if (! selection->admits (facetValues (record, name)))
+            return false;
+
+    return matchesText (record, lowered);
+}
+
+/** The facet's own selection inside a query, so a pass can lift it. The type facet is the odd
+    one out — its selection is the query's own `type` field rather than a facet — and returns
+    null, which the caller reads as "clear the type instead". */
+LibraryFacetSelection* selectionFor (LibraryQuery& query, const juce::String& facet)
+{
+    if (facet == "categories")    return &query.categories;
+    if (facet == "tags")          return &query.tags;
+    if (facet == "instruments")   return &query.instruments;
+    if (facet == "manufacturers") return &query.manufacturers;
+    if (facet == "sources")       return &query.sources;
+    return nullptr;
+}
+
+void tally (juce::Array<LibraryFacetValue>& into, const Library& library,
+            const LibraryQuery& query, const juce::String& lowered,
+            const LibraryAvailability& isAvailable, const juce::String& facet,
+            const LibraryFacetSelection& selection)
+{
+    // The base pass lifts this facet's KEEP list and leaves its refusals in force, because
+    // clicking an unchosen chip adds it to the OR group and changes nothing else. A count
+    // taken this way is exactly what that click would give you.
+    auto base = query;
+    if (auto* own = selectionFor (base, facet))
+        own->include.clear();
+    else
+        base.type = {};
+
+    std::map<juce::String, int> counts;
+    for (const auto& value : selection.include)
+        counts[value];
+
+    for (const auto& record : library.allRecords())
+        if (matchesQuery (record, base, lowered, isAvailable))
+            for (const auto& value : facetValues (record, facet))
+                ++counts[value];
+
+    // A refused value counts nothing in that pass, by construction — and zero is not what its
+    // chip offers. The click a refused chip offers is "take the refusal off", so its number is
+    // what THAT would give you, and it gets a pass of its own. There are only ever a handful.
+    for (const auto& refused : selection.exclude)
+    {
+        auto lifted = base;
+        if (auto* own = selectionFor (lifted, facet))
+            own->exclude.removeString (refused);
+
+        int count = 0;
+        for (const auto& record : library.allRecords())
+            if (matchesQuery (record, lifted, lowered, isAvailable)
+                && facetValues (record, facet).contains (refused, true))
+                ++count;
+
+        counts[refused] = count;
+    }
+
+    for (const auto& [value, count] : counts)
+        into.add ({ value, count, selection.include.contains (value, true),
+                    selection.exclude.contains (value, true) });
+
+    // Most first, then alphabetically, so the list is stable while you type.
+    std::stable_sort (into.begin(), into.end(),
+                      [] (const LibraryFacetValue& a, const LibraryFacetValue& b)
+                      {
+                          if (a.count != b.count) return a.count > b.count;
+                          return a.value.compareIgnoreCase (b.value) < 0;
+                      });
+}
+
+juce::var selectionToVar (const LibraryFacetSelection& selection)
+{
+    auto toArray = [] (const juce::StringArray& values)
+    {
+        juce::Array<juce::var> out;
+        for (const auto& value : values) out.add (value);
+        return out;
+    };
+
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("include", toArray (selection.include));
+    o->setProperty ("exclude", toArray (selection.exclude));
+    return juce::var (o);
+}
+
+LibraryFacetSelection selectionFromVar (const juce::var& stored)
+{
+    LibraryFacetSelection selection;
+    auto read = [&stored] (const char* key, juce::StringArray& into)
+    {
+        if (const auto* array = stored.getProperty (key, {}).getArray())
+            for (const auto& value : *array)
+            {
+                const auto text = value.toString();
+                if (text.isNotEmpty())
+                    into.addIfNotAlreadyThere (text);
+            }
+    };
+    read ("include", selection.include);
+    read ("exclude", selection.exclude);
+    return selection;
+}
+
+} // namespace
+
+juce::Array<const LibraryRecord*> searchLibrary (const Library& library, const LibraryQuery& query,
+                                                 const LibraryAvailability& isAvailable)
+{
+    const auto lowered = query.text.trim().toLowerCase();
+    juce::Array<const LibraryRecord*> out;
+
+    for (const auto& record : library.allRecords())
+        if (matchesQuery (record, query, lowered, isAvailable))
+            out.add (&record);
+
+    return out;
+}
+
+LibraryFacets libraryFacets (const Library& library, const LibraryQuery& query,
+                             const LibraryAvailability& isAvailable)
+{
+    const auto lowered = query.text.trim().toLowerCase();
+    LibraryFacets facets;
+
+    // The type facet's selection is the query's own `type` field; tally() knows to lift that
+    // one rather than a facet, so it only needs telling what is currently chosen.
+    LibraryFacetSelection typeSelection;
+    if (query.type.isNotEmpty())
+        typeSelection.include.add (query.type);
+    tally (facets.types, library, query, lowered, isAvailable, "types", typeSelection);
+
+    tally (facets.categories,    library, query, lowered, isAvailable, "categories",    query.categories);
+    tally (facets.tags,          library, query, lowered, isAvailable, "tags",          query.tags);
+    tally (facets.instruments,   library, query, lowered, isAvailable, "instruments",   query.instruments);
+    tally (facets.manufacturers, library, query, lowered, isAvailable, "manufacturers", query.manufacturers);
+    tally (facets.sources,       library, query, lowered, isAvailable, "sources",       query.sources);
+    return facets;
+}
+
+juce::var libraryQueryToVar (const LibraryQuery& query)
+{
+    auto* facets = new juce::DynamicObject();
+    facets->setProperty ("categories",    selectionToVar (query.categories));
+    facets->setProperty ("tags",          selectionToVar (query.tags));
+    facets->setProperty ("instruments",   selectionToVar (query.instruments));
+    facets->setProperty ("manufacturers", selectionToVar (query.manufacturers));
+    facets->setProperty ("sources",       selectionToVar (query.sources));
+
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("text",           query.text);
+    o->setProperty ("type",           query.type);
+    o->setProperty ("collection",     query.collection);
+    o->setProperty ("favouritesOnly", query.favouritesOnly);
+    o->setProperty ("minRating",      query.minRating);
+    o->setProperty ("availableOnly",  query.availableOnly);
+    o->setProperty ("facets",         juce::var (facets));
+    return juce::var (o);
+}
+
+LibraryQuery libraryQueryFromVar (const juce::var& stored)
+{
+    LibraryQuery query;
+
+    // `query` is what the command surface has always called the text box, and the WebView still
+    // sends it; `text` is what this structure calls it. Reading both means the older payload and
+    // a saved collection are the same shape to everything downstream.
+    query.text = stored.getProperty ("text", stored.getProperty ("query", {})).toString();
+    query.type = stored.getProperty ("type", {}).toString();
+    query.collection = stored.getProperty ("collection", {}).toString();
+    query.favouritesOnly = (bool) stored.getProperty ("favouritesOnly", false);
+    query.minRating = juce::jlimit (0, 5, (int) stored.getProperty ("minRating", 0));
+    query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
+
+    const auto facets = stored.getProperty ("facets", {});
+    query.categories    = selectionFromVar (facets.getProperty ("categories", {}));
+    query.tags          = selectionFromVar (facets.getProperty ("tags", {}));
+    query.instruments   = selectionFromVar (facets.getProperty ("instruments", {}));
+    query.manufacturers = selectionFromVar (facets.getProperty ("manufacturers", {}));
+    query.sources       = selectionFromVar (facets.getProperty ("sources", {}));
+    return query;
 }
 
 VstPresetHeader parseVstPresetHeader (const void* data, size_t size)

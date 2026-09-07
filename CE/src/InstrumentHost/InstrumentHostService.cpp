@@ -1,4 +1,5 @@
 #include "InstrumentHostService.h"
+
 #include "PatchDiff.h"
 #include "EditorSnapshot.h"
 #include "LiveWorkerDiagnostics.h"
@@ -11,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <map>
 #include <set>
 #include <utility>
 
@@ -5460,8 +5462,47 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "getLibrary")
     {
         ensureLibrary();
-        emitLibrary (payload.getProperty ("query", {}).toString(),
-                     payload.getProperty ("type", {}).toString());
+        libraryView = libraryQueryFromVar (payload);
+        emitLibrary (libraryView);
+        return;
+    }
+
+    if (cmd == "saveSmartCollection")
+    {
+        ensureLibrary();
+        SmartCollection collection;
+        collection.collectionId = payload.getProperty ("collectionId", {}).toString();
+        collection.name = payload.getProperty ("name", {}).toString().trim();
+        if (collection.name.isEmpty())
+        {
+            emitError ("A collection needs a name.");
+            return;
+        }
+
+        // No query in the payload means "save what I am looking at", which is the gesture the
+        // browser actually offers — you filter until the results are right, then name them.
+        collection.query = payload.getDynamicObject() != nullptr
+                             && payload.getDynamicObject()->hasProperty ("query")
+                               ? libraryQueryFromVar (payload["query"])
+                               : libraryView;
+
+        library.putSmartCollection (std::move (collection));
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+        return;
+    }
+
+    if (cmd == "removeSmartCollection")
+    {
+        ensureLibrary();
+        if (! library.removeSmartCollection (payload.getProperty ("collectionId", {}).toString()))
+        {
+            emitError ("Unknown collection.");
+            return;
+        }
+
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5470,7 +5511,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         ensureLibrary();
         scanVstPresets();
         library.saveTo (libraryFile());
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5494,7 +5535,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                                              for (const auto& p : libraryPaths) a.add (p);
                                              return a; }());
         libraryPathsFile().replaceWithText (juce::JSON::toString (juce::var (root)));
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5586,7 +5627,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             savePerformance();
             emitState();
         }
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5630,7 +5671,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         library.addCapturedRecord (std::move (record));
         library.saveTo (libraryFile());
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5649,7 +5690,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         library.addCapturedRecord (std::move (record));
         library.saveTo (libraryFile());
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5689,7 +5730,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         library.setUserMetadata (record->recordId, user);
         library.saveTo (libraryFile());
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -5712,7 +5753,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         library.removeRecord (record->recordId);
         library.saveTo (libraryFile());
-        emitLibrary ({}, {});
+        emitLibrary (libraryView);
         return;
     }
 
@@ -8371,12 +8412,21 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
     return {};
 }
 
-void InstrumentHostService::emitLibrary (const juce::String& query, const juce::String& type)
+LibraryAvailability InstrumentHostService::libraryAvailability() const
 {
+    return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
+}
+
+void InstrumentHostService::emitLibrary (const LibraryQuery& query)
+{
+    if (options.emit == nullptr)
+        return;
+
+    const auto isAvailable = libraryAvailability();
     juce::Array<juce::var> recordVars;
     int presets = 0, racks = 0, chains = 0, missing = 0;
 
-    for (const auto* record : searchLibrary (library, query, type))
+    for (const auto* record : searchLibrary (library, query, isAvailable))
     {
         const auto reason = recordUnavailableReason (*record);
 
@@ -8399,6 +8449,9 @@ void InstrumentHostService::emitLibrary (const juce::String& query, const juce::
         r->setProperty ("tags",         [record] { juce::Array<juce::var> a;
                                                    for (const auto& t : record->user.tags) a.add (t);
                                                    return a; }());
+        r->setProperty ("collections",  [record] { juce::Array<juce::var> a;
+                                                   for (const auto& c : record->user.collections) a.add (c);
+                                                   return a; }());
         recordVars.add (juce::var (r));
     }
 
@@ -8416,17 +8469,80 @@ void InstrumentHostService::emitLibrary (const juce::String& query, const juce::
     counts->setProperty ("racks",   racks);
     counts->setProperty ("chains",  chains);
     counts->setProperty ("missing", missing);
+    counts->setProperty ("matched", recordVars.size());
+
+    // Every facet, with its own selection lifted while counting — see Library.h. The browser
+    // draws these as chips and never invents a value the library does not hold.
+    const auto facets = libraryFacets (library, query, isAvailable);
+    auto facetArray = [] (const juce::Array<LibraryFacetValue>& values)
+    {
+        juce::Array<juce::var> out;
+        for (const auto& value : values)
+        {
+            auto* v = new juce::DynamicObject();
+            v->setProperty ("value",    value.value);
+            v->setProperty ("count",    value.count);
+            v->setProperty ("selected", value.selected);
+            v->setProperty ("excluded", value.excluded);
+            out.add (juce::var (v));
+        }
+        return out;
+    };
+
+    auto* facetVar = new juce::DynamicObject();
+    facetVar->setProperty ("types",         facetArray (facets.types));
+    facetVar->setProperty ("categories",    facetArray (facets.categories));
+    facetVar->setProperty ("tags",          facetArray (facets.tags));
+    facetVar->setProperty ("instruments",   facetArray (facets.instruments));
+    facetVar->setProperty ("manufacturers", facetArray (facets.manufacturers));
+    facetVar->setProperty ("sources",       facetArray (facets.sources));
+
+    // A saved query carries its own count, because a rail entry that cannot say how many is a
+    // rail entry nobody clicks. It is the same search, run again — the point of a smart
+    // collection is that it is never stale.
+    juce::Array<juce::var> collectionVars;
+    for (const auto& collection : library.allSmartCollections())
+    {
+        auto* c = new juce::DynamicObject();
+        c->setProperty ("collectionId", collection.collectionId);
+        c->setProperty ("name",         collection.name);
+        c->setProperty ("query",        libraryQueryToVar (collection.query));
+        c->setProperty ("count",        searchLibrary (library, collection.query, isAvailable).size());
+        collectionVars.add (juce::var (c));
+    }
+
+    // The static collections a record can name are the other half of the rail, and they are
+    // gathered from the records rather than declared anywhere.
+    std::map<juce::String, int> statics;
+    for (const auto& record : library.allRecords())
+        for (const auto& name : record.user.collections)
+            if (name.isNotEmpty())
+                ++statics[name];
+
+    juce::Array<juce::var> staticVars;
+    for (const auto& [name, count] : statics)
+    {
+        auto* c = new juce::DynamicObject();
+        c->setProperty ("name",  name);
+        c->setProperty ("count", count);
+        staticVars.add (juce::var (c));
+    }
 
     auto* root = new juce::DynamicObject();
     root->setProperty ("records", recordVars);
-    root->setProperty ("query",   query);
-    root->setProperty ("type",    type);
+    // `query` and `type` stay the flat strings the command surface has always echoed; `request`
+    // is the whole query, so a page can restore its chips from the answer alone.
+    root->setProperty ("query",   query.text);
+    root->setProperty ("type",    query.type);
+    root->setProperty ("request", libraryQueryToVar (query));
     root->setProperty ("counts",  juce::var (counts));
+    root->setProperty ("facets",  juce::var (facetVar));
+    root->setProperty ("smartCollections", collectionVars);
+    root->setProperty ("collections", staticVars);
     root->setProperty ("paths",   [this] { juce::Array<juce::var> a;
                                            for (const auto& p : libraryPaths) a.add (p);
                                            return a; }());
-    if (options.emit != nullptr)
-        options.emit ("instrumentHostLibrary", juce::var (root));
+    options.emit ("instrumentHostLibrary", juce::var (root));
 }
 
 void InstrumentHostService::scanVstPresets()

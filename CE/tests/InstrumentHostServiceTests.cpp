@@ -1582,6 +1582,192 @@ void testTwinPresetsKeepTheirOwnRecords()
            "while the missing twin stays itself");
 }
 
+// Browsing: the facets, the refusals, and the counts that have to predict the click.
+//
+// This is the half of the browser that the product this succeeds got right and stopped at — it
+// could say "pads" and never "pads, but nothing distorted" — plus the two things that make a
+// faceted browser trustworthy rather than merely present: a chip's count says what clicking it
+// would give you, and a chip you have already used never disappears from the list.
+void testLibraryBrowsing()
+{
+    std::cout << "\nfacets, exclusion and counts that predict the click" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::SmartCollection;
+    using ceditor::host::searchLibrary;
+    using ceditor::host::libraryFacets;
+
+    const auto make = [] (const juce::String& name, const juce::String& instrument,
+                          const juce::String& category, const juce::StringArray& tags,
+                          int rating = 0, bool favourite = false)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "vstpreset";
+        record.sourceLocator = "/presets/" + name + ".vstpreset";
+        record.fingerprint = name;
+        record.manufacturer = "Mock Audio";
+        record.name = name;
+        record.instrument = instrument;
+        record.category = category;
+        record.user.tags = tags;
+        record.user.rating = rating;
+        record.user.favourite = favourite;
+        return record;
+    };
+
+    Library library;
+    juce::Array<LibraryRecord> seeded {
+        make ("Wool Pad",        "Stage Keys", "Pad",  { "warm", "wide" },       5, true),
+        make ("Glass Cathedral", "Stage Keys", "Pad",  { "warm", "glassy" },     4),
+        make ("Rust Pad",        "Analog One", "Pad",  { "distorted", "wide" },  3),
+        make ("Rubber Bass",     "Analog One", "Bass", { "warm" },               4, true),
+        make ("Lost Lead",       "Gone Synth", "Lead", { "bright" },             2),
+    };
+    library.mergeVendorScan ("vstpreset", seeded);
+
+    // One file then disappears, the way §18.6.5 says it must: the record and its rating stay,
+    // marked missing, so `availableOnly` has something real to refuse.
+    seeded.remove (4);
+    library.mergeVendorScan ("vstpreset", seeded);
+
+    const auto names = [] (const juce::Array<const LibraryRecord*>& found)
+    {
+        juce::StringArray out;
+        for (const auto* record : found) out.add (record->name);
+        out.sort (true);
+        return out.joinIntoString (", ");
+    };
+
+    // A facet with several values is an OR — picking Pad and Bass means either.
+    LibraryQuery query;
+    query.categories.include.add ("Pad");
+    check (names (searchLibrary (library, query)) == "Glass Cathedral, Rust Pad, Wool Pad",
+           "an included facet value keeps only records carrying it");
+    query.categories.include.add ("Bass");
+    check (names (searchLibrary (library, query)) == "Glass Cathedral, Rubber Bass, Rust Pad, Wool Pad",
+           "and a second value in the same facet widens it, because chips OR");
+
+    // The search VIP could not run.
+    query = {};
+    query.categories.include.add ("Pad");
+    query.tags.exclude.add ("distorted");
+    check (names (searchLibrary (library, query)) == "Glass Cathedral, Wool Pad",
+           "an excluded value refuses the record whatever else matched — pads, but nothing distorted");
+
+    // Between facets it is an AND, and exclusion beats inclusion on the same record.
+    query = {};
+    query.categories.include.add ("Pad");
+    query.instruments.include.add ("Analog One");
+    check (names (searchLibrary (library, query)) == "Rust Pad", "facets AND each other");
+    query.tags.include.add ("wide");
+    query.tags.exclude.add ("distorted");
+    check (searchLibrary (library, query).isEmpty(),
+           "and a record that is both included and excluded is refused: no is louder than yes");
+
+    // The rest of the query surface.
+    query = {};
+    query.favouritesOnly = true;
+    check (names (searchLibrary (library, query)) == "Rubber Bass, Wool Pad", "favourites only");
+    query = {};
+    query.minRating = 4;
+    check (names (searchLibrary (library, query)) == "Glass Cathedral, Rubber Bass, Wool Pad",
+           "a rating floor keeps the unrated out");
+    query = {};
+    query.availableOnly = true;
+    check (! names (searchLibrary (library, query)).contains ("Lost Lead"),
+           "availableOnly drops the record whose source vanished");
+    check (names (searchLibrary (library, query, [] (const LibraryRecord& r)
+                                                 { return r.instrument != "Stage Keys"; }))
+             == "Lost Lead, Rubber Bass, Rust Pad",
+           "and a supplied hook is the WHOLE answer, missing flag included — only the service "
+           "knows whether a plug-in is installed, and its own answer is the stricter one");
+    query = {};
+    query.text = "PAD";
+    check (names (searchLibrary (library, query)) == "Glass Cathedral, Rust Pad, Wool Pad",
+           "text still searches name, instrument, manufacturer, category and tags, case-blind "
+           "— Glass Cathedral is in because its CATEGORY is Pad");
+
+    const auto facetCount = [] (const juce::Array<ceditor::host::LibraryFacetValue>& values,
+                                const juce::String& value)
+    {
+        for (const auto& v : values) if (v.value == value) return v.count;
+        return -1;
+    };
+
+    // THE RULE THAT MAKES COUNTS USEFUL. With Pad chosen, the Bass chip must still say 1 — what
+    // you would have if you clicked it — rather than 0, which is only "you already filtered".
+    query = {};
+    query.categories.include.add ("Pad");
+    auto facets = libraryFacets (library, query);
+    check (facetCount (facets.categories, "Bass") == 1,
+           "a facet's own selection is lifted while counting, so an unpicked chip predicts the click");
+    check (facetCount (facets.categories, "Pad") == 3, "and the picked chip counts its own records");
+    check (facetCount (facets.instruments, "Stage Keys") == 2,
+           "while every OTHER facet is counted inside the current result");
+    check (facetCount (facets.instruments, "Gone Synth") == -1,
+           "a value nothing in the result carries is simply absent");
+
+    // Counts are ordered most-first, and a chip you used is never dropped.
+    check (facets.categories.getFirst().value == "Pad" && facets.categories.getFirst().count == 3,
+           "facet values come back most-first");
+    // A refused chip stays in the list — a chip you cannot see is a filter you cannot take off
+    // — and its number is what TAKING THE REFUSAL OFF would give you, because that is the click
+    // it offers. Zero would be true of every refused chip and would say nothing.
+    query = {};
+    query.tags.exclude.add ("warm");
+    facets = libraryFacets (library, query);
+    bool warmDrawn = false;
+    for (const auto& v : facets.tags)
+        if (v.value == "warm")
+            warmDrawn = v.excluded && v.count == 3;
+    check (warmDrawn, "a refused chip stays in the list, saying how many clearing it brings back");
+
+    // The mixed case: one facet holding a keep AND a refusal. Each count is still exactly what
+    // its own click does — the kept chip counts what the refusal still allows, the refused one
+    // counts what clearing it restores.
+    query.tags.include.add ("wide");
+    facets = libraryFacets (library, query);
+    check (facetCount (facets.tags, "wide") == 1,
+           "a kept chip counts what this facet's refusals still allow");
+    check (facetCount (facets.tags, "warm") == 3,
+           "while the refused chip beside it reports what clearing it would restore");
+
+    // Saved queries: stored by id, replaced by id, and they survive the file.
+    SmartCollection collection;
+    collection.name = "Warm pads, nothing harsh";
+    collection.query.categories.include.add ("Pad");
+    collection.query.tags.exclude.add ("distorted");
+    const auto id = library.putSmartCollection (collection);
+    check (id.isNotEmpty() && library.allSmartCollections().size() == 1, "a saved query is minted an id");
+    collection.collectionId = id;
+    collection.name = "Renamed";
+    library.putSmartCollection (collection);
+    check (library.allSmartCollections().size() == 1
+             && library.allSmartCollections().getFirst().name == "Renamed",
+           "and putting it again by id replaces rather than duplicates");
+
+    const auto reloaded = Library::fromVar (library.toVar());
+    check (reloaded.allSmartCollections().size() == 1
+             && reloaded.allSmartCollections().getFirst().collectionId == id
+             && reloaded.allSmartCollections().getFirst().query.tags.exclude.contains ("distorted"),
+           "saved queries round-trip through the library file, exclusions included");
+    check (names (searchLibrary (reloaded, reloaded.allSmartCollections().getFirst().query))
+             == "Glass Cathedral, Wool Pad",
+           "and the reloaded query still finds what it found before");
+
+    // The older {query,type} payload and the full query are the same shape to everything
+    // downstream, which is what lets the WebView migrate one screen at a time.
+    auto* legacy = new juce::DynamicObject();
+    legacy->setProperty ("query", "pad");
+    legacy->setProperty ("type", "preset");
+    const auto parsed = ceditor::host::libraryQueryFromVar (juce::var (legacy));
+    check (parsed.text == "pad" && parsed.type == "preset",
+           "the flat {query,type} payload reads as a LibraryQuery");
+}
+
 // The first click an empty rack sees is Load on an instrument, and the on-screen keyboard is
 // how a rack gets auditioned without hardware. Both found by the owner actually using the
 // program: Load silently required a part nobody had been told to add, and there was no way to
@@ -6895,6 +7081,83 @@ void testLibrary()
         h.cmd ("getLibrary", { { "type", "rack" } });
         check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 0,
                "and the type filter holds after the rack record's removal");
+
+        // -- what the browser asks for, over the wire ------------------------------------
+        //
+        // The facets, the exclusions and the saved queries reach the page as one answer. The
+        // pure half is proved in testLibraryBrowsing(); this is the payload shape the WebView
+        // renders, and the one thing only the service can settle: the view is REMEMBERED, so a
+        // mutation does not silently drop you back to the whole library while the chips on
+        // screen still claim to be filtering.
+
+        const auto facetValues = [] (const juce::var& answer, const char* facet)
+        {
+            juce::StringArray out;
+            if (const auto* array = answer.getProperty ("facets", {})
+                                          .getProperty (facet, {}).getArray())
+                for (const auto& v : *array)
+                    out.add (v.getProperty ("value", {}).toString() + "="
+                               + v.getProperty ("count", {}).toString());
+            return out;
+        };
+
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        const auto all = h.emits.entries.back().payload;
+        check (facetValues (all, "sources").contains ("userState=1")
+                 && facetValues (all, "sources").contains ("vstpreset=2"),
+               "the answer carries a facet per field, counted");
+        check (all.getProperty ("counts", {}).getProperty ("matched", 0).equals (3),
+               "and says how many the query matched, beside how many exist");
+
+        // Exclusion over the wire: the search the product this succeeds could not run.
+        auto* facets = new juce::DynamicObject();
+        auto* sources = new juce::DynamicObject();
+        sources->setProperty ("exclude", juce::Array<juce::var> { "userState" });
+        facets->setProperty ("sources", juce::var (sources));
+        h.emits.clear();
+        h.cmd ("getLibrary", { { "facets", juce::var (facets) } });
+        const auto withoutCaptures = h.emits.entries.back().payload;
+        check (withoutCaptures.getProperty ("records", {}).size() == 2,
+               "an excluded facet value refuses those records over the wire");
+        bool drawnAtZero = false;
+        for (const auto& v : *withoutCaptures.getProperty ("facets", {})
+                                 .getProperty ("sources", {}).getArray())
+            if (v.getProperty ("value", {}).toString() == "userState")
+                drawnAtZero = (bool) v.getProperty ("excluded", false);
+        check (drawnAtZero, "and the refused chip comes back marked, so it can be taken off again");
+
+        // The remembered view. A favourite is set while the exclusion is on; the answer that
+        // comes back unasked is still the filtered one.
+        juce::String someId;
+        for (const auto& r : *withoutCaptures.getProperty ("records", {}).getArray())
+            someId = r.getProperty ("recordId", {}).toString();
+        h.emits.clear();
+        h.cmd ("setLibraryUserMetadata", { { "recordId", someId }, { "favourite", true } });
+        check (h.emits.entries.back().payload.getProperty ("records", {}).size() == 2,
+               "a mutation re-emits the view you were looking at, not the whole library");
+
+        // Saving the view as a collection, which is the gesture: filter, then name it.
+        h.emits.clear();
+        h.cmd ("saveSmartCollection", { { "name", "Vendor only" } });
+        const auto saved = h.emits.entries.back().payload
+                              .getProperty ("smartCollections", {});
+        check (saved.size() == 1 && saved[0].getProperty ("name", {}).toString() == "Vendor only"
+                 && saved[0].getProperty ("count", {}).equals (2),
+               "an unnamed query saves what you are looking at, and reports its own count");
+        const auto collectionId = saved[0].getProperty ("collectionId", {}).toString();
+
+        h.emits.clear();
+        h.cmd ("saveSmartCollection");
+        check (h.emits.lastError().contains ("needs a name"), "a nameless collection refuses");
+        h.emits.clear();
+        h.cmd ("removeSmartCollection", { { "collectionId", "nope" } });
+        check (h.emits.lastError().contains ("Unknown collection"), "and an unknown id refuses");
+
+        h.emits.clear();
+        h.cmd ("removeSmartCollection", { { "collectionId", collectionId } });
+        check (h.emits.entries.back().payload.getProperty ("smartCollections", {}).size() == 0,
+               "removing one answers with the rail it left behind");
     }
 }
 
@@ -8533,6 +8796,7 @@ int main (int argc, char* argv[])
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
     testLibrary();
+    testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();
     testScanFolderBrowseAndModuleProjection();

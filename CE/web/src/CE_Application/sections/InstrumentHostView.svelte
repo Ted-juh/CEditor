@@ -70,6 +70,7 @@
   import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
   import Unplug from 'lucide-svelte/icons/unplug';
   import Trash2 from 'lucide-svelte/icons/trash-2';
+  import SoundBrowser from './SoundBrowser.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
@@ -119,6 +120,7 @@
   ];
   const hostUtilities = [
     { id: 'library', label: 'Library' },
+    { id: 'sounds', label: 'Sounds' },
     { id: 'devices', label: 'Audio & MIDI' },
     { id: 'project', label: 'Project' },
     { id: 'product', label: 'Product' },
@@ -729,6 +731,10 @@
 
   {#if activeUtility === 'licence'}
     <LicencePanel />
+  {/if}
+
+  {#if activeUtility === 'sounds'}
+    <SoundBrowser />
   {/if}
 
   {#if activeUtility === 'library'}

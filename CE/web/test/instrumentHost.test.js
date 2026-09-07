@@ -40,6 +40,15 @@ import {
   clearControlSlot,
   setControlSlotValue,
   normalizeHostLibrary,
+  emptyLibraryQuery,
+  normalizeLibraryQuery,
+  libraryQueryIsEmpty,
+  cycleLibraryFacet,
+  matchesLibraryQuery,
+  computeLibraryFacets,
+  saveSmartCollection,
+  removeSmartCollection,
+  setMockSmartCollections,
   hostLibrary,
   requestLibrary,
   saveUserPreset,
@@ -579,6 +588,143 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
   removeLibraryRecord('lib-1');
   assert.equal(get(hostLibrary).records.some((r) => r.recordId === 'lib-1'), true,
     'factory records refuse removal in the mock too');
+});
+
+test('a facet chip cycles off → keep → refuse, and alt-click goes straight to refuse', () => {
+  let query = emptyLibraryQuery();
+  assert.equal(libraryQueryIsEmpty(query), true);
+
+  query = cycleLibraryFacet(query, 'tags', 'warm');
+  assert.deepEqual(query.facets.tags, { include: ['warm'], exclude: [] });
+  assert.equal(libraryQueryIsEmpty(query), false);
+
+  query = cycleLibraryFacet(query, 'tags', 'warm');
+  assert.deepEqual(query.facets.tags, { include: [], exclude: ['warm'] },
+    'a second click refuses what the first kept');
+
+  query = cycleLibraryFacet(query, 'tags', 'warm');
+  assert.equal(libraryQueryIsEmpty(query), true, 'and a third clears it');
+
+  const straight = cycleLibraryFacet(emptyLibraryQuery(), 'tags', 'warm', true);
+  assert.deepEqual(straight.facets.tags.exclude, ['warm'], 'alt-click refuses in one gesture');
+  assert.deepEqual(cycleLibraryFacet(straight, 'tags', 'warm', true).facets.tags.exclude, [],
+    'and alt-clicking a refused chip clears it rather than refusing it twice');
+});
+
+test('the query reads the older {query,type} payload as well as its own shape', () => {
+  const legacy = normalizeLibraryQuery({ query: 'pad', type: 'preset' });
+  assert.equal(legacy.text, 'pad');
+  assert.equal(legacy.type, 'preset');
+  assert.deepEqual(legacy.facets.sources, { include: [], exclude: [] });
+  assert.equal(normalizeLibraryQuery({ minRating: 99 }).minRating, 5, 'a rating is clamped');
+});
+
+test('within a facet values OR, between facets they AND, and a refusal beats a match', () => {
+  const record = { name: 'Wool Pad', category: 'Pad', instrument: 'Stage Keys',
+                   manufacturer: 'Mock Audio', sourceType: 'vstpreset', type: 'preset',
+                   available: true, rating: 5, favourite: true, tags: ['warm', 'wide'] };
+
+  const pick = (facet, ...values) => ({ ...emptyLibraryQuery(),
+    facets: { ...emptyLibraryQuery().facets, [facet]: { include: values, exclude: [] } } });
+
+  assert.equal(matchesLibraryQuery(record, pick('categories', 'Pad')), true);
+  assert.equal(matchesLibraryQuery(record, pick('categories', 'Bass')), false);
+  assert.equal(matchesLibraryQuery(record, pick('categories', 'Bass', 'Pad')), true,
+    'two values in one facet widen it');
+
+  const both = pick('categories', 'Pad');
+  both.facets.instruments = { include: ['Analog One'], exclude: [] };
+  assert.equal(matchesLibraryQuery(record, both), false, 'facets AND each other');
+
+  const refused = pick('categories', 'Pad');
+  refused.facets.tags = { include: ['warm'], exclude: ['wide'] };
+  assert.equal(matchesLibraryQuery(record, refused), false,
+    'a record that is both kept and refused is refused: no is louder than yes');
+
+  assert.equal(matchesLibraryQuery(record, { ...emptyLibraryQuery(), text: 'MOCK' }), true,
+    'text is case-blind across name, instrument, maker, category and tags');
+  assert.equal(matchesLibraryQuery(record, { ...emptyLibraryQuery(), minRating: 5 }), true);
+  assert.equal(matchesLibraryQuery({ ...record, rating: 2 },
+    { ...emptyLibraryQuery(), minRating: 5 }), false);
+});
+
+test('a facet count says what clicking the chip would give you, not what is already filtered', () => {
+  const records = [
+    { name: 'a', category: 'Pad', type: 'preset', tags: ['warm'], available: true },
+    { name: 'b', category: 'Pad', type: 'preset', tags: ['bright'], available: true },
+    { name: 'c', category: 'Bass', type: 'preset', tags: ['warm'], available: true },
+  ];
+  const query = cycleLibraryFacet(emptyLibraryQuery(), 'categories', 'Pad');
+  const facets = computeLibraryFacets(records, query);
+  const count = (facet, value) => facets[facet].find((v) => v.value === value)?.count;
+
+  assert.equal(count('categories', 'Bass'), 1,
+    "the facet's own selection is lifted, so an unpicked chip predicts the click");
+  assert.equal(count('categories', 'Pad'), 2);
+  assert.equal(count('tags', 'warm'), 1, 'while every other facet counts inside the result');
+  assert.equal(count('tags', 'bright'), 1);
+
+  // A refused chip stays in the list — a chip you cannot see is a filter you cannot take off —
+  // and its number is what TAKING THE REFUSAL OFF would give you, because that is the click it
+  // offers. Zero there would be true of every refused chip and would say nothing.
+  const refusing = cycleLibraryFacet(cycleLibraryFacet(emptyLibraryQuery(), 'tags', 'warm'),
+                                     'tags', 'warm');
+  const refused = computeLibraryFacets(records, refusing).tags.find((v) => v.value === 'warm');
+  assert.equal(refused.excluded, true);
+  assert.equal(refused.count, 2, 'a refused chip says how many clearing it would bring back');
+
+  // The mixed case, where one facet holds a keep AND a refusal: 'bright' is kept, 'warm' is
+  // refused, and each count is still exactly what its own click does.
+  const mixed = cycleLibraryFacet(refusing, 'tags', 'bright');
+  const tags = computeLibraryFacets(records, mixed).tags;
+  assert.equal(tags.find((v) => v.value === 'bright').count, 1,
+    'clicking a kept chip yields records carrying it that the refusals still allow');
+  assert.equal(tags.find((v) => v.value === 'warm').count, 2,
+    'while the refused chip still reports what clearing it restores');
+});
+
+test('mock reducer: browsing by facet, refusing a chip, and saving the view as a search', () => {
+  hostStateStore.set(mockHostState());
+  setMockSmartCollections([]);
+  requestLibrary(emptyLibraryQuery());
+  assert.equal(get(hostLibrary).counts.matched, 5);
+
+  // The search the product this succeeds could not run: everything except what you captured.
+  const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
+  requestLibrary(noCaptures);
+  assert.equal(get(hostLibrary).records.some((r) => r.sourceType === 'userState'), false,
+    'a refused facet value drops those records');
+  const chip = get(hostLibrary).facets.sources.find((v) => v.value === 'userState');
+  assert.equal(chip.excluded, true, 'and comes back marked, so it can be taken off again');
+
+  // Saving the view is the gesture: filter until it is right, then name it.
+  saveSmartCollection('Not mine', noCaptures);
+  const saved = get(hostLibrary).smartCollections;
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].name, 'Not mine');
+  assert.equal(saved[0].count, 4, 'a saved search reports its own count, run fresh');
+
+  // Running it again reproduces the view, exclusion included.
+  requestLibrary(emptyLibraryQuery());
+  assert.equal(get(hostLibrary).records.length, 5);
+  requestLibrary(saved[0].query);
+  assert.equal(get(hostLibrary).records.length, 4, 'and re-running it restores the view');
+
+  removeSmartCollection(saved[0].collectionId);
+  assert.equal(get(hostLibrary).smartCollections.length, 0);
+  requestLibrary(emptyLibraryQuery());
+});
+
+test('mock reducer: the view is remembered, so a favourite does not clear your filters', () => {
+  hostStateStore.set(mockHostState());
+  setMockSmartCollections([]);
+  requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
+  assert.equal(get(hostLibrary).records.length, 3);
+
+  setLibraryUserMetadata('lib-2', { favourite: true });
+  assert.equal(get(hostLibrary).records.length, 3,
+    'a mutation answers with the view you were looking at, not the whole library');
+  requestLibrary(emptyLibraryQuery());
 });
 
 test('mock reducer: a chain record captures a whole voice and lands as one', () => {

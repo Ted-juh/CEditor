@@ -54,6 +54,10 @@ let mockEntitySerial = 0;
 const nextMockSuffix = () => `${Date.now()}-${++mockEntitySerial}`;
 const nextMockId = (prefix) => `${prefix}-${nextMockSuffix()}`;
 
+// The library's facet names, declared before the stores because emptyHostLibrary()
+// runs at module load and builds an empty list per facet from them.
+export const LIBRARY_FACETS = ['categories', 'tags', 'instruments', 'manufacturers', 'sources'];
+
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
 export const hostLastError = writable('');
@@ -350,10 +354,81 @@ export function normalizeSupportBundle(payload) {
 
 // --- the Stage 4 library ------------------------------------------------------------------------
 
+// The browser's query. Every facet carries two lists because a chip can be REFUSED as well as
+// chosen — "pads, but nothing distorted" is the search a person runs once they know what they
+// do not want, and it is the one the product this succeeds could never express. Mirrors
+// LibraryQuery in CE/src/InstrumentHost/Library.h; the shape is the wire format both ways.
+
+export function emptyLibraryQuery() {
+  return {
+    text: '',
+    type: '',
+    collection: '',
+    favouritesOnly: false,
+    minRating: 0,
+    availableOnly: false,
+    facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
+  };
+}
+
+const strings = (value) => (Array.isArray(value) ? value.map(String).filter(Boolean) : []);
+
+export function normalizeLibraryQuery(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const facets = p.facets && typeof p.facets === 'object' ? p.facets : {};
+  return {
+    // `query` is what the command surface has always called the text box; `text` is what the
+    // query structure calls it. Reading both keeps an older payload and a saved collection the
+    // same shape to everything downstream.
+    text: String(p.text ?? p.query ?? ''),
+    type: String(p.type ?? ''),
+    collection: String(p.collection ?? ''),
+    favouritesOnly: p.favouritesOnly === true,
+    minRating: Math.min(5, Math.max(0, Number(p.minRating ?? 0))),
+    availableOnly: p.availableOnly === true,
+    facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, {
+      include: strings(facets[f]?.include),
+      exclude: strings(facets[f]?.exclude),
+    }])),
+  };
+}
+
+/** True when the query asks for anything at all — what the "Clear" button is gated on. */
+export function libraryQueryIsEmpty(query) {
+  const q = normalizeLibraryQuery(query);
+  return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
+    && q.minRating === 0 && !q.availableOnly
+    && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
+}
+
+/** One click on a chip, in the browser's three-state cycle: off → include → exclude → off.
+    Alt-clicking jumps straight to exclude, which is the gesture the header advertises. */
+export function cycleLibraryFacet(query, facet, value, straightToExclude = false) {
+  const next = normalizeLibraryQuery(query);
+  const selection = next.facets[facet];
+  if (!selection) return next;
+  const included = selection.include.includes(value);
+  const excluded = selection.exclude.includes(value);
+  selection.include = selection.include.filter((v) => v !== value);
+  selection.exclude = selection.exclude.filter((v) => v !== value);
+  if (straightToExclude) {
+    if (!excluded) selection.exclude.push(value);
+  } else if (!included && !excluded) {
+    selection.include.push(value);
+  } else if (included) {
+    selection.exclude.push(value);
+  }
+  return next;
+}
+
 export function emptyHostLibrary() {
   return {
     records: [],
-    counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0 },
+    counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0 },
+    facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
+    smartCollections: [],
+    collections: [],
+    request: emptyLibraryQuery(),
     paths: [],
     query: '',
     type: '',
@@ -387,40 +462,163 @@ export function normalizeHostLibrary(payload) {
       racks: Number(p.counts?.racks ?? 0),
       chains: Number(p.counts?.chains ?? 0),
       missing: Number(p.counts?.missing ?? 0),
+      matched: Number(p.counts?.matched ?? (Array.isArray(p.records) ? p.records.length : 0)),
     },
+    facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f,
+      (Array.isArray(p.facets?.[f]) ? p.facets[f] : []).map((v) => ({
+        value: String(v?.value ?? ''),
+        count: Number(v?.count ?? 0),
+        selected: v?.selected === true,
+        excluded: v?.excluded === true,
+      })).filter((v) => v.value !== ''),
+    ])),
+    smartCollections: (Array.isArray(p.smartCollections) ? p.smartCollections : []).map((c) => ({
+      collectionId: String(c?.collectionId ?? ''),
+      name: String(c?.name ?? ''),
+      count: Number(c?.count ?? 0),
+      query: normalizeLibraryQuery(c?.query),
+    })).filter((c) => c.collectionId !== ''),
+    collections: (Array.isArray(p.collections) ? p.collections : []).map((c) => ({
+      name: String(c?.name ?? ''),
+      count: Number(c?.count ?? 0),
+    })).filter((c) => c.name !== ''),
+    request: normalizeLibraryQuery(p.request ?? { query: p.query, type: p.type }),
     paths: (Array.isArray(p.paths) ? p.paths : []).map(String),
     query: String(p.query ?? ''),
     type: String(p.type ?? ''),
   };
 }
 
+// The pure half of the query, in JavaScript, for the browser demo and its tests. It mirrors
+// matchesQuery() in CE/src/InstrumentHost/Library.cpp — same rules, same order: within a facet
+// the chosen values OR, between facets they AND, and an excluded value refuses the record
+// whatever else matched.
+const recordFacetValues = (record, facet) => ({
+  categories: [record.category],
+  tags: record.tags ?? [],
+  instruments: [record.instrument],
+  manufacturers: [record.manufacturer],
+  sources: [record.sourceType],
+  types: [record.type],
+}[facet] ?? []).filter(Boolean);
+
+const admits = (selection, values) => {
+  if (values.some((v) => selection.exclude.includes(v))) return false;
+  if (selection.include.length === 0) return true;
+  return values.some((v) => selection.include.includes(v));
+};
+
+export function matchesLibraryQuery(record, query) {
+  const q = normalizeLibraryQuery(query);
+  if (q.type && record.type !== q.type) return false;
+  if (q.favouritesOnly && record.favourite !== true) return false;
+  if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
+  if (q.collection && !(record.collections ?? []).includes(q.collection)) return false;
+  if (q.availableOnly && record.available !== true) return false;
+  for (const facet of LIBRARY_FACETS)
+    if (!admits(q.facets[facet], recordFacetValues(record, facet)))
+      return false;
+
+  const text = q.text.trim().toLowerCase();
+  if (!text) return true;
+  return [record.name, record.instrument, record.manufacturer, record.category,
+          ...(record.tags ?? [])].some((v) => String(v ?? '').toLowerCase().includes(text));
+}
+
+/** Facet counts, mirroring tally() in CE/src/InstrumentHost/Library.cpp: the number on a chip
+    is what CLICKING it would give you. That is two passes, because the two kinds of chip offer
+    different clicks — an unchosen value joins this facet's OR group (so the keep list is lifted
+    and the refusals stay), while a refused value's click takes its refusal off. */
+export function computeLibraryFacets(records, query) {
+  const q = normalizeLibraryQuery(query);
+  const build = (facet, selection) => {
+    // The base pass, with this facet's keep list lifted and its refusals still in force.
+    const base = facet === 'types'
+      ? { ...q, type: '' }
+      : { ...q, facets: { ...q.facets, [facet]: { include: [], exclude: selection.exclude } } };
+
+    const counts = new Map();
+    for (const value of selection.include) if (!counts.has(value)) counts.set(value, 0);
+    for (const record of records)
+      if (matchesLibraryQuery(record, base))
+        for (const value of recordFacetValues(record, facet))
+          counts.set(value, (counts.get(value) ?? 0) + 1);
+
+    // A refused value counts nothing above, and zero is not what its chip offers.
+    for (const refused of selection.exclude) {
+      const lifted = { ...base,
+        facets: { ...base.facets,
+                  [facet]: { include: [], exclude: selection.exclude.filter((v) => v !== refused) } } };
+      counts.set(refused, records.filter((r) => matchesLibraryQuery(r, lifted)
+        && recordFacetValues(r, facet).includes(refused)).length);
+    }
+
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count,
+        selected: selection.include.includes(value), excluded: selection.exclude.includes(value) }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+  };
+
+  return {
+    types: build('types', { include: q.type ? [q.type] : [], exclude: [] }),
+    ...Object.fromEntries(LIBRARY_FACETS.map((f) => [f, build(f, q.facets[f])])),
+  };
+}
+
+let mockSmartCollections = [];
+// The browser demo remembers its view for the same reason the service does: a mutation must
+// not silently drop you back to the whole library while the chips on screen still filter.
+let mockLibraryView = emptyLibraryQuery();
+
 export function mockHostLibrary(query = '', type = '') {
   const all = [
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
-      factory: true, available: true, favourite: true },
+      category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
+      tags: ['warm', 'wide'] },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
-      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
-      available: true, tags: ['bass'] },
+      manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
+      category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'] },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
-      manufacturer: 'Someone', instrument: 'Uninstalled Synth', factory: true,
-      available: false, reason: 'Requires Uninstalled Synth, which is not in the catalogue.' },
-    { recordId: 'lib-4', type: 'rack', sourceType: 'rackCapture', name: 'Live Rig', available: true },
+      manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
+      available: false, tags: ['bright'],
+      reason: 'Requires Uninstalled Synth, which is not in the catalogue.' },
+    { recordId: 'lib-4', type: 'rack', sourceType: 'rackCapture', name: 'Live Rig',
+      available: true, collections: ['Friday'] },
     { recordId: 'lib-5', type: 'chain', sourceType: 'chainCapture', name: 'Big Lead',
-      manufacturer: 'Mock Audio', instrument: 'Analog One', available: true },
+      manufacturer: 'Mock Audio', instrument: 'Analog One', category: 'Lead', available: true,
+      rating: 3, tags: ['bright', 'wide'], collections: ['Friday'] },
   ];
-  const q = query.trim().toLowerCase();
-  const records = all.filter((r) =>
-    (!type || r.type === type)
-    && (!q || r.name.toLowerCase().includes(q) || (r.instrument ?? '').toLowerCase().includes(q)
-        || (r.manufacturer ?? '').toLowerCase().includes(q)));
+
+  // Both call shapes: the older (text, type) pair and the whole query object.
+  const request = normalizeLibraryQuery(
+    typeof query === 'object' && query !== null ? query : { text: query, type });
+  const records = all.filter((r) => matchesLibraryQuery(r, request));
+
+  const statics = new Map();
+  for (const record of all)
+    for (const name of record.collections ?? [])
+      statics.set(name, (statics.get(name) ?? 0) + 1);
+
   return normalizeHostLibrary({
     records,
-    counts: { total: all.length, presets: 3, racks: 1, chains: 1, missing: 0 },
+    counts: { total: all.length, presets: 3, racks: 1, chains: 1, missing: 0,
+              matched: records.length },
+    facets: computeLibraryFacets(all, request),
+    smartCollections: mockSmartCollections.map((c) => ({
+      ...c, count: all.filter((r) => matchesLibraryQuery(r, c.query)).length })),
+    collections: [...statics.entries()].map(([name, count]) => ({ name, count })),
+    request,
     paths: [],
-    query,
-    type,
+    query: request.text,
+    type: request.type,
   });
+}
+
+/** The browser demo's saved queries live in the module, because there is no native side to
+    keep them. Exported so a test can start from a known state. */
+export function setMockSmartCollections(collections) {
+  mockSmartCollections = collections.map((c) => ({ ...c, query: normalizeLibraryQuery(c.query) }));
 }
 
 export function emptyHostProject() {
@@ -5937,7 +6135,29 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'getLibrary' || payload?.cmd === 'scanLibrary') {
-      hostLibrary.set(mockHostLibrary(payload.query ?? '', payload.type ?? ''));
+      mockLibraryView = payload.cmd === 'getLibrary' ? normalizeLibraryQuery(payload)
+                                                     : mockLibraryView;
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'saveSmartCollection') {
+      const name = String(payload.name ?? '').trim();
+      if (!name) { hostLastError.set('A collection needs a name.'); return; }
+      setMockSmartCollections([...get(hostLibrary).smartCollections,
+        { collectionId: `sc-${Date.now()}`, name,
+          query: payload.query ? normalizeLibraryQuery(payload.query) : mockLibraryView }]);
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'removeSmartCollection') {
+      const kept = get(hostLibrary).smartCollections
+                     .filter((c) => c.collectionId !== payload.collectionId);
+      if (kept.length === get(hostLibrary).smartCollections.length) {
+        hostLastError.set('Unknown collection.');
+        return;
+      }
+      setMockSmartCollections(kept);
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
       return;
     }
     if (payload?.cmd === 'saveUserPreset' || payload?.cmd === 'saveRackToLibrary'
@@ -6411,7 +6631,20 @@ export const cancelSoundComparison = () => send({ cmd: 'cancelSoundComparison' }
 export const learnKeyChord = (partId) => send({ cmd: 'learnKeyChord', partId });
 export const cancelKeyChordLearn = () => send({ cmd: 'cancelKeyChordLearn' });
 export const clearKeyChord = (partId, key) => send({ cmd: 'clearKeyChord', partId, key });
-export const requestLibrary = (query = '', type = '') => send({ cmd: 'getLibrary', query, type });
+/** Ask for a view of the library. Takes either the older (text, type) pair or a whole
+    LibraryQuery — the native side reads both, so the two callers can coexist. */
+export const requestLibrary = (query = '', type = '') =>
+  (typeof query === 'object' && query !== null
+    ? send({ cmd: 'getLibrary', ...normalizeLibraryQuery(query) })
+    : send({ cmd: 'getLibrary', query, type }));
+
+/** Save the view you are looking at as a rail entry. Omitting the query means "what is on
+    screen", which is the gesture: filter until the results are right, then name them. */
+export const saveSmartCollection = (name, query) =>
+  send(query ? { cmd: 'saveSmartCollection', name, query: normalizeLibraryQuery(query) }
+             : { cmd: 'saveSmartCollection', name });
+export const removeSmartCollection = (collectionId) =>
+  send({ cmd: 'removeSmartCollection', collectionId });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });

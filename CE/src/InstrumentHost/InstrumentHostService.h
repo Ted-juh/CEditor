@@ -87,8 +87,11 @@
 //      A part belongs to one group and must take MIDI from the keyboard. Continuous sources
 //      in all mode crossfade live audio; key/velocity sources shape incoming note velocity.)
 //   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
+//   saveSmartCollection {collectionId?,name,query?} | removeSmartCollection {collectionId}
 //   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
-//     (the Stage 4 library: getLibrary answers with instrumentHostLibrary — records
+//     (getLibrary takes the full LibraryQuery — text/type/collection/facets with their
+//      include and exclude lists/favouritesOnly/minRating/availableOnly — and the older
+//      {query,type} payload still reads as one. It answers with instrumentHostLibrary — records
 //      projected with live availability. Loading goes through Stage 1's one transaction:
 //      action is "focused", "replace" (with partId) or "add"; a vendor .vstpreset applies
 //      through Options::applyVstPreset after the normal commit; a rack record restores
@@ -726,11 +729,14 @@ private:
     void restoreSessionImpl (bool includePerformance);
     void ensureHostProject();
     void ensureLibrary();
-    void emitLibrary (const juce::String& query, const juce::String& type);
+    void emitLibrary (const LibraryQuery& query);
     void scanVstPresets();
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
         catalogLock itself): empty = loadable, else the actionable reason. */
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
+    /** What `availableOnly` means here: the source is still on disk AND the plug-in the record
+        targets is in the catalogue. Only the service knows the second half. */
+    LibraryAvailability libraryAvailability() const;
     void loadPresetRecord (const LibraryRecord& record, const juce::String& partId,
                            std::function<void()> afterLoaded = {});
     /** A chain capture applied onto one part: the instrument, its MIDI modules and its
@@ -1104,6 +1110,10 @@ private:
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
     Library library;                // the Stage 4 unified index; loaded on first ask
+    // What the browser is currently looking at. Every mutation re-emits THIS rather than an
+    // empty query: favouriting a record must not silently drop you back to all 12,000 sounds
+    // while the filter chips on screen still claim to be on.
+    LibraryQuery libraryView;
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
     bool libraryLoaded = false;
     struct PresetAuditionEvent

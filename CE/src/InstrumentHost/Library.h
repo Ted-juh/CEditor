@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+#include <functional>
+
 // Library — Hostage's unified preset, instrument and rack library.
 //
 // One index with explicit record types, never a second host: a record ORCHESTRATES Stage 1
@@ -52,6 +54,64 @@ struct LibraryRecord
     UserMetadata user;
 };
 
+// -- browsing: facets, exclusion, and the queries a collection is made of -----------------------
+//
+// The browser this feeds is a faceted one, and two rules decide everything below.
+//
+// A CHIP CAN BE REFUSED, not only chosen. The product this succeeds could say "pads" and never
+// "pads, but nothing distorted", which is the search a person actually runs when they know what
+// they do not want. So every facet carries two lists: `include` is an opinion about what to keep
+// (empty means no opinion, and several values are OR'd, because picking Bass and Lead means
+// either), `exclude` refuses a record outright whatever else about it matched.
+//
+// A COUNT MUST PREDICT THE CLICK. The number beside a chip is what you would have if you clicked
+// it — which takes two passes rather than one, because the two kinds of chip offer different
+// clicks. For an unchosen or chosen value the click adds it to this facet's OR group, so the
+// count lifts the facet's KEEP list and leaves its refusals in force. For a refused value the
+// click takes the refusal off, so that value alone is counted again with its own refusal lifted.
+// Counting inside the current result instead makes every unselected chip in the facet you just
+// used read zero, which is true and useless: it says only "you have already filtered by this".
+
+struct LibraryFacetSelection
+{
+    juce::StringArray include, exclude;
+
+    bool isEmpty() const           { return include.isEmpty() && exclude.isEmpty(); }
+    bool admits (const juce::StringArray& values) const;
+    bool admits (const juce::String& value) const { juce::StringArray one; one.add (value);
+                                                    return admits (one); }
+};
+
+struct LibraryQuery
+{
+    juce::String text;          // the free-text box; same fields searchLibrary() reads
+    juce::String type;          // "preset" | "rack" | "chain" | "" for every type
+    juce::String collection;    // a user collection the record must name; "" for any
+
+    LibraryFacetSelection categories, tags, instruments, manufacturers, sources;
+
+    bool favouritesOnly = false;
+    int  minRating = 0;         // 0 = unrated included
+    bool availableOnly = false; // see the availability hook below
+};
+
+/** Whether a record can be loaded right now. The library itself only knows whether the SOURCE
+    vanished (`missing`); whether the plug-in a preset targets is installed is the catalogue's
+    business and the service's to answer, so `availableOnly` asks through this rather than
+    guessing. Defaults to "the source is still there", which is all a pure test can know. */
+using LibraryAvailability = std::function<bool (const LibraryRecord&)>;
+
+/** A saved query — the browser's "smart collection". The rail runs it fresh every time, so a
+    record joins one by matching rather than by being filed, and nothing has to be re-filed when
+    a sound is retagged. Static collections are the other kind and already exist: they are the
+    `collections` list on a record's user block. */
+struct SmartCollection
+{
+    juce::String collectionId;   // stable, minted once
+    juce::String name;
+    LibraryQuery query;
+};
+
 class Library
 {
 public:
@@ -80,6 +140,14 @@ public:
     /** Updates only the user block of a record. */
     bool setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user);
 
+    const juce::Array<SmartCollection>& allSmartCollections() const { return smartCollections; }
+
+    /** Adds a saved query, or replaces one by id when the id is already known. An empty id is
+        minted. Returns the id either way. */
+    juce::String putSmartCollection (SmartCollection collection);
+
+    bool removeSmartCollection (const juce::String& collectionId);
+
     void loadFrom (const juce::File& file);
     void saveTo (const juce::File& file) const;
 
@@ -88,14 +156,44 @@ public:
 
 private:
     juce::Array<LibraryRecord> records;
+    juce::Array<SmartCollection> smartCollections;
 };
 
 /** Case-insensitive text search over name, instrument, manufacturer, category and user tags,
     with optional type filter (""=all). Pure; the WebView and the hardware browse the same
-    way (baseline §18.6.10). */
+    way (baseline §18.6.10). The LibraryQuery overload below is the same search with the
+    facets, the exclusions and the availability hook; this one is it with only two of them. */
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const juce::String& query,
                                                  const juce::String& type = {});
+
+/** Everything the query keeps, in library order. */
+juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
+                                                 const LibraryQuery& query,
+                                                 const LibraryAvailability& isAvailable = {});
+
+struct LibraryFacetValue
+{
+    juce::String value;
+    int count = 0;
+    bool selected = false;   // in the facet's include list
+    bool excluded = false;   // in its exclude list
+};
+
+/** One list per facet, ordered by count descending then value, with a selected or excluded
+    value always present even when nothing would match it — a chip you cannot see is a filter
+    you cannot take off. */
+struct LibraryFacets
+{
+    juce::Array<LibraryFacetValue> types, categories, tags, instruments, manufacturers, sources;
+};
+
+LibraryFacets libraryFacets (const Library& library, const LibraryQuery& query,
+                             const LibraryAvailability& isAvailable = {});
+
+juce::var libraryQueryToVar (const LibraryQuery& query);
+LibraryQuery libraryQueryFromVar (const juce::var& stored);
+
 
 // -- the .vstpreset container ------------------------------------------------------------------
 // Steinberg's preset file: 'VST3' magic, a version word, the 32-character ASCII class id of

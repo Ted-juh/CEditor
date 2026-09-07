@@ -1,6 +1,6 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **a plan, not a commitment.** Nothing here is built. The mockups it describes are in
+Status: **Stage A is built** (2026-09-07); B–F are a plan, not a commitment. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -123,9 +123,7 @@ which instruments are indexed that way.
 
 Each stage ships something on its own.
 
-- **A — the workspace.** The slide-out list becomes a tab: rail, facets with exclusion, grid,
-  inspector, audition bar; smart collections as stored queries. No analysis anywhere. This is a
-  better browser over exactly today's data, and it is front-end weighted.
+- ~~**A — the workspace.**~~ **Built, 2026-09-07** — see *Stage A, as built* below.
 - **B — the auditioner.** The scanner worker learns to render a probe. Descriptors on the record,
   thumbprints, measured ranges, duplicate folding. The expensive stage, and the one the rest needs.
 - **C — instant audition.** Snapshot cache, live handoff at the note boundary, the rolling eight-bar
@@ -135,6 +133,47 @@ Each stage ships something on its own.
 - **E — Atlas and substitutes.** The map, "more like this" and the missing-plug-in flow are one
   distance function with three faces.
 - **F — off the mouse.** The browser mirrored to any profile that declares a screen; generic first.
+
+## Stage A, as built
+
+`SoundBrowser.svelte` replaced the slide-out list: a rail, a facet strip, a result grid and an
+inspector, over `LibraryQuery` and `libraryFacets` in `Library.h`. No analysis anywhere — this is
+a better browser over exactly the data the library already held.
+
+**The exclusion is the point.** Every facet carries `include` and `exclude`, a chip cycles
+off → keep → refuse, and alt-clicking refuses in one gesture. "Pads, but nothing distorted" is a
+search the product this succeeds could not express at all.
+
+**A count is what clicking the chip does**, and getting that literally true took two passes
+rather than one, because the two kinds of chip offer different clicks. An unchosen value joins
+the facet's OR group, so its count lifts the facet's keep list and leaves its refusals in force.
+A refused value's click takes the refusal off, so that one value is counted again with its own
+refusal lifted. Counting inside the current result — the obvious implementation — makes every
+unpicked chip in the facet you just used read zero, which is true and says only "you have
+already filtered by this". The mixed case, one facet holding a keep and a refusal at once, is
+pinned by a test on both sides.
+
+**The view is remembered.** Every mutation used to re-emit `emitLibrary({}, {})`, so favouriting
+a record dropped you back to the whole library while the chips on screen still claimed to be
+filtering. `libraryView` on the service holds the last query and every mutation replays it.
+
+**Smart collections are saved queries**, kept in `library.json` beside the records, run fresh on
+every answer so each rail entry carries its own live count. Static collections — the
+`collections` list on a record's user block — were already in the model and had never been
+shown; the rail gathers them from the records rather than declaring them anywhere.
+
+**What rendering it found**, in the order it found it, because none of it was visible in the
+code. Svelte scopes styles per component, so every control in the new component came up in the
+browser's own default chrome — white buttons and a white search field inside a dark tool — until
+`InstrumentHostView`'s `button`/`input` rules were repeated in it. A rack capture and a chain
+capture are yours by definition, so the `MINE` badge next to `RACK` and `CHAIN` said nothing the
+badge beside it had not; it is `userState` only now. And the three-state chip is invisible until
+somebody tries it, so the strip says what alt-click does rather than hiding it in a tooltip.
+
+**Not in Stage A, deliberately:** the audition bar as drawn (there is nothing to audition
+instantly until Stage B renders the snapshots), thumbprints, the Atlas, versions, substitutes.
+The audition toggle that already existed — load into the focused part and play a note — moved
+across unchanged.
 
 ## What this deliberately does not do
 
@@ -154,6 +193,8 @@ Each stage ships something on its own.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage A built; see *Stage A, as built* above for what rendering found.
 
 - **2026-09-07** — the proposal above, with five screens drawn:
   [`sound-browser-mockups.html`](sound-browser-mockups.html). What drawing it settled, before any
