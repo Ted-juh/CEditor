@@ -49,12 +49,17 @@ import {
   saveSmartCollection,
   removeSmartCollection,
   setMockSmartCollections,
+  resetMockLibraryState,
   measuredValue,
   measuredNormalised,
   measuredLabel,
   MEASURED_AXES,
   analyseLibrary,
   hostAnalysis,
+  hostAudition,
+  auditionRecord,
+  stopAudition,
+  setAuditionPhrase,
   hostLibrary,
   requestLibrary,
   saveUserPreset,
@@ -798,6 +803,7 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
 
 test('mock reducer: the auditioner measures what has no profile, once', () => {
   hostStateStore.set(mockHostState());
+  resetMockLibraryState();
   requestLibrary(emptyLibraryQuery());
   const before = get(hostLibrary);
   assert.ok(before.counts.measurable > 0, 'something starts out unheard');
@@ -812,6 +818,70 @@ test('mock reducer: the auditioner measures what has no profile, once', () => {
   analyseLibrary();
   assert.match(get(hostAnalysis).what, /Nothing left/,
     'a second run says so rather than spinning');
+});
+
+// --- instant audition ------------------------------------------------------------------------
+
+test('normalizeHostLibrary carries which sounds preview instantly, and what the cache costs', () => {
+  const shaped = normalizeHostLibrary({
+    records: [{ recordId: 'a', instant: true }, { recordId: 'b' }, { recordId: 'c', instant: 'yes' }],
+    counts: { snapshots: '4', snapshotBytes: 140000 },
+  });
+  assert.equal(shaped.records[0].instant, true);
+  assert.equal(shaped.records[1].instant, false, 'absent means "loads the slow way"');
+  assert.equal(shaped.records[2].instant, false, 'and a truthy string is not a snapshot');
+  assert.equal(shaped.counts.snapshots, 4);
+  assert.equal(shaped.counts.snapshotBytes, 140000);
+});
+
+test('mock reducer: auditioning reports the stages the indicator draws', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  // A sound with a stored preview answers immediately, then hands over to the real thing.
+  auditionRecord('lib-1');
+  const after = get(hostAudition);
+  assert.equal(after.recordId, 'lib-1');
+  assert.equal(after.stage, 'live', 'the handoff is the last word');
+  assert.match(after.detail, /last \d+ bars/, 'and it says what it is playing');
+
+  // One with no preview says so rather than claiming to be the real thing while it loads.
+  const unheard = get(hostLibrary).records.find((r) => !r.instant && r.type === 'preset'
+                                                       && r.available);
+  assert.ok(unheard, 'the demo keeps one sound deliberately unheard');
+  auditionRecord(unheard.recordId);
+  assert.equal(get(hostAudition).recordId, unheard.recordId);
+  // The "no snapshot yet — loading" stage is real but not observable HERE: the demo has no
+  // plug-in and therefore no load to wait through, so the handoff lands in the same tick and
+  // the store only ever holds the latest. The native test pins that sequence, where the wait
+  // is the whole point.
+  assert.equal(get(hostAudition).stage, 'live');
+
+  // A rack loads rather than previews, and says so instead of doing nothing.
+  auditionRecord('lib-4');
+  assert.equal(get(hostAudition).stage, 'silent');
+  assert.match(get(hostAudition).detail, /loads rather than previews/);
+
+  // An unavailable record refuses aloud.
+  hostLastError.set('');
+  auditionRecord('lib-3');
+  assert.ok(get(hostLastError).length > 0, 'a record whose plug-in is missing refuses aloud');
+
+  stopAudition();
+  assert.equal(get(hostAudition).stage, 'stopped');
+});
+
+test('mock reducer: the audition phrase is a setting, and nonsense is refused', () => {
+  setAuditionPhrase('chord');
+  assert.equal(get(hostAudition).phrase, 'chord');
+  setAuditionPhrase('recent', 8);
+  assert.deepEqual([get(hostAudition).phrase, get(hostAudition).bars], ['recent', 8]);
+  setAuditionPhrase('nonsense');
+  assert.equal(get(hostAudition).phrase, 'recent', 'a phrase nobody offers is not stored');
+  setAuditionPhrase('recent', 99);
+  assert.equal(get(hostAudition).bars, 16, 'and the bar count is clamped');
+  setAuditionPhrase('recent', 4);
 });
 
 test('mock reducer: a chain record captures a whole voice and lands as one', () => {

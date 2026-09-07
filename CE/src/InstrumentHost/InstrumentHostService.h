@@ -14,6 +14,8 @@
 #include "InstrumentRackHost.h"
 #include "ParameterModel.h"
 #include "Library.h"
+#include "SnapshotStore.h"
+#include "RecentPlay.h"
 #include "PlatformMatrix.h"
 #include "ActiveHostingMarker.h"
 #include "SafeMode.h"
@@ -89,6 +91,8 @@
 //   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
 //   saveSmartCollection {collectionId?,name,query?} | removeSmartCollection {collectionId}
 //   analyseLibrary {all?} | cancelAnalysis
+//   auditionRecord {recordId, load?} | stopAudition | setAuditionPhrase {phrase, bars?}
+//     (instant audition: the snapshot plays now, the plug-in takes over when it arrives)
 //     (the auditioner: plays every preset once and writes down what came out. Answers with
 //      instrumentHostAnalysisProgress as it goes and instrumentHostLibrary when it lands.)
 //   removeLibraryRecord {recordId} | loadLibraryRecord {recordId, action, partId?}
@@ -750,6 +754,20 @@ private:
     };
 
     juce::Array<AnalysisTask> analysisBacklog (bool remeasureEverything) const;
+    /** Plays a record's snapshot immediately if there is one. Returns what happened, for the
+        event the browser draws its indicator from: "snapshot", "live" (nothing stored, so the
+        plug-in is the only route) or "silent". */
+    juce::String beginAudition (const LibraryRecord& record, const juce::String& partId);
+    void emitAudition (const juce::String& recordId, const juce::String& stage,
+                       const juce::String& detail = {});
+    /** The phrase an audition plays: a single note, a chord, or what you last played. */
+    juce::Array<RecentNote> auditionPhrase() const;
+    /** Where the beat clock is now: the transport's position while it rolls, and a free count
+        at the same tempo while it is parked — the convention the arpeggiator already uses. */
+    double nowBeats() const;
+    void playPhrase (const juce::String& partId);
+    /** The live instrument arrived: fade the snapshot out and play the phrase through it. */
+    void handOffAudition (const juce::String& partId);
     void runAnalysisNow (juce::Array<AnalysisTask> tasks);
     void emitAnalysisProgress (int done, int total, const juce::String& what, bool running);
     /** Applies a record's stored state to a live processor. Empty return = it took; otherwise
@@ -887,6 +905,7 @@ private:
     bool parameterFavouritesLoaded = false;
 
     juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
+    juce::File snapshotDirectory() const { return options.dataDirectory.getChildFile ("snapshots"); }
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
     void showEditorFor (const juce::String& partId);
@@ -1137,6 +1156,17 @@ private:
     juce::var hostProject;          // the Host Project manifest; loaded/minted on first ask
     bool hostProjectLoaded = false;
     Library library;                // the Stage 4 unified index; loaded on first ask
+    // The rendered previews that make browsing instant, and the ring that remembers what you
+    // played so a preset can be auditioned with your own line rather than a middle C.
+    std::unique_ptr<SnapshotStore> snapshots;
+    /** What the snapshot cache is allowed to cost. Four hundred megabytes is roughly a
+        twelve-thousand-preset library; past it, the least recently heard go first. */
+    static constexpr juce::int64 snapshotBudgetBytes = 400ll * 1024 * 1024;
+    RecentPlay recentPlay;
+    juce::String auditionPhraseMode { "recent" };   // "note" | "chord" | "recent"
+    int auditionBars = 4;
+    juce::String auditioningRecordId;
+    const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an
     // empty query: favouriting a record must not silently drop you back to all 12,000 sounds
     // while the filter chips on screen still claim to be on.

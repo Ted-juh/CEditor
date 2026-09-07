@@ -972,6 +972,13 @@ export function onInstrumentHostAnalysisProgress(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Audition stages ({ recordId, stage, detail, phrase, bars }) — snapshot, live, silent. */
+export function onInstrumentHostAudition(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostAudition', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Refused or failed commands ({ message }). */
 export function onInstrumentHostError(callback) {
   if (!isJuceAvailable()) return () => {};

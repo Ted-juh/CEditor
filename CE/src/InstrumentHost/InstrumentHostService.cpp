@@ -891,6 +891,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                           : juce::MidiMessage::noteOff (channel, note);
         message.setTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001);
         player.getMidiMessageCollector().addMessageToQueue (message);
+        recentPlay.add (nowBeats(), message);
         return;
     }
 
@@ -5475,6 +5476,67 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "auditionRecord")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        if (const auto reason = recordUnavailableReason (*record); reason.isNotEmpty())
+        {
+            emitError (reason);
+            return;
+        }
+
+        // A rack is many sounds at once and a hardware patch is bytes going down a cable; both
+        // are loaded rather than previewed, and saying so beats a silent no-op.
+        if (record->type == "rack" || record->sourceType == "hardwarePatch")
+        {
+            emitAudition (record->recordId, "silent", "This one loads rather than previews.");
+            return;
+        }
+
+        const auto partId = rack.getPerformance().focusedPartId;
+        const auto stage = beginAudition (*record, partId);
+        emitAudition (record->recordId, stage,
+                      stage == "loading" ? "No snapshot yet — loading the plug-in." : juce::String());
+
+        // The load starts on the same command, behind the preview. When it lands,
+        // handOffAudition() fades the snapshot out and plays the phrase through the real thing.
+        if (payload.getProperty ("load", true))
+        {
+            loadPresetRecord (*record, partId.isNotEmpty() ? partId : rack.addPart());
+            // Same class already live: the preset applied in place, so there is no commit to
+            // wait for and the handoff is now.
+            if (partId.isNotEmpty() && rack.getInstrument (partId) != nullptr)
+                handOffAudition (partId);
+        }
+        return;
+    }
+
+    if (cmd == "stopAudition")
+    {
+        rack.getAuditionPlayer().stop();
+        if (auditioningRecordId.isNotEmpty())
+            emitAudition (auditioningRecordId, "stopped");
+        auditioningRecordId.clear();
+        return;
+    }
+
+    if (cmd == "setAuditionPhrase")
+    {
+        const auto mode = payload.getProperty ("phrase", {}).toString();
+        if (mode == "note" || mode == "chord" || mode == "recent")
+            auditionPhraseMode = mode;
+        auditionBars = juce::jlimit (1, 16, (int) payload.getProperty ("bars", auditionBars));
+        emitAudition (auditioningRecordId, "phrase");
+        return;
+    }
+
     if (cmd == "analyseLibrary")
     {
         ensureLibrary();
@@ -6543,6 +6605,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             if (afterCommit != nullptr)
                 if (auto* committed = rack.getInstrument (partId))
                     afterCommit (*committed);
+
+            // The live instrument is here, so anything standing in for it steps aside. One
+            // place, because every route that loads an instrument comes through this commit.
+            handOffAudition (partId);
 
             attachParameters (partId);
             ingestProgramList (partId);
@@ -8375,6 +8441,7 @@ void InstrumentHostService::ensureLibrary()
 
     options.dataDirectory.createDirectory();
     library.loadFrom (libraryFile());
+    snapshots = std::make_unique<SnapshotStore> (snapshotDirectory());
 
     if (libraryPathsFile().existsAsFile())
     {
@@ -8645,11 +8712,21 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
             if (applyRecordState (*instrument, asRecord).isEmpty())
             {
+                // The two passes by hand rather than through probeProcessor(), because the loud
+                // render is not only measured — it is KEPT, and that is what makes the next
+                // click on this preset instant instead of a four-second wait for a plug-in.
+                const auto loud = renderProbe (*instrument, spec, spec.velocity);
+                const auto quiet = renderProbe (*instrument, spec, spec.quietVelocity);
+
                 Finding finding;
                 finding.recordId = task.recordId;
                 finding.fingerprint = task.fingerprint;
-                finding.profile = probeProcessor (*instrument, spec);
+                finding.profile = analyseProbe (loud, quiet, spec);
                 findings.push_back (std::move (finding));
+
+                if (snapshots != nullptr && ! finding.profile.silent)
+                    snapshots->put (snapshotKeyFor (task.fingerprint, task.recordId),
+                                    loud.audio, spec.sampleRate);
             }
 
             ++i;
@@ -8679,6 +8756,12 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
         if (! findings.empty())
             library.saveTo (libraryFile());
 
+        // A cache, and it behaves like one. Least recently heard goes first, and a snapshot
+        // that goes takes nothing with it: the record, its measurements and its rating stay,
+        // and browsing it falls back to loading the plug-in the slow way.
+        if (snapshots != nullptr)
+            snapshots->sweep (snapshotBudgetBytes);
+
         analysisBusy = false;
         emitAnalysisProgress (done, total,
                               cancelled ? "Stopped." : "Done — " + juce::String (findings.size())
@@ -8686,6 +8769,133 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
                               false);
         emitLibrary (libraryView);
     });
+}
+
+void InstrumentHostService::emitAudition (const juce::String& recordId, const juce::String& stage,
+                                          const juce::String& detail)
+{
+    if (options.emit == nullptr)
+        return;
+
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("recordId", recordId);
+    payload->setProperty ("stage",    stage);      // "snapshot" | "loading" | "live" | "silent" | "stopped"
+    payload->setProperty ("detail",   detail);
+    payload->setProperty ("phrase",   auditionPhraseMode);
+    payload->setProperty ("bars",     auditionBars);
+    options.emit ("instrumentHostAudition", juce::var (payload));
+}
+
+juce::Array<RecentNote> InstrumentHostService::auditionPhrase() const
+{
+    juce::Array<RecentNote> out;
+
+    if (auditionPhraseMode == "recent")
+    {
+        const auto& transport = rack.getEngine().getTransport();
+        out = recentPlay.phrase (nowBeats(), auditionBars, transport.barLengthPpq());
+        if (! out.isEmpty())
+            return out;
+        // Nothing played yet is not a reason to make no sound: fall through to the single note,
+        // which is what a browser with nothing to go on should do.
+    }
+
+    if (auditionPhraseMode == "chord")
+    {
+        for (const auto interval : { 0, 4, 7 })
+        {
+            out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60 + interval, (juce::uint8) 100) });
+            out.add ({ 2.0, juce::MidiMessage::noteOff (1, 60 + interval) });
+        }
+        return out;
+    }
+
+    out.add ({ 0.0, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100) });
+    out.add ({ 1.5, juce::MidiMessage::noteOff (1, 60) });
+    return out;
+}
+
+double InstrumentHostService::nowBeats() const
+{
+    const auto& transport = rack.getEngine().getTransport();
+    if (transport.isPlaying())
+        return transport.getPositionPpq();
+
+    // Parked, so free-count from the same tempo — the convention the arpeggiator and the
+    // pattern lanes already share, so a phrase captured with the transport stopped still lines
+    // up with one captured while it rolls.
+    return (juce::Time::getMillisecondCounterHiRes() * 0.001 - freeRunEpoch)
+             * transport.getTempo() / 60.0;
+}
+
+void InstrumentHostService::playPhrase (const juce::String& partId)
+{
+    if (! audioRunning)
+        return;
+
+    const auto phrase = auditionPhrase();
+    if (phrase.isEmpty())
+        return;
+
+    // Beats to seconds against the current tempo, stamped forward from now. Anything already
+    // sounding on this part is released first: an audition that stacks on top of the last one
+    // is a mess by the third preset.
+    const auto secondsPerBeat = 60.0 / juce::jmax (20.0, rack.getEngine().getTransport().getTempo());
+    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    auto& collector = player.getMidiMessageCollector();
+
+    auto panic = juce::MidiMessage::allNotesOff (1);
+    panic.setTimeStamp (now);
+    collector.addMessageToQueue (panic);
+
+    for (const auto& note : phrase)
+    {
+        auto message = note.message;
+        message.setTimeStamp (now + 0.02 + note.beat * secondsPerBeat);
+        collector.addMessageToQueue (message);
+    }
+
+    (void) partId;   // the phrase enters where the keyboard does, so zones and the chain apply
+}
+
+juce::String InstrumentHostService::beginAudition (const LibraryRecord& record,
+                                                   const juce::String& partId)
+{
+    rack.setAuditionTarget (partId);
+    auditioningRecordId = record.recordId;
+
+    if (snapshots == nullptr)
+        return "loading";
+
+    auto snapshot = snapshots->get (snapshotKeyFor (record.fingerprint, record.recordId));
+    if (snapshot.getNumSamples() == 0)
+        // Not a failure. This is the ordinary case for anything the auditioner has not reached
+        // or whose snapshot was swept, and it degrades to exactly the old behaviour: load the
+        // plug-in and wait. "loading" rather than "live", because nothing is sounding yet and
+        // an indicator that says otherwise is lying for as long as the plug-in takes.
+        return "loading";
+
+    rack.getAuditionPlayer().start (std::move (snapshot),
+                                    (double) SnapshotStore::snapshotSampleRate);
+    return "snapshot";
+}
+
+void InstrumentHostService::handOffAudition (const juce::String& partId)
+{
+    if (auditioningRecordId.isEmpty() || rack.getAuditionTarget() != partId)
+        return;
+
+    // The real thing has arrived. The snapshot fades rather than cuts, and the phrase goes in
+    // behind it — which is the whole point of the rolling capture: you hear the new sound
+    // playing the line you were just playing, not a middle C.
+    rack.getAuditionPlayer().stop();
+    playPhrase (partId);
+    emitAudition (auditioningRecordId, "live",
+                  auditionPhraseMode == "recent" ? "Playing your last " + juce::String (auditionBars)
+                                                     + " bars."
+                  : auditionPhraseMode == "chord" ? juce::String ("Playing a chord.")
+                                                  : juce::String ("Playing a note."));
+    auditioningRecordId.clear();
 }
 
 LibraryAvailability InstrumentHostService::libraryAvailability() const
@@ -8728,6 +8938,12 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("collections",  [record] { juce::Array<juce::var> a;
                                                    for (const auto& c : record->user.collections) a.add (c);
                                                    return a; }());
+
+        // Which ones are instant. A snapshot is a cache, so this changes between answers and is
+        // reported per answer rather than stored on the record.
+        r->setProperty ("instant", snapshots != nullptr
+                                     && snapshots->has (snapshotKeyFor (record->fingerprint,
+                                                                        record->recordId)));
 
         // The measured half, only when there is one. An absent `sonic` is how the browser tells
         // "not measured yet" from "measured and dark", which are not the same thing.
@@ -8776,6 +8992,8 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                   if (r.sonic.measured) ++n;
                                               return n; }());
     counts->setProperty ("measurable", analysisBacklog (false).size());
+    counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
+    counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 
     // Every facet, with its own selection lifted while counting — see Library.h. The browser
     // draws these as chips and never invents a value the library does not hold.
@@ -12288,6 +12506,11 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
             pendingPatchSysex.push_back (message);
         return;
     }
+
+    // Everything you play goes into the ring, so a preset can be auditioned with your own line
+    // rather than a middle C. Notes only, and RecentPlay drops the rest itself.
+    if (message.isNoteOnOrOff())
+        recentPlay.add (nowBeats(), message);
 
     // Clock, active sensing and sysex housekeeping would light the indicator continuously and
     // prove nothing about the keys. Channel voice messages are what a person is testing.

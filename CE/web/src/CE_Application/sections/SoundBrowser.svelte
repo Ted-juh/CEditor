@@ -29,6 +29,7 @@
     saveSmartCollection, removeSmartCollection,
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
     hostAnalysis, analyseLibrary, cancelAnalysis,
+    hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
@@ -81,6 +82,14 @@
     return [...top, ...bottom].join(' ');
   }
 
+  /** What the preview cache costs, in a unit somebody can act on. Rounding 70 kB to "0 MB"
+      makes the number look broken; below a megabyte it is kilobytes. */
+  function cacheSize(bytes) {
+    if (!(bytes > 0)) return '';
+    if (bytes < 1048576) return ` · ${Math.round(bytes / 1024)} kB`;
+    return ` · ${Math.round(bytes / 1048576)} MB`;
+  }
+
   function setRange(axis, key, value) {
     const next = normalizeLibraryQuery(query);
     const range = next.ranges[axis];
@@ -125,8 +134,10 @@
   function clickTile(record) {
     selectedId = record.recordId;
     // Selecting shows it; loading is the button. A single click that both selects and loads is
-    // how the old list put an instrument somewhere nobody expected.
-    if (auditionOn && record.available && record.type !== 'rack') loadInto(record, 'focused');
+    // how the old list put an instrument somewhere nobody expected. With audition on, a click
+    // makes a SOUND — the stored snapshot answers immediately and the plug-in takes over when
+    // it arrives, which is the whole difference between browsing and waiting.
+    if (auditionOn && record.available) auditionRecord(record.recordId);
   }
 
   function saveCurrentView() {
@@ -512,6 +523,54 @@
       </div>
     {/if}
   </div>
+
+  <!-- The audition bar. It is the answer to "what am I hearing, and what is it playing" — the
+       two questions a preview that swaps sources underneath you has to keep answering. -->
+  <div class="audition" data-testid="audition-bar">
+    <button type="button" class="play"
+            disabled={!selected || !selected.available}
+            title={selected?.instant ? 'Play the stored preview now'
+                                     : 'Load and play — this one has no preview yet'}
+            onclick={() => selected && auditionRecord(selected.recordId)}>▶</button>
+
+    <div class="now">
+      <span class="now-name">{$hostAudition.recordId
+        ? (records.find((r) => r.recordId === $hostAudition.recordId)?.name ?? selected?.name ?? '—')
+        : (selected?.name ?? 'Nothing selected')}</span>
+      <span class="now-stage" data-testid="audition-stage">
+        {#if $hostAudition.stage === 'snapshot'}
+          <i class="pip snap"></i>preview · the plug-in is still loading
+        {:else if $hostAudition.stage === 'loading'}
+          <i class="pip none"></i>{$hostAudition.detail || 'loading…'}
+        {:else if $hostAudition.stage === 'live'}
+          <i class="pip live"></i>the real thing{$hostAudition.detail ? ` · ${$hostAudition.detail}` : ''}
+        {:else if $hostAudition.stage === 'silent'}
+          <i class="pip none"></i>{$hostAudition.detail}
+        {:else if selected}
+          <i class="pip" class:snap={selected.instant} class:none={!selected.instant}></i>
+          {selected.instant ? 'previews instantly' : 'no preview yet — would load first'}
+        {/if}
+      </span>
+    </div>
+
+    <div class="phrase">
+      <span class="phrase-label">Play with</span>
+      {#each [['note', 'A note'], ['chord', 'A chord'], ['recent', `Your last ${$hostAudition.bars} bars`]] as [mode, label] (mode)}
+        <button type="button" class="toggle" class:on={$hostAudition.phrase === mode}
+                data-testid="phrase-mode"
+                title={mode === 'recent'
+                       ? 'Audition with the line you were just playing, at your tempo'
+                       : `Audition with ${label.toLowerCase()}`}
+                onclick={() => setAuditionPhrase(mode)}>{label}</button>
+      {/each}
+    </div>
+
+    <span class="cache" title="Previews are a cache — the least recently heard are dropped first">
+      {$hostLibrary.counts.snapshots} previews{cacheSize($hostLibrary.counts.snapshotBytes)}
+    </span>
+
+    <button type="button" class="ghost" onclick={() => stopAudition()}>Stop</button>
+  </div>
 </div>
 
 <style>
@@ -738,4 +797,27 @@
   .notes { color: #9aa5b1; font-size: 11px; margin-top: 6px; }
   button.insp-remove { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
   .empty-hint { color: #7d8894; font-size: 12px; padding: 12px 0; }
+
+  .audition {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 10px; margin-top: 2px;
+    border: 1px solid #2a333d; border-radius: 5px; background: #101315;
+  }
+  button.play {
+    width: 26px; height: 26px; padding: 0; border-radius: 50%;
+    background: #7fb4e01f; border-color: #4a86bd; color: #7fb4e0; font-size: 11px;
+  }
+  .now { display: flex; flex-direction: column; gap: 1px; min-width: 190px; }
+  .now-name { font-weight: 600; font-size: 12px; color: #d6dbe0; }
+  .now-stage { display: flex; align-items: center; gap: 5px; color: #7d8894; font-size: 10.5px; }
+  .pip { width: 7px; height: 7px; border-radius: 50%; background: #3b4652; flex: 0 0 7px; }
+  .pip.snap { background: #7fb4e0; }
+  .pip.live { background: #35c46f; }
+  .pip.none { background: #566372; }
+  .phrase { display: flex; align-items: center; gap: 4px; }
+  .phrase-label {
+    color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    margin-right: 2px;
+  }
+  .cache { margin-left: auto; color: #66707b; font-size: 10.5px; }
 </style>

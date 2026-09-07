@@ -41,6 +41,7 @@ import {
   onInstrumentHostHardwarePatchPrompt,
   onInstrumentHostPatchCompare,
   onInstrumentHostAnalysisProgress,
+  onInstrumentHostAudition,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import {
@@ -71,6 +72,11 @@ export const hostLibrary = writable(emptyHostLibrary());
 /** What the auditioner is doing, if anything. `running` is what the browser gates its
  *  Listen button on; `total` of 0 with running false is the idle state. */
 export const hostAnalysis = writable({ done: 0, total: 0, what: '', running: false });
+/** What the audition is doing. `stage` is 'snapshot' while the rendered preview is standing in,
+ *  'live' once the real instrument took over, 'silent' for records that load rather than
+ *  preview, and '' when nothing is auditioning. */
+export const hostAudition = writable({ recordId: '', stage: '', detail: '',
+                                       phrase: 'recent', bars: 4 });
 export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
@@ -483,7 +489,7 @@ export function emptyHostLibrary() {
   return {
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
-              measured: 0, measurable: 0 },
+              measured: 0, measurable: 0, snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
     smartCollections: [],
@@ -516,6 +522,9 @@ export function normalizeHostLibrary(payload) {
       notes: String(r?.notes ?? ''),
       tags: (Array.isArray(r?.tags) ? r.tags : []).map(String),
       collections: (Array.isArray(r?.collections) ? r.collections : []).map(String),
+      // Whether a rendered snapshot exists right now. A cache, so it is per answer rather than
+      // a property of the record — and false only ever means "this one loads the slow way".
+      instant: r?.instant === true,
       // Absent, not zeroed: "not measured yet" and "measured and dark" are not the same thing,
       // and a browser that cannot tell them apart draws a flat line for both.
       sonic: r?.sonic && typeof r.sonic === 'object' ? {
@@ -545,6 +554,8 @@ export function normalizeHostLibrary(payload) {
       matched: Number(p.counts?.matched ?? (Array.isArray(p.records) ? p.records.length : 0)),
       measured: Number(p.counts?.measured ?? 0),
       measurable: Number(p.counts?.measurable ?? 0),
+      snapshots: Number(p.counts?.snapshots ?? 0),
+      snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
     duplicates: (Array.isArray(p.duplicates) ? p.duplicates : []).map((d) => ({
       keyRecordId: String(d?.keyRecordId ?? ''),
@@ -720,6 +731,11 @@ export function mockHostLibrary(query = '', type = '') {
   // Both call shapes: the older (text, type) pair and the whole query object.
   const request = normalizeLibraryQuery(
     typeof query === 'object' && query !== null ? query : { text: query, type });
+  // In the demo a measured sound is an instant one, which is what the native side arranges too:
+  // the auditioner keeps the render it measured.
+  for (const record of all)
+    record.instant = Boolean(record.sonic) && record.sonic.silent !== true;
+
   const records = all.filter((r) => matchesLibraryQuery(r, request));
 
   const statics = new Map();
@@ -731,6 +747,8 @@ export function mockHostLibrary(query = '', type = '') {
     records,
     counts: { total: all.length, presets: 4, racks: 1, chains: 1, missing: 0,
               matched: records.length,
+              snapshots: all.filter((r) => r.sonic && !r.sonic.silent).length,
+              snapshotBytes: all.filter((r) => r.sonic).length * 35000,
               measured: all.filter((r) => r.sonic).length,
               measurable: all.filter((r) => !r.sonic && r.type === 'preset'
                                               && r.available !== false).length },
@@ -749,6 +767,17 @@ export function mockHostLibrary(query = '', type = '') {
     keep them. Exported so a test can start from a known state. */
 export function setMockSmartCollections(collections) {
   mockSmartCollections = collections.map((c) => ({ ...c, query: normalizeLibraryQuery(c.query) }));
+}
+
+/** Puts the demo back where it starts: nothing saved, nothing measured that was not measured to
+    begin with. The auditioner's effect is module state — running it in one test would otherwise
+    decide what a later one sees. */
+export function resetMockLibraryState() {
+  mockSmartCollections = [];
+  mockMeasuredEverything = false;
+  mockLibraryView = emptyLibraryQuery();
+  hostAudition.set({ recordId: '', stage: '', detail: '', phrase: 'recent', bars: 4 });
+  hostAnalysis.set({ done: 0, total: 0, what: '', running: false });
 }
 
 export function emptyHostProject() {
@@ -5803,6 +5832,15 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
+  onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
+    recordId: String(payload?.recordId ?? ''),
+    // A 'phrase' answer is the setting changing, not a sound starting — it must not blank the
+    // indicator for whatever is currently playing.
+    stage: payload?.stage === 'phrase' ? was.stage : String(payload?.stage ?? ''),
+    detail: payload?.stage === 'phrase' ? was.detail : String(payload?.detail ?? ''),
+    phrase: String(payload?.phrase ?? was.phrase),
+    bars: Number(payload?.bars ?? was.bars),
+  })));
   onInstrumentHostAnalysisProgress((payload) => hostAnalysis.set({
     done: Number(payload?.done ?? 0),
     total: Number(payload?.total ?? 0),
@@ -6289,6 +6327,40 @@ function send(payload) {
       hostAnalysis.set({ done: todo, total: todo, what: `Done — ${todo} measured.`, running: false });
       mockMeasuredEverything = true;
       hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'auditionRecord') {
+      const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
+      if (!record) { hostLastError.set('Unknown library record.'); return; }
+      if (!record.available) { hostLastError.set(record.reason || 'Not playable here.'); return; }
+      if (record.type === 'rack' || record.sourceType === 'hardwarePatch') {
+        hostAudition.update((was) => ({ ...was, recordId: record.recordId, stage: 'silent',
+          detail: 'This one loads rather than previews.' }));
+        return;
+      }
+      const phrase = get(hostAudition).phrase;
+      const bars = get(hostAudition).bars;
+      hostAudition.set({ recordId: record.recordId,
+        stage: record.instant ? 'snapshot' : 'loading',
+        detail: record.instant ? '' : 'No snapshot yet — loading the plug-in.',
+        phrase, bars });
+      // The demo has no audio, so the handoff is immediate rather than "when the plug-in
+      // lands" — the stages are the same two the native side reports, in the same order.
+      hostAudition.update((was) => ({ ...was, stage: 'live',
+        detail: phrase === 'recent' ? `Playing your last ${bars} bars.`
+              : phrase === 'chord' ? 'Playing a chord.' : 'Playing a note.' }));
+      return;
+    }
+    if (payload?.cmd === 'stopAudition') {
+      hostAudition.update((was) => ({ ...was, stage: 'stopped', detail: '' }));
+      return;
+    }
+    if (payload?.cmd === 'setAuditionPhrase') {
+      hostAudition.update((was) => ({
+        ...was,
+        phrase: ['note', 'chord', 'recent'].includes(payload.phrase) ? payload.phrase : was.phrase,
+        bars: payload.bars ? Math.min(16, Math.max(1, Number(payload.bars))) : was.bars,
+      }));
       return;
     }
     if (payload?.cmd === 'cancelAnalysis') {
@@ -6806,6 +6878,14 @@ export const removeSmartCollection = (collectionId) =>
 export const analyseLibrary = (all = false) => send(all ? { cmd: 'analyseLibrary', all: true }
                                                         : { cmd: 'analyseLibrary' });
 export const cancelAnalysis = () => send({ cmd: 'cancelAnalysis' });
+
+/** Play a sound now. The rendered snapshot answers immediately where there is one; the plug-in
+    loads behind it and takes over when it arrives. `load` false previews without loading. */
+export const auditionRecord = (recordId, load = true) =>
+  send(load ? { cmd: 'auditionRecord', recordId } : { cmd: 'auditionRecord', recordId, load: false });
+export const stopAudition = () => send({ cmd: 'stopAudition' });
+export const setAuditionPhrase = (phrase, bars) =>
+  send(bars ? { cmd: 'setAuditionPhrase', phrase, bars } : { cmd: 'setAuditionPhrase', phrase });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
 export const browseLibraryPath = () => send({ cmd: 'browseLibraryPath' });
 export const removeLibraryPath = (path) => send({ cmd: 'removeLibraryPath', path });

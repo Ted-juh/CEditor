@@ -3,6 +3,7 @@
 #include <map>
 #include "RackModel.h"
 #include "RackProcessors.h"
+#include "AuditionPlayer.h"
 
 // InstrumentRackHost — Hostage's live multi-part rack over one AudioProcessorGraph.
 //
@@ -59,6 +60,17 @@ public:
     /** The wrappers drive this: the standalone through an AudioProcessorPlayer, the outer
         VST3 by delegating its processBlock, tests directly. */
     juce::AudioProcessorGraph& getGraph()                 { return graph; }
+
+    // -- instant audition (Stage C) -----------------------------------------------------
+    // One node that plays a rendered snapshot while the real plug-in is still loading. It is
+    // wired at exactly the point a part's instrument feeds, so the preview runs through that
+    // part's inserts, fader, pan and sends and is heard at the level the real thing will be.
+    // Named part gone or empty: it feeds the master chain instead, which is a preview rather
+    // than a rehearsal and is honest about the difference.
+    AuditionPlayer& getAuditionPlayer() const;
+    /** Which part's chain the preview joins. Rewires; safe to call while audio runs. */
+    void setAuditionTarget (const juce::String& partId);
+    const juce::String& getAuditionTarget() const         { return auditionPartId; }
 
     // -- rack structure -----------------------------------------------------------------
     const Performance& getPerformance() const             { return model; }
@@ -427,6 +439,8 @@ private:
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorGraph::Node::Ptr midiInNode, audioInNode, audioOutNode, engineNode;
     juce::AudioProcessorGraph::Node::Ptr masterGainNode;   // the Performance fader (Stage 7)
+    juce::AudioProcessorGraph::Node::Ptr auditionNode;     // the snapshot preview (Stage C)
+    juce::String auditionPartId;   // whose chain it feeds; empty = the master chain
     double currentSampleRate = 44100.0;
     int currentBlockSize = 512;
     bool prepared = false;

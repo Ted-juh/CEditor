@@ -1,6 +1,6 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A and B are built** (2026-09-07); C–F are a plan, not a commitment. The mockups it describes are in
+Status: **Stages A, B and C are built** (2026-09-07); D–F are a plan, not a commitment. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -126,8 +126,7 @@ Each stage ships something on its own.
 - ~~**A — the workspace.**~~ **Built, 2026-09-07** — see *Stage A, as built* below.
 - ~~**B — the auditioner.**~~ **Built, 2026-09-07** — see *Stage B, as built* below. Out-of-process
   hardening is what remains of it, and it is now B2 rather than a precondition.
-- **C — instant audition.** Snapshot cache, live handoff at the note boundary, the rolling eight-bar
-  buffer, auditioning through the part's chain.
+- ~~**C — instant audition.**~~ **Built, 2026-09-07** — see *Stage C, as built* below.
 - **D — versions and diff.** Independent of B; could come earlier if saving-over is the louder
   complaint. The real design work is the retention policy, not the UI.
 - **E — Atlas and substitutes.** The map, "more like this" and the missing-plug-in flow are one
@@ -244,6 +243,59 @@ statement from drawing a flat sound.
 people will notice first), the Atlas, "sounds like" in the inspector, and the substitutes. The
 distance function they all share is built and tested.
 
+## Stage C, as built
+
+Three pieces, each small enough to prove on its own: `SnapshotStore` keeps the render,
+`AuditionPlayer` plays it, `RecentPlay` remembers what you played.
+
+**The promise is that a click makes a sound now.** The auditioner already renders every preset
+once; Stage B threw that audio away. It is now kept as a 2-second mono FLAC at 16 kHz — about
+35 kB — so `auditionRecord` starts a sound on the same message that begins loading the plug-in.
+When the plug-in commits, the snapshot fades out and the real thing takes over.
+
+**It is a cache and it behaves like one.** 400 MB budget, least recently *heard* evicted first —
+reading a snapshot touches it, so the ones you actually browse are the ones that survive. A
+missing snapshot is not an error anywhere: it degrades to exactly the old behaviour, load the
+plug-in and wait, and the indicator says `no snapshot yet — loading the plug-in` rather than
+claiming to be the real thing. Snapshots are keyed by content fingerprint, so two copies of one
+preset share one file — which is what a library full of duplicates is made of.
+
+**Where the preview sits in the graph.** One node, wired at exactly the point a part's
+instrument feeds, so the preview runs through that part's inserts, its fader, its pan and its
+sends and is heard at the level the real instrument will be. With no part focused it joins the
+master chain instead — a preview rather than a rehearsal, and the difference is worth being
+honest about.
+
+**A fade, not a cut.** The snapshot and the live instrument are two renderings of the same sound
+arriving a few hundred milliseconds apart; cutting between them clicks, and a click is what
+makes a preview feel cheap. The test asserts the shape rather than a magic number: every block
+quieter than the last, and the final audible one far enough down to be inaudible.
+
+**"Your last eight bars" is the feature no preset browser has had.** Every note that reaches the
+rack goes into a ring stamped in beats — beats, not seconds, because a phrase captured in
+seconds replays at the wrong tempo the moment anybody changes it. When the live instrument takes
+over, that phrase plays through it. Auditioning a bass with a middle C tells you nothing;
+auditioning it with the line you were just playing tells you everything.
+
+Two rules make that phrase usable rather than a curiosity. The window ends at the **last bar line
+crossed**, so what comes back starts on a downbeat and loops instead of starting wherever you
+happened to stop. And it can never hang: a note still sounding at the end of the window is given
+an off, and an off whose on fell outside the window is dropped rather than replayed — on stage a
+stuck note is the only bug that matters.
+
+**What rendering it found.** `isPlaying()` was false for one block after `start()`, because
+`playing` was only set when the audio thread picked the clip up — so a caller that started a
+preview and asked whether anything was sounding was told no, and the indicator lagged the sound.
+Starting now means playing now, and a block that cannot take the swap lock outputs silence
+rather than a fragment of whatever was playing before. The cache size read `0 MB` for 68 kB,
+which looks like a broken number rather than a small one. And "the real thing" was shown while a
+plug-in with no snapshot was still loading, which is a lie for as long as the load takes — that
+is its own `loading` stage now.
+
+**Not in Stage C:** the snapshot is what the auditioner rendered — one note, dry, as the plug-in
+alone made it. Auditioning the *chain* would mean rendering the chain, which is a different
+probe. And nothing here is out of process; that is still B2.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -262,6 +314,10 @@ distance function they all share is built and tested.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage C built; see *Stage C, as built* above. The idea worth carrying: the
+  audition phrase had to be captured in beats and cut at bar lines. Neither was obvious from the
+  sketch, and both are the difference between "it replays something" and "it replays your line".
 
 - **2026-09-07** — Stage B built; see *Stage B, as built* above. The one thing worth carrying
   forward: the spectral centroid had to come from the sustain rather than the whole render, or

@@ -253,6 +253,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -570,6 +571,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -1047,6 +1049,7 @@ if(WIN32)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -1408,6 +1411,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)

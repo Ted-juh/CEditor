@@ -23,6 +23,9 @@
 #include "InstrumentHost/PatchDiff.h"
 #include "InstrumentHost/PluginWorkerCrashDumps.h"
 #include "InstrumentHost/SonicProbe.h"
+#include "InstrumentHost/SnapshotStore.h"
+#include "InstrumentHost/AuditionPlayer.h"
+#include "InstrumentHost/RecentPlay.h"
 #include <juce_cryptography/juce_cryptography.h>
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
@@ -1793,6 +1796,184 @@ void testSonicProbe()
            "an unmeasured profile is maximally far from everything, rather than a false match");
 }
 
+// Instant audition: the snapshot cache, the player that fades out of the way, and the last few
+// bars you played.
+//
+// The promise is that a click makes a sound NOW, and everything here exists to keep it. What
+// must hold: a snapshot survives a round trip, the store is a CACHE that throws away what you
+// have not listened to, a missing snapshot is a miss rather than a failure, the player stops
+// without a click, and a phrase captured in beats starts on a downbeat and never leaves a note
+// hanging.
+void testInstantAudition()
+{
+    std::cout << "\ninstant audition: snapshots, the handoff, and your last few bars" << std::endl;
+
+    using namespace ceditor::host;
+
+    // -- the store -----------------------------------------------------------------------
+    {
+        const auto dir = freshDataDir ("snapshots").getChildFile ("audio");
+        SnapshotStore store (dir);
+
+        // A ramp at 44.1k: something whose shape survives being halved in rate and can be
+        // recognised on the way back out.
+        juce::AudioBuffer<float> source (2, 44100);
+        for (int i = 0; i < source.getNumSamples(); ++i)
+        {
+            const auto value = std::sin (juce::MathConstants<float>::twoPi * 220.0f
+                                           * (float) i / 44100.0f) * 0.5f;
+            source.setSample (0, i, value);
+            source.setSample (1, i, value);
+        }
+
+        check (! store.has ("nothing"), "a store starts empty");
+        check (store.get ("nothing").getNumSamples() == 0,
+               "and a missing snapshot reads back as nothing — a miss, not a failure");
+
+        check (store.put ("sound-a", source, 44100.0), "a render stores");
+        check (store.has ("sound-a") && store.count() == 1, "as one file");
+
+        const auto read = store.get ("sound-a");
+        check (read.getNumChannels() == 1, "mono on the way back — a preview, not the sound");
+        check (std::abs (read.getNumSamples() - SnapshotStore::snapshotSampleRate) < 400,
+               "one second in, one second back, at the snapshot's own rate");
+        check (read.getMagnitude (0, read.getNumSamples()) > 0.2f,
+               "and it is the audio that went in, not silence");
+
+        // A key that is not a legal filename must still work, and must not collide with another
+        // key that sanitises to the same thing — that would serve one preset's audio for
+        // another's, silently.
+        check (store.put ("a/b:c", source, 44100.0) && store.put ("a?b*c", source, 44100.0),
+               "keys that are not filenames still store");
+        check (store.count() == 3, "and two different awkward keys are two different files");
+        check (store.get ("a/b:c").getNumSamples() > 0, "each readable by its own key");
+
+        // The budget. This is a cache and it has to behave like one: least recently HEARD goes
+        // first, which is what makes the snapshots you browse the ones that survive.
+        store.get ("sound-a");                       // heard now
+        juce::Thread::sleep (1100);                  // file times are second-resolution
+        store.put ("sound-d", source, 44100.0);      // newest
+
+        const auto before = store.bytes();
+        check (before > 0, "the store can say what it costs");
+        const auto removed = store.sweep (before / 2);
+        check (removed > 0 && store.bytes() <= before, "a sweep gets under the budget");
+        check (store.has ("sound-d"), "keeping what was written most recently");
+        check (store.sweep (before) == 0, "and a sweep already under budget removes nothing");
+
+        check (snapshotKeyFor ("fingerprint", "record") == "fingerprint"
+                 && snapshotKeyFor ("", "record") == "record",
+               "snapshots are filed by content where there is a fingerprint, so two copies of "
+               "one preset share one file");
+    }
+
+    // -- the player ----------------------------------------------------------------------
+    {
+        AuditionPlayer player;
+        player.setPlayConfigDetails (0, 2, 44100.0, 64);
+        player.prepareToPlay (44100.0, 64);
+
+        juce::AudioBuffer<float> block (2, 64);
+        juce::MidiBuffer midi;
+        const auto run = [&] { block.clear(); player.processBlock (block, midi); };
+
+        run();
+        check (block.getMagnitude (0, 64) == 0.0f && ! player.isPlaying(),
+               "an idle player is silent");
+
+        // Half a second of full-scale tone at the snapshot's own rate, played back at 44.1k.
+        juce::AudioBuffer<float> snapshot (1, SnapshotStore::snapshotSampleRate / 2);
+        for (int i = 0; i < snapshot.getNumSamples(); ++i)
+            snapshot.setSample (0, i, 0.8f);
+
+        player.start (snapshot, (double) SnapshotStore::snapshotSampleRate);
+        run();
+        check (player.isPlaying() && block.getMagnitude (0, 64) > 0.5f,
+               "and starts making sound on the very next block — that is the whole promise");
+
+        // Stopping fades rather than cuts. A 5 ms fade at 44.1k is 220 samples — four blocks of
+        // 64 — so the assertion is on the SHAPE: every block quieter than the last, and the
+        // final audible one far enough down that the handoff cannot click.
+        player.stop (0.005f);
+        float previousPeak = 1.0f, lastAudible = 1.0f;
+        bool monotonic = true;
+        for (int guard = 0; player.isPlaying() && guard < 200; ++guard)
+        {
+            run();
+            const auto peak = block.getMagnitude (0, 64);
+            if (peak > previousPeak)
+                monotonic = false;
+            if (peak > 0.0f)
+                lastAudible = peak;
+            previousPeak = peak;
+        }
+        check (! player.isPlaying(), "stopping ends the playback");
+        check (monotonic && lastAudible < 0.4f,
+               "through a fade that only ever descends, so the handoff cannot click");
+        run();
+        check (block.getMagnitude (0, 64) == 0.0f, "and nothing sounds afterwards");
+
+        // Rate conversion: a 16 kHz snapshot at 44.1 kHz lasts as long in seconds, not samples.
+        player.start (snapshot, (double) SnapshotStore::snapshotSampleRate);
+        int blocks = 0;
+        while (player.isPlaying() && blocks < 2000) { run(); ++blocks; }
+        const auto seconds = (blocks * 64) / 44100.0;
+        check (seconds > 0.4 && seconds < 0.62,
+               "a 16 kHz snapshot plays for its own half second at 44.1 kHz");
+    }
+
+    // -- the last few bars ---------------------------------------------------------------
+    {
+        RecentPlay recent;
+        check (recent.phrase (16.0, 4, 4.0).isEmpty(), "nothing played is no phrase");
+
+        // Four bars of four, one note per bar, played from beat 0 to beat 16.
+        for (int bar = 0; bar < 4; ++bar)
+        {
+            recent.add (bar * 4.0, juce::MidiMessage::noteOn (1, 60 + bar, (juce::uint8) 100));
+            recent.add (bar * 4.0 + 3.5, juce::MidiMessage::noteOff (1, 60 + bar));
+        }
+
+        // Asked for two bars part-way through bar five: the window ends at the last bar line
+        // crossed, so what comes back starts on a downbeat rather than wherever you stopped.
+        const auto two = recent.phrase (17.3, 2, 4.0);
+        check (two.size() == 4, "two bars of that is two notes, on and off");
+        check (juce::approximatelyEqual (two.getFirst().beat, 0.0)
+                 && two.getFirst().message.getNoteNumber() == 62,
+               "rebased to start at beat 0, on the downbeat of the first bar in the window");
+
+        check (recent.phrase (17.3, 8, 4.0).size() == 8, "asking for more than was played gets what there is");
+
+        // A note still held when the window ends gets an off, because a phrase that leaves a
+        // note on is a phrase that hangs — on stage the only bug that matters.
+        RecentPlay held;
+        held.add (0.5, juce::MidiMessage::noteOn (1, 48, (juce::uint8) 90));
+        const auto hung = held.phrase (4.0, 1, 4.0);
+        check (hung.size() == 2 && hung.getLast().message.isNoteOff()
+                 && hung.getLast().message.getNoteNumber() == 48,
+               "a note still sounding at the end of the window is released at the end of it");
+
+        // An off whose on fell outside the window would silence a note the instrument is not
+        // playing — or one it is.
+        RecentPlay orphan;
+        orphan.add (0.5, juce::MidiMessage::noteOn (1, 55, (juce::uint8) 90));
+        orphan.add (5.0, juce::MidiMessage::noteOff (1, 55));
+        const auto second = orphan.phrase (8.0, 1, 4.0);
+        check (second.isEmpty(), "an orphan note-off is dropped rather than replayed");
+
+        // Only notes. Controller traffic replayed into a different instrument is noise at best.
+        RecentPlay filtered;
+        filtered.add (1.0, juce::MidiMessage::controllerEvent (1, 74, 100));
+        check (filtered.isEmpty(), "anything that is not a note never enters the ring");
+
+        // The ring is a fixed cost, not a growing one.
+        RecentPlay ring;
+        for (int i = 0; i < RecentPlay::capacity + 200; ++i)
+            ring.add ((double) i, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100));
+        check (ring.size() == RecentPlay::capacity, "and the ring stays a fixed size");
+    }
+}
+
 // The auditioner at the command surface: what it measures, what it skips, and what it never
 // measures twice.
 void testAuditioner()
@@ -1894,6 +2075,85 @@ void testAuditioner()
     h.cmd ("getLibrary");
     check (library()->getProperty ("duplicates", {}).size() == 0,
            "three identically-measuring presets with different names are not duplicates");
+
+    // -- and what the auditioner leaves behind: the snapshots that make browsing instant ----
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    int instant = 0;
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if ((bool) r.getProperty ("instant", false))
+            ++instant;
+    check (instant == 3 && counts ("snapshots") == 3,
+           "every measured preset left a snapshot behind, and the browser is told which are instant");
+    check ((double) library()->getProperty ("counts", {}).getProperty ("snapshotBytes", 0.0) > 0.0,
+           "and what the cache costs, because it is a cache and somebody has to be able to see it");
+
+    // Auditioning one: the snapshot answers immediately, and the handoff happens when the real
+    // instrument lands. Audio is off in this harness, so the phrase is not heard — the stages
+    // are what this pins, because they are what the browser's indicator draws.
+    juce::String presetId;
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (r.getProperty ("name", {}).toString() == "Bright")
+            presetId = r.getProperty ("recordId", {}).toString();
+
+    h.emits.clear();
+    h.cmd ("auditionRecord", { { "recordId", presetId } });
+    const auto* audition = h.emits.last ("instrumentHostAudition");
+    check (audition != nullptr && audition->getProperty ("stage", {}).toString() == "live",
+           "the same class is already loaded, so the real thing answers and no preview is needed");
+
+    // A record with no snapshot degrades to loading the plug-in, which is the ordinary case for
+    // anything the auditioner has not reached — and it is not an error.
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Unheard" } });
+    juce::String unheardId;
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (r.getProperty ("name", {}).toString() == "Unheard")
+            unheardId = r.getProperty ("recordId", {}).toString();
+
+    h.emits.clear();
+    h.cmd ("auditionRecord", { { "recordId", unheardId } });
+    check (h.emits.lastError().isEmpty(),
+           "a sound with no snapshot is not an error — it just loads the slow way");
+    bool saidWhy = false, playedThePhrase = false;
+    for (const auto& entry : h.emits.entries)
+        if (entry.name == "instrumentHostAudition")
+        {
+            const auto detail = entry.payload.getProperty ("detail", {}).toString();
+            saidWhy = saidWhy || detail.contains ("No snapshot");
+            playedThePhrase = playedThePhrase || detail.contains ("bars")
+                                || detail.contains ("note") || detail.contains ("chord");
+        }
+    check (saidWhy, "and the browser is told why it was not instant");
+    check (playedThePhrase,
+           "then the handoff says what it is playing through the real thing — which is the "
+           "point of keeping what you played");
+
+    // A rack loads rather than previews, and says so instead of doing nothing.
+    h.cmd ("saveRackToLibrary", { { "name", "Rig" } });
+    juce::String rackId;
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (r.getProperty ("type", {}).toString() == "rack")
+            rackId = r.getProperty ("recordId", {}).toString();
+    h.emits.clear();
+    h.cmd ("auditionRecord", { { "recordId", rackId } });
+    check (h.emits.last ("instrumentHostAudition")->getProperty ("stage", {}).toString() == "silent",
+           "a rack loads rather than previews, and says so");
+
+    // The phrase setting is remembered and reported.
+    h.emits.clear();
+    h.cmd ("setAuditionPhrase", { { "phrase", "chord" }, { "bars", 8 } });
+    const auto* phrase = h.emits.last ("instrumentHostAudition");
+    check (phrase != nullptr && phrase->getProperty ("phrase", {}).toString() == "chord"
+             && (int) phrase->getProperty ("bars", 0) == 8,
+           "the audition phrase is a setting, and every answer carries it");
+    h.cmd ("setAuditionPhrase", { { "phrase", "nonsense" } });
+    check (h.emits.last ("instrumentHostAudition")->getProperty ("phrase", {}).toString() == "chord",
+           "and a phrase nobody offers is refused rather than stored");
+
 }
 
 // Browsing: the facets, the refusals, and the counts that have to predict the click.
@@ -9112,6 +9372,7 @@ int main (int argc, char* argv[])
     testLibrary();
     testSonicProbe();
     testAuditioner();
+    testInstantAudition();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

@@ -236,6 +236,24 @@ InstrumentRackHost::InstrumentRackHost()
     // it is the product's level, not another insert, so nothing on the master bus can be
     // driven by it and it cannot be bypassed by an effect that is.
     masterGainNode = graph.addNode (std::make_unique<GainPanProcessor>());
+
+    // The audition preview. It exists from the start and is silent until something is played
+    // through it, so no rewiring is needed to begin previewing — which matters, because the
+    // whole point is that a click makes a sound now rather than after a graph rebuild.
+    auditionNode = graph.addNode (std::make_unique<AuditionPlayer>());
+}
+
+AuditionPlayer& InstrumentRackHost::getAuditionPlayer() const
+{
+    return *static_cast<AuditionPlayer*> (auditionNode->getProcessor());
+}
+
+void InstrumentRackHost::setAuditionTarget (const juce::String& partId)
+{
+    if (auditionPartId == partId)
+        return;
+    auditionPartId = partId;
+    rewireAudio();
 }
 
 InstrumentRackHost::~InstrumentRackHost() = default;
@@ -2034,7 +2052,14 @@ void InstrumentRackHost::rewireAudio()
 
         auto* chainHead = inserts.isEmpty() ? lp.gainNode.get() : inserts.getFirst();
 
-        bool hasSource = false;
+        // The preview joins here, where the instrument would: through this part's inserts, its
+        // fader and its sends. A part with no instrument yet is the ordinary case — you are
+        // auditioning INTO it — so the inserts are wired below whether or not one has landed.
+        const auto previewingThisPart = auditionPartId == partId;
+        if (previewingThisPart)
+            connectAudio (auditionNode.get(), chainHead);
+
+        bool hasSource = previewingThisPart;
         if (part->hardware)
         {
             if (part->audioReturnChannel >= 0
@@ -2103,6 +2128,12 @@ void InstrumentRackHost::rewireAudio()
                 }
         }
     }
+
+    // With no part named — or a named part that has since gone — the preview joins the master
+    // chain instead. That is a preview rather than a rehearsal (no inserts, no fader, no sends
+    // of the part it is destined for), and the difference is worth being honest about.
+    if (auditionPartId.isEmpty() || findLive (auditionPartId) == nullptr)
+        connectAudio (auditionNode.get(), masterSink);
 
     // Master serial hops, tail into the fader, fader into output pair 0.
     for (int i = 0; i + 1 < masterNodes.size(); ++i)
