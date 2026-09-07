@@ -1,7 +1,11 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A–F are built, B2 included** (2026-09-07). The auditioner now listens in a
-child process; what that cost and what it bought is *Stage B2, as built* below. The mockups it describes are in
+Status: **Stages A–F are built, B2 included** (2026-09-07). Every stage below ends with what
+building it found, and each says plainly what it deliberately did not do. Three of those
+deferrals have since been closed — the auditioner listens in a child process (*Stage B2*), a
+substitute you choose is remembered (*Stage E*), and the browser reaches the keyboard (*Stage
+F*). What is left open is listed in *What this deliberately does not do* and, for the one thing
+that genuinely needs the hardware, at the end of Stage F. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -295,7 +299,7 @@ is its own `loading` stage now.
 
 **Not in Stage C:** the snapshot is what the auditioner rendered — one note, dry, as the plug-in
 alone made it. Auditioning the *chain* would mean rendering the chain, which is a different
-probe. And nothing here is out of process; that is still B2.
+probe. (The rendering itself is out of process now; that was B2, below.)
 
 ## Stage D, as built
 
