@@ -60,6 +60,11 @@ import {
   auditionRecord,
   stopAudition,
   setAuditionPhrase,
+  hostVersionDiff,
+  normalizeVersionDiff,
+  commitVersion,
+  applyVersion,
+  diffVersions,
   hostLibrary,
   requestLibrary,
   saveUserPreset,
@@ -882,6 +887,89 @@ test('mock reducer: the audition phrase is a setting, and nonsense is refused', 
   setAuditionPhrase('recent', 99);
   assert.equal(get(hostAudition).bars, 16, 'and the bar count is clamped');
   setAuditionPhrase('recent', 4);
+});
+
+// --- versions ----------------------------------------------------------------------------------
+
+test('normalizeHostLibrary shapes the saves without their blobs', () => {
+  const shaped = normalizeHostLibrary({
+    records: [{ recordId: 'a',
+                versions: [{ versionId: 'v1', label: 'darker', savedAtMs: '1700', bytes: '18000' },
+                           { origin: true }],
+                branchedFrom: 'f1', branchedFromName: 'Rubber Bass' }],
+  });
+  const record = shaped.records[0];
+  assert.equal(record.versions.length, 1, 'a version with no id is not a version');
+  assert.deepEqual(record.versions[0],
+    { versionId: 'v1', label: 'darker', savedAtMs: 1700, origin: false, bytes: 18000 });
+  assert.equal(record.branchedFromName, 'Rubber Bass');
+  assert.deepEqual(normalizeHostLibrary({ records: [{ recordId: 'b' }] }).records[0].versions, [],
+    'a record with no saves has none rather than undefined');
+});
+
+test('normalizeVersionDiff shapes a comparison the rows can be drawn from', () => {
+  const diff = normalizeVersionDiff({
+    recordId: 'a', nameA: 'factory', nameB: 'now', differing: '1', total: 2, identical: 'no',
+    parameters: [{ definitionId: 'cutoff', name: 'Cutoff', a: '0.25', b: 0.8,
+                   aText: 25, bText: '80 %', changed: true },
+                 { definitionId: 'x' }],
+  });
+  assert.equal(diff.differing, 1);
+  assert.equal(diff.identical, false, 'a truthy string is not "identical"');
+  assert.equal(diff.parameters[0].a, 0.25);
+  assert.equal(diff.parameters[0].aText, '25');
+  assert.equal(diff.parameters[1].changed, false);
+});
+
+test('mock reducer: saving keeps a version, and saving over a factory preset branches', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const mine = () => get(hostLibrary).records.find((r) => r.recordId === 'lib-2');
+  assert.equal(mine().versions.length, 0, 'a record starts with no saves');
+
+  commitVersion('lib-2', 'darker');
+  commitVersion('lib-2');
+  assert.deepEqual(mine().versions.map((v) => v.label), ['darker', ''],
+    'each save is a version on the same record, oldest first — never an overwrite');
+
+  // A vendor record's versions would be the vendor's, and a rescan is entitled to refresh
+  // everything on one. So the first save branches into a record of your own.
+  const factory = get(hostLibrary).records.find((r) => r.factory && r.type === 'preset');
+  const before = get(hostLibrary).records.length;
+  commitVersion(factory.recordId, 'mine');
+  const after = get(hostLibrary).records;
+  assert.equal(after.length, before + 1, 'saving over a factory preset makes a new record');
+  const branch = after.find((r) => r.branchedFrom === factory.recordId);
+  assert.equal(branch.branchedFromName, factory.name, 'which remembers what it came from');
+  assert.equal(branch.factory, false, 'and is yours');
+  assert.equal(after.find((r) => r.recordId === factory.recordId).versions.length, 0,
+    'while the vendor record is left exactly as it was');
+});
+
+test('mock reducer: the diff refuses when there is nothing to compare against', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  hostLastError.set('');
+  diffVersions('lib-2');
+  assert.ok(get(hostLastError).length > 0, 'one save is not a comparison');
+  assert.equal(get(hostVersionDiff), null);
+
+  commitVersion('lib-2', 'a');
+  commitVersion('lib-2', 'b');
+  diffVersions('lib-2');
+  const diff = get(hostVersionDiff);
+  assert.equal(diff.recordId, 'lib-2');
+  assert.equal(diff.differing, 2);
+  assert.equal(diff.parameters.filter((r) => r.changed).length, 2);
+
+  hostLastError.set('');
+  applyVersion('lib-2', 'nope');
+  assert.match(get(hostLastError), /not on this record/);
+  resetMockLibraryState();
 });
 
 test('mock reducer: a chain record captures a whole voice and lands as one', () => {

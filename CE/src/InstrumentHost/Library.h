@@ -71,6 +71,37 @@ struct SonicProfile
     library half-probed never claims a match it cannot support. */
 float sonicDistance (const SonicProfile& a, const SonicProfile& b);
 
+// -- keeping more than one of a sound -----------------------------------------------------------
+//
+// Saving a sound should not be a decision about whether to destroy the old one. Every save is a
+// version; the record's current state is the newest of them. That costs a state blob per save —
+// eighteen kilobytes for a big synth — which is why the retention rule below exists rather than
+// keeping everything forever and hoping.
+//
+// THE RULE, and it is the real design work in this stage rather than the rail that draws it:
+//
+//   under 30 days   every save, because that is the window in which you are still working on it
+//   under a year    one a day, because after a month what you want is "the one from Tuesday"
+//   older           only the ones you named
+//
+// and on top of that, three are never dropped whatever their age: anything you gave a name to
+// (naming it is the whole signal that it matters), the newest (it is the sound), and the one
+// marked `origin` (what this was branched from — throwing that away loses the comparison the
+// diff exists for).
+
+struct LibraryVersion
+{
+    juce::String versionId;         // minted once
+    juce::String label;             // what you called it; empty for an unnamed save
+    juce::int64 savedAtMs = 0;      // juce::Time::currentTimeMillis()
+    juce::String stateBlobBase64;   // the state itself
+    bool origin = false;            // the state this record was branched from
+};
+
+/** Applies the rule above, newest last. Pure and total: the same list in, the same list out. */
+juce::Array<LibraryVersion> pruneLibraryVersions (juce::Array<LibraryVersion> versions,
+                                                  juce::int64 nowMs);
+
 struct LibraryRecord
 {
     juce::String recordId;        // stable, minted once
@@ -94,6 +125,15 @@ struct LibraryRecord
     // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
     SonicProfile sonic;
     juce::String sonicFingerprint;
+
+    // Every save of this sound, oldest first. `stateBlobBase64` above is the newest of them —
+    // one current state, so nothing that already reads a record has to learn about versions.
+    juce::Array<LibraryVersion> versions;
+    // The vendor record this was branched from, when it was. A factory preset's versions are
+    // yours, not the vendor's, so the first save of one makes a record of your own that
+    // remembers where it came from — which is what "41 of 186 parameters differ from factory"
+    // is measured against.
+    juce::String branchedFromRecordId;
 
     struct UserMetadata
     {

@@ -979,6 +979,13 @@ export function onInstrumentHostAudition(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** A parameter-level comparison of two saves ({ recordId, nameA, nameB, parameters, … }). */
+export function onInstrumentHostVersionDiff(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostVersionDiff', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Refused or failed commands ({ message }). */
 export function onInstrumentHostError(callback) {
   if (!isJuceAvailable()) return () => {};

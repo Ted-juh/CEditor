@@ -57,17 +57,34 @@ struct StubSynthProcessor : juce::AudioProcessor
                                                    audio.getNumSamples());
     }
 
+    // State is `patch` FOLLOWED BY the three parameters, which is what a real plug-in's state
+    // is: a sound, not a serial number. The int stays first and stays alone-readable, so every
+    // suite that round-trips `patch` through a four-byte blob still does. The parameters were
+    // added when versions and their diff needed two states that actually differ by something a
+    // parameter diff can name.
     void getStateInformation (juce::MemoryBlock& dest) override
     {
         ++stateCaptureCount;
         juce::MemoryOutputStream stream (dest, false);
         stream.writeInt (patch);
+        stream.writeFloat (cutoff->get());
+        stream.writeInt (wave->getIndex());
+        stream.writeBool (drive->get());
     }
 
     void setStateInformation (const void* data, int size) override
     {
-        if (size >= 4)
-            patch = juce::MemoryInputStream (data, (size_t) size, false).readInt();
+        if (size < 4)
+            return;
+
+        juce::MemoryInputStream stream (data, (size_t) size, false);
+        patch = stream.readInt();
+        if (size >= 13)
+        {
+            *cutoff = stream.readFloat();
+            *wave = stream.readInt();
+            *drive = stream.readBool();
+        }
     }
 
     const juce::String getName() const override               { return "Stub Synth"; }

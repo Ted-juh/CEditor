@@ -90,6 +90,10 @@
 //      in all mode crossfade live audio; key/velocity sources shape incoming note velocity.)
 //   setLibraryUserMetadata {recordId, favourite?,rating?,notes?,tags?,collections?}
 //   saveSmartCollection {collectionId?,name,query?} | removeSmartCollection {collectionId}
+//   commitVersion {recordId?,partId?,label?} | applyVersion {recordId,versionId,partId?}
+//   diffVersions {recordId, versionIdA?, versionIdB?, partId?} | morphVersions {…, amount}
+//     (versions: every save is kept, never an overwrite. A factory preset's first save
+//      branches into a record of your own that remembers where it came from.)
 //   analyseLibrary {all?} | cancelAnalysis
 //   auditionRecord {recordId, load?} | stopAudition | setAuditionPhrase {phrase, bars?}
 //     (instant audition: the snapshot plays now, the plug-in takes over when it arrives)
@@ -774,6 +778,13 @@ private:
         the sentence to show. One definition, because loading a preset onto a part and playing
         it to measure it are the same operation with different reasons. */
     juce::String applyRecordState (juce::AudioProcessor& instrument, const LibraryRecord& record) const;
+    /** A raw captured state onto a live processor. Empty return = it took. */
+    static juce::String applyStateBlob (juce::AudioProcessor& instrument, const juce::String& base64);
+    /** Every host-visible parameter's normalised value and its text, in descriptor order. */
+    struct ParameterReading { juce::String definitionId, name, text; float value = 0.0f; };
+    static juce::Array<ParameterReading> readParameters (juce::AudioProcessor& instrument);
+    /** The part a version command acts on: the one named, else the focused one. */
+    juce::String versionTargetPart (const juce::var& payload) const;
     void emitLibrary (const LibraryQuery& query);
     void scanVstPresets();
     /** Availability, computed live against the catalogue (caller holds no locks; this takes

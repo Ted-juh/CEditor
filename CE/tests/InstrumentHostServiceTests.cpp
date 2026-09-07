@@ -1796,6 +1796,200 @@ void testSonicProbe()
            "an unmeasured profile is maximally far from everything, rather than a false match");
 }
 
+// Versions over the command surface: saving instead of overwriting, branching off a factory
+// preset, putting an old one back, and the diff that says what changed.
+void testVersionsInTheService()
+{
+    std::cout << "\nversions over the command surface" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Init", 0.50f }, { "Bright", 0.90f } };
+
+    const auto dir = freshDataDir ("versions");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+
+    const auto library = [&h] { return h.emits.last ("instrumentHostLibrary"); };
+    const auto recordNamed = [&library] (const juce::String& name)
+    {
+        juce::var found;
+        for (const auto& r : *library()->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == name)
+                found = r;
+        return found;
+    };
+
+    // Save one of our own, then save it again: two versions, one record. Not two records, and
+    // certainly not one record with the first save gone.
+    h.cmd ("saveUserPreset", { { "partId", partId }, { "name", "Mine" } });
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    const auto mineId = recordNamed ("Mine").getProperty ("recordId", {}).toString();
+    check (mineId.isNotEmpty(), "a captured sound is a record");
+
+    stub->cutoff->setValueNotifyingHost (0.25f);
+    h.emits.clear();
+    h.cmd ("commitVersion", { { "recordId", mineId }, { "label", "darker" } });
+    auto mine = recordNamed ("Mine");
+    check (mine.getProperty ("versions", {}).size() == 1,
+           "committing keeps a version on the record it came from, not a second record");
+    check (mine.getProperty ("versions", {})[0].getProperty ("label", {}).toString() == "darker",
+           "with the name you gave it");
+
+    stub->cutoff->setValueNotifyingHost (0.80f);
+    h.emits.clear();
+    h.cmd ("commitVersion", { { "recordId", mineId } });
+    mine = recordNamed ("Mine");
+    check (mine.getProperty ("versions", {}).size() == 2, "and a second save is a second version");
+    const auto firstVersionId = mine.getProperty ("versions", {})[0]
+                                    .getProperty ("versionId", {}).toString();
+
+    // Putting an old one back is what a version rail is for.
+    h.cmd ("applyVersion", { { "recordId", mineId }, { "versionId", firstVersionId } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.25f),
+           "applying an old version puts that sound back on the part");
+
+    // The diff. Two states, read through the plug-in that understands them, and what was on the
+    // part when you asked is what is on it afterwards — a comparison must not be a change.
+    h.cmd ("applyVersion", { { "recordId", mineId },
+                             { "versionId", mine.getProperty ("versions", {})[1]
+                                                .getProperty ("versionId", {}).toString() } });
+    h.emits.clear();
+    h.cmd ("diffVersions", { { "recordId", mineId },
+                             { "versionIdA", firstVersionId } });
+    const auto* diff = h.emits.last ("instrumentHostVersionDiff");
+    check (diff != nullptr && (int) diff->getProperty ("differing", 0) == 1,
+           "the diff finds the one parameter that moved");
+    check (diff != nullptr && (int) diff->getProperty ("total", 0) >= 3,
+           "out of every parameter the plug-in exposes");
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.80f),
+           "and the part is left exactly as it was — comparing is not editing");
+
+    bool named = false;
+    for (const auto& row : *diff->getProperty ("parameters", {}).getArray())
+        if (row.getProperty ("name", {}).toString() == "Cutoff")
+            named = (bool) row.getProperty ("changed", false)
+                      && row.getProperty ("aText", {}).toString().isNotEmpty();
+    check (named, "naming the parameter and showing both values as the plug-in words them");
+
+    // A factory preset's first save branches: its versions are yours, not the vendor's, and a
+    // rescan is entitled to refresh everything on a vendor record.
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    juce::String factoryId;
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (r.getProperty ("sourceType", {}).toString() == "programList"
+            && r.getProperty ("name", {}).toString() == "Bright")
+            factoryId = r.getProperty ("recordId", {}).toString();
+    check (factoryId.isNotEmpty(), "the plug-in's own programs are in the library");
+
+    h.emits.clear();
+    h.cmd ("commitVersion", { { "recordId", factoryId }, { "label", "Bright, mine" } });
+    const auto branched = recordNamed ("Bright, mine");
+    check (branched.getProperty ("recordId", {}).toString().isNotEmpty(),
+           "saving over a factory preset makes a record of your own instead");
+    check (branched.getProperty ("branchedFrom", {}).toString() == factoryId
+             && branched.getProperty ("branchedFromName", {}).toString() == "Bright",
+           "which remembers what it came from, by name");
+    check (! (bool) branched.getProperty ("factory", true)
+             && branched.getProperty ("sourceType", {}).toString() == "userState",
+           "and is yours: a rescan cannot refresh it out from under you");
+
+    // Refusals are events, not silence.
+    h.emits.clear();
+    h.cmd ("applyVersion", { { "recordId", mineId }, { "versionId", "nope" } });
+    check (h.emits.lastError().contains ("not on this record"), "an unknown version refuses");
+    h.emits.clear();
+    h.cmd ("diffVersions", { { "recordId", factoryId } });
+    check (h.emits.lastError().isNotEmpty(),
+           "and a record with nothing to compare against says so rather than emitting an empty diff");
+}
+
+// Versions: keeping more than one of a sound, and the rule that decides what survives.
+//
+// The rail that draws these is the easy half. The rule is the design work: keeping every save
+// forever costs a state blob each — eighteen kilobytes for a big synth — and keeping only the
+// newest is the overwrite this stage exists to abolish. Three things are never dropped whatever
+// their age, and each is there for a reason a test can state.
+void testVersionRetention()
+{
+    std::cout << "\nversions, and what survives" << std::endl;
+
+    using ceditor::host::LibraryVersion;
+    using ceditor::host::pruneLibraryVersions;
+
+    constexpr juce::int64 day = 24ll * 60 * 60 * 1000;
+    const juce::int64 now = 1'700'000'000'000ll;
+
+    const auto at = [] (juce::int64 when, const juce::String& id, const juce::String& label = {},
+                        bool origin = false)
+    {
+        LibraryVersion v;
+        v.versionId = id;
+        v.label = label;
+        v.savedAtMs = when;
+        v.origin = origin;
+        return v;
+    };
+
+    const auto ids = [] (const juce::Array<LibraryVersion>& versions)
+    {
+        juce::StringArray out;
+        for (const auto& v : versions) out.add (v.versionId);
+        return out.joinIntoString (",");
+    };
+
+    check (ids (pruneLibraryVersions ({ at (now, "only") }, now)) == "only",
+           "one version is always one version");
+
+    // Under thirty days: everything, because that is the window in which you are still working
+    // on it and "the one from twenty minutes ago" is a thing people want.
+    juce::Array<LibraryVersion> recent {
+        at (now - 3 * day, "a"), at (now - 2 * day, "b"),
+        at (now - 2 * day + 1000, "c"), at (now, "d") };
+    check (ids (pruneLibraryVersions (recent, now)) == "a,b,c,d",
+           "under thirty days every save survives, twice on the same day included");
+
+    // Between a month and a year: one a day, and it is the LAST save of that day — the one you
+    // finished on rather than the one you started with.
+    juce::Array<LibraryVersion> older {
+        at (now - 90 * day, "morning"), at (now - 90 * day + 60'000, "afternoon"),
+        at (now - 89 * day, "nextDay"), at (now, "newest") };
+    check (ids (pruneLibraryVersions (older, now)) == "afternoon,nextDay,newest",
+           "past a month it is one a day, keeping the one you finished on");
+
+    // Past a year: only the ones you named. Naming a save is the whole signal that it matters.
+    juce::Array<LibraryVersion> ancient {
+        at (now - 800 * day, "forgotten"), at (now - 700 * day, "beforeTheTour", "Before the tour"),
+        at (now, "newest") };
+    check (ids (pruneLibraryVersions (ancient, now)) == "beforeTheTour,newest",
+           "past a year only the named survive");
+
+    // The three that are never dropped, each for its own reason.
+    juce::Array<LibraryVersion> pinned {
+        at (now - 900 * day, "origin", {}, true),
+        at (now - 500 * day, "named", "The good one"),
+        at (now - 400 * day, "plain"),
+        at (now, "newest") };
+    const auto kept = pruneLibraryVersions (pinned, now);
+    check (ids (kept) == "origin,named,newest",
+           "the origin, the named and the newest survive any age; an unnamed old one does not");
+    check (kept.getFirst().origin,
+           "and the origin keeps its mark — the diff measures everything against it");
+
+    // Order in, order out: the rail draws these top to bottom and a shuffled list would draw a
+    // history that never happened.
+    juce::Array<LibraryVersion> shuffled { at (now, "third"), at (now - day, "second"),
+                                           at (now - 2 * day, "first") };
+    check (ids (pruneLibraryVersions (shuffled, now)) == "first,second,third",
+           "however they arrive, they come back oldest first");
+}
+
 // Instant audition: the snapshot cache, the player that fades out of the way, and the last few
 // bars you played.
 //
@@ -9373,6 +9567,8 @@ int main (int argc, char* argv[])
     testSonicProbe();
     testAuditioner();
     testInstantAudition();
+    testVersionRetention();
+    testVersionsInTheService();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

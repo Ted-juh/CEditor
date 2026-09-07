@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <utility>
 
@@ -226,6 +227,24 @@ juce::var Library::toVar() const
             r->setProperty ("sonic", juce::var (m));
             r->setProperty ("sonicFingerprint", record.sonicFingerprint);
         }
+
+        if (! record.versions.isEmpty())
+        {
+            juce::Array<juce::var> versionVars;
+            for (const auto& version : record.versions)
+            {
+                auto* v = new juce::DynamicObject();
+                v->setProperty ("versionId", version.versionId);
+                v->setProperty ("label",     version.label);
+                v->setProperty ("savedAtMs", version.savedAtMs);
+                v->setProperty ("stateBlob", version.stateBlobBase64);
+                v->setProperty ("origin",    version.origin);
+                versionVars.add (juce::var (v));
+            }
+            r->setProperty ("versions", versionVars);
+        }
+        if (record.branchedFromRecordId.isNotEmpty())
+            r->setProperty ("branchedFrom", record.branchedFromRecordId);
         recordVars.add (juce::var (r));
     }
 
@@ -310,6 +329,20 @@ Library Library::fromVar (const juce::var& stored)
             record.sonicFingerprint = r.getProperty ("sonicFingerprint", {}).toString();
         }
 
+        if (const auto* stored = r.getProperty ("versions", {}).getArray())
+            for (const auto& v : *stored)
+            {
+                LibraryVersion version;
+                version.versionId = v.getProperty ("versionId", {}).toString();
+                version.label = v.getProperty ("label", {}).toString();
+                version.savedAtMs = (juce::int64) (double) v.getProperty ("savedAtMs", 0.0);
+                version.stateBlobBase64 = v.getProperty ("stateBlob", {}).toString();
+                version.origin = (bool) v.getProperty ("origin", false);
+                if (version.versionId.isNotEmpty())
+                    record.versions.add (std::move (version));
+            }
+        record.branchedFromRecordId = r.getProperty ("branchedFrom", {}).toString();
+
         const auto u = r.getProperty ("user", {});
         record.user.favourite = (bool) u.getProperty ("favourite", false);
         record.user.rating    = juce::jlimit (0, 5, (int) u.getProperty ("rating", 0));
@@ -367,6 +400,66 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
     }
 
     return out;
+}
+
+juce::Array<LibraryVersion> pruneLibraryVersions (juce::Array<LibraryVersion> versions,
+                                                  juce::int64 nowMs)
+{
+    if (versions.size() < 2)
+        return versions;
+
+    // Oldest first, so "the newest" is the last and one-a-day keeps the last of each day.
+    std::stable_sort (versions.begin(), versions.end(),
+                      [] (const LibraryVersion& a, const LibraryVersion& b)
+                      { return a.savedAtMs < b.savedAtMs; });
+
+    constexpr juce::int64 day = 24ll * 60 * 60 * 1000;
+    const auto recent = nowMs - 30 * day;
+    const auto ancient = nowMs - 365 * day;
+
+    juce::Array<LibraryVersion> kept;
+    juce::int64 lastKeptDay = std::numeric_limits<juce::int64>::min();
+
+    for (int i = 0; i < versions.size(); ++i)
+    {
+        const auto& version = versions.getReference (i);
+        const auto isNewest = (i == versions.size() - 1);
+
+        // Never dropped, whatever their age: named, newest, and the origin the diff measures
+        // everything against.
+        if (isNewest || version.origin || version.label.isNotEmpty())
+        {
+            kept.add (version);
+            lastKeptDay = version.savedAtMs / day;
+            continue;
+        }
+
+        if (version.savedAtMs >= recent)
+        {
+            kept.add (version);
+            lastKeptDay = version.savedAtMs / day;
+            continue;
+        }
+
+        if (version.savedAtMs < ancient)
+            continue;   // older than a year and unnamed
+
+        // One a day. Sorted oldest first, so this keeps the LAST save of each day — the one you
+        // finished on rather than the one you started with.
+        const auto thisDay = version.savedAtMs / day;
+        const auto nextIsSameDay = i + 1 < versions.size()
+                                     && versions.getReference (i + 1).savedAtMs / day == thisDay;
+        if (nextIsSameDay)
+            continue;
+
+        if (thisDay != lastKeptDay)
+        {
+            kept.add (version);
+            lastKeptDay = thisDay;
+        }
+    }
+
+    return kept;
 }
 
 float sonicDistance (const SonicProfile& a, const SonicProfile& b)

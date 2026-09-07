@@ -30,6 +30,7 @@
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
     hostAnalysis, analyseLibrary, cancelAnalysis,
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
+    hostVersionDiff, commitVersion, applyVersion, diffVersions,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
@@ -43,6 +44,9 @@
   } = $props();
 
   let query = $state(emptyLibraryQuery());
+  let versionLabel = $state('');
+  let namingVersion = $state(false);
+  let onlyDifferences = $state(true);
   let selectedId = $state('');
   let collectionName = $state('');
   let namingCollection = $state(false);
@@ -138,6 +142,22 @@
     // makes a SOUND — the stored snapshot answers immediately and the plug-in takes over when
     // it arrives, which is the whole difference between browsing and waiting.
     if (auditionOn && record.available) auditionRecord(record.recordId);
+  }
+
+  /** When a save happened, in the words somebody would use out loud. */
+  function whenSaved(ms) {
+    const seconds = Math.max(0, (Date.now() - ms) / 1000);
+    if (seconds < 90) return 'just now';
+    if (seconds < 5400) return `${Math.round(seconds / 60)} min ago`;
+    if (seconds < 172800) return `${Math.round(seconds / 3600)} h ago`;
+    return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  function saveVersion() {
+    if (!selected) return;
+    commitVersion(selected.recordId, versionLabel.trim() || undefined);
+    versionLabel = '';
+    namingVersion = false;
   }
 
   function saveCurrentView() {
@@ -375,6 +395,41 @@
         </div>
       </div>
 
+      {#if $hostVersionDiff && $hostVersionDiff.recordId === selected?.recordId}
+        {@const diff = $hostVersionDiff}
+        <div class="diff" data-testid="version-diff">
+          <div class="diff-head">
+            <span class="diff-title">{diff.nameA} → {diff.nameB}</span>
+            <span class="diff-count">
+              {diff.identical ? 'identical' : `${diff.differing} of ${diff.total} parameters differ`}
+            </span>
+            <button type="button" class="toggle" class:on={onlyDifferences}
+                    onclick={() => (onlyDifferences = !onlyDifferences)}>Only differences</button>
+            <button type="button" class="ghost" onclick={() => hostVersionDiff.set(null)}>Close</button>
+          </div>
+          <div class="diff-rows">
+            {#each diff.parameters.filter((r) => !onlyDifferences || r.changed) as row (row.definitionId)}
+              <div class="drow" class:changed={row.changed}>
+                <span class="dname">{row.name}</span>
+                <span class="dbar">
+                  <i class="da" style={`width:calc(${Math.round(row.a * 100)}% - 2px)`}></i>
+                  <i class="db" style={`width:calc(${Math.round(row.b * 100)}% - 2px)`}></i>
+                </span>
+                <span class="dval">{row.aText}</span>
+                <span class="dval b">{row.bText}</span>
+              </div>
+            {/each}
+            {#if diff.parameters.filter((r) => !onlyDifferences || r.changed).length === 0}
+              <div class="notes">Nothing differs — these two saves are the same sound.</div>
+            {/if}
+          </div>
+          {#if onlyDifferences && diff.total > diff.differing}
+            {@const hidden = diff.total - diff.differing}
+            <div class="diff-foot">{hidden} identical parameter{hidden === 1 ? '' : 's'} hidden</div>
+          {/if}
+        </div>
+      {/if}
+
       {#if records.length === 0}
         <div class="empty-hint">
           {$hostLibrary.counts.total === 0
@@ -514,6 +569,58 @@
             </div>
           {/if}
           {#if selected.notes}<div class="notes">{selected.notes}</div>{/if}
+        </div>
+
+        <div class="insp-block">
+          <div class="insp-head">
+            Saves
+            {#if selected.versions.length > 1 || selected.branchedFrom}
+              <button type="button" class="ghost more" data-testid="show-diff"
+                      title="What changed between the first of these and now"
+                      onclick={() => diffVersions(selected.recordId)}>WHAT CHANGED?</button>
+            {/if}
+          </div>
+
+          {#if selected.versions.length === 0}
+            <div class="notes">
+              {selected.factory
+                ? 'A vendor preset. Saving over it makes a sound of your own instead — the vendor keeps theirs.'
+                : 'No saves yet. Saving keeps a version rather than writing over this one.'}
+            </div>
+          {:else}
+            <div class="vrail" data-testid="version-rail">
+              {#each [...selected.versions].reverse() as version, index (version.versionId)}
+                <div class="vrow" class:now={index === 0}>
+                  <i class="pip" class:origin={version.origin}></i>
+                  <button type="button" class="ghost vlabel" data-testid="version-row"
+                          title="Put this one back on the part"
+                          onclick={() => applyVersion(selected.recordId, version.versionId)}>
+                    {version.label || (index === 0 ? 'the current sound' : 'an unnamed save')}
+                  </button>
+                  <span class="vwhen">{whenSaved(version.savedAtMs)}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+
+          {#if selected.branchedFromName}
+            <div class="branched">branched from <b>{selected.branchedFromName}</b></div>
+          {/if}
+
+          <div class="vsave">
+            {#if namingVersion}
+              <input class="name-field" placeholder="Name this save…" bind:value={versionLabel}
+                     data-testid="version-name"
+                     onkeydown={(e) => e.key === 'Enter' && saveVersion()} />
+              <button type="button" data-testid="save-version" onclick={saveVersion}>Save</button>
+              <button type="button" class="ghost" onclick={() => (namingVersion = false)}>Cancel</button>
+            {:else}
+              <button type="button" data-testid="commit-version"
+                      title="Keep the part's current sound as another save of this record"
+                      onclick={() => commitVersion(selected.recordId)}>Save this state</button>
+              <button type="button" class="ghost" onclick={() => (namingVersion = true)}>Name it…</button>
+            {/if}
+          </div>
         </div>
 
         {#if !selected.factory}
@@ -797,6 +904,55 @@
   .notes { color: #9aa5b1; font-size: 11px; margin-top: 6px; }
   button.insp-remove { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
   .empty-hint { color: #7d8894; font-size: 12px; padding: 12px 0; }
+
+  .vrail { display: flex; flex-direction: column; gap: 0; }
+  .vrow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px;
+          align-items: center; position: relative; padding: 2px 0; }
+  .vrow .pip { width: 6px; height: 6px; border-radius: 50%; background: #3b4652; margin-left: 2px;
+               z-index: 1; }
+  .vrow.now .pip { background: #7fb4e0; box-shadow: 0 0 0 3px #7fb4e026; }
+  .vrow .pip.origin { background: #7d8894; }
+  /* The line down the rail is the history; the first and last rows only own half of it. */
+  .vrow::before { content: ''; position: absolute; left: 4.5px; top: 0; bottom: 0; width: 1px;
+                  background: #2a333d; }
+  .vrow:first-child::before { top: 50%; }
+  .vrow:last-child::before { bottom: 50%; }
+  button.vlabel { text-align: left; padding: 1px 3px; font-size: 11px; color: #9aa5b1;
+                  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vrow.now button.vlabel { color: #d6dbe0; font-weight: 600; }
+  .vwhen { color: #66707b; font-size: 10px; white-space: nowrap; }
+  .branched { color: #7d8894; font-size: 10.5px; margin-top: 6px; }
+  .branched b { color: #9aa5b1; font-weight: 600; }
+  .vsave { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .vsave .name-field { width: 130px; }
+  button.more { margin-left: auto; color: #7fb4e0; font-size: 9px; letter-spacing: 0.06em;
+                padding: 0 2px; }
+
+  .diff {
+    display: flex; flex-direction: column; gap: 6px; padding: 9px 10px;
+    border: 1px solid #3b4652; border-radius: 5px; background: #14181b;
+  }
+  .diff-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .diff-title { font-weight: 600; font-size: 12px; color: #d6dbe0; }
+  .diff-count { color: #7d8894; font-size: 11px; margin-right: auto; }
+  .diff-rows { display: flex; flex-direction: column; max-height: 190px; overflow-y: auto; }
+  .drow {
+    display: grid; grid-template-columns: 130px 1fr 78px 78px; gap: 8px; align-items: center;
+    padding: 4px 0; border-bottom: 1px solid #1c2126; font-size: 11px;
+  }
+  .dname { color: #9aa5b1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drow.changed .dname { color: #d6dbe0; }
+  .dbar { position: relative; height: 12px; background: #101315; border: 1px solid #2a333d;
+          border-radius: 2px; }
+  /* A's value is the ground the change happened on; B's is drawn thinner on top of it, so a
+     row reads as one bar moving rather than two bars competing. */
+  .dbar .da { position: absolute; left: 1px; top: 1px; bottom: 1px; background: #39424d;
+              border-radius: 1px; }
+  .dbar .db { position: absolute; left: 1px; top: 3px; bottom: 3px; border-radius: 1px;
+              background: linear-gradient(90deg, #4a86bd, #7fb4e0); }
+  .dval { color: #7d8894; font-size: 10.5px; text-align: right; font-variant-numeric: tabular-nums; }
+  .dval.b { color: #7fb4e0; }
+  .diff-foot { color: #66707b; font-size: 10.5px; }
 
   .audition {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

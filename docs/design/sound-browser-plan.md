@@ -1,6 +1,6 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A, B and C are built** (2026-09-07); D–F are a plan, not a commitment. The mockups it describes are in
+Status: **Stages A–D are built** (2026-09-07); E and F are a plan, not a commitment. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -296,6 +296,50 @@ is its own `loading` stage now.
 alone made it. Auditioning the *chain* would mean rendering the chain, which is a different
 probe. And nothing here is out of process; that is still B2.
 
+## Stage D, as built
+
+Saving a sound is no longer a decision about whether to destroy the old one. Every save is a
+version; the record's current state is the newest of them, so nothing that already reads a
+record had to learn about versions.
+
+**The rule is the design work, not the rail.** Keeping every save forever costs a state blob
+each — eighteen kilobytes for a big synth — and keeping only the newest is the overwrite this
+stage exists to abolish. So: everything under 30 days, one a day under a year, and past a year
+only what you named. On top of that, three are never dropped at any age — anything you named
+(naming it is the whole signal that it matters), the newest (it is the sound), and the origin
+(throwing it away loses the comparison the diff exists for). One-a-day keeps the *last* save of
+each day, the one you finished on rather than the one you started with. `pruneLibraryVersions`
+is pure and the test states each clause.
+
+**A factory preset's first save branches.** A vendor record's versions would be the vendor's,
+and a rescan is entitled to refresh everything on one — so saving over a factory preset makes a
+record of your own that remembers where it came from. That is also what "against factory" in the
+diff is measured against.
+
+**The diff needs the plug-in, and says so.** Two opaque state blobs cannot be compared by
+parameter without something that understands them, so the live instrument reads both and what
+was on the part when you asked is put back afterwards — a comparison must not be a change. Where
+there are no parameter names to be had, a hardware patch routes to `PatchDiff` instead, which
+already says the one true thing about the bytes: where they differ. A record with no second
+state refuses aloud rather than emitting an empty diff.
+
+**The morph is a parameter blend and is honest about it.** It interpolates between the two saves
+on the parameters the plug-in exposes; anything a plug-in keeps out of its parameter list does
+not move. That is a real limitation and it is the reason morphing is not offered as "blend these
+two sounds".
+
+**What building it found.** `StubSynthProcessor`'s state was one int — a serial number, not a
+sound — so two versions of it differed by nothing a parameter diff could name and the feature
+looked broken when it was the fixture that was. Its state now carries its three parameters after
+the int, which every existing four-byte round-trip still reads. On screen, the version rail's
+rows wrapped their timestamp onto a second line, because a grid item's default minimum width is
+its content and a nowrap label refuses to shrink; `minmax(0, 1fr)` is the fix. And "1 identical
+parameters hidden" is the sort of thing only rendering catches.
+
+**Not in Stage D:** A/B is two clicks on the rail rather than a sample-accurate switch with both
+states resident, because applying a state is already fast enough that the difference is not
+audible and holding two live instruments to prove otherwise is a large cost for a small claim.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -314,6 +358,11 @@ probe. And nothing here is out of process; that is still B2.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage D built; see *Stage D, as built* above. The idea worth carrying: a
+  parameter diff cannot be computed from two blobs — it needs the plug-in that understands them,
+  which makes "compare" a thing that touches the live instrument and therefore a thing that has
+  to put back exactly what it found.
 
 - **2026-09-07** — Stage C built; see *Stage C, as built* above. The idea worth carrying: the
   audition phrase had to be captured in beats and cut at bar lines. Neither was obvious from the

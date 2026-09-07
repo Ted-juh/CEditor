@@ -5476,6 +5476,330 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "commitVersion")
+    {
+        ensureLibrary();
+
+        const auto partId = versionTargetPart (payload);
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Focus a rack part first.");
+            return;
+        }
+
+        // What to capture: a hardware part's patch bytes, or a software part's plug-in state.
+        juce::String blob;
+        if (part->hardware)
+        {
+            if (part->hardwarePatchBase64.isEmpty())
+            {
+                emitError ("Capture a patch from the synth first — there is nothing to save yet.");
+                return;
+            }
+            blob = part->hardwarePatchBase64;
+        }
+        else
+        {
+            auto* instrument = rack.getInstrument (partId);
+            if (instrument == nullptr)
+            {
+                emitError ("That part has no instrument loaded.");
+                return;
+            }
+            juce::MemoryBlock state;
+            instrument->getStateInformation (state);
+            blob = juce::Base64::toBase64 (state.getData(), state.getSize());
+        }
+
+        auto requestedId = payload.getProperty ("recordId", {}).toString();
+        if (requestedId.isEmpty())
+            requestedId = part->lastPresetRecordId;
+
+        auto* target = library.find (requestedId);
+        if (target == nullptr)
+        {
+            emitError ("Load a sound from the library first, or save this as a new one.");
+            return;
+        }
+
+        const auto label = payload.getProperty ("label", {}).toString().trim();
+
+        // A vendor record's versions would be YOURS, not the vendor's, and a rescan is entitled
+        // to refresh everything on a vendor record. So the first save of a factory preset
+        // branches: a record of your own that remembers where it came from, which is what the
+        // diff's "against factory" side is then measured against.
+        if (target->factory)
+        {
+            LibraryRecord branch;
+            branch.type = target->type;
+            branch.sourceType = "userState";
+            branch.name = label.isNotEmpty() ? label : target->name;
+            branch.manufacturer = target->manufacturer;
+            branch.instrument = target->instrument;
+            branch.targetCeId = target->targetCeId;
+            branch.category = target->category;
+            branch.stateBlobBase64 = blob;
+            branch.branchedFromRecordId = target->recordId;
+            branch.user = target->user;
+
+            LibraryVersion first;
+            first.versionId = juce::Uuid().toDashedString();
+            first.label = label;
+            first.savedAtMs = juce::Time::currentTimeMillis();
+            first.stateBlobBase64 = blob;
+            branch.versions.add (std::move (first));
+
+            const auto newId = library.addCapturedRecord (std::move (branch));
+            rack.setPartLastPreset (partId, newId, library.find (newId)->name);
+            library.saveTo (libraryFile());
+            savePerformance();
+            emitState();
+            emitLibrary (libraryView);
+            return;
+        }
+
+        LibraryVersion version;
+        version.versionId = juce::Uuid().toDashedString();
+        version.label = label;
+        version.savedAtMs = juce::Time::currentTimeMillis();
+        version.stateBlobBase64 = blob;
+        target->versions.add (std::move (version));
+        target->versions = pruneLibraryVersions (std::move (target->versions),
+                                                 juce::Time::currentTimeMillis());
+        // The record's own state is the newest version — one current state, so nothing that
+        // already reads a record has to learn about versions.
+        target->stateBlobBase64 = target->versions.getLast().stateBlobBase64;
+
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+        return;
+    }
+
+    if (cmd == "applyVersion")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        const auto versionId = payload.getProperty ("versionId", {}).toString();
+        const LibraryVersion* version = nullptr;
+        for (const auto& v : record->versions)
+            if (v.versionId == versionId)
+                version = &v;
+
+        if (version == nullptr)
+        {
+            emitError ("That version is not on this record.");
+            return;
+        }
+
+        const auto partId = versionTargetPart (payload);
+        if (const auto* part = rack.getPerformance().findPart (partId); part != nullptr && part->hardware)
+        {
+            rack.setHardwarePatch (partId, version->stateBlobBase64, record->name);
+            queueHardwarePatchSend (partId);
+            savePerformance();
+            emitState();
+            return;
+        }
+
+        auto* instrument = rack.getInstrument (partId);
+        if (instrument == nullptr)
+        {
+            emitError ("That part has no instrument loaded.");
+            return;
+        }
+
+        if (const auto refusal = applyStateBlob (*instrument, version->stateBlobBase64);
+            refusal.isNotEmpty())
+        {
+            emitError (refusal);
+            return;
+        }
+
+        rack.setPartLastPreset (partId, record->recordId,
+                                version->label.isNotEmpty() ? record->name + " — " + version->label
+                                                            : record->name);
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "diffVersions" || cmd == "morphVersions")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Either side may be a version of this record, or — with no id — the thing it was
+        // branched from, which is the comparison people actually want: "what did I change?"
+        juce::String blobA, nameA, blobB, nameB;
+        const auto findVersion = [record] (const juce::String& id) -> const LibraryVersion*
+        {
+            for (const auto& v : record->versions)
+                if (v.versionId == id)
+                    return &v;
+            return nullptr;
+        };
+
+        const auto idA = payload.getProperty ("versionIdA", {}).toString();
+        const auto idB = payload.getProperty ("versionIdB", {}).toString();
+
+        if (const auto* v = findVersion (idA); v != nullptr)
+        {
+            blobA = v->stateBlobBase64;
+            nameA = v->label.isNotEmpty() ? v->label : "an earlier save";
+        }
+        else if (const auto* origin = library.find (record->branchedFromRecordId); origin != nullptr)
+        {
+            blobA = origin->stateBlobBase64;
+            nameA = origin->name + " (factory)";
+        }
+
+        if (const auto* v = findVersion (idB); v != nullptr)
+        {
+            blobB = v->stateBlobBase64;
+            nameB = v->label.isNotEmpty() ? v->label : "a later save";
+        }
+        else if (! record->versions.isEmpty())
+        {
+            blobB = record->versions.getLast().stateBlobBase64;
+            nameB = "now";
+        }
+        else
+        {
+            blobB = record->stateBlobBase64;
+            nameB = "now";
+        }
+
+        if (blobA.isEmpty() || blobB.isEmpty())
+        {
+            emitError ("There is nothing to compare this against yet.");
+            return;
+        }
+
+        // A hardware patch has no parameters to name, and PatchDiff already says the one true
+        // thing about the bytes: WHERE they differ. Route there rather than pretending.
+        if (record->sourceType == "hardwarePatch")
+        {
+            juce::MemoryBlock bytesA, bytesB;
+            if (! bytesA.fromBase64Encoding (blobA) || ! bytesB.fromBase64Encoding (blobB))
+            {
+                emitError ("One of the saves could not be read back.");
+                return;
+            }
+
+            auto result = patchDiff::toVar (patchDiff::compare (bytesA, bytesB));
+            if (auto* obj = result.getDynamicObject())
+            {
+                obj->setProperty ("recordId", record->recordId);
+                obj->setProperty ("nameA", nameA);
+                obj->setProperty ("nameB", nameB);
+            }
+            if (options.emit != nullptr)
+                options.emit ("instrumentHostPatchCompare", result);
+            return;
+        }
+
+        // A parameter diff needs the plug-in: two opaque blobs cannot be compared by parameter
+        // without something that understands them. So the live instrument reads both, and what
+        // was on it is put back — a comparison must not be a change.
+        const auto partId = versionTargetPart (payload);
+        auto* instrument = rack.getInstrument (partId);
+        if (instrument == nullptr)
+        {
+            emitError ("Load this sound onto a part first — comparing needs the plug-in that "
+                       "understands these states.");
+            return;
+        }
+
+        juce::MemoryBlock before;
+        instrument->getStateInformation (before);
+
+        auto refusal = applyStateBlob (*instrument, blobA);
+        const auto valuesA = refusal.isEmpty() ? readParameters (*instrument)
+                                               : juce::Array<ParameterReading>();
+        if (refusal.isEmpty())
+            refusal = applyStateBlob (*instrument, blobB);
+        const auto valuesB = refusal.isEmpty() ? readParameters (*instrument)
+                                               : juce::Array<ParameterReading>();
+
+        if (cmd == "morphVersions")
+        {
+            // Between the two, on the parameters the plug-in exposes. Anything it keeps out of
+            // its parameter list does not move — the diff says which those are by omission, and
+            // the morph is honest about being a parameter blend rather than a state blend.
+            const auto amount = juce::jlimit (0.0f, 1.0f,
+                                              (float) (double) payload.getProperty ("amount", 1.0));
+            instrument->setStateInformation (before.getData(), (int) before.getSize());
+            const auto& parameters = instrument->getParameters();
+            for (int i = 0; i < valuesA.size() && i < valuesB.size(); ++i)
+            {
+                const auto& a = valuesA.getReference (i);
+                const auto& b = valuesB.getReference (i);
+                const auto inventory = describeParameters (*instrument);
+                if (const auto* descriptor = inventory.find (a.definitionId);
+                    descriptor != nullptr
+                    && juce::isPositiveAndBelow (descriptor->index, parameters.size()))
+                    parameters[descriptor->index]
+                        ->setValueNotifyingHost (a.value + amount * (b.value - a.value));
+            }
+            savePerformance();
+            emitState();
+            return;
+        }
+
+        instrument->setStateInformation (before.getData(), (int) before.getSize());
+
+        if (refusal.isNotEmpty())
+        {
+            emitError (refusal);
+            return;
+        }
+
+        juce::Array<juce::var> rows;
+        int differing = 0;
+        for (int i = 0; i < valuesA.size() && i < valuesB.size(); ++i)
+        {
+            const auto& a = valuesA.getReference (i);
+            const auto& b = valuesB.getReference (i);
+            const auto changed = ! juce::approximatelyEqual (a.value, b.value);
+            if (changed)
+                ++differing;
+
+            auto* row = new juce::DynamicObject();
+            row->setProperty ("definitionId", a.definitionId);
+            row->setProperty ("name",   a.name);
+            row->setProperty ("a",      a.value);
+            row->setProperty ("b",      b.value);
+            row->setProperty ("aText",  a.text);
+            row->setProperty ("bText",  b.text);
+            row->setProperty ("changed", changed);
+            rows.add (juce::var (row));
+        }
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("recordId",   record->recordId);
+        answer->setProperty ("nameA",      nameA);
+        answer->setProperty ("nameB",      nameB);
+        answer->setProperty ("parameters", rows);
+        answer->setProperty ("differing",  differing);
+        answer->setProperty ("total",      rows.size());
+        answer->setProperty ("identical",  differing == 0);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostVersionDiff", juce::var (answer));
+        return;
+    }
+
     if (cmd == "auditionRecord")
     {
         ensureLibrary();
@@ -8898,6 +9222,41 @@ void InstrumentHostService::handOffAudition (const juce::String& partId)
     auditioningRecordId.clear();
 }
 
+juce::String InstrumentHostService::applyStateBlob (juce::AudioProcessor& instrument,
+                                                    const juce::String& base64)
+{
+    juce::MemoryOutputStream decoded;
+    if (! juce::Base64::convertFromBase64 (decoded, base64))
+        return "That saved state could not be read back.";
+    instrument.setStateInformation (decoded.getData(), (int) decoded.getDataSize());
+    return {};
+}
+
+juce::Array<InstrumentHostService::ParameterReading>
+InstrumentHostService::readParameters (juce::AudioProcessor& instrument)
+{
+    juce::Array<ParameterReading> out;
+    const auto inventory = describeParameters (instrument);
+    const auto& parameters = instrument.getParameters();
+
+    for (const auto& descriptor : inventory.descriptors)
+    {
+        if (! juce::isPositiveAndBelow (descriptor.index, parameters.size()))
+            continue;
+        auto* parameter = parameters[descriptor.index];
+        out.add ({ descriptor.definitionId, descriptor.name,
+                   parameter->getCurrentValueAsText(), parameter->getValue() });
+    }
+
+    return out;
+}
+
+juce::String InstrumentHostService::versionTargetPart (const juce::var& payload) const
+{
+    const auto named = payload.getProperty ("partId", {}).toString();
+    return named.isNotEmpty() ? named : rack.getPerformance().focusedPartId;
+}
+
 LibraryAvailability InstrumentHostService::libraryAvailability() const
 {
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
@@ -8938,6 +9297,30 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("collections",  [record] { juce::Array<juce::var> a;
                                                    for (const auto& c : record->user.collections) a.add (c);
                                                    return a; }());
+
+        // The saves, without their blobs: the rail needs when and what they were called, and a
+        // payload carrying eighteen kilobytes per version per record would be unusable.
+        if (! record->versions.isEmpty())
+        {
+            juce::Array<juce::var> versionVars;
+            for (const auto& version : record->versions)
+            {
+                auto* v = new juce::DynamicObject();
+                v->setProperty ("versionId", version.versionId);
+                v->setProperty ("label",     version.label);
+                v->setProperty ("savedAtMs", (double) version.savedAtMs);
+                v->setProperty ("origin",    version.origin);
+                v->setProperty ("bytes",     (int) version.stateBlobBase64.length());
+                versionVars.add (juce::var (v));
+            }
+            r->setProperty ("versions", versionVars);
+        }
+        if (record->branchedFromRecordId.isNotEmpty())
+        {
+            r->setProperty ("branchedFrom", record->branchedFromRecordId);
+            if (const auto* origin = library.find (record->branchedFromRecordId))
+                r->setProperty ("branchedFromName", origin->name);
+        }
 
         // Which ones are instant. A snapshot is a cache, so this changes between answers and is
         // reported per answer rather than stored on the record.

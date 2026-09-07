@@ -42,6 +42,7 @@ import {
   onInstrumentHostPatchCompare,
   onInstrumentHostAnalysisProgress,
   onInstrumentHostAudition,
+  onInstrumentHostVersionDiff,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import {
@@ -77,6 +78,29 @@ export const hostAnalysis = writable({ done: 0, total: 0, what: '', running: fal
  *  preview, and '' when nothing is auditioning. */
 export const hostAudition = writable({ recordId: '', stage: '', detail: '',
                                        phrase: 'recent', bars: 4 });
+/** The last parameter comparison of two saves. null until something asks for one. */
+export const hostVersionDiff = writable(null);
+
+export function normalizeVersionDiff(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    recordId: String(p.recordId ?? ''),
+    nameA: String(p.nameA ?? ''),
+    nameB: String(p.nameB ?? ''),
+    differing: Number(p.differing ?? 0),
+    total: Number(p.total ?? 0),
+    identical: p.identical === true,
+    parameters: (Array.isArray(p.parameters) ? p.parameters : []).map((r) => ({
+      definitionId: String(r?.definitionId ?? ''),
+      name: String(r?.name ?? ''),
+      a: Number(r?.a ?? 0),
+      b: Number(r?.b ?? 0),
+      aText: String(r?.aText ?? ''),
+      bText: String(r?.bText ?? ''),
+      changed: r?.changed === true,
+    })),
+  };
+}
 export const hostSupportBundle = writable(emptySupportBundle());
 export const hostLicenceReceipt = writable('');
 /** The latest MIDI message seen on any enabled input, with a monotonically increasing `seq`
@@ -525,6 +549,17 @@ export function normalizeHostLibrary(payload) {
       // Whether a rendered snapshot exists right now. A cache, so it is per answer rather than
       // a property of the record — and false only ever means "this one loads the slow way".
       instant: r?.instant === true,
+      // Every save, oldest first, without their blobs — the rail needs when and what they were
+      // called, not eighteen kilobytes each.
+      versions: (Array.isArray(r?.versions) ? r.versions : []).map((v) => ({
+        versionId: String(v?.versionId ?? ''),
+        label: String(v?.label ?? ''),
+        savedAtMs: Number(v?.savedAtMs ?? 0),
+        origin: v?.origin === true,
+        bytes: Number(v?.bytes ?? 0),
+      })).filter((v) => v.versionId !== ''),
+      branchedFrom: String(r?.branchedFrom ?? ''),
+      branchedFromName: String(r?.branchedFromName ?? ''),
       // Absent, not zeroed: "not measured yet" and "measured and dark" are not the same thing,
       // and a browser that cannot tell them apart draws a flat line for both.
       sonic: r?.sonic && typeof r.sonic === 'object' ? {
@@ -702,6 +737,8 @@ let mockSmartCollections = [];
 // not silently drop you back to the whole library while the chips on screen still filter.
 let mockLibraryView = emptyLibraryQuery();
 let mockMeasuredEverything = false;
+let mockVersions = {};
+let mockBranches = [];
 
 export function mockHostLibrary(query = '', type = '') {
   const all = [
@@ -731,10 +768,14 @@ export function mockHostLibrary(query = '', type = '') {
   // Both call shapes: the older (text, type) pair and the whole query object.
   const request = normalizeLibraryQuery(
     typeof query === 'object' && query !== null ? query : { text: query, type });
+  all.push(...mockBranches.map((b) => ({ ...b, sonic: mockSonic(0.45, 0.30, 0.50, 0.20, 0.12) })));
+
   // In the demo a measured sound is an instant one, which is what the native side arranges too:
   // the auditioner keeps the render it measured.
-  for (const record of all)
+  for (const record of all) {
     record.instant = Boolean(record.sonic) && record.sonic.silent !== true;
+    record.versions = record.versions ?? mockVersions[record.recordId] ?? [];
+  }
 
   const records = all.filter((r) => matchesLibraryQuery(r, request));
 
@@ -775,6 +816,9 @@ export function setMockSmartCollections(collections) {
 export function resetMockLibraryState() {
   mockSmartCollections = [];
   mockMeasuredEverything = false;
+  mockVersions = {};
+  mockBranches = [];
+  hostVersionDiff.set(null);
   mockLibraryView = emptyLibraryQuery();
   hostAudition.set({ recordId: '', stage: '', detail: '', phrase: 'recent', bars: 4 });
   hostAnalysis.set({ done: 0, total: 0, what: '', running: false });
@@ -5832,6 +5876,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
+  onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
     recordId: String(payload?.recordId ?? ''),
     // A 'phrase' answer is the setting changing, not a sound starting — it must not blank the
@@ -6329,6 +6374,60 @@ function send(payload) {
       hostLibrary.set(mockHostLibrary(mockLibraryView));
       return;
     }
+    if (payload?.cmd === 'commitVersion') {
+      const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
+      if (!record) { hostLastError.set('Load a sound from the library first.'); return; }
+      const now = Date.now();
+      if (record.factory) {
+        // A vendor record's versions would be the vendor's. Branch instead — the same rule the
+        // native side follows, and the reason the demo can show a branched record at all.
+        mockBranches.push({
+          recordId: `lib-branch-${now}`,
+          name: payload.label || `${record.name} (mine)`,
+          type: record.type, sourceType: 'userState',
+          manufacturer: record.manufacturer, instrument: record.instrument,
+          category: record.category, available: true, tags: [...(record.tags ?? [])],
+          branchedFrom: record.recordId, branchedFromName: record.name,
+          versions: [{ versionId: `v-${now}`, label: payload.label ?? '', savedAtMs: now,
+                       origin: false, bytes: 18000 }],
+        });
+      } else {
+        mockVersions[record.recordId] = [...(mockVersions[record.recordId] ?? []),
+          { versionId: `v-${now}-${Math.random().toString(36).slice(2, 7)}`,
+            label: payload.label ?? '', savedAtMs: now, origin: false, bytes: 18000 }];
+      }
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'applyVersion') {
+      const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
+      if (!record?.versions.some((v) => v.versionId === payload.versionId)) {
+        hostLastError.set('That version is not on this record.');
+      }
+      return;
+    }
+    if (payload?.cmd === 'diffVersions') {
+      const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
+      if (!record) { hostLastError.set('Unknown library record.'); return; }
+      if (record.versions.length < 2 && !record.branchedFrom) {
+        hostLastError.set('There is nothing to compare this against yet.');
+        return;
+      }
+      hostVersionDiff.set(normalizeVersionDiff({
+        recordId: record.recordId, nameA: 'an earlier save', nameB: 'now',
+        differing: 2, total: 3, identical: false,
+        parameters: [
+          { definitionId: 'cutoff', name: 'Cutoff', a: 0.25, b: 0.8,
+            aText: '25.0 %', bText: '80.0 %', changed: true },
+          { definitionId: 'wave', name: 'Wave', a: 0, b: 0.5,
+            aText: 'Saw', bText: 'Square', changed: true },
+          { definitionId: 'drive', name: 'Drive', a: 0, b: 0, aText: 'Off', bText: 'Off',
+            changed: false },
+        ],
+      }));
+      return;
+    }
+    if (payload?.cmd === 'morphVersions') return;
     if (payload?.cmd === 'auditionRecord') {
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record) { hostLastError.set('Unknown library record.'); return; }
@@ -6884,6 +6983,22 @@ export const cancelAnalysis = () => send({ cmd: 'cancelAnalysis' });
 export const auditionRecord = (recordId, load = true) =>
   send(load ? { cmd: 'auditionRecord', recordId } : { cmd: 'auditionRecord', recordId, load: false });
 export const stopAudition = () => send({ cmd: 'stopAudition' });
+
+/** Keep the part's current sound as another save of the record it came from. A factory preset
+    branches into a record of your own instead of being written over. */
+export const commitVersion = (recordId, label, partId) =>
+  send({ cmd: 'commitVersion', ...(recordId ? { recordId } : {}), ...(label ? { label } : {}),
+         ...(partId ? { partId } : {}) });
+/** Put one of the saves back on the part — the A/B of a version rail. */
+export const applyVersion = (recordId, versionId, partId) =>
+  send({ cmd: 'applyVersion', recordId, versionId, ...(partId ? { partId } : {}) });
+/** What changed between two saves. Omitting either side means "the origin" and "now". */
+export const diffVersions = (recordId, versionIdA, versionIdB) =>
+  send({ cmd: 'diffVersions', recordId, ...(versionIdA ? { versionIdA } : {}),
+         ...(versionIdB ? { versionIdB } : {}) });
+export const morphVersions = (recordId, versionIdA, versionIdB, amount) =>
+  send({ cmd: 'morphVersions', recordId, amount,
+         ...(versionIdA ? { versionIdA } : {}), ...(versionIdB ? { versionIdB } : {}) });
 export const setAuditionPhrase = (phrase, bars) =>
   send(bars ? { cmd: 'setAuditionPhrase', phrase, bars } : { cmd: 'setAuditionPhrase', phrase });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });
