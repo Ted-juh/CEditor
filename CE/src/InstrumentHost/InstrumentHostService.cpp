@@ -2,6 +2,8 @@
 
 #include "PatchDiff.h"
 #include "SonicProbe.h"
+#include "SonicAnalysisJob.h"
+#include "SonicAnalysisWorker.h"
 #include "EditorSnapshot.h"
 #include "LiveWorkerDiagnostics.h"
 #include "PluginWorkerBoundary.h"
@@ -9095,8 +9097,11 @@ InstrumentHostService::analysisBacklog (bool remeasureEverything) const
         // Measured against the bytes it was measured from: a rescan that finds the same content
         // never re-renders it, which is what makes the second run of a 12,000-preset library
         // take no time at all.
-        if (! remeasureEverything && record.sonic.measured
-            && record.sonicFingerprint == record.fingerprint)
+        // Tried these exact bytes already — either it measured, or it refused and said why.
+        // Both are answers; only "never tried" is a reason to try. Asking for everything to be
+        // measured again is how you get another go at a preset that refused.
+        if (! remeasureEverything && record.sonicFingerprint == record.fingerprint
+            && (record.sonic.measured || record.sonicRefusal.isNotEmpty()))
             continue;
 
         AnalysisTask task;
@@ -9148,8 +9153,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
     // Everything below runs off the controlling thread. It touches no member the command
     // surface touches: the work list was copied before it started, the findings go back through
     // onControlThread, and the only shared things are the two atomics and the emit hook.
-    struct Finding { juce::String recordId, fingerprint; SonicProfile profile; };
-    std::vector<Finding> findings;
+    std::vector<AnalysisFinding> findings;
 
     const auto marshal = [this] (std::function<void()> work)
     {
@@ -9186,8 +9190,28 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
     };
 
     ProbeSpec spec;
+
+    // Stage B2: the listening happens in a child process where there is a worker to do it in.
+    // §17's argument for the out-of-process SCAN applies here with more force, because
+    // auditioning does not merely instantiate a plug-in — it drives it through every preset it
+    // holds and renders each one. Without a worker this measures in process exactly as before,
+    // which is what a test does and what a build shipping no helper falls back to.
     int done = 0;
     const auto total = tasks.size();
+
+    std::unique_ptr<SonicAnalysisWorker> worker;
+    if (options.auditionOutOfProcess && options.workerExecutable.existsAsFile())
+    {
+        SonicAnalysisWorker::Options workerOptions;
+        workerOptions.workerExecutable = options.workerExecutable;
+        workerOptions.jobDirectory = options.dataDirectory.getChildFile ("audition-jobs");
+        // A crash or a hang is the one thing somebody browsing needs told about, so the
+        // worker's own account of it goes to the same progress line the names go to.
+        workerOptions.log = [this, &done, total] (const juce::String& line)
+                            { emitAnalysisProgress (done, total, line, true); };
+        worker = std::make_unique<SonicAnalysisWorker> (std::move (workerOptions));
+    }
+
     emitAnalysisProgress (0, total, "Listening…", true);
 
     for (int i = 0; i < tasks.size();)
@@ -9197,10 +9221,66 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
         const auto ceId = tasks.getReference (i).targetCeId;
 
-        // One instance, borrowed for as long as this plug-in's presets last. Instantiation goes
-        // through the same hook everything else uses, so it lands wherever the host puts it —
-        // the message thread in the app — and this thread waits for it rather than making one
-        // itself.
+        // One plug-in and every preset it holds is the unit of work: instantiating is the
+        // expensive part and playing is not, so an instance is made once and everything it can
+        // play is played before the next one exists. That is also exactly one worker process.
+        AnalysisJob job;
+        job.targetCeId = ceId;
+        job.descriptionXml = tasks.getReference (i).descriptionXml;
+        job.spec = spec;
+        if (snapshots != nullptr)
+            job.snapshotDirectory = snapshots->getDirectory();
+
+        for (; i < tasks.size() && tasks.getReference (i).targetCeId == ceId; ++i)
+        {
+            const auto& task = tasks.getReference (i);
+            AnalysisPreset preset;
+            preset.recordId = task.recordId;
+            preset.fingerprint = task.fingerprint;
+            preset.name = task.name;
+            preset.sourceType = task.sourceType;
+            preset.sourceLocator = task.sourceLocator;
+            preset.stateBlobBase64 = task.stateBlobBase64;
+            job.presets.push_back (std::move (preset));
+        }
+
+        const auto moduleEnd = i;
+        const auto nameOf = [&job] (const juce::String& recordId)
+        {
+            for (const auto& preset : job.presets)
+                if (preset.recordId == recordId)
+                    return preset.name;
+            return juce::String();
+        };
+
+        const auto keep = [&] (const AnalysisFinding& finding)
+        {
+            findings.push_back (finding);
+            ++done;
+            if (done % 8 == 0 || done == total)
+                emitAnalysisProgress (done, total, nameOf (finding.recordId), true);
+        };
+
+        const auto keepGoing = [this] { return ! analysisStopRequested.load(); };
+
+        if (worker != nullptr)
+        {
+            const auto outcome = worker->run (job, keep, keepGoing);
+
+            if (outcome.moduleFailed)
+                emitAnalysisProgress (done, total, "Skipped " + ceId + " — " + outcome.detail, true);
+
+            // Whatever the worker could not reach — a plug-in that never loaded, or the tail of
+            // a job it gave up on — is counted as gone through so the bar reaches its end. The
+            // records themselves are untouched, which is what lets a later run try them again.
+            if (keepGoing())
+                done = moduleEnd;
+            continue;
+        }
+
+        // No worker: measure here, which is what a test does. The instance still comes through
+        // the same hook everything else uses, so it lands wherever the host puts it — the
+        // message thread in the app — and this thread waits for it rather than making one.
         std::unique_ptr<juce::AudioProcessor> instrument;
         juce::String instantiationError;
         {
@@ -9214,8 +9294,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             }
             else
             {
-                options.instantiate (tasks.getReference (i).descriptionXml, spec.sampleRate,
-                                     spec.blockSize,
+                options.instantiate (job.descriptionXml, spec.sampleRate, spec.blockSize,
                     [&] (std::unique_ptr<juce::AudioProcessor> made, const juce::String& error)
                     {
                         const std::scoped_lock lock (mutex);
@@ -9232,13 +9311,10 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
         if (instrument == nullptr)
         {
-            // A plug-in that will not load is not a reason to stop: every other plug-in's
-            // presets are still measurable, and the browser says which ones were skipped.
-            while (i < tasks.size() && tasks.getReference (i).targetCeId == ceId)
-            {
-                ++i;
-                ++done;
-            }
+            // A plug-in that will not load is not a reason to stop, and it is not a reason to
+            // mark its presets unmeasurable either: every other plug-in's presets are still
+            // measurable, and these can be tried again the day it loads.
+            done = moduleEnd;
             emitAnalysisProgress (done, total,
                                   "Skipped " + ceId + (instantiationError.isEmpty()
                                                          ? juce::String() : " — " + instantiationError),
@@ -9246,44 +9322,34 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             continue;
         }
 
-        while (i < tasks.size() && tasks.getReference (i).targetCeId == ceId
-               && ! analysisStopRequested.load())
+        // Applying a preset to a VST3 is a CONTROLLER operation, and JUCE marshals it to the
+        // message thread — so calling it from here and rendering immediately renders the state
+        // that was there BEFORE. That is not a hypothetical: against a real plug-in every preset
+        // was measured with the previous preset's sound, one whole render behind, and every
+        // number was plausible. The stub could never show it, because a plain AudioProcessor
+        // applies its state where it is asked. The worker above has no such problem — over
+        // there, everything is already on the one thread.
+        const auto applyState = [this, &marshalAndWait] (juce::AudioProcessor& processor,
+                                                         const AnalysisPreset& preset)
         {
-            const auto& task = tasks.getReference (i);
-
             LibraryRecord asRecord;
-            asRecord.name = task.name;
-            asRecord.sourceType = task.sourceType;
-            asRecord.sourceLocator = task.sourceLocator;
-            asRecord.stateBlobBase64 = task.stateBlobBase64;
+            asRecord.name = preset.name;
+            asRecord.sourceType = preset.sourceType;
+            asRecord.sourceLocator = preset.sourceLocator;
+            asRecord.stateBlobBase64 = preset.stateBlobBase64;
 
             juce::String refusal;
-            marshalAndWait ([&] { refusal = applyRecordState (*instrument, asRecord); });
+            marshalAndWait ([&] { refusal = applyRecordState (processor, asRecord); });
+            return refusal;
+        };
 
-            if (refusal.isEmpty())
+        measurePresets (job, *instrument, applyState,
+            [&keep] (const AnalysisEvent& event)
             {
-                // The two passes by hand rather than through probeProcessor(), because the loud
-                // render is not only measured — it is KEPT, and that is what makes the next
-                // click on this preset instant instead of a four-second wait for a plug-in.
-                const auto loud = renderProbe (*instrument, spec, spec.velocity);
-                const auto quiet = renderProbe (*instrument, spec, spec.quietVelocity);
-
-                Finding finding;
-                finding.recordId = task.recordId;
-                finding.fingerprint = task.fingerprint;
-                finding.profile = analyseProbe (loud, quiet, spec);
-                findings.push_back (std::move (finding));
-
-                if (snapshots != nullptr && ! finding.profile.silent)
-                    snapshots->put (snapshotKeyFor (task.fingerprint, task.recordId),
-                                    loud.audio, spec.sampleRate);
-            }
-
-            ++i;
-            ++done;
-            if (done % 8 == 0 || i == tasks.size())
-                emitAnalysisProgress (done, total, task.name, true);
-        }
+                if (event.kind == AnalysisEvent::Kind::finding)
+                    keep (event.finding);
+            },
+            keepGoing);
 
         // Handing the instance back is the other thing that must not happen here: a plug-in
         // expects to be destroyed where it was made. Shared rather than unique only because a
@@ -9296,12 +9362,22 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
     marshal ([this, findings = std::move (findings), done, total, cancelled]
     {
+        int measured = 0;
         for (const auto& finding : findings)
+        {
+            if (finding.problem.isEmpty())
+                ++measured;
+
             if (auto* record = library.find (finding.recordId))
             {
                 record->sonic = finding.profile;
+                // The bytes that were ATTEMPTED, whether or not they yielded anything. A preset
+                // that crashed the plug-in is stamped exactly like one that measured, because
+                // the point of the stamp is that the next run does not walk into it again.
                 record->sonicFingerprint = finding.fingerprint;
+                record->sonicRefusal = finding.problem;
             }
+        }
 
         if (! findings.empty())
             library.saveTo (libraryFile());
@@ -9314,7 +9390,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
 
         analysisBusy = false;
         emitAnalysisProgress (done, total,
-                              cancelled ? "Stopped." : "Done — " + juce::String (findings.size())
+                              cancelled ? "Stopped." : "Done — " + juce::String (measured)
                                                          + " measured.",
                               false);
         emitLibrary (libraryView);
@@ -9772,6 +9848,13 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                    return a; }());
             r->setProperty ("sonic", juce::var (m));
         }
+
+        // Why it has no measurement, when the auditioner tried and got none. The browser draws
+        // this instead of an empty thumbprint: "not heard yet" and "the plug-in crashed while
+        // playing it" are different things to be told.
+        if (record->sonicRefusal.isNotEmpty())
+            r->setProperty ("sonicRefusal", record->sonicRefusal);
+
         recordVars.add (juce::var (r));
     }
 

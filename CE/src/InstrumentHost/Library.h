@@ -147,6 +147,12 @@ struct LibraryRecord
     SonicProfile sonic;
     juce::String sonicFingerprint;
 
+    // Why the last attempt produced no measurement, when it produced none. "Tried and it did
+    // not work" is a different fact from "never tried", and only the first of them should stop
+    // the auditioner walking into the same crashing preset on every future run. Cleared by a
+    // successful measurement and by asking for everything to be measured again.
+    juce::String sonicRefusal;
+
     // What each part of a captured rack sounded like. Rack records only, and only for parts
     // that were playing something the library knows.
     juce::Array<CapturedPart> parts;

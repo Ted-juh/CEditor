@@ -184,11 +184,21 @@ Expect `ALL PASSED`, and read the three measured lines it prints even when it pa
 the actual numbers, and a change that makes them implausible while keeping the orderings true is
 exactly what this cannot catch on its own.
 
+It measures the library **twice**: once through the out-of-process auditioner (Stage B2, the
+default) and once in this process, and requires the two to agree. A browser whose numbers depend
+on where they were taken cannot compare a preset measured last year with one measured today, so
+that agreement is the thing the change rests on — and it is also the only check anywhere that
+the in-process fallback, which a build shipping no worker uses, still works.
+
 **It works with any instrument**, and that is worth doing occasionally with something large and
 real: point it at a commercial synth and it will scan, load, measure every program, snapshot
 them, rank them and diff two saves. With a plug-in that is not `probe-synth` it skips the
 assertions about *which* program should measure brighter — it cannot know — and prints what it
 measured for reading by hand instead.
+
+What a *crashing* or *hanging* plug-in does to the auditioner is not this gate's question — it
+cannot make a real plug-in die on demand. That is `SonicAnalysisWorkerTests`, which drives the
+same coordinator against the stub worker and is in CI.
 
 Two things it needs that the stub tests do not, both documented on `InstrumentHostService::Options`:
 the analysis executor must be a **real background thread** (the job borrows an instance through

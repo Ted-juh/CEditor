@@ -265,6 +265,14 @@ int main (int argc, char* argv[])
              && (int) progress->getProperty ("done") >= 3,
            "the auditioner plays every program of a real plug-in and finishes");
 
+    // And it did it in a CHILD PROCESS, which is the claim Stage B2 makes and the one thing
+    // about it that cannot be inferred from the numbers: identical measurements are exactly
+    // what a silent fallback to in-process would also produce. The job document is written
+    // here and deleted after each pass, so the directory existing is the evidence the worker
+    // was actually asked.
+    check (dataDir.getChildFile ("audition-jobs").isDirectory(),
+           "and it was a child process that played them, not this one");
+
     emits.clear();
     cmd ("getLibrary");
     library = emits.last ("instrumentHostLibrary");
@@ -325,6 +333,119 @@ int main (int argc, char* argv[])
     check (measured (pad, "width") > measured (dark, "width") + 0.1f,
            "a preset whose two channels differ measures wider than one whose do not");
     check (measured (dark, "width") < 0.1f, "while a mono-in-both-channels preset is not wide");
+
+    // -- the same sound, measured in this process, must be the same measurement ------------
+    //
+    // Stage B2 moved the listening into a child process, and everything above went through it:
+    // a plug-in that dies while being auditioned now costs a process and one blamed preset
+    // rather than the editor. That is only an improvement if it measures IDENTICALLY, because
+    // a browser whose numbers depend on where they were taken cannot compare a preset measured
+    // before the change with one measured after it — the filters, the map and every match are
+    // one scale or they are nothing.
+    //
+    // So the whole thing runs again with the auditioner in this process, over its own library,
+    // and the two have to agree. This is also the only check anywhere that the in-process
+    // fallback still works, which matters because it is what a build with no worker uses.
+    {
+        auto inProcessDir = dataDir.getSiblingFile ("ceditor-real-plugin-check-inproc");
+        inProcessDir.deleteRecursively();
+        inProcessDir.createDirectory();
+
+        Emits localEmits;
+        InstrumentHostService::Options localOptions;
+        localOptions.dataDirectory = inProcessDir;
+        localOptions.workerExecutable = worker;
+        localOptions.auditionOutOfProcess = false;    // the whole point of this block
+        localOptions.includeDefaultScanRoots = false;
+        localOptions.enableAudio = false;
+        localOptions.emit = [&localEmits] (const juce::String& name, const juce::var& payload)
+                            { localEmits.entries.push_back ({ name, payload }); };
+        localOptions.instantiate = ceditor::host::makePluginInstantiator (formats);
+        localOptions.applyVstPreset = ceditor::host::applyVstPresetFile;
+        localOptions.scanExecutor = [] (std::function<void()> body) { body(); };
+
+        std::thread localThread;
+        localOptions.analysisExecutor = [&localThread] (std::function<void()> body)
+        {
+            if (localThread.joinable())
+                localThread.join();
+            localThread = std::thread (std::move (body));
+        };
+        localOptions.onControlThread = [] (std::function<void()> work)
+                                       { juce::MessageManager::callAsync (std::move (work)); };
+
+        InstrumentHostService local (std::move (localOptions));
+        const auto localCmd = [&local, &pump] (const juce::String& name,
+                                  std::initializer_list<std::pair<const char*, juce::var>> fields = {})
+        {
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("cmd", name);
+            for (const auto& [key, value] : fields)
+                payload->setProperty (juce::Identifier (key), value);
+            local.handleCommand (juce::var (payload));
+            pump (20);
+        };
+
+        localCmd ("getState");
+        localCmd ("addScanPath", { { "path", plugin.getParentDirectory().getFullPathName() } });
+        localCmd ("scan");
+        localCmd ("addPart");
+        localEmits.clear();
+        localCmd ("getState");
+        juce::String localPartId;
+        if (const auto* current = localEmits.last ("instrumentHostState"))
+            localPartId = current->getProperty ("rack").getProperty ("parts", {})[0]
+                              .getProperty ("partId", {}).toString();
+        localCmd ("loadInstrument", { { "partId", localPartId }, { "ceId", ceId } });
+        for (int i = 0; i < 100 && local.getRackHost().getInstrument (localPartId) == nullptr; ++i)
+            pump (50);
+
+        localEmits.clear();
+        localCmd ("analyseLibrary");
+        for (int i = 0; i < 600; ++i)
+        {
+            pump (50);
+            const auto* running = localEmits.last ("instrumentHostAnalysisProgress");
+            if (running != nullptr && ! (bool) running->getProperty ("running"))
+                break;
+        }
+        if (localThread.joinable())
+            localThread.join();
+        pump (100);
+
+        localEmits.clear();
+        localCmd ("getLibrary");
+        const auto* localLibrary = localEmits.last ("instrumentHostLibrary");
+        const auto localDark = recordNamed (localLibrary, "Dark Pluck");
+        const auto localBright = recordNamed (localLibrary, "Bright Pluck");
+        const auto localPad = recordNamed (localLibrary, "Wide Slow Pad");
+
+        check (localDark.isObject() && localBright.isObject() && localPad.isObject(),
+               "the in-process auditioner still measures every program");
+
+        // Identical, not merely similar: both paths run the same probe over the same renders
+        // through the same analysis, so any difference at all is a difference in the plumbing.
+        // A hundredth of a normalised unit is the tolerance for a plug-in that is not perfectly
+        // deterministic across instances; a real disagreement is far larger than that.
+        const auto agrees = [] (const juce::var& a, const juce::var& b, const char* axis)
+        {
+            return std::abs (measured (a, axis) - measured (b, axis)) < 0.01f;
+        };
+
+        check (agrees (dark, localDark, "brightness") && agrees (bright, localBright, "brightness")
+                 && agrees (pad, localPad, "brightness"),
+               "and a child process measures the same brightness this one does");
+        check (agrees (dark, localDark, "attack") && agrees (pad, localPad, "attack")
+                 && agrees (dark, localDark, "tail") && agrees (pad, localPad, "tail")
+                 && agrees (pad, localPad, "width"),
+               "the same attack, tail and width too — one scale, wherever it was taken");
+
+        ceditor::host::SnapshotStore localStore (inProcessDir.getChildFile ("snapshots"));
+        check (localStore.count() >= 3,
+               "and both paths leave the snapshot behind that makes the next click instant");
+
+        inProcessDir.deleteRecursively();
+    }
 
     // -- the snapshots that make browsing instant -----------------------------------------
     int instant = 0;

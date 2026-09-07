@@ -316,6 +316,15 @@ public:
     {
         juce::File dataDirectory;
         juce::File workerExecutable;
+        // Whether the auditioner plays presets in a child process (Stage B2). It uses the same
+        // helper the scan does — `workerExecutable` above — and falls back to measuring in this
+        // process when there is no worker to be had, saying so in the log rather than silently.
+        //
+        // The default is the isolated one because that is what every shipping caller wants: a
+        // plug-in that dies while being auditioned costs a child process and one blamed preset
+        // instead of the editor. A test with no worker, or one measuring a processor that lives
+        // in the test's own process, sets this false.
+        bool auditionOutOfProcess = true;
         std::function<void (const juce::String& eventName, const juce::var& payload)> emit;
         std::function<void (const juce::String& descriptionXml, double sampleRate, int blockSize,
                             InstantiateCallback)> instantiate;

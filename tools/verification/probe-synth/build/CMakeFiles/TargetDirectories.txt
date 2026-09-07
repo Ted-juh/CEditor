@@ -1,0 +1,10 @@
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/ProbeSynth.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/ProbeSynth_All.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/ProbeSynth_VST3.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/juce_vst3_helper.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/edit_cache.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/rebuild_cache.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/list_install_components.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/install.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/install/local.dir
+/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/install/strip.dir

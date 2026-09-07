@@ -354,6 +354,13 @@ struct Harness
         // The auditioner runs inline here, and its control-thread hook runs inline too: in the
         // app those are a background thread and the message thread, and the job is written so
         // the difference is the executor and nothing else.
+        //
+        // And it measures IN THIS PROCESS, which is the one thing the product does not do any
+        // more (Stage B2 puts it behind the worker). It has to: the instrument these tests
+        // measure is a StubSynthProcessor that exists only here, and no child process can be
+        // handed one. What the worker path does with a real plug-in is Gate S's job, and the
+        // protocol between the two is SonicAnalysisWorkerTests'.
+        options.auditionOutOfProcess = false;
         options.analysisExecutor = [] (std::function<void()> body) { body(); };
         options.onControlThread = [] (std::function<void()> work) { work(); };
         options.scanExecutor = [this] (std::function<void()> body)
@@ -2490,6 +2497,86 @@ void testInstantAudition()
             ring.add ((double) i, juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100));
         check (ring.size() == RecentPlay::capacity, "and the ring stays a fixed size");
     }
+}
+
+// A preset the plug-in will not take is an ANSWER, and the auditioner has to remember it.
+// Without this the browser retries the same refusing preset on every run for the life of the
+// library, which is exactly the shape a crashing preset has too — and out of process (Stage B2)
+// a crash is the case that matters, because there the run survives it and comes back to try
+// again.
+void testARefusalIsRememberedRatherThanRetried()
+{
+    std::cout << "\nthe auditioner: a preset that will not load is not asked twice" << std::endl;
+
+    const auto dir = freshDataDir ("audition-refusal");
+    seedCatalog (dir);
+
+    const auto presetRoot = dir.getChildFile ("presets");
+    const auto presetFile = presetRoot.getChildFile ("Test Audio").getChildFile ("Good Synth")
+                                      .getChildFile ("Stubborn.vstpreset");
+    {
+        std::vector<std::uint8_t> bytes (64, 0);
+        std::memcpy (bytes.data(), "VST3", 4);
+        std::memcpy (bytes.data() + 8, "ABCDEF0123456789ABCDEF0123456789", 32);
+        presetFile.getParentDirectory().createDirectory();
+        presetFile.replaceWithData (bytes.data(), bytes.size());
+    }
+
+    // The plug-in loads; the PRESET is what it refuses. That is the difference this test is
+    // about: a plug-in that will not load leaves its presets alone for another day.
+    int refusals = 0;
+    Harness h (dir, {}, [&refusals] (InstrumentHostService::Options& o)
+    {
+        o.applyVstPreset = [&refusals] (juce::AudioProcessor&, const juce::File&)
+        {
+            ++refusals;
+            return false;
+        };
+    });
+
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("addLibraryPath", { { "path", presetRoot.getFullPathName() } });
+    h.cmd ("scanLibrary");
+
+    const auto library = [&h] { return h.emits.last ("instrumentHostLibrary"); };
+    const auto measurable = [&library]
+    {
+        return (int) library()->getProperty ("counts", {}).getProperty ("measurable", 0);
+    };
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    const auto before = measurable();
+    check (before > 0, "the vendor preset arrives measurable");
+
+    h.emits.clear();
+    h.cmd ("analyseLibrary");
+    const auto afterFirst = refusals;
+    check (afterFirst > 0, "the auditioner tries it and the plug-in refuses");
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    // Nothing is left: the plug-in's own programs measured, and the one that refused is an
+    // answer too. A refusal that stayed on the list would be retried for the life of the
+    // library.
+    check (measurable() == 0, "which takes it off the list of things left to measure");
+
+    juce::String refusalText;
+    for (const auto& r : *library()->getProperty ("records", {}).getArray())
+        if (r.getProperty ("name", {}).toString() == "Stubborn")
+            refusalText = r.getProperty ("sonicRefusal", {}).toString();
+    check (refusalText.isNotEmpty(),
+           "and the browser is told WHY it has no measurement rather than shown a blank");
+
+    h.emits.clear();
+    h.cmd ("analyseLibrary");
+    check (refusals == afterFirst, "a second run does not ask the plug-in again");
+
+    h.emits.clear();
+    h.cmd ("analyseLibrary", { { "all", true } });
+    check (refusals > afterFirst, "but asking for everything again does, which is the way back");
 }
 
 // The auditioner at the command surface: what it measures, what it skips, and what it never
@@ -9936,6 +10023,7 @@ int main (int argc, char* argv[])
     testLibrary();
     testSonicProbe();
     testAuditioner();
+    testARefusalIsRememberedRatherThanRetried();
     testInstantAudition();
     testNearestSounds();
     testVersionRetention();

@@ -15,20 +15,35 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <iostream>
 
+#include "SonicAnalysisJob.h"
+
+static int runScan (const juce::String& modulePath);
+static int runAudition (const juce::File& jobFile);
+
 int main (int argc, char* argv[])
 {
-    if (argc != 3 || juce::String (argv[1]) != "--scan")
+    if (argc == 3 && juce::String (argv[1]) == "--scan")
     {
-        std::cerr << "usage: CEditorPluginScanner --scan <path-to-vst3>" << std::endl;
-        return 64;
+        // Scanning instantiates the module briefly, and VST3 module code expects a message
+        // manager to exist on the thread doing it — the same footing PluginDirectoryScanner
+        // runs on.
+        juce::ScopedJuceInitialiser_GUI juceInit;
+        return runScan (juce::String::fromUTF8 (argv[2]));
     }
 
-    // Scanning instantiates the module briefly, and VST3 module code expects a message
-    // manager to exist on the thread doing it — the same footing PluginDirectoryScanner runs on.
-    juce::ScopedJuceInitialiser_GUI juceInit;
+    if (argc == 3 && juce::String (argv[1]) == "--audition")
+    {
+        juce::ScopedJuceInitialiser_GUI juceInit;
+        return runAudition (juce::File (juce::String::fromUTF8 (argv[2])));
+    }
 
-    const juce::String modulePath = juce::String::fromUTF8 (argv[2]);
+    std::cerr << "usage: CEditorPluginScanner --scan <path-to-vst3>" << std::endl;
+    std::cerr << "       CEditorPluginScanner --audition <path-to-job-xml>" << std::endl;
+    return 64;
+}
 
+static int runScan (const juce::String& modulePath)
+{
     juce::XmlElement out ("SCANRESULT");
     out.setAttribute ("module", modulePath);
 
@@ -129,5 +144,85 @@ int main (int argc, char* argv[])
     }
 
     std::cout << out.toString() << std::endl;
+    return 0;
+}
+
+// --- auditioning ------------------------------------------------------------------------------
+//
+// Stage B2. The scan above asks a module what it contains; this plays what it contains and
+// writes down how it sounded. Same argument for being here rather than in the editor, only
+// more so: scanning instantiates a plug-in briefly, auditioning drives it through hundreds of
+// preset changes and renders each one.
+//
+// Everything in this process is on the message thread, which is the whole reason a separate
+// process is simpler as well as safer: a plug-in expects to be created, driven and destroyed on
+// one thread, and here that thread is `main`. There is nothing to marshal.
+//
+// Output is a line per event, flushed as it happens, so a death at preset 300 keeps the 299
+// before it — see SonicAnalysisJob.h for why that shape was chosen over one document.
+
+static int runAudition (const juce::File& jobFile)
+{
+    using namespace ceditor::host;
+
+    const auto fatal = [] (const juce::String& detail)
+    {
+        juce::XmlElement element ("FATAL");
+        element.setAttribute ("detail", detail);
+        std::cout << element.toString (juce::XmlElement::TextFormat().singleLine().withoutHeader())
+                  << std::endl;
+        return 2;
+    };
+
+    AnalysisJob job;
+    if (! jobFile.existsAsFile())
+        return fatal ("job file not found: " + jobFile.getFullPathName());
+    if (! analysisJobFromXml (jobFile.loadFileAsString(), job))
+        return fatal ("job file is not an audition job: " + jobFile.getFullPathName());
+
+    juce::PluginDescription description;
+    const auto parsedDescription = juce::XmlDocument::parse (job.descriptionXml);
+    if (parsedDescription == nullptr || ! description.loadFromXml (*parsedDescription))
+        return fatal ("unreadable plugin description");
+
+    juce::AudioPluginFormatManager formats;
+    formats.addDefaultFormats();
+
+    juce::String error;
+    auto instrument = formats.createPluginInstance (description, job.spec.sampleRate,
+                                                    job.spec.blockSize, error);
+    if (instrument == nullptr)
+        return fatal (error.isEmpty() ? juce::String ("the plug-in would not load") : error);
+
+    // A vendor .vstpreset needs the VST3 format to validate the class id inside the file against
+    // the live instance, so a mismatched preset fails here rather than half-applying. Everything
+    // else is a captured blob or a program index and needs no format at all.
+    const auto applyState = [] (juce::AudioProcessor& processor, const AnalysisPreset& preset) -> juce::String
+    {
+        if (preset.sourceType != "vstpreset")
+            return applyPresetStatePlain (processor, preset);
+
+        auto* asInstance = dynamic_cast<juce::AudioPluginInstance*> (&processor);
+        juce::MemoryBlock data;
+        if (asInstance == nullptr || ! juce::File (preset.sourceLocator).loadFileAsData (data))
+            return "The vendor preset could not be read: " + preset.name;
+        if (! juce::VST3PluginFormat::setStateFromVSTPresetFile (asInstance, data))
+            return "The plug-in refused this preset: " + preset.name;
+        return {};
+    };
+
+    measurePresets (job, *instrument, applyState,
+        [] (const AnalysisEvent& event)
+        {
+            if (event.kind == AnalysisEvent::Kind::trying)
+                std::cout << analysisTryingLine (event.recordId) << std::endl;
+            else if (event.kind == AnalysisEvent::Kind::finding)
+                std::cout << analysisFindingLine (event.finding) << std::endl;
+        });
+
+    // Destroyed here, on the thread that made it, before the message manager goes.
+    instrument.reset();
+
+    std::cout << "<DONE/>" << std::endl;
     return 0;
 }

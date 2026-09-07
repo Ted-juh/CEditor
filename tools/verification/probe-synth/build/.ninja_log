@@ -1,0 +1,32 @@
+# ninja log v5
+2	34	0	/home/user/CEditor/tools/verification/probe-synth/build/CMakeFiles/cmake.verify_globs	b6f518d7b21307ed
+34	52	1788804209657647296	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_processors/juce_audio_processors_ara.cpp.o	dee8091ae2d75b7e
+35	56	1788804209664632667	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_processors/juce_audio_processors_lv2_libs.cpp.o	74ebee286986283d
+34	6200	1788804215802638469	CMakeFiles/ProbeSynth.dir/ProbeSynth.cpp.o	df9b555ef578776
+6200	7261	1788804216866638532	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_graphics/juce_graphics_Sheenbidi.c.o	9cd258f37e6f52d8
+35	15252	1788804224854639007	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_gui_extra/juce_gui_extra.cpp.o	1378f7c73ca8c587
+7261	16345	1788804225942639072	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_events/juce_events.cpp.o	2f0c9e90e2121888
+16345	16369	1788804225977340640	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_core/juce_core_CompilationTime.cpp.o	a25cf096453a94bb
+16369	22493	1788804232098639438	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_data_structures/juce_data_structures.cpp.o	b25efa5c4036689d
+34	24076	1788804233674639531	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_processors/juce_audio_processors.cpp.o	32ea0a82a950c58d
+24076	37624	1788804247222640337	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_utils/juce_audio_utils.cpp.o	49cf0c7d54dab545
+22493	38624	1788804248226640397	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_basics/juce_audio_basics.cpp.o	f6cdac7418421bea
+38624	50052	1788804259650641076	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_devices/juce_audio_devices.cpp.o	3ac748ecdfa56a5
+15252	50885	1788804260474641125	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_core/juce_core.cpp.o	16fc1c542bd4ff3b
+50886	57756	1788804267358641534	CMakeFiles/juce_vst3_helper.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.o	3d5f3158a2a6a24a
+57756	57870	1788804267477749086	juce_vst3_helper	19438c5e8c198f22
+57870	57898	1788804267506436097	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_AAX.cpp.o	3d7693189ffde65c
+57898	57918	1788804267526634034	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_AAX_utils.cpp.o	c187708550db4308
+57918	57938	1788804267546382558	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_ARA.cpp.o	ffd65ba19bd7bcdd
+57938	57962	1788804267570611562	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp.o	edd09d1badc2f83c
+57962	57985	1788804267594385222	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_Standalone.cpp.o	ee105cd00f621a4c
+57986	58008	1788804267614353619	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_Unity.cpp.o	5511cdf9ca2f1f7c
+58008	58038	1788804267646351489	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST2.cpp.o	91f64401dd43e74c
+56	59192	1788804268782641618	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_graphics/juce_graphics_Harfbuzz.cpp.o	d69652ed9d92eac5
+52	60093	1788804269690641672	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_graphics/juce_graphics.cpp.o	ab4e652396d4167c
+50052	62333	1788804271934641806	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_dsp/juce_dsp.cpp.o	7529dfb0d413e9e
+37624	64464	1788804274062641932	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_formats/juce_audio_formats.cpp.o	13aca394b673b3ea
+58038	74866	1788804284466642551	CMakeFiles/ProbeSynth_VST3.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp.o	61d64b30ea19c7b2
+38	83750	1788804293338643078	CMakeFiles/ProbeSynth.dir/home/user/CEditor/JUCE/include/JUCE-8.0.7/modules/juce_gui_basics/juce_gui_basics.cpp.o	34af8711213f9b3c
+83750	84002	1788804293590643093	ProbeSynth_artefacts/Release/libProbe Synth_SharedCode.a	464fa6262401e86a
+84002	84289	1788804293846643108	ProbeSynth_artefacts/Release/VST3/Probe Synth.vst3/Contents/x86_64-linux/Probe Synth.so	5de6375b03e54f05

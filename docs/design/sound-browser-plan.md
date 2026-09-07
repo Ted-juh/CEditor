@@ -1,7 +1,7 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A–F are built** (2026-09-07). What remains is B2 — moving the
-auditioner out of process — and it is named in Stage B below. The mockups it describes are in
+Status: **Stages A–F are built, B2 included** (2026-09-07). The auditioner now listens in a
+child process; what that cost and what it bought is *Stage B2, as built* below. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -225,13 +225,13 @@ library. Instances are borrowed one per plug-in and every preset that plug-in ho
 before the next one is made, because instantiating is the expensive part and playing is not.
 A plug-in that will not load is skipped with its reason, never fatal.
 
-It is still **in process**, and that is the gap. §17's whole argument is that a plug-in which
-takes the process down must not take the editor with it, and the scanner is out of process for
-exactly that reason. The argument for running the auditioner in process is real but partial:
-these classes have already been vetted by the out-of-process scan, and the host loads them into
-the rack anyway. It is not the same as crash isolation. **B2 is moving the job behind the
-scanner's worker**, and the shape above was chosen so that is a different `analysisExecutor`
-and instantiation hook rather than a rewrite.
+It was still **in process** when this stage was written, and that was the gap: §17's whole
+argument is that a plug-in which takes the process down must not take the editor with it, and
+the scanner is out of process for exactly that reason. The argument for auditioning in process
+was real but partial — these classes have already been vetted by the out-of-process scan, and
+the host loads them into the rack anyway — and it is not the same as crash isolation. That is
+**Stage B2**, below, and the prediction made here held: it was a different execution path for
+the same measuring loop rather than a rewrite.
 
 **What rendering it found.** The range inputs arrived wearing the browser's own chrome — a light
 track and a default thumb inside a dark tool — because `accent-color` colours the fill and
@@ -430,6 +430,70 @@ the CTRL49's own pages already exist (`Ctrl49RackDisplay`), this produces the sa
 model, and joining them is transport work that needs the hardware in the room to be worth
 trusting.
 
+## Stage B2, as built
+
+The auditioner listens in a child process now. `CEditorPluginScanner` — already the one place a
+third-party module is loaded to be *asked what it contains* — gained a second mode where it is
+also the one place a module is loaded to be *played*, which is strictly more third-party code
+running and therefore the stronger case for the same isolation.
+
+**The unit of work is one plug-in and every preset it holds**, which is the grouping the
+in-process loop already used for its own reason: instantiating is the expensive part and playing
+is not. It turns out to be exactly one worker process, so nothing had to be regrouped.
+
+**It streams, and the scan does not.** That is the one real difference in protocol, and it is
+forced: a scan is short and its answer is small, so one XML document at the end is right; a
+synth with five hundred presets is five hundred renders and minutes of work. Reporting a line
+per preset buys two things a wait-then-read cannot:
+
+- **the 299 survive** a crash at preset 300, where before the same crash took the editor down,
+  so this is not a smaller loss of the same kind — it is an hour of listening surviving; and
+- **the dead preset is named.** The worker prints which preset it is about to touch before
+  touching it, so a process that dies without a matching result identifies the sound that killed
+  it. That preset is blamed, recorded, skipped, and the job **relaunches for the rest**. The scan
+  can only ever blame a whole module; this blames one sound out of five hundred and continues.
+
+**A refusal is an answer, and answers are remembered.** A preset that crashes the plug-in or that
+the plug-in will not take is now stamped with `sonicRefusal` against the bytes it was tried on,
+so the next run does not walk into it again and the browser can say *why* a tile has no
+thumbprint instead of showing a blank. Asking for everything to be measured again is the way
+back. Without this the out-of-process auditioner would be worse than the in-process one in one
+specific way — it survives the crash, so it would come back and do it again on every run.
+
+**A plug-in that will not load at all is treated differently, on purpose.** Its presets are
+reported and left *untouched*, not stamped. A crash on a particular preset is usually that
+preset; a plug-in that will not start is usually the machine that day — a dongle that is not in,
+a licence server, a missing dependency — and stamping five hundred presets unmeasurable because
+of a Tuesday is the worse mistake.
+
+**The audio does not come back down the pipe.** The worker writes snapshots into the same store
+the editor reads from, because a snapshot *is* a file cache and both processes can see it.
+Putting 35 kB of FLAC per preset through stdout would be a second encoding of something already
+encoded for exactly this purpose.
+
+**What building it found.** The out-of-process path is *simpler than the in-process one*, which
+was not expected. In the worker everything — creating the instance, applying each preset,
+rendering — happens on the one thread that is also the message thread, so the marshalling that
+the real-VST3 gate caught the editor getting wrong (a preset applied on the wrong thread is
+applied one render late) cannot arise there at all. The in-process path keeps its `marshalAndWait`
+because it still needs it; the worker needs nothing.
+
+There is no read-with-timeout on a child process's pipe, so a hung plug-in would block the
+reading thread on a pipe that will never produce another byte. The timeout is therefore enforced
+from *beside* the loop: a watchdog kills the child, and killing it is what makes the read return.
+
+**Both paths are proven against a real plug-in and must agree.** Gate S now runs the whole
+library twice — once through the worker, once in process — and requires the measurements to
+match, because a browser whose numbers depend on where they were taken cannot compare a preset
+measured before this change with one measured after it. It also asserts that the first run
+really did use a child process: identical numbers are exactly what a silent fallback to
+in-process would produce too, so the evidence has to be something else (the job document's
+directory), not the numbers.
+
+**Not in B2:** the auditioner is isolated; the RACK is not. Loading an instrument to play it
+still happens in the editor's process, which is the same exposure the product had before any of
+this and a much larger piece of work — it is §17's remaining half, not this stage's.
+
 ## What a real VST3 found
 
 Everything above was proved against `StubSynthProcessor`, which is a DC generator with three
@@ -488,6 +552,11 @@ on `Options` where somebody wiring a new consumer will read them.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — B2, the auditioner in a child process; see *Stage B2, as built* above. The
+  thing worth carrying: a streaming protocol was not chosen for throughput but for BLAME. One
+  line printed before each preset is what turns "this plug-in crashes" into "this sound crashes",
+  and that single line is the difference between abandoning five hundred presets and skipping one.
 
 - **2026-09-07** — the real-VST3 gate; see *What a real VST3 found* above. The lesson to carry:
   a stub proves the shape of a thing and can say nothing about whether it is true. Every number

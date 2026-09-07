@@ -253,6 +253,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
@@ -572,6 +574,8 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
@@ -1054,6 +1058,8 @@ if(WIN32)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -1417,6 +1423,8 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
     "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
     "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
@@ -1438,6 +1446,31 @@ add_test(NAME InstrumentHostService
          COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)
 ce_configure_test(CEditorInstrumentHostServiceTests)
 
+# The out-of-process auditioner's protocol and its recovery (Sound Browser Stage B2). Runs
+# against the same stub worker the scan coordinator uses, so a plug-in that dies on one preset,
+# hangs, never loads or prints its own noise are all reproducible on a machine with no VST3 at
+# all. What a REAL plug-in sounds like is Gate S's question, not this one's.
+add_executable(CEditorSonicAnalysisWorkerTests
+    "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+    "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/tests/SonicAnalysisWorkerTests.cpp"
+)
+target_compile_features(CEditorSonicAnalysisWorkerTests PRIVATE cxx_std_23)
+target_include_directories(CEditorSonicAnalysisWorkerTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorSonicAnalysisWorkerTests PRIVATE
+    juce::juce_core
+    juce::juce_cryptography
+    juce::juce_audio_processors
+    juce::juce_audio_formats
+    juce::juce_dsp
+)
+add_test(NAME SonicAnalysisWorker
+         COMMAND CEditorSonicAnalysisWorkerTests $<TARGET_FILE:CEditorScannerStub>)
+ce_configure_test(CEditorSonicAnalysisWorkerTests)
+
 # The Sound Browser against an actual VST3 rather than the stub. Off by default and NOT a
 # ctest: CI has no plug-ins, and a check that needs one it cannot have would be a red run that
 # means nothing. It is the gate somebody runs by hand — see docs/verify-end-to-end.md — and it
@@ -1456,6 +1489,8 @@ if (CEDITOR_REAL_PLUGIN_CHECK)
         "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisWorker.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
         "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
@@ -1505,8 +1540,15 @@ endif()
 # worker ships beside it; -DCEDITOR_SCANNER_WORKER=ON builds it anywhere for verification.
 option(CEDITOR_SCANNER_WORKER "Build the out-of-process VST3 scanner helper (CEditorPluginScanner)" ${CEDITOR_BUILD_APP_DEFAULT})
 if (CEDITOR_SCANNER_WORKER)
+    # It is the audition worker as well now (Stage B2): the same argument that keeps a module's
+    # SCAN out of the editor keeps its presets' PLAYBACK out of it, and one helper beside the
+    # app is one thing to ship, sign and find.
     add_executable(CEditorPluginScanner
         "${CE_ROOT}/src/InstrumentHost/ScannerWorkerMain.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicAnalysisJob.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     )
     target_compile_features(CEditorPluginScanner PRIVATE cxx_std_23)
     target_compile_definitions(CEditorPluginScanner PRIVATE
@@ -1516,7 +1558,11 @@ if (CEDITOR_SCANNER_WORKER)
         JUCE_STANDALONE_APPLICATION=1
     )
     target_include_directories(CEditorPluginScanner PRIVATE "${CE_ROOT}/src")
-    target_link_libraries(CEditorPluginScanner PRIVATE juce::juce_audio_processors)
+    target_link_libraries(CEditorPluginScanner PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats   # the snapshot it keeps is a FLAC
+        juce::juce_dsp             # the spectrum it measures is an FFT
+        juce::juce_cryptography)   # library.cpp fingerprints
     message(STATUS "CEditor: VST3 scanner worker ENABLED (CEditorPluginScanner).")
 endif()
 

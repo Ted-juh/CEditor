@@ -120,6 +120,7 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             const auto keepUser = record.user;
             const auto keepSonic = record.sonic;
             const auto keepSonicFingerprint = record.sonicFingerprint;
+            const auto keepSonicRefusal = record.sonicRefusal;
             const auto keepVersions = record.versions;
             const auto keepBranchedFrom = record.branchedFromRecordId;
             const auto keepParts = record.parts;
@@ -128,6 +129,7 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             record.user = keepUser;
             record.sonic = keepSonic;
             record.sonicFingerprint = keepSonicFingerprint;
+            record.sonicRefusal = keepSonicRefusal;
             record.versions = keepVersions;
             record.branchedFromRecordId = keepBranchedFrom;
             record.parts = keepParts;
@@ -241,8 +243,15 @@ juce::var Library::toVar() const
                                                     for (auto v : record.sonic.envelope) a.add (v);
                                                     return a; }());
             r->setProperty ("sonic", juce::var (m));
-            r->setProperty ("sonicFingerprint", record.sonicFingerprint);
         }
+
+        // Outside the block above on purpose: this is the fingerprint of the last ATTEMPT, and
+        // an attempt that produced no measurement is exactly the case that has to be
+        // remembered — otherwise the auditioner walks into the same crashing preset every run.
+        if (record.sonicFingerprint.isNotEmpty())
+            r->setProperty ("sonicFingerprint", record.sonicFingerprint);
+        if (record.sonicRefusal.isNotEmpty())
+            r->setProperty ("sonicRefusal", record.sonicRefusal);
 
         if (! record.versions.isEmpty())
         {
@@ -368,8 +377,10 @@ Library Library::fromVar (const juce::var& stored)
             if (const auto* envelope = m.getProperty ("envelope", {}).getArray())
                 for (const auto& v : *envelope)
                     sonic.envelope.add (juce::jlimit (0.0f, 1.0f, (float) (double) v));
-            record.sonicFingerprint = r.getProperty ("sonicFingerprint", {}).toString();
         }
+
+        record.sonicFingerprint = r.getProperty ("sonicFingerprint", {}).toString();
+        record.sonicRefusal     = r.getProperty ("sonicRefusal", {}).toString();
 
         if (const auto* stored = r.getProperty ("versions", {}).getArray())
             for (const auto& v : *stored)
