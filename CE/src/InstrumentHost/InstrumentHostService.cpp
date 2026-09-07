@@ -971,6 +971,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "setPartMidiRules")
     {
         const auto partId = payload.getProperty ("partId", {}).toString();
+        const auto preview = (bool) payload.getProperty ("preview", false);
         const auto* part = rack.getPerformance().findPart (partId);
         if (part == nullptr)
         {
@@ -988,8 +989,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         rules.transpose    = (int) payload.getProperty ("transpose",    rules.transpose);
 
         rack.setMidiRules (partId, rules);
-        savePerformance();
-        emitState();
+        if (! preview)
+        {
+            savePerformance();
+            emitState();
+        }
         return;
     }
 

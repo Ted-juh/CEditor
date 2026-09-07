@@ -47,7 +47,8 @@
 //     (browseScanPath opens the native directory picker through Options::pickDirectory and
 //      adds whatever the user chose; cancelling chooses nothing and changes nothing)
 //   addPart | removePart {partId} | movePart {partId,index} | focusPart {partId}
-//   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose}
+//   setPartMidiRules {partId, channel,keyLow,keyHigh,velocityLow,velocityHigh,transpose,preview?}
+//     (preview applies to the live MIDI filter without saving or emitting a full state snapshot)
 //   importScalaTuning {text,sourceName?} | resetMicrotuning
 //   setMicrotuning {enabled?,name?,rootMidiNote?,referenceMidiNote?,referenceFrequency?,
 //     mtsDeviceId?,mtsProgram?} | setPartMicrotuning {partId,enabled}

@@ -20,14 +20,15 @@
    * should keep doing that — you can hear which side of a split a key falls on. Every other
    * part is a thin band along the top of the keys it covers, stacked where they overlap, so a
    * six-way split reads as six bands on one keyboard rather than six lanes; click a band to
-   * switch to that part. Every drag sends the same setPartMidiRules command the numeric zone
-   * fields send, so the digits and the picture can never disagree.
+   * switch to that part. A drag paints locally and sends at most one lightweight native
+   * preview per animation frame; releasing it sends the ordinary persistent command once.
    *
    * There used to be a second keyboard for this under the rack, linear in semitones, which
    * never lined up with the piano above it. One keyboard, one geometry (pianoGeometry.js).
    */
+  import { onDestroy } from 'svelte';
   import { hostNote, hostState, hostKeyboardMode, showKeyboardPlay, showPartRange,
-           setPartMidiRules, partColor } from '../stores/instrumentHost.js';
+           previewPartMidiRules, setPartMidiRules, partColor } from '../stores/instrumentHost.js';
   import { FULL_KEYBOARD, MAX_COMPLETE_OCTAVES, isBlack, noteName, whiteCount,
            noteAtFraction, zoneExtent, maxPlayBaseOctave, playKeyboardRange,
            playKeyboardWidthPercent }
@@ -60,10 +61,15 @@
       if (!isBlack(n)) out.push({ note: n, sharp: n + 1 <= high && isBlack(n + 1) ? n + 1 : -1 });
     return out;
   });
-  let extent = $derived(rangePart ? zoneExtent(rangePart.keyLow, rangePart.keyHigh, low, high) : null);
+  // Keep the pointer's value on the browser side while dragging. The full native state is a
+  // deliberately expensive snapshot and must not sit between the pointer and its pixels.
+  let rangeDraft = $state(null);
+  let displayedRange = $derived(rangeDraft?.partId === rangePart?.partId ? rangeDraft : rangePart);
+  let extent = $derived(displayedRange
+    ? zoneExtent(displayedRange.keyLow, displayedRange.keyHigh, low, high) : null);
 
   const covers = (part, note) => note >= part.keyLow && note <= part.keyHigh;
-  const inRange = (note) => mode === 'range' && rangePart != null && covers(rangePart, note);
+  const inRange = (note) => mode === 'range' && displayedRange != null && covers(displayedRange, note);
   const bandsOn = (note) => (mode === 'range' ? others.filter(({ part }) => covers(part, note)) : []);
 
   const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
@@ -116,7 +122,7 @@
   function typeDown(event) {
     if (event.repeat || event.target.closest('input, textarea, select, [contenteditable]')) return;
     const key = event.key.toLowerCase();
-    if (key === 'escape' && mode === 'range') { showKeyboardPlay(); return; }
+    if (key === 'escape' && mode === 'range') { cancelRangeDrag(); showKeyboardPlay(); return; }
     if (key === 'z') { shiftOctave(-1); return; }
     if (key === 'x') { shiftOctave(1); return; }
     if (key in KEYMAP) press(noteAt(baseOctave, KEYMAP[key]), 100);
@@ -143,6 +149,16 @@
   // started on instead of snapping the range's left edge to the pointer.
   let rimEl = $state(null);
   let drag = $state(null);
+  let previewFrame = 0;
+
+  $effect(() => {
+    // Keep the optimistic drawing after pointer-up until the committed native snapshot arrives.
+    if (!drag && rangeDraft) {
+      if (rangePart?.partId !== rangeDraft.partId
+          || (rangePart.keyLow === rangeDraft.keyLow && rangePart.keyHigh === rangeDraft.keyHigh))
+        rangeDraft = null;
+    }
+  });
 
   function keyAtClientX(clientX) {
     const rect = rimEl.getBoundingClientRect();
@@ -153,30 +169,92 @@
     if (!rangePart) return;
     event.preventDefault();
     event.stopPropagation();
-    drag = { handle, grabOffset: keyAtClientX(event.clientX) - rangePart.keyLow };
+    rangeDraft = {
+      partId: rangePart.partId,
+      keyLow: rangePart.keyLow,
+      keyHigh: rangePart.keyHigh,
+    };
+    drag = {
+      handle,
+      partId: rangePart.partId,
+      originalLow: rangePart.keyLow,
+      originalHigh: rangePart.keyHigh,
+      grabOffset: keyAtClientX(event.clientX) - rangePart.keyLow,
+    };
     rimEl.setPointerCapture?.(event.pointerId);
   }
 
-  function moveDrag(event) {
-    if (!drag || !rangePart) { drag = null; return; }
-    const part = rangePart;
-    const key = keyAtClientX(event.clientX);
-
-    if (drag.handle === 'low') {
-      const next = Math.min(key, part.keyHigh);
-      if (next !== part.keyLow) setPartMidiRules(part.partId, { keyLow: next });
-    } else if (drag.handle === 'high') {
-      const next = Math.max(key, part.keyLow);
-      if (next !== part.keyHigh) setPartMidiRules(part.partId, { keyHigh: next });
-    } else {
-      const width = part.keyHigh - part.keyLow;
-      const next = Math.max(0, Math.min(127 - width, key - drag.grabOffset));
-      if (next !== part.keyLow)
-        setPartMidiRules(part.partId, { keyLow: next, keyHigh: next + width });
-    }
+  function schedulePreview() {
+    if (previewFrame) return;
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      if (drag && rangeDraft?.partId === drag.partId)
+        previewPartMidiRules(drag.partId,
+          { keyLow: rangeDraft.keyLow, keyHigh: rangeDraft.keyHigh });
+    });
   }
 
-  const endDrag = () => (drag = null);
+  function cancelPreviewFrame() {
+    if (!previewFrame) return;
+    cancelAnimationFrame(previewFrame);
+    previewFrame = 0;
+  }
+
+  function moveDrag(event) {
+    if (!drag || !rangeDraft || rangeDraft.partId !== rangePart?.partId) {
+      cancelPreviewFrame();
+      drag = null;
+      rangeDraft = null;
+      return;
+    }
+    const key = keyAtClientX(event.clientX);
+    let nextLow = rangeDraft.keyLow;
+    let nextHigh = rangeDraft.keyHigh;
+
+    if (drag.handle === 'low') {
+      nextLow = Math.min(key, rangeDraft.keyHigh);
+    } else if (drag.handle === 'high') {
+      nextHigh = Math.max(key, rangeDraft.keyLow);
+    } else {
+      const width = rangeDraft.keyHigh - rangeDraft.keyLow;
+      const next = Math.max(0, Math.min(127 - width, key - drag.grabOffset));
+      nextLow = next;
+      nextHigh = next + width;
+    }
+
+    if (nextLow === rangeDraft.keyLow && nextHigh === rangeDraft.keyHigh) return;
+    rangeDraft = { ...rangeDraft, keyLow: nextLow, keyHigh: nextHigh };
+    schedulePreview();
+  }
+
+  function endDrag() {
+    if (!drag || !rangeDraft) return;
+    const final = rangeDraft;
+    cancelPreviewFrame();
+    drag = null;
+    // This is the only full-state rebuild and disk save in the entire gesture.
+    setPartMidiRules(final.partId, { keyLow: final.keyLow, keyHigh: final.keyHigh });
+  }
+
+  function cancelRangeDrag() {
+    if (!drag) return;
+    const original = drag;
+    cancelPreviewFrame();
+    drag = null;
+    rangeDraft = null;
+    // A preview may already have reached the live MIDI filter; cancellation restores it
+    // without turning the cancelled gesture into a saved edit.
+    previewPartMidiRules(original.partId,
+      { keyLow: original.originalLow, keyHigh: original.originalHigh });
+  }
+
+  onDestroy(() => {
+    if (drag)
+      previewPartMidiRules(drag.partId,
+        { keyLow: drag.originalLow, keyHigh: drag.originalHigh });
+    cancelPreviewFrame();
+  });
+
   const pct = (fraction) => `${(fraction * 100).toFixed(3)}%`;
   const partLabel = (part) => part.pluginName || (part.hardware ? part.midiOutputName || 'hardware' : 'empty');
 </script>
@@ -212,7 +290,7 @@
               title="Back to the playable keyboard (Esc). Drag the tabs on the rim to set the range, the strip between them to move it; click a band on the keys to edit another part."
               onclick={() => showKeyboardPlay()}>Play</button>
       <span class="range-for" style={`--part-color:${rangeColor}`}>
-        {rangePart ? `${partLabel(rangePart)} · ${noteName(rangePart.keyLow)}–${noteName(rangePart.keyHigh)}` : 'Key ranges'}
+        {rangePart && displayedRange ? `${partLabel(rangePart)} · ${noteName(displayedRange.keyLow)}–${noteName(displayedRange.keyHigh)}` : 'Key ranges'}
       </span>
     {/if}
   </div>
@@ -222,12 +300,12 @@
       <!-- The rim: where the range is edited, so the keys underneath stay playable. -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="rim" bind:this={rimEl} data-testid="host-key-rim"
-           onpointermove={moveDrag} onpointerup={endDrag} onpointercancel={endDrag}>
-        {#if rangePart && extent}
+           onpointermove={moveDrag} onpointerup={endDrag} onpointercancel={cancelRangeDrag}>
+        {#if rangePart && displayedRange && extent}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="range-strip" data-testid="key-range-strip"
                style={`left:${pct(extent.left)};width:${pct(extent.width)};--part-color:${rangeColor}`}
-               title={`${partLabel(rangePart)} · ${noteName(rangePart.keyLow)}–${noteName(rangePart.keyHigh)} — drag to move, drag a tab to resize`}
+               title={`${partLabel(rangePart)} · ${noteName(displayedRange.keyLow)}–${noteName(displayedRange.keyHigh)} — drag to move, drag a tab to resize`}
                onpointerdown={(e) => beginDrag(e, 'move')}>
             <span class="tab low" data-testid="key-range-low" title="Drag: lowest key"
                   onpointerdown={(e) => beginDrag(e, 'low')}></span>

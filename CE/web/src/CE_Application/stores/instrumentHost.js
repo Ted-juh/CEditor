@@ -6160,6 +6160,8 @@ export const moveRackPart = (partId, index) => send({ cmd: 'movePart', partId, i
 export const loadInstrument = (partId, ceId) => send({ cmd: 'loadInstrument', partId, ceId });
 export const unloadInstrument = (partId) => send({ cmd: 'unloadInstrument', partId });
 export const setPartMixer = (partId, fields) => send({ cmd: 'setPartMixer', partId, ...fields });
+export const previewPartMidiRules = (partId, fields) =>
+  send({ cmd: 'setPartMidiRules', partId, ...fields, preview: true });
 export const setPartMidiRules = (partId, fields) => send({ cmd: 'setPartMidiRules', partId, ...fields });
 export const importScalaTuning = (text, sourceName = '') =>
   send({ cmd: 'importScalaTuning', text: String(text ?? ''), sourceName });

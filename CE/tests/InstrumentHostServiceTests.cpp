@@ -475,6 +475,23 @@ void testCommandFlow()
              && (int) ruled.getProperty ("keyLow", -1) == 0,
            "setPartMidiRules keeps the fields it does not name");
 
+    const auto sessionFile = dir.getChildFile ("session-performance.json");
+    const auto persistedRules = sessionFile.loadFileAsString();
+    h.emits.clear();
+    h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 71 }, { "preview", true } });
+    check (h.emits.entries.empty(), "a MIDI-rule preview emits no full state snapshot");
+    check (sessionFile.loadFileAsString() == persistedRules,
+           "a MIDI-rule preview does not save the performance");
+
+    h.cmd ("getState");
+    const auto previewed = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+    check ((int) previewed.getProperty ("keyHigh", -1) == 71,
+           "a MIDI-rule preview reaches the live rack model");
+
+    h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 71 } });
+    check (sessionFile.loadFileAsString() != persistedRules,
+           "the release command persists the previewed MIDI rules");
+
     h.emits.clear();
     h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "no-such-instrument" } });
     check (h.emits.lastError().contains ("not in the catalogue"), "an unknown ceId is refused aloud");
