@@ -2649,6 +2649,9 @@ void testARefusalIsRememberedRatherThanRetried()
             refusalText = r.getProperty ("sonicRefusal", {}).toString();
     check (refusalText.isNotEmpty(),
            "and the browser is told WHY it has no measurement rather than shown a blank");
+    check ((int) library()->getProperty ("counts", {}).getProperty ("refused", 0) == 1,
+           "counted on its own, because a refusal is not on the list of things left to measure "
+           "and would otherwise vanish from the arithmetic");
 
     h.emits.clear();
     h.cmd ("analyseLibrary");

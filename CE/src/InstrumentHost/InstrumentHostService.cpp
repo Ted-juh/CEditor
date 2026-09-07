@@ -10009,6 +10009,14 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                   if (r.sonic.measured) ++n;
                                               return n; }());
     counts->setProperty ("measurable", analysisBacklog (false).size());
+    // Tried and it would not. These are not in `measurable` — that is the point of remembering
+    // a refusal — so without their own count they would simply vanish from the arithmetic and
+    // "12 measured, nothing left to do" would be quietly hiding three sounds nobody can hear.
+    counts->setProperty ("refused", [this] { int n = 0;
+                                             for (const auto& r : library.allRecords())
+                                                 if (! r.sonic.measured && r.sonicRefusal.isNotEmpty())
+                                                     ++n;
+                                             return n; }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 

@@ -338,13 +338,24 @@
         <button type="button" class="rail-action" data-testid="host-analyse"
                 disabled={$hostLibrary.counts.measurable === 0}
                 title={$hostLibrary.counts.measurable === 0
-                       ? 'Everything with a plug-in behind it has been measured'
+                       ? 'Everything with a plug-in behind it has been asked'
                        : 'Play each of these once and write down what came out'}
                 onclick={() => analyseLibrary()}>
           {$hostLibrary.counts.measurable === 0
             ? 'Nothing left to measure'
             : `Listen to ${$hostLibrary.counts.measurable} sound${$hostLibrary.counts.measurable === 1 ? '' : 's'}`}
         </button>
+        <!-- Refused sounds are not in `measurable` — that is what remembering a refusal means —
+             so without their own line "nothing left to measure" would be quietly hiding them.
+             This is also the only way back to one: the auditioner will not ask again on its own. -->
+        {#if $hostLibrary.counts.refused > 0}
+          <div class="listen-refused" data-testid="refused-count">
+            {$hostLibrary.counts.refused} could not be heard.
+            <button type="button" class="ghost more" data-testid="host-analyse-all"
+                    title="Ask every sound again, including the ones that refused"
+                    onclick={() => analyseLibrary(true)}>MEASURE EVERYTHING AGAIN</button>
+          </div>
+        {/if}
         {#if $hostAnalysis.what}
           <span class="listen-what">{$hostAnalysis.what}</span>
         {/if}
@@ -677,8 +688,8 @@
                  yet", and it is the one that has an answer: the auditioner will not ask again
                  unless somebody asks for everything to be measured again. -->
             <div class="notes" data-testid="inspector-refusal">{selected.sonicRefusal}
-              It will not be tried again on its own — use <em>Measure everything again</em> if
-              you want another go at it.</div>
+              It will not be asked again on its own — <em>Measure everything again</em>, beside
+              the listen button, is the way back to it.</div>
           </div>
         {/if}
 
@@ -1150,6 +1161,10 @@
   }
   .listen-progress .bar i { display: block; height: 100%; background: #4a86bd; }
   .listen-what { color: #7d8894; font-size: 10px; padding: 2px 0; }
+  .listen-refused {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    color: #b08a3d; font-size: 10px; padding: 2px 0;
+  }
   .dup-note { color: #d9a13c; font-size: 10.5px; padding: 2px 0; }
   .hint { color: #66707b; font-size: 10.5px; margin-right: auto; }
   .flabel {

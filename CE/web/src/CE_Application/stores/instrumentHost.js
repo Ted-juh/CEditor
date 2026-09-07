@@ -612,7 +612,7 @@ export function emptyHostLibrary() {
   return {
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
-              measured: 0, measurable: 0, snapshots: 0, snapshotBytes: 0 },
+              measured: 0, measurable: 0, refused: 0, snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
     smartCollections: [],
@@ -691,6 +691,9 @@ export function normalizeHostLibrary(payload) {
       matched: Number(p.counts?.matched ?? (Array.isArray(p.records) ? p.records.length : 0)),
       measured: Number(p.counts?.measured ?? 0),
       measurable: Number(p.counts?.measurable ?? 0),
+      // Tried and it would not. Not part of `measurable`, so it needs its own count or three
+      // sounds nobody can hear disappear from the arithmetic entirely.
+      refused: Number(p.counts?.refused ?? 0),
       snapshots: Number(p.counts?.snapshots ?? 0),
       snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
@@ -880,6 +883,12 @@ export function mockHostLibrary(query = '', type = '') {
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Keys', factory: true, available: true, tags: ['glassy'],
       sonic: mockMeasuredEverything ? mockSonic(0.55, 0.18, 0.40, 0.30, 0.14) : null },
+    // Tried, and the plug-in would not have it. A different absence from "not heard yet": this
+    // one has had its turn and has an answer, and the auditioner will not ask again on its own.
+    { recordId: 'lib-7', type: 'preset', sourceType: 'vstpreset', name: 'Broken Choir',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', category: 'Pad', factory: true,
+      available: true, tags: ['choir'], sonic: null,
+      sonicRefusal: 'The plug-in crashed while playing this sound.' },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -912,13 +921,15 @@ export function mockHostLibrary(query = '', type = '') {
 
   return normalizeHostLibrary({
     records,
-    counts: { total: all.length, presets: 4, racks: 1, chains: 1, missing: 0,
+    counts: { total: all.length, presets: 5, racks: 1, chains: 1, missing: 0,
               matched: records.length,
               snapshots: all.filter((r) => r.sonic && !r.sonic.silent).length,
               snapshotBytes: all.filter((r) => r.sonic).length * 35000,
               measured: all.filter((r) => r.sonic).length,
               measurable: all.filter((r) => !r.sonic && r.type === 'preset'
-                                              && r.available !== false).length },
+                                              && r.available !== false
+                                              && !r.sonicRefusal).length,
+              refused: all.filter((r) => !r.sonic && r.sonicRefusal).length },
     facets: computeLibraryFacets(all, request),
     smartCollections: mockSmartCollections.map((c) => ({
       ...c, count: all.filter((r) => matchesLibraryQuery(r, c.query)).length })),

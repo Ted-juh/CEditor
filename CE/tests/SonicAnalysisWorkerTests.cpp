@@ -269,6 +269,30 @@ void testCancellationStops (const juce::File& worker)
     check (! outcome.moduleFailed, "and stopping is not reported as a failure");
 }
 
+void testStaleJobsAreSweptUp (const juce::File& worker)
+{
+    std::cout << "\n-- what a killed run leaves behind" << std::endl;
+
+    const auto jobs = testRoot().getChildFile ("jobs");
+    jobs.createDirectory();
+
+    // A job document from a run that never finished. One job can be a hundred presets of
+    // base64, so these are not small, and nothing else would ever remove them.
+    const auto old = jobs.getChildFile ("ce-audition-old.xml");
+    old.replaceWithText ("<AUDITIONJOB/>");
+    old.setLastModificationTime (juce::Time::getCurrentTime() - juce::RelativeTime::days (3.0));
+
+    const auto recent = jobs.getChildFile ("ce-audition-recent.xml");
+    recent.replaceWithText ("<AUDITIONJOB/>");
+
+    SonicAnalysisWorker runner (optionsFor (worker));
+    runner.run (jobWith ("stub-clean", { "one" }), {});
+
+    check (! old.existsAsFile(), "a job document from a run that was killed is swept up");
+    check (recent.existsAsFile(),
+           "while one from today is left alone — it may belong to a run still going");
+}
+
 void testTheJobSurvivesTheRoundTrip()
 {
     std::cout << "\n-- the job document" << std::endl;
@@ -318,6 +342,7 @@ int main (int argc, char* argv[])
     testNoiseOnStdoutIsIgnored (worker);
     testARefusalIsCarriedBack (worker);
     testAMissingWorkerIsSaidPlainly();
+    testStaleJobsAreSweptUp (worker);
     testCancellationStops (worker);
     testTheJobSurvivesTheRoundTrip();
 

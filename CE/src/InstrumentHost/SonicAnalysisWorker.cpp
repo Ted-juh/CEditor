@@ -24,6 +24,19 @@ SonicAnalysisWorker::runOnePass (const AnalysisJob& job,
                        : juce::File::getSpecialLocation (juce::File::tempDirectory);
     directory.createDirectory();
 
+    // Job documents are deleted as each pass ends, but "as each pass ends" is a promise this
+    // process cannot keep if it is killed mid-analysis — and one job can be a hundred presets
+    // of base64, so the leftovers are not small. Anything older than a day is from a run that
+    // is not coming back.
+    {
+        juce::Array<juce::File> stale;
+        directory.findChildFiles (stale, juce::File::findFiles, false, "ce-audition*.xml");
+        const auto cutoff = juce::Time::getCurrentTime() - juce::RelativeTime::days (1.0);
+        for (const auto& file : stale)
+            if (file.getLastModificationTime() < cutoff)
+                file.deleteFile();
+    }
+
     // The job goes in a file rather than on the command line: a captured state is eighteen
     // kilobytes of base64 and there can be hundreds of them in one job, which is orders past
     // what any platform will accept as an argument.

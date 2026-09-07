@@ -591,7 +591,7 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 6);
+  assert.equal(get(hostLibrary).records.length, 7);
 
   requestLibrary('warm', '');
   assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
@@ -600,7 +600,7 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 7, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 8, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -717,7 +717,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 6);
+  assert.equal(get(hostLibrary).counts.matched, 7);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -732,13 +732,13 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   const saved = get(hostLibrary).smartCollections;
   assert.equal(saved.length, 1);
   assert.equal(saved[0].name, 'Not mine');
-  assert.equal(saved[0].count, 5, 'a saved search reports its own count, run fresh');
+  assert.equal(saved[0].count, 6, 'a saved search reports its own count, run fresh');
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 6);
+  assert.equal(get(hostLibrary).records.length, 7);
   requestLibrary(saved[0].query);
-  assert.equal(get(hostLibrary).records.length, 5, 'and re-running it restores the view');
+  assert.equal(get(hostLibrary).records.length, 6, 'and re-running it restores the view');
 
   removeSmartCollection(saved[0].collectionId);
   assert.equal(get(hostLibrary).smartCollections.length, 0);
@@ -749,10 +749,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 4);
+  assert.equal(get(hostLibrary).records.length, 5);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 4,
+  assert.equal(get(hostLibrary).records.length, 5,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -818,6 +818,30 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
   assert.equal(shaped.counts.measured, 1);
   assert.equal(shaped.counts.measurable, 4);
   assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
+});
+
+test('mock reducer: a sound that refused is counted apart from one nobody has got to', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const counts = get(hostLibrary).counts;
+  assert.equal(counts.refused, 1, 'a refused sound has its own count');
+  assert.ok(counts.measurable > 0, 'and there is still something left to measure');
+
+  const refused = get(hostLibrary).records.find((r) => r.sonicRefusal);
+  assert.equal(refused.sonic, null, 'it carries no measurement');
+  assert.match(refused.sonicRefusal, /crashed/, 'and says why');
+
+  // The whole point of remembering a refusal: it is NOT on the list of things left to do, so
+  // it needs its own count or it disappears from the arithmetic entirely.
+  const measurableNames = get(hostLibrary).records
+    .filter((r) => !r.sonic && !r.sonicRefusal && r.type === 'preset' && r.available !== false)
+    .map((r) => r.name);
+  assert.ok(!measurableNames.includes(refused.name),
+    'a refusal is not queued to be tried again on the next run');
+
+  resetMockLibraryState();
 });
 
 test('normalizeHostLibrary keeps "not tried yet" apart from "tried and it would not"', () => {
