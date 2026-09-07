@@ -2033,6 +2033,86 @@ void testSubstitutes()
                "and the axes behind it, so the number can be argued with rather than trusted");
         check (best.getProperty ("distance", {}).isDouble(),
                "beside the distance it was computed from");
+
+        // A CHOICE, remembered. The rig with five gaps should be five confirmations next time,
+        // not five decisions — and the choice is about THIS machine, so it lives in its own
+        // file rather than in the library somebody might hand you.
+        const auto missingCeId = part.getProperty ("pluginCeId", {}).toString();
+        const auto lastCandidate = candidates[candidates.size() - 1];
+        const auto chosenId = lastCandidate.getProperty ("recordId", {}).toString();
+        check (chosenId.isNotEmpty() && chosenId != best.getProperty ("recordId", {}).toString(),
+               "there is more than one candidate, so a choice means something");
+
+        h.emits.clear();
+        h.cmd ("rememberSubstitute", { { "pluginCeId", missingCeId },
+                                       { "presetName", part.getProperty ("presetName", {}) },
+                                       { "recordId", chosenId },
+                                       { "rackRecordId", rackId } });
+
+        const auto* afterChoosing = h.emits.last ("instrumentHostSubstitutes");
+        check (afterChoosing != nullptr,
+               "choosing answers with the rack again rather than needing a second round trip");
+
+        juce::var chosenPart;
+        if (afterChoosing != nullptr)
+            for (const auto& p : *afterChoosing->getProperty ("parts", {}).getArray())
+                if (! (bool) p.getProperty ("installed", true))
+                    chosenPart = p;
+
+        check (chosenPart.getProperty ("remembered", {}).toString() == chosenId,
+               "the part says which substitute you chose");
+        check (chosenPart.getProperty ("candidates", {})[0].getProperty ("recordId", {}).toString()
+                 == chosenId,
+               "and it is first now, however the distance function would have ranked it");
+
+        check (dir.getChildFile ("substitutions.json").existsAsFile(),
+               "kept in its own file, NOT in the library — a Sound Pack you hand somebody must "
+               "not carry your answers about plug-ins on your machine");
+        check (! dir.getChildFile ("library.json").loadFileAsString().contains ("substitutions"),
+               "and the library really does not carry it");
+    }
+
+    // A choice survives the application closing, which is the entire point of writing it down.
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.emits.clear();
+        h.cmd ("rackSubstitutes", { { "recordId", rackId } });
+
+        juce::var part;
+        for (const auto& p : *h.emits.last ("instrumentHostSubstitutes")
+                                  ->getProperty ("parts", {}).getArray())
+            if (! (bool) p.getProperty ("installed", true))
+                part = p;
+
+        const auto remembered = part.getProperty ("remembered", {}).toString();
+        check (remembered.isNotEmpty(), "a new session still knows what you chose");
+        check (part.getProperty ("candidates", {})[0].getProperty ("recordId", {}).toString()
+                 == remembered,
+               "and still offers it first");
+
+        // And out again: forgetting has to be possible, or a choice made once is a choice
+        // forever, which is not a memory but a trap.
+        h.emits.clear();
+        h.cmd ("rememberSubstitute", { { "pluginCeId", part.getProperty ("pluginCeId", {}) },
+                                       { "presetName", part.getProperty ("presetName", {}) },
+                                       { "recordId", "" },
+                                       { "rackRecordId", rackId } });
+
+        juce::var forgotten;
+        for (const auto& p : *h.emits.last ("instrumentHostSubstitutes")
+                                  ->getProperty ("parts", {}).getArray())
+            if (! (bool) p.getProperty ("installed", true))
+                forgotten = p;
+        check (forgotten.getProperty ("remembered", {}).toString().isEmpty(),
+               "and an empty choice forgets it again");
+
+        h.emits.clear();
+        h.cmd ("rememberSubstitute", { { "pluginCeId", part.getProperty ("pluginCeId", {}) },
+                                       { "presetName", part.getProperty ("presetName", {}) },
+                                       { "recordId", "no-such-record" } });
+        check (h.emits.last ("instrumentHostError") != nullptr,
+               "a substitute that is not in the library refuses rather than being stored");
     }
 }
 

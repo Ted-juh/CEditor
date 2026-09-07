@@ -68,6 +68,7 @@ import {
   normalizeSubstitutes,
   similarSounds,
   rackSubstitutes,
+  rememberSubstitute,
   mockSonicDistance,
   hostSurfaceBrowse,
   normalizeSurfaceBrowse,
@@ -819,6 +820,18 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
   assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
 });
 
+test('normalizeHostLibrary keeps "not tried yet" apart from "tried and it would not"', () => {
+  const shaped = normalizeHostLibrary({
+    records: [{ recordId: 'a' },
+              { recordId: 'b', sonicRefusal: 'The plug-in crashed while playing this sound.' }],
+  });
+  assert.equal(shaped.records[0].sonicRefusal, '',
+    'a record nobody has got to yet carries no refusal');
+  assert.equal(shaped.records[1].sonic, null, 'a refused record still has no measurement');
+  assert.match(shaped.records[1].sonicRefusal, /crashed/,
+    'but it carries the reason, so the browser can say why rather than showing a blank');
+});
+
 test('mock reducer: the auditioner measures what has no profile, once', () => {
   hostStateStore.set(mockHostState());
   resetMockLibraryState();
@@ -1061,6 +1074,33 @@ test('mock reducer: a rack says what it needs before it will play here', () => {
     'best first');
   assert.ok(subs.parts.some((p) => p.installed),
     'and the parts that are fine are listed as fine rather than left out');
+  resetMockLibraryState();
+});
+
+test('mock reducer: the substitute you chose is offered first next time', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  rackSubstitutes('lib-4');
+  const part = get(hostSubstitutes).parts.find((p) => !p.installed);
+  assert.equal(part.remembered, '', 'nothing is chosen until somebody chooses it');
+  assert.ok(part.candidates.length > 1, 'there is more than one candidate, so a choice means something');
+
+  const last = part.candidates[part.candidates.length - 1];
+  rememberSubstitute(part.pluginCeId, part.presetName, last.recordId, 'lib-4');
+
+  const after = get(hostSubstitutes).parts.find((p) => !p.installed);
+  assert.equal(after.remembered, last.recordId, 'the part carries the choice');
+  assert.equal(after.candidates[0].recordId, last.recordId,
+    'and it is first, however the distance function would have ranked it');
+
+  rememberSubstitute(part.pluginCeId, part.presetName, '', 'lib-4');
+  const forgotten = get(hostSubstitutes).parts.find((p) => !p.installed);
+  assert.equal(forgotten.remembered, '', 'and an empty choice forgets it');
+  assert.ok(forgotten.candidates.every((c, i, all) => i === 0 || all[i - 1].percent >= c.percent),
+    'putting the list back to nearest-first');
+
   resetMockLibraryState();
 });
 

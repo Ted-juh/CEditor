@@ -5637,9 +5637,40 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 // Only what the library actually heard can be ranked. A part played from
                 // nowhere has no profile, and offering a guess dressed as a percentage would be
                 // worse than saying there is nothing to go on.
-                pv->setProperty ("candidates",
-                                 matchesToVar (nearestSounds (library, part.sonic, 3, isAvailable),
-                                               part.sonic));
+                auto candidates = nearestSounds (library, part.sonic, 3, isAvailable);
+
+                // What you chose last time comes first, whether or not the distance function
+                // would have put it there — you have already answered this question, and a rig
+                // with five gaps should be five confirmations rather than five decisions. It is
+                // still only OFFERED: the record goes on naming the plug-in it wants, so the
+                // day that comes back the rig plays properly again.
+                const auto remembered = substitutions.getValue (
+                    substitutionKey (part.pluginCeId, part.presetName), {});
+
+                if (remembered.isNotEmpty())
+                {
+                    int at = -1;
+                    for (int c = 0; c < candidates.size(); ++c)
+                        if (candidates.getReference (c).record != nullptr
+                            && candidates.getReference (c).record->recordId == remembered)
+                            at = c;
+
+                    if (at >= 0)
+                    {
+                        candidates.move (at, 0);
+                    }
+                    else if (const auto* chosen = library.find (remembered);
+                             chosen != nullptr && isAvailable (*chosen))
+                    {
+                        // Outside the nearest three, and still the answer: a choice you made
+                        // deliberately outranks a ranking. Its distance is the real one, so the
+                        // report can be argued with rather than just obeyed.
+                        candidates.insert (0, { chosen, sonicDistance (part.sonic, chosen->sonic) });
+                    }
+                }
+
+                pv->setProperty ("candidates", matchesToVar (candidates, part.sonic));
+                pv->setProperty ("remembered", remembered);
             }
 
             partVars.add (juce::var (pv));
@@ -5652,6 +5683,55 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         answer->setProperty ("needing",  needing);
         if (options.emit != nullptr)
             options.emit ("instrumentHostSubstitutes", juce::var (answer));
+        return;
+    }
+
+    // Remembering a substitute (Stage E). Machine-local by design — see substitutionsFile().
+    if (cmd == "rememberSubstitute")
+    {
+        ensureLibrary();
+
+        const auto pluginCeId = payload.getProperty ("pluginCeId", {}).toString();
+        const auto presetName = payload.getProperty ("presetName", {}).toString();
+        const auto recordId   = payload.getProperty ("recordId", {}).toString();
+
+        if (pluginCeId.isEmpty())
+        {
+            emitError ("There is no plug-in named to substitute for.");
+            return;
+        }
+
+        const auto key = substitutionKey (pluginCeId, presetName);
+
+        // An empty recordId forgets, which is the only way back out of a choice you regret and
+        // is why it is the same command rather than a second one.
+        if (recordId.isEmpty())
+        {
+            substitutions.remove (substitutions.getAllKeys().indexOf (key));
+        }
+        else if (library.find (recordId) == nullptr)
+        {
+            emitError ("That sound is not in the library.");
+            return;
+        }
+        else
+        {
+            substitutions.set (key, recordId);
+        }
+
+        saveSubstitutions();
+
+        // Answer with the rack's report again where the caller said which rack it was asking
+        // about, so the list redraws with the choice in it rather than needing a second round
+        // trip to look right.
+        if (const auto rackId = payload.getProperty ("rackRecordId", {}).toString();
+            rackId.isNotEmpty())
+        {
+            auto* again = new juce::DynamicObject();
+            again->setProperty ("cmd", "rackSubstitutes");
+            again->setProperty ("recordId", rackId);
+            handleCommand (juce::var (again));
+        }
         return;
     }
 
@@ -8966,6 +9046,8 @@ void InstrumentHostService::ensureLibrary()
     library.loadFrom (libraryFile());
     snapshots = std::make_unique<SnapshotStore> (snapshotDirectory());
 
+    loadSubstitutions();
+
     if (libraryPathsFile().existsAsFile())
     {
         const auto parsed = juce::JSON::parse (libraryPathsFile().loadFileAsString());
@@ -9076,6 +9158,52 @@ juce::String InstrumentHostService::applyRecordState (juce::AudioProcessor& inst
         return "The captured state for " + record.name + " is damaged.";
     instrument.setStateInformation (decoded.getData(), (int) decoded.getDataSize());
     return {};
+}
+
+juce::String InstrumentHostService::substitutionKey (const juce::String& pluginCeId,
+                                                     const juce::String& presetName)
+{
+    // A newline, because neither a class identifier nor a preset name contains one, and a
+    // separator that can appear in either half is a key that collides quietly.
+    return pluginCeId + "\n" + presetName;
+}
+
+void InstrumentHostService::loadSubstitutions()
+{
+    substitutions.clear();
+
+    if (! substitutionsFile().existsAsFile())
+        return;
+
+    const auto parsed = juce::JSON::parse (substitutionsFile().loadFileAsString());
+    if (const auto* entries = parsed.getProperty ("substitutions", {}).getArray())
+        for (const auto& entry : *entries)
+        {
+            const auto ceId = entry.getProperty ("pluginCeId", {}).toString();
+            const auto preset = entry.getProperty ("presetName", {}).toString();
+            const auto chosen = entry.getProperty ("recordId", {}).toString();
+            if (ceId.isNotEmpty() && chosen.isNotEmpty())
+                substitutions.set (substitutionKey (ceId, preset), chosen);
+        }
+}
+
+void InstrumentHostService::saveSubstitutions() const
+{
+    // Written as a list of three named fields rather than as the packed key, so somebody
+    // reading the file can see what it says without knowing how the key is built.
+    juce::Array<juce::var> entries;
+    for (const auto& key : substitutions.getAllKeys())
+    {
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty ("pluginCeId", key.upToFirstOccurrenceOf ("\n", false, false));
+        entry->setProperty ("presetName", key.fromFirstOccurrenceOf ("\n", false, false));
+        entry->setProperty ("recordId",   substitutions[key]);
+        entries.add (juce::var (entry));
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("substitutions", entries);
+    substitutionsFile().replaceWithText (juce::JSON::toString (juce::var (root), false));
 }
 
 juce::Array<InstrumentHostService::AnalysisTask>

@@ -951,6 +951,23 @@ private:
     bool parameterFavouritesLoaded = false;
 
     juce::File libraryFile() const      { return options.dataDirectory.getChildFile ("library.json"); }
+
+    /** The substitutes you accepted, kept DELIBERATELY OUTSIDE library.json (Stage E).
+        A library is portable — a Sound Pack is a bundle you hand somebody — and "when this
+        rack asks for a plug-in I do not have, play that one instead" is an answer about THIS
+        machine and nobody else's. Putting it in the library would export a stranger's
+        substitutes onto your rig, so it lives in its own file that never travels. */
+    juce::File substitutionsFile() const
+        { return options.dataDirectory.getChildFile ("substitutions.json"); }
+
+    /** The sound a rack part wanted, as one key: the plug-in it named and the preset it was
+        playing. Keying on the plug-in alone would answer for every preset it ever held, and
+        substituting a brass lead is not substituting a soft pad. */
+    static juce::String substitutionKey (const juce::String& pluginCeId,
+                                         const juce::String& presetName);
+
+    void loadSubstitutions();
+    void saveSubstitutions() const;
     juce::File snapshotDirectory() const { return options.dataDirectory.getChildFile ("snapshots"); }
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
@@ -1223,6 +1240,11 @@ private:
     // while the filter chips on screen still claim to be on.
     LibraryQuery libraryView;
     juce::StringArray libraryPaths; // user-added .vstpreset folders, beside the standard roots
+
+    // "When a rack asks for that sound and the plug-in is gone, I chose this one." Keyed by
+    // substitutionKey(); the value is a library record id. Machine-local — see
+    // substitutionsFile() for why it is not in the library.
+    juce::StringPairArray substitutions;
     bool libraryLoaded = false;
     struct PresetAuditionEvent
     {

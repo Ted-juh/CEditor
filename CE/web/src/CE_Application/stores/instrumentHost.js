@@ -173,6 +173,9 @@ export function normalizeSubstitutes(payload) {
       installed: part?.installed === true,
       measured: part?.measured === true,
       candidates: (Array.isArray(part?.candidates) ? part.candidates : []).map(normalizeMatch),
+      // The substitute you chose for this sound before, if you chose one. Machine-local on the
+      // C++ side and never part of a library somebody hands you.
+      remembered: String(part?.remembered ?? ''),
     })),
   };
 }
@@ -675,6 +678,9 @@ export function normalizeHostLibrary(payload) {
         envelope: (Array.isArray(r.sonic.envelope) ? r.sonic.envelope : [])
                     .map((v) => Math.min(1, Math.max(0, Number(v) || 0))),
       } : null,
+      // Why there is no measurement, when the auditioner tried and got none. A crashing preset
+      // is not a preset nobody has got to yet, and the browser says which it is looking at.
+      sonicRefusal: String(r?.sonicRefusal ?? ''),
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -930,11 +936,16 @@ export function setMockSmartCollections(collections) {
   mockSmartCollections = collections.map((c) => ({ ...c, query: normalizeLibraryQuery(c.query) }));
 }
 
+// The substitutes chosen in the demo, keyed the way the C++ side keys them: the plug-in that is
+// wanted and the preset it was playing.
+let mockRememberedSubstitutes = {};
+
 /** Puts the demo back where it starts: nothing saved, nothing measured that was not measured to
     begin with. The auditioner's effect is module state — running it in one test would otherwise
     decide what a later one sees. */
 export function resetMockLibraryState() {
   mockSmartCollections = [];
+  mockRememberedSubstitutes = {};
   mockMeasuredEverything = false;
   mockVersions = {};
   mockBranches = [];
@@ -6567,6 +6578,13 @@ function send(payload) {
       }));
       return;
     }
+    if (payload?.cmd === 'rememberSubstitute') {
+      const key = `${payload.pluginCeId ?? ''}\n${payload.presetName ?? ''}`;
+      if (payload.recordId) mockRememberedSubstitutes[key] = String(payload.recordId);
+      else delete mockRememberedSubstitutes[key];
+      if (payload.rackRecordId) send({ cmd: 'rackSubstitutes', recordId: payload.rackRecordId });
+      return;
+    }
     if (payload?.cmd === 'rackSubstitutes') {
       const all = get(hostLibrary).records;
       const rack = all.find((r) => r.recordId === payload.recordId);
@@ -6585,9 +6603,16 @@ function send(payload) {
           sourceType: record.sourceType, distance, percent: Math.round(100 * (1 - distance)),
           axes: mockAxisDeltas(wanted.sonic, record.sonic),
         }));
+
+      // The one you chose comes first, whatever the distance says: you have already answered
+      // this question once.
+      const remembered = mockRememberedSubstitutes[`${wanted.pluginCeId}\n${wanted.presetName}`] ?? '';
+      const at = candidates.findIndex((c) => c.recordId === remembered);
+      if (at > 0) candidates.unshift(candidates.splice(at, 1)[0]);
+
       hostSubstitutes.set(normalizeSubstitutes({
         recordId: rack.recordId, name: rack.name, needing: 1,
-        parts: [{ ...wanted, candidates },
+        parts: [{ ...wanted, candidates, remembered },
                 { partId: 'mock-part-2', pluginName: 'Stage Keys', presetName: 'Warm Pad',
                   installed: true, measured: true, candidates: [] }],
       }));
@@ -7220,6 +7245,11 @@ export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
 /** What a captured rack needs before it can play here, and the nearest things you do own. */
 export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
+/** Chooses (or with an empty recordId, un-chooses) the substitute for one wanted sound. The
+    rack record goes on naming the plug-in it wants — this only decides what is offered first
+    next time, and only on this machine. */
+export const rememberSubstitute = (pluginCeId, presetName, recordId, rackRecordId) =>
+  send({ cmd: 'rememberSubstitute', pluginCeId, presetName, recordId, rackRecordId });
 
 /** Hand the library to the hardware, or take it back. */
 export const browseOnSurface = (on) =>

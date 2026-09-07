@@ -386,9 +386,22 @@ Attack Tail Width Cost", which is unreadable; they are two labelled rows, *Acros
 the audition bar told a rack it had "no preview yet", which is not true of a thing that loads
 rather than previews.
 
-**Not in Stage E:** "remember this substitution for this machine" would be a machine-local
-mapping outliving the session, which is a store this project does not have and should decide on
-deliberately rather than acquire by accident.
+**Remembering a substitution, decided rather than acquired.** This was left out of Stage E on
+the grounds that a machine-local mapping outliving the session is a store the project did not
+have and should be decided on deliberately. Here is the decision. It lives in
+`substitutions.json` beside the library and *deliberately not in it*: a library is portable —
+a Sound Pack is a bundle you hand somebody — and "when a rack wants a plug-in I do not have,
+play that one instead" is an answer about one machine and nobody else's. Putting it in the
+library would export a stranger's substitutes onto your rig.
+
+The key is the plug-in **and** the preset it was playing, because substituting a brass lead is
+not substituting a soft pad and keying on the plug-in alone would answer for every preset it
+ever held. The choice is still only *offered*: it comes first in the list whatever the distance
+function would have said, the record goes on naming the plug-in it wants, and the rig plays
+properly again the day that comes back. Choosing is explicit and reversible — loading a
+substitute to hear it is not the same act as deciding it is the answer, and the same command
+with an empty choice forgets it, because a choice made once that cannot be unmade is not a
+memory but a trap.
 
 ## Stage F, as built
 

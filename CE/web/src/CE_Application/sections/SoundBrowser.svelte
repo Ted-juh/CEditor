@@ -31,7 +31,7 @@
     hostAnalysis, analyseLibrary, cancelAnalysis,
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
     hostVersionDiff, commitVersion, applyVersion, diffVersions,
-    hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes,
+    hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
@@ -595,6 +595,11 @@
                   <polygon points={thumbPoints(record.sonic.envelope)} />
                   <line x1="0" y1="12" x2="100" y2="12" />
                 </svg>
+              {:else if record.sonicRefusal}
+                <div class="thumb unheard refused" title={record.sonicRefusal}
+                     data-testid="tile-refused">
+                  <span>could not be heard</span>
+                </div>
               {:else}
                 <div class="thumb unheard" title="Not listened to yet">
                   <span>not heard yet</span>
@@ -664,6 +669,18 @@
             </span>
           </div>
         </div>
+
+        {#if !selected.sonic && selected.sonicRefusal}
+          <div class="insp-block">
+            <div class="insp-head">Why it has no measurement</div>
+            <!-- "Tried and it did not work" is a different thing to be told from "not heard
+                 yet", and it is the one that has an answer: the auditioner will not ask again
+                 unless somebody asks for everything to be measured again. -->
+            <div class="notes" data-testid="inspector-refusal">{selected.sonicRefusal}
+              It will not be tried again on its own — use <em>Measure everything again</em> if
+              you want another go at it.</div>
+          </div>
+        {/if}
 
         {#if selected.sonic}
           <div class="insp-block">
@@ -763,19 +780,41 @@
                       </div>
                     {:else}
                       {#each part.candidates as candidate, index (candidate.recordId)}
-                        <button type="button" class="ghost simrow" class:best={index === 0}
-                                data-testid="substitute-candidate"
-                                title={`Load ${candidate.name} onto this part instead`}
-                                onclick={() => loadLibraryRecord(candidate.recordId, 'replace', part.partId)}>
-                          <span class="simname">{candidate.name}</span>
-                          <span class="simpct">{candidate.percent}%</span>
-                        </button>
+                        {@const chosen = part.remembered === candidate.recordId}
+                        <div class="subrow" class:chosen>
+                          <button type="button" class="ghost simrow" class:best={index === 0}
+                                  data-testid="substitute-candidate"
+                                  title={`Load ${candidate.name} onto this part instead`}
+                                  onclick={() => loadLibraryRecord(candidate.recordId, 'replace', part.partId)}>
+                            <span class="simname">{candidate.name}</span>
+                            <span class="simpct">{candidate.percent}%</span>
+                          </button>
+                          <!-- Choosing is explicit and reversible. Loading a substitute to hear
+                               it is not the same act as deciding it is the answer, and nothing
+                               here is written down behind your back. -->
+                          <button type="button" class="ghost keep" class:on={chosen}
+                                  data-testid="substitute-keep"
+                                  title={chosen
+                                    ? 'Forget this choice — the list goes back to nearest-first'
+                                    : 'Offer this one first next time, on this computer'}
+                                  onclick={() => rememberSubstitute(part.pluginCeId, part.presetName,
+                                                                   chosen ? '' : candidate.recordId,
+                                                                   selected.recordId)}>
+                            {chosen ? 'CHOSEN' : 'KEEP'}
+                          </button>
+                        </div>
                       {/each}
                       <div class="notes simwhy">
                         {agreedAxes(part.candidates[0]).join(', ')} agree{gaveUp(part.candidates[0])
                           ? ` — ${gaveUp(part.candidates[0])}` : ''}. The rack keeps naming
                         {part.pluginName}, so it plays properly again the day that comes back.
                       </div>
+                      {#if part.remembered}
+                        <div class="notes simwhy" data-testid="substitute-chosen-note">
+                          Your choice, kept on this computer only — a Sound Pack you hand
+                          somebody does not carry it.
+                        </div>
+                      {/if}
                     {/if}
                   </div>
                 {/each}
@@ -1097,6 +1136,10 @@
     display: flex; align-items: center; justify-content: center;
     border: 1px dashed #2a333d; color: #4d565f; font-size: 9px; letter-spacing: 0.06em;
   }
+  /* A refusal is not the same absence as "not heard yet": one is waiting its turn, the other
+     has had its turn and has an answer. Amber rather than grey, the same colour the duplicate
+     note uses for "something here needs reading". */
+  .thumb.unheard.refused { border-color: #6b5426; color: #b08a3d; }
   .thumb polygon { fill: #6fb0c9; fill-opacity: 0.85; }
   .thumb line { stroke: #7fb4e0; stroke-opacity: 0.3; stroke-width: 0.4; }
 
@@ -1252,6 +1295,12 @@
   }
   button.simrow:hover:not(:disabled) { background: #1c2126; border-color: transparent; }
   button.simrow.best { border-color: #35c46f66; background: #35c46f0d; }
+  .subrow { display: flex; align-items: stretch; gap: 4px; }
+  .subrow button.simrow { flex: 1; min-width: 0; }
+  button.keep {
+    flex: 0 0 auto; font-size: 9px; letter-spacing: 0.06em; padding: 0 6px; color: #7d8894;
+  }
+  button.keep.on { color: #d9d3c4; border-color: #6b5426; background: #d9a13c14; }
   .simname { color: #9aa5b1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
              min-width: 0; flex: 1; }
   .simpct { color: #35c46f; font-size: 10.5px; font-variant-numeric: tabular-nums; }
