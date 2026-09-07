@@ -31,6 +31,7 @@
     hostAnalysis, analyseLibrary, cancelAnalysis,
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
     hostVersionDiff, commitVersion, applyVersion, diffVersions,
+    hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
@@ -47,6 +48,13 @@
   let versionLabel = $state('');
   let namingVersion = $state(false);
   let onlyDifferences = $state(true);
+  // Grid or map. The map is the same records on two measured axes — no projection, no learned
+  // embedding, nothing to explain: where a dot sits IS its brightness and its attack.
+  let view = $state('grid');
+  let axisX = $state('brightness');
+  let axisY = $state('attack');
+  let hovered = $state(null);
+  let lasso = $state(null);   // { x0, y0, x1, y1 } in 0..1, while dragging
   let selectedId = $state('');
   let collectionName = $state('');
   let namingCollection = $state(false);
@@ -94,6 +102,43 @@
     return ` · ${Math.round(bytes / 1048576)} MB`;
   }
 
+  /** A rectangle on the map IS a query: two active ranges. That is why the selection is a
+      rectangle and not a freehand loop — a loop could not be saved, re-run, or explained. */
+  function lassoToQuery(box) {
+    const next = normalizeLibraryQuery(query);
+    next.ranges[axisX] = { min: Math.min(box.x0, box.x1), max: Math.max(box.x0, box.x1),
+                           active: true };
+    // Screen y grows downward and the axis grows upward, so the box flips on the way in.
+    next.ranges[axisY] = { min: 1 - Math.max(box.y0, box.y1), max: 1 - Math.min(box.y0, box.y1),
+                           active: true };
+    return next;
+  }
+
+  function mapPoint(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)),
+             y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)) };
+  }
+
+  function lassoDown(event) {
+    const at = mapPoint(event);
+    lasso = { x0: at.x, y0: at.y, x1: at.x, y1: at.y };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function lassoMove(event) {
+    if (!lasso) return;
+    const at = mapPoint(event);
+    lasso = { ...lasso, x1: at.x, y1: at.y };
+  }
+  function lassoUp() {
+    if (!lasso) return;
+    const box = lasso;
+    lasso = null;
+    // A click rather than a drag is not a selection.
+    if (Math.abs(box.x1 - box.x0) < 0.02 || Math.abs(box.y1 - box.y0) < 0.02) return;
+    ask(lassoToQuery(box));
+  }
+
   function setRange(axis, key, value) {
     const next = normalizeLibraryQuery(query);
     const range = next.ranges[axis];
@@ -110,6 +155,9 @@
   }
 
   let records = $derived($hostLibrary.records);
+  // Asking is cheap and the answer is per-record, so it is fetched on selection rather than
+  // carried on every record in every library payload.
+  let lastAskedSimilar = $state('');
   let selected = $derived(records.find((r) => r.recordId === selectedId) ?? records[0] ?? null);
   let facets = $derived($hostLibrary.facets);
   let filtered = $derived(!libraryQueryIsEmpty(query));
@@ -135,8 +183,27 @@
     if (auditionOn && action !== 'add') onAudition();
   }
 
+  /** The axes that agreed, and the one that did not — a percentage nobody can argue with is
+      worse than one they can. */
+  const agreedAxes = (match) => match.axes.slice(0, 3)
+    .map((a) => AXIS_LABELS[a.axis]?.toLowerCase() ?? a.axis);
+  const gaveUp = (match) => {
+    const worst = match.axes[match.axes.length - 1];
+    if (!worst || Math.abs(worst.delta) < 0.05) return '';
+    const axis = AXIS_LABELS[worst.axis]?.toLowerCase() ?? worst.axis;
+    return `${worst.delta > 0 ? 'more' : 'less'} ${axis}`;
+  };
+
+  function selectRecord(recordId) {
+    selectedId = recordId;
+    if (recordId && recordId !== lastAskedSimilar) {
+      lastAskedSimilar = recordId;
+      similarSounds(recordId);
+    }
+  }
+
   function clickTile(record) {
-    selectedId = record.recordId;
+    selectRecord(record.recordId);
     // Selecting shows it; loading is the button. A single click that both selects and loads is
     // how the old list put an instrument somewhere nobody expected. With audition on, a click
     // makes a SOUND — the stored snapshot answers immediately and the plug-in takes over when
@@ -186,6 +253,15 @@
       {#each [['', 'All'], ['preset', 'Sounds'], ['chain', 'Chains'], ['rack', 'Racks']] as [value, label] (value)}
         <button type="button" class="toggle" class:on={query.type === value}
                 onclick={() => (value === '' ? ask({ ...query, type: '' }) : clickType(value))}>{label}</button>
+      {/each}
+    </span>
+    <span class="types">
+      {#each [['grid', 'Grid'], ['map', 'Map']] as [value, label] (value)}
+        <button type="button" class="toggle" class:on={view === value} data-testid="view-mode"
+                title={value === 'map'
+                       ? 'The same sounds placed by what they measured, not by what they are called'
+                       : 'The result list'}
+                onclick={() => (view = value)}>{label}</button>
       {/each}
     </span>
     <button type="button" class="toggle" class:on={auditionOn} data-testid="host-audition"
@@ -430,7 +506,71 @@
         </div>
       {/if}
 
-      {#if records.length === 0}
+      {#if view === 'map'}
+        <div class="mapwrap" data-testid="sound-map">
+          <div class="mapaxes">
+            <span class="flabel">Across</span>
+            {#each MEASURED_AXES.filter((a) => a !== axisY) as axis (axis)}
+              <button type="button" class="chip" class:on={axisX === axis}
+                      onclick={() => (axisX = axis)}>{AXIS_LABELS[axis]}</button>
+            {/each}
+          </div>
+          <div class="mapaxes">
+            <span class="flabel">Up</span>
+            {#each MEASURED_AXES.filter((a) => a !== axisX) as axis (axis)}
+              <button type="button" class="chip" class:on={axisY === axis}
+                      onclick={() => (axisY = axis)}>{AXIS_LABELS[axis]}</button>
+            {/each}
+          </div>
+
+          <div class="map" role="presentation"
+               onpointerdown={lassoDown} onpointermove={lassoMove} onpointerup={lassoUp}>
+            {#each records.filter((r) => r.sonic) as record (record.recordId)}
+              {@const x = record.sonic[axisX]}
+              {@const y = 1 - record.sonic[axisY]}
+              <button type="button" class="dot"
+                      class:sel={record.recordId === selected?.recordId}
+                      class:unavailable={!record.available}
+                      data-testid="map-dot"
+                      style={`left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%`}
+                      title={`${record.name} — ${measuredLabel(axisX, record.sonic[axisX])} × ${measuredLabel(axisY, record.sonic[axisY])}`}
+                      onmouseenter={() => (hovered = record)}
+                      onmouseleave={() => (hovered = null)}
+                      onclick={() => clickTile(record)}></button>
+            {/each}
+
+            {#if lasso}
+              <div class="lasso"
+                   style={`left:${Math.min(lasso.x0, lasso.x1) * 100}%;top:${Math.min(lasso.y0, lasso.y1) * 100}%;width:${Math.abs(lasso.x1 - lasso.x0) * 100}%;height:${Math.abs(lasso.y1 - lasso.y0) * 100}%`}></div>
+            {/if}
+
+            <span class="axlabel x0">{measuredLabel(axisX, 0)}</span>
+            <span class="axlabel x1">{measuredLabel(axisX, 1)}</span>
+            <span class="axlabel y0">{measuredLabel(axisY, 0)}</span>
+            <span class="axlabel y1">{measuredLabel(axisY, 1)}</span>
+
+            {#if hovered}
+              <div class="mapcard"
+                   style={`left:${Math.min(78, hovered.sonic[axisX] * 100)}%;top:${Math.min(72, (1 - hovered.sonic[axisY]) * 100)}%`}>
+                <span class="mapcard-name">{hovered.name}</span>
+                <span class="mapcard-sub">{detailLine(hovered)}</span>
+                <span class="mapcard-nums">
+                  {AXIS_LABELS[axisX].toLowerCase()} {measuredLabel(axisX, hovered.sonic[axisX])}
+                  · {AXIS_LABELS[axisY].toLowerCase()} {measuredLabel(axisY, hovered.sonic[axisY])}
+                </span>
+              </div>
+            {/if}
+          </div>
+
+          <div class="mapfoot">
+            <span class="hint">
+              Drag a box to keep what is inside it — a box on two measured axes is a search, so
+              it can be saved and run again. {records.filter((r) => r.sonic).length} of
+              {records.length} shown; the rest have not been listened to.
+            </span>
+          </div>
+        </div>
+      {:else if records.length === 0}
         <div class="empty-hint">
           {$hostLibrary.counts.total === 0
             ? 'Nothing in the library yet — scan presets, or capture the focused part.'
@@ -571,6 +711,78 @@
           {#if selected.notes}<div class="notes">{selected.notes}</div>{/if}
         </div>
 
+        {#if $hostSimilar.recordId === selected.recordId && $hostSimilar.matches.length > 0}
+          <div class="insp-block">
+            <div class="insp-head">Sounds like</div>
+            {#each $hostSimilar.matches as match (match.recordId)}
+              <button type="button" class="ghost simrow" data-testid="similar-row"
+                      title={`${agreedAxes(match).join(', ')} agree${gaveUp(match) ? ` — but ${gaveUp(match)}` : ''}`}
+                      onclick={() => selectRecord(match.recordId)}>
+                <span class="simname">{match.name}</span>
+                <span class="simpct">{match.percent}%</span>
+              </button>
+            {/each}
+            <div class="notes simwhy">
+              Closest on {agreedAxes($hostSimilar.matches[0]).join(', ')}.
+              {#if gaveUp($hostSimilar.matches[0])}
+                What you give up: {gaveUp($hostSimilar.matches[0])}.
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        {#if selected.type === 'rack'}
+          <div class="insp-block">
+            <div class="insp-head">
+              Will it play here?
+              <button type="button" class="ghost more" data-testid="check-rack"
+                      onclick={() => rackSubstitutes(selected.recordId)}>CHECK</button>
+            </div>
+            {#if $hostSubstitutes && $hostSubstitutes.recordId === selected.recordId}
+              {#if $hostSubstitutes.needing === 0}
+                <div class="notes">Every plug-in this rack wants is installed.</div>
+              {:else}
+                <div class="subneed" data-testid="substitute-need">
+                  {$hostSubstitutes.needing} of {$hostSubstitutes.parts.length} parts need a substitute.
+                </div>
+                {#each $hostSubstitutes.parts.filter((p) => !p.installed) as part (part.partId)}
+                  <div class="subpart">
+                    <div class="subwant">
+                      wants <b>{part.pluginName}</b>{#if part.presetName} · {part.presetName}{/if}
+                    </div>
+                    {#if part.candidates.length === 0}
+                      <div class="notes">
+                        {part.measured
+                          ? 'Nothing you own measures close enough to offer.'
+                          : 'This part was never listened to, so there is nothing to match against.'}
+                      </div>
+                    {:else}
+                      {#each part.candidates as candidate, index (candidate.recordId)}
+                        <button type="button" class="ghost simrow" class:best={index === 0}
+                                data-testid="substitute-candidate"
+                                title={`Load ${candidate.name} onto this part instead`}
+                                onclick={() => loadLibraryRecord(candidate.recordId, 'replace', part.partId)}>
+                          <span class="simname">{candidate.name}</span>
+                          <span class="simpct">{candidate.percent}%</span>
+                        </button>
+                      {/each}
+                      <div class="notes simwhy">
+                        {agreedAxes(part.candidates[0]).join(', ')} agree{gaveUp(part.candidates[0])
+                          ? ` — ${gaveUp(part.candidates[0])}` : ''}. The rack keeps naming
+                        {part.pluginName}, so it plays properly again the day that comes back.
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              {/if}
+            {:else}
+              <div class="notes">A captured rack names the plug-ins it wants. Check what this
+                machine has.</div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if selected.type !== 'rack'}
         <div class="insp-block">
           <div class="insp-head">
             Saves
@@ -622,6 +834,7 @@
             {/if}
           </div>
         </div>
+        {/if}
 
         {#if !selected.factory}
           <button type="button" class="ghost danger insp-remove"
@@ -653,6 +866,8 @@
           <i class="pip live"></i>the real thing{$hostAudition.detail ? ` · ${$hostAudition.detail}` : ''}
         {:else if $hostAudition.stage === 'silent'}
           <i class="pip none"></i>{$hostAudition.detail}
+        {:else if selected?.type === 'rack' || selected?.sourceType === 'hardwarePatch'}
+          <i class="pip none"></i>loads rather than previews
         {:else if selected}
           <i class="pip" class:snap={selected.instant} class:none={!selected.instant}></i>
           {selected.instant ? 'previews instantly' : 'no preview yet — would load first'}
@@ -953,6 +1168,60 @@
   .dval { color: #7d8894; font-size: 10.5px; text-align: right; font-variant-numeric: tabular-nums; }
   .dval.b { color: #7fb4e0; }
   .diff-foot { color: #66707b; font-size: 10.5px; }
+
+  button.simrow {
+    display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left;
+    padding: 3px 4px; border-radius: 3px; font-size: 11px;
+  }
+  button.simrow:hover:not(:disabled) { background: #1c2126; border-color: transparent; }
+  button.simrow.best { border-color: #35c46f66; background: #35c46f0d; }
+  .simname { color: #9aa5b1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+             min-width: 0; flex: 1; }
+  .simpct { color: #35c46f; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .simwhy { font-size: 10px; margin-top: 4px; }
+  .subneed { color: #d9a13c; font-size: 11px; margin-bottom: 6px; }
+  .subpart { border-top: 1px solid #1c2126; padding-top: 6px; margin-top: 6px; }
+  .subwant { color: #7d8894; font-size: 10.5px; margin-bottom: 4px; }
+  .subwant b { color: #d6dbe0; font-weight: 600; }
+
+  .mapwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .mapaxes { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .map {
+    /* A fixed height rather than flex:1. Growing to fit pushed the audition bar off the bottom
+       of the window, which is exactly the control somebody reaches for while browsing a map. */
+    position: relative; height: 300px; flex: 0 0 300px;
+    border: 1px solid #2a333d; border-radius: 5px;
+    background:
+      linear-gradient(#1c212633 1px, transparent 1px) 0 0 / 100% 20%,
+      linear-gradient(90deg, #1c212633 1px, transparent 1px) 0 0 / 20% 100%,
+      #101315;
+    touch-action: none; cursor: crosshair; overflow: hidden;
+  }
+  button.dot {
+    position: absolute; width: 9px; height: 9px; padding: 0; margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%; border: 1px solid #101315; background: #7fb4e0; opacity: 0.8;
+  }
+  button.dot:hover:not(:disabled) { opacity: 1; border-color: #d6dbe0; }
+  button.dot.sel { background: #d6dbe0; box-shadow: 0 0 0 3px #7fb4e044; opacity: 1; }
+  button.dot.unavailable { background: #566372; opacity: 0.55; }
+  .lasso {
+    position: absolute; border: 1px dashed #7fb4e0; background: #7fb4e014; pointer-events: none;
+  }
+  .axlabel { position: absolute; color: #5b6570; font-size: 9.5px; pointer-events: none; }
+  .axlabel.x0 { left: 5px; bottom: 3px; }
+  .axlabel.x1 { right: 5px; bottom: 3px; }
+  .axlabel.y0 { left: 5px; bottom: 14px; }
+  .axlabel.y1 { left: 5px; top: 4px; }
+  .mapcard {
+    position: absolute; margin: 10px 0 0 10px; padding: 6px 8px; width: 172px;
+    background: #171a1d; border: 1px solid #4a86bd; border-radius: 4px;
+    display: flex; flex-direction: column; gap: 1px; pointer-events: none;
+    box-shadow: 0 8px 22px #000a;
+  }
+  .mapcard-name { font-weight: 600; font-size: 11.5px; color: #d6dbe0; }
+  .mapcard-sub { color: #7d8894; font-size: 10px; }
+  .mapcard-nums { color: #9aa5b1; font-size: 10px; margin-top: 3px; }
+  .mapfoot { display: flex; }
 
   .audition {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

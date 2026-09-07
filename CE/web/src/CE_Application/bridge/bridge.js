@@ -986,6 +986,20 @@ export function onInstrumentHostVersionDiff(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** The closest measured sounds to one ({ recordId, matches }). */
+export function onInstrumentHostSimilar(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSimilar', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** What a captured rack needs before it can play here ({ recordId, parts, needing }). */
+export function onInstrumentHostSubstitutes(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSubstitutes', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Refused or failed commands ({ message }). */
 export function onInstrumentHostError(callback) {
   if (!isJuceAvailable()) return () => {};

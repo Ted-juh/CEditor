@@ -62,6 +62,13 @@ import {
   setAuditionPhrase,
   hostVersionDiff,
   normalizeVersionDiff,
+  hostSimilar,
+  hostSubstitutes,
+  normalizeSimilar,
+  normalizeSubstitutes,
+  similarSounds,
+  rackSubstitutes,
+  mockSonicDistance,
   commitVersion,
   applyVersion,
   diffVersions,
@@ -969,6 +976,85 @@ test('mock reducer: the diff refuses when there is nothing to compare against', 
   hostLastError.set('');
   applyVersion('lib-2', 'nope');
   assert.match(get(hostLastError), /not on this record/);
+  resetMockLibraryState();
+});
+
+// --- one distance function, three faces -----------------------------------------------------
+
+test('the demo distance agrees with the native one about what matters', () => {
+  const at = (brightness, attack) => ({ brightness, attack, tail: 0.5, width: 0.5,
+                                        noisiness: 0.2, dynamics: 0.3 });
+  assert.equal(mockSonicDistance(at(0.4, 0.4), at(0.4, 0.4)), 0, 'a sound is identical to itself');
+  assert.equal(mockSonicDistance(null, at(0.4, 0.4)), 1,
+    'and an unmeasured profile is maximally far from everything, not a false match');
+  // Brightness is weighted above attack, so the same numeric change matters more there.
+  assert.ok(mockSonicDistance(at(0.4, 0.4), at(0.8, 0.4))
+              > mockSonicDistance(at(0.4, 0.4), at(0.4, 0.8)),
+    'brightness moves the distance more than attack, as the weights say it should');
+});
+
+test('normalizeSimilar and normalizeSubstitutes shape a ranked list with its reasons', () => {
+  const similar = normalizeSimilar({
+    recordId: 'a', measured: true,
+    matches: [{ recordId: 'b', name: 'Wool Pad', percent: '94', distance: 0.06,
+                axes: [{ axis: 'brightness', delta: 0.02 }, { axis: '' }] },
+              { name: 'dropped' }],
+  });
+  assert.equal(similar.matches.length, 1, 'a match with no record id is not a match');
+  assert.equal(similar.matches[0].percent, 94);
+  assert.equal(similar.matches[0].axes.length, 1, 'and an axis with no name is not an axis');
+
+  const subs = normalizeSubstitutes({
+    recordId: 'r', name: 'Rig', needing: '1',
+    parts: [{ partId: 'p1', pluginName: 'Diva', installed: 'yes', measured: true,
+              candidates: [{ recordId: 'c', name: 'Wool Pad', percent: 91 }] }],
+  });
+  assert.equal(subs.needing, 1);
+  assert.equal(subs.parts[0].installed, false, 'a truthy string is not "installed"');
+  assert.equal(subs.parts[0].candidates[0].name, 'Wool Pad');
+});
+
+test('mock reducer: sounds like, and never itself or anything unheard', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  similarSounds('lib-1');
+  const answer = get(hostSimilar);
+  assert.equal(answer.recordId, 'lib-1');
+  assert.ok(answer.matches.length > 0, 'a measured sound has neighbours');
+  assert.ok(!answer.matches.some((m) => m.recordId === 'lib-1'),
+    'a sound is never offered as a match for itself');
+  assert.ok(!answer.matches.some((m) => m.recordId === 'lib-3'),
+    'and nothing whose plug-in is missing is offered — the point of a match is that you can play it');
+  assert.ok(answer.matches.every((m, i, all) => i === 0 || all[i - 1].distance <= m.distance),
+    'nearest first');
+  assert.equal(answer.matches[0].axes.length, 6, 'each match carries the reasons behind it');
+
+  hostLastError.set('');
+  similarSounds('nope');
+  assert.ok(get(hostLastError).length > 0);
+});
+
+test('mock reducer: a rack says what it needs before it will play here', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  hostLastError.set('');
+  rackSubstitutes('lib-1');
+  assert.match(get(hostLastError), /not a rack/, 'only a rack has parts to substitute');
+
+  rackSubstitutes('lib-4');
+  const subs = get(hostSubstitutes);
+  assert.equal(subs.needing, 1);
+  const needing = subs.parts.filter((p) => !p.installed);
+  assert.equal(needing.length, 1);
+  assert.ok(needing[0].candidates.length > 0, 'offering what you can actually play');
+  assert.ok(needing[0].candidates.every((c, i, all) => i === 0 || all[i - 1].percent >= c.percent),
+    'best first');
+  assert.ok(subs.parts.some((p) => p.installed),
+    'and the parts that are fine are listed as fine rather than left out');
   resetMockLibraryState();
 });
 

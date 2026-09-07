@@ -94,6 +94,9 @@
 //   diffVersions {recordId, versionIdA?, versionIdB?, partId?} | morphVersions {…, amount}
 //     (versions: every save is kept, never an overwrite. A factory preset's first save
 //      branches into a record of your own that remembers where it came from.)
+//   similarSounds {recordId,count?} | rackSubstitutes {recordId}
+//     (one distance function, two faces: "sounds like", and the nearest thing you own when a
+//      rack's plug-in has gone. Reporting only — a substitution never rewrites the record.)
 //   analyseLibrary {all?} | cancelAnalysis
 //   auditionRecord {recordId, load?} | stopAudition | setAuditionPhrase {phrase, bars?}
 //     (instant audition: the snapshot plays now, the plug-in takes over when it arrives)
@@ -793,6 +796,10 @@ private:
     /** What `availableOnly` means here: the source is still on disk AND the plug-in the record
         targets is in the catalogue. Only the service knows the second half. */
     LibraryAvailability libraryAvailability() const;
+    /** One ranked list, shaped for the page: the record, the percentage a person reads, the
+        distance it came from, and the axes that agreed or did not. */
+    juce::Array<juce::var> matchesToVar (const juce::Array<SoundMatch>& matches,
+                                         const SonicProfile& to) const;
     void loadPresetRecord (const LibraryRecord& record, const juce::String& partId,
                            std::function<void()> afterLoaded = {});
     /** A chain capture applied onto one part: the instrument, its MIDI modules and its

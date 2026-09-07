@@ -5476,6 +5476,86 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "similarSounds")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        const auto count = juce::jlimit (1, 24, (int) payload.getProperty ("count", 5));
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("recordId", record->recordId);
+        answer->setProperty ("measured", record->sonic.measured);
+        answer->setProperty ("matches",
+                             matchesToVar (nearestSounds (library, record->sonic, count,
+                                                          libraryAvailability(), record->recordId),
+                                           record->sonic));
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostSimilar", juce::var (answer));
+        return;
+    }
+
+    if (cmd == "rackSubstitutes")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr || record->type != "rack")
+        {
+            emitError ("That library record is not a rack.");
+            return;
+        }
+
+        const auto isAvailable = libraryAvailability();
+        juce::Array<juce::var> partVars;
+        int needing = 0;
+
+        for (const auto& part : record->parts)
+        {
+            bool installed = false;
+            {
+                const std::scoped_lock lock (catalogLock);
+                const ModuleRecord* module = nullptr;
+                const auto* classRecord = findClass (part.pluginCeId, &module);
+                installed = classRecord != nullptr && module != nullptr
+                              && module->unavailableReason().isEmpty();
+            }
+
+            auto* pv = new juce::DynamicObject();
+            pv->setProperty ("partId",     part.partId);
+            pv->setProperty ("pluginCeId", part.pluginCeId);
+            pv->setProperty ("pluginName", part.pluginName);
+            pv->setProperty ("presetName", part.presetName);
+            pv->setProperty ("installed",  installed);
+            pv->setProperty ("measured",   part.sonic.measured);
+
+            if (! installed)
+            {
+                ++needing;
+                // Only what the library actually heard can be ranked. A part played from
+                // nowhere has no profile, and offering a guess dressed as a percentage would be
+                // worse than saying there is nothing to go on.
+                pv->setProperty ("candidates",
+                                 matchesToVar (nearestSounds (library, part.sonic, 3, isAvailable),
+                                               part.sonic));
+            }
+
+            partVars.add (juce::var (pv));
+        }
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("recordId", record->recordId);
+        answer->setProperty ("name",     record->name);
+        answer->setProperty ("parts",    partVars);
+        answer->setProperty ("needing",  needing);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostSubstitutes", juce::var (answer));
+        return;
+    }
+
     if (cmd == "commitVersion")
     {
         ensureLibrary();
@@ -6119,6 +6199,26 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                                                                   : juce::String ("Rack capture");
         record.rackManifestJson = juce::JSON::toString (rack.captureState().toVar());
         record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
+
+        // What each part sounded like, harvested from the library record it was playing. This
+        // is the whole of what makes a substitute possible later: a rack that knows only which
+        // plug-in it wanted can do nothing when that plug-in is gone.
+        for (const auto& part : rack.getPerformance().parts)
+        {
+            if (part.pluginCeId.isEmpty())
+                continue;
+
+            CapturedPart captured;
+            captured.partId = part.partId;
+            captured.pluginCeId = part.pluginCeId;
+            captured.pluginName = part.pluginName;
+            if (const auto* source = library.find (part.lastPresetRecordId); source != nullptr)
+            {
+                captured.presetName = source->name;
+                captured.sonic = source->sonic;
+            }
+            record.parts.add (std::move (captured));
+        }
 
         library.addCapturedRecord (std::move (record));
         library.saveTo (libraryFile());
@@ -9255,6 +9355,36 @@ juce::String InstrumentHostService::versionTargetPart (const juce::var& payload)
 {
     const auto named = payload.getProperty ("partId", {}).toString();
     return named.isNotEmpty() ? named : rack.getPerformance().focusedPartId;
+}
+
+juce::Array<juce::var> InstrumentHostService::matchesToVar (const juce::Array<SoundMatch>& matches,
+                                                            const SonicProfile& to) const
+{
+    juce::Array<juce::var> out;
+    for (const auto& match : matches)
+    {
+        auto* m = new juce::DynamicObject();
+        m->setProperty ("recordId",   match.record->recordId);
+        m->setProperty ("name",       match.record->name);
+        m->setProperty ("instrument", match.record->instrument);
+        m->setProperty ("sourceType", match.record->sourceType);
+        m->setProperty ("distance",   match.distance);
+        // A percentage is what a person reads; the distance is what it was computed from, and
+        // both are here so the number can be argued with.
+        m->setProperty ("percent",    juce::roundToInt (100.0f * (1.0f - match.distance)));
+
+        juce::Array<juce::var> axes;
+        for (const auto& [axis, delta] : sonicDifferences (to, match.record->sonic))
+        {
+            auto* a = new juce::DynamicObject();
+            a->setProperty ("axis",  axis);
+            a->setProperty ("delta", delta);
+            axes.add (juce::var (a));
+        }
+        m->setProperty ("axes", axes);
+        out.add (juce::var (m));
+    }
+    return out;
 }
 
 LibraryAvailability InstrumentHostService::libraryAvailability() const

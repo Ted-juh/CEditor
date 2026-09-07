@@ -65,11 +65,32 @@ struct SonicProfile
     juce::Array<float> envelope;  // sonicEnvelopePoints peaks, 0..1 — the tile's waveform
 };
 
+/** One part of a captured rack, as it sounded when the rack was saved. Harvested from the
+    library record the part was playing, so a rack whose plug-in has since gone can be offered
+    the nearest thing you actually own. A part played from nowhere has no profile, and the
+    substitution says so rather than guessing at one. */
+struct CapturedPart
+{
+    juce::String partId, pluginCeId, pluginName, presetName;
+    SonicProfile sonic;
+};
+
 /** How far apart two sounds are, 0 (indistinguishable on these axes) to 1. Weighted, because the
     axes are not equally telling: brightness and attack are what somebody means by "like this
     one", and a peak level is not. Unmeasured profiles are maximally far from everything, so a
     library half-probed never claims a match it cannot support. */
 float sonicDistance (const SonicProfile& a, const SonicProfile& b);
+
+/** Per-axis, b minus a on the normalised scale, ordered by how much they disagree — closest
+    first. This is what turns a match percentage from a number into a reason: the axes at the
+    top agreed, the one at the bottom is what you are giving up. */
+struct SonicAxisDelta
+{
+    juce::String axis;   // "brightness" | "attack" | "tail" | "width" | "noisiness" | "dynamics"
+    float delta = 0.0f;
+};
+
+juce::Array<SonicAxisDelta> sonicDifferences (const SonicProfile& a, const SonicProfile& b);
 
 // -- keeping more than one of a sound -----------------------------------------------------------
 //
@@ -125,6 +146,10 @@ struct LibraryRecord
     // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
     SonicProfile sonic;
     juce::String sonicFingerprint;
+
+    // What each part of a captured rack sounded like. Rack records only, and only for parts
+    // that were playing something the library knows.
+    juce::Array<CapturedPart> parts;
 
     // Every save of this sound, oldest first. `stateBlobBase64` above is the newest of them —
     // one current state, so nothing that already reads a record has to learn about versions.
@@ -329,6 +354,24 @@ struct LibraryDuplicateSet
 
 juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library,
                                                     float tolerance = 0.04f);
+
+/** One candidate, and how close it is. */
+struct SoundMatch
+{
+    const LibraryRecord* record = nullptr;
+    float distance = 1.0f;
+};
+
+/** The closest measured sounds to a profile, nearest first. Unmeasured records are never
+    offered — an unmeasured profile is maximally far from everything, which is the honest answer
+    rather than a false match — and `excludeRecordId` keeps a sound off its own list.
+
+    This one function is three features: "sounds like" in the inspector, the nearest dot on the
+    map, and the substitute for a plug-in you no longer have. They differ only in what they ask
+    about and how the answer is drawn. */
+juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfile& to, int count,
+                                       const LibraryAvailability& isAvailable = {},
+                                       const juce::String& excludeRecordId = {});
 
 
 // -- the .vstpreset container ------------------------------------------------------------------

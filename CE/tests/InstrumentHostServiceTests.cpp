@@ -1796,6 +1796,135 @@ void testSonicProbe()
            "an unmeasured profile is maximally far from everything, rather than a false match");
 }
 
+// The substitution flow at the command surface: a rack remembers what its parts SOUNDED like,
+// so one whose plug-in has gone can be offered the nearest thing you actually own.
+void testSubstitutes()
+{
+    std::cout << "\nthe rack whose plug-in has gone" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = { { "Init", 0.5f }, { "Bright", 0.9f } };
+
+    const auto dir = freshDataDir ("substitutes");
+    seedCatalog (dir);
+
+    // A second healthy plug-in, because a substitute has to come from somewhere: on a machine
+    // whose only instrument has gone there is genuinely nothing to offer, and the interesting
+    // case is the one where there IS.
+    {
+        PluginCatalog catalog;
+        catalog.loadFrom (dir.getChildFile ("plugin-catalog.json"));
+        ModuleScanResult spare;
+        spare.modulePath = "C:\\VST3\\Spare.vst3";
+        spare.fingerprint = "fp-spare";
+        PluginClassRecord synth;
+        synth.ceId = "VST3-spare-synth";
+        synth.name = "Spare Synth";
+        synth.vendor = "Good Audio";
+        synth.version = "1.0";
+        synth.isInstrument = true;
+        synth.descriptionXml = "<PLUGIN name=\"Spare Synth\" ceId=\"VST3-spare-synth\"/>";
+        spare.classes.add (synth);
+        catalog.commitScanResult (spare);
+        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    }
+
+    juce::String rackId;
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+        // The spare's programs reach the library the same way — by being loaded once.
+        h.cmd ("addPart");
+        h.emits.clear();
+        h.cmd ("getState");
+        const auto parts = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {});
+        juce::String sparePart;
+        for (const auto& p : *parts.getArray())
+            if (p.getProperty ("partId", {}).toString() != partId)
+                sparePart = p.getProperty ("partId", {}).toString();
+        h.cmd ("loadInstrument", { { "partId", sparePart }, { "ceId", "VST3-spare-synth" } });
+
+        // Measure, so the library has heard the sounds this rack is about to be built from.
+        h.cmd ("analyseLibrary");
+
+        // Put one of the measured programs on the part, then capture the rack.
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        // Both stub classes expose the same program names, so the record has to be picked by
+        // the plug-in it belongs to — by name alone this loads the other synth's Bright and
+        // quietly replaces the instrument under test.
+        juce::String brightId;
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")
+                                  ->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == "Bright"
+                && r.getProperty ("targetCeId", {}).toString() == "VST3-good-synth")
+                brightId = r.getProperty ("recordId", {}).toString();
+        check (brightId.isNotEmpty(), "the good synth's own Bright is in the library");
+        h.cmd ("loadLibraryRecord", { { "recordId", brightId }, { "action", "focused" },
+                                      { "partId", partId } });
+
+        h.emits.clear();
+        h.cmd ("saveRackToLibrary", { { "name", "Blue Note rig" } });
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")
+                                  ->getProperty ("records", {}).getArray())
+            if (r.getProperty ("type", {}).toString() == "rack")
+                rackId = r.getProperty ("recordId", {}).toString();
+        check (rackId.isNotEmpty(), "the rack captures");
+
+        // Everything is installed here, so nothing needs substituting — and saying "0" is a
+        // better answer than an empty payload.
+        h.emits.clear();
+        h.cmd ("rackSubstitutes", { { "recordId", rackId } });
+        const auto* answer = h.emits.last ("instrumentHostSubstitutes");
+        check (answer != nullptr && (int) answer->getProperty ("needing", -1) == 0,
+               "with every plug-in installed, nothing needs a substitute");
+        bool goodPartMeasured = false;
+        for (const auto& pp : *answer->getProperty ("parts", {}).getArray())
+            if (pp.getProperty ("pluginName", {}).toString() == "Good Synth")
+                goodPartMeasured = (bool) pp.getProperty ("measured", false);
+        check (answer->getProperty ("parts", {}).size() == 2 && goodPartMeasured,
+               "and the rack remembers what its parts sounded like, which is what makes the "
+               "substitution possible at all");
+    }
+
+    // Now the plug-in is gone. The catalogue is rewritten without it, which is exactly what
+    // opening the rig on another machine looks like.
+    {
+        auto catalogFile = dir.getChildFile ("plugin-catalog.json");
+        auto text = catalogFile.loadFileAsString();
+        catalogFile.replaceWithText (text.replace ("VST3-good-synth", "VST3-vanished-synth"));
+
+        Harness h (dir);
+        h.cmd ("getState");
+        h.emits.clear();
+        h.cmd ("rackSubstitutes", { { "recordId", rackId } });
+        const auto* answer = h.emits.last ("instrumentHostSubstitutes");
+        check (answer != nullptr && (int) answer->getProperty ("needing", 0) == 1,
+               "with the plug-in gone, the part needs one");
+
+        juce::var part;
+        for (const auto& p : *answer->getProperty ("parts", {}).getArray())
+            if (! (bool) p.getProperty ("installed", true))
+                part = p;
+        check (part.isObject() && part.getProperty ("pluginName", {}).toString() == "Good Synth",
+               "and says which part that is, by the name it was playing");
+
+        const auto candidates = part.getProperty ("candidates", {});
+        check (candidates.size() > 0, "offering the nearest sounds you can actually play");
+        const auto best = candidates[0];
+        check ((int) best.getProperty ("percent", 0) > 0
+                 && best.getProperty ("name", {}).toString().isNotEmpty(),
+               "each with a percentage a person reads");
+        check (best.getProperty ("axes", {}).size() == 6,
+               "and the axes behind it, so the number can be argued with rather than trusted");
+        check (best.getProperty ("distance", {}).isDouble(),
+               "beside the distance it was computed from");
+    }
+}
+
 // Versions over the command surface: saving instead of overwriting, branching off a factory
 // preset, putting an old one back, and the diff that says what changed.
 void testVersionsInTheService()
@@ -1908,6 +2037,97 @@ void testVersionsInTheService()
     h.cmd ("diffVersions", { { "recordId", factoryId } });
     check (h.emits.lastError().isNotEmpty(),
            "and a record with nothing to compare against says so rather than emitting an empty diff");
+}
+
+// One distance function, three faces: "sounds like", the nearest dot on the map, and the
+// substitute for a plug-in you no longer have.
+void testNearestSounds()
+{
+    std::cout << "\nsounds like, and the substitute for a plug-in that has gone" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::SonicProfile;
+    using ceditor::host::nearestSounds;
+    using ceditor::host::sonicDifferences;
+
+    const auto profile = [] (float brightness, float attack, float tail, float width)
+    {
+        SonicProfile p;
+        p.measured = true;
+        p.brightness = brightness;
+        p.attack = attack;
+        p.tail = tail;
+        p.width = width;
+        return p;
+    };
+
+    Library library;
+    const auto add = [&library, &profile] (const juce::String& name, SonicProfile p,
+                                           bool measured = true, bool silent = false)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "userState";
+        record.name = name;
+        p.measured = measured;
+        p.silent = silent;
+        record.sonic = p;
+        return library.addCapturedRecord (std::move (record));
+    };
+
+    const auto wool = add ("Wool Pad",   profile (0.25f, 0.80f, 0.70f, 0.85f));
+    add ("Tape Choir",  profile (0.30f, 0.75f, 0.65f, 0.80f));   // very close to Wool
+    add ("Glass Bell",  profile (0.75f, 0.10f, 0.30f, 0.20f));   // far away
+    add ("Sub Thump",   profile (0.10f, 0.02f, 0.10f, 0.02f));
+    const auto unheard = add ("Never Heard", {}, false);
+    add ("Silent One", profile (0.30f, 0.75f, 0.65f, 0.80f), true, true);
+
+    const auto names = [] (const juce::Array<ceditor::host::SoundMatch>& matches)
+    {
+        juce::StringArray out;
+        for (const auto& m : matches) out.add (m.record->name);
+        return out.joinIntoString (", ");
+    };
+
+    const auto* woolRecord = library.find (wool);
+    const auto matches = nearestSounds (library, woolRecord->sonic, 3, {}, wool);
+    check (names (matches) == "Tape Choir, Glass Bell, Sub Thump"
+             || names (matches) == "Tape Choir, Sub Thump, Glass Bell",
+           "the nearest sound comes first");
+    check (matches.getFirst().record->name == "Tape Choir"
+             && matches.getFirst().distance < 0.1f,
+           "and a sound measured almost the same is almost no distance away");
+
+    check (! names (matches).contains ("Wool Pad"),
+           "a sound is never offered as a match for itself");
+    check (! names (matches).contains ("Never Heard"),
+           "and neither is one nothing has listened to — an unmeasured profile is maximally far "
+           "from everything, which is the honest answer rather than a false match");
+    check (! names (matches).contains ("Silent One"),
+           "nor one whose probe made no sound, however alike the numbers look");
+
+    check (nearestSounds (library, library.find (unheard)->sonic, 3).isEmpty(),
+           "asking what an unmeasured sound is like has no answer, rather than a wrong one");
+
+    // Offering something that cannot be loaded is worse than offering nothing: the whole point
+    // of a substitute is that you can play it now.
+    const auto onlyPads = nearestSounds (library, woolRecord->sonic, 3,
+                                         [] (const LibraryRecord& r)
+                                         { return r.name != "Tape Choir"; }, wool);
+    check (! names (onlyPads).contains ("Tape Choir"),
+           "and a record the caller says is unavailable is never offered");
+
+    // The reason behind the number: the axes that agreed, and the one that did not.
+    const auto axes = sonicDifferences (woolRecord->sonic, library.find (wool)->sonic);
+    check (axes.size() == 6 && std::abs (axes.getFirst().delta) < 1.0e-6f,
+           "a sound differs from itself on nothing");
+
+    SonicProfile brighter = woolRecord->sonic;
+    brighter.brightness += 0.4f;
+    const auto why = sonicDifferences (woolRecord->sonic, brighter);
+    check (why.getLast().axis == "brightness",
+           "and the axis that disagrees most is the last one — what you would be giving up");
 }
 
 // Versions: keeping more than one of a sound, and the rule that decides what survives.
@@ -2363,6 +2583,8 @@ void testLibraryBrowsing()
     using ceditor::host::Library;
     using ceditor::host::LibraryRecord;
     using ceditor::host::LibraryQuery;
+    using ceditor::host::LibraryVersion;
+    using ceditor::host::CapturedPart;
     using ceditor::host::SmartCollection;
     using ceditor::host::searchLibrary;
     using ceditor::host::libraryFacets;
@@ -2516,6 +2738,50 @@ void testLibraryBrowsing()
     check (library.allSmartCollections().size() == 1
              && library.allSmartCollections().getFirst().name == "Renamed",
            "and putting it again by id replaces rather than duplicates");
+
+    // A RESCAN REFRESHES WHAT THE VENDOR SAYS AND NOTHING ELSE. §18.6.5 states this for
+    // favourites; everything CEditor puts on a record is the same kind of thing and used to go
+    // silently — an hour of listening, somebody's saves, and what a substitution is computed
+    // from, all destroyed by loading a plug-in again. Found by a substitution that came back
+    // empty on the second run of a test and not the first.
+    {
+        Library keeps;
+        juce::Array<LibraryRecord> first;
+        first.add (make ("Wool Pad", "Stage Keys", "Pad", { "warm" }));
+        keeps.mergeVendorScan ("vstpreset", first);
+
+        const auto id = keeps.allRecords().getFirst().recordId;
+        auto* record = keeps.find (id);
+        record->sonic.measured = true;
+        record->sonic.brightness = 0.42f;
+        record->sonicFingerprint = record->fingerprint;
+        record->branchedFromRecordId = "somewhere";
+        LibraryVersion save;
+        save.versionId = "v1";
+        save.label = "the good one";
+        record->versions.add (save);
+        CapturedPart part;
+        part.pluginName = "Stage Keys";
+        record->parts.add (part);
+        LibraryRecord::UserMetadata user;
+        user.favourite = true;
+        keeps.setUserMetadata (id, user);
+
+        keeps.mergeVendorScan ("vstpreset", first);   // the same file, found again
+
+        const auto* after = keeps.find (id);
+        check (after != nullptr && after->user.favourite, "a rescan keeps the favourite");
+        check (after != nullptr && after->sonic.measured
+                 && juce::approximatelyEqual (after->sonic.brightness, 0.42f)
+                 && after->sonicFingerprint == after->fingerprint,
+               "and the measurements, which cost an hour of listening");
+        check (after != nullptr && after->versions.size() == 1
+                 && after->versions.getFirst().label == "the good one",
+               "and the saves, which are somebody's history");
+        check (after != nullptr && after->parts.size() == 1
+                 && after->branchedFromRecordId == "somewhere",
+               "and what a substitution is computed from, and where this came from");
+    }
 
     const auto reloaded = Library::fromVar (library.toVar());
     check (reloaded.allSmartCollections().size() == 1
@@ -9567,8 +9833,10 @@ int main (int argc, char* argv[])
     testSonicProbe();
     testAuditioner();
     testInstantAudition();
+    testNearestSounds();
     testVersionRetention();
     testVersionsInTheService();
+    testSubstitutes();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

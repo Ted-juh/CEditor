@@ -1,6 +1,6 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A–D are built** (2026-09-07); E and F are a plan, not a commitment. The mockups it describes are in
+Status: **Stages A–E are built** (2026-09-07); F is a plan, not a commitment. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -340,6 +340,55 @@ parameters hidden" is the sort of thing only rendering catches.
 states resident, because applying a state is already fast enough that the difference is not
 audible and holding two live instruments to prove otherwise is a large cost for a small claim.
 
+## Stage E, as built
+
+`sonicDistance` was built and tested in Stage B. This is the stage that spends it, three times.
+
+**"Sounds like"**, in the inspector, asked per selection rather than carried on every record in
+every payload. It never offers a sound as a match for itself, never offers one nothing has
+listened to, and never offers one that cannot be loaded — the whole point of a match is that you
+can play it. Each match carries the axes behind it, so the percentage can be argued with rather
+than trusted: the three that agreed, and what you would be giving up.
+
+**The map is two measured axes and nothing else.** No projection, no learned embedding, nothing
+to explain: where a dot sits *is* its brightness and its attack, and either axis can be swapped
+for any other measurement. That is the honest version of the sketch's Atlas, and it is better
+than a UMAP nobody could account for.
+
+**The selection is a rectangle, and that is the point.** A box on two measured axes *is* a
+`LibraryQuery` with two active ranges — so dragging one filters the results, fills in the
+measured sliders with real units, and can be saved as a smart collection and re-run later. A
+freehand loop would look nicer and could not be saved, explained, or repeated. The constraint is
+what makes the feature reusable rather than a toy.
+
+**Substitutes.** A captured rack now stores what each of its parts *sounded like*, harvested at
+capture time from the library record the part was playing. Without that a rack knows only which
+plug-in it wanted, and can do nothing when that plug-in is gone. `rackSubstitutes` reports every
+part, says which are installed, and for the ones that are not offers the nearest sounds you can
+actually play, with the reasons. It is **reporting only** — the record keeps naming the plug-in
+it wants, so the rig plays properly again the day that comes back — and accepting a substitute is
+the existing "load this record onto that part" command, not a new mutation.
+
+**The bug this stage found, which was not in this stage.** A substitution came back empty on the
+second run of a test and not the first, and the reason was that `mergeVendorScan` assigned the
+incoming record wholesale and restored only the id and the user block. Every rescan — and every
+plug-in load, which re-ingests its program list — silently destroyed the measurements, the saves,
+the branch it came from and the captured parts. §18.6.5 already says a rescan must not be able to
+take somebody's favourites; the measurements cost an hour of listening, the saves are somebody's
+history, and the captured parts are what a substitution is computed from. All four are now kept,
+and a test states each one.
+
+**What rendering it found.** The map grew to fill its column and pushed the audition bar off the
+bottom of the window — the one control somebody reaches for while browsing a map. It has a fixed
+height now. The axis pickers were one row reading "Brightness Attack Tail Width Cost × Attack
+Attack Tail Width Cost", which is unreadable; they are two labelled rows, *Across* and *Up*. And
+the audition bar told a rack it had "no preview yet", which is not true of a thing that loads
+rather than previews.
+
+**Not in Stage E:** "remember this substitution for this machine" would be a machine-local
+mapping outliving the session, which is a store this project does not have and should decide on
+deliberately rather than acquire by accident.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -358,6 +407,11 @@ audible and holding two live instruments to prove otherwise is a large cost for 
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage E built; see *Stage E, as built* above. Two things worth carrying: a
+  rectangle on two measured axes is a saveable query and a freehand lasso is not, which is the
+  whole argument for the constraint; and a rescan had been quietly destroying everything this
+  project puts on a vendor record, which nothing but a second test run would have shown.
 
 - **2026-09-07** — Stage D built; see *Stage D, as built* above. The idea worth carrying: a
   parameter diff cannot be computed from two blobs — it needs the plug-in that understands them,

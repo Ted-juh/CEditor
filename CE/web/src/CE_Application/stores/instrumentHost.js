@@ -43,6 +43,8 @@ import {
   onInstrumentHostAnalysisProgress,
   onInstrumentHostAudition,
   onInstrumentHostVersionDiff,
+  onInstrumentHostSimilar,
+  onInstrumentHostSubstitutes,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import {
@@ -80,6 +82,55 @@ export const hostAudition = writable({ recordId: '', stage: '', detail: '',
                                        phrase: 'recent', bars: 4 });
 /** The last parameter comparison of two saves. null until something asks for one. */
 export const hostVersionDiff = writable(null);
+/** The closest measured sounds to whatever last asked. */
+export const hostSimilar = writable({ recordId: '', measured: false, matches: [] });
+/** What a captured rack needs before it can play on this machine. null until asked. */
+export const hostSubstitutes = writable(null);
+
+/** One ranked match: the percentage a person reads, the distance it came from, and the axes
+    that agreed or did not — so the number can be argued with rather than trusted. */
+function normalizeMatch(m) {
+  return {
+    recordId: String(m?.recordId ?? ''),
+    name: String(m?.name ?? ''),
+    instrument: String(m?.instrument ?? ''),
+    sourceType: String(m?.sourceType ?? ''),
+    distance: Number(m?.distance ?? 1),
+    percent: Number(m?.percent ?? 0),
+    axes: (Array.isArray(m?.axes) ? m.axes : []).map((a) => ({
+      axis: String(a?.axis ?? ''),
+      delta: Number(a?.delta ?? 0),
+    })).filter((a) => a.axis !== ''),
+  };
+}
+
+export function normalizeSimilar(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    recordId: String(p.recordId ?? ''),
+    measured: p.measured === true,
+    matches: (Array.isArray(p.matches) ? p.matches : []).map(normalizeMatch)
+               .filter((m) => m.recordId !== ''),
+  };
+}
+
+export function normalizeSubstitutes(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    recordId: String(p.recordId ?? ''),
+    name: String(p.name ?? ''),
+    needing: Number(p.needing ?? 0),
+    parts: (Array.isArray(p.parts) ? p.parts : []).map((part) => ({
+      partId: String(part?.partId ?? ''),
+      pluginCeId: String(part?.pluginCeId ?? ''),
+      pluginName: String(part?.pluginName ?? ''),
+      presetName: String(part?.presetName ?? ''),
+      installed: part?.installed === true,
+      measured: part?.measured === true,
+      candidates: (Array.isArray(part?.candidates) ? part.candidates : []).map(normalizeMatch),
+    })),
+  };
+}
 
 export function normalizeVersionDiff(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
@@ -730,6 +781,30 @@ function mockSonic(brightness, attack, tail, width, cost) {
     costPercent: measuredValue('cost', cost), latencySamples: 0,
     envelope,
   };
+}
+
+/** The demo's own distance, mirroring sonicDistance() in Library.cpp — same axes, same weights.
+    Unmeasured is maximally far from everything, which is the honest answer rather than a false
+    match. */
+/** Per-axis, closest first — the reason behind a percentage. */
+export function mockAxisDeltas(a, b) {
+  if (!a || !b) return [];
+  return ['brightness', 'attack', 'tail', 'width', 'noisiness', 'dynamics']
+    .map((axis) => ({ axis, delta: Number(b[axis] ?? 0) - Number(a[axis] ?? 0) }))
+    .sort((x, y) => Math.abs(x.delta) - Math.abs(y.delta));
+}
+
+export function mockSonicDistance(a, b) {
+  if (!a || !b) return 1;
+  const axes = [['brightness', 1.0], ['attack', 0.85], ['tail', 0.55],
+                ['width', 0.4], ['noisiness', 0.45], ['dynamics', 0.25]];
+  let sum = 0, weights = 0;
+  for (const [axis, weight] of axes) {
+    const delta = Number(a[axis] ?? 0) - Number(b[axis] ?? 0);
+    sum += weight * delta * delta;
+    weights += weight;
+  }
+  return Math.min(1, Math.sqrt(sum / weights));
 }
 
 let mockSmartCollections = [];
@@ -5877,6 +5952,8 @@ export function initInstrumentHostBridge() {
   onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
+  onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
+  onInstrumentHostSubstitutes((payload) => hostSubstitutes.set(normalizeSubstitutes(payload)));
   onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
     recordId: String(payload?.recordId ?? ''),
     // A 'phrase' answer is the setting changing, not a sound starting — it must not blank the
@@ -6372,6 +6449,51 @@ function send(payload) {
       hostAnalysis.set({ done: todo, total: todo, what: `Done — ${todo} measured.`, running: false });
       mockMeasuredEverything = true;
       hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'similarSounds') {
+      const all = get(hostLibrary).records;
+      const to = all.find((r) => r.recordId === payload.recordId);
+      if (!to) { hostLastError.set('Unknown library record.'); return; }
+      const matches = all
+        .filter((r) => r.recordId !== to.recordId && r.sonic && !r.sonic.silent && r.available)
+        .map((r) => ({ record: r, distance: mockSonicDistance(to.sonic, r.sonic) }))
+        .sort((x, y) => x.distance - y.distance)
+        .slice(0, payload.count ?? 5);
+      hostSimilar.set(normalizeSimilar({
+        recordId: to.recordId, measured: Boolean(to.sonic),
+        matches: to.sonic ? matches.map(({ record, distance }) => ({
+          recordId: record.recordId, name: record.name, instrument: record.instrument,
+          sourceType: record.sourceType, distance, percent: Math.round(100 * (1 - distance)),
+          axes: mockAxisDeltas(to.sonic, record.sonic),
+        })) : [],
+      }));
+      return;
+    }
+    if (payload?.cmd === 'rackSubstitutes') {
+      const all = get(hostLibrary).records;
+      const rack = all.find((r) => r.recordId === payload.recordId);
+      if (!rack || rack.type !== 'rack') { hostLastError.set('That library record is not a rack.'); return; }
+      // The demo's rack names one plug-in nobody has, which is the case worth showing.
+      const wanted = { partId: 'mock-part-1', pluginCeId: 'VST3-gone', pluginName: 'Diva',
+                       presetName: 'Warm Choir Pad', installed: false, measured: true,
+                       sonic: mockSonic(0.30, 0.75, 0.66, 0.84, 0.10) };
+      const candidates = all
+        .filter((r) => r.sonic && !r.sonic.silent && r.available && r.type === 'preset')
+        .map((r) => ({ record: r, distance: mockSonicDistance(wanted.sonic, r.sonic) }))
+        .sort((x, y) => x.distance - y.distance)
+        .slice(0, 3)
+        .map(({ record, distance }) => ({
+          recordId: record.recordId, name: record.name, instrument: record.instrument,
+          sourceType: record.sourceType, distance, percent: Math.round(100 * (1 - distance)),
+          axes: mockAxisDeltas(wanted.sonic, record.sonic),
+        }));
+      hostSubstitutes.set(normalizeSubstitutes({
+        recordId: rack.recordId, name: rack.name, needing: 1,
+        parts: [{ ...wanted, candidates },
+                { partId: 'mock-part-2', pluginName: 'Stage Keys', presetName: 'Warm Pad',
+                  installed: true, measured: true, candidates: [] }],
+      }));
       return;
     }
     if (payload?.cmd === 'commitVersion') {
@@ -6996,6 +7118,12 @@ export const applyVersion = (recordId, versionId, partId) =>
 export const diffVersions = (recordId, versionIdA, versionIdB) =>
   send({ cmd: 'diffVersions', recordId, ...(versionIdA ? { versionIdA } : {}),
          ...(versionIdB ? { versionIdB } : {}) });
+/** The closest measured sounds to this one. */
+export const similarSounds = (recordId, count) =>
+  send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
+/** What a captured rack needs before it can play here, and the nearest things you do own. */
+export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
+
 export const morphVersions = (recordId, versionIdA, versionIdB, amount) =>
   send({ cmd: 'morphVersions', recordId, amount,
          ...(versionIdA ? { versionIdA } : {}), ...(versionIdB ? { versionIdB } : {}) });

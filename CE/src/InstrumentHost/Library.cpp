@@ -109,12 +109,28 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             if (matched[i] || ! predicate (*existing[i]))
                 continue;
 
+            // A rescan refreshes what the VENDOR says and nothing else. Everything CEditor or
+            // the user put on the record outlives it — the same rule §18.6.5 states for
+            // favourites, and for the same reason: a rescan is not an event that should be able
+            // to destroy work. The measurements cost an hour of listening, the saves are
+            // somebody's history, and the captured parts are what a substitution is computed
+            // from; all three used to go silently when a plug-in was simply loaded again.
             auto& record = *existing[i];
             const auto keepId = record.recordId;
             const auto keepUser = record.user;
+            const auto keepSonic = record.sonic;
+            const auto keepSonicFingerprint = record.sonicFingerprint;
+            const auto keepVersions = record.versions;
+            const auto keepBranchedFrom = record.branchedFromRecordId;
+            const auto keepParts = record.parts;
             record = incoming;
             record.recordId = keepId;
             record.user = keepUser;
+            record.sonic = keepSonic;
+            record.sonicFingerprint = keepSonicFingerprint;
+            record.versions = keepVersions;
+            record.branchedFromRecordId = keepBranchedFrom;
+            record.parts = keepParts;
             record.missing = false;
             matched.set (i, true);
             return true;
@@ -245,6 +261,32 @@ juce::var Library::toVar() const
         }
         if (record.branchedFromRecordId.isNotEmpty())
             r->setProperty ("branchedFrom", record.branchedFromRecordId);
+
+        if (! record.parts.isEmpty())
+        {
+            juce::Array<juce::var> partVars;
+            for (const auto& part : record.parts)
+            {
+                auto* pv = new juce::DynamicObject();
+                pv->setProperty ("partId",     part.partId);
+                pv->setProperty ("pluginCeId", part.pluginCeId);
+                pv->setProperty ("pluginName", part.pluginName);
+                pv->setProperty ("presetName", part.presetName);
+                if (part.sonic.measured)
+                {
+                    auto* m = new juce::DynamicObject();
+                    m->setProperty ("brightness", part.sonic.brightness);
+                    m->setProperty ("attack",     part.sonic.attack);
+                    m->setProperty ("tail",       part.sonic.tail);
+                    m->setProperty ("width",      part.sonic.width);
+                    m->setProperty ("noisiness",  part.sonic.noisiness);
+                    m->setProperty ("dynamics",   part.sonic.dynamics);
+                    pv->setProperty ("sonic", juce::var (m));
+                }
+                partVars.add (juce::var (pv));
+            }
+            r->setProperty ("parts", partVars);
+        }
         recordVars.add (juce::var (r));
     }
 
@@ -342,6 +384,27 @@ Library Library::fromVar (const juce::var& stored)
                     record.versions.add (std::move (version));
             }
         record.branchedFromRecordId = r.getProperty ("branchedFrom", {}).toString();
+
+        if (const auto* storedParts = r.getProperty ("parts", {}).getArray())
+            for (const auto& pv : *storedParts)
+            {
+                CapturedPart part;
+                part.partId     = pv.getProperty ("partId", {}).toString();
+                part.pluginCeId = pv.getProperty ("pluginCeId", {}).toString();
+                part.pluginName = pv.getProperty ("pluginName", {}).toString();
+                part.presetName = pv.getProperty ("presetName", {}).toString();
+                if (const auto m = pv.getProperty ("sonic", {}); m.isObject())
+                {
+                    part.sonic.measured   = true;
+                    part.sonic.brightness = (float) (double) m.getProperty ("brightness", 0.0);
+                    part.sonic.attack     = (float) (double) m.getProperty ("attack", 0.0);
+                    part.sonic.tail       = (float) (double) m.getProperty ("tail", 0.0);
+                    part.sonic.width      = (float) (double) m.getProperty ("width", 0.0);
+                    part.sonic.noisiness  = (float) (double) m.getProperty ("noisiness", 0.0);
+                    part.sonic.dynamics   = (float) (double) m.getProperty ("dynamics", 0.0);
+                }
+                record.parts.add (std::move (part));
+            }
 
         const auto u = r.getProperty ("user", {});
         record.user.favourite = (bool) u.getProperty ("favourite", false);
@@ -488,6 +551,53 @@ float sonicDistance (const SonicProfile& a, const SonicProfile& b)
     }
 
     return juce::jlimit (0.0f, 1.0f, std::sqrt (sum / weights));
+}
+
+juce::Array<SonicAxisDelta> sonicDifferences (const SonicProfile& a, const SonicProfile& b)
+{
+    juce::Array<SonicAxisDelta> out;
+    out.add ({ "brightness", b.brightness - a.brightness });
+    out.add ({ "attack",     b.attack     - a.attack });
+    out.add ({ "tail",       b.tail       - a.tail });
+    out.add ({ "width",      b.width      - a.width });
+    out.add ({ "noisiness",  b.noisiness  - a.noisiness });
+    out.add ({ "dynamics",   b.dynamics   - a.dynamics });
+
+    std::stable_sort (out.begin(), out.end(),
+                      [] (const SonicAxisDelta& x, const SonicAxisDelta& y)
+                      { return std::abs (x.delta) < std::abs (y.delta); });
+    return out;
+}
+
+juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfile& to, int count,
+                                       const LibraryAvailability& isAvailable,
+                                       const juce::String& excludeRecordId)
+{
+    juce::Array<SoundMatch> matches;
+    if (! to.measured || count <= 0)
+        return matches;
+
+    for (const auto& record : library.allRecords())
+    {
+        if (record.recordId == excludeRecordId || ! record.sonic.measured || record.sonic.silent)
+            continue;
+
+        // Offering something that cannot be loaded is worse than offering nothing: the whole
+        // point of a substitute is that you can play it now.
+        const auto available = isAvailable ? isAvailable (record) : ! record.missing;
+        if (! available)
+            continue;
+
+        matches.add ({ &record, sonicDistance (to, record.sonic) });
+    }
+
+    std::stable_sort (matches.begin(), matches.end(),
+                      [] (const SoundMatch& x, const SoundMatch& y)
+                      { return x.distance < y.distance; });
+
+    if (matches.size() > count)
+        matches.removeRange (count, matches.size() - count);
+    return matches;
 }
 
 bool LibraryFacetSelection::admits (const juce::StringArray& values) const
