@@ -1,0 +1,1354 @@
+<title>Hostage Sound Browser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ---------------------------------------------------------------------------
+   Palette is the Instrument Host's own, read out of InstrumentHostView.svelte:
+   panels #171a1d, rules #3b4652/#2a333d, type #d6dbe0/#9aa5b1/#7d8894,
+   accent #7fb4e0, ok #35c46f, warn #d9a13c, bad #e05656. The mockups have to
+   look like the application, so the document wears the application's colours.
+   Committed dark on purpose — this is a picture of a dark audio tool.
+--------------------------------------------------------------------------- */
+:root{
+  --ground:#0e1113; --ground-2:#12161a; --panel:#171a1d; --panel-2:#1c2126;
+  --sunk:#101315; --rule:#2a333d; --rule-2:#3b4652;
+  --ink:#d6dbe0; --ink-2:#9aa5b1; --ink-3:#7d8894; --ink-4:#5b6570;
+  --accent:#7fb4e0; --accent-deep:#4a86bd; --ok:#35c46f; --warn:#d9a13c;
+  --bad:#e05656; --violet:#a98bd6;
+  --shot:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --disp:'Bricolage Grotesque','IBM Plex Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+     font:400 16px/1.62 var(--shot);-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+.wrap{max-width:1420px;margin:0 auto;padding:0 30px 120px}
+
+/* --- document chrome ------------------------------------------------------ */
+.hero{padding:64px 0 40px;border-bottom:1px solid var(--rule)}
+.sec>.kicker,.sec>h2,.sec>h3{max-width:none}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+         color:var(--ink-3);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow b{color:var(--accent);font-weight:600}
+h1{font:800 clamp(38px,6vw,74px)/0.98 var(--disp);letter-spacing:-.025em;
+   margin:20px 0 0;max-width:16ch;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.thesis{font:500 clamp(18px,2vw,22px)/1.5 var(--shot);color:var(--ink-2);
+        max-width:60ch;margin:22px 0 0;text-wrap:pretty}
+.thesis b{color:var(--ink);font-weight:600}
+.factstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+           gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:38px}
+.fact{background:var(--ground-2);padding:14px 16px}
+.fact .n{font:600 22px/1.1 var(--mono);color:var(--ink);letter-spacing:-.02em}
+.fact .n.a{color:var(--accent)} .fact .n.g{color:var(--ok)} .fact .n.w{color:var(--warn)}
+.fact .l{font:400 12px/1.4 var(--shot);color:var(--ink-3);margin-top:5px}
+
+.sec{padding-top:76px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+h2{font:700 clamp(26px,3.4vw,40px)/1.08 var(--disp);letter-spacing:-.02em;
+   margin:14px 0 0;max-width:22ch;text-wrap:balance}
+h3{font:700 19px/1.3 var(--disp);margin:38px 0 0;color:var(--ink)}
+.lede{font:400 17px/1.65 var(--shot);color:var(--ink-2);max-width:66ch;margin:16px 0 0}
+p{max-width:66ch;color:var(--ink-2);margin:14px 0 0}
+p b,li b{color:var(--ink);font-weight:600}
+p code,li code,td code{font:500 13px/1 var(--mono);color:var(--accent);
+   background:#7fb4e014;padding:2px 5px;border-radius:3px;white-space:nowrap}
+ul.notes{max-width:66ch;padding-left:0;list-style:none;margin:18px 0 0}
+ul.notes li{color:var(--ink-2);padding:0 0 0 20px;position:relative;margin-top:11px}
+ul.notes li::before{content:'';position:absolute;left:2px;top:11px;width:7px;height:1px;
+                    background:var(--rule-2)}
+
+/* --- the plates ----------------------------------------------------------- */
+.plate{margin-top:34px}
+.plate-scroll{overflow-x:auto;background:var(--sunk);border:1px solid var(--rule);
+              border-radius:10px;padding:18px}
+.plate-cap{display:flex;gap:18px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.plate-cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+               color:var(--ink-4);white-space:nowrap}
+.plate-cap .ct{color:var(--ink-3);font-size:14px;max-width:78ch;margin:0}
+
+/* --- comparison table ----------------------------------------------------- */
+.cmp{width:100%;border-collapse:collapse;margin-top:26px;font-size:14px}
+.cmp th{text-align:left;font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+        color:var(--ink-4);padding:0 14px 10px 0;border-bottom:1px solid var(--rule-2)}
+.cmp td{padding:13px 14px 13px 0;border-bottom:1px solid var(--rule);
+        vertical-align:top;color:var(--ink-2)}
+.cmp td:first-child{color:var(--ink);font-weight:600;width:23%}
+.cmp td:nth-child(2){width:34%;color:var(--ink-3)}
+.cmp tr td:last-child{color:var(--ink)}
+.cmp .win{color:var(--ok);font-family:var(--mono);font-size:12px}
+
+/* --- stages --------------------------------------------------------------- */
+.stages{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:1px;
+        background:var(--rule);border:1px solid var(--rule);margin-top:28px}
+.stage{background:var(--ground-2);padding:18px 18px 20px}
+.stage .sn{font:600 11px/1 var(--mono);letter-spacing:.12em;color:var(--accent);text-transform:uppercase}
+.stage h4{font:700 16px/1.3 var(--disp);margin:10px 0 0}
+.stage p{font-size:13.5px;line-height:1.55;margin-top:8px;max-width:none}
+.stage .cost{margin-top:12px;font:500 12px/1 var(--mono);color:var(--ink-4);
+             padding-top:11px;border-top:1px solid var(--rule)}
+
+/* ===========================================================================
+   THE MOCKUP. Everything below draws the application, at application scale
+   and application type sizes (11–13px), so what is on the plate is what would
+   be on screen.
+   =========================================================================== */
+.frame{width:1340px;background:var(--ground-2);border:1px solid var(--rule-2);border-radius:6px;
+       overflow:hidden;font:400 12px/1.45 var(--shot);color:var(--ink);
+       box-shadow:0 24px 60px #0008}
+.frame *{box-sizing:border-box}
+.tabs{display:flex;align-items:center;gap:2px;background:#101315;padding:0 10px;
+      border-bottom:1px solid var(--rule);height:32px}
+.tabs .app{font:600 11px/1 var(--mono);color:var(--ink-4);letter-spacing:.08em;
+           text-transform:uppercase;margin-right:16px}
+.tab{padding:0 12px;height:32px;display:flex;align-items:center;color:var(--ink-3);font-size:12px;
+     border-bottom:2px solid transparent}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);background:#7fb4e00d}
+.tabs .right{margin-left:auto;display:flex;gap:12px;align-items:center;
+             color:var(--ink-4);font:400 11px/1 var(--mono)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--ok);
+     vertical-align:-1px;margin-right:5px}
+.dot.w{background:var(--warn)} .dot.b{background:var(--bad)} .dot.a{background:var(--accent)}
+.dot.o{background:var(--ink-4)} .dot.v{background:var(--violet)}
+
+.tbar{display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:var(--panel);
+      border-bottom:1px solid var(--rule)}
+.search{flex:1;max-width:520px;display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;
+        background:var(--sunk);border:1px solid var(--rule-2);border-radius:4px;color:var(--ink)}
+.search .ic{color:var(--ink-4);font:600 12px/1 var(--mono)}
+.search .q{color:var(--ink)}
+.search .caret{width:1px;height:14px;background:var(--accent);margin-left:1px}
+.search .hint{margin-left:auto;font:400 10px/1 var(--mono);color:var(--ink-4);
+              border:1px solid var(--rule-2);border-radius:3px;padding:3px 5px}
+.seg{display:flex;border:1px solid var(--rule-2);border-radius:4px;overflow:hidden}
+.seg b{font:500 11px/1 var(--shot);padding:7px 11px;color:var(--ink-3);background:var(--sunk);
+       border-right:1px solid var(--rule-2)}
+.seg b:last-child{border-right:0}
+.seg b.on{background:#7fb4e01f;color:var(--accent)}
+.tbar .count{margin-left:auto;font:400 11px/1 var(--mono);color:var(--ink-4)}
+.btn{font:500 11px/1 var(--shot);padding:7px 10px;border:1px solid var(--rule-2);border-radius:4px;
+     background:var(--sunk);color:var(--ink-2)}
+.btn.p{background:#7fb4e01f;border-color:var(--accent-deep);color:var(--accent)}
+
+.body{display:flex;align-items:stretch;height:640px}
+
+/* rail */
+.rail{width:196px;flex:0 0 196px;background:var(--panel);border-right:1px solid var(--rule);
+      padding:12px 0;overflow:hidden}
+.rail-h{font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);
+        padding:0 12px;margin:16px 0 7px}
+.rail-h:first-child{margin-top:0}
+.rail-item{display:flex;align-items:center;gap:7px;padding:5px 12px;color:var(--ink-2);font-size:12px}
+.rail-item .n{margin-left:auto;font:400 10px/1 var(--mono);color:var(--ink-4)}
+.rail-item.on{background:#7fb4e014;color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+.rail-item .sq{width:8px;height:8px;border-radius:2px;flex:0 0 8px;background:var(--rule-2)}
+.rail-item.on .sq{background:var(--accent)}
+.rail-item .sq.g{background:var(--ok)} .rail-item .sq.w{background:var(--warn)}
+.rail-item .sq.v{background:var(--violet)} .rail-item .sq.r{background:var(--bad)}
+.rail-item .live{font:600 9px/1 var(--mono);color:var(--violet);border:1px solid #a98bd655;
+                 border-radius:2px;padding:2px 3px;margin-left:auto}
+
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--ground-2)}
+.facets{padding:10px 14px 0;display:flex;flex-direction:column;gap:7px}
+.frow{display:flex;align-items:center;gap:6px}
+.flabel{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);
+        width:74px;flex:0 0 74px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:11px;
+      border:1px solid var(--rule-2);background:var(--panel);color:var(--ink-2);font-size:11px}
+.chip .n{font:400 10px/1 var(--mono);color:var(--ink-4)}
+.chip.on{background:#7fb4e01f;border-color:var(--accent-deep);color:var(--accent)}
+.chip.on .n{color:var(--accent-deep)}
+.chip.no{border-color:#e0565688;color:#e08a8a;background:#e0565614;text-decoration:line-through}
+.chip.mo{border-style:dashed;color:var(--ink-4)}
+
+.sonic{display:flex;gap:14px;align-items:flex-end;padding:12px 14px 11px;margin:10px 14px 0;
+       background:var(--panel);border:1px solid var(--rule);border-radius:5px}
+.sonic .stitle{font:600 10px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+               color:var(--ink-4);width:74px;flex:0 0 74px}
+.knob{flex:1;min-width:0}
+.knob .kl{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);
+          margin-bottom:6px;font-family:var(--mono)}
+.knob .kl b{color:var(--ink);font-weight:500}
+.track{height:4px;border-radius:2px;background:var(--sunk);position:relative;
+       border:1px solid var(--rule)}
+.track .fill{position:absolute;top:-1px;bottom:-1px;background:linear-gradient(90deg,var(--accent-deep),var(--accent));
+             border-radius:2px}
+.track .h{position:absolute;top:-4px;width:9px;height:11px;border-radius:2px;background:#c9d6e2;
+          border:1px solid #0006}
+.hist{display:flex;align-items:flex-end;gap:1px;height:15px;margin-bottom:3px}
+.hist i{flex:1;background:var(--rule-2);border-radius:1px 1px 0 0}
+.hist i.in{background:var(--accent-deep)}
+
+/* results */
+.grid{flex:1;overflow:hidden;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;
+      padding:12px 14px;align-content:start}
+.tile{background:var(--panel);border:1px solid var(--rule);border-radius:5px;padding:8px;
+      display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-deep),0 0 18px #7fb4e033}
+.tile.dim{opacity:.5}
+.tprint{height:34px;background:var(--sunk);border-radius:3px;overflow:hidden;position:relative}
+.tprint svg{display:block;width:100%;height:34px}
+.tprint .dup{position:absolute;right:4px;top:4px;font:600 8px/1 var(--mono);color:var(--warn);
+             border:1px solid #d9a13c66;border-radius:2px;padding:2px 3px;background:#0009}
+.tname{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsub{font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tfoot{display:flex;align-items:center;gap:5px;margin-top:auto}
+.badge{font:600 8.5px/1 var(--mono);letter-spacing:.06em;padding:3px 4px;border-radius:2px;
+       border:1px solid var(--rule-2);color:var(--ink-4)}
+.badge.mine{color:var(--accent);border-color:var(--accent-deep);background:#7fb4e014}
+.badge.hw{color:var(--warn);border-color:#d9a13c66;background:#d9a13c14}
+.badge.chain{color:var(--violet);border-color:#a98bd666;background:#a98bd614}
+.badge.rack{color:var(--ok);border-color:#35c46f66;background:#35c46f14}
+.badge.miss{color:var(--bad);border-color:#e0565666;background:#e0565614}
+.stars{font-size:9px;color:var(--warn);letter-spacing:1px;margin-left:auto}
+.cpu{font:400 9.5px/1 var(--mono);color:var(--ink-4)}
+
+/* inspector */
+.insp{width:320px;flex:0 0 320px;background:var(--panel);border-left:1px solid var(--rule);
+      padding:12px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.insp .iname{font:700 17px/1.15 var(--disp);letter-spacing:-.01em}
+.insp .isub{font-size:11px;color:var(--ink-3)}
+.spec{background:var(--sunk);border:1px solid var(--rule);border-radius:4px;padding:7px}
+.spec svg{display:block;width:100%;height:62px}
+.spec .axis{display:flex;justify-content:space-between;font:400 9px/1 var(--mono);
+            color:var(--ink-4);margin-top:5px}
+.iblk{border-top:1px solid var(--rule);padding-top:9px}
+.ih{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);
+    margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.ih .more{margin-left:auto;color:var(--accent);font-size:9px;letter-spacing:.06em}
+.kv{display:grid;grid-template-columns:84px 1fr;gap:4px 8px;font-size:11px}
+.kv .k{color:var(--ink-4)} .kv .v{color:var(--ink-2)}
+.kv .v.ok{color:var(--ok)} .kv .v.wr{color:var(--warn)}
+.tagrow{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:10px;padding:3px 7px;border-radius:10px;background:var(--panel-2);
+     border:1px solid var(--rule-2);color:var(--ink-2)}
+.tag.prop{border-style:dashed;color:var(--violet);border-color:#a98bd655;background:#a98bd60d}
+.tag.prop::before{content:'+ ';color:var(--violet)}
+.vrail{display:flex;flex-direction:column;gap:0}
+.vrow{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;
+      font-size:11px;padding:4px 0;position:relative}
+.vrow .pip{width:7px;height:7px;border-radius:50%;background:var(--rule-2);margin-left:2px;z-index:1}
+.vrow.now .pip{background:var(--accent);box-shadow:0 0 0 3px #7fb4e026}
+.vrow.fac .pip{background:var(--ink-4)}
+.vrow::before{content:'';position:absolute;left:5.5px;top:0;bottom:0;width:1px;background:var(--rule)}
+.vrow:first-child::before{top:50%} .vrow:last-child::before{bottom:50%}
+.vrow .vl{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow.now .vl{color:var(--ink);font-weight:600}
+.vrow .vt{font:400 10px/1 var(--mono);color:var(--ink-4)}
+.simrow{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:11px}
+.simrow svg{width:44px;height:16px;flex:0 0 44px;background:var(--sunk);border-radius:2px}
+.simrow .sn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.simrow .sm{margin-left:auto;font:500 10px/1 var(--mono);color:var(--ok)}
+
+/* audition bar */
+.aud{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#101315;overflow:hidden;
+     border-top:1px solid var(--rule-2)}
+.aud .ap{width:30px;height:30px;border-radius:50%;background:#7fb4e01f;border:1px solid var(--accent-deep);
+         color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px}
+.aud .now{display:flex;flex-direction:column;gap:2px;min-width:150px}
+.aud .now .t{font-weight:600;font-size:12px}
+.aud .now .s{font:400 10px/1 var(--mono);color:var(--ink-4)}
+.aud .state{display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:4px;
+            background:var(--panel);border:1px solid var(--rule-2);font-size:11px;color:var(--ink-2)}
+.aud .state .hand{font:400 10px/1 var(--mono);color:var(--ink-4)}
+.handoff{width:132px;height:16px;background:var(--sunk);border:1px solid var(--rule);border-radius:3px;
+         position:relative;overflow:hidden}
+.handoff .snap{position:absolute;left:0;top:0;bottom:0;width:46%;background:linear-gradient(90deg,#4a86bd66,#4a86bd11)}
+.handoff .live{position:absolute;right:0;top:0;bottom:0;width:54%;background:linear-gradient(90deg,#35c46f11,#35c46f55)}
+.handoff .mark{position:absolute;left:46%;top:0;bottom:0;width:1px;background:var(--ink-2)}
+.handoff .lab{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;
+              padding:0 5px;font:600 8px/1 var(--mono);color:#dfe7ee;letter-spacing:.06em}
+.abx{display:flex;gap:4px}
+.abx b{width:26px;height:26px;border-radius:4px;border:1px solid var(--rule-2);background:var(--panel);
+       display:flex;align-items:center;justify-content:center;font:600 11px/1 var(--mono);color:var(--ink-3)}
+.abx b.on{border-color:var(--accent);color:var(--accent);background:#7fb4e01f}
+.aud .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.aud .tgt{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;color:var(--ink-3);
+          border:1px solid var(--rule-2);border-radius:4px;padding:6px 9px;background:var(--panel)}
+.aud .tgt b{color:var(--ink);font-weight:600}
+
+/* atlas */
+.atlaswrap{flex:1;position:relative;padding:12px 14px;overflow:hidden}
+.atlaswrap svg{display:block;width:100%;height:100%}
+.acard{position:absolute;background:var(--panel);border:1px solid var(--accent-deep);border-radius:5px;
+       padding:8px 9px;width:186px;box-shadow:0 12px 30px #000a}
+.acard .an{font-weight:600;font-size:12px}
+.acard .as{font-size:10px;color:var(--ink-3);margin-top:1px}
+.acard svg{width:100%;height:24px;margin-top:6px;background:var(--sunk);border-radius:2px}
+.acard .ak{display:flex;justify-content:space-between;font:400 9.5px/1.6 var(--mono);color:var(--ink-4);margin-top:5px}
+.alegend{position:absolute;left:22px;bottom:18px;display:flex;flex-direction:column;gap:5px;
+         background:#101315cc;border:1px solid var(--rule);border-radius:4px;padding:8px 10px}
+.alegend div{font-size:10.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.aband{position:absolute;right:22px;top:20px;background:#101315cc;border:1px solid var(--rule);
+       border-radius:4px;padding:9px 11px;width:212px}
+.aband .t{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--warn)}
+.aband p{font-size:11px;color:var(--ink-3);margin:6px 0 0;max-width:none;line-height:1.5}
+.aband .b{margin-top:8px;display:flex;gap:6px}
+
+/* diff */
+.diffbody{display:flex;height:640px}
+.dmain{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--ground-2)}
+.dhead{padding:14px 16px 12px;border-bottom:1px solid var(--rule);background:var(--panel)}
+.dhead .dt{font:700 18px/1.2 var(--disp)}
+.dhead .ds{font-size:11px;color:var(--ink-3);margin-top:3px}
+.abbar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--rule)}
+.morph{flex:1;max-width:340px}
+.dtable{flex:1;overflow:hidden;padding:6px 16px 0}
+.drow{display:grid;grid-template-columns:150px 1fr 74px 74px 62px;gap:10px;align-items:center;
+      padding:7px 0;border-bottom:1px solid var(--rule);font-size:11.5px}
+.drow.h{border-bottom:1px solid var(--rule-2);color:var(--ink-4);
+        font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding-bottom:8px}
+.drow .pn{color:var(--ink);font-weight:500}
+.dbar{height:14px;background:var(--sunk);border:1px solid var(--rule);border-radius:2px;position:relative}
+.dbar .a{position:absolute;top:2px;bottom:2px;left:2px;background:#39424d;border-radius:1px}
+.dbar .b{position:absolute;top:5px;bottom:5px;left:2px;background:linear-gradient(90deg,var(--accent-deep),var(--accent));
+         border-radius:1px;opacity:.9}
+.dbar .arrow{position:absolute;top:0;bottom:0;width:1px;background:var(--warn)}
+.dval{font:400 10.5px/1 var(--mono);color:var(--ink-3);text-align:right}
+.dval.b{color:var(--accent)}
+.ddelta{font:500 10.5px/1 var(--mono);text-align:right}
+.ddelta.up{color:var(--ok)} .ddelta.dn{color:var(--warn)}
+.bytes{border-top:1px solid var(--rule-2);background:var(--sunk);padding:11px 16px 13px}
+.bytes .bh{display:flex;align-items:center;gap:8px;font:600 10px/1 var(--mono);letter-spacing:.1em;
+           text-transform:uppercase;color:var(--ink-4)}
+.bytes table{border-collapse:collapse;margin-top:8px;font:400 10.5px/1 var(--mono);width:100%}
+.bytes th{text-align:left;color:var(--ink-4);font-weight:500;padding:3px 12px 5px 0}
+.bytes td{padding:3px 12px 3px 0;color:var(--ink-2)}
+.bytes td .was{color:var(--ink-4)} .bytes td .is{color:var(--accent)}
+.dside{width:262px;flex:0 0 262px;background:var(--panel);border-left:1px solid var(--rule);padding:12px;
+       display:flex;flex-direction:column;gap:11px}
+
+/* surface */
+.surfwrap{padding:18px;background:var(--ground-2);display:flex;gap:18px;align-items:flex-start}
+.kb{flex:1;background:var(--sunk);border:1px solid var(--rule-2);border-radius:6px;padding:14px}
+.kb svg{display:block;width:100%;height:auto}
+.padlist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:14px}
+.padlist div{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel);
+             border:1px solid var(--rule);border-radius:4px;min-width:0}
+.padlist b{font:600 9px/1 var(--mono);color:var(--ink-4);flex:0 0 auto}
+.padlist span{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.padlist i{width:6px;height:6px;border-radius:2px;flex:0 0 6px}
+.kbnote{font-size:11px;line-height:1.55;color:var(--ink-4);margin:12px 0 0;max-width:none}
+.scrn{width:330px;flex:0 0 330px}
+.lcd{background:#06170f;border:1px solid #1d4a34;border-radius:5px;padding:11px 12px;
+     font-family:var(--mono);color:#8ff0b8;box-shadow:inset 0 0 26px #0b3a2555}
+.lcd .lh{display:flex;justify-content:space-between;font-size:10px;color:#4fbf87;
+         border-bottom:1px solid #1d4a34;padding-bottom:6px;letter-spacing:.06em}
+.lcd .lr{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:12px}
+.lcd .lr.on{color:#d6ffe8}
+.lcd .lr .lp{width:5px;height:5px;border-radius:50%;background:#1d4a34}
+.lcd .lr.on .lp{background:#8ff0b8;box-shadow:0 0 6px #8ff0b8}
+.lcd .lr .lm{margin-left:auto;font-size:9.5px;color:#4fbf87}
+.lcd .lf{display:flex;justify-content:space-between;font-size:9.5px;color:#4fbf87;
+         border-top:1px solid #1d4a34;padding-top:6px;margin-top:6px;letter-spacing:.04em}
+.encrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+.enc{background:var(--panel);border:1px solid var(--rule-2);border-radius:4px;padding:7px 8px}
+.enc .en{font:600 9px/1 var(--mono);color:var(--ink-4);letter-spacing:.08em}
+.enc .ev{font-size:11px;color:var(--ink);margin-top:5px;white-space:nowrap;overflow:hidden;
+         text-overflow:ellipsis}
+.enc.act{border-color:var(--accent);background:#7fb4e014}
+.enc.act .ev{color:var(--accent)}
+
+/* substitution */
+.subwrap{padding:16px;background:var(--ground-2);height:640px;display:flex;flex-direction:column;gap:12px}
+.subhead{display:flex;align-items:flex-start;gap:12px;padding:13px 15px;background:#d9a13c0f;
+         border:1px solid #d9a13c55;border-radius:5px}
+.subhead .sy{font:700 20px/1 var(--mono);color:var(--warn)}
+.subhead .sh{font:700 15px/1.3 var(--disp)}
+.subhead p{font-size:12px;color:var(--ink-3);margin:4px 0 0;max-width:none}
+.subrow{background:var(--panel);border:1px solid var(--rule);border-radius:5px;padding:12px 14px}
+.subrow .miss{display:flex;align-items:center;gap:10px;padding-bottom:11px;border-bottom:1px solid var(--rule)}
+.subrow .miss .mn{font-weight:600;font-size:13px}
+.subrow .miss .mw{font-size:11px;color:var(--ink-3)}
+.cands{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:11px}
+.cand{border:1px solid var(--rule);border-radius:4px;padding:9px;background:var(--panel-2);
+      display:flex;flex-direction:column;gap:7px}
+.cand.best{border-color:var(--ok);box-shadow:0 0 0 1px #35c46f44}
+.cand .cn{font-weight:600;font-size:12px}
+.cand .cs{font-size:10.5px;color:var(--ink-3)}
+.cand svg{width:100%;height:26px;background:var(--sunk);border-radius:2px;display:block}
+.cand .cm{display:flex;align-items:center;gap:7px}
+.cand .cm .pct{font:600 13px/1 var(--mono);color:var(--ok)}
+.cand .cm .mt{flex:1;height:4px;background:var(--sunk);border-radius:2px;border:1px solid var(--rule);position:relative}
+.cand .cm .mt i{position:absolute;left:0;top:-1px;bottom:-1px;background:var(--ok);border-radius:2px}
+.why{display:flex;flex-wrap:wrap;gap:4px}
+.why span{font:400 9.5px/1 var(--mono);color:var(--ink-3);border:1px solid var(--rule-2);
+          border-radius:2px;padding:3px 4px}
+.why span.mm{color:var(--warn);border-color:#d9a13c55}
+.subfoot{margin-top:auto;display:flex;align-items:center;gap:10px;padding-top:12px;
+         border-top:1px solid var(--rule)}
+.subfoot .note{font-size:11px;color:var(--ink-4);max-width:52ch}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow"><span>CEditor · Instrument Host</span><span>·</span><span>design proposal</span>
+    <span>·</span><span><b>2026-09-07</b></span></div>
+  <h1>The browser knows what it <em>sounds</em> like.</h1>
+  <p class="thesis">VIP's preset system indexed <b>files</b>: it read what the vendor wrote on the tin,
+     put it in four tag columns, and left you to click through 12,000 rows hoping one of them was the
+     pad you could hear in your head. This indexes <b>sounds</b> — every one of them auditioned once,
+     measured, drawn, and filed next to your hardware patches and your own chains, because a Juno
+     patch and a .vstpreset are the same thing to a person looking for a bass.</p>
+  <div class="factstrip">
+    <div class="fact"><div class="n a">4 of 7</div><div class="l">record types already in
+      <code>Library.h</code> — preset, chain, rack, hardware patch</div></div>
+    <div class="fact"><div class="n g">shipped</div><div class="l">provenance, favourites-survive-rescan,
+      missing-not-deleted, fingerprints</div></div>
+    <div class="fact"><div class="n w">the gap</div><div class="l">no analysis, no audio, no versions,
+      no map, no substitutes</div></div>
+    <div class="fact"><div class="n">0 new</div><div class="l">out-of-process workers — the auditioner is
+      the scanner host, re-tasked</div></div>
+  </div>
+</header>
+
+<section class="sec">
+  <div class="kicker">The complaint, stated fairly</div>
+  <h2>VIP's browser was the best in the business, and it was still a filing cabinet.</h2>
+  <p class="lede">Everything below is aimed at one weakness, and it is worth naming precisely because
+    "make it better" is not actionable: <b>VIP knew a preset's name, its vendor, and whatever four
+    tags a marketing intern typed. It never once listened to it.</b></p>
+  <p>Every consequence follows from that. Tags disagree between vendors because they were typed by
+    different people. Auditioning is gated on plug-in load time, because there is nothing to play
+    until the plug-in is up. "Init" appears forty times and nothing notices. A multi dies when a
+    plug-in is uninstalled, because a name is all the multi ever knew about what it wanted. And a
+    hardware synth — the thing a controller keyboard was sold to play — is not in the browser at all.</p>
+  <table class="cmp">
+    <tr><th>What you do</th><th>VIP</th><th>Here</th></tr>
+    <tr><td>Find a sound</td><td>Name, vendor and four vendor tag columns</td>
+      <td>The same facets <span class="win">plus</span> measured ranges — brightness, attack, tail,
+        width, CPU — and any facet chip excludable, not just selectable</td></tr>
+    <tr><td>Hear one</td><td>Load the plug-in, wait, play a note</td>
+      <td><span class="win">Instant.</span> A 2-second snapshot captured at scan time plays on click;
+        the real plug-in loads behind it and takes over at the next note boundary</td></tr>
+    <tr><td>Hear it in context</td><td>Solo, dry, one note</td>
+      <td>Through the part's chain, at your tempo, over <b>the last eight bars you played</b></td></tr>
+    <tr><td>What's in the library</td><td>VST/AU presets</td>
+      <td>Presets, your captured states, <b>hardware synth patches</b>, whole voice chains, whole racks
+        — one index, one search, one keyboard flow</td></tr>
+    <tr><td>Tagging</td><td>Type them, or accept the vendor's</td>
+      <td>Measured tags proposed from the analysis, your vocabulary learned from your own records,
+        never applied without you</td></tr>
+    <tr><td>Forty copies of "Init"</td><td>Forty rows</td>
+      <td>One row, <span class="win">39 folded</span>, flagged by fingerprint and sonic distance</td></tr>
+    <tr><td>You changed a sound</td><td>Overwrite, or Save As and hope</td>
+      <td>Versions on a rail, A/B against any of them, a <b>parameter-level diff</b> against the factory
+        preset, and a byte diff for hardware</td></tr>
+    <tr><td>A plug-in is missing</td><td>The multi is broken</td>
+      <td>The rack offers the nearest sound you actually own, ranked, with the reasons shown</td></tr>
+    <tr><td>Browsing from the keyboard</td><td>Two blessed inMusic controllers</td>
+      <td>Any surface whose profile declares a screen — the drawing and the encoder map already exist</td></tr>
+  </table>
+</section>
+
+<section class="sec">
+  <div class="kicker">Plate one</div>
+  <h2>The Sound Browser</h2>
+  <p class="lede">A workspace, not the slide-out list the host has today. Left rail is where sounds
+    come from and how you've grouped them; the facet strip and the measured ranges narrow; the grid
+    shows every sound as its own waveform.</p>
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="frame" id="f-browser">
+        <div class="tabs"><span class="app">CEditor — Instrument Host</span>
+          <span class="tab">Rack</span><span class="tab on">Sounds</span><span class="tab">Mixer</span>
+          <span class="tab">Surface</span><span class="tab">Project</span>
+          <span class="right"><span><i class="dot"></i>Audio 48k · 128</span>
+            <span><i class="dot a"></i>CTRL49</span><span>3.1% CPU</span></span></div>
+        <div class="tbar">
+          <div class="search"><span class="ic">⌕</span><span class="q">warm pad</span>
+            <span class="caret"></span>
+            <span class="hint">⌥ click a chip to exclude</span></div>
+          <div class="seg"><b class="on">Grid</b><b>List</b><b>Atlas</b></div>
+          <span class="btn p">Audition</span>
+          <span class="btn">Scan…</span>
+          <span class="count">412 of 12,481 · 39 duplicates folded</span>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <div class="rail-h">Library</div>
+            <div class="rail-item on"><i class="sq"></i>All sounds<span class="n">12,481</span></div>
+            <div class="rail-item"><i class="sq"></i>Favourites<span class="n">211</span></div>
+            <div class="rail-item"><i class="sq"></i>Added this week<span class="n">64</span></div>
+            <div class="rail-item"><i class="sq"></i>Modified, unsaved<span class="n">3</span></div>
+            <div class="rail-h">Smart collections</div>
+            <div class="rail-item"><i class="sq g"></i>Live-safe pads<span class="live">LIVE</span></div>
+            <div class="rail-item"><i class="sq g"></i>Under 3% CPU<span class="live">LIVE</span></div>
+            <div class="rail-item"><i class="sq g"></i>Never played<span class="live">LIVE</span></div>
+            <div class="rail-h">Set lists</div>
+            <div class="rail-item"><i class="sq v"></i>Fri — Blue Note<span class="n">9</span></div>
+            <div class="rail-item"><i class="sq v"></i>Studio, Tue<span class="n">14</span></div>
+            <div class="rail-h">Sources</div>
+            <div class="rail-item"><i class="sq"></i>Stage Keys<span class="n">2,104</span></div>
+            <div class="rail-item"><i class="sq"></i>Analog One<span class="n">1,876</span></div>
+            <div class="rail-item"><i class="sq"></i>FM Eight<span class="n">988</span></div>
+            <div class="rail-item"><i class="sq w"></i>Juno-106<span class="n">128</span></div>
+            <div class="rail-item"><i class="sq w"></i>Prophet-5<span class="n">40</span></div>
+            <div class="rail-item"><i class="sq r"></i>Diva<span class="n">1,203</span></div>
+          </div>
+          <div class="main">
+            <div class="facets">
+              <div class="frow"><span class="flabel">Type</span>
+                <span class="chip on">Pad <i class="n">412</i></span>
+                <span class="chip">Bass <i class="n">1,904</i></span>
+                <span class="chip">Lead <i class="n">2,210</i></span>
+                <span class="chip">Keys <i class="n">1,688</i></span>
+                <span class="chip">Pluck <i class="n">744</i></span>
+                <span class="chip no">Drums <i class="n">0</i></span>
+                <span class="chip mo">+ 9 more</span></div>
+              <div class="frow"><span class="flabel">Character</span>
+                <span class="chip on">Warm <i class="n">286</i></span>
+                <span class="chip">Evolving <i class="n">173</i></span>
+                <span class="chip">Glassy <i class="n">96</i></span>
+                <span class="chip no">Distorted <i class="n">41</i></span>
+                <span class="chip">Wide <i class="n">302</i></span>
+                <span class="chip mo">+ 14 more</span></div>
+            </div>
+            <div class="sonic">
+              <div class="stitle">Measured</div>
+              <div class="knob"><div class="kl"><span>Brightness</span><b id="k1">dark → mid</b></div>
+                <div class="hist" id="h1"></div><div class="track"><i class="fill" style="left:6%;width:44%"></i>
+                <i class="h" style="left:4%"></i><i class="h" style="left:47%"></i></div></div>
+              <div class="knob"><div class="kl"><span>Attack</span><b>&gt; 180 ms</b></div>
+                <div class="hist" id="h2"></div><div class="track"><i class="fill" style="left:38%;width:62%"></i>
+                <i class="h" style="left:36%"></i><i class="h" style="left:96%"></i></div></div>
+              <div class="knob"><div class="kl"><span>Tail</span><b>any</b></div>
+                <div class="hist" id="h3"></div><div class="track"><i class="fill" style="left:2%;width:96%"></i>
+                <i class="h" style="left:0%"></i><i class="h" style="left:96%"></i></div></div>
+              <div class="knob"><div class="kl"><span>Width</span><b>stereo</b></div>
+                <div class="hist" id="h4"></div><div class="track"><i class="fill" style="left:52%;width:46%"></i>
+                <i class="h" style="left:50%"></i><i class="h" style="left:96%"></i></div></div>
+              <div class="knob"><div class="kl"><span>CPU</span><b>&lt; 6%</b></div>
+                <div class="hist" id="h5"></div><div class="track"><i class="fill" style="left:2%;width:36%"></i>
+                <i class="h" style="left:0%"></i><i class="h" style="left:36%"></i></div></div>
+            </div>
+            <div class="grid" id="g-browser"></div>
+          </div>
+          <div class="insp" id="i-browser"></div>
+        </div>
+        <div class="aud">
+          <span class="ap">▶</span>
+          <div class="now"><span class="t">Glass Cathedral</span>
+            <span class="s">Stage Keys · factory · 4.1% · 0 ms</span></div>
+          <div class="state"><span class="hand">AUDITION</span>
+            <div class="handoff"><i class="snap"></i><i class="live"></i><i class="mark"></i>
+              <span class="lab"><span>SNAPSHOT 0.0s</span><span>LIVE 1.9s</span></span></div>
+            <span style="color:var(--ok)"><i class="dot"></i>plug-in ready</span></div>
+          <div class="state"><span class="hand">PLAY WITH</span>
+            <span class="btn">Single note</span><span class="btn">Chord</span>
+            <span class="btn p">Your last 8 bars</span></div>
+          <div class="abx"><b class="on">A</b><b>B</b><b>C</b><b>D</b></div>
+          <div class="right">
+            <div class="tgt">Load into <b>Part 2 — Stage Keys</b></div>
+            <span class="btn p">Load</span><span class="btn">+ New part</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-cap"><span class="cn">Plate 1 / browser</span>
+      <p class="ct">Everything on this screen exists as data today except the five measured ranges and
+        the waveform on each tile. Note what the grid is showing: a hardware Juno patch, a captured
+        chain and a whole rack sit in the same result set as the vendor presets — one search, because
+        to the person looking they are all just sounds.</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">Plate two</div>
+  <h2>The Atlas</h2>
+  <p class="lede">The same 12,481 sounds, placed by what the analysis measured rather than by what
+    somebody named them. Brightness across, attack up. You do not read this map — you point at the
+    corner where the sound you want lives and hear what is there.</p>
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="frame" id="f-atlas">
+        <div class="tabs"><span class="app">CEditor — Instrument Host</span>
+          <span class="tab">Rack</span><span class="tab on">Sounds</span><span class="tab">Mixer</span>
+          <span class="tab">Surface</span><span class="tab">Project</span>
+          <span class="right"><span><i class="dot"></i>Audio 48k · 128</span>
+            <span><i class="dot a"></i>CTRL49</span><span>3.1% CPU</span></span></div>
+        <div class="tbar">
+          <div class="search"><span class="ic">⌕</span><span class="q" style="color:var(--ink-4)">
+            Search 12,481 sounds</span></div>
+          <div class="seg"><b>Grid</b><b>List</b><b class="on">Atlas</b></div>
+          <span class="btn">Axes: Brightness × Attack</span>
+          <span class="btn">Colour: Type</span>
+          <span class="count">hover to hear · drag to lasso</span>
+        </div>
+        <div class="body">
+          <div class="rail">
+            <div class="rail-h">Library</div>
+            <div class="rail-item on"><i class="sq"></i>All sounds<span class="n">12,481</span></div>
+            <div class="rail-item"><i class="sq"></i>Favourites<span class="n">211</span></div>
+            <div class="rail-h">Clusters found</div>
+            <div class="rail-item"><i class="sq g"></i>Soft pads<span class="n">1,208</span></div>
+            <div class="rail-item"><i class="sq g"></i>Plucked keys<span class="n">944</span></div>
+            <div class="rail-item"><i class="sq g"></i>Hard basses<span class="n">1,702</span></div>
+            <div class="rail-item"><i class="sq g"></i>Bright leads<span class="n">2,014</span></div>
+            <div class="rail-item"><i class="sq w"></i>Unclustered<span class="n">613</span></div>
+            <div class="rail-h">Housekeeping</div>
+            <div class="rail-item"><i class="sq w"></i>Duplicates<span class="n">39 sets</span></div>
+            <div class="rail-item"><i class="sq r"></i>Silent on probe<span class="n">18</span></div>
+            <div class="rail-item"><i class="sq r"></i>Unavailable<span class="n">1,203</span></div>
+          </div>
+          <div class="main">
+            <div class="atlaswrap" id="a-wrap">
+              <svg id="a-svg" viewBox="0 0 900 560" preserveAspectRatio="none"></svg>
+              <div class="acard" style="left:47%;top:26%">
+                <div class="an">Tape Choir</div>
+                <div class="as">Mellow · pack “Analogue Tapes” · 2.2%</div>
+                <svg class="mini" data-seed="Tape Choir" data-at="0.7" data-br="0.36"></svg>
+                <div class="ak"><span>bright 0.36</span><span>atk 340ms</span><span>tail 4.2s</span></div>
+              </div>
+              <div class="alegend">
+                <div><i class="dot a"></i>Pad</div><div><i class="dot g"></i>Keys</div>
+                <div><i class="dot w"></i>Bass</div><div><i class="dot v"></i>Lead</div>
+                <div><i class="dot o"></i>Unavailable — plug-in not installed</div>
+              </div>
+              <div class="aband">
+                <div class="t">39 duplicate sets</div>
+                <p>“Init Saw” exists 6 times across 3 libraries, identical fingerprint and identical
+                   probe render. Folding keeps the one with your tags on it.</p>
+                <div class="b"><span class="btn p">Review &amp; fold</span><span class="btn">Ignore</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="insp" id="i-atlas"></div>
+        </div>
+        <div class="aud">
+          <span class="ap">▶</span>
+          <div class="now"><span class="t">Hovering — Tape Choir</span>
+            <span class="s">snapshot · no plug-in loaded</span></div>
+          <div class="state"><span class="hand">AUDITION</span>
+            <div class="handoff"><i class="snap" style="width:100%"></i>
+              <span class="lab"><span>SNAPSHOT</span><span></span></span></div>
+            <span style="color:var(--ink-4)">hold to load for real</span></div>
+          <div class="state"><span class="hand">NEAREST</span>
+            <span class="btn">Wool Pad 96%</span><span class="btn">Choirbox 94%</span>
+            <span class="btn">Slow Glass 91%</span></div>
+          <div class="right"><div class="tgt">Load into <b>Part 2 — Stage Keys</b></div>
+            <span class="btn p">Load</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-cap"><span class="cn">Plate 2 / atlas</span>
+      <p class="ct">Grey dots are sounds whose plug-in is not installed — they stay on the map, because
+        the record and its ratings survive the plug-in leaving (that rule is already in
+        <code>Library.h</code>). The clusters in the rail are not a taxonomy anybody typed; they are
+        what the descriptors clustered into, named once and then editable.</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">Plate three</div>
+  <h2>Versions, and the diff</h2>
+  <p class="lede">Saving a sound should not be a decision about whether to destroy the old one. Every
+    save is a version on a rail; every version can be A/B'd instantly, and the difference against any
+    other version — or against the factory preset you started from — is shown as parameters, not as
+    a shrug.</p>
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="frame" id="f-diff">
+        <div class="tabs"><span class="app">CEditor — Instrument Host</span>
+          <span class="tab">Rack</span><span class="tab on">Sounds</span><span class="tab">Mixer</span>
+          <span class="tab">Surface</span><span class="tab">Project</span>
+          <span class="right"><span><i class="dot"></i>Audio 48k · 128</span><span>3.1% CPU</span></span></div>
+        <div class="diffbody">
+          <div class="dmain">
+            <div class="dhead">
+              <div class="dt">Rubber Bass <span style="color:var(--ink-4);font-weight:400">— v6, yours</span></div>
+              <div class="ds">Analog One · captured from Part 1 · branched from factory “Rubber Bass”
+                on 12 Aug · 41 of 186 parameters differ</div>
+            </div>
+            <div class="abbar">
+              <span class="btn">A · factory</span><span class="btn p">B · v6 (playing)</span>
+              <div class="morph"><div class="kl" style="display:flex;justify-content:space-between;
+                font:400 10px/1 var(--mono);color:var(--ink-3);margin-bottom:6px">
+                <span>MORPH A → B</span><b style="color:var(--ink)">100%</b></div>
+                <div class="track"><i class="fill" style="left:0;width:100%"></i>
+                  <i class="h" style="left:96%"></i></div></div>
+              <span class="btn">Only differences</span>
+              <span class="btn">Revert selected</span>
+            </div>
+            <div class="dtable" id="d-table"></div>
+            <div class="bytes">
+              <div class="bh"><span>And when there are no parameter names —</span>
+                <span style="color:var(--warn)"><i class="dot w"></i>Juno-106, hardware patch</span></div>
+              <table>
+                <tr><th>Msg</th><th>Offset</th><th>Was</th><th>Is</th><th>Read against the manual</th></tr>
+                <tr><td>0</td><td>0x1C</td><td class="was">0x40</td><td class="is">0x5E</td>
+                  <td style="color:var(--ink-4)">VCF cutoff</td></tr>
+                <tr><td>0</td><td>0x1D</td><td class="was">0x00</td><td class="is">0x22</td>
+                  <td style="color:var(--ink-4)">VCF resonance</td></tr>
+                <tr><td>0</td><td>0x24</td><td class="was">0x7F</td><td class="is">0x31</td>
+                  <td style="color:var(--ink-4)">Chorus mode</td></tr>
+                <tr><td colspan="5" style="color:var(--ink-4);padding-top:6px">
+                  3 of 3 differing bytes. <code>PatchDiff.h</code> already computes this list; the
+                  right-hand column is the profile's field map where one exists, and blank where it
+                  does not — the diff never pretends to understand the bytes.</td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="dside">
+            <div><div class="iname" style="font-size:15px">Version rail</div>
+              <div class="isub">Every save. Nothing overwritten.</div></div>
+            <div class="vrail">
+              <div class="vrow now"><i class="pip"></i><span class="vl">v6 — “more thumb”</span>
+                <span class="vt">2h ago</span></div>
+              <div class="vrow"><i class="pip"></i><span class="vl">v5 — before the gig</span>
+                <span class="vt">3 Sep</span></div>
+              <div class="vrow"><i class="pip"></i><span class="vl">v4</span><span class="vt">28 Aug</span></div>
+              <div class="vrow"><i class="pip"></i><span class="vl">v3 — take it darker</span>
+                <span class="vt">28 Aug</span></div>
+              <div class="vrow"><i class="pip"></i><span class="vl">v2</span><span class="vt">14 Aug</span></div>
+              <div class="vrow fac"><i class="pip"></i><span class="vl">factory — Rubber Bass</span>
+                <span class="vt">12 Aug</span></div>
+            </div>
+            <div class="iblk"><div class="ih">Where it is used<span class="more">SHOW</span></div>
+              <div class="kv"><span class="k">Racks</span><span class="v">Blue Note rig, Studio Tue</span>
+                <span class="k">Chains</span><span class="v">“Nightdrive” part 3</span>
+                <span class="k">Set lists</span><span class="v ok">Fri — Blue Note</span></div></div>
+            <div class="iblk"><div class="ih">Cost of a version</div>
+              <div class="kv"><span class="k">State blob</span><span class="v">18 kB</span>
+                <span class="k">Snapshot</span><span class="v">11 kB · 2.0 s</span>
+                <span class="k">6 versions</span><span class="v">174 kB total</span></div></div>
+            <div class="iblk"><div class="ih">Retention</div>
+              <div class="kv"><span class="k">Keep</span><span class="v">every save for 30 days,</span>
+                <span class="k"></span><span class="v">then one a day, then named ones forever</span></div></div>
+          </div>
+        </div>
+        <div class="aud">
+          <span class="ap">▶</span>
+          <div class="now"><span class="t">A/B on the sustain pedal</span>
+            <span class="s">swap is sample-accurate — both states are resident</span></div>
+          <div class="state"><span class="hand">DIFF</span>
+            <span>41 parameters · 3 sysex bytes · same plug-in version</span></div>
+          <div class="right"><span class="btn">Save as new sound</span>
+            <span class="btn p">Commit v7</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-cap"><span class="cn">Plate 3 / versions</span>
+      <p class="ct">The parameter names come from <code>ParameterModel.h</code>, which already reads a
+        hosted plug-in's exposed parameters; the byte rows come from <code>PatchDiff.h</code>, which
+        already exists and already refuses to guess what a byte means. Neither is new work — what is
+        new is keeping more than one state per record and drawing the comparison.</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">Plate four</div>
+  <h2>Browsing with your hands on the keys</h2>
+  <p class="lede">This was VIP's real trick, and the one thing it did that no plug-in browser matched:
+    you never touched the mouse. It worked on two keyboards, both made by the company that wrote it.
+    Here it works on any surface whose profile declares a screen — which is the whole point of
+    <code>SurfaceProfile</code>, and the drawing and the encoder map are already built.</p>
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="frame" id="f-surface">
+        <div class="tabs"><span class="app">CEditor — Instrument Host</span>
+          <span class="tab">Rack</span><span class="tab">Sounds</span><span class="tab">Mixer</span>
+          <span class="tab on">Surface</span><span class="tab">Project</span>
+          <span class="right"><span><i class="dot"></i>M-Audio CTRL49 · connected</span>
+            <span>profile akai-ctrl49</span></span></div>
+        <div class="surfwrap">
+          <div class="kb"><svg id="kb-svg" viewBox="0 0 980 300"></svg>
+            <div class="padlist" id="padlist"></div>
+            <p class="kbnote">Traced from the profile's own layout block — normalised positions, a
+              kind and an index per control — and not from a product photograph, which belongs to its
+              maker. A control drawn with index −1 is labelled and honestly inert.</p></div>
+          <div class="scrn">
+            <div style="font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+                        color:var(--ink-4);margin-bottom:8px">What the hardware screen shows</div>
+            <div class="lcd">
+              <div class="lh"><span>SOUNDS · PAD · WARM</span><span>412</span></div>
+              <div class="lr"><i class="lp"></i>Wool Pad<span class="lm">STAGE KEYS</span></div>
+              <div class="lr on"><i class="lp"></i>Glass Cathedral<span class="lm">STAGE KEYS</span></div>
+              <div class="lr"><i class="lp"></i>Tape Choir<span class="lm">MELLOW</span></div>
+              <div class="lr"><i class="lp"></i>Juno Strings<span class="lm">HW · JUNO-106</span></div>
+              <div class="lr"><i class="lp"></i>Nightdrive<span class="lm">CHAIN</span></div>
+              <div class="lf"><span>◀ TYPE</span><span>PUSH = LOAD</span><span>CHAR ▶</span></div>
+            </div>
+            <div class="encrow">
+              <div class="enc act"><div class="en">ENC 1</div><div class="ev">Scroll ▸ 2/412</div></div>
+              <div class="enc"><div class="en">ENC 2</div><div class="ev">Type: Pad</div></div>
+              <div class="enc"><div class="en">ENC 3</div><div class="ev">Character: Warm</div></div>
+              <div class="enc"><div class="en">ENC 4</div><div class="ev">Brightness ≤ .5</div></div>
+              <div class="enc"><div class="en">ENC 5</div><div class="ev">Attack ≥ 180ms</div></div>
+              <div class="enc"><div class="en">ENC 6</div><div class="ev">Source: any</div></div>
+              <div class="enc"><div class="en">ENC 7</div><div class="ev">Rating ≥ ★★★</div></div>
+              <div class="enc"><div class="en">ENC 8</div><div class="ev">Target: Part 2</div></div>
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:var(--ink-3);line-height:1.55">
+              Pads 1–8 hold this filter's top eight results, lit by type colour. Press one and it
+              loads — snapshot first, live at the next note boundary, so the pad responds before the
+              plug-in does. A surface with no screen gets the pads and the encoders and no list; a
+              surface with neither is told so, rather than being silently unsupported.</div>
+            <div style="margin-top:10px;display:flex;gap:6px">
+              <span class="btn">Edit page</span><span class="btn">Learn</span>
+              <span class="btn p">Mirror browser to surface</span></div>
+          </div>
+        </div>
+        <div class="aud">
+          <span class="ap">▶</span>
+          <div class="now"><span class="t">Glass Cathedral</span>
+            <span class="s">selected on encoder 1 · not yet loaded</span></div>
+          <div class="state"><span class="hand">SURFACE</span>
+            <span>8 encoders · 8 pads · 9 faders drawn, 0 mapped</span></div>
+          <div class="right"><div class="tgt">Load into <b>Part 2 — Stage Keys</b></div>
+            <span class="btn p">Load</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-cap"><span class="cn">Plate 4 / surface</span>
+      <p class="ct">The drawing is the one already in the repo — traced coordinates, not a product
+        photograph, because a photograph belongs to its maker and this repository is AGPLv3. “9 faders
+        drawn, 0 mapped” is the profile telling the truth about itself: the layout says what is there,
+        the capabilities say what CEditor can drive, and conformance already checks the two against
+        each other.</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">Plate five</div>
+  <h2>The gig where the plug-in is missing</h2>
+  <p class="lede">A VIP multi that named a plug-in you no longer have was simply broken. A rack here
+    knows what each part <b>sounded like</b>, not just what it was called — so it can offer the closest
+    thing you actually own, ranked, with its reasoning shown, in the ninety seconds before you go on.</p>
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="frame" id="f-subs">
+        <div class="tabs"><span class="app">CEditor — Instrument Host</span>
+          <span class="tab on">Rack</span><span class="tab">Sounds</span><span class="tab">Mixer</span>
+          <span class="tab">Surface</span><span class="tab">Project</span>
+          <span class="right"><span><i class="dot w"></i>Opening “Blue Note rig”</span></span></div>
+        <div class="subwrap">
+          <div class="subhead"><span class="sy">!</span>
+            <div><div class="sh">2 of 9 parts need a substitute</div>
+              <p>Diva and Omnisphere are not installed on this machine. Nothing has been changed on
+                 disk — the rack will open either way, and every part that is fine is already loaded
+                 and playable.</p></div>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <span class="btn">Open with the parts silent</span>
+              <span class="btn p">Accept both best matches</span></div></div>
+
+          <div class="subrow">
+            <div class="miss"><i class="dot b"></i>
+              <span class="mn">Part 3 — “Warm Choir Pad”</span>
+              <span class="mw">wants <b style="color:var(--ink)">u-he Diva</b> · vendor preset · last
+                played 3 Sep · <span style="color:var(--ink-4)">bright 0.31 · atk 420ms · tail 5.1s ·
+                width 0.88</span></span>
+              <span class="btn" style="margin-left:auto">Locate plug-in…</span></div>
+            <div class="cands" id="c1"></div>
+          </div>
+
+          <div class="subrow">
+            <div class="miss"><i class="dot b"></i>
+              <span class="mn">Part 7 — “Sub Thump”</span>
+              <span class="mw">wants <b style="color:var(--ink)">Omnisphere 2</b> · your captured state ·
+                <span style="color:var(--ink-4)">bright 0.12 · atk 6ms · tail 0.4s · width 0.02</span></span>
+              <span class="btn" style="margin-left:auto">Locate plug-in…</span></div>
+            <div class="cands" id="c2"></div>
+          </div>
+
+          <div class="subfoot">
+            <span class="note">A substitution is a session-local decision. The record keeps naming Diva,
+              so the rack plays correctly again the moment Diva is back — it is not rewritten behind
+              your back, which is the same rule that keeps a missing preset's ratings alive.</span>
+            <span class="btn" style="margin-left:auto">Remember for this machine</span>
+            <span class="btn p">Play</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="plate-cap"><span class="cn">Plate 5 / substitutes</span>
+      <p class="ct">The match percentage is distance in the same descriptor space the Atlas plots, so
+        it is explainable rather than magical: the chips under each candidate are the axes that agreed
+        and the one that did not. This is the feature that only works <em>because</em> the library
+        listened to everything once.</p></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">The mechanism</div>
+  <h2>One probe, played once, and everything above falls out of it</h2>
+  <p class="lede">The whole proposal rests on a single new job: play every sound once, offline, and
+    keep what came back. It is not a research project — it is the plug-in scanner doing a second
+    kind of work.</p>
+
+  <h3>What the probe is</h3>
+  <p>Instantiate the plug-in <b>once</b>, then walk its presets, loading each state and rendering
+    offline: C3 at velocity 100 held 1.2&nbsp;s, released, tail captured to 0.8&nbsp;s; a second pass
+    at velocity 40 for how it answers touch; a three-note chord for width. From that come the
+    descriptors — spectral centroid and its drift, attack and release time, harmonic-to-noise ratio,
+    stereo width, dynamic response, peak and RMS, pitch tracking, whether it made a sound at all —
+    plus the CPU it took and the latency it reported.</p>
+  <p>Cost, stated honestly: the render is 50–200× real time; the expensive part is the plug-in
+    accepting a state, which is 100–400&nbsp;ms for a big instrument. Twelve thousand presets is
+    therefore <b>about an hour</b>, out of process, resumable, incremental, and never repeated for a
+    fingerprint it has already seen. VIP's scan was not faster and produced less.</p>
+
+  <h3>What it keeps, and what that costs on disk</h3>
+  <p>Forty-odd floats per record, which is nothing, and a <b>2-second mono snapshot</b> at 16&nbsp;kHz
+    in FLAC — around 35&nbsp;kB, roughly 430&nbsp;MB across a twelve-thousand-preset library. That is
+    real, so the snapshot is a <b>cache and says so</b>: descriptors and thumbprints are kept forever,
+    snapshots are evicted least-recently-heard down to a budget you set, and a missing snapshot
+    degrades to exactly today's behaviour — load the plug-in and wait.</p>
+
+  <h3>The hole VIP never filled, and the way round it</h3>
+  <p>Some instruments keep their presets to themselves. Omnisphere, Serum and Diva have their own
+    browsers and expose little or nothing to a host, and this is precisely where VIP's promise of
+    "every preset in one place" quietly stopped being true. Scanning cannot fix that, and pretending
+    otherwise is how you get a browser that lies.</p>
+  <p>So don't scan them — <b>listen while you work</b>. When you browse inside a plug-in's own UI, the
+    host already has the plug-in up and is already rendering its audio. Notice the state blob change,
+    run the same descriptor pass over the audio that just came out, and offer a single unobtrusive
+    "file this" with the name read from the plug-in where it exposes one. Browse Omnisphere for ten
+    minutes and the library has learned ten minutes of Omnisphere, measured the same way as everything
+    else, with your provenance on it. <b>Nothing is filed without you saying so.</b></p>
+</section>
+
+<section class="sec">
+  <div class="kicker">Grounding</div>
+  <h2>What is already in the repository</h2>
+  <p class="lede">This is not a greenfield feature. Most of the hard, boring, correctness-critical
+    half is built and under test.</p>
+  <table class="cmp">
+    <tr><th>Piece</th><th>Where it is</th><th>State</th></tr>
+    <tr><td>Records with provenance</td><td><code>CE/src/InstrumentHost/Library.h</code></td>
+      <td>Built — preset / rack / chain, vendor vs captured, fingerprints, missing-not-deleted,
+        user block survives rescans</td></tr>
+    <tr><td>Hardware patches as records</td><td><code>sourceType: "hardwarePatch"</code></td>
+      <td>Built — which is why a Juno patch can sit in the same grid as a .vstpreset</td></tr>
+    <tr><td>Chain and rack capture</td><td><code>saveChainToLibrary</code>, <code>saveRackToLibrary</code></td>
+      <td>Built — a whole voice, or a whole rig, as one record</td></tr>
+    <tr><td>Search over the index</td><td><code>searchLibrary()</code></td>
+      <td>Built, pure, tested — needs facets and range predicates added</td></tr>
+    <tr><td>Byte-level patch diff</td><td><code>CE/src/InstrumentHost/PatchDiff.h</code></td>
+      <td>Built — message, offset, before, after, and no guessing</td></tr>
+    <tr><td>Exposed plug-in parameters</td><td><code>CE/src/InstrumentHost/ParameterModel.h</code></td>
+      <td>Built — the parameter-level diff reads from it</td></tr>
+    <tr><td>Out-of-process worker</td><td><code>PluginScannerCoordinator</code>, <code>ScannerWorkerMain</code></td>
+      <td>Built — the auditioner is this, re-tasked; a plug-in that dies during a probe must not take
+        the editor down, and that problem is already solved here</td></tr>
+    <tr><td>The surface drawing and its encoder map</td><td><code>CE/src/ControlSurface/SurfaceProfile.h</code></td>
+      <td>Built — layout, indices, conformance, live feedback</td></tr>
+    <tr><td class="win">The analysis, the snapshots, versions, the Atlas</td><td>—</td>
+      <td style="color:var(--warn)">New. Everything on this page that is genuinely new is in this row.</td></tr>
+  </table>
+</section>
+
+<section class="sec">
+  <div class="kicker">Order of work</div>
+  <h2>Six stages, each of which ships alone</h2>
+  <div class="stages">
+    <div class="stage"><div class="sn">Stage A</div><h4>The workspace</h4>
+      <p>The slide-out list becomes a tab: rail, facets, grid, inspector, audition bar. Facets and
+        exclusion over <code>searchLibrary</code>. Smart collections as stored queries. No analysis
+        anywhere — this is a better browser over exactly today's data.</p>
+      <div class="cost">Front-end weighted · no new native subsystem</div></div>
+    <div class="stage"><div class="sn">Stage B</div><h4>The auditioner</h4>
+      <p>The scanner worker learns to render a probe. Descriptors on the record, thumbprints in the
+        grid, measured range filters, duplicate folding by fingerprint plus sonic distance. The
+        expensive stage, and the one everything else needs.</p>
+      <div class="cost">Native · out of process · resumable</div></div>
+    <div class="stage"><div class="sn">Stage C</div><h4>Instant audition</h4>
+      <p>Snapshot cache plays on click; the real instrument loads behind it and takes over at the next
+        note boundary. The rolling eight-bar MIDI buffer, so a preset is auditioned with what you just
+        played, through the part's own chain.</p>
+      <div class="cost">Needs B · the feature people will notice first</div></div>
+    <div class="stage"><div class="sn">Stage D</div><h4>Versions and diff</h4>
+      <p>Records keep more than one state. The rail, A/B, morph where parameters are exposed, the
+        parameter diff from <code>ParameterModel</code> and the byte diff from <code>PatchDiff</code>.
+        Independent of B — it could go earlier if saving-over is the louder complaint.</p>
+      <div class="cost">Storage policy is the real design work</div></div>
+    <div class="stage"><div class="sn">Stage E</div><h4>Atlas and substitutes</h4>
+      <p>The map, nearest-neighbour "more like this", and the missing-plug-in substitution flow. All
+        three are the same distance function with three different faces.</p>
+      <div class="cost">Needs B · small once B exists</div></div>
+    <div class="stage"><div class="sn">Stage F</div><h4>Off the mouse</h4>
+      <p>The browser mirrored to any surface profile that declares a screen: encoders drive the
+        facets, pads hold the top eight, push loads. Generic first; a profile with no screen gets the
+        pads and is told what it does not have.</p>
+      <div class="cost">Reuses the existing surface layer</div></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="kicker">The boundaries</div>
+  <h2>What this deliberately does not do</h2>
+  <ul class="notes">
+    <li><b>No cloud, no account, no gallery.</b> The library is files on your disk. A Sound Pack is a
+      portable bundle you can hand somebody; there is no service in the middle, and nothing phones
+      anywhere.</li>
+    <li><b>No vendor artwork, ever.</b> Plug-in logos and product photographs belong to their makers
+      and this repository is AGPLv3. A sound's tile is drawn from its own audio, which is both legally
+      clean and more informative than a logo — the thumbnail tells you it is a slow pad before you
+      read the name.</li>
+    <li><b>A substitution never rewrites the record.</b> The rack keeps naming the plug-in it wants, so
+      it plays correctly the day that plug-in comes back. Same rule as ratings surviving a missing
+      source: nothing you did is destroyed by something you did not do.</li>
+    <li><b>Nothing is tagged behind your back.</b> The analysis <em>proposes</em>; the proposals appear
+      dashed and become real when you accept them. A library that quietly retags itself is a library
+      you stop trusting.</li>
+    <li><b>It does not scrape a plug-in's own browser.</b> Reading another program's UI is brittle,
+      hostile, and breaks on their next release. Where a plug-in will not expose its presets, the
+      answer is the listen-while-you-work path — and the browser says which instruments are indexed
+      that way, rather than implying it has everything.</li>
+    <li><b>It is not a sample manager.</b> Audio files are not sounds you play; a browser that mixes
+      the two ends up good at neither.</li>
+    <li><b>The descriptors are measurements, not opinions.</b> Brightness is a spectral centroid and
+      says so on hover. There is no model here deciding your pad is "emotional".</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+/* Every waveform, spectrum and dot on this page is generated from the sound's own name as a
+   seed, so the picture is consistent between plates: the same sound draws the same shape in
+   the grid, in the inspector, in the Atlas and in the substitution list. */
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const rng = (s) => { let a = hash(s); return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+
+/* amplitude envelope: attack fraction `atk` of the frame, then a decay whose slope is set by
+   brightness (bright things tend to be shorter here — a drawing convention, not a law). */
+function envAt(x, atk, br) {
+  const a = Math.max(0.012, atk * 0.55);
+  if (x < a) return Math.pow(x / a, 0.72);
+  const d = (x - a) / (1 - a);
+  return Math.exp(-d * (1.4 + br * 3.4)) * (1 - 0.16 * d);
+}
+
+function wavePath(w, h, seed, atk, br, gradId) {
+  const r = rng(seed), n = Math.round(w / 2.1), mid = h / 2, pts = [];
+  let ph = r() * 6.28;
+  for (let i = 0; i <= n; i++) {
+    const x = i / n;
+    const carrier = Math.sin(ph + x * (18 + br * 90)) * 0.55 + Math.sin(ph * 2 + x * (46 + br * 210)) * (0.18 + br * 0.3);
+    const grain = (r() - 0.5) * (0.22 + br * 0.5);
+    pts.push([x * w, Math.min(1, Math.abs(carrier + grain)) * envAt(x, atk, br) * (mid - 1.5)]);
+  }
+  const top = pts.map((p) => `${p[0].toFixed(1)},${(mid - p[1]).toFixed(1)}`).join(' ');
+  const bot = pts.slice().reverse().map((p) => `${p[0].toFixed(1)},${(mid + p[1]).toFixed(1)}`).join(' ');
+  return `<defs><linearGradient id="${gradId}" x1="0" x2="1"><stop offset="0" stop-color="#7fb4e0"/>`
+       + `<stop offset="0.55" stop-color="#6fc6c0"/><stop offset="1" stop-color="#9fd6a3"/></linearGradient></defs>`
+       + `<polygon points="${top} ${bot}" fill="url(#${gradId})" opacity="0.86"/>`
+       + `<line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="#7fb4e0" stroke-opacity="0.28" stroke-width="0.6"/>`;
+}
+let gid = 0;
+const wave = (w, h, seed, atk, br) => `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${wavePath(w, h, seed, atk, br, 'g' + (gid++))}</svg>`;
+
+function spectrum(w, h, seed, br) {
+  const r = rng(seed + '~spec'), bars = 46, bw = w / bars, out = [];
+  for (let i = 0; i < bars; i++) {
+    const f = i / (bars - 1);
+    const tilt = Math.exp(-Math.pow((f - br * 0.9) / (0.20 + br * 0.35), 2));
+    const harm = i % 4 === 0 ? 1.25 : 0.82;
+    const v = Math.min(1, (tilt * harm * (0.62 + r() * 0.5)));
+    const bh = Math.max(1.5, v * (h - 4));
+    out.push(`<rect x="${(i * bw + 0.6).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${(bw - 1.2).toFixed(1)}" height="${bh.toFixed(1)}" rx="0.8" fill="url(#sg)"/>`);
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="sg" x1="0" y1="1" x2="0" y2="0">`
+       + `<stop offset="0" stop-color="#4a86bd"/><stop offset="1" stop-color="#9fd6a3"/></linearGradient></defs>${out.join('')}</svg>`;
+}
+
+/* ---- the result grid ---------------------------------------------------- */
+const SOUNDS = [
+  { n: 'Glass Cathedral', p: 'Stage Keys', s: 'factory', cpu: 4.1, r: 4, at: .72, br: .40, sel: 1 },
+  { n: 'Wool Pad', p: 'Stage Keys', s: 'factory', cpu: 2.8, r: 5, at: .80, br: .22 },
+  { n: 'Tape Choir', p: 'Mellow', s: 'pack', cpu: 2.2, r: 4, at: .70, br: .36 },
+  { n: 'Juno Strings', p: 'Juno-106', s: 'hw', cpu: 0, r: 5, at: .58, br: .34 },
+  { n: 'Nightdrive', p: 'Analog One +2', s: 'chain', cpu: 7.4, r: 4, at: .46, br: .52 },
+  { n: 'Slow Glass', p: 'FM Eight', s: 'factory', cpu: 3.0, r: 3, at: .86, br: .48 },
+  { n: 'Breath Mk II', p: 'Stage Keys', s: 'mine', cpu: 4.4, r: 5, at: .64, br: .30 },
+  { n: 'Choirbox', p: 'Mellow', s: 'pack', cpu: 2.0, r: 3, at: .74, br: .38 },
+  { n: 'Prophet Halo', p: 'Prophet-5', s: 'hw', cpu: 0, r: 4, at: .66, br: .44 },
+  { n: 'Blue Note rig', p: '9 parts · 3 buses', s: 'rack', cpu: 31.0, r: 5, at: .55, br: .42 },
+  { n: 'Wet Cardboard', p: 'Analog One', s: 'mine', cpu: 3.6, r: 2, at: .69, br: .26 },
+  { n: 'Warm Choir Pad', p: 'Diva', s: 'miss', cpu: 0, r: 5, at: .78, br: .31, dim: 1 },
+  { n: 'Sunday Wash', p: 'B3X', s: 'factory', cpu: 1.9, r: 3, at: .50, br: .46 },
+  { n: 'Init Saw', p: 'Analog One', s: 'factory', cpu: 1.2, r: 0, at: .30, br: .66, dup: 6 },
+  { n: 'Ghost Bells', p: 'FM Eight', s: 'factory', cpu: 3.3, r: 4, at: .40, br: .62 },
+  { n: 'Low Fog', p: 'Mellow', s: 'pack', cpu: 2.4, r: 4, at: .90, br: .18 },
+  { n: 'Second Room', p: 'Stage Keys', s: 'mine', cpu: 4.9, r: 3, at: .68, br: .35 },
+  { n: 'Analogue Sky', p: 'Analog One', s: 'factory', cpu: 3.1, r: 4, at: .82, br: .28 },
+  { n: 'Paper Strings', p: 'Mellow', s: 'pack', cpu: 2.6, r: 3, at: .76, br: .42 },
+  { n: 'Cold Chapel', p: 'FM Eight', s: 'factory', cpu: 3.8, r: 5, at: .84, br: .50 },
+];
+const BADGE = { factory: '', mine: '<span class="badge mine">MINE</span>', hw: '<span class="badge hw">HW</span>',
+  chain: '<span class="badge chain">CHAIN</span>', rack: '<span class="badge rack">RACK</span>',
+  pack: '<span class="badge">PACK</span>', miss: '<span class="badge miss">NO PLUG-IN</span>' };
+const stars = (r) => '★★★★★'.slice(0, r) + '<span style="color:#3b4652">' + '★★★★★'.slice(0, 5 - r) + '</span>';
+
+document.getElementById('g-browser').innerHTML = SOUNDS.map((d) => `
+  <div class="tile${d.sel ? ' sel' : ''}${d.dim ? ' dim' : ''}">
+    <div class="tprint">${wave(160, 34, d.n, d.at, d.br)}${d.dup ? `<span class="dup">×${d.dup}</span>` : ''}</div>
+    <div class="tname">${d.n}</div>
+    <div class="tsub">${d.p}</div>
+    <div class="tfoot">${BADGE[d.s]}<span class="cpu">${d.cpu ? d.cpu.toFixed(1) + '%' : '—'}</span>
+      <span class="stars">${stars(d.r)}</span></div>
+  </div>`).join('');
+
+/* ---- the inspector ------------------------------------------------------ */
+const inspector = (sel) => `
+  <div><div class="iname">${sel.n}</div><div class="isub">${sel.sub}</div></div>
+  <div class="spec">${spectrum(300, 62, sel.n, sel.br)}
+    <div class="axis"><span>50</span><span>200</span><span>800</span><span>3k</span><span>12k Hz</span></div></div>
+  <div class="iblk"><div class="ih">Measured<span class="more">HOW?</span></div>
+    <div class="kv">
+      <span class="k">Brightness</span><span class="v">0.40 · centroid 1.9 kHz</span>
+      <span class="k">Attack</span><span class="v">410 ms</span>
+      <span class="k">Tail</span><span class="v">6.8 s</span>
+      <span class="k">Width</span><span class="v">0.91 stereo</span>
+      <span class="k">Touch</span><span class="v">strong · +14 dB v40→v100</span>
+      <span class="k">Cost</span><span class="v ok">4.1% · 0 ms latency</span></div></div>
+  <div class="iblk"><div class="ih">Provenance</div>
+    <div class="kv">
+      <span class="k">Source</span><span class="v">Stage Keys factory bank</span>
+      <span class="k">File</span><span class="v">…/Presets/Pads/Glass Cathedral.vstpreset</span>
+      <span class="k">Class id</span><span class="v" style="font-family:var(--mono);font-size:10px">
+        56535441 4E31…</span>
+      <span class="k">Status</span><span class="v ok">available</span></div></div>
+  <div class="iblk"><div class="ih">Tags<span class="more">EDIT</span></div>
+    <div class="tagrow"><span class="tag">pad</span><span class="tag">warm</span><span class="tag">wide</span>
+      <span class="tag">church</span><span class="tag prop">slow attack</span><span class="tag prop">live-safe</span></div>
+    <div style="font-size:10px;color:var(--ink-4);margin-top:6px">Dashed tags are proposed from the
+      measurement and from what you tag things like this. Click to keep.</div></div>
+  <div class="iblk"><div class="ih">Sounds like<span class="more">MAP</span></div>
+    ${sel.similar.map((s) => `<div class="simrow">${wave(44, 16, s[0], s[1], s[2])}
+      <span class="sn">${s[0]}</span><span class="sm">${s[3]}</span></div>`).join('')}</div>
+  <div class="iblk"><div class="ih">Used in</div>
+    <div class="kv"><span class="k">Racks</span><span class="v">Blue Note rig</span>
+      <span class="k">Last played</span><span class="v">3 Sep, 21:40</span></div></div>`;
+
+document.getElementById('i-browser').innerHTML = inspector({
+  n: 'Glass Cathedral', sub: 'Stage Keys · factory preset · 412th of 2,104', br: .40,
+  similar: [['Wool Pad', .80, .22, '96%'], ['Cold Chapel', .84, .50, '93%'],
+            ['Tape Choir', .70, .36, '91%'], ['Juno Strings · HW', .58, .34, '88%']] });
+document.getElementById('i-atlas').innerHTML = inspector({
+  n: 'Tape Choir', sub: 'Mellow · pack “Analogue Tapes” · unheard until now', br: .36,
+  similar: [['Choirbox', .74, .38, '94%'], ['Wool Pad', .80, .22, '92%'],
+            ['Paper Strings', .76, .42, '89%'], ['Low Fog', .90, .18, '85%']] });
+
+/* histograms behind the measured range sliders */
+[['h1', .34], ['h2', .55], ['h3', .48], ['h4', .70], ['h5', .30]].forEach(([id, peak]) => {
+  const r = rng(id), el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = Array.from({ length: 26 }, (_, i) => {
+    const f = i / 25, v = Math.exp(-Math.pow((f - peak) / 0.26, 2)) * (0.6 + r() * 0.5);
+    const inRange = id === 'h1' ? f > .04 && f < .5 : id === 'h2' ? f > .36
+      : id === 'h4' ? f > .5 : id === 'h5' ? f < .36 : true;
+    return `<i class="${inRange ? 'in' : ''}" style="height:${Math.max(8, v * 100)}%"></i>`;
+  }).join('');
+});
+
+/* ---- the Atlas ---------------------------------------------------------- */
+(function atlas() {
+  const svg = document.getElementById('a-svg');
+  if (!svg) return;
+  svg.removeAttribute('preserveAspectRatio');
+  svg.setAttribute('viewBox', '0 0 800 590');
+  const W = 800, H = 590, L = 46, R = 18, T = 16, B = 34;
+  const x = (v) => L + v * (W - L - R), y = (v) => H - B - v * (H - T - B);
+  const out = [];
+
+  out.push(`<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="#101315" stroke="#2a333d"/>`);
+  for (let i = 1; i < 5; i++) {
+    out.push(`<line x1="${x(i / 5)}" y1="${T}" x2="${x(i / 5)}" y2="${H - B}" stroke="#2a333d" stroke-dasharray="2 4"/>`);
+    out.push(`<line x1="${L}" y1="${y(i / 5)}" x2="${W - R}" y2="${y(i / 5)}" stroke="#2a333d" stroke-dasharray="2 4"/>`);
+  }
+  const CL = [
+    { n: 'Soft pads', c: '#7fb4e0', cx: .30, cy: .74, sx: .16, sy: .13, k: 132 },
+    { n: 'Plucked keys', c: '#9fd6a3', cx: .54, cy: .26, sx: .15, sy: .12, k: 108 },
+    { n: 'Hard basses', c: '#d9a13c', cx: .17, cy: .16, sx: .12, sy: .10, k: 116 },
+    { n: 'Bright leads', c: '#a98bd6', cx: .78, cy: .46, sx: .14, sy: .16, k: 124 },
+  ];
+  CL.forEach((c) => out.push(`<ellipse cx="${x(c.cx)}" cy="${y(c.cy)}" rx="${c.sx * (W - L - R) * 1.5}" `
+    + `ry="${c.sy * (H - T - B) * 1.5}" fill="${c.c}" fill-opacity="0.05" stroke="${c.c}" `
+    + `stroke-opacity="0.22" stroke-dasharray="3 5"/>`));
+
+  const gauss = (r) => (r() + r() + r() - 1.5) / 1.5;
+  CL.forEach((c) => {
+    const r = rng(c.n);
+    for (let i = 0; i < c.k; i++) {
+      const px = Math.min(.99, Math.max(.01, c.cx + gauss(r) * c.sx));
+      const py = Math.min(.99, Math.max(.01, c.cy + gauss(r) * c.sy));
+      const grey = r() < 0.10;
+      out.push(`<circle cx="${x(px).toFixed(1)}" cy="${y(py).toFixed(1)}" r="${(2.1 + r() * 1.7).toFixed(1)}" `
+        + `fill="${grey ? '#5b6570' : c.c}" fill-opacity="${grey ? 0.5 : 0.72}"/>`);
+    }
+  });
+  const rr = rng('scatter');
+  for (let i = 0; i < 70; i++) {
+    out.push(`<circle cx="${x(rr()).toFixed(1)}" cy="${y(rr()).toFixed(1)}" r="1.9" fill="#5b6570" fill-opacity="0.42"/>`);
+  }
+  /* the six copies of Init Saw, ringed where they land on top of one another */
+  out.push(`<circle cx="${x(.64)}" cy="${y(.14)}" r="13" fill="none" stroke="#d9a13c" stroke-opacity="0.85" stroke-dasharray="3 3"/>`);
+  out.push(`<text x="${x(.64) + 18}" y="${y(.14) + 4}" fill="#d9a13c" font-family="IBM Plex Mono,monospace" font-size="10">×6 Init Saw</text>`);
+  /* the hovered sound */
+  const hx = x(.415), hy = y(.685);
+  out.push(`<circle cx="${hx}" cy="${hy}" r="11" fill="none" stroke="#d6dbe0" stroke-opacity="0.9"/>`);
+  out.push(`<circle cx="${hx}" cy="${hy}" r="4" fill="#d6dbe0"/>`);
+  out.push(`<line x1="${hx}" y1="${hy + 11}" x2="${hx + 6}" y2="${hy + 40}" stroke="#7fb4e0" stroke-opacity="0.7"/>`);
+  /* a lasso, mid-drag */
+  out.push(`<path d="M ${x(.70)} ${y(.62)} q 40 -34 84 -6 q 26 34 -12 58 q -52 20 -80 -12 z" fill="#7fb4e0" `
+    + `fill-opacity="0.07" stroke="#7fb4e0" stroke-opacity="0.7" stroke-dasharray="4 3"/>`);
+  out.push(`<text x="${x(.70) + 6}" y="${y(.62) - 12}" fill="#7fb4e0" font-family="IBM Plex Mono,monospace" font-size="10">31 selected → new collection</text>`);
+  /* axes */
+  const F = 'font-family="IBM Plex Sans,sans-serif" font-size="10.5" fill="#7d8894"';
+  out.push(`<text x="${W / 2}" y="${H - 9}" text-anchor="middle" ${F}>BRIGHTNESS  —  spectral centroid, 120 Hz → 9 kHz</text>`);
+  out.push(`<text transform="translate(13 ${H / 2}) rotate(-90)" text-anchor="middle" ${F}>ATTACK  —  1 ms → 2 s</text>`);
+  ['dark', '', 'mid', '', 'bright'].forEach((t, i) => t && out.push(`<text x="${x(i / 4)}" y="${H - B + 15}" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#5b6570">${t}</text>`));
+  ['fast', '', 'slow'].forEach((t, i) => t && out.push(`<text x="${L - 6}" y="${y(i / 2) + 3}" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="9" fill="#5b6570">${t}</text>`));
+  CL.forEach((c) => out.push(`<text x="${x(c.cx)}" y="${y(c.cy) - c.sy * (H - T - B) * 1.5 - 7}" text-anchor="middle" `
+    + `font-family="IBM Plex Mono,monospace" font-size="10" fill="${c.c}" fill-opacity="0.85">${c.n.toUpperCase()}</text>`));
+  svg.innerHTML = out.join('');
+  document.querySelectorAll('.acard .mini').forEach((el) => {
+    el.outerHTML = `<div>${wave(180, 24, el.dataset.seed, +el.dataset.at, +el.dataset.br)}</div>`;
+  });
+})();
+
+/* ---- the parameter diff ------------------------------------------------- */
+(function diff() {
+  const host = document.getElementById('d-table');
+  if (!host) return;
+  const P = [
+    ['Filter cutoff', .38, .71, '38.0%', '71.4%', '+33.4', 'up'],
+    ['Filter resonance', .12, .34, '12.0%', '34.2%', '+22.2', 'up'],
+    ['Env 2 → filter', .44, .68, '44.0%', '68.0%', '+24.0', 'up'],
+    ['Amp release', .62, .28, '1.24 s', '0.41 s', '−0.83 s', 'dn'],
+    ['Osc 2 detune', .50, .57, '0 ct', '+11 ct', '+11 ct', 'up'],
+    ['Sub oscillator', .20, .74, '−18 dB', '−4 dB', '+14 dB', 'up'],
+    ['Drive', .00, .41, 'off', '41.0%', 'engaged', 'up'],
+    ['Glide time', .30, .09, '92 ms', '28 ms', '−64 ms', 'dn'],
+    ['LFO 1 rate', .55, .55, '4.10 Hz', '4.10 Hz', 'same', ''],
+    ['Unison spread', .66, .33, '66.0%', '33.0%', '−33.0', 'dn'],
+    ['Velocity → filter', .10, .58, '10.0%', '58.0%', '+48.0', 'up'],
+  ];
+  host.innerHTML = `<div class="drow h"><span>Parameter</span><span>A → B</span><span>Factory</span>
+      <span>v6</span><span>Δ</span></div>`
+    + P.map(([n, a, b, av, bv, d, dir]) => {
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      return `<div class="drow"><span class="pn">${n}</span>
+        <span class="dbar"><i class="a" style="width:calc(${(a * 100).toFixed(0)}% - 4px)"></i>
+          <i class="b" style="width:calc(${(b * 100).toFixed(0)}% - 4px)"></i>
+          <i class="arrow" style="left:${(lo * 100).toFixed(0)}%"></i>
+          <i class="arrow" style="left:${(hi * 100).toFixed(0)}%"></i></span>
+        <span class="dval">${av}</span><span class="dval b">${bv}</span>
+        <span class="ddelta ${dir}">${d}</span></div>`;
+    }).join('')
+    + `<div class="drow" style="border:0;color:var(--ink-4)"><span>30 more differ</span>
+        <span style="color:var(--ink-4);font-size:11px">145 parameters are identical and hidden</span>
+        <span></span><span></span><span></span></div>`;
+})();
+
+/* ---- substitution candidates -------------------------------------------- */
+(function subs() {
+  const mk = (d) => `<div class="cand${d.best ? ' best' : ''}">
+      <div><div class="cn">${d.n}</div><div class="cs">${d.p}</div></div>
+      ${wave(560, 26, d.n, d.at, d.br)}
+      <div class="cm"><span class="pct">${d.m}%</span>
+        <span class="mt"><i style="width:${d.m}%"></i></span></div>
+      <div class="why">${d.why.map((w) => `<span class="${w[0] === '!' ? 'mm' : ''}">${w.replace('!', '')}</span>`).join('')}</div>
+    </div>`;
+  const a = document.getElementById('c1'), b = document.getElementById('c2');
+  if (a) a.innerHTML = [
+    { n: 'Wool Pad', p: 'Stage Keys · factory · yours since 2024', m: 94, at: .80, br: .22, best: 1,
+      why: ['same register', 'attack 380 ms', 'tail 4.8 s', 'width 0.84', '!8% darker'] },
+    { n: 'Tape Choir', p: 'Mellow · pack', m: 91, at: .70, br: .36,
+      why: ['same register', 'attack 340 ms', 'width 0.79', '!tail 1.9 s shorter'] },
+    { n: 'Glass Cathedral', p: 'Stage Keys · factory', m: 88, at: .72, br: .40,
+      why: ['attack 410 ms', 'tail 6.8 s', '!brighter', '!+1.3% CPU'] },
+  ].map(mk).join('');
+  if (b) b.innerHTML = [
+    { n: 'Rubber Bass v6', p: 'Analog One · yours', m: 96, at: .06, br: .14, best: 1,
+      why: ['attack 8 ms', 'mono', 'tail 0.5 s', 'sub-heavy'] },
+    { n: 'Thumb', p: 'Analog One · factory', m: 90, at: .04, br: .20,
+      why: ['attack 5 ms', 'mono', '!brighter'] },
+    { n: 'Juno Bass 12', p: 'Juno-106 · hardware patch', m: 84, at: .09, br: .18,
+      why: ['attack 12 ms', 'mono', '!needs the Juno powered on'] },
+  ].map(mk).join('');
+})();
+
+/* ---- the control surface, drawn from a layout rather than photographed --- */
+(function surface() {
+  const svg = document.getElementById('kb-svg');
+  if (!svg) return;
+  const o = [];
+  const T = (x, y, t, c = '#5b6570', s = 8, anch = 'middle') =>
+    `<text x="${x}" y="${y}" text-anchor="${anch}" font-family="IBM Plex Mono,monospace" font-size="${s}" fill="${c}" letter-spacing="0.5">${t}</text>`;
+  svg.setAttribute('viewBox', '0 0 980 344');
+  o.push('<rect x="1" y="1" width="978" height="342" rx="9" fill="#181c20" stroke="#3b4652"/>');
+  o.push('<rect x="12" y="12" width="954" height="140" rx="6" fill="#12161a" stroke="#2a333d"/>');
+
+  /* transport / navigation, left */
+  [['◀', 26], ['▶', 60], ['●', 94]].forEach(([g, x]) =>
+    o.push(`<rect x="${x}" y="28" width="28" height="20" rx="3" fill="#1c2126" stroke="#3b4652"/>` + T(x + 14, 42, g, '#7d8894', 9)));
+  o.push(T(26, 62, 'TRANSPORT', '#5b6570', 7, 'start'));
+  ['PRESET', 'MAIN', 'BROWSE'].forEach((t, i) =>
+    o.push(`<rect x="${26 + i * 46}" y="76" width="40" height="18" rx="3" fill="${i === 2 ? '#7fb4e01f' : '#1c2126'}" stroke="${i === 2 ? '#4a86bd' : '#3b4652'}"/>`
+      + T(46 + i * 46, 88, t, i === 2 ? '#7fb4e0' : '#7d8894', 7)));
+
+  /* pads — lit with the type colour of what they hold */
+  const padCol = ['#7fb4e0', '#7fb4e0', '#9fd6a3', '#d9a13c', '#a98bd6', '#7fb4e0', '#9fd6a3', '#a98bd6'];
+  for (let i = 0; i < 8; i++) {
+    const cx = 190 + (i % 4) * 44, cy = 26 + Math.floor(i / 4) * 46;
+    o.push(`<rect x="${cx}" y="${cy}" width="38" height="38" rx="4" fill="${padCol[i]}" fill-opacity="0.18" stroke="${padCol[i]}" stroke-opacity="0.75"/>`
+      + T(cx + 19, cy + 23, i + 1, padCol[i], 10));
+  }
+  o.push(T(190, 132, 'PADS 1–8 — TOP EIGHT RESULTS, PUSH TO LOAD', '#5b6570', 7, 'start'));
+
+  /* the screen */
+  o.push('<rect x="382" y="22" width="206" height="66" rx="4" fill="#06170f" stroke="#1d4a34"/>');
+  o.push(T(392, 38, 'SOUNDS · PAD · WARM', '#4fbf87', 8, 'start'));
+  ['Wool Pad', 'Glass Cathedral', 'Tape Choir'].forEach((t, i) =>
+    o.push(T(392, 54 + i * 13, (i === 1 ? '▸ ' : '  ') + t, i === 1 ? '#d6ffe8' : '#8ff0b8', 9, 'start')));
+  o.push(T(578, 38, '412', '#4fbf87', 8, 'end'));
+  ['◀ TYPE', 'CHAR ▶', 'LOAD', 'BACK'].forEach((t, i) =>
+    o.push(`<rect x="${382 + i * 52}" y="96" width="46" height="16" rx="3" fill="#1c2126" stroke="#3b4652"/>` + T(405 + i * 52, 107, t, '#7d8894', 7)));
+
+  /* encoders */
+  for (let i = 0; i < 8; i++) {
+    const cx = 638 + i * 40, on = i === 0;
+    o.push(`<circle cx="${cx}" cy="42" r="15" fill="#1c2126" stroke="${on ? '#7fb4e0' : '#3b4652'}" stroke-width="${on ? 2 : 1}"/>`
+      + `<line x1="${cx}" y1="42" x2="${cx + (on ? 9 : 4)}" y2="${42 - (on ? 12 : 14)}" stroke="${on ? '#7fb4e0' : '#5b6570'}" stroke-width="2"/>`
+      + T(cx, 68, i + 1, on ? '#7fb4e0' : '#5b6570', 8));
+  }
+  o.push(T(638, 86, 'ENCODERS 1–8 — SCROLL, THEN THE FILTERS', '#5b6570', 7, 'start'));
+  /* faders: drawn because they are there, unmapped because the profile says so */
+  for (let i = 0; i < 9; i++) {
+    const cx = 640 + i * 36;
+    o.push(`<rect x="${cx}" y="98" width="6" height="26" rx="3" fill="#101315" stroke="#2a333d"/>`
+      + `<rect x="${cx - 3}" y="${106 + (i % 3) * 4}" width="12" height="6" rx="2" fill="#2a333d"/>`);
+  }
+  o.push(T(966, 140, '9 FADERS DRAWN · 0 MAPPED — THE LAYOUT SAYS WHAT IS THERE', '#5b6570', 7, 'end'));
+
+  /* keybed — 49 keys, C to C */
+  const kx = 14, kw = 952 / 29, black = [0, 1, 3, 4, 5];
+  for (let i = 0; i < 29; i++) {
+    o.push(`<rect x="${(kx + i * kw).toFixed(1)}" y="166" width="${(kw - 1.2).toFixed(1)}" height="150" rx="2" fill="#dfe4e8"/>`);
+  }
+  for (let i = 0; i < 29; i++) {
+    if (!black.includes(i % 7)) continue;
+    o.push(`<rect x="${(kx + (i + 1) * kw - kw * 0.32).toFixed(1)}" y="166" width="${(kw * 0.62).toFixed(1)}" height="95" rx="2" fill="#15181b"/>`);
+  }
+  /* the zone the focused part is listening to */
+  o.push(`<rect x="${kx}" y="166" width="${(kw * 14).toFixed(1)}" height="150" fill="#7fb4e0" fill-opacity="0.07"/>`);
+  o.push(`<rect x="${kx}" y="320" width="${(kw * 14).toFixed(1)}" height="5" rx="2.5" fill="#7fb4e0"/>`);
+  o.push(`<rect x="${(kx + kw * 14).toFixed(1)}" y="320" width="${(kw * 15).toFixed(1)}" height="5" rx="2.5" fill="#3b4652"/>`);
+  o.push(T(kx + kw * 7, 338, 'PART 2 ZONE — C1 TO B2', '#7fb4e0', 8));
+  o.push(T(kx + kw * 21.5, 338, 'PART 5 — C3 UP', '#5b6570', 8));
+  svg.innerHTML = o.join('');
+  const held = [['Wool Pad', '#7fb4e0'], ['Glass Cathedral', '#7fb4e0'], ['Tape Choir', '#9fd6a3'],
+    ['Juno Strings', '#d9a13c'], ['Nightdrive', '#a98bd6'], ['Choirbox', '#7fb4e0'],
+    ['Slow Glass', '#9fd6a3'], ['Cold Chapel', '#a98bd6']];
+  const pl = document.getElementById('padlist');
+  if (pl) pl.innerHTML = held.map(([n, c], i) =>
+    `<div><b>PAD ${i + 1}</b><i style="background:${c}"></i><span>${n}</span></div>`).join('');
+})();
+</script>
