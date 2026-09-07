@@ -9159,6 +9159,32 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             work();
     };
 
+    // The same, but the caller waits. Applying a preset to a VST3 is a CONTROLLER operation,
+    // and JUCE marshals it to the message thread — so calling it from here and rendering
+    // immediately renders the state that was there BEFORE. That is not a hypothetical: against
+    // a real plug-in every preset was measured with the previous preset's sound, one whole
+    // render behind, and every number was plausible. The stub could never show it, because a
+    // plain AudioProcessor applies its state where it is asked.
+    const auto marshalAndWait = [&marshal] (std::function<void()> work)
+    {
+        std::mutex mutex;
+        std::condition_variable ready;
+        bool done = false;
+
+        marshal ([&]
+        {
+            work();
+            {
+                const std::scoped_lock lock (mutex);
+                done = true;
+            }
+            ready.notify_all();
+        });
+
+        std::unique_lock lock (mutex);
+        ready.wait (lock, [&done] { return done; });
+    };
+
     ProbeSpec spec;
     int done = 0;
     const auto total = tasks.size();
@@ -9231,7 +9257,10 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
             asRecord.sourceLocator = task.sourceLocator;
             asRecord.stateBlobBase64 = task.stateBlobBase64;
 
-            if (applyRecordState (*instrument, asRecord).isEmpty())
+            juce::String refusal;
+            marshalAndWait ([&] { refusal = applyRecordState (*instrument, asRecord); });
+
+            if (refusal.isEmpty())
             {
                 // The two passes by hand rather than through probeProcessor(), because the loud
                 // render is not only measured — it is KEPT, and that is what makes the next

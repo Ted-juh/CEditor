@@ -430,6 +430,46 @@ the CTRL49's own pages already exist (`Ctrl49RackDisplay`), this produces the sa
 model, and joining them is transport work that needs the hardware in the room to be worth
 trusting.
 
+## What a real VST3 found
+
+Everything above was proved against `StubSynthProcessor`, which is a DC generator with three
+parameters. Stage B's whole claim — that the measurements describe the sound — could not be
+tested that way, so `tools/verification/probe-synth` is a real VST3 whose three programs differ
+along the axes `SonicProfile` measures, and `CEditorRealPluginCheck` runs the whole chain against
+it: the out-of-process scanner finds it, the service loads it, the auditioner plays every
+program, and the numbers have to separate presets that genuinely differ. Gate S in
+[verify-end-to-end.md](../verify-end-to-end.md) is the recipe; it needs no Windows and no
+purchased plug-in.
+
+**It found a real bug immediately, and a serious one.** Every preset was being measured with the
+*previous* preset's sound — one whole render behind, with every number plausible. Applying a
+preset to a VST3 is a *controller* operation and JUCE marshals it to the message thread, so
+calling it from the auditioner's own thread and rendering immediately renders the state that was
+there before. The stub could never show this, because a plain `AudioProcessor` applies its state
+where it is asked. Preset application now goes through `onControlThread` and waits, which is the
+same rule already stated for creating and destroying instances: a plug-in expects to be driven
+from the thread it was made on.
+
+**And a constraint that had been true but unstated:** the analysis executor must be a real
+background thread whenever `instantiate` is asynchronous — the job borrows an instance and waits
+for it, so running inline on the thread that would deliver it is a deadlock. The stub tests get
+away with an inline executor because their instantiate answers synchronously. Both rules are now
+on `Options` where somebody wiring a new consumer will read them.
+
+**Three things about real plug-ins worth writing down**, none of them bugs here:
+
+- **2088 host-visible parameters** for an instrument with six of its own. JUCE's VST3 client
+  publishes a MIDI CC parameter per controller per channel. The parameter diff enumerates them
+  all and shows only what changed, which is why it stays usable — but "how many parameters does
+  this plug-in have" is not a question with the answer anybody expects.
+- **Selecting the program you are already on sends nothing.** There is no change for the host to
+  make, so a plug-in whose initial state is not its first program will have that program measured
+  as something else. Real plug-ins are built so those agree; nothing here can force it.
+- **A power-weighted spectral centroid is dominated by the fundamental.** A seven-fold cutoff
+  change through a gentle filter moves it much less than "seven times brighter" suggests. The
+  measurement is right and the intuition is wrong, which is worth knowing before somebody
+  "fixes" the number.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -448,6 +488,10 @@ trusting.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — the real-VST3 gate; see *What a real VST3 found* above. The lesson to carry:
+  a stub proves the shape of a thing and can say nothing about whether it is true. Every number
+  the auditioner produced was plausible, ordered, stable across runs, and one render behind.
 
 - **2026-09-07** — Stage F built; see *Stage F, as built* above. The rule worth carrying beyond
   this project: a cursor that wraps cannot be driven without looking, and a window that

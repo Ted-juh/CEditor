@@ -328,11 +328,18 @@ public:
         std::function<void (std::function<void()>)> scanExecutor;
         // The same, for the auditioner (analyseLibrary). Separate because the two must be able
         // to run at once: a scan finds plug-ins, the auditioner plays what they hold.
+        //
+        // THIS ONE MUST NOT RUN INLINE ON THE CONTROLLING THREAD when `instantiate` is
+        // asynchronous — the job borrows an instance and waits for it, so running on the
+        // thread that would deliver it is a deadlock. The default (a background thread) is
+        // right; only a test whose instantiate answers synchronously may pass an inline one.
         std::function<void (std::function<void()>)> analysisExecutor;
-        // Runs something back on the controlling thread. The auditioner needs it for the two
-        // things that must not happen on its own thread: destroying a plug-in instance, and
-        // writing its findings into the library. Default (nullptr) = run it inline, which is
-        // what a test with an inline executor wants and what an app must NOT leave unset.
+        // Runs something back on the controlling thread. The auditioner needs it for three
+        // things that must not happen on its own thread: APPLYING A PRESET (a controller
+        // operation that JUCE marshals, so doing it here and rendering immediately measures the
+        // state that was there before), destroying a plug-in instance, and writing findings
+        // into the library. Default (nullptr) = run it inline, which is what a test with an
+        // inline executor wants and what an app must NOT leave unset.
         std::function<void (std::function<void()>)> onControlThread;
         // Launches the Host Project build pipeline (the app streams a node child process;
         // tests capture the call). Absent = building is not available in this build, and

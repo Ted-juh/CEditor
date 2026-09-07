@@ -1438,6 +1438,66 @@ add_test(NAME InstrumentHostService
          COMMAND CEditorInstrumentHostServiceTests $<TARGET_FILE:CEditorScannerStub>)
 ce_configure_test(CEditorInstrumentHostServiceTests)
 
+# The Sound Browser against an actual VST3 rather than the stub. Off by default and NOT a
+# ctest: CI has no plug-ins, and a check that needs one it cannot have would be a red run that
+# means nothing. It is the gate somebody runs by hand — see docs/verify-end-to-end.md — and it
+# is the only thing that can say whether the auditioner's numbers describe the sound or the
+# probe. Needs VST3 hosting, so it carries the same defines the scanner worker does.
+option(CEDITOR_REAL_PLUGIN_CHECK "Build the Sound Browser's real-VST3 verification gate" OFF)
+if (CEDITOR_REAL_PLUGIN_CHECK)
+    add_executable(CEditorRealPluginCheck
+        "${CE_ROOT}/src/Performance/PatternModel.cpp"
+        "${CE_ROOT}/src/Performance/PatternCompiler.cpp"
+        "${CE_ROOT}/src/Performance/PerformanceEngine.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PluginScannerCoordinator.cpp"
+        "${CE_ROOT}/src/InstrumentHost/RackModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentRackHost.cpp"
+        "${CE_ROOT}/src/Performance/MidiInsertRack.cpp"
+        "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
+        "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
+        "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
+        "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
+        "${CE_ROOT}/src/Licensing/Licence.cpp"
+        "${CE_ROOT}/src/Licensing/Entitlements.cpp"
+        "${CE_ROOT}/src/Licensing/LicenceStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceProfile.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Reducer.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49SurfaceBroker.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WindowsEndpoints.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49WinMmOutput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49PrivateInput.cpp"
+        "${CE_ROOT}/src/ControlSurface/Ctrl49Protocol.cpp"
+        "${CE_ROOT}/src/InstrumentHost/ParameterModel.cpp"
+        "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+        "${CE_ROOT}/tests/RealPluginCheck.cpp"
+    )
+    target_compile_features(CEditorRealPluginCheck PRIVATE cxx_std_23)
+    target_compile_definitions(CEditorRealPluginCheck PRIVATE
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_STANDALONE_APPLICATION=1
+        # The real instantiator delivers on the message thread; a console program has to turn
+        # the loop itself, which is what runDispatchLoopUntil needs.
+        JUCE_MODAL_LOOPS_PERMITTED=1
+    )
+    target_include_directories(CEditorRealPluginCheck PRIVATE "${CE_ROOT}/src")
+    target_link_libraries(CEditorRealPluginCheck PRIVATE
+        juce::juce_core
+        juce::juce_cryptography
+        juce::juce_audio_utils
+        juce::juce_dsp
+        $<$<PLATFORM_ID:Windows>:winmm>
+    )
+endif()
+
 # The worker. Deliberately OUTSIDE the CEDITOR_BUILD_APP block: it needs none of what that
 # block exists to gate (no WebView2, no juceaide, no BinaryData) — juce_audio_processors with
 # VST3 hosting is its whole dependency, and that compiles on Linux too, given the same X11/ALSA

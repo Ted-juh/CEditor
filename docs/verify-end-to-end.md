@@ -150,6 +150,53 @@ and the bundled `tools\node\node.exe` runs.)
 
 ---
 
+## Gate S — the Sound Browser against a real VST3 (20 min, any OS)
+
+Everything else in the host's suite proves the browser against `StubSynthProcessor`, which is a
+DC generator with three parameters. It is the right tool for routing, identity and refusals and
+it cannot answer the question the auditioner exists to answer: **do the measurements describe
+the sound, or the probe?** This gate answers it, and it has already earned its keep — it found a
+bug in which every preset was measured with the *previous* preset's sound, one whole render
+behind, with every number plausible.
+
+Needs no Windows and no purchased plug-in: the instrument is in the repo.
+
+```bash
+# 1. Build the verification instrument (a real VST3).
+cd tools/verification/probe-synth
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH="$PWD/../../../JUCE/lib/cmake/JUCE-8.0.7"
+cmake --build build
+
+# 2. Build the gate and the out-of-process scanner.
+cd ../../..
+cmake -B build/real -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCEDITOR_SCANNER_WORKER=ON -DCEDITOR_REAL_PLUGIN_CHECK=ON
+cmake --build build/real --target CEditorRealPluginCheck CEditorPluginScanner
+
+# 3. Run it. On a headless Linux box, wrap it: xvfb-run -a …
+./build/real/CEditorRealPluginCheck \
+    "tools/verification/probe-synth/build/ProbeSynth_artefacts/Release/VST3/Probe Synth.vst3" \
+    ./build/real/CEditorPluginScanner
+```
+
+Expect `ALL PASSED`, and read the three measured lines it prints even when it passes — they are
+the actual numbers, and a change that makes them implausible while keeping the orderings true is
+exactly what this cannot catch on its own.
+
+**It works with any instrument**, and that is worth doing occasionally with something large and
+real: point it at a commercial synth and it will scan, load, measure every program, snapshot
+them, rank them and diff two saves. With a plug-in that is not `probe-synth` it skips the
+assertions about *which* program should measure brighter — it cannot know — and prints what it
+measured for reading by hand instead.
+
+Two things it needs that the stub tests do not, both documented on `InstrumentHostService::Options`:
+the analysis executor must be a **real background thread** (the job borrows an instance through
+the asynchronous instantiate hook and waits for it, so running inline on the thread that would
+deliver it is a deadlock), and `onControlThread` must be **wired to the message thread** (applying
+a preset to a VST3 is a controller operation that JUCE marshals; doing it on the job's own thread
+and rendering immediately measures the state that was there before).
+
 ## Quick triage
 
 | Symptom | Where to look |
