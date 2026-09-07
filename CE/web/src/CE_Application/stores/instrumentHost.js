@@ -6510,7 +6510,9 @@ function send(payload) {
     }
     if (payload?.cmd === 'browseOnSurface' || payload?.cmd === 'browseTurn'
         || payload?.cmd === 'browsePad') {
-      const rows = 5;
+      // Eight, matching what the real surface reports: the browser rides the knob page's eight
+      // labelled slots, so eight rows is what a screen can show rather than a guess at it.
+      const rows = 8;
       const caps = { encoders: 8, pads: 8, hasDisplay: true, displayRows: rows,
                      displayColumns: 16 };
       const results = get(hostLibrary).records;

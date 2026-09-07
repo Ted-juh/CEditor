@@ -3296,6 +3296,135 @@ void testCtrl49Broker()
     check (h.service->ownsHardwareSurface(), "with the claim re-taken");
     check (discoveries >= 2, "through a fresh discovery, not a stale handle");
 
+    // -- browsing the library from the keys (Sound Browser Stage F) ---------------------------
+    //
+    // The whole loop, over the fake cable: a page that only exists while browsing is on, an
+    // encoder that moves the cursor in the SERVICE's browser rather than in one of the broker's
+    // own, a pad that loads what the screen is showing, and bytes carrying the results out to
+    // the device.
+    {
+        // A surface with capabilities to browse on, and something in the library to browse.
+        // The program list is global to the stub, so it is put back afterwards: a test that
+        // leaves it changed decides what every later test sees.
+        ceditor::ctrl49::registerCtrl49Profile();
+        const auto programsBefore = ceditor::test::StubSynthProcessor::factoryPrograms;
+        const juce::ScopeGuard restorePrograms { [&programsBefore]
+            { ceditor::test::StubSynthProcessor::factoryPrograms = programsBefore; } };
+        ceditor::test::StubSynthProcessor::factoryPrograms = {
+            { "Init", 0.5f }, { "Bright", 0.9f }, { "Dark", 0.1f } };
+
+        h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+        h.cmd ("getLibrary");
+
+        const auto framesBeforeBrowsing = fake.frameCount();
+
+        // With browsing off there is no browser page at all, so however far Page Right walks
+        // it cannot arrive at one: a surface does not grow a browser under somebody's hands.
+        broker.tick();
+        check (broker.pages().browse < 0, "with browsing off the page is not there to walk on to");
+        for (int i = 0; i < ceditor::ctrl49::Ctrl49Reducer::kPageCount + 1; ++i)
+        {
+            fake.feed (0xB0, 40, 127);
+            broker.tick();
+        }
+        fake.feed (0xB0, 0x0B, 0x01);
+        broker.tick();
+        check (h.service->browsePosition().index == 0,
+               "and no amount of walking finds one — the turn lands on the page it is on");
+
+        h.cmd ("browseOnSurface", { { "on", true } });
+
+        // Page Right walks towards the browser, which is last. How many presses that takes
+        // depends on how many control pages the rack has, so walk until it arrives rather than
+        // assuming — the point being that it IS reachable by walking, from wherever you were.
+        for (int i = 0; i < ceditor::ctrl49::Ctrl49Reducer::kPageCount
+                        && broker.currentPage() != broker.pages().browse; ++i)
+        {
+            fake.feed (0xB0, 40, 127);
+            broker.tick();
+        }
+        check (broker.currentPage() == broker.pages().browse && broker.pages().browse > 0,
+               "and Page Right walks to it once browsing is on");
+
+        check (h.service->browseResults().size() == 3 && h.service->browseSurface().encoders > 0,
+               "there is a library to browse and a surface to browse it on");
+        const auto indexBefore = h.service->browsePosition().index;
+        fake.feed (0xB0, 0x0B, 0x01);         // encoder 1, one detent up
+        broker.tick();
+        check (h.service->browsePosition().index > indexBefore,
+               "an encoder turn moves the cursor in the service's own browser");
+        check (h.service->browsingOnSurface(),
+               "and the broker keeps no browsing state of its own to drift from it");
+
+        fakeNow += 300.0;
+        broker.tick();
+        check (fake.frameCount() > framesBeforeBrowsing,
+               "and the results reach the device");
+
+        // The bytes TRACK THE CURSOR, which is the claim this level can make and the one that
+        // matters: the screen is a face on the service's browser rather than a thing that
+        // happens to be repainted near it. What is actually IN the payload — the names, the
+        // title, the mark on the row under the cursor — is proven where it is built, in
+        // Ctrl49RackDisplayTests, because the frame is MIDI-7 encoded by the time it is here.
+        // The bytes TRACK THE CURSOR, which is the claim this level can make and the one that
+        // matters: the screen is a face on the service's browser rather than a thing that
+        // happens to be repainted near it. What is actually IN the payload — the names, the
+        // title, the mark on the row under the cursor — is proven where it is built, in
+        // Ctrl49RackDisplayTests, because the frame is MIDI-7 encoded by the time it is here.
+        //
+        // A paint is a BURST of frames ending in a constant one, so the comparison is burst
+        // against burst; the last frame alone is the same every time and says nothing.
+        std::vector<ceditor::ctrl49::Bytes> before, after;
+        {
+            const std::scoped_lock scoped (fake.lock);
+            before = fake.frames;
+        }
+
+        const auto indexBeforeSecondTurn = h.service->browsePosition().index;
+        fake.feed (0xB0, 0x0B, 0x01);
+        broker.tick();
+        check (h.service->browsePosition().index != indexBeforeSecondTurn, "the cursor moves again");
+
+        fakeNow += 300.0;
+        broker.tick();
+        {
+            const std::scoped_lock scoped (fake.lock);
+            after = fake.frames;
+        }
+
+        const std::vector<ceditor::ctrl49::Bytes> painted (after.begin() + (long) before.size(),
+                                                           after.end());
+        const std::vector<ceditor::ctrl49::Bytes> previously (before.end() - (long) painted.size(),
+                                                              before.end());
+        check (! painted.empty() && painted != previously, "and change when the cursor does");
+
+        fakeNow += 300.0;
+        broker.tick();
+        {
+            const std::scoped_lock scoped (fake.lock);
+            check (fake.frames.size() == after.size(),
+                   "while a cursor that has not moved sends nothing at all — the display link "
+                   "is slow and a browser that redraws on every tick flickers");
+        }
+
+        h.emits.clear();
+        fake.feed (0xB0, 0x01, 100);          // pad 1, struck
+        broker.tick();
+        check (h.emits.last ("instrumentHostAudition") != nullptr,
+               "a pad press plays what the pads are holding");
+
+        // And back out again, to where the keyboard was doing what it was doing.
+        h.cmd ("browseOnSurface", { { "on", false } });
+        broker.tick();
+        check (! h.service->browsingOnSurface(), "browsing turns off");
+        fakeNow += 150.0;
+        broker.tick();
+        check (broker.state() == Ctrl49SurfaceBroker::State::connected,
+               "and the surface goes on driving the rack rather than sitting on a page that "
+               "no longer exists");
+    }
+
     // Another instance holding the surface: the broker must refuse to drive, aloud.
     {
         fake.running.store (false);

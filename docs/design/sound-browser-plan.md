@@ -438,10 +438,37 @@ been, down to the snapshot answering first.
 check, once, that the two agree — so the workspace draws what the hardware is showing, in its
 own phosphor, beside the encoder map and the pads.
 
-**Not in Stage F:** sending the payloads to the hardware over the wire. The display builders for
-the CTRL49's own pages already exist (`Ctrl49RackDisplay`), this produces the same shape of
-model, and joining them is transport work that needs the hardware in the room to be worth
-trusting.
+**The wire, joined.** This was left out of Stage F as transport work needing the hardware in the
+room. Most of it turned out not to: the browser needs **no new wire format and no new page on
+the device**, because a row of results is eight labels and eight knob positions, which is
+exactly what the multiknob page already draws. `browseSlotViews` turns the browse window into
+the rack page's own slot views — the row under the cursor takes a full knob and the rest take
+none, which is the only way to say *this one* on a page made of knobs, and a result that cannot
+be loaded comes back unresolved, which that page already marks.
+
+The broker gained one page, **last**, because browsing is what you go to deliberately rather
+than what you play from. It exists only while browsing is on: a surface that quietly grew an
+extra page under somebody's hands is a surface that stopped doing what they had it doing, which
+is the rule the browsing flag itself already followed. Turning it off while you are standing on
+it puts you back on the performance page rather than on a page that is no longer there.
+
+Input goes **through the command surface**, not through a second API of its own. The browser the
+hardware drives has to be the same browser the workspace draws, down to the cursor, or the mirror
+beside the encoder map is a picture of something else — and because those commands emit as they
+go, the screen on the computer follows the hands on the keyboard for free. The broker keeps no
+browsing state at all; it reads the service's flag and cursor.
+
+Building it settled one number honestly. `browseSurface()` used to report five display rows —
+"the conservative answer rather than an invented one", written when there was no transport to
+check against. There is one now, and it has eight labelled slots, so it reports eight.
+
+**What still needs the device**, and it is the layout rather than the transport: whether eight
+sound names under eight knob graphics reads better than eight *encoder* labels with the current
+name in the title. The model supports both and the choice is one function. The whole loop —
+walking to the page, an encoder moving the cursor in the service's own browser, a pad loading
+what the screen shows, bytes changing when the cursor does and not when it has not — is proven
+over a scripted cable in `testCtrl49Broker`, so what is unverified is how it looks, not whether
+it works.
 
 ## Stage B2, as built
 
@@ -565,6 +592,12 @@ on `Options` where somebody wiring a new consumer will read them.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage F's transport, and the substitution memory. The lesson from the
+  transport: the feature that looked like it needed the hardware needed a *decision* about the
+  hardware, and only one of them. Everything else about it was arithmetic that could be proven
+  over a scripted cable, and separating the two is most of the work of knowing what you have
+  actually verified.
 
 - **2026-09-07** — B2, the auditioner in a child process; see *Stage B2, as built* above. The
   thing worth carrying: a streaming protocol was not chosen for throughput but for BLAME. One

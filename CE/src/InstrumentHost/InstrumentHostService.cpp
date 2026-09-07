@@ -9744,9 +9744,12 @@ surface::BrowseSurface InstrumentHostService::browseSurface() const
     out.pads = capabilities.pads;
     out.hasDisplay = capabilities.hasDisplay;
     out.displayColumns = capabilities.displayColumns;
-    // The knob page's screen shows a handful of rows. A profile that declares a display but no
-    // row count gets the conservative answer rather than an invented one.
-    out.displayRows = capabilities.hasDisplay ? 5 : 0;
+    // Eight, because that is what the transport turned out to be: the browser rides the knob
+    // page's eight labelled slots (Ctrl49RackDisplay's browseSlotViews), so eight rows is what
+    // a screen with a display can actually show rather than a conservative guess at it. A
+    // profile with no display still gets none, and every function in SurfaceBrowse.h handles
+    // that by refusing rather than by inventing.
+    out.displayRows = capabilities.hasDisplay ? 8 : 0;
     return out;
 }
 

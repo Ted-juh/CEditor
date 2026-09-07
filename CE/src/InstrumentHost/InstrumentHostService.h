@@ -649,6 +649,21 @@ public:
     // instance can drive, and the catalogue, which is a file two scanners must not interleave.
 
     /** True when this instance currently owns the hardware surface. */
+    /** The library browser as the hardware sees it (Sound Browser Stage F). Public because the
+        CTRL49 broker draws and drives it, and it owns no browsing state of its own: the screen,
+        the workspace's mirror of it and the encoders are all faces on the one flag and the one
+        cursor kept here, or they drift apart the first time somebody browses from the computer
+        instead of from the keys.
+
+        A surface that declares nothing gets a zeroed BrowseSurface, which every function in
+        SurfaceBrowse.h handles by refusing rather than by inventing. */
+    surface::BrowseSurface browseSurface() const;
+    /** The facets the encoders turn — the library's own values, never invented ones. */
+    std::vector<surface::BrowseFacet> browseFacets() const;
+    std::vector<surface::BrowseEntry> browseResults() const;
+    bool browsingOnSurface() const               { return surfaceBrowsing; }
+    surface::BrowseCursor browsePosition() const { return browseCursor; }
+
     bool ownsHardwareSurface() const;
     /** Claims the surface for this instance, taking it from an instance whose heartbeat has
         gone stale. Returns false when another live instance holds it. */
@@ -789,13 +804,6 @@ private:
                        const juce::String& detail = {});
     /** The phrase an audition plays: a single note, a chord, or what you last played. */
     juce::Array<RecentNote> auditionPhrase() const;
-    /** The connected surface's capabilities as the browser needs them. A surface that declares
-        nothing gets a zeroed one, which every function in SurfaceBrowse.h handles by refusing
-        rather than by inventing. */
-    surface::BrowseSurface browseSurface() const;
-    /** The facets the encoders turn — the library's own values, never invented ones. */
-    std::vector<surface::BrowseFacet> browseFacets() const;
-    std::vector<surface::BrowseEntry> browseResults() const;
     void emitSurfaceBrowse();
     /** Where the beat clock is now: the transport's position while it rolls, and a free count
         at the same tempo while it is parked — the convention the arpeggiator already uses. */

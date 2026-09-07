@@ -98,6 +98,27 @@ public:
     void tick();
 
     State state() const noexcept        { return currentState; }
+    /** Which page the surface is showing, and what the pages are. Public because the status
+        readout names the page, and because a test can then say which page it expected rather
+        than inferring it from bytes it cannot decode. */
+    int currentPage() const noexcept    { return reducer.page(); }
+
+    /** Where the pages are. The control pages come first, then the performance page, then the
+        browser (Sound Browser Stage F) — last because it is the one you go to deliberately
+        rather than the one you play from, and Page Right walks towards it.
+
+        The browser page is only THERE when the library says browsing is on. A surface that
+        quietly grew an extra page under somebody's hands is a surface that stopped doing what
+        they had it doing, which is the same rule the browsing flag itself follows. */
+    struct Pages
+    {
+        int control = 0;       // pages [0, control)
+        int performance = 0;
+        int browse = -1;       // -1 when browsing is off, which is most of the time
+        int count = 1;
+    };
+
+    Pages pages() const;
     juce::String stateName() const;
     juce::String detail() const         { return statusDetail; }
 

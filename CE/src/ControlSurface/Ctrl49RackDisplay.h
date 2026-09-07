@@ -14,9 +14,11 @@
 #pragma once
 
 #include "Ctrl49Protocol.h"
+#include "SurfaceBrowse.h"
 
 #include <array>
 #include <string>
+#include <vector>
 
 namespace ceditor::ctrl49
 {
@@ -40,5 +42,21 @@ Bytes buildRackLabelPayload (const std::string& title, const RackSlotViews& slot
     Values come from the slot positions; the switch flags light unresolved-but-assigned
     slots. The pad/velocity/division bytes are zeroed — the rack page does not use them. */
 Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots);
+
+/** The library browser as this page's eight slots (Sound Browser Stage F).
+
+    Browsing needs NO NEW WIRE FORMAT and no new page on the device, which is why it is here
+    rather than in a file of its own: a row of results is eight labels and eight knob positions,
+    which is exactly what the multiknob page already draws. The row under the cursor takes a
+    full knob and the rest take none, so the highlight is visible in the graphic the page is
+    built around rather than fought against; a result that cannot be loaded comes back
+    unresolved, which this page already marks.
+
+    Labels carry the NAME only. `detail` ("STAGE KEYS", "HW · JUNO-106") belongs to a screen
+    with room for it — truncating "Wool Pad · STAGE KEYS" into twelve characters produces
+    "Wool Pad · S." which is worse than "Wool Pad", and a name you can read is the whole
+    point of browsing without looking at the computer. */
+RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
+                               int cursorRowInWindow, int columns);
 
 } // namespace ceditor::ctrl49

@@ -48,4 +48,24 @@ Bytes buildRackStatePayload (int activeSlot, const RackSlotViews& slots)
     return result;
 }
 
+RackSlotViews browseSlotViews (const std::vector<surface::BrowseEntry>& rows,
+                               int cursorRowInWindow, int columns)
+{
+    RackSlotViews views {};
+
+    for (std::size_t i = 0; i < views.size() && i < rows.size(); ++i)
+    {
+        const auto& row = rows[i];
+        views[i].label = surface::fitToColumns (row.name, columns > 0 ? columns : 12);
+        views[i].assigned = true;
+        views[i].resolved = row.available;
+        // The cursor row takes a full knob and the others take none. There is no other way to
+        // say "this one" on a page made of knobs, and a row you cannot pick out is a list you
+        // have to look at the computer to read — which is the thing this stage exists to stop.
+        views[i].position = (int) i == cursorRowInWindow ? 127 : 0;
+    }
+
+    return views;
+}
+
 } // namespace ceditor::ctrl49

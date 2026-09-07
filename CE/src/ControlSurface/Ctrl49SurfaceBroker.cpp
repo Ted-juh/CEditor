@@ -317,13 +317,25 @@ void Ctrl49SurfaceBroker::tick()
     }
 }
 
+Ctrl49SurfaceBroker::Pages Ctrl49SurfaceBroker::pages() const
+{
+    Pages layout;
+    layout.control = juce::jmin (Ctrl49Reducer::kPageCount - 2,
+                                 service.getRackHost().getPerformance().pages.size());
+    layout.performance = layout.control;
+    layout.browse = service.browsingOnSurface() ? layout.performance + 1 : -1;
+    layout.count = layout.browse >= 0 ? layout.browse + 1 : layout.performance + 1;
+    return layout;
+}
+
 void Ctrl49SurfaceBroker::pumpInput()
 {
     const auto& performance = service.getRackHost().getPerformance();
-    const auto controlPages = juce::jmin (Ctrl49Reducer::kPageCount - 1, performance.pages.size());
-    const auto performancePage = controlPages;
+    const auto layout = pages();
+    const auto controlPages = layout.control;
+    const auto performancePage = layout.performance;
     const auto pageBeforeCountChange = reducer.page();
-    reducer.setPageCount (controlPages + 1);
+    reducer.setPageCount (layout.count);
     if (pageBeforeCountChange != reducer.page())
         emitStatus();
 
@@ -397,6 +409,29 @@ void Ctrl49SurfaceBroker::pumpInput()
                     action->encoderDelta);
             }
         }
+        else if (reducer.page() == layout.browse)
+        {
+            // Straight through the command surface rather than through a second API of its
+            // own: the browser the hardware drives has to be the SAME browser the workspace
+            // draws, down to the cursor, or the mirror beside the encoder map is a picture of
+            // something else. These commands emit as they go, so the screen on the computer
+            // follows the hands on the keyboard for free.
+            if (action->encoderMoved)
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("cmd", "browseTurn");
+                payload->setProperty ("encoder", action->encoderSlot);
+                payload->setProperty ("delta", action->encoderDelta);
+                service.handleCommand (juce::var (payload));
+            }
+            else if (action->padChanged && action->pad >= 1 && action->velocity > 0)
+            {
+                auto* payload = new juce::DynamicObject();
+                payload->setProperty ("cmd", "browsePad");
+                payload->setProperty ("pad", action->pad - 1);
+                service.handleCommand (juce::var (payload));
+            }
+        }
         else if (controlPages > 0 && action->encoderMoved)
         {
             const auto& page = performance.pages.getReference (reducer.page());
@@ -410,12 +445,31 @@ void Ctrl49SurfaceBroker::pumpInput()
 void Ctrl49SurfaceBroker::refreshDisplay()
 {
     const auto& performance = service.getRackHost().getPerformance();
-    const auto controlPages = juce::jmin (Ctrl49Reducer::kPageCount - 1, performance.pages.size());
-    const auto performancePage = controlPages;
+    const auto layout = pages();
+    const auto controlPages = layout.control;
+    const auto performancePage = layout.performance;
 
     Bytes labels, state;
 
-    if (reducer.page() == performancePage)
+    if (reducer.page() == layout.browse)
+    {
+        // No new wire format and no new page on the device: a row of results is eight labels
+        // and eight knob positions, which is what this page already draws. See browseSlotViews.
+        const auto hardware = service.browseSurface();
+        const auto cursor = service.browsePosition();
+        const auto results = service.browseResults();
+        const auto rows = surface::browseWindow (results, cursor,
+                                                 juce::jmax (1, hardware.displayRows));
+        const auto views = browseSlotViews (rows, cursor.index - cursor.firstVisible,
+                                            hardware.displayColumns);
+
+        labels = buildRackLabelPayload (surface::browseTitle (service.browseFacets(), cursor.index,
+                                                              (int) results.size()),
+                                        views);
+        state = buildRackStatePayload (juce::jlimit (0, 7, cursor.index - cursor.firstVisible),
+                                       views);
+    }
+    else if (reducer.page() == performancePage)
     {
         const auto t = service.surfaceTransport();
         PerformanceTransportView transport { t.playing, t.tempo, t.bar, t.beat,

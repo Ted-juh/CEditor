@@ -244,6 +244,48 @@ int main()
         check (fitToColumns ("anything", 0).empty(), "no columns, nothing to draw");
     }
 
+    // The browser as this page's eight slots — no new wire format, no new page on the device.
+    {
+        std::printf ("\n-- the browser on the knob page\n");
+        using namespace ceditor::surface;
+
+        const std::vector<BrowseEntry> rows {
+            { "Wool Pad", "STAGE KEYS", true, true },
+            { "Glass Cathedral Extended", "STAGE KEYS", true, false },
+            { "Lost Lead", "DIVA", false, false },
+        };
+
+        const auto views = browseSlotViews (rows, 1, 12);
+
+        check (views[0].label == "Wool Pad" && views[0].assigned && views[0].resolved,
+               "a result becomes a slot with its name on it");
+        check (views[1].label == "Glass Cathe." && views[1].label.size() == 12,
+               "trimmed to the screen, ending in a dot rather than vanishing mid-word");
+        check (! views[2].resolved && views[2].assigned,
+               "one that cannot be loaded comes back unresolved, which this page already marks");
+        check (views[3].label.empty() && ! views[3].assigned,
+               "and a slot past the end of the list holds nothing rather than repeating");
+
+        // There is no other way to say "this one" on a page made of knobs.
+        check (views[1].position == 127 && views[0].position == 0 && views[2].position == 0,
+               "the row under the cursor takes a full knob and the rest take none");
+
+        const auto labels = buildRackLabelPayload (browseTitle ({}, 1, 3), views);
+        const std::string asText (labels.begin(), labels.end());
+        check (asText.find ("Wool Pad") != std::string::npos
+                 && asText.find ("SOUNDS") != std::string::npos,
+               "and the whole thing is the label payload the page already reads");
+        check (asText.find ("!Lost Lead") != std::string::npos,
+               "with an unloadable result marked the way an unresolved binding is");
+
+        const auto state = buildRackStatePayload (1, views);
+        check (state.size() == 9 && state[0] == 1 && state[2] == 127,
+               "beside the nine-byte value payload, cursor row full");
+
+        check (browseSlotViews ({}, 0, 12)[0].label.empty(),
+               "an empty list draws an empty page rather than nothing at all");
+    }
+
     std::printf (failures == 0 ? "\nALL PASSED\n" : "\nFAILURES: %d\n", failures);
     return failures == 0 ? 0 : 1;
 }
