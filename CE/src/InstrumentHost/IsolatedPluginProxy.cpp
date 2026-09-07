@@ -203,6 +203,7 @@ private:
             stopTimer();
             owner.sendEditorClose();
             child = 0;
+            childPixelSize = {};
         }
         hostWindow = handle;
         if (hostWindow == 0)
@@ -265,11 +266,19 @@ private:
             if (child != nativeHandle)
             {
                 child = nativeHandle;
+                childPixelSize = {};
                 placedArea = {};
                 placedShowing = false;
                 startTimer (250);
                 repaint();
             }
+
+            // The worker window may have been prewarmed beneath HWND_MESSAGE. That parking
+            // window has no monitor DPI, so the child's JUCE peer can report physical pixels
+            // as if they were logical component units after it is reparented into Hostage.
+            // Measuring the actual HWND avoids trusting that stale scale factor. Hostage's
+            // component stays in logical units; the borrowed child keeps its exact pixel size.
+            updateSizeFromChild (width, height);
             if (! readyReported)
             {
                 readyReported = true;
@@ -280,10 +289,12 @@ private:
                                      "visible after " + juce::String (elapsed) + " ms; "
                                          + (reused ? "reparented" : "constructed") + " by worker in "
                                          + juce::String (workerOpenMs) + " ms; "
-                                         + juce::String (width) + "x" + juce::String (height));
+                                         + juce::String (width) + "x" + juce::String (height)
+                                         + " reported, " + juce::String (childPixelSize.x) + "x"
+                                         + juce::String (childPixelSize.y) + " native pixels, "
+                                         + juce::String (getWidth()) + "x" + juce::String (getHeight())
+                                         + " host units");
             }
-            if (width > 0 && height > 0 && (width != getWidth() || height != getHeight()))
-                setSize (width, height);
             place();
         }
         else if (state == "opening" || state == "idle")
@@ -293,6 +304,7 @@ private:
             if (child != 0)
             {
                 child = 0;
+                childPixelSize = {};
                 startTimer (20);
                 repaint();
             }
@@ -306,9 +318,49 @@ private:
         }
     }
 
+    void updateSizeFromChild (int reportedWidth, int reportedHeight)
+    {
+        auto logicalWidth = reportedWidth;
+        auto logicalHeight = reportedHeight;
+
+       #if JUCE_WINDOWS
+        if (child != 0)
+        {
+            RECT client {};
+            const auto hwnd = reinterpret_cast<HWND> (
+                static_cast<juce::pointer_sized_int> (child));
+            if (::GetClientRect (hwnd, &client) != FALSE)
+            {
+                const auto measured = juce::Point<int> {
+                    juce::jmax (0, static_cast<int> (client.right - client.left)),
+                    juce::jmax (0, static_cast<int> (client.bottom - client.top)) };
+                if (measured.x > 0 && measured.y > 0)
+                    childPixelSize = measured;
+            }
+        }
+
+        if (childPixelSize.x > 0 && childPixelSize.y > 0)
+        {
+            const auto* peer = getPeer();
+            const auto scale = peer != nullptr
+                                   ? juce::jmax (0.01, peer->getPlatformScaleFactor())
+                                   : 1.0;
+            logicalWidth = juce::jmax (1, juce::roundToInt (
+                static_cast<double> (childPixelSize.x) / scale));
+            logicalHeight = juce::jmax (1, juce::roundToInt (
+                static_cast<double> (childPixelSize.y) / scale));
+        }
+       #endif
+
+        if (logicalWidth > 0 && logicalHeight > 0
+            && (logicalWidth != getWidth() || logicalHeight != getHeight()))
+            setSize (logicalWidth, logicalHeight);
+    }
+
     // The child over this component, in the peer's physical pixels: the peer's own account
-    // of where this component is, scaled as juce::HWNDComponent scales it. Shown or hidden
-    // with this component, and never activated or reordered from here.
+    // of where this component is, scaled as juce::HWNDComponent scales it. Its size remains
+    // the HWND's measured pixel size rather than being derived from the parked peer's stale
+    // DPI scale. Shown or hidden with this component, and never activated or reordered here.
     void place()
     {
        #if JUCE_WINDOWS
@@ -317,8 +369,10 @@ private:
         auto* peer = getPeer();
         if (peer == nullptr)
             return;
-        const auto area = (peer->getAreaCoveredBy (*this).toFloat()
-                           * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
+        auto area = (peer->getAreaCoveredBy (*this).toFloat()
+                     * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
+        if (childPixelSize.x > 0 && childPixelSize.y > 0)
+            area.setSize (childPixelSize.x, childPixelSize.y);
         const auto showing = isShowing();
         // Only when something changed. Every SetWindowPos and ShowWindow is a synchronous
         // message into the worker's message thread, and this was being called on every
@@ -341,6 +395,7 @@ private:
     std::unique_ptr<Watcher> watcher;
     juce::int64 hostWindow = 0;   // the peer the child was created in
     juce::int64 child = 0;        // the worker's window, 0 until it exists
+    juce::Point<int> childPixelSize; // measured HWND client size; never DPI-scaled a second time
     juce::Rectangle<int> placedArea;   // what the child was last told, so it is not told again
     bool placedShowing = false;
     int reportedStallMs = 0;
