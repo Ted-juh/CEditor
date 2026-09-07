@@ -5476,6 +5476,103 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "browseOnSurface")
+    {
+        ensureLibrary();
+        // Off until asked for: a surface that becomes a browser under somebody's hands is a
+        // surface that stopped doing what they had it doing.
+        surfaceBrowsing = payload.getDynamicObject() != nullptr
+                            && payload.getDynamicObject()->hasProperty ("on")
+                              ? (bool) payload["on"] : ! surfaceBrowsing;
+        browseCursor = {};
+        emitSurfaceBrowse();
+        return;
+    }
+
+    if (cmd == "browseTurn")
+    {
+        ensureLibrary();
+        const auto hardware = browseSurface();
+        const auto encoder = juce::jmax (0, (int) payload.getProperty ("encoder", 0));
+        const auto delta = juce::jlimit (-64, 64, (int) payload.getProperty ("delta", 1));
+
+        const auto facets = browseFacets();
+        const auto assignments = surface::assignBrowseEncoders (hardware, facets,
+                                                                 (int) browseResults().size(),
+                                                                 browseCursor.index);
+        if (encoder >= (int) assignments.size())
+        {
+            emitError ("That encoder is not part of the browser.");
+            return;
+        }
+
+        const auto& assignment = assignments[(size_t) encoder];
+        if (assignment.role == "scroll")
+        {
+            browseCursor = surface::browseScroll (browseCursor, delta,
+                                                  (int) browseResults().size(),
+                                                  juce::jmax (1, hardware.displayRows));
+        }
+        else if (assignment.role == "facet"
+                 && assignment.facetIndex < (int) facets.size())
+        {
+            // Turning a filter walks its values and then off the end into "no opinion", which is
+            // the detent people expect and the only way to clear one without a mouse.
+            const auto& facet = facets[(size_t) assignment.facetIndex];
+            const auto count = (int) facet.values.size();
+            const auto next = juce::jlimit (-1, count - 1, facet.selected + delta);
+
+            const auto label = juce::String (facet.label);
+            auto* selection = label == "TYPE"       ? &libraryView.categories
+                            : label == "CHARACTER"  ? &libraryView.tags
+                            : label == "INSTRUMENT" ? &libraryView.instruments
+                            : label == "MAKER"      ? &libraryView.manufacturers
+                                                    : &libraryView.sources;
+            selection->include.clear();
+            if (next >= 0)
+                selection->include.add (juce::String (facet.values[(size_t) next]));
+
+            browseCursor = {};
+            emitLibrary (libraryView);
+        }
+
+        emitSurfaceBrowse();
+        return;
+    }
+
+    if (cmd == "browsePad")
+    {
+        ensureLibrary();
+        const auto hardware = browseSurface();
+        const auto results = browseResults();
+        const auto pads = surface::assignBrowsePads (hardware, results);
+        const auto pad = (int) payload.getProperty ("pad", 0);
+
+        if (pad < 0 || pad >= (int) pads.size())
+        {
+            emitError (hardware.pads <= 0
+                         ? juce::String ("This surface has no pads.")
+                         : "Pad " + juce::String (pad + 1) + " holds nothing.");
+            return;
+        }
+
+        // The pads hold the top of the list, so pad N is result N — the same order the screen
+        // shows, which is what makes a pad press predictable without looking.
+        const auto found = searchLibrary (library, libraryView, libraryAvailability());
+        if (pad >= found.size())
+            return;
+
+        handleCommand ([&]
+        {
+            auto* p = new juce::DynamicObject();
+            p->setProperty ("cmd", "auditionRecord");
+            p->setProperty ("recordId", found[pad]->recordId);
+            return juce::var (p);
+        }());
+        emitSurfaceBrowse();
+        return;
+    }
+
     if (cmd == "similarSounds")
     {
         ensureLibrary();
@@ -9385,6 +9482,170 @@ juce::Array<juce::var> InstrumentHostService::matchesToVar (const juce::Array<So
         out.add (juce::var (m));
     }
     return out;
+}
+
+surface::BrowseSurface InstrumentHostService::browseSurface() const
+{
+    surface::BrowseSurface out;
+
+    // The owner's own described controller wins over an authored profile, exactly as the
+    // drawing does — describing one is something you only do when the authored profile is not
+    // your device.
+    ctrl49::SurfaceCapabilities capabilities;
+    if (userSurfaceName.isNotEmpty())
+    {
+        capabilities = userSurfaceCapabilities;
+    }
+    else
+    {
+        const auto& registry = ctrl49::SurfaceProfileRegistry::instance();
+        for (const auto& id : registry.profileIds())
+            if (const auto* profile = registry.find (id); profile != nullptr)
+            {
+                capabilities = profile->capabilities;
+                break;
+            }
+    }
+
+    out.encoders = capabilities.encoders;
+    out.pads = capabilities.pads;
+    out.hasDisplay = capabilities.hasDisplay;
+    out.displayColumns = capabilities.displayColumns;
+    // The knob page's screen shows a handful of rows. A profile that declares a display but no
+    // row count gets the conservative answer rather than an invented one.
+    out.displayRows = capabilities.hasDisplay ? 5 : 0;
+    return out;
+}
+
+std::vector<surface::BrowseFacet> InstrumentHostService::browseFacets() const
+{
+    // The library's own facet values, in the order the browser already ranks them, never a
+    // vocabulary invented for the hardware. An encoder turning through "Pad, Bass, Lead" is
+    // turning through what this library actually holds.
+    const auto facets = libraryFacets (library, libraryView, libraryAvailability());
+    const std::pair<const char*, const juce::Array<LibraryFacetValue>*> wanted[] {
+        { "TYPE",       &facets.categories },
+        { "CHARACTER",  &facets.tags },
+        { "INSTRUMENT", &facets.instruments },
+        { "MAKER",      &facets.manufacturers },
+        { "SOURCE",     &facets.sources },
+    };
+
+    std::vector<surface::BrowseFacet> out;
+    for (const auto& [label, values] : wanted)
+    {
+        if (values->isEmpty())
+            continue;
+
+        surface::BrowseFacet facet;
+        facet.label = label;
+        for (const auto& value : *values)
+        {
+            if (facet.selected < 0 && value.selected)
+                facet.selected = (int) facet.values.size();
+            facet.values.push_back (value.value.toStdString());
+        }
+        out.push_back (std::move (facet));
+    }
+    return out;
+}
+
+std::vector<surface::BrowseEntry> InstrumentHostService::browseResults() const
+{
+    std::vector<surface::BrowseEntry> out;
+    for (const auto* record : searchLibrary (library, libraryView, libraryAvailability()))
+    {
+        surface::BrowseEntry entry;
+        entry.name = record->name.toStdString();
+        entry.detail = (record->type == "rack" ? juce::String ("RACK")
+                        : record->type == "chain" ? juce::String ("CHAIN")
+                        : record->sourceType == "hardwarePatch"
+                            ? "HW · " + record->instrument
+                            : record->instrument).toUpperCase().toStdString();
+        entry.available = recordUnavailableReason (*record).isEmpty();
+        entry.instant = snapshots != nullptr
+                          && snapshots->has (snapshotKeyFor (record->fingerprint, record->recordId));
+        out.push_back (std::move (entry));
+    }
+    return out;
+}
+
+void InstrumentHostService::emitSurfaceBrowse()
+{
+    if (options.emit == nullptr)
+        return;
+
+    const auto hardware = browseSurface();
+    const auto facets = browseFacets();
+    const auto results = browseResults();
+    const auto total = (int) results.size();
+
+    browseCursor = surface::browseScroll (browseCursor, 0, total,
+                                          juce::jmax (1, hardware.displayRows));
+
+    auto strings = [] (const std::vector<std::string>& values)
+    {
+        juce::Array<juce::var> out;
+        for (const auto& value : values) out.add (juce::String (value));
+        return out;
+    };
+
+    juce::Array<juce::var> rows;
+    const auto window = surface::browseWindow (results, browseCursor, hardware.displayRows);
+    for (int i = 0; i < (int) window.size(); ++i)
+    {
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("name",    juce::String (surface::fitToColumns (window[(size_t) i].name,
+                                                                          hardware.displayColumns)));
+        row->setProperty ("detail",  juce::String (window[(size_t) i].detail));
+        row->setProperty ("current", browseCursor.firstVisible + i == browseCursor.index);
+        row->setProperty ("available", window[(size_t) i].available);
+        row->setProperty ("instant", window[(size_t) i].instant);
+        rows.add (juce::var (row));
+    }
+
+    juce::Array<juce::var> knobs;
+    for (const auto& knob : surface::assignBrowseEncoders (hardware, facets, total,
+                                                            browseCursor.index))
+    {
+        auto* k = new juce::DynamicObject();
+        k->setProperty ("role",  juce::String (knob.role));
+        k->setProperty ("label", juce::String (knob.label));
+        k->setProperty ("value", juce::String (knob.value));
+        knobs.add (juce::var (k));
+    }
+
+    juce::Array<juce::var> pads;
+    for (const auto& pad : surface::assignBrowsePads (hardware, results))
+    {
+        auto* p = new juce::DynamicObject();
+        p->setProperty ("name",      juce::String (surface::fitToColumns (pad.name, 12)));
+        p->setProperty ("available", pad.available);
+        pads.add (juce::var (p));
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("browsing", surfaceBrowsing);
+    root->setProperty ("title",    juce::String (surface::browseTitle (facets, browseCursor.index,
+                                                                       total)));
+    root->setProperty ("rows",     rows);
+    root->setProperty ("encoders", knobs);
+    root->setProperty ("pads",     pads);
+    root->setProperty ("index",    browseCursor.index);
+    root->setProperty ("total",    total);
+    root->setProperty ("limitations",
+                       juce::String (surface::browseLimitations (hardware, (int) facets.size())));
+
+    auto* caps = new juce::DynamicObject();
+    caps->setProperty ("encoders",       hardware.encoders);
+    caps->setProperty ("pads",           hardware.pads);
+    caps->setProperty ("hasDisplay",     hardware.hasDisplay);
+    caps->setProperty ("displayRows",    hardware.displayRows);
+    caps->setProperty ("displayColumns", hardware.displayColumns);
+    root->setProperty ("surface", juce::var (caps));
+
+    (void) strings;
+    options.emit ("instrumentHostSurfaceBrowse", juce::var (root));
 }
 
 LibraryAvailability InstrumentHostService::libraryAvailability() const

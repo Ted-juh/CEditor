@@ -69,6 +69,12 @@ import {
   similarSounds,
   rackSubstitutes,
   mockSonicDistance,
+  hostSurfaceBrowse,
+  normalizeSurfaceBrowse,
+  emptySurfaceBrowse,
+  browseOnSurface,
+  browseTurn,
+  browsePad,
   commitVersion,
   applyVersion,
   diffVersions,
@@ -1055,6 +1061,66 @@ test('mock reducer: a rack says what it needs before it will play here', () => {
     'best first');
   assert.ok(subs.parts.some((p) => p.installed),
     'and the parts that are fine are listed as fine rather than left out');
+  resetMockLibraryState();
+});
+
+// --- browsing from the hardware ----------------------------------------------------------------
+
+test('normalizeSurfaceBrowse shapes what the hardware is showing', () => {
+  const shaped = normalizeSurfaceBrowse({
+    browsing: true, title: 'SOUNDS · 1/3', index: '0', total: 3,
+    rows: [{ name: 'Wool Pad', detail: 'STAGE KEYS', current: true, available: true }],
+    encoders: [{ role: 'scroll', label: 'SCROLL', value: '1/3' }, { label: '—' }],
+    pads: [{ name: 'Wool Pad', available: 'yes' }],
+    surface: { encoders: '8', pads: 8, hasDisplay: true, displayRows: 5, displayColumns: 16 },
+  });
+  assert.equal(shaped.browsing, true);
+  assert.equal(shaped.index, 0);
+  assert.equal(shaped.rows[0].current, true);
+  assert.equal(shaped.encoders[1].role, '', 'an encoder with no role is drawn and inert');
+  assert.equal(shaped.pads[0].available, false, 'a truthy string is not availability');
+  assert.equal(shaped.surface.encoders, 8);
+  assert.deepEqual(emptySurfaceBrowse().rows, [], 'the resting state shows nothing');
+});
+
+test('mock reducer: the hardware browser scrolls, stops at the ends, and loads', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  assert.equal(get(hostSurfaceBrowse).browsing, false,
+    'a surface does not become a browser until it is asked — it was doing something else');
+
+  browseOnSurface(true);
+  const opened = get(hostSurfaceBrowse);
+  assert.equal(opened.browsing, true);
+  assert.equal(opened.index, 0);
+  assert.ok(opened.rows.length > 0 && opened.rows[0].current,
+    'the cursor starts on the first row');
+  assert.equal(opened.encoders[0].role, 'scroll', 'and the first encoder scrolls');
+
+  browseTurn(0, 2);
+  assert.equal(get(hostSurfaceBrowse).index, 2);
+  browseTurn(0, 99);
+  assert.equal(get(hostSurfaceBrowse).index, get(hostSurfaceBrowse).total - 1,
+    'turning past the end stops there rather than wrapping to the top');
+  browseTurn(0, -99);
+  assert.equal(get(hostSurfaceBrowse).index, 0, 'and the same going back');
+
+  // A pad press is the same audition a click would have been.
+  browsePad(0);
+  assert.equal(get(hostAudition).recordId, get(hostLibrary).records[0].recordId);
+
+  hostLastError.set('');
+  browsePad(99);
+  assert.match(get(hostLastError), /holds nothing/);
+
+  hostLastError.set('');
+  browseTurn(99, 1);
+  assert.match(get(hostLastError), /not part of the browser/);
+
+  browseOnSurface(false);
+  assert.equal(get(hostSurfaceBrowse).browsing, false, 'and it hands the surface back');
   resetMockLibraryState();
 });
 

@@ -254,6 +254,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -572,6 +573,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
         "${CE_ROOT}/src/Licensing/Licence.cpp"
@@ -937,6 +939,9 @@ add_executable(CEditorCtrl49RackDisplayTests
     "${CE_ROOT}/src/ControlSurface/Ctrl49RackDisplay.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49PerformanceDisplay.cpp"
     "${CE_ROOT}/src/ControlSurface/Ctrl49Session.cpp"
+    # The library browser's surface half rides with the other display builders: same tier
+    # (pure std, no JUCE), same reason (the windowing arithmetic must be provable anywhere).
+    "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
     "${CE_ROOT}/tests/Ctrl49RackDisplayTests.cpp"
 )
 target_compile_features(CEditorCtrl49RackDisplayTests PRIVATE cxx_std_23)
@@ -1050,6 +1055,7 @@ if(WIN32)
         "${CE_ROOT}/src/InstrumentHost/InstrumentHostService.cpp"
         "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
         "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+        "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
         "${CE_ROOT}/src/InstrumentHost/EditorSnapshot.cpp"
         "${CE_ROOT}/src/InstrumentHost/PlatformMatrix.cpp"
         "${CE_ROOT}/src/InstrumentHost/SupportBundle.cpp"
@@ -1412,6 +1418,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"
     "${CE_ROOT}/src/InstrumentHost/SonicProbe.cpp"
     "${CE_ROOT}/src/InstrumentHost/SnapshotStore.cpp"
+    "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)

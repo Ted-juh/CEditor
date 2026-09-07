@@ -7,6 +7,7 @@
 // encoder delta before the reducer's own bookkeeping absorbs it, and the page-changed flag.
 
 #include "ControlSurface/Ctrl49RackDisplay.h"
+#include "ControlSurface/SurfaceBrowse.h"
 #include "ControlSurface/Ctrl49PerformanceDisplay.h"
 #include "ControlSurface/Ctrl49Reducer.h"
 
@@ -138,6 +139,109 @@ int main()
         check (emptyState.size() == 9, "an empty bank still builds a valid payload");
         for (std::size_t i = 1; i < 9; ++i)
             check (emptyState[i] == 0, "with nothing turning");
+    }
+
+    // -- browsing the library from the hardware ------------------------------------------
+    //
+    // The product this succeeds did this on two keyboards, both made by the company that wrote
+    // it, and that was its cage. Nothing here names a device: a surface arrives as four numbers
+    // and this decides what browsing looks like on it. What must hold is that the arithmetic
+    // never puts the cursor somewhere the screen is not, and that a surface which cannot do
+    // something is TOLD so rather than quietly half-supported.
+    {
+        using namespace ceditor::surface;
+
+        BrowseSurface ctrl49;
+        ctrl49.encoders = 8;
+        ctrl49.pads = 8;
+        ctrl49.hasDisplay = true;
+        ctrl49.displayRows = 5;
+        ctrl49.displayColumns = 16;
+
+        std::vector<BrowseEntry> results;
+        for (int i = 0; i < 40; ++i)
+            results.push_back ({ "Sound " + std::to_string (i), "STAGE KEYS", true, i % 2 == 0 });
+
+        // The cursor stops at the ends. Wrapping while somebody is turning fast puts them at the
+        // other end of twelve thousand sounds with nothing on screen to say it happened.
+        auto cursor = browseScroll ({}, -5, (int) results.size(), ctrl49.displayRows);
+        check (cursor.index == 0 && cursor.firstVisible == 0, "turning back from the top stops");
+        cursor = browseScroll ({ 39, 35 }, +5, (int) results.size(), ctrl49.displayRows);
+        check (cursor.index == 39, "and turning on from the end stops too");
+
+        // The window follows only when the cursor would leave it, keeping a one-row margin.
+        cursor = {};
+        for (int i = 0; i < 3; ++i)
+            cursor = browseScroll (cursor, +1, (int) results.size(), ctrl49.displayRows);
+        check (cursor.index == 3 && cursor.firstVisible == 0,
+               "the list does not move while the cursor still has room in it");
+        cursor = browseScroll (cursor, +1, (int) results.size(), ctrl49.displayRows);
+        check (cursor.index == 4 && cursor.firstVisible == 1,
+               "and then follows by one row, rather than re-centring under your hand");
+
+        const auto window = browseWindow (results, cursor, ctrl49.displayRows);
+        check ((int) window.size() == ctrl49.displayRows, "the screen draws its own number of rows");
+        check (window.front().name == "Sound 1", "starting where the window says");
+
+        cursor = browseScroll ({ 39, 35 }, 0, (int) results.size(), ctrl49.displayRows);
+        check ((int) browseWindow (results, cursor, ctrl49.displayRows).size() == 5,
+               "and the last page is a full page, not a ragged one");
+
+        // Encoder 0 always scrolls; the rest take filters until either runs out.
+        std::vector<BrowseFacet> facets {
+            { "TYPE", { "Pad", "Bass", "Lead" }, 0 },
+            { "CHARACTER", { "Warm", "Bright" }, -1 },
+        };
+
+        const auto knobs = assignBrowseEncoders (ctrl49, facets, (int) results.size(), 4);
+        check ((int) knobs.size() == 8, "one assignment per encoder the surface has");
+        check (knobs[0].role == "scroll" && knobs[0].value == "5/40",
+               "the first scrolls, and says where in the list you are");
+        check (knobs[1].role == "facet" && knobs[1].label == "TYPE" && knobs[1].value == "Pad",
+               "the next turns a filter and reads what it is set to");
+        check (knobs[2].value == "any", "an unset filter reads as no opinion, not as a value");
+        check (knobs[3].role.empty() && knobs[3].label == "—",
+               "and an encoder this browser has nothing for is drawn, labelled and inert");
+
+        // A one-encoder surface still scrolls: that is the control every browser needs.
+        BrowseSurface minimal;
+        minimal.encoders = 1;
+        minimal.pads = 0;
+        const auto oneKnob = assignBrowseEncoders (minimal, facets, 40, 0);
+        check (oneKnob.size() == 1 && oneKnob[0].role == "scroll",
+               "one encoder scrolls rather than filtering");
+        check (assignBrowseEncoders ({}, facets, 40, 0).empty(),
+               "and a surface with none gets none rather than a phantom");
+
+        // The pads hold the top of the list, so a pad press is always a sound you can see.
+        check ((int) assignBrowsePads (ctrl49, results).size() == 8, "eight pads hold eight");
+        BrowseSurface fourPads = ctrl49;
+        fourPads.pads = 4;
+        check ((int) assignBrowsePads (fourPads, results).size() == 4, "four hold four");
+        check (assignBrowsePads (minimal, results).empty(), "and none hold none");
+        check (assignBrowsePads (ctrl49, {}).empty(), "an empty result set fills no pads");
+
+        check (browseTitle (facets, 4, 40) == "SOUNDS · Pad · 5/40",
+               "the title says what is being browsed and how much of it there is");
+        check (browseTitle ({}, 0, 0) == "SOUNDS · none", "and says so when there is nothing");
+
+        // Being told beats discovering it by pressing something.
+        check (browseLimitations (ctrl49, 2).empty(),
+               "a surface that can do all of it is told nothing");
+        check (browseLimitations (ctrl49, 12).find ("7 of 12") != std::string::npos,
+               "one with too few encoders is told how many filters fit");
+        const auto blind = browseLimitations (minimal, 2);
+        check (blind.find ("no screen") != std::string::npos
+                 && blind.find ("no pads") != std::string::npos,
+               "and one with no screen and no pads is told both, rather than half-supported");
+
+        // A screen that silently clips reads as damage.
+        check (fitToColumns ("Glass Cathedral", 16) == "Glass Cathedral", "a name that fits fits");
+        check (fitToColumns ("Glass Cathedral Extended", 16) == "Glass Cathedral.",
+               "and one that does not ends in a dot rather than vanishing mid-word");
+        check (fitToColumns ("Caf\xC3\xA9 Pad", 16).find ('?') != std::string::npos,
+               "a byte these character cells cannot draw becomes one that is visible");
+        check (fitToColumns ("anything", 0).empty(), "no columns, nothing to draw");
     }
 
     std::printf (failures == 0 ? "\nALL PASSED\n" : "\nFAILURES: %d\n", failures);

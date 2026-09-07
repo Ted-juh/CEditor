@@ -23,6 +23,7 @@
 #include "SupportBundle.h"
 #include "Licensing/LicenceStore.h"
 #include "ControlSurface/SurfaceProfile.h"
+#include "ControlSurface/SurfaceBrowse.h"
 
 // InstrumentHostService — the Hostage engine behind one bridge event.
 //
@@ -94,6 +95,9 @@
 //   diffVersions {recordId, versionIdA?, versionIdB?, partId?} | morphVersions {…, amount}
 //     (versions: every save is kept, never an overwrite. A factory preset's first save
 //      branches into a record of your own that remembers where it came from.)
+//   browseOnSurface {on?} | browseTurn {encoder,delta} | browsePad {pad}
+//     (the library on the hardware: nothing here names a device — a surface arrives as its
+//      capabilities and the browser is built to fit it, or is told what it cannot do.)
 //   similarSounds {recordId,count?} | rackSubstitutes {recordId}
 //     (one distance function, two faces: "sounds like", and the nearest thing you own when a
 //      rack's plug-in has gone. Reporting only — a substitution never rewrites the record.)
@@ -769,6 +773,14 @@ private:
                        const juce::String& detail = {});
     /** The phrase an audition plays: a single note, a chord, or what you last played. */
     juce::Array<RecentNote> auditionPhrase() const;
+    /** The connected surface's capabilities as the browser needs them. A surface that declares
+        nothing gets a zeroed one, which every function in SurfaceBrowse.h handles by refusing
+        rather than by inventing. */
+    surface::BrowseSurface browseSurface() const;
+    /** The facets the encoders turn — the library's own values, never invented ones. */
+    std::vector<surface::BrowseFacet> browseFacets() const;
+    std::vector<surface::BrowseEntry> browseResults() const;
+    void emitSurfaceBrowse();
     /** Where the beat clock is now: the transport's position while it rolls, and a free count
         at the same tempo while it is parked — the convention the arpeggiator already uses. */
     double nowBeats() const;
@@ -1184,6 +1196,11 @@ private:
     juce::String auditionPhraseMode { "recent" };   // "note" | "chord" | "recent"
     int auditionBars = 4;
     juce::String auditioningRecordId;
+    // Where the hardware browser is. Off until asked for, because a surface that suddenly
+    // becomes a browser under somebody's hands is a surface that stopped doing what they had
+    // it doing.
+    bool surfaceBrowsing = false;
+    surface::BrowseCursor browseCursor;
     const double freeRunEpoch = juce::Time::getMillisecondCounterHiRes() * 0.001;
     // What the browser is currently looking at. Every mutation re-emits THIS rather than an
     // empty query: favouriting a record must not silently drop you back to all 12,000 sounds

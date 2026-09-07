@@ -1,6 +1,7 @@
 # The Sound Browser: a library that has heard everything in it
 
-Status: **Stages A–E are built** (2026-09-07); F is a plan, not a commitment. The mockups it describes are in
+Status: **Stages A–F are built** (2026-09-07). What remains is B2 — moving the
+auditioner out of process — and it is named in Stage B below. The mockups it describes are in
 [`sound-browser-mockups.html`](sound-browser-mockups.html) — open it in a browser; it is
 self-contained. Like the [rack canvas](rack-canvas-plan.md), this is written to be argued with,
 and the running log at the end is where new ideas go.
@@ -389,6 +390,46 @@ rather than previews.
 mapping outliving the session, which is a store this project does not have and should decide on
 deliberately rather than acquire by accident.
 
+## Stage F, as built
+
+`SurfaceBrowse.h` is the library browser as a surface sees it: pure std, no JUCE, no I/O, the
+same tier as the protocol library and for the same reason — the windowing arithmetic is the part
+that is easy to get subtly wrong, and it should be provable anywhere.
+
+**Nothing here names a device.** A surface arrives as four numbers — encoders, pads, and the
+size of its screen if it has one — and the browser is built to fit it. Sixteen encoders get more
+filters. One encoder scrolls and nothing else. No screen still gets the pads. That is the whole
+difference from the product this succeeds, whose hardware browsing worked on two keyboards, both
+made by the company that wrote it, and could not be fixed.
+
+**A surface is told what it cannot do**, in a sentence, rather than being quietly
+half-supported: *no screen, so the list stays on the computer — the pads still load*. That is
+the same rule the drawn surface already follows, where a control the runtime cannot address is
+drawn, labelled and honestly inert. An encoder this browser has nothing for gets exactly that
+treatment.
+
+**Two arithmetic rules decide whether a list can be browsed blind.** The cursor stops at the
+ends rather than wrapping — a wrap while somebody is turning fast puts them at the other end of
+twelve thousand sounds with nothing on screen to say it happened. And the window follows only
+when the cursor would leave it, keeping a one-row margin: a list that re-centres on every turn
+is a list whose rows are never where you last saw them.
+
+**The encoders turn the library's own query.** A filter knob walks the facet values the library
+actually holds — never a vocabulary invented for the hardware — and turning past the first value
+lands on *no opinion*, which is the only way to clear a filter without a mouse. Because it is
+the same `LibraryQuery` the window is filtering by, the screen and the hardware are one browser
+rather than two that resemble each other. A pad press is the same audition a click would have
+been, down to the snapshot answering first.
+
+**The mirror is not decoration.** Browsing without looking at the computer only works if you can
+check, once, that the two agree — so the workspace draws what the hardware is showing, in its
+own phosphor, beside the encoder map and the pads.
+
+**Not in Stage F:** sending the payloads to the hardware over the wire. The display builders for
+the CTRL49's own pages already exist (`Ctrl49RackDisplay`), this produces the same shape of
+model, and joining them is transport work that needs the hardware in the room to be worth
+trusting.
+
 ## What this deliberately does not do
 
 - **No cloud, no account, no gallery.** The library is files on your disk. A Sound Pack is a
@@ -407,6 +448,11 @@ deliberately rather than acquire by accident.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-07** — Stage F built; see *Stage F, as built* above. The rule worth carrying beyond
+  this project: a cursor that wraps cannot be driven without looking, and a window that
+  re-centres cannot be read while it moves. Both are one line of arithmetic and both decide
+  whether the feature works at all.
 
 - **2026-09-07** — Stage E built; see *Stage E, as built* above. Two things worth carrying: a
   rectangle on two measured axes is a saveable query and a freehand lasso is not, which is the

@@ -32,6 +32,7 @@
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
     hostVersionDiff, commitVersion, applyVersion, diffVersions,
     hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes,
+    hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
@@ -264,6 +265,10 @@
                 onclick={() => (view = value)}>{label}</button>
       {/each}
     </span>
+    <button type="button" class="toggle" class:on={$hostSurfaceBrowse.browsing}
+            data-testid="mirror-toggle"
+            title="Put the library on the connected controller — encoders scroll and filter, pads load"
+            onclick={() => browseOnSurface(!$hostSurfaceBrowse.browsing)}>⌘ On the keys</button>
     <button type="button" class="toggle" class:on={auditionOn} data-testid="host-audition"
             title="When on, clicking a sound loads it into the focused part and plays a short note"
             onclick={() => onToggleAudition()}>♪ Audition</button>
@@ -844,6 +849,78 @@
     {/if}
   </div>
 
+  {#if $hostSurfaceBrowse.browsing}
+    <!-- What the hardware is showing, mirrored. Not a decoration: browsing without looking at
+         the computer only works if you can check, once, that the two agree. -->
+    <div class="mirror" data-testid="surface-mirror">
+      <div class="lcd">
+        <div class="lcd-head">
+          <span>{$hostSurfaceBrowse.title}</span>
+          <span>{$hostSurfaceBrowse.total}</span>
+        </div>
+        {#each $hostSurfaceBrowse.rows as row (row.name + row.detail)}
+          <div class="lcd-row" class:on={row.current} class:dim={!row.available}>
+            <i class="lcd-pip" class:lit={row.current}></i>
+            <span class="lcd-name">{row.name}</span>
+            <span class="lcd-detail">{row.detail}</span>
+          </div>
+        {/each}
+        {#if $hostSurfaceBrowse.rows.length === 0}
+          <div class="lcd-row"><span class="lcd-name">nothing matches</span></div>
+        {/if}
+        <div class="lcd-foot">
+          <button type="button" class="ghost lcd-btn"
+                  onclick={() => browseTurn(0, -1)}>◀ PREV</button>
+          <span>PUSH = LOAD</span>
+          <button type="button" class="ghost lcd-btn"
+                  onclick={() => browseTurn(0, 1)}>NEXT ▶</button>
+        </div>
+      </div>
+
+      <div class="mirror-right">
+        <div class="encgrid">
+          {#each $hostSurfaceBrowse.encoders as knob, index (index)}
+            <button type="button" class="enc" class:act={knob.role === 'scroll'}
+                    class:inert={knob.role === ''} data-testid="mirror-encoder"
+                    title={knob.role === '' ? 'Drawn, and honestly inert — this browser has nothing for it'
+                           : `Turn ${knob.label.toLowerCase()}`}
+                    disabled={knob.role === ''}
+                    onclick={() => browseTurn(index, 1)}>
+              <span class="enc-n">ENC {index + 1}</span>
+              <span class="enc-v">{knob.label}{knob.value ? `: ${knob.value}` : ''}</span>
+            </button>
+          {/each}
+        </div>
+
+        {#if $hostSurfaceBrowse.pads.length > 0}
+          <div class="padgrid">
+            {#each $hostSurfaceBrowse.pads as pad, index (index)}
+              <button type="button" class="pad" class:dim={!pad.available}
+                      data-testid="mirror-pad"
+                      title={`Pad ${index + 1}: ${pad.name}`}
+                      onclick={() => browsePad(index)}>{pad.name}</button>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="mirror-note">
+          {#if $hostSurfaceBrowse.limitations}
+            <b>This controller:</b> {$hostSurfaceBrowse.limitations}
+          {:else}
+            {$hostSurfaceBrowse.surface.encoders} encoders ·
+            {$hostSurfaceBrowse.surface.pads} pads{$hostSurfaceBrowse.pads.length
+              < $hostSurfaceBrowse.surface.pads
+              ? ` (${$hostSurfaceBrowse.pads.length} holding something)` : ''} ·
+            {$hostSurfaceBrowse.surface.hasDisplay
+              ? `${$hostSurfaceBrowse.surface.displayRows}-row screen`
+              : 'no screen'}. The browser is built from what this surface says it has, not from
+            a list of blessed devices.
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <!-- The audition bar. It is the answer to "what am I hearing, and what is it playing" — the
        two questions a preview that swaps sources underneath you has to keep answering. -->
   <div class="audition" data-testid="audition-bar">
@@ -1222,6 +1299,57 @@
   .mapcard-sub { color: #7d8894; font-size: 10px; }
   .mapcard-nums { color: #9aa5b1; font-size: 10px; margin-top: 3px; }
   .mapfoot { display: flex; }
+
+  .mirror {
+    display: flex; gap: 12px; padding: 10px; margin-top: 2px;
+    border: 1px solid #2a333d; border-radius: 5px; background: #101315; flex-wrap: wrap;
+  }
+  /* The screen is drawn as a screen — a character grid in its own phosphor — because that is
+     what somebody is checking against, and a styled HTML list would not be it. */
+  .lcd {
+    width: 268px; flex: 0 0 268px; padding: 8px 9px; border-radius: 4px;
+    background: #06170f; border: 1px solid #1d4a34; color: #8ff0b8;
+    font-family: ui-monospace, monospace; box-shadow: inset 0 0 24px #0b3a2544;
+  }
+  .lcd-head {
+    display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; color: #4fbf87;
+    border-bottom: 1px solid #1d4a34; padding-bottom: 5px; letter-spacing: 0.06em;
+  }
+  .lcd-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11.5px; }
+  .lcd-row.on { color: #d6ffe8; }
+  .lcd-row.dim { color: #2f6f4f; }
+  .lcd-pip { width: 5px; height: 5px; border-radius: 50%; background: #1d4a34; flex: 0 0 5px; }
+  .lcd-pip.lit { background: #8ff0b8; box-shadow: 0 0 6px #8ff0b8; }
+  .lcd-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lcd-detail { font-size: 9px; color: #4fbf87; white-space: nowrap; }
+  .lcd-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    border-top: 1px solid #1d4a34; padding-top: 5px; margin-top: 5px;
+    font-size: 9px; color: #4fbf87; letter-spacing: 0.04em;
+  }
+  button.lcd-btn { color: #4fbf87; font-size: 9px; padding: 1px 3px; font-family: inherit; }
+  button.lcd-btn:hover:not(:disabled) { color: #8ff0b8; border-color: #1d4a34; }
+
+  .mirror-right { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 6px; }
+  .encgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  button.enc {
+    display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+    padding: 5px 6px; min-width: 0;
+  }
+  button.enc.act { border-color: #4a86bd; background: #7fb4e014; }
+  button.enc.inert { opacity: 0.45; }
+  .enc-n { font: 600 8.5px/1 ui-monospace, monospace; color: #66707b; letter-spacing: 0.06em; }
+  .enc-v { font-size: 10.5px; color: #9aa5b1; overflow: hidden; text-overflow: ellipsis;
+           white-space: nowrap; max-width: 100%; }
+  button.enc.act .enc-v { color: #7fb4e0; }
+  .padgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  button.pad {
+    padding: 7px 5px; font-size: 10px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; background: #7fb4e014; border-color: #4a86bd66;
+  }
+  button.pad.dim { opacity: 0.45; }
+  .mirror-note { color: #66707b; font-size: 10.5px; line-height: 1.5; }
+  .mirror-note b { color: #d9a13c; font-weight: 600; }
 
   .audition {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

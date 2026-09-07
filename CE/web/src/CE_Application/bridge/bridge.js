@@ -1000,6 +1000,13 @@ export function onInstrumentHostSubstitutes(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** What the hardware is showing while it browses ({ browsing, title, rows, encoders, pads }). */
+export function onInstrumentHostSurfaceBrowse(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostSurfaceBrowse', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Refused or failed commands ({ message }). */
 export function onInstrumentHostError(callback) {
   if (!isJuceAvailable()) return () => {};

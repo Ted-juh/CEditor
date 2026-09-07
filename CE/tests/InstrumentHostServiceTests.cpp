@@ -1796,6 +1796,110 @@ void testSonicProbe()
            "an unmeasured profile is maximally far from everything, rather than a false match");
 }
 
+// Browsing from the hardware, over the command surface. The generic arithmetic is proved in
+// Ctrl49RackDisplayTests; this is the part only the service can settle — that the encoders turn
+// the SAME query the screen is filtering by, and that a pad press is the same audition a click
+// would have been.
+void testBrowseOnSurface()
+{
+    std::cout << "\nbrowsing with your hands on the keys" << std::endl;
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Init", 0.5f }, { "Bright", 0.9f }, { "Dark", 0.1f } };
+
+    const auto dir = freshDataDir ("surface-browse");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+
+    const auto browse = [&h] { return h.emits.last ("instrumentHostSurfaceBrowse"); };
+
+    h.emits.clear();
+    h.cmd ("browseOnSurface", { { "on", true } });
+    const auto* view = browse();
+    check (view != nullptr && (bool) view->getProperty ("browsing", false),
+           "the surface becomes a browser only when asked");
+    check ((int) view->getProperty ("total", 0) == 3,
+           "showing what the library holds — the same three the screen has");
+    check (view->getProperty ("rows", {}).size() > 0
+             && (bool) view->getProperty ("rows", {})[0].getProperty ("current", false),
+           "with the cursor on the first row");
+    check (view->getProperty ("title", {}).toString().contains ("1/3"),
+           "and a title saying where in the list you are");
+
+    // The encoders come from the profile's capabilities, not from a device name.
+    const auto capabilities = view->getProperty ("surface", {});
+    check ((int) capabilities.getProperty ("encoders", 0) > 0,
+           "the encoders are however many the connected profile declares");
+    check (view->getProperty ("encoders", {}).size()
+             == (int) capabilities.getProperty ("encoders", 0),
+           "one assignment per encoder it has, no more and no fewer");
+    check (view->getProperty ("encoders", {})[0].getProperty ("role", {}).toString() == "scroll",
+           "and the first one scrolls, because that is what every browser needs");
+
+    // Turning the scroll encoder moves the cursor and nothing else.
+    h.emits.clear();
+    h.cmd ("browseTurn", { { "encoder", 0 }, { "delta", 2 } });
+    check ((int) browse()->getProperty ("index", 0) == 2, "turning it moves the cursor");
+    h.cmd ("browseTurn", { { "encoder", 0 }, { "delta", 99 } });
+    check ((int) browse()->getProperty ("index", 0) == 2,
+           "and it stops at the end rather than wrapping to the top");
+
+    // Turning a filter encoder narrows THE SAME QUERY the screen is filtering by — the hardware
+    // and the window are one browser, not two that happen to look alike.
+    juce::String facetLabel;
+    int facetEncoder = -1;
+    for (int i = 0; i < view->getProperty ("encoders", {}).size(); ++i)
+        if (browse()->getProperty ("encoders", {})[i].getProperty ("role", {}).toString() == "facet"
+            && facetEncoder < 0)
+        {
+            facetEncoder = i;
+            facetLabel = browse()->getProperty ("encoders", {})[i].getProperty ("label", {}).toString();
+        }
+    check (facetEncoder > 0, "a surface with encoders to spare gets filters on them");
+
+    h.emits.clear();
+    h.cmd ("browseTurn", { { "encoder", facetEncoder }, { "delta", 1 } });
+    const auto* narrowed = h.emits.last ("instrumentHostLibrary");
+    check (narrowed != nullptr,
+           "turning a filter answers with the library, because it IS the library's own query");
+    check ((int) browse()->getProperty ("index", 0) == 0,
+           "and the cursor goes back to the top, because the list underneath it changed");
+
+    // Off the end of a filter's values is "no opinion" — the only way to clear one without a
+    // mouse.
+    for (int i = 0; i < 12; ++i)
+        h.cmd ("browseTurn", { { "encoder", facetEncoder }, { "delta", -1 } });
+    bool cleared = false;
+    for (const auto& knob : *browse()->getProperty ("encoders", {}).getArray())
+        if (knob.getProperty ("label", {}).toString() == facetLabel)
+            cleared = knob.getProperty ("value", {}).toString() == "any";
+    check (cleared, "turning a filter past its first value clears it rather than sticking");
+
+    // A pad press is the same audition a click would have been.
+    h.emits.clear();
+    h.cmd ("browsePad", { { "pad", 0 } });
+    check (h.emits.last ("instrumentHostAudition") != nullptr,
+           "a pad press auditions the sound it holds, exactly as a click does");
+
+    h.emits.clear();
+    h.cmd ("browsePad", { { "pad", 40 } });
+    check (h.emits.lastError().contains ("holds nothing"),
+           "and a pad holding nothing says so rather than doing something surprising");
+
+    h.emits.clear();
+    h.cmd ("browseTurn", { { "encoder", 99 }, { "delta", 1 } });
+    check (h.emits.lastError().contains ("not part of the browser"),
+           "an encoder this browser does not use refuses aloud");
+
+    h.emits.clear();
+    h.cmd ("browseOnSurface", { { "on", false } });
+    check (! (bool) browse()->getProperty ("browsing", true), "and it can be handed back");
+}
+
 // The substitution flow at the command surface: a rack remembers what its parts SOUNDED like,
 // so one whose plug-in has gone can be offered the nearest thing you actually own.
 void testSubstitutes()
@@ -9837,6 +9941,7 @@ int main (int argc, char* argv[])
     testVersionRetention();
     testVersionsInTheService();
     testSubstitutes();
+    testBrowseOnSurface();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

@@ -45,6 +45,7 @@ import {
   onInstrumentHostVersionDiff,
   onInstrumentHostSimilar,
   onInstrumentHostSubstitutes,
+  onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
 import {
@@ -86,6 +87,50 @@ export const hostVersionDiff = writable(null);
 export const hostSimilar = writable({ recordId: '', measured: false, matches: [] });
 /** What a captured rack needs before it can play on this machine. null until asked. */
 export const hostSubstitutes = writable(null);
+
+/** What the connected surface is showing while it browses. `browsing` false is the resting
+ *  state; `limitations` is what this particular surface cannot do, in a sentence. */
+export function emptySurfaceBrowse() {
+  return { browsing: false, title: '', rows: [], encoders: [], pads: [], index: 0, total: 0,
+           limitations: '',
+           surface: { encoders: 0, pads: 0, hasDisplay: false, displayRows: 0, displayColumns: 0 } };
+}
+export const hostSurfaceBrowse = writable(emptySurfaceBrowse());
+
+export function normalizeSurfaceBrowse(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const s = p.surface && typeof p.surface === 'object' ? p.surface : {};
+  return {
+    browsing: p.browsing === true,
+    title: String(p.title ?? ''),
+    index: Number(p.index ?? 0),
+    total: Number(p.total ?? 0),
+    limitations: String(p.limitations ?? ''),
+    rows: (Array.isArray(p.rows) ? p.rows : []).map((r) => ({
+      name: String(r?.name ?? ''),
+      detail: String(r?.detail ?? ''),
+      current: r?.current === true,
+      available: r?.available === true,
+      instant: r?.instant === true,
+    })),
+    encoders: (Array.isArray(p.encoders) ? p.encoders : []).map((e) => ({
+      role: String(e?.role ?? ''),
+      label: String(e?.label ?? ''),
+      value: String(e?.value ?? ''),
+    })),
+    pads: (Array.isArray(p.pads) ? p.pads : []).map((pad) => ({
+      name: String(pad?.name ?? ''),
+      available: pad?.available === true,
+    })),
+    surface: {
+      encoders: Number(s.encoders ?? 0),
+      pads: Number(s.pads ?? 0),
+      hasDisplay: s.hasDisplay === true,
+      displayRows: Number(s.displayRows ?? 0),
+      displayColumns: Number(s.displayColumns ?? 0),
+    },
+  };
+}
 
 /** One ranked match: the percentage a person reads, the distance it came from, and the axes
     that agreed or did not — so the number can be argued with rather than trusted. */
@@ -5954,6 +5999,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
   onInstrumentHostSubstitutes((payload) => hostSubstitutes.set(normalizeSubstitutes(payload)));
+  onInstrumentHostSurfaceBrowse((payload) => hostSurfaceBrowse.set(normalizeSurfaceBrowse(payload)));
   onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
     recordId: String(payload?.recordId ?? ''),
     // A 'phrase' answer is the setting changing, not a sound starting — it must not blank the
@@ -6449,6 +6495,57 @@ function send(payload) {
       hostAnalysis.set({ done: todo, total: todo, what: `Done — ${todo} measured.`, running: false });
       mockMeasuredEverything = true;
       hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'browseOnSurface' || payload?.cmd === 'browseTurn'
+        || payload?.cmd === 'browsePad') {
+      const rows = 5;
+      const caps = { encoders: 8, pads: 8, hasDisplay: true, displayRows: rows,
+                     displayColumns: 16 };
+      const results = get(hostLibrary).records;
+      const state = get(hostSurfaceBrowse);
+      let { index, browsing } = { index: state.index, browsing: state.browsing };
+      let firstVisible = Math.max(0, Math.min(state.index - 1, results.length - rows));
+
+      if (payload.cmd === 'browseOnSurface') {
+        browsing = payload.on === undefined ? !browsing : payload.on === true;
+        index = 0;
+        firstVisible = 0;
+      } else if (payload.cmd === 'browseTurn' && payload.encoder === 0) {
+        index = Math.max(0, Math.min(results.length - 1, index + Number(payload.delta ?? 0)));
+        firstVisible = Math.max(0, Math.min(index - 1, results.length - rows));
+      } else if (payload.cmd === 'browsePad') {
+        const record = results[Number(payload.pad ?? 0)];
+        if (!record) { hostLastError.set(`Pad ${Number(payload.pad ?? 0) + 1} holds nothing.`); return; }
+        applyMockCommand(get(hostState), { cmd: 'auditionRecord', recordId: record.recordId });
+        send({ cmd: 'auditionRecord', recordId: record.recordId });
+      } else if (payload.cmd === 'browseTurn') {
+        hostLastError.set('That encoder is not part of the browser.');
+        return;
+      }
+
+      const window = results.slice(Math.max(0, firstVisible), Math.max(0, firstVisible) + rows);
+      hostSurfaceBrowse.set(normalizeSurfaceBrowse({
+        browsing,
+        title: `SOUNDS · ${results.length ? `${index + 1}/${results.length}` : 'none'}`,
+        index, total: results.length, limitations: '',
+        rows: window.map((r, i) => ({
+          name: r.name.length > 16 ? `${r.name.slice(0, 15)}.` : r.name,
+          detail: (r.type === 'rack' ? 'RACK' : r.type === 'chain' ? 'CHAIN'
+                   : r.instrument || '').toUpperCase(),
+          current: Math.max(0, firstVisible) + i === index,
+          available: r.available, instant: r.instant,
+        })),
+        encoders: [{ role: 'scroll', label: 'SCROLL',
+                     value: results.length ? `${index + 1}/${results.length}` : 'none' },
+                   ...['TYPE', 'CHARACTER', 'INSTRUMENT', 'MAKER', 'SOURCE']
+                     .map((label) => ({ role: 'facet', label, value: 'any' })),
+                   { role: '', label: '—', value: '' },
+                   { role: '', label: '—', value: '' }],
+        pads: results.slice(0, caps.pads).map((r) => ({
+          name: r.name.length > 12 ? `${r.name.slice(0, 11)}.` : r.name, available: r.available })),
+        surface: caps,
+      }));
       return;
     }
     if (payload?.cmd === 'similarSounds') {
@@ -7123,6 +7220,14 @@ export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
 /** What a captured rack needs before it can play here, and the nearest things you do own. */
 export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
+
+/** Hand the library to the hardware, or take it back. */
+export const browseOnSurface = (on) =>
+  send(on === undefined ? { cmd: 'browseOnSurface' } : { cmd: 'browseOnSurface', on });
+/** An encoder turned. Encoder 0 scrolls; the rest turn whatever filters fit on this surface. */
+export const browseTurn = (encoder, delta) => send({ cmd: 'browseTurn', encoder, delta });
+/** A pad pressed: the same audition a click would have been. */
+export const browsePad = (pad) => send({ cmd: 'browsePad', pad });
 
 export const morphVersions = (recordId, versionIdA, versionIdB, amount) =>
   send({ cmd: 'morphVersions', recordId, amount,
