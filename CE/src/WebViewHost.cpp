@@ -332,7 +332,10 @@ WebViewHost::WebViewHost (AppSettings* settings)
     // overlapping it. Hidden until an editor opens; the split in resized() follows.
     addChildComponent (editorPane);
     editorPane.onLayoutChanged = [this] { resized(); };
-    editorPane.onCloseRequested = [this] { bridge.requestInstrumentEditorClose(); };
+    editorPane.onCloseRequested = [this] (const juce::String& targetId)
+    {
+        bridge.requestInstrumentEditorClose (targetId);
+    };
     bridge.setEditorPane (&editorPane);
 
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()

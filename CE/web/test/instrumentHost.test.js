@@ -269,7 +269,7 @@ test('opening the instrument host tab survives the panel-selection sync', () => 
   assert.notEqual(get(activeEditorTab).type, 'instrumentHost');
 });
 
-test('mock reducer: the editor opens on loaded parts and follows focus', () => {
+test('mock reducer: loaded plug-in editors form an explicit docked stack', () => {
   let state = mockHostState();
   const loaded = state.rack.parts[0].partId;   // Stage Keys, has an instrument
   const empty = state.rack.parts[1].partId;
@@ -279,13 +279,14 @@ test('mock reducer: the editor opens on loaded parts and follows focus', () => {
 
   state = applyMockCommand(state, { cmd: 'openEditor', partId: loaded });
   assert.equal(state.editorOpenPartId, loaded);
+  assert.deepEqual(state.editorOpenPartIds, [loaded]);
 
   state = applyMockCommand(state, { cmd: 'focusPart', partId: empty });
-  assert.equal(state.editorOpenPartId, '', 'focusing an empty part hides the editor');
+  assert.deepEqual(state.editorOpenPartIds, [loaded], 'focus does not replace docked cards');
 
   state = applyMockCommand(state, { cmd: 'openEditor', partId: loaded });
   state = applyMockCommand(state, { cmd: 'removePart', partId: loaded });
-  assert.equal(state.editorOpenPartId, '', 'removing the part closes its editor');
+  assert.deepEqual(state.editorOpenPartIds, [], 'removing the part closes its editor');
 
   state = applyMockCommand(state, { cmd: 'closeEditor' });
   assert.equal(state.editorOpenPartId, '');
@@ -297,6 +298,10 @@ test('normalizeHostState shapes the editor and audio fields', () => {
     audio: { enabled: true, running: 'yes', deviceName: 'Speakers', sampleRate: '48000' },
   });
   assert.equal(shaped.editorOpenPartId, '42');
+  assert.deepEqual(shaped.editorOpenPartIds, ['42'], 'old singular state upgrades to a stack');
+  const stacked = normalizeHostState({ editorOpenPartIds: ['a', 2] });
+  assert.deepEqual(stacked.editorOpenPartIds, ['a', '2']);
+  assert.equal(stacked.editorOpenPartId, '2', 'legacy singular names the newest card');
   assert.equal(shaped.audio.enabled, true);
   assert.equal(shaped.audio.running, false, 'running is strictly boolean');
   assert.equal(shaped.audio.deviceName, 'Speakers');
@@ -3272,7 +3277,7 @@ test('steps carry chord notes: normalized in, mock-merged back', () => {
   assert.deepEqual(step.chordNotes, [48, 55], 'the drawn stack lands in the model');
 });
 
-test('floating editors: several at once, dock steals back, mock mirrors the policy', () => {
+test('floating and stacked editors move each processor between the two hosts', () => {
   let state = mockHostState();
   const a = state.rack.parts[0].partId;
   state = applyMockCommand(state, { cmd: 'loadInstrument', partId: state.rack.parts[1].partId, ceId: 'mock-analog' });
@@ -3285,11 +3290,21 @@ test('floating editors: several at once, dock steals back, mock mirrors the poli
 
   state = applyMockCommand(state, { cmd: 'openEditor', partId: a });
   assert.equal(state.editorOpenPartId, a);
-  assert.deepEqual(state.floatingEditorPartIds, [b],
-    'docking a floating part pulls its one editor back in');
+  state = applyMockCommand(state, { cmd: 'openEditor', partId: b });
+  assert.deepEqual(state.editorOpenPartIds, [a, b], 'several editors dock at once');
+  assert.deepEqual(state.floatingEditorPartIds, [],
+    'docking each floating part pulls its one editor back in');
 
   state = applyMockCommand(state, { cmd: 'floatEditor', partId: a });
-  assert.equal(state.editorOpenPartId, '', 'floating the docked part empties the pane');
+  assert.deepEqual(state.editorOpenPartIds, [b], 'floating removes only that docked card');
+  assert.deepEqual(state.floatingEditorPartIds, [a]);
+
+  state = applyMockCommand(state, { cmd: 'closeEditor', partId: b });
+  assert.deepEqual(state.editorOpenPartIds, [], 'a named close leaves no unrelated changes');
+
+  state = applyMockCommand(state, { cmd: 'floatEditor', partId: b });
+  assert.deepEqual(state.floatingEditorPartIds, [a, b],
+    'the second part can return to a floating window independently');
 
   state = applyMockCommand(state, { cmd: 'closeEditorWindow', partId: b });
   assert.deepEqual(state.floatingEditorPartIds, [a], 'a window close closes only its window');

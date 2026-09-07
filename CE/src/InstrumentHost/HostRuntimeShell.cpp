@@ -35,12 +35,13 @@ HostRuntimeShell::HostRuntimeShell()
     options.editorPane.show = [this] (const juce::String& targetId, juce::AudioProcessor& processor,
                                       const juce::String& title)
     {
-        // Remembered because the pane itself is told a processor and a title, not who they
-        // belong to, and the thumbnail hooks below need to name the class they captured.
-        panedTargetId = targetId;
-        editorPane.show (processor, title);
+        editorPane.show (targetId, processor, title);
     };
-    options.editorPane.hide = [this] { editorPane.hide(); };
+    options.editorPane.close = [this] (const juce::String& targetId)
+    {
+        editorPane.close (targetId);
+    };
+    options.editorPane.closeAll = [this] { editorPane.hide(); };
 
     options.editorWindows.show = [this] (const juce::String& partId,
                                          juce::AudioProcessor& processor,
@@ -132,23 +133,25 @@ HostRuntimeShell::HostRuntimeShell()
 
     // The pane's close button goes through the service, same as the editor's preview — the
     // WebView's state stays authoritative instead of the pane closing behind its back.
-    editorPane.onCloseRequested = [this]
+    editorPane.onCloseRequested = [this] (const juce::String& targetId)
     {
         auto* payload = new juce::DynamicObject();
         payload->setProperty ("cmd", "closeEditor");
+        payload->setProperty ("partId", targetId);
         service->handleCommand (juce::var (payload));
     };
 
     // Thumbnails: the pane and the floating windows take the picture, the service decides
     // whether it wanted one and where it goes.
-    editorPane.shouldCaptureEditor = [this]
+    editorPane.shouldCaptureEditor = [this] (const juce::String& targetId)
     {
-        return service != nullptr && service->wantsEditorSnapshot (panedTargetId);
+        return service != nullptr && service->wantsEditorSnapshot (targetId);
     };
-    editorPane.onEditorPictured = [this] (const juce::Image& picture)
+    editorPane.onEditorPictured = [this] (const juce::String& targetId,
+                                          const juce::Image& picture)
     {
         if (service != nullptr)
-            service->offerEditorSnapshot (panedTargetId, picture);
+            service->offerEditorSnapshot (targetId, picture);
     };
     editorWindows.shouldCaptureEditor = [this] (const juce::String& partId)
     {

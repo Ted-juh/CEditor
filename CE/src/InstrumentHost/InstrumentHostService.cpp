@@ -49,8 +49,8 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
             presetAuditionPlaying = false;
         }
         partParameters.erase (partId);
-        if (partId == editorTargetId)
-            hideEditor();
+        if (editorTargetIds.contains (partId))
+            hideEditor (partId);
         if (floatingEditorIds.contains (partId))
         {
             floatingEditorIds.removeString (partId);
@@ -822,14 +822,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        // The editor follows the focused part (baseline §8.6.9): showEditorFor hides the
-        // pane when the newly focused part has nothing to show. An EFFECT editor stays put —
-        // the focus model distinguishes focused part from focused processor (§18.7.8), and
-        // yanking an effect editor away on part focus would fight the mixing workflow.
-        const auto followEditor = (bool) payload.getProperty ("followEditor", true);
-        if (followEditor && editorTargetId.isNotEmpty() && editorTargetId != partId
-            && rack.getPerformance().findPart (editorTargetId) != nullptr)
-            showEditorFor (partId);
+        // Docked editors are an explicit stack. Merely focusing a different part must not
+        // replace, close or silently add a card; the Editor button controls that stack.
 
         savePerformanceModel();
         emitState();
@@ -911,18 +905,16 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     if (cmd == "closeEditor")
     {
-        hideEditor();
+        hideEditor (payload.getProperty ("partId", {}).toString());
         emitState();
         return;
     }
 
     if (cmd == "floatEditor")
     {
-        // Any editor in its own window, beside however many others: the docked pane was
-        // policy, not a limit. The target is a part's instrument OR an insert effect — the
-        // same either-or the pane serves; the owner's first session found the effects half
-        // missing. A processor carries one live editor, so floating what is docked moves
-        // it out of the pane first.
+        // Any editor in its own window, beside however many docked or floating editors. The
+        // target is a part's instrument OR an insert effect. A processor carries one live
+        // editor, so floating a docked target removes only its matching card first.
         const auto targetId = payload.getProperty ("partId", {}).toString();
 
         juce::AudioProcessor* processor = rack.getInstrument (targetId);
@@ -947,8 +939,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        if (targetId == editorTargetId)
-            hideEditor();
+        if (editorTargetIds.contains (targetId))
+            hideEditor (targetId);
 
         floatingEditorIds.addIfNotAlreadyThere (targetId);
         if (options.editorWindows.show != nullptr)
@@ -6446,9 +6438,9 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
                 return;
             }
 
-            // The replacement will tear down the old editor through the rack hook; remember
-            // whether the pane was on this part so it can come straight back on the new one.
-            const bool editorWasHere = (editorTargetId == partId);
+            // The replacement tears down this part's card through the rack hook; remember it
+            // so the card can come straight back without disturbing the rest of the stack.
+            const bool editorWasHere = editorTargetIds.contains (partId);
 
             if (! rack.commitLoad (partId, generation, std::move (instrument),
                                    { info.ceId, info.modulePath, info.name, info.vendor }))
@@ -6593,7 +6585,7 @@ void InstrumentHostService::requestEffect (
                 return;
             }
 
-            const bool editorWasHere = (editorTargetId == effectId);
+            const bool editorWasHere = editorTargetIds.contains (effectId);
 
             if (! rack.commitEffectLoad (effectId, generation, std::move (effect),
                                          { info.ceId, info.modulePath, info.name, info.vendor }))
@@ -6690,11 +6682,18 @@ void InstrumentHostService::showEditorForEffect (const juce::String& effectId)
     const auto* slot = rack.getPerformance().findEffect (effectId);
     if (effect == nullptr || slot == nullptr)
     {
-        hideEditor();
+        hideEditor (effectId);
         return;
     }
 
-    editorTargetId = effectId;
+    if (floatingEditorIds.contains (effectId))
+    {
+        floatingEditorIds.removeString (effectId);
+        if (options.editorWindows.close != nullptr)
+            options.editorWindows.close (effectId);
+    }
+
+    editorTargetIds.addIfNotAlreadyThere (effectId);
     if (options.editorPane.show != nullptr)
         options.editorPane.show (effectId, *effect,
                                  slot->pluginName.isNotEmpty() ? slot->pluginName
@@ -6722,11 +6721,11 @@ void InstrumentHostService::showEditorFor (const juce::String& partId)
 
     if (part == nullptr || instrument == nullptr)
     {
-        hideEditor();
+        hideEditor (partId);
         return;
     }
 
-    // Docking a floating part moves the one editor back in; its window closes first.
+    // Docking a floating part moves its one editor back into the stack; its window closes first.
     if (floatingEditorIds.contains (partId))
     {
         floatingEditorIds.removeString (partId);
@@ -6734,21 +6733,32 @@ void InstrumentHostService::showEditorFor (const juce::String& partId)
             options.editorWindows.close (partId);
     }
 
-    editorTargetId = partId;
+    editorTargetIds.addIfNotAlreadyThere (partId);
     if (options.editorPane.show != nullptr)
         options.editorPane.show (partId, *instrument,
                                  part->pluginName.isNotEmpty() ? part->pluginName
                                                                : juce::String ("Instrument"));
 }
 
-void InstrumentHostService::hideEditor()
+void InstrumentHostService::hideEditor (const juce::String& targetId)
 {
-    if (editorTargetId.isEmpty())
+    if (targetId.isNotEmpty())
+    {
+        if (! editorTargetIds.contains (targetId))
+            return;
+
+        editorTargetIds.removeString (targetId);
+        if (options.editorPane.close != nullptr)
+            options.editorPane.close (targetId);
+        return;
+    }
+
+    if (editorTargetIds.isEmpty())
         return;
 
-    editorTargetId = {};
-    if (options.editorPane.hide != nullptr)
-        options.editorPane.hide();
+    editorTargetIds.clear();
+    if (options.editorPane.closeAll != nullptr)
+        options.editorPane.closeAll();
 }
 
 int InstrumentHostService::neededInputChannels() const
@@ -9428,8 +9438,8 @@ void InstrumentHostService::drainProcessorFailures()
             lastKnownValues = found->second.lastKnownValues;
         partParameters.erase (failure.targetId);
         touchedParametersByTarget.erase (failure.targetId);
-        if (editorTargetId == failure.targetId)
-            hideEditor();
+        if (editorTargetIds.contains (failure.targetId))
+            hideEditor (failure.targetId);
         if (floatingEditorIds.contains (failure.targetId))
         {
             floatingEditorIds.removeString (failure.targetId);
@@ -12781,8 +12791,16 @@ void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)
 
 void InstrumentHostService::reassertEditorPane()
 {
-    if (editorTargetId.isNotEmpty())
-        showEditorFor (editorTargetId);
+    // showEditorFor may prune a target that disappeared while the outer editor was closed,
+    // so iterate a copy rather than the live array.
+    const auto intended = editorTargetIds;
+    for (const auto& targetId : intended)
+    {
+        if (rack.getInstrument (targetId) != nullptr)
+            showEditorFor (targetId);
+        else
+            showEditorForEffect (targetId);
+    }
 }
 
 const PluginClassRecord* InstrumentHostService::findClass (const juce::String& ceId,
@@ -13588,7 +13606,14 @@ juce::var InstrumentHostService::buildStatePayload()
     root->setProperty ("licence", licencePayload());
     root->setProperty ("stageLocked", stageLocked);
     root->setProperty ("scanning", scanBusy.load());
-    root->setProperty ("editorOpenPartId", editorTargetId);
+    juce::Array<juce::var> dockedEditors;
+    for (const auto& targetId : editorTargetIds)
+        dockedEditors.add (targetId);
+    root->setProperty ("editorOpenPartIds", dockedEditors);
+    // Kept for older front ends: the most recently opened card was the only value they knew.
+    root->setProperty ("editorOpenPartId", editorTargetIds.isEmpty()
+                                                ? juce::String()
+                                                : editorTargetIds[editorTargetIds.size() - 1]);
     {
         juce::Array<juce::var> floating;
         for (const auto& partId : floatingEditorIds)

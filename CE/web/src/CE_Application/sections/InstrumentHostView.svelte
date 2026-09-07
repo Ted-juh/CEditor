@@ -468,8 +468,13 @@
   });
 
   function toggleEditor(part) {
-    if ($hostState.editorOpenPartId === part.partId) closeEditor();
+    if ($hostState.editorOpenPartIds.includes(part.partId)) closeEditor(part.partId);
     else openEditor(part.partId);
+  }
+
+  function toggleEffectEditor(effectId) {
+    if ($hostState.editorOpenPartIds.includes(effectId)) closeEditor(effectId);
+    else openEffectEditor(effectId);
   }
 
   /** L20 / C / R35 — how a pan reads on a desk, not -0.2. */
@@ -1085,7 +1090,7 @@
                       onclick={() => moveRackPart(part.partId, partIndex + 1)}><ChevronDown size={20} strokeWidth={2} /></button>
               <span class="action-sep" aria-hidden="true"></span>
               <button type="button" class="toggle icon" disabled={!part.hasInstrument}
-                      class:on={$hostState.editorOpenPartId === part.partId}
+                      class:on={$hostState.editorOpenPartIds.includes(part.partId)}
                       data-testid="part-open-editor"
                       aria-label={`Show ${partTitle(part)}'s own interface in the host`}
                       title="Show the plug-in's own interface in the native pane"
@@ -1494,9 +1499,9 @@
                   <PropertyToggle compact label="Byp" value={effect.bypassed} ariaLabel={`Bypass ${effect.pluginName}`}
                                   onchange={(on) => setEffectBypassed(effect.effectId, on)} />
                   <button type="button" class="toggle" disabled={!effect.hasProcessor}
-                          class:on={$hostState.editorOpenPartId === effect.effectId}
+                          class:on={$hostState.editorOpenPartIds.includes(effect.effectId)}
                           title="Show the effect's own interface"
-                          onclick={() => openEffectEditor(effect.effectId)}>Editor</button>
+                          onclick={() => toggleEffectEditor(effect.effectId)}>Editor</button>
                   <button type="button" class="toggle"
                           class:on={$hostState.floatingEditorPartIds.includes(effect.effectId)}
                           disabled={!effect.hasProcessor}

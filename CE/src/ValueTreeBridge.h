@@ -44,7 +44,7 @@ public:
 
     /** The pane's own close button, routed through the instrument host so the WebView's
         state stays authoritative. No-op before the host exists. */
-    void requestInstrumentEditorClose();
+    void requestInstrumentEditorClose (const juce::String& targetId);
 
     /** Returns WebBrowserComponent::Options with all native functions and event listeners
      *  registered. Chain this into your Options builder before constructing the WebBrowserComponent.
@@ -154,9 +154,6 @@ private:
     // only the handlers .cpp needs the host implementation.
     std::unique_ptr<ceditor::host::InstrumentHostService> instrumentHost;
     ceditor::host::PluginEditorHost* editorPane = nullptr;
-    // Who the pane is currently showing. The pane is told a processor and a title; the
-    // thumbnail hooks need the target's identity to ask the service about its class.
-    juce::String panedEditorTargetId;
     // Active Host Project build (tools/scripts/build-host-product.mjs as a child process), held
     // as its Timer base for the same reason as buildJob above.
     std::unique_ptr<juce::Timer> hostBuildJob;

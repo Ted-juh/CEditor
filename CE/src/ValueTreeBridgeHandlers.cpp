@@ -1735,13 +1735,15 @@ void ValueTreeBridge::ensureInstrumentHost()
     options.editorPane.show = [this] (const juce::String& targetId, juce::AudioProcessor& processor,
                                       const juce::String& title)
     {
-        // Remembered for the thumbnail hooks below: the pane is handed a processor and a
-        // title, and never learns whose they are.
-        panedEditorTargetId = targetId;
         if (editorPane != nullptr)
-            editorPane->show (processor, title);
+            editorPane->show (targetId, processor, title);
     };
-    options.editorPane.hide = [this]
+    options.editorPane.close = [this] (const juce::String& targetId)
+    {
+        if (editorPane != nullptr)
+            editorPane->close (targetId);
+    };
+    options.editorPane.closeAll = [this]
     {
         if (editorPane != nullptr)
             editorPane->hide();
@@ -1871,15 +1873,16 @@ void ValueTreeBridge::ensureInstrumentHost()
     // Wired after construction because they need the service that was just built.
     if (editorPane != nullptr)
     {
-        editorPane->shouldCaptureEditor = [this]
+        editorPane->shouldCaptureEditor = [this] (const juce::String& targetId)
         {
             return instrumentHost != nullptr
-                   && instrumentHost->wantsEditorSnapshot (panedEditorTargetId);
+                   && instrumentHost->wantsEditorSnapshot (targetId);
         };
-        editorPane->onEditorPictured = [this] (const juce::Image& picture)
+        editorPane->onEditorPictured = [this] (const juce::String& targetId,
+                                               const juce::Image& picture)
         {
             if (instrumentHost != nullptr)
-                instrumentHost->offerEditorSnapshot (panedEditorTargetId, picture);
+                instrumentHost->offerEditorSnapshot (targetId, picture);
         };
     }
 
@@ -1940,12 +1943,13 @@ void ValueTreeBridge::ensureInstrumentHost()
     instrumentParamPump = std::make_unique<ParamPump> (*instrumentHost, *instrumentSurfaceBroker);
 }
 
-void ValueTreeBridge::requestInstrumentEditorClose()
+void ValueTreeBridge::requestInstrumentEditorClose (const juce::String& targetId)
 {
     if (instrumentHost == nullptr)
         return;
 
     auto* payload = new juce::DynamicObject();
     payload->setProperty ("cmd", "closeEditor");
+    payload->setProperty ("partId", targetId);
     instrumentHost->handleCommand (juce::var (payload));
 }

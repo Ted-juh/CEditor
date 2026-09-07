@@ -572,8 +572,9 @@ private:
     {
         if (frame == nullptr)
             return;
-        width.store (frame->getWidth(), std::memory_order_release);
-        height.store (frame->getHeight(), std::memory_order_release);
+        const auto content = frame->contentSize();
+        width.store (content.x, std::memory_order_release);
+        height.store (content.y, std::memory_order_release);
     }
 
     // The editor's frame: sized BY the editor, never the other way round. A vendor GUI that
@@ -603,6 +604,12 @@ private:
 
         void paint (juce::Graphics& graphics) override { graphics.fillAll (juce::Colours::black); }
         void resized() override { editor->setTopLeftPosition (0, 0); }
+
+        juce::Point<int> contentSize() const noexcept
+        {
+            return { juce::jmax (1, editor->getWidth()),
+                     juce::jmax (1, editor->getHeight()) };
+        }
 
     private:
         void componentMovedOrResized (juce::Component&, bool, bool wasResized) override

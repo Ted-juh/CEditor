@@ -17,10 +17,11 @@ public:
     {
         addChildComponent (editorPane);
         editorPane.onLayoutChanged = [this] { resized(); };
-        editorPane.onCloseRequested = [this]
+        editorPane.onCloseRequested = [this] (const juce::String& targetId)
         {
             auto* payload = new juce::DynamicObject();
             payload->setProperty ("cmd", "closeEditor");
+            payload->setProperty ("partId", targetId);
             owner.getService().handleCommand (juce::var (payload));
         };
 
@@ -29,20 +30,21 @@ public:
                              const juce::String& title)
         {
             // Remembered for the thumbnail hooks: the pane is told a processor, not whose.
-            panedTargetId = targetId;
-            editorPane.show (instrument, title);
+            editorPane.show (targetId, instrument, title);
         };
-        hooks.hide = [this] { editorPane.hide(); };
+        hooks.close = [this] (const juce::String& targetId) { editorPane.close (targetId); };
+        hooks.closeAll = [this] { editorPane.hide(); };
         owner.getService().setEditorPaneHooks (std::move (hooks));
 
         // Thumbnails: the pane takes the picture, the service decides whether it wanted one.
-        editorPane.shouldCaptureEditor = [this]
+        editorPane.shouldCaptureEditor = [this] (const juce::String& targetId)
         {
-            return owner.getService().wantsEditorSnapshot (panedTargetId);
+            return owner.getService().wantsEditorSnapshot (targetId);
         };
-        editorPane.onEditorPictured = [this] (const juce::Image& picture)
+        editorPane.onEditorPictured = [this] (const juce::String& targetId,
+                                              const juce::Image& picture)
         {
-            owner.getService().offerEditorSnapshot (panedTargetId, picture);
+            owner.getService().offerEditorSnapshot (targetId, picture);
         };
 
         auto webViewOptions = makeHostWebViewOptions ("CEHost_WebView2",
@@ -118,8 +120,6 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;
-    juce::String panedTargetId;   // who the pane is showing, for the thumbnail hooks
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HostPluginEditor)
 };
 

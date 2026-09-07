@@ -232,12 +232,12 @@
 //      range/inversion so hardware and UI share one transform.)
 //
 // THE EDITOR PANE is presentation the service commands but does not own: Options::editorPane
-// carries show/hide hooks into the native PluginEditorHost (stubs in tests). The service owns
-// the POLICY — one editor, following the focused part; hidden before its processor dies (via
-// the rack's onInstrumentWillBeRemoved); re-shown across a same-part replacement; close is
-// never unload. The pane object must outlive this service or be unhooked first; in the app
-// the pane is destroyed before the bridge that owns this service, which also guarantees any
-// last editor dies before the rack's processors do.
+// carries add/close hooks into the native PluginEditorHost (stubs in tests). The service owns
+// the explicit stack of docked target ids: each affected card is hidden before its processor
+// dies (via the rack's onInstrumentWillBeRemoved), re-shown across a same-target replacement,
+// and close is never unload. The pane object must outlive this service or be unhooked first;
+// in the app the pane is destroyed before the bridge that owns this service, which also
+// guarantees every last editor dies before the rack's processors do.
 //
 // AUDIO (Options::enableAudio) makes the editor the Preview Runtime in the simplest honest
 // form: default output device, every MIDI input enabled, AudioProcessorPlayer driving the
@@ -276,7 +276,8 @@ public:
     {
         std::function<void (const juce::String& partId, juce::AudioProcessor& processor,
                             const juce::String& title)> show;
-        std::function<void()> hide;
+        std::function<void (const juce::String& partId)> close;
+        std::function<void()> closeAll;
     };
 
     /** Floating editor windows — any number at once, owned by the app like the pane is.
@@ -402,9 +403,8 @@ public:
         hooks) on destruction. The service keeps its editor intent across the gap. */
     void setEditorPaneHooks (EditorPaneHooks hooks);
 
-    /** Re-shows the intended part's editor into a freshly attached pane — the DAW reopened
-        the plug-in window and the pane is new, but which editor was open is service state
-        and survived. */
+    /** Re-shows every intended editor into a freshly attached pane — the DAW reopened the
+        plug-in window and the pane is new, but the stack is service state and survived. */
     void reassertEditorPane();
 
     // -- editor thumbnails ------------------------------------------------------------------
@@ -857,7 +857,7 @@ private:
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
     void showEditorFor (const juce::String& partId);
-    void hideEditor();
+    void hideEditor (const juce::String& targetId = {});
     void startAudio();
     void stopAudio();
     /** Reopens the device when a hardware audio return now needs more input channels than
@@ -1092,7 +1092,7 @@ private:
     mutable std::mutex catalogLock;
     InstrumentRackHost rack;
     juce::StringArray userScanPaths;
-    juce::String editorTargetId;      // the part whose editor the pane is showing, or empty
+    juce::StringArray editorTargetIds; // instrument/effect editors stacked in the docked pane
     juce::StringArray floatingEditorIds;   // parts whose editors float in their own windows
     bool sessionRestored = false;
     // Stage Lock is deliberately session-only: reopening the application must not strand the

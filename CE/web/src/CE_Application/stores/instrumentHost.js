@@ -716,6 +716,7 @@ export function emptyHostState() {
     scanning: false,
     stageLocked: false,
     editorOpenPartId: '',
+    editorOpenPartIds: [],
     floatingEditorPartIds: [],
     audio: { enabled: false, running: false, deviceName: '', sampleRate: 0, bufferSize: 0,
              inputChannels: 0, cpu: 0, xruns: 0 },
@@ -2271,6 +2272,10 @@ function normalizePluginClass(i) {
 export function normalizeHostState(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const rack = p.rack && typeof p.rack === 'object' ? p.rack : {};
+  const editorOpenPartIds = (Array.isArray(p.editorOpenPartIds)
+    ? p.editorOpenPartIds.map(String)
+    : (p.editorOpenPartId === undefined || p.editorOpenPartId === null
+        || String(p.editorOpenPartId) === '' ? [] : [String(p.editorOpenPartId)]));
 
   return {
     instruments: (Array.isArray(p.instruments) ? p.instruments : []).map(normalizePluginClass),
@@ -2289,7 +2294,9 @@ export function normalizeHostState(payload) {
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
     stageLocked: p.stageLocked === true,
-    editorOpenPartId: String(p.editorOpenPartId ?? ''),
+    // Singular is retained for compatibility with an older native host. New UI uses the set.
+    editorOpenPartId: editorOpenPartIds.at(-1) ?? '',
+    editorOpenPartIds,
     floatingEditorPartIds: (Array.isArray(p.floatingEditorPartIds) ? p.floatingEditorPartIds : []).map(String),
     audio: {
       enabled: p.audio?.enabled === true,
@@ -3200,6 +3207,10 @@ export function applyMockCommand(state, payload) {
   const cmd = payload?.cmd;
   const next = normalizeHostState(state);
   const part = (id) => next.rack.parts.find((p) => p.partId === id);
+  const setDockedEditors = (ids) => {
+    next.editorOpenPartIds = [...new Set(ids.map(String).filter(Boolean))];
+    next.editorOpenPartId = next.editorOpenPartIds.at(-1) ?? '';
+  };
 
   if (cmd === 'setStageLock') {
     if (payload?.enabled === true) next.stageLocked = true;
@@ -3318,21 +3329,19 @@ export function applyMockCommand(state, payload) {
     })).filter((group) => group.members.length >= 2);
     if (next.rack.focusedPartId === payload.partId)
       next.rack.focusedPartId = next.rack.parts[0]?.partId ?? '';
-    if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
+    setDockedEditors(next.editorOpenPartIds.filter((id) => id !== payload.partId));
     return next;
   }
   if (cmd === 'focusPart') {
     if (part(payload.partId)) {
       next.rack.focusedPartId = payload.partId;
-      // The editor follows focus, hiding over an empty part — the native rule, mirrored.
-      if (next.editorOpenPartId && next.editorOpenPartId !== payload.partId)
-        next.editorOpenPartId = part(payload.partId)?.hasInstrument ? payload.partId : '';
+      // The docked editor stack is explicit; focus does not add or replace cards.
     }
     return next;
   }
   if (cmd === 'openEditor') {
     if (part(payload.partId)?.hasInstrument) {
-      next.editorOpenPartId = payload.partId;
+      setDockedEditors([...next.editorOpenPartIds, payload.partId]);
       // One editor per processor: docking pulls a floating part back in.
       next.floatingEditorPartIds = next.floatingEditorPartIds.filter((id) => id !== payload.partId);
     }
@@ -3344,7 +3353,7 @@ export function applyMockCommand(state, payload) {
                            ...next.rack.returns.flatMap((r) => r.effects)];
     const isLiveEffect = effectTargets.some((e) => e.effectId === payload.partId && e.hasProcessor);
     if (part(payload.partId)?.hasInstrument || isLiveEffect) {
-      if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
+      setDockedEditors(next.editorOpenPartIds.filter((id) => id !== payload.partId));
       if (!next.floatingEditorPartIds.includes(payload.partId))
         next.floatingEditorPartIds = [...next.floatingEditorPartIds, payload.partId];
     }
@@ -3355,7 +3364,9 @@ export function applyMockCommand(state, payload) {
     return next;
   }
   if (cmd === 'closeEditor') {
-    next.editorOpenPartId = '';
+    setDockedEditors(payload.partId
+      ? next.editorOpenPartIds.filter((id) => id !== payload.partId)
+      : []);
     return next;
   }
   if (cmd === 'loadInstrument') {
@@ -3390,7 +3401,7 @@ export function applyMockCommand(state, payload) {
   if (cmd === 'unloadInstrument') {
     const target = part(payload.partId);
     if (target) { target.hasInstrument = false; target.unresolved = target.pluginCeId !== ''; }
-    if (next.editorOpenPartId === payload.partId) next.editorOpenPartId = '';
+    setDockedEditors(next.editorOpenPartIds.filter((id) => id !== payload.partId));
     return next;
   }
   if (cmd === 'setPartMixer') {
@@ -3487,13 +3498,28 @@ export function applyMockCommand(state, payload) {
     else next.rack.returns.find((r) => r.returnId === payload.chainId)?.effects.push(slot);
     return next;
   }
+  if (cmd === 'openEffectEditor') {
+    const effects = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
+                     ...next.rack.returns.map((r) => r.effects)].flat();
+    if (effects.some((effect) => effect.effectId === payload.effectId && effect.hasProcessor)) {
+      setDockedEditors([...next.editorOpenPartIds, payload.effectId]);
+      next.floatingEditorPartIds = next.floatingEditorPartIds
+        .filter((id) => id !== payload.effectId);
+    }
+    return next;
+  }
   if (cmd === 'removeEffect' || cmd === 'setEffectBypassed' || cmd === 'moveEffect') {
     const chains = [next.rack.masterEffects, ...next.rack.parts.map((p) => p.effects),
                     ...next.rack.returns.map((r) => r.effects)];
     for (const chain of chains) {
       const index = chain.findIndex((e) => e.effectId === payload.effectId);
       if (index < 0) continue;
-      if (cmd === 'removeEffect') chain.splice(index, 1);
+      if (cmd === 'removeEffect') {
+        chain.splice(index, 1);
+        setDockedEditors(next.editorOpenPartIds.filter((id) => id !== payload.effectId));
+        next.floatingEditorPartIds = next.floatingEditorPartIds
+          .filter((id) => id !== payload.effectId);
+      }
       else if (cmd === 'setEffectBypassed') chain[index].bypassed = payload.bypassed === true;
       else chain.splice(Math.max(0, Math.min(chain.length - 1, Number(payload.index ?? 0))), 0,
                         ...chain.splice(index, 1));
@@ -6173,7 +6199,9 @@ export const sendMicrotuning = (partId = '') =>
   send(partId ? { cmd: 'sendMicrotuning', partId } : { cmd: 'sendMicrotuning' });
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
 export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
-export const closeEditor = () => send({ cmd: 'closeEditor' });
+export const closeEditor = (partId = '') => send(partId
+  ? { cmd: 'closeEditor', partId }
+  : { cmd: 'closeEditor' });
 export const floatEditor = (partId) => send({ cmd: 'floatEditor', partId });
 export const closeEditorWindow = (partId) => send({ cmd: 'closeEditorWindow', partId });
 export const requestAudioDevices = () => send({ cmd: 'getAudioDevices' });

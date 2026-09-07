@@ -7,7 +7,7 @@
 // HostRuntimeShell — the generated Hostage standalone's whole window content.
 //
 // The same split WebViewHost gives the editor, without any of the editor: host.html in a
-// WebView on the left, the native PluginEditorHost pane on the right, one
+// WebView on the left, the stacked native PluginEditorHost pane on the right, one
 // InstrumentHostService between them with audio enabled — the shell IS the Performance
 // Runtime, so it opens the default output device and every MIDI input the way the editor's
 // preview does, and persists its session per user under its own product directory (never
@@ -53,9 +53,6 @@ private:
     std::unique_ptr<juce::WebBrowserComponent> webView;
     juce::Label statusLabel;   // only ever visible when WebView2 could not start
     PluginEditorHost editorPane;
-    // Who the pane is currently showing. The pane is handed a processor and a title; the
-    // thumbnail hooks need the target's identity to ask the service about its class.
-    juce::String panedTargetId;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HostRuntimeShell)
 };

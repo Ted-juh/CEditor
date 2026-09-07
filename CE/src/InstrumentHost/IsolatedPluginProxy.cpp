@@ -268,16 +268,16 @@ private:
                 child = nativeHandle;
                 childPixelSize = {};
                 placedArea = {};
+                placedClipArea = {};
                 placedShowing = false;
                 startTimer (250);
                 repaint();
             }
 
-            // The worker window may have been prewarmed beneath HWND_MESSAGE. That parking
-            // window has no monitor DPI, so the child's JUCE peer can report physical pixels
-            // as if they were logical component units after it is reparented into Hostage.
-            // Measuring the actual HWND avoids trusting that stale scale factor. Hostage's
-            // component stays in logical units; the borrowed child keeps its exact pixel size.
+            // A VST3 reports its editor extent in native pixels. The worker wraps that editor
+            // in a DPI-aware JUCE peer, which makes the OUTER HWND 125% larger on a 125% display.
+            // The protocol's reported size is still the plug-in content size and is therefore
+            // the size the borrowed HWND must keep. Hostage converts it to logical units once.
             updateSizeFromChild (width, height);
             if (! readyReported)
             {
@@ -290,8 +290,9 @@ private:
                                          + (reused ? "reparented" : "constructed") + " by worker in "
                                          + juce::String (workerOpenMs) + " ms; "
                                          + juce::String (width) + "x" + juce::String (height)
-                                         + " reported, " + juce::String (childPixelSize.x) + "x"
-                                         + juce::String (childPixelSize.y) + " native pixels, "
+                                         + " content pixels, " + juce::String (measuredWindowPixelSize.x)
+                                         + "x" + juce::String (measuredWindowPixelSize.y)
+                                         + " wrapper pixels before correction, "
                                          + juce::String (getWidth()) + "x" + juce::String (getHeight())
                                          + " host units");
             }
@@ -324,6 +325,7 @@ private:
         auto logicalHeight = reportedHeight;
 
        #if JUCE_WINDOWS
+        measuredWindowPixelSize = {};
         if (child != 0)
         {
             RECT client {};
@@ -335,9 +337,18 @@ private:
                     juce::jmax (0, static_cast<int> (client.right - client.left)),
                     juce::jmax (0, static_cast<int> (client.bottom - client.top)) };
                 if (measured.x > 0 && measured.y > 0)
-                    childPixelSize = measured;
+                    measuredWindowPixelSize = measured;
             }
         }
+
+        // The worker's Frame is sized directly from AudioProcessorEditor::getWidth/Height,
+        // before its desktop peer scales the wrapper. That makes the reported dimensions the
+        // authoritative native content extent. The HWND measurement is only a fallback for an
+        // older/malformed worker that did not publish a usable size.
+        if (reportedWidth > 0 && reportedHeight > 0)
+            childPixelSize = { reportedWidth, reportedHeight };
+        else if (measuredWindowPixelSize.x > 0 && measuredWindowPixelSize.y > 0)
+            childPixelSize = measuredWindowPixelSize;
 
         if (childPixelSize.x > 0 && childPixelSize.y > 0)
         {
@@ -359,8 +370,11 @@ private:
 
     // The child over this component, in the peer's physical pixels: the peer's own account
     // of where this component is, scaled as juce::HWNDComponent scales it. Its size remains
-    // the HWND's measured pixel size rather than being derived from the parked peer's stale
-    // DPI scale. Shown or hidden with this component, and never activated or reordered here.
+    // the worker-reported VST3 content extent rather than the DPI-enlarged outer wrapper.
+    // The native child must respect the vertical card boundaries and the right edge of each
+    // JUCE viewport, or it paints above adjacent editors and their scrollbars. Its left edge
+    // deliberately remains unclipped: scrolling a wide editor right may let it slide out over
+    // the workspace, which is the useful pane behaviour rather than squeezing the plug-in.
     void place()
     {
        #if JUCE_WINDOWS
@@ -373,20 +387,51 @@ private:
                      * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
         if (childPixelSize.x > 0 && childPixelSize.y > 0)
             area.setSize (childPixelSize.x, childPixelSize.y);
-        const auto showing = isShowing();
+
+        auto visibleTop = area.getY();
+        auto visibleRight = area.getRight();
+        auto visibleBottom = area.getBottom();
+        for (auto* ancestor = getParentComponent(); ancestor != nullptr;
+             ancestor = ancestor->getParentComponent())
+        {
+            const auto ancestorArea = (peer->getAreaCoveredBy (*ancestor).toFloat()
+                                       * peer->getPlatformScaleFactor()).getSmallestIntegerContainer();
+            visibleTop = juce::jmax (visibleTop, ancestorArea.getY());
+            visibleRight = juce::jmin (visibleRight, ancestorArea.getRight());
+            visibleBottom = juce::jmin (visibleBottom, ancestorArea.getBottom());
+            if (visibleRight <= area.getX() || visibleBottom <= visibleTop)
+                break;
+        }
+
+        const juce::Rectangle<int> visibleArea {
+            area.getX(),
+            visibleTop,
+            juce::jmax (0, visibleRight - area.getX()),
+            juce::jmax (0, visibleBottom - visibleTop)
+        };
+        const auto clipArea = visibleArea.translated (-area.getX(), -area.getY());
+        const auto showing = isShowing() && ! clipArea.isEmpty();
         // Only when something changed. Every SetWindowPos and ShowWindow is a synchronous
         // message into the worker's message thread, and this was being called on every
         // poll tick — four times a second — with nothing to say, which is four interruptions
         // a second of a thread that is trying to draw a plug-in.
-        if (area == placedArea && showing == placedShowing)
+        if (area == placedArea && clipArea == placedClipArea && showing == placedShowing)
             return;
         const auto hwnd = reinterpret_cast<HWND> (static_cast<juce::pointer_sized_int> (child));
         if (area != placedArea)
             ::SetWindowPos (hwnd, nullptr, area.getX(), area.getY(), area.getWidth(), area.getHeight(),
                             SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+        if (clipArea != placedClipArea)
+        {
+            const auto region = ::CreateRectRgn (clipArea.getX(), clipArea.getY(),
+                                                 clipArea.getRight(), clipArea.getBottom());
+            if (::SetWindowRgn (hwnd, region, TRUE) == 0)
+                ::DeleteObject (region);
+        }
         if (showing != placedShowing)
             ::ShowWindow (hwnd, showing ? SW_SHOWNA : SW_HIDE);
         placedArea = area;
+        placedClipArea = clipArea;
         placedShowing = showing;
        #endif
     }
@@ -395,8 +440,10 @@ private:
     std::unique_ptr<Watcher> watcher;
     juce::int64 hostWindow = 0;   // the peer the child was created in
     juce::int64 child = 0;        // the worker's window, 0 until it exists
-    juce::Point<int> childPixelSize; // measured HWND client size; never DPI-scaled a second time
+    juce::Point<int> childPixelSize; // worker-reported VST3 content extent in native pixels
+    juce::Point<int> measuredWindowPixelSize; // outer wrapper before Hostage corrects it
     juce::Rectangle<int> placedArea;   // what the child was last told, so it is not told again
+    juce::Rectangle<int> placedClipArea; // visible slice after JUCE ancestor clipping
     bool placedShowing = false;
     int reportedStallMs = 0;
     double openRequestedMs = 0.0;

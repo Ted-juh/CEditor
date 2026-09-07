@@ -359,11 +359,20 @@ struct Harness
                                           const juce::String& title)
         {
             paneLog.push_back ("show:" + partId + ":" + title);
+            openPaneEditors.addIfNotAlreadyThere (partId);
             lastShownProcessor = &processor;
         };
-        options.editorPane.hide = [this]
+        options.editorPane.close = [this] (const juce::String& partId)
         {
             paneLog.push_back ("hide");
+            openPaneEditors.removeString (partId);
+            if (openPaneEditors.isEmpty())
+                lastShownProcessor = nullptr;
+        };
+        options.editorPane.closeAll = [this]
+        {
+            paneLog.push_back ("hide");
+            openPaneEditors.clear();
             lastShownProcessor = nullptr;
         };
         options.editorWindows.show = [this] (const juce::String& partId,
@@ -416,8 +425,20 @@ struct Harness
                                 : juce::String();
     }
 
+    juce::StringArray editorOpenPartIds() const
+    {
+        juce::StringArray result;
+        const auto* state = emits.lastState();
+        const auto ids = state != nullptr ? state->getProperty ("editorOpenPartIds", {})
+                                          : juce::var();
+        for (int i = 0; i < ids.size(); ++i)
+            result.add (ids[i].toString());
+        return result;
+    }
+
     Emits emits;
     std::vector<juce::String> paneLog;
+    juce::StringArray openPaneEditors;
     juce::AudioProcessor* lastShownProcessor = nullptr;
     std::vector<juce::String> windowLog;
     juce::StringArray openWindows;
@@ -1808,7 +1829,7 @@ void testCtrl49Broker()
 
 void testEditorPolicy()
 {
-    std::cout << "\neditor pane policy" << std::endl;
+    std::cout << "\nstacked editor pane policy" << std::endl;
 
     const auto dir = freshDataDir ("editor");
     seedCatalog (dir);
@@ -1837,27 +1858,34 @@ void testEditorPolicy()
     check (h.editorOpenPartId() == a, "state carries the open editor's part");
 
     h.cmd ("focusPart", { { "partId", b } });
-    check (h.paneLog.back() == "show:" + b + ":Good Synth",
-           "the editor follows the focused part");
-    check (h.editorOpenPartId() == b, "state follows too");
+    check (h.openPaneEditors.size() == 1 && h.openPaneEditors.contains (a),
+           "focus alone does not replace an explicitly opened editor card");
 
     h.cmd ("focusPart", { { "partId", empty } });
-    check (h.paneLog.back() == "hide", "focusing an empty part hides the pane");
-    check (h.editorOpenPartId().isEmpty(), "and state says so");
+    check (h.openPaneEditors.contains (a), "focusing an empty part leaves the stack intact");
 
-    // Replacement continuity: reopen on B, replace B's instrument, the pane comes back on
-    // the new one — hidden first (the old editor must die before its processor), then shown.
     h.cmd ("openEditor", { { "partId", b } });
+    check (h.openPaneEditors.size() == 2 && h.openPaneEditors.contains (a)
+             && h.openPaneEditors.contains (b),
+           "opening a second instrument adds a second docked editor");
+    check (h.editorOpenPartIds().size() == 2,
+           "state carries the complete docked editor stack");
+
+    // Replacement continuity: replace B's instrument; only B's card is rebuilt while A stays.
     h.paneLog.clear();
     h.cmd ("loadInstrument", { { "partId", b }, { "ceId", "VST3-good-synth" } });
     check (h.paneLog.size() >= 2 && h.paneLog.front() == "hide"
              && h.paneLog.back() == "show:" + b + ":Good Synth",
            "a replacement hides the old editor first and re-shows on the new instrument");
+    check (h.openPaneEditors.contains (a) && h.openPaneEditors.contains (b),
+           "replacing one instrument preserves the other editor cards");
     check (h.lastShownProcessor == h.service->getRackHost().getInstrument (b),
            "showing the replacement instrument, not the destroyed one");
 
-    h.cmd ("closeEditor");
-    check (h.paneLog.back() == "hide" && h.editorOpenPartId().isEmpty(), "closeEditor hides");
+    h.cmd ("closeEditor", { { "partId", b } });
+    check (h.paneLog.back() == "hide" && h.openPaneEditors.size() == 1
+             && h.openPaneEditors.contains (a),
+           "closeEditor removes only the named card");
     check (h.service->getRackHost().partHasInstrument (b),
            "and close is not unload — the instrument stays");
 
@@ -1866,9 +1894,9 @@ void testEditorPolicy()
     h.cmd ("removePart", { { "partId", b } });
     check (! h.paneLog.empty() && h.paneLog.front() == "hide",
            "removing the part hides its editor before the processor dies");
-    check (h.editorOpenPartId().isEmpty(), "and clears the open-editor state");
+    check (! h.openPaneEditors.contains (b) && h.openPaneEditors.contains (a),
+           "and clears only that part from the open-editor state");
 
-    h.cmd ("openEditor", { { "partId", a } });
     h.paneLog.clear();
     h.cmd ("unloadInstrument", { { "partId", a } });
     check (! h.paneLog.empty() && h.paneLog.front() == "hide",

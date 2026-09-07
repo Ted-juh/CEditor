@@ -52,7 +52,7 @@
   // else: opening a plug-in's interface, floating it or removing the part all meant switching
   // back to List, which is a worse place to hide a control than any menu.
   const toggleEditor = (partId) =>
-    ($hostState.editorOpenPartId === partId ? closeEditor() : openEditor(partId));
+    ($hostState.editorOpenPartIds.includes(partId) ? closeEditor(partId) : openEditor(partId));
   const toggleFloat = (partId) =>
     ($hostState.floatingEditorPartIds.includes(partId)
        ? closeEditorWindow(partId) : floatEditor(partId));
@@ -236,7 +236,7 @@
         {#if isPart}
           <span class="node-actions">
             <button type="button" class="node-action" disabled={!node.hasInstrument}
-                    class:on={$hostState.editorOpenPartId === node.id}
+                    class:on={$hostState.editorOpenPartIds.includes(node.id)}
                     data-testid="canvas-open-editor"
                     aria-label={`Show ${node.title}'s own interface in the host`}
                     title="Show the plug-in's own interface in the native pane"

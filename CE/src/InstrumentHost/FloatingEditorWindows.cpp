@@ -4,9 +4,10 @@
 namespace ceditor::host
 {
 
-// One part's window: native title bar, the editor as non-owned content so destruction order
-// stays explicit (editor first, window after), and a listener so a vendor GUI that resizes
-// itself carries its window along instead of being clipped.
+// One part's window: native title bar, a scrollable viewport around the non-owned editor,
+// and a listener so a vendor GUI that resizes itself carries its window along when it fits.
+// The viewport keeps every part of an editor reachable when its natural size is larger than
+// the display, or when the user deliberately makes the floating window smaller.
 class FloatingEditorWindows::EditorWindow final : public juce::DocumentWindow,
                                                  private juce::ComponentListener,
                                                  private juce::Timer
@@ -29,8 +30,14 @@ public:
             editor = std::make_unique<juce::GenericAudioProcessorEditor> (processor);
 
         editor->addComponentListener (this);
-        setContentNonOwned (editor.get(), true);
-        setResizable (editor->isResizable(), false);
+        viewport.setScrollBarsShown (true, true);
+        viewport.setViewedComponent (editor.get(), false);
+        setContentNonOwned (&viewport, false);
+        fitWindowToEditor();
+
+        // A fixed-size VST editor still needs a resizable HOST window: resizing changes the
+        // viewport, never the vendor editor, and reveals scrollbars whenever it no longer fits.
+        setResizable (true, false);
         setVisible (true);
 
         if (owner.onEditorPictured != nullptr
@@ -46,6 +53,7 @@ public:
         // The invariant's window half: the editor dies here, first, every path.
         if (editor != nullptr)
             editor->removeComponentListener (this);
+        viewport.setViewedComponent (nullptr, false);
         setContentNonOwned (nullptr, false);
         editor.reset();
     }
@@ -82,14 +90,45 @@ private:
 
     void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
     {
-        // A vendor editor that resizes itself takes its window with it.
+        // A vendor editor that changes its natural size takes the viewport with it, capped
+        // to the current display so an oversized UI never puts its window edges off-screen.
         if (wasResized && editor != nullptr)
-            setContentNonOwned (editor.get(), true);
+            fitWindowToEditor();
+    }
+
+    void fitWindowToEditor()
+    {
+        if (editor == nullptr)
+            return;
+
+        const auto& displays = juce::Desktop::getInstance().getDisplays();
+        auto* display = displays.getDisplayForRect (getScreenBounds());
+        if (display == nullptr)
+            display = displays.getDisplayForPoint (juce::Desktop::getMousePosition());
+        if (display == nullptr)
+            display = displays.getPrimaryDisplay();
+
+        auto available = display != nullptr ? display->userArea.reduced (32)
+                                            : juce::Rectangle<int> (0, 0, 1280, 720);
+        const auto maximumWidth = juce::jmax (160, available.getWidth());
+        const auto maximumHeight = juce::jmax (120, available.getHeight());
+        const auto scrollBar = viewport.getScrollBarThickness();
+        const auto editorWidth = juce::jmax (1, editor->getWidth());
+        const auto editorHeight = juce::jmax (1, editor->getHeight());
+
+        // Reserve room for the other scrollbar only when that dimension overflows. This
+        // keeps normal editors pixel-tight and prevents one scrollbar from hiding the last
+        // strip of content in the other direction.
+        const auto wantedWidth = editorWidth + (editorHeight > maximumHeight ? scrollBar : 0);
+        const auto wantedHeight = editorHeight + (editorWidth > maximumWidth ? scrollBar : 0);
+        setContentComponentSize (juce::jmin (wantedWidth, maximumWidth),
+                                 juce::jmin (wantedHeight, maximumHeight));
     }
 
     FloatingEditorWindows& owner;
     juce::String partId;
     int captureAttempt = 0;
+    juce::Viewport viewport;
     std::unique_ptr<juce::AudioProcessorEditor> editor;
 };
 
