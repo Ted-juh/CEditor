@@ -75,3 +75,28 @@ test('JUCE/VENDORED.md records the patch', () => {
   assert.ok(text.includes('CEDITOR_SIDECAR_IDENTITY'), 'VENDORED.md does not name the patch guard');
   assert.ok(text.includes('juce_audio_plugin_client_VST3.cpp'), 'VENDORED.md does not name the patched file');
 });
+
+// Patch 2: the Linux webview bridge frames its pipe messages in bytes. Upstream counted characters
+// and sent UTF-8, so one accented preset name desynchronised the bridge for the rest of the session.
+const LINUX_BRIDGE = join(repoRoot,
+  'JUCE/include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp');
+
+test('the vendored JUCE Linux webview bridge still frames its messages in bytes', () => {
+  assert.ok(existsSync(LINUX_BRIDGE), `the vendored Linux webview bridge is missing: ${LINUX_BRIDGE}`);
+  const source = readFileSync(LINUX_BRIDGE, 'utf8');
+  const sendCommand = source.slice(source.indexOf('static void sendCommand ('));
+  const body = sendCommand.slice(0, sendCommand.indexOf('private:'));
+  assert.ok(body.includes('json.getNumBytesAsUTF8()'),
+    `sendCommand measures the payload in characters again, not bytes. ${REAPPLY}`);
+  assert.ok(!body.includes('json.length()'),
+    `sendCommand still uses String::length() for the frame length. ${REAPPLY}`);
+  assert.ok(/while \(written < len\)/.test(body),
+    `sendCommand no longer loops the write until the whole message is out. ${REAPPLY}`);
+});
+
+test('JUCE/VENDORED.md records the Linux bridge patch too', () => {
+  const text = readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8');
+  assert.ok(text.includes('juce_WebBrowserComponent_linux.cpp') && text.includes('getNumBytesAsUTF8'),
+    'VENDORED.md must name the Linux bridge file and the byte-count fix');
+});
+

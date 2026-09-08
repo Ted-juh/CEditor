@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There is exactly one patch, and it is listed here because a
+Upstream JUCE is otherwise untouched. There are exactly two patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -41,3 +41,29 @@ across the change. `CE/tests/PanelIdentitySidecarTests.cpp` asserts that equalit
 **If you upgrade JUCE:** re-apply it. `getInterfaceId` is a short static function near the top of
 that file; the whole rationale is in `CE/src/Export/Vst3SidecarIdentity.h`, and the guard test names
 this document when it fails.
+
+### 2. Linux webview bridge: messages framed in bytes
+
+**File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp`,
+`CommandReceiver::sendCommand`.
+
+**Guard:** none needed — the file is compiled on Linux only, and the change is a correction, not a
+behaviour switch. Windows uses WebView2 and never reaches this code.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`, which fails if the patch is gone.
+
+**What.** The parent and the WebKit child talk over a pipe: a `size_t` length, then that many
+**bytes** of JSON, which the receiver reads exactly and parses. Upstream computes the length with
+`String::length()` — characters — and copies `toRawUTF8()` — bytes. The patch uses
+`getNumBytesAsUTF8()`, and loops the `write()` until the whole message has gone, because a
+multi-megabyte event does not always leave in one call.
+
+**Why.** Any message carrying a non-ASCII character arrived a few bytes short, failed to parse, and
+left its surplus bytes at the head of the next message — so every event after it was misframed
+too. A real synth's factory list has such names (`µcomputer`, `Café`, `™`); the first library
+event of the session carried them, and from the page's side the library simply never came. Found
+running the app on Linux with a 3,600-preset Surge XT library (2026-09-08, commit `08a2c85`).
+
+**If you upgrade JUCE:** check whether upstream fixed it (look for `getNumBytesAsUTF8` in
+`sendCommand`); if not, re-apply both halves. The guard test names this document when it fails.
+
