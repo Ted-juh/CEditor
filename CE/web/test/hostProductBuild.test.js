@@ -541,7 +541,7 @@ test('every command-sending store export is reachable from Svelte or deliberatel
     'InstrumentHostView.svelte', 'HostMixerPanel.svelte', 'PerformancePanel.svelte',
     'MidiChainPanel.svelte', 'LayerGroupsPanel.svelte', 'HostRackCanvas.svelte',
     'ProductPanel.svelte', 'ReliabilityPanel.svelte', 'LicencePanel.svelte',
-    'StageView.svelte', 'HostSurfacePanel.svelte',
+    'StageView.svelte', 'HostSurfacePanel.svelte', 'SoundBrowser.svelte',
   ].map((name) => readFileSync(path.join(
     repoRoot, 'CE', 'web', 'src', 'CE_Application', 'sections', name), 'utf8')).join('\n');
 

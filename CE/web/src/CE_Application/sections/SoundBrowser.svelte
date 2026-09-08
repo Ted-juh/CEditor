@@ -30,7 +30,7 @@
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
     hostAnalysis, analyseLibrary, cancelAnalysis,
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
-    hostVersionDiff, commitVersion, applyVersion, diffVersions,
+    hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
     hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
@@ -48,6 +48,8 @@
   let query = $state(emptyLibraryQuery());
   let versionLabel = $state('');
   let namingVersion = $state(false);
+  // Where the blend sits between the first save and the current one, 0-100.
+  let blendAmount = $state(100);
   let onlyDifferences = $state(true);
   // Grid or map. The map is the same records on two measured axes — no projection, no learned
   // embedding, nothing to explain: where a dot sits IS its brightness and its attack.
@@ -870,6 +872,22 @@
             </div>
           {/if}
 
+          {#if selected.versions.length > 1}
+            <!-- Two saves of one sound are two points, and everything between them is a sound
+                 too. The rail picks one; this crosses from the first to the last without
+                 keeping either. Nothing is written until you save the result. -->
+            <div class="vblend">
+              <label for="blend-{selected.recordId}">first</label>
+              <input id="blend-{selected.recordId}" type="range" min="0" max="100" step="1"
+                     data-testid="version-blend" bind:value={blendAmount}
+                     oninput={() => morphVersions(selected.recordId,
+                                                  selected.versions[0].versionId,
+                                                  selected.versions[selected.versions.length - 1].versionId,
+                                                  blendAmount / 100)} />
+              <label for="blend-{selected.recordId}">now</label>
+            </div>
+          {/if}
+
           {#if selected.branchedFromName}
             <div class="branched">branched from <b>{selected.branchedFromName}</b></div>
           {/if}
@@ -1273,6 +1291,10 @@
   .vwhen { color: #66707b; font-size: 10px; white-space: nowrap; }
   .branched { color: #7d8894; font-size: 10.5px; margin-top: 6px; }
   .branched b { color: #9aa5b1; font-weight: 600; }
+  .vblend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .vblend label { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em; }
+  .vblend input { flex: 1; }
+
   .vsave { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
   .vsave .name-field { width: 130px; }
   button.more { margin-left: auto; color: #7fb4e0; font-size: 9px; letter-spacing: 0.06em;
