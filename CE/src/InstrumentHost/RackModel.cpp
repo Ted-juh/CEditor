@@ -457,6 +457,14 @@ juce::var Performance::toVar() const
         p->setProperty ("midiSourcePartId", part.midiSourcePartId);
         p->setProperty ("lastPresetRecordId", part.lastPresetRecordId);
         p->setProperty ("lastPresetName",     part.lastPresetName);
+        if (part.hasMorph())
+        {
+            p->setProperty ("morphRecordIdA", part.morphRecordIdA);
+            p->setProperty ("morphNameA",     part.morphNameA);
+            p->setProperty ("morphRecordIdB", part.morphRecordIdB);
+            p->setProperty ("morphNameB",     part.morphNameB);
+            p->setProperty ("morphAmount",    part.morphAmount);
+        }
         p->setProperty ("microtuningEnabled", part.microtuningEnabled);
         p->setProperty ("outputPair",       part.outputPair);
         p->setProperty ("effects",          effectsToVar (part.effects));
@@ -1029,6 +1037,11 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
         part.midiSourcePartId = p.getProperty ("midiSourcePartId", {}).toString();
         part.lastPresetRecordId = p.getProperty ("lastPresetRecordId", {}).toString();
         part.lastPresetName     = p.getProperty ("lastPresetName", {}).toString();
+        part.morphRecordIdA = p.getProperty ("morphRecordIdA", {}).toString();
+        part.morphNameA     = p.getProperty ("morphNameA", {}).toString();
+        part.morphRecordIdB = p.getProperty ("morphRecordIdB", {}).toString();
+        part.morphNameB     = p.getProperty ("morphNameB", {}).toString();
+        part.morphAmount    = floatOf (p, "morphAmount", 0.0f, 0.0f, 1.0f);
         part.microtuningEnabled = (bool) p.getProperty ("microtuningEnabled", false);
         part.outputPair = intOf (p, "outputPair", 0, 0, 7);
 

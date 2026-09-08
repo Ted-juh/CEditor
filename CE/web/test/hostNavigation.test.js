@@ -59,3 +59,20 @@ test('every tab the host draws is a utility the navigation will accept', () => {
   assert.deepEqual(HOST_UTILITIES.filter((id) => !drawn.includes(id)), [],
     'a utility nothing draws is unreachable');
 });
+
+test('the Sounds drawer is told which part is focused', () => {
+  // SoundBrowser takes the focused part as a prop and every per-part action in it — save
+  // this sound, load into the part, morph the part between two neighbours — is disabled with
+  // "focus a part first" until it is handed one. Mounted bare, the drawer drew all of those
+  // buttons and none of them worked, while a part sat focused in the rack beside it. The
+  // component cannot know the difference between "nothing is focused" and "nobody told me",
+  // so the mount site is checked here instead.
+  const view = readFileSync(new URL(
+    '../src/CE_Application/sections/InstrumentHostView.svelte', import.meta.url), 'utf8');
+  const mounts = [...view.matchAll(/<SoundBrowser\b([^>]*)>/g)].map((match) => match[1]);
+  assert.ok(mounts.length >= 1, 'the host view mounts the sound browser');
+  for (const attributes of mounts) {
+    assert.match(attributes, /\{focusedPart\}|focusedPart=/, 'the browser is handed the focused part');
+    assert.match(attributes, /\{partTitle\}|partTitle=/, 'and the part naming rule');
+  }
+});

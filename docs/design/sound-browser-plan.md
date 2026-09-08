@@ -538,6 +538,48 @@ directory), not the numbers.
 still happens in the editor's process, which is the same exposure the product had before any of
 this and a much larger piece of work — it is §17's remaining half, not this stage's.
 
+## Stage G, as built: a morph between two sounds, on a macro
+
+Stage D put a slider between two *saves* of one sound. The line it rides does not care that
+the two ends share a record — it is two parameter vectors read through one plug-in — so the
+same line now runs between any two sounds of the part's plug-in: the preset you are on and the
+neighbour beside it on the map, a pad and the pad next to it. "Sounds like" gives each
+neighbour a MORPH button, the map takes a shift-click for the second end, and the pair goes
+on the **part**, as `morphRecordIdA/B` beside `lastPresetRecordId`, which is what lets it
+persist with the session and be ridden from anywhere.
+
+**The ride is a parameter address.** A part with a pair answers to `"@morph"` the way it
+answers to `"@gain"`: `setParameter`, a page slot, a macro target, a modulation cable, a
+learned knob — the same binding math, no second path. That is the whole reason the pair is
+rack state rather than a browser gesture: `morphVersions` was a command you sent with an
+amount, and a command cannot be put on a macro. The registry lists it under a "Morph" group
+named after both ends, so M+ and ⚡ in the parameter list reach it without learning anything.
+
+**The ends are runtime, the pair is state.** The two vectors are read through the live
+plug-in — apply A, read, apply B, read, put back what was there, exactly Stage D's shape — and
+kept in memory against the part. They are read again from whichever instance answers next:
+a reopened session carries the pair and the position and no vectors, and the first turn of the
+macro samples them. Nothing stale is ever stored, and a plug-in that changed its parameter set
+between sessions is read as it is now. `setMorph` samples eagerly when the instrument is there,
+so the first turn is a turn and a pair the plug-in refuses (the preset file gone) is refused
+aloud at the moment you pick it rather than quietly never moving.
+
+**What a parameter the ends agree on does.** Nothing. A parameter with the same value at A and
+B is not part of the morph and is not written, which is what lets you nudge the filter by hand
+while a macro rides the pair underneath — Stage D's slider wrote every parameter on every move,
+and that was tolerable for a slider and would not have been for an LFO.
+
+**Class-bound, like a binding.** Both ends must be sounds for the part's plug-in (`targetCeId`
+against `pluginCeId`); a rack, a chain and a hardware patch have no parameters to read and are
+refused by name. Loading a *different* class onto the part drops the pair the way the preset
+cursor clears, because the new class cannot answer for either end; reloading the same class
+keeps it and re-reads the ends from the new instance. Clearing by hand keeps the sound where
+the ride left it — it is not a recall.
+
+**Still a parameter blend, still honest about it.** Everything Stage D said about what a
+plug-in keeps out of its parameter list still holds, and the text on a slot says where you are
+("35% Glass Keys") rather than pretending the sound is anything but a position between two.
+
 ## What a real VST3 found
 
 Everything above was proved against `StubSynthProcessor`, which is a DC generator with three
@@ -596,6 +638,12 @@ on `Options` where somebody wiring a new consumer will read them.
 ## Running idea log
 
 New ideas go here with a date, so nothing gets lost between sessions.
+
+- **2026-09-08** — Stage G built; see *Stage G, as built* above. The thing worth carrying: a
+  feature that exists as a command with an amount cannot be put on a macro, and turning it into
+  a parameter address on the part was less code than the command had been — the whole binding
+  path, the persistence, the learn and the modulation matrix came for free the moment the
+  amount had somewhere to live.
 
 - **2026-09-07** — Stage F's transport, and the substitution memory. The lesson from the
   transport: the feature that looked like it needed the hardware needed a *decision* about the

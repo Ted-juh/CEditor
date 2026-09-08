@@ -3131,6 +3131,7 @@ export function normalizeHostState(payload) {
         destinationBusId: String(part?.destinationBusId ?? ''),
         presetRecordId: String(part?.presetRecordId ?? ''),
         presetName: String(part?.presetName ?? ''),
+        morph: normalizeMorph(part?.morph),
         hasInstrument: part?.hasInstrument === true,
         unresolved: part?.unresolved === true,
         channel: Number(part?.channel ?? 0),
@@ -3334,11 +3335,28 @@ export function mockHostState() {
   });
 }
 
+/** A part's morph as state carries it: two records of its plug-in and where the part sits
+    between them, or null when it has none. `live` is whether riding it moves a sound right
+    now; `refusal` is the native side's word on why not, when it could not. */
+export function normalizeMorph(morph) {
+  if (!morph || typeof morph !== 'object' || !morph.recordIdB) return null;
+  return {
+    recordIdA: String(morph.recordIdA ?? ''),
+    nameA: String(morph.nameA ?? ''),
+    recordIdB: String(morph.recordIdB ?? ''),
+    nameB: String(morph.nameB ?? ''),
+    amount: Math.max(0, Math.min(1, Number(morph.amount ?? 0) || 0)),
+    live: morph.live === true,
+    refusal: String(morph.refusal ?? ''),
+  };
+}
+
 /** The native virtualParameterName rule, mirrored for the mock's bindings and chips. */
 function mockBindingName(parameterId, rack) {
   const id = String(parameterId ?? '');
   if (id === '@gain') return 'Level';
   if (id === '@pan') return 'Pan';
+  if (id === '@morph') return 'Morph';
   if (id.startsWith('@send:'))
     return `Send — ${rack.returns.find((r) => r.returnId === id.slice(6))?.name ?? 'gone'}`;
   return id.replace(/^./, (c) => c.toUpperCase());
@@ -3366,6 +3384,7 @@ function writeMockVirtualTarget(rack, targetId, parameterId, value) {
   if (!part) return;
   if (parameterId === '@gain') part.volume = normalized * 2;
   else if (parameterId === '@pan') part.pan = normalized * 2 - 1;
+  else if (parameterId === '@morph') { if (part.morph) part.morph = { ...part.morph, amount: normalized }; }
   else if (parameterId.startsWith('@send:')) {
     const returnId = parameterId.slice(6);
     let send = part.sends.find((candidate) => candidate.returnId === returnId);
@@ -6379,6 +6398,11 @@ function send(payload) {
             text: (part.sends.find((s) => s.returnId === r.returnId)?.level ?? 0).toFixed(2),
             defaultValue: 0,
           })),
+          // And the morph, when the part has one: this list is where a macro goes shopping.
+          ...(part.morph ? [{
+            id: '@morph', name: `Morph — ${part.morph.nameA} ↔ ${part.morph.nameB}`, group: 'Morph',
+            value: part.morph.amount, text: mockMorphText(part.morph), defaultValue: 0,
+          }] : []),
         ];
         hostParameters.set(normalizeHostParameters({
           partId: payload.partId,
@@ -6445,6 +6469,10 @@ function send(payload) {
           cmd: 'setSendLevel', partId: payload.partId,
           returnId: id.slice(6), level: value * 2,
         }));
+      } else if (id === '@morph') {
+        const value = payload.cmd === 'resetParameter' ? 0 : Math.min(1, Math.max(0, Number(payload.value ?? 0)));
+        hostState.update((st) => withPart(st, payload.partId,
+          (part) => (part.morph ? { morph: { ...part.morph, amount: value } } : {})));
       }
       return;
     }
@@ -6685,6 +6713,43 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'morphVersions') return;
+    if (payload?.cmd === 'setMorph' || payload?.cmd === 'clearMorph') {
+      const state = get(hostState);
+      const partId = payload.partId || state.rack.focusedPartId;
+      const part = state.rack.parts.find((p) => p.partId === partId);
+      if (!part) { hostLastError.set('Unknown rack part.'); return; }
+      if (payload.cmd === 'clearMorph') {
+        hostState.update((st) => withPart(st, partId, () => ({ morph: null })));
+        return;
+      }
+      const records = get(hostLibrary).records;
+      const idA = 'recordIdA' in payload ? String(payload.recordIdA ?? '') : part.presetRecordId;
+      const a = records.find((r) => r.recordId === idA);
+      const b = records.find((r) => r.recordId === String(payload.recordIdB ?? ''));
+      if (!a || !b) {
+        hostLastError.set(idA ? 'Unknown library record.'
+          : 'Load a sound onto the part first, or name both ends of the morph.');
+        return;
+      }
+      if (a.recordId === b.recordId) { hostLastError.set('A morph needs two different sounds.'); return; }
+      for (const end of [a, b]) {
+        if (end.type !== 'preset' || end.sourceType === 'hardwarePatch') {
+          hostLastError.set(`${end.name} is not a sound a plug-in can be moved between.`);
+          return;
+        }
+        if (!part.pluginCeId || end.targetCeId !== part.pluginCeId) {
+          hostLastError.set(`${end.name} is a sound for ${end.instrument}, and this part `
+            + `${part.pluginName ? `plays ${part.pluginName}` : 'plays nothing yet'}. `
+            + 'Both ends of a morph belong to the part\'s plug-in.');
+          return;
+        }
+      }
+      hostState.update((st) => withPart(st, partId, () => ({
+        morph: { recordIdA: a.recordId, nameA: a.name, recordIdB: b.recordId, nameB: b.name,
+                 amount: 0, live: part.hasInstrument, refusal: '' },
+      })));
+      return;
+    }
     if (payload?.cmd === 'auditionRecord') {
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record) { hostLastError.set('Unknown library record.'); return; }
@@ -7275,6 +7340,19 @@ export const browsePad = (pad) => send({ cmd: 'browsePad', pad });
 export const morphVersions = (recordId, versionIdA, versionIdB, amount) =>
   send({ cmd: 'morphVersions', recordId, amount,
          ...(versionIdA ? { versionIdA } : {}), ...(versionIdB ? { versionIdB } : {}) });
+/** Two sounds of the part's plug-in become the ends of its "@morph" address. A missing
+    recordIdA means the preset the part is on; B is the neighbour you picked. */
+export const setMorph = (partId, recordIdA, recordIdB) =>
+  send({ cmd: 'setMorph', partId, recordIdB, ...(recordIdA ? { recordIdA } : {}) });
+export const clearMorph = (partId) => send({ cmd: 'clearMorph', partId });
+/** How far toward B the part sits, as the native side words it on a slot. */
+export function mockMorphText(morph) {
+  const pct = Math.round((morph?.amount ?? 0) * 100);
+  if (!morph) return `${pct}%`;
+  if (pct <= 0) return morph.nameA;
+  if (pct >= 100) return morph.nameB;
+  return `${pct}% ${morph.nameB}`;
+}
 export const setAuditionPhrase = (phrase, bars) =>
   send(bars ? { cmd: 'setAuditionPhrase', phrase, bars } : { cmd: 'setAuditionPhrase', phrase });
 export const scanLibrary = () => send({ cmd: 'scanLibrary' });

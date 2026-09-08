@@ -2269,6 +2269,167 @@ void testVersionsInTheService()
 
 // One distance function, three faces: "sounds like", the nearest dot on the map, and the
 // substitute for a plug-in you no longer have.
+
+void testPresetMorphOnAMacro()
+{
+    std::cout << "\npreset morph: two sounds of one plug-in, ridden from a macro" << std::endl;
+
+    // Two programs are two library records of the same class, and the stub's cutoff is the
+    // one parameter a program moves — so the line between them is one number to check.
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Dark", 0.20f }, { "Bright", 0.80f }, { "Same as dark", 0.20f } };
+
+    const auto dir = freshDataDir ("morph");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+
+    const auto recordNamed = [&h] (const juce::String& name)
+    {
+        h.cmd ("getLibrary");
+        juce::String id;
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("name", {}).toString() == name)
+                id = r.getProperty ("recordId", {}).toString();
+        return id;
+    };
+    const auto darkId = recordNamed ("Dark");
+    const auto brightId = recordNamed ("Bright");
+    check (darkId.isNotEmpty() && brightId.isNotEmpty(), "both programs are in the library");
+
+    // Asks rather than reads back: a refusal emits an error and no state, and the checks
+    // after one still want to see the part.
+    const auto partState = [&h]
+    {
+        h.cmd ("getState");
+        return h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
+    };
+    const auto morph = [&partState] { return partState().getProperty ("morph", {}); };
+
+    check (morph().isVoid(), "a part starts with no morph");
+
+    // Refusals first: a morph needs two sounds, different ones, of this plug-in.
+    h.emits.clear();
+    h.cmd ("setMorph", { { "partId", partId }, { "recordIdB", brightId } });
+    check (h.emits.lastError().contains ("Load a sound"),
+           "without a loaded preset and no A named, there is no A to morph from");
+
+    h.cmd ("loadLibraryRecord", { { "recordId", darkId }, { "action", "replace" }, { "partId", partId } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.20f), "the part is on Dark");
+    h.emits.clear();
+    h.cmd ("setMorph", { { "partId", partId }, { "recordIdB", darkId } });
+    check (h.emits.lastError().contains ("two different sounds"), "A and B may not be the same");
+    h.emits.clear();
+    h.cmd ("setMorph", { { "partId", partId }, { "recordIdB", "no-such-record" } });
+    check (h.emits.lastError().contains ("Unknown library record"), "an unknown B is refused");
+    check (morph().isVoid(), "and a refused pair leaves the part without one");
+
+    // The pair: A is what the part is on, B the neighbour you picked.
+    h.emits.clear();
+    h.cmd ("setMorph", { { "partId", partId }, { "recordIdB", brightId } });
+    check (h.emits.lastError().isEmpty(), "two programs of the loaded plug-in are a valid pair");
+    check (morph().getProperty ("recordIdA", {}).toString() == darkId
+             && morph().getProperty ("nameA", {}).toString() == "Dark"
+             && morph().getProperty ("recordIdB", {}).toString() == brightId
+             && morph().getProperty ("nameB", {}).toString() == "Bright",
+           "state carries both ends by id and by name, A defaulting to the loaded preset");
+    check ((bool) morph().getProperty ("live", false), "and says it can be ridden");
+    check (juce::approximatelyEqual ((float) (double) morph().getProperty ("amount", 1.0), 0.0f)
+             && juce::approximatelyEqual (stub->cutoff->get(), 0.20f),
+           "a fresh pair rests at A, and reading the ends did not move the part");
+
+    // Riding it by hand, through the same address everything else uses.
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 0.5 } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.50f),
+           "@morph at one half puts every differing parameter halfway between the ends");
+    check (juce::approximatelyEqual ((float) (double) morph().getProperty ("amount", 0.0), 0.5f),
+           "and state carries where the ride is");
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 1.0 } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.80f), "at one it is B whole");
+
+    // A parameter the ends agree on is not part of the morph: your hand on it stays.
+    stub->wave->setValueNotifyingHost (1.0f);
+    const auto waveBefore = stub->wave->getIndex();
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 0.25 } });
+    check (stub->wave->getIndex() == waveBefore,
+           "riding the morph leaves alone what the two ends have in common");
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.35f), "while moving what differs");
+
+    // The registry lists it, so pages, macros and learn can reach it like a mixer address.
+    h.emits.clear();
+    h.cmd ("getParameters", { { "partId", partId } });
+    const auto rows = h.emits.entries.back().payload.getProperty ("parameters", {});
+    juce::var morphRow;
+    for (int i = 0; i < rows.size(); ++i)
+        if (rows[i].getProperty ("id", {}).toString() == "@morph")
+            morphRow = rows[i];
+    check (! morphRow.isVoid() && morphRow.getProperty ("group", {}).toString() == "Morph",
+           "the part's registry carries the morph address");
+    check (morphRow.getProperty ("name", {}).toString().contains ("Dark")
+             && morphRow.getProperty ("name", {}).toString().contains ("Bright"),
+           "named after both ends");
+    check (morphRow.getProperty ("text", {}).toString() == "25% Bright",
+           "and reads as how far toward B it sits");
+
+    // On a macro: the point of the exercise.
+    h.cmd ("addMacro", { { "name", "Ride" } });
+    const auto macroId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("macros", {})[0]
+                             .getProperty ("macroId", {}).toString();
+    h.emits.clear();
+    h.cmd ("addMacroTarget", { { "macroId", macroId }, { "targetId", partId }, { "parameterId", "@morph" } });
+    check (h.emits.lastError().isEmpty(), "a macro may target the morph");
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 1.0 }, { "final", true } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.80f), "the macro at one is B");
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.0 }, { "final", true } });
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.20f), "and at zero is A");
+
+    // The pair is the session's, and the ends are re-read from whichever instance answers
+    // next: a reopened rig rides the same line without anything stale stored for it.
+    h.cmd ("setMacroValue", { { "macroId", macroId }, { "value", 0.5 }, { "final", true } });
+    {
+        Harness h2 (dir);
+        h2.cmd ("getState");
+        auto* reopened = h2.lastStub;
+        check (reopened != nullptr && reopened != stub, "the reopened session has its own instance");
+        const auto reopenedMorph = h2.emits.lastState()->getProperty ("rack", {})
+                                       .getProperty ("parts", {})[0].getProperty ("morph", {});
+        check (reopenedMorph.getProperty ("recordIdB", {}).toString() == brightId
+                 && juce::approximatelyEqual ((float) (double) reopenedMorph.getProperty ("amount", 0.0), 0.5f),
+               "the pair and the position survive a reopen");
+        h2.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 1.0 } });
+        check (reopened != nullptr && juce::approximatelyEqual (reopened->cutoff->get(), 0.80f),
+               "and the first ride after reopening reads the ends through the new instance");
+        h2.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 0.5 } });
+    }
+
+    // A morph is two sounds of one plug-in: asking the part for another class drops it,
+    // the way the preset cursor clears — the new class cannot answer for either end.
+    Harness h3 (dir);
+    h3.cmd ("getState");
+    check (! h3.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+               .getProperty ("morph", {}).isVoid(), "the pair is still there before the switch");
+    h3.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-broken-synth" } });
+    check (h3.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0]
+               .getProperty ("morph", {}).isVoid(),
+           "loading a different class clears the morph");
+
+    // Clearing by hand keeps the sound where the ride left it — it is not a recall.
+    h.cmd ("clearMorph", { { "partId", partId } });
+    check (morph().isVoid(), "clearMorph removes the pair");
+    check (juce::approximatelyEqual (stub->cutoff->get(), 0.50f),
+           "and the part keeps the blend it was on");
+    h.emits.clear();
+    h.cmd ("setParameter", { { "partId", partId }, { "id", "@morph" }, { "value", 1.0 } });
+    check (h.emits.lastError().contains ("Unknown parameter"),
+           "without a pair the address is gone, like a send whose return was removed");
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {};
+}
+
 void testNearestSounds()
 {
     std::cout << "\nsounds like, and the substitute for a plug-in that has gone" << std::endl;
@@ -10286,6 +10447,7 @@ int main (int argc, char* argv[])
     testNearestSounds();
     testVersionRetention();
     testVersionsInTheService();
+    testPresetMorphOnAMacro();
     testSubstitutes();
     testBrowseOnSurface();
     testLibraryBrowsing();

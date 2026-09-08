@@ -1301,6 +1301,41 @@ bool InstrumentRackHost::setPartLastPreset (const juce::String& partId, const ju
     return true;
 }
 
+bool InstrumentRackHost::setPartMorph (const juce::String& partId,
+                                       const juce::String& recordIdA, const juce::String& nameA,
+                                       const juce::String& recordIdB, const juce::String& nameB)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr)
+        return false;
+
+    if (recordIdB.isEmpty())
+    {
+        part->morphRecordIdA.clear();
+        part->morphNameA.clear();
+        part->morphRecordIdB.clear();
+        part->morphNameB.clear();
+        part->morphAmount = 0.0f;
+        return true;
+    }
+
+    part->morphRecordIdA = recordIdA;
+    part->morphNameA = nameA;
+    part->morphRecordIdB = recordIdB;
+    part->morphNameB = nameB;
+    part->morphAmount = 0.0f;
+    return true;
+}
+
+bool InstrumentRackHost::setPartMorphAmount (const juce::String& partId, float amount)
+{
+    auto* part = model.findPart (partId);
+    if (part == nullptr || ! part->hasMorph())
+        return false;
+    part->morphAmount = juce::jlimit (0.0f, 1.0f, amount);
+    return true;
+}
+
 bool InstrumentRackHost::setSlotMidi (const juce::String& pageId, const juce::String& slotId,
                                       int cc, int channel)
 {

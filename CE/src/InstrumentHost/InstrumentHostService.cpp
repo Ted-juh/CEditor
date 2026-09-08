@@ -57,6 +57,8 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
             presetAuditionPlaying = false;
         }
         partParameters.erase (partId);
+        // The morph's endpoints were read through THIS plug-in; the next one reads its own.
+        morphSamples.erase (partId);
         if (editorTargetIds.contains (partId))
             hideEditor (partId);
         if (floatingEditorIds.contains (partId))
@@ -1191,6 +1193,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         // A plain instrument load starts from the plug-in's own default, so the preset
         // cursor clears — the walk starts at the top, and no stale name is displayed.
         rack.setPartLastPreset (partId, {}, {});
+        // A morph is two sounds OF ONE PLUG-IN. Reloading the same class keeps it (the
+        // endpoints are re-read from the new instance); another class cannot answer for
+        // either end, so the pair goes rather than sitting unresolved on a part that would
+        // otherwise look like it still had a morph.
+        if (part->pluginCeId != ceId)
+            rack.setPartMorph (partId, {}, {}, {}, {});
         requestInstrument (partId, ceId);
         return;
     }
@@ -1274,6 +1282,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             juce::StringArray ids { "@gain", "@pan" };
             for (const auto& chain : rack.getPerformance().returns)
                 ids.add ("@send:" + chain.returnId);
+            // And its morph, when it has one: the whole point of the pair is that a macro
+            // or a knob can ride it, and this list is where both go shopping.
+            if (part->hasMorph())
+                ids.add ("@morph");
 
             for (const auto& id : ids)
             {
@@ -1282,7 +1294,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 obj->setProperty ("index",        -1);
                 obj->setProperty ("name",         virtualParameterName (partId, id));
                 obj->setProperty ("label",        juce::String());
-                obj->setProperty ("group",        "Mixer");
+                obj->setProperty ("group",        id == "@morph" ? "Morph" : "Mixer");
                 obj->setProperty ("value",        virtualParameterValue (partId, id));
                 obj->setProperty ("text",         virtualParameterText (partId, id));
                 obj->setProperty ("defaultValue", virtualParameterDefault (id));
@@ -6059,6 +6071,93 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "setMorph" || cmd == "clearMorph")
+    {
+        const auto partId = versionTargetPart (payload);
+        const auto* part = rack.getPerformance().findPart (partId);
+        if (part == nullptr)
+        {
+            emitError ("Unknown rack part.");
+            return;
+        }
+
+        if (cmd == "clearMorph")
+        {
+            // The sound stays where the ride left it: clearing the pair is not a recall.
+            rack.setPartMorph (partId, {}, {}, {}, {});
+            morphSamples.erase (partId);
+            morphRefusals.erase (partId);
+            savePerformance();
+            emitState();
+            return;
+        }
+
+        ensureLibrary();
+        // A is the sound the part is on unless you say otherwise; B is the one you picked —
+        // the neighbour on the map, the pad next to this pad.
+        const auto idA = payload.hasProperty ("recordIdA")
+                           ? payload.getProperty ("recordIdA", {}).toString()
+                           : part->lastPresetRecordId;
+        const auto idB = payload.getProperty ("recordIdB", {}).toString();
+        const auto* a = library.find (idA);
+        const auto* b = library.find (idB);
+        if (a == nullptr || b == nullptr)
+        {
+            emitError (idA.isEmpty() ? "Load a sound onto the part first, or name both ends "
+                                       "of the morph."
+                                     : "Unknown library record.");
+            return;
+        }
+        if (a->recordId == b->recordId)
+        {
+            emitError ("A morph needs two different sounds.");
+            return;
+        }
+        // Both ends must be sounds THIS plug-in understands: a parameter vector read through
+        // one class means nothing to another, and a rack or a hardware patch has no parameters
+        // to read at all.
+        for (const auto* end : { a, b })
+        {
+            if (end->type != "preset" || end->sourceType == "hardwarePatch")
+            {
+                emitError (end->name + " is not a sound a plug-in can be moved between.");
+                return;
+            }
+            if (part->pluginCeId.isEmpty() || end->targetCeId != part->pluginCeId)
+            {
+                emitError (end->name + " is a sound for " + end->instrument + ", and this part "
+                           + (part->pluginName.isNotEmpty() ? "plays " + part->pluginName
+                                                             : juce::String ("plays nothing yet"))
+                           + ". Both ends of a morph belong to the part's plug-in.");
+                return;
+            }
+        }
+
+        rack.setPartMorph (partId, a->recordId, a->name, b->recordId, b->name);
+        morphSamples.erase (partId);
+        morphRefusals.erase (partId);
+
+        // Read the ends now rather than on the first ride, so the first turn of the macro is
+        // a turn and not a wait — and so a pair that cannot be read (the preset file gone, the
+        // plug-in refusing it) is refused HERE, aloud, instead of quietly never moving.
+        if (rack.getInstrument (partId) != nullptr)
+        {
+            if (const auto refusal = sampleMorph (partId); refusal.isNotEmpty())
+            {
+                rack.setPartMorph (partId, {}, {}, {}, {});
+                emitError (refusal);
+                return;
+            }
+            // Rest at A. The part is usually on A already, in which case this changes
+            // nothing audible; when A was named explicitly the ride starts from its end.
+            applyMorphAmount (partId, 0.0f);
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "auditionRecord")
     {
         ensureLibrary();
@@ -7905,6 +8004,8 @@ bool InstrumentHostService::virtualParameterExists (const juce::String& targetId
         return false;
     if (parameterId == "@gain" || parameterId == "@pan")
         return true;
+    if (parameterId == "@morph")
+        return performance.findPart (targetId)->hasMorph();
     if (parameterId.startsWith ("@send:"))
         return performance.findReturn (parameterId.substring (6)) != nullptr;
     return false;
@@ -7927,6 +8028,8 @@ float InstrumentHostService::virtualParameterValue (const juce::String& targetId
         return part->volume * 0.5f;                     // 0..2 linear → 0..1
     if (parameterId == "@pan")
         return (part->pan + 1.0f) * 0.5f;               // -1..+1 → 0..1
+    if (parameterId == "@morph")
+        return part->morphAmount;
     if (parameterId.startsWith ("@send:"))
     {
         const auto returnId = parameterId.substring (6);
@@ -7943,6 +8046,19 @@ juce::String InstrumentHostService::virtualParameterText (const juce::String& ta
     const auto value = virtualParameterValue (targetId, parameterId);
     if (parameterId == "@macro")
         return juce::String (juce::roundToInt (value * 100.0f)) + "%";
+    if (parameterId == "@morph")
+    {
+        // Read as "how far toward B": 0% is A whole, 100% is B whole.
+        const auto* part = rack.getPerformance().findPart (targetId);
+        const auto pct = juce::roundToInt (value * 100.0f);
+        if (part == nullptr || ! part->hasMorph())
+            return juce::String (pct) + "%";
+        if (pct <= 0)
+            return part->morphNameA;
+        if (pct >= 100)
+            return part->morphNameB;
+        return juce::String (pct) + "% " + part->morphNameB;
+    }
     if (parameterId == "@pan")
     {
         const auto pan = value * 2.0f - 1.0f;
@@ -7965,6 +8081,13 @@ juce::String InstrumentHostService::virtualParameterName (const juce::String& ta
         return "Level";
     if (parameterId == "@pan")
         return "Pan";
+    if (parameterId == "@morph")
+    {
+        const auto* part = rack.getPerformance().findPart (targetId);
+        if (part == nullptr || ! part->hasMorph())
+            return "Morph";
+        return "Morph — " + part->morphNameA + " ↔ " + part->morphNameB;
+    }
     if (parameterId.startsWith ("@send:"))
     {
         const auto* chain = rack.getPerformance().findReturn (parameterId.substring (6));
@@ -7980,7 +8103,7 @@ float InstrumentHostService::virtualParameterDefault (const juce::String& parame
         return 0.5f;    // unity
     if (parameterId == "@pan")
         return 0.5f;    // centre
-    return 0.0f;        // sends and macros rest at zero
+    return 0.0f;        // sends, macros and morphs rest at zero (a morph at zero is A)
 }
 
 void InstrumentHostService::setVirtualParameter (const juce::String& targetId,
@@ -8003,6 +8126,8 @@ void InstrumentHostService::setVirtualParameter (const juce::String& targetId,
         rack.setVolume (targetId, value * 2.0f);
     else if (parameterId == "@pan")
         rack.setPan (targetId, value * 2.0f - 1.0f);
+    else if (parameterId == "@morph")
+        applyMorphAmount (targetId, value);
     else if (parameterId.startsWith ("@send:"))
         rack.setSendLevel (targetId, parameterId.substring (6), value * 2.0f);
 }
@@ -9688,6 +9813,101 @@ juce::String InstrumentHostService::versionTargetPart (const juce::var& payload)
 {
     const auto named = payload.getProperty ("partId", {}).toString();
     return named.isNotEmpty() ? named : rack.getPerformance().focusedPartId;
+}
+
+juce::String InstrumentHostService::sampleMorph (const juce::String& partId)
+{
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr || ! part->hasMorph())
+        return "That part has no morph.";
+
+    auto* instrument = rack.getInstrument (partId);
+    if (instrument == nullptr)
+        return "Load the instrument first — a morph is read through the plug-in that "
+               "understands both sounds.";
+
+    ensureLibrary();
+    const auto* a = library.find (part->morphRecordIdA);
+    const auto* b = library.find (part->morphRecordIdB);
+    if (a == nullptr || b == nullptr)
+        return "One end of the morph is no longer in the library: "
+               + (a == nullptr ? part->morphNameA : part->morphNameB);
+    if (a->targetCeId != part->pluginCeId || b->targetCeId != part->pluginCeId)
+        return "The morph was made for another plug-in.";
+
+    // Same shape as diffVersions: apply, read, apply, read, put back. What was on the part
+    // when you asked is what is on it afterwards — reading the ends is not a change.
+    juce::MemoryBlock before;
+    instrument->getStateInformation (before);
+
+    MorphSample sampled;
+    auto refusal = applyRecordState (*instrument, *a);
+    if (refusal.isEmpty())
+    {
+        sampled.a = readParameters (*instrument);
+        refusal = applyRecordState (*instrument, *b);
+    }
+    if (refusal.isEmpty())
+        sampled.b = readParameters (*instrument);
+
+    instrument->setStateInformation (before.getData(), (int) before.getSize());
+
+    if (refusal.isNotEmpty())
+        return refusal;
+
+    morphSamples[partId] = std::move (sampled);
+    return {};
+}
+
+void InstrumentHostService::applyMorphAmount (const juce::String& partId, float amount)
+{
+    if (! rack.setPartMorphAmount (partId, amount))
+        return;
+
+    // The amount is remembered whether or not it can be heard yet: a macro turned while the
+    // instrument is still loading is a position, and the part takes it up on the next turn
+    // once the plug-in is there. The refusal is state, not a burst of errors per tick.
+    if (morphSamples.find (partId) == morphSamples.end())
+    {
+        if (const auto refusal = sampleMorph (partId); refusal.isNotEmpty())
+        {
+            morphRefusals[partId] = refusal;
+            return;
+        }
+    }
+    morphRefusals.erase (partId);
+
+    const auto clamped = juce::jlimit (0.0f, 1.0f, amount);
+    const auto& sample = morphSamples[partId];
+    for (int i = 0; i < sample.a.size() && i < sample.b.size(); ++i)
+    {
+        const auto& a = sample.a.getReference (i);
+        const auto& b = sample.b.getReference (i);
+        // A parameter the two ends agree on is not part of the morph. Leaving it alone is
+        // what lets you nudge the filter by hand while a macro rides the pair underneath.
+        if (a.definitionId != b.definitionId || juce::approximatelyEqual (a.value, b.value))
+            continue;
+        writeTargetValueRaw (partId, a.definitionId, a.value + clamped * (b.value - a.value));
+    }
+}
+
+juce::var InstrumentHostService::morphProjection (const RackPart& part, float amount) const
+{
+    if (! part.hasMorph())
+        return {};
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("recordIdA", part.morphRecordIdA);
+    obj->setProperty ("nameA",     part.morphNameA);
+    obj->setProperty ("recordIdB", part.morphRecordIdB);
+    obj->setProperty ("nameB",     part.morphNameB);
+    obj->setProperty ("amount",    amount);
+    // "Live" is the honest word: the pair exists either way, but it only moves the sound
+    // when the plug-in is here to move. The refusal names why not, when there is a why.
+    obj->setProperty ("live",      rack.partHasInstrument (part.partId));
+    if (const auto found = morphRefusals.find (part.partId); found != morphRefusals.end())
+        obj->setProperty ("refusal", found->second);
+    return juce::var (obj);
 }
 
 juce::Array<juce::var> InstrumentHostService::matchesToVar (const juce::Array<SoundMatch>& matches,
@@ -14772,6 +14992,11 @@ juce::var InstrumentHostService::buildStatePayload()
         obj->setProperty ("destinationBusId", part.destinationBusId);
         obj->setProperty ("presetRecordId", part.lastPresetRecordId);
         obj->setProperty ("presetName",     part.lastPresetName);
+        // Like gain and pan: the position the player set, not whatever a cable is doing
+        // to it this instant.
+        obj->setProperty ("morph",          morphProjection (part,
+                                                modulationBaseFor (part.partId, "@morph",
+                                                                   part.morphAmount)));
         obj->setProperty ("hasInstrument", rack.partHasInstrument (part.partId));
         obj->setProperty ("unresolved",    part.pluginCeId.isNotEmpty()
                                              && ! rack.partHasInstrument (part.partId));

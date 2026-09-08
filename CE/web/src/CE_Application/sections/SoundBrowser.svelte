@@ -29,8 +29,9 @@
     saveSmartCollection, removeSmartCollection,
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
     hostAnalysis, analyseLibrary, cancelAnalysis,
-    hostAudition, auditionRecord, stopAudition, setAuditionPhrase,
+    hostAudition, auditionRecord, stopAudition, setAuditionPhrase, auditionLibraryRecord,
     hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
+    setMorph, clearMorph, setParameter,
     hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
@@ -41,7 +42,6 @@
     focusedPart = null,
     partTitle = () => '',
     auditionOn = false,
-    onAudition = () => {},
     onToggleAudition = () => {},
   } = $props();
 
@@ -182,8 +182,11 @@
   }
 
   function loadInto(record, action) {
-    loadLibraryRecord(record.recordId, action, action === 'focused' ? focusedPart?.partId : undefined);
-    if (auditionOn && action !== 'add') onAudition();
+    const partId = action === 'focused' ? focusedPart?.partId : undefined;
+    // With audition on, loading IS the phrase: the native side commits the preset and then
+    // plays, one command, so the note never lands on the sound that was there before.
+    if (auditionOn && action !== 'add') auditionLibraryRecord(record.recordId, action, partId);
+    else loadLibraryRecord(record.recordId, action, partId);
   }
 
   /** The axes that agreed, and the one that did not — a percentage nobody can argue with is
@@ -203,6 +206,25 @@
       lastAskedSimilar = recordId;
       similarSounds(recordId);
     }
+  }
+
+  // Two sounds of the focused part's plug-in become the ends of its morph: the selected one
+  // is A, the one you point at is B, and from then on the part's "@morph" address rides the
+  // line between them — from the slider in the rail, or from whatever macro you put it on.
+  // The native side refuses a pair the plug-in cannot read both ends of; here the only gate
+  // is having a part with an instrument to move.
+  const canMorph = $derived(Boolean(focusedPart?.hasInstrument && selected && selected.type === 'preset'));
+  function morphWith(recordIdB) {
+    if (!canMorph || !recordIdB || recordIdB === selected.recordId) return;
+    setMorph(focusedPart.partId, selected.recordId, recordIdB);
+  }
+  function clickDot(event, record) {
+    // Shift-click on the map picks the second end of a morph; a plain click selects.
+    if (event.shiftKey && canMorph && record.recordId !== selected?.recordId) {
+      morphWith(record.recordId);
+      return;
+    }
+    clickTile(record);
   }
 
   function clickTile(record) {
@@ -411,6 +433,34 @@
       <button type="button" class="rail-action" onclick={() => saveRackToLibrary()}
               data-testid="host-save-rack">Save the rack</button>
 
+      {#if focusedPart?.morph}
+        <!-- Two sounds of one plug-in and the line between them. The slider is the part's
+             "@morph" address, the same one a macro or a knob rides; nothing here is a save. -->
+        <div class="rail-head">Morph</div>
+        <div class="morph" data-testid="host-morph">
+          <div class="morph-ends">
+            <span class="morph-end" title={focusedPart.morph.nameA}>{focusedPart.morph.nameA}</span>
+            <span class="morph-arrow">↔</span>
+            <span class="morph-end b" title={focusedPart.morph.nameB}>{focusedPart.morph.nameB}</span>
+          </div>
+          <input type="range" min="0" max="100" step="1" data-testid="morph-ride"
+                 aria-label={`Morph ${partTitle(focusedPart)} between ${focusedPart.morph.nameA} and ${focusedPart.morph.nameB}`}
+                 disabled={!focusedPart.morph.live}
+                 value={Math.round(focusedPart.morph.amount * 100)}
+                 oninput={(e) => setParameter(focusedPart.partId, '@morph', Number(e.currentTarget.value) / 100)} />
+          {#if focusedPart.morph.refusal}
+            <div class="notes bad" data-testid="morph-refusal">{focusedPart.morph.refusal}</div>
+          {:else if !focusedPart.morph.live}
+            <div class="notes">Load the instrument to ride it.</div>
+          {:else}
+            <div class="notes">On a macro: it is <b>Morph</b> in {partTitle(focusedPart)}'s parameter list — M+ puts it on the selected macro, ⚡ on a knob.</div>
+          {/if}
+          <button type="button" class="ghost morph-clear" data-testid="morph-clear"
+                  title="Forget the pair. The sound stays where the ride left it."
+                  onclick={() => clearMorph(focusedPart.partId)}>Clear the morph</button>
+        </div>
+      {/if}
+
       {#if $hostLibrary.paths.length > 0}
         <div class="rail-head">Scanned folders</div>
         {#each $hostLibrary.paths as path (path)}
@@ -554,8 +604,11 @@
                       title={`${record.name} — ${measuredLabel(axisX, record.sonic[axisX])} × ${measuredLabel(axisY, record.sonic[axisY])}`}
                       onmouseenter={() => (hovered = record)}
                       onmouseleave={() => (hovered = null)}
-                      onclick={() => clickTile(record)}></button>
+                      onclick={(e) => clickDot(e, record)}></button>
             {/each}
+            {#if canMorph}
+              <span class="maphint">shift-click a second dot to morph {partTitle(focusedPart)} between them</span>
+            {/if}
 
             {#if lasso}
               <div class="lasso"
@@ -750,12 +803,22 @@
           <div class="insp-block">
             <div class="insp-head">Sounds like</div>
             {#each $hostSimilar.matches as match (match.recordId)}
-              <button type="button" class="ghost simrow" data-testid="similar-row"
-                      title={`${agreedAxes(match).join(', ')} agree${gaveUp(match) ? ` — but ${gaveUp(match)}` : ''}`}
-                      onclick={() => selectRecord(match.recordId)}>
-                <span class="simname">{match.name}</span>
-                <span class="simpct">{match.percent}%</span>
-              </button>
+              <div class="subrow">
+                <button type="button" class="ghost simrow" data-testid="similar-row"
+                        title={`${agreedAxes(match).join(', ')} agree${gaveUp(match) ? ` — but ${gaveUp(match)}` : ''}`}
+                        onclick={() => selectRecord(match.recordId)}>
+                  <span class="simname">{match.name}</span>
+                  <span class="simpct">{match.percent}%</span>
+                </button>
+                <!-- A neighbour is a sound you could be halfway to. The pair goes on the
+                     focused part; riding it is the rail's slider or a macro. -->
+                <button type="button" class="ghost keep morph-with" data-testid="morph-with"
+                        disabled={!canMorph}
+                        title={canMorph
+                                 ? `Morph ${partTitle(focusedPart)} between ${selected.name} and ${match.name}`
+                                 : 'Focus a part with an instrument first'}
+                        onclick={() => morphWith(match.recordId)}>MORPH</button>
+              </div>
             {/each}
             <div class="notes simwhy">
               Closest on {agreedAxes($hostSimilar.matches[0]).join(', ')}.
@@ -1361,6 +1424,20 @@
   button.simrow.best { border-color: #35c46f66; background: #35c46f0d; }
   .subrow { display: flex; align-items: stretch; gap: 4px; }
   .subrow button.simrow { flex: 1; min-width: 0; }
+  button.morph-with:disabled { opacity: 0.35; }
+
+  .morph { display: flex; flex-direction: column; gap: 5px; padding: 0 2px; }
+  .morph-ends { display: flex; align-items: baseline; gap: 6px; font-size: 11px; min-width: 0; }
+  .morph-end { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .morph-end.b { text-align: right; }
+  .morph-arrow { flex: 0 0 auto; color: #7d8894; }
+  .morph input[type="range"] { width: 100%; margin: 0; }
+  .morph .notes.bad { color: #e0725c; }
+  button.morph-clear { align-self: flex-start; font-size: 10px; padding: 2px 6px; color: #7d8894; }
+  .maphint {
+    position: absolute; left: 8px; bottom: 6px; font-size: 10px; color: #66707b;
+    pointer-events: none;
+  }
   button.keep {
     flex: 0 0 auto; font-size: 9px; letter-spacing: 0.06em; padding: 0 6px; color: #7d8894;
   }

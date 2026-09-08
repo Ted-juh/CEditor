@@ -303,6 +303,13 @@ public:
     /** Records the part's place in the preset walk (empty strings clear it). */
     bool setPartLastPreset (const juce::String& partId, const juce::String& recordId,
                             const juce::String& name);
+    /** Records the two ends of the part's morph (an empty B clears it) and rests the amount
+        at 0 — entirely A — so a newly chosen pair starts from the sound you were on. */
+    bool setPartMorph (const juce::String& partId,
+                       const juce::String& recordIdA, const juce::String& nameA,
+                       const juce::String& recordIdB, const juce::String& nameB);
+    /** Where the part sits between its two morph ends, 0..1. False when it has no morph. */
+    bool setPartMorphAmount (const juce::String& partId, float amount);
 
     /** Records where a canvas box was dropped, or moves the one already recorded. Refuses an
         id that is not a node — "@master", a part, a bus or a return — because a position for

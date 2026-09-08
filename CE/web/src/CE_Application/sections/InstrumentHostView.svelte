@@ -734,7 +734,12 @@
   {/if}
 
   {#if activeUtility === 'sounds'}
-    <SoundBrowser />
+    <!-- The browser acts on the focused part — save it, load into it, morph it — so it is
+         told which part that is. Mounted bare, every one of those buttons stayed disabled with
+         "focus a part first" while a part sat focused in the rack. -->
+    <SoundBrowser {focusedPart} {partTitle}
+                  auditionOn={audition.enabled}
+                  onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
   {/if}
 
   {#if activeUtility === 'library'}

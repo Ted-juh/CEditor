@@ -95,6 +95,11 @@
 //   diffVersions {recordId, versionIdA?, versionIdB?, partId?} | morphVersions {…, amount}
 //     (versions: every save is kept, never an overwrite. A factory preset's first save
 //      branches into a record of your own that remembers where it came from.)
+//   setMorph {partId?, recordIdA?, recordIdB} | clearMorph {partId?}
+//     (two sounds of the part's plug-in — two map neighbours — become the ends of the part's
+//      "@morph" address, ridden like any parameter: setParameter, a page slot, a macro, a
+//      modulation cable. A missing recordIdA is the preset the part last loaded. The blend is
+//      by parameter, read through the plug-in, and the pair persists with the session.)
 //   browseOnSurface {on?} | browseTurn {encoder,delta} | browsePad {pad}
 //     (the library on the hardware: nothing here names a device — a surface arrives as its
 //      capabilities and the browser is built to fit it, or is told what it cannot do.)
@@ -238,7 +243,8 @@
 //
 // VIRTUAL PARAMETER ADDRESSES (Stage 5). A parameterId starting with '@' resolves against
 // the rack's own state instead of a plug-in registry: "@gain" and "@pan" on any part,
-// "@send:<returnId>" for that part's send level, "@macro" with the macroId as the target id.
+// "@send:<returnId>" for that part's send level, "@macro" with the macroId as the target id,
+// "@morph" on a part that has a morph pair (setMorph).
 // They work everywhere a plug-in parameter does — setParameter, page slots, macro targets
 // (except "@macro" itself: a macro may not target a macro), surface nudges — so hardware
 // encoders drive faders, sends and whole macros through the same binding math. Their writes
@@ -824,6 +830,21 @@ private:
     static juce::Array<ParameterReading> readParameters (juce::AudioProcessor& instrument);
     /** The part a version command acts on: the one named, else the focused one. */
     juce::String versionTargetPart (const juce::var& payload) const;
+
+    // -- preset morph ("@morph") ---------------------------------------------------------
+    /** Reads both ends of the part's morph through its live plug-in — apply A, read, apply
+        B, read, put back what was there — and keeps the two parameter vectors. Empty return
+        = sampled. The endpoints are runtime: a session opens with the pair and no vectors,
+        and the first ride samples them, so nothing stale is ever stored. */
+    juce::String sampleMorph (const juce::String& partId);
+    /** Moves the part to `amount` between its two ends on every parameter the plug-in
+        exposes that differs between them. Anything a plug-in keeps out of its parameter list
+        does not move — a parameter blend, said plainly, the same honesty as morphVersions. */
+    void applyMorphAmount (const juce::String& partId, float amount);
+    /** The part's morph as state carries it: the pair, the amount (the caller passes the
+        unmodulated one, as with gain and pan), and why it cannot be ridden right now when it
+        cannot. Void when the part has none. */
+    juce::var morphProjection (const RackPart& part, float amount) const;
     void emitLibrary (const LibraryQuery& query);
     void scanVstPresets();
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
@@ -872,8 +893,8 @@ private:
                                                      const ParameterDescriptor** descriptorOut = nullptr);
 
     // -- virtual parameter addresses (Stage 5) -----------------------------------------
-    // '@'-prefixed ids resolve against the rack's own state: "@gain"/"@pan"/"@send:<id>" on
-    // a part, "@macro" on a macro id. Values are normalized 0..1 like everything else on
+    // '@'-prefixed ids resolve against the rack's own state: "@gain"/"@pan"/"@send:<id>" and
+    // "@morph" on a part, "@macro" on a macro id. Values are normalized 0..1 like everything else on
     // the parameter path; writes go through the rack's setters, never a second store.
     static bool isVirtualParameterId (const juce::String& parameterId)
     {
@@ -1269,6 +1290,12 @@ private:
     juce::String presetAuditionPartId;
     double presetAuditionStartedMs = 0.0;
     bool presetAuditionPlaying = false;
+    struct MorphSample
+    {
+        juce::Array<ParameterReading> a, b;
+    };
+    std::map<juce::String, MorphSample> morphSamples;   // partId → endpoints, sampled lazily
+    std::map<juce::String, juce::String> morphRefusals; // partId → why the last ride could not
     struct SoundComparisonRuntime
     {
         bool active = false;

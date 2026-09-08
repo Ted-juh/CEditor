@@ -65,6 +65,9 @@ import {
   hostSimilar,
   hostSubstitutes,
   normalizeSimilar,
+  normalizeMorph,
+  setMorph,
+  clearMorph,
   normalizeSubstitutes,
   similarSounds,
   rackSubstitutes,
@@ -4083,4 +4086,74 @@ test('group buses: parts join one, removal releases them, loops are refused', ()
   assert.equal(state.rack.buses.length, 1);
   assert.equal(state.rack.parts[0].destinationBusId, '',
     'a removed bus puts its instruments back on the master, never into silence');
+});
+
+// --- preset morph: two sounds of one plug-in on a macro -------------------------------------------
+
+test('normalize: a part carries its morph pair, or null', () => {
+  const state = normalizeHostState({ rack: { parts: [
+    { partId: 'p1', morph: { recordIdA: 'a', nameA: 'Warm', recordIdB: 'b', nameB: 'Glass',
+                             amount: '1.7', live: true, refusal: '' } },
+    { partId: 'p2', morph: { recordIdA: 'a', nameA: 'Warm' } },   // no B: not a morph
+    { partId: 'p3' },
+  ] } });
+  assert.deepEqual(state.rack.parts[0].morph,
+    { recordIdA: 'a', nameA: 'Warm', recordIdB: 'b', nameB: 'Glass', amount: 1, live: true, refusal: '' },
+    'both ends by id and name, the amount clamped to 0..1');
+  assert.equal(state.rack.parts[1].morph, null, 'half a pair is no pair');
+  assert.equal(state.rack.parts[2].morph, null, 'and a part without one says so');
+  assert.equal(normalizeMorph(undefined), null);
+  assert.equal(normalizeMorph({ recordIdB: 'b', amount: -3 }).amount, 0);
+});
+
+test('mock reducer: a morph is two sounds of the focused part\'s plug-in, ridden by @morph', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+  const part = () => get(hostStateStore).rack.parts.find((p) => p.partId === 'mock-part-1');
+
+  // The refusals the native side pins, mirrored.
+  hostLastError.set('');
+  setMorph('mock-part-1', 'lib-1', 'lib-1');
+  assert.match(get(hostLastError), /two different sounds/);
+  hostLastError.set('');
+  setMorph('mock-part-1', 'lib-1', 'lib-4');
+  assert.match(get(hostLastError), /not a sound a plug-in can be moved between/, 'a rack is not an end');
+  hostLastError.set('');
+  setMorph('mock-part-1', 'lib-1', 'lib-3');
+  assert.match(get(hostLastError), /Both ends of a morph belong to the part's plug-in/,
+    'a sound for another plug-in is not an end');
+  hostLastError.set('');
+  setMorph('mock-part-2', 'lib-1', 'lib-6');
+  assert.match(get(hostLastError), /plays nothing yet/, 'an empty part has nothing to move');
+  hostLastError.set('');
+  setMorph('mock-part-1', 'lib-1', 'nope');
+  assert.match(get(hostLastError), /Unknown library record/);
+  assert.equal(part().morph, null, 'a refused pair leaves the part without one');
+
+  // The pair, A defaulting to the sound the part is on.
+  hostLastError.set('');
+  loadLibraryRecord('lib-1', 'replace', 'mock-part-1');
+  setMorph('mock-part-1', undefined, 'lib-6');
+  assert.equal(get(hostLastError), '');
+  assert.deepEqual(part().morph, { recordIdA: 'lib-1', nameA: 'Warm Pad', recordIdB: 'lib-6',
+    nameB: 'Never Heard', amount: 0, live: true, refusal: '' },
+    'A is the loaded preset, B the one you picked, resting at A');
+
+  // The registry lists it, so a macro or a knob can take it; the write moves the amount.
+  requestParameters('mock-part-1');
+  const row = get(hostParameters).parameters.find((d) => d.id === '@morph');
+  assert.ok(row && row.group === 'Morph', 'the part answers with its morph address');
+  assert.equal(row.name, 'Morph — Warm Pad ↔ Never Heard');
+  assert.equal(row.text, 'Warm Pad', 'at zero it reads as A');
+  setParameter('mock-part-1', '@morph', 0.5);
+  assert.equal(part().morph.amount, 0.5, '@morph writes the part\'s position');
+  requestParameters('mock-part-1');
+  assert.equal(get(hostParameters).parameters.find((d) => d.id === '@morph').text, '50% Never Heard');
+
+  clearMorph('mock-part-1');
+  assert.equal(part().morph, null, 'clearing forgets the pair');
+  requestParameters('mock-part-1');
+  assert.ok(!get(hostParameters).parameters.some((d) => d.id === '@morph'),
+    'and the address goes with it');
 });

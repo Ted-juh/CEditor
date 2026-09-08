@@ -135,6 +135,20 @@ struct RackPart
     // cache still truthfully names the sound that was loaded). Empty until a preset loads.
     juce::String lastPresetRecordId;
     juce::String lastPresetName;
+    // A morph: two library records of THIS part's plug-in, and where the part sits between
+    // them. Two saves of one sound were already a line you could ride (morphVersions); two
+    // sounds are the same line — two map neighbours, a pad and the pad next to it — and
+    // riding it from a macro is the point, so the pair lives with the part rather than in a
+    // transient command. The names are display caches like lastPresetName; the record ids
+    // are the identity. Empty B = no morph. The amount is the part's "@morph" address:
+    // 0 is entirely A, 1 entirely B, on every parameter the plug-in exposes (the endpoints
+    // are read through the plug-in when the morph is first ridden, not stored here).
+    juce::String morphRecordIdA;
+    juce::String morphNameA;
+    juce::String morphRecordIdB;
+    juce::String morphNameB;
+    float morphAmount = 0.0f;
+    bool hasMorph() const         { return morphRecordIdB.isNotEmpty(); }
     /** This part receives the Performance's shared Scala/MTS table. Off by default because
         sending tuning SysEx to an instrument that does not support it is not useful. */
     bool microtuningEnabled = false;
