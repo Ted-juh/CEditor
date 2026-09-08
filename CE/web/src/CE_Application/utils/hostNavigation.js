@@ -6,7 +6,7 @@
  */
 
 export const HOST_WORKSPACES = Object.freeze(['rack', 'performance', 'mixer', 'layers', 'controller']);
-export const HOST_UTILITIES = Object.freeze(['library', 'devices', 'project', 'product', 'health', 'licence']);
+export const HOST_UTILITIES = Object.freeze(['library', 'sounds', 'devices', 'project', 'product', 'health', 'licence']);
 
 const STORAGE_KEY = 'ceditor.instrumentHost.navigation.v1';
 

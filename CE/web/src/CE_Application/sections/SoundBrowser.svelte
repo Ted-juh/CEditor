@@ -1072,6 +1072,13 @@
   }
 
   .browser {
+    /* The browser is laid out against its own width, not the window's. It was built for a
+       full-width workspace and now also has to sit in the utility drawer, which is less than
+       half that: three fixed columns at 186 + 234 plus the grid do not fit, and what a person
+       sees when they do not fit is labels printed over chips. A container query is the honest
+       way to say that - the drawer can be resized, and the layout follows the space it is
+       actually given rather than a guess about which of the two places it is in. */
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1272,6 +1279,26 @@
   .notes { color: #9aa5b1; font-size: 11px; margin-top: 6px; }
   button.insp-remove { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
   .empty-hint { color: #7d8894; font-size: 12px; padding: 12px 0; }
+
+  /* Under roughly 760px the three columns become three rows, in reading order: what you are
+     filtering by, what came back, and what one of them is. Each keeps its own scroll so the
+     drawer never grows a second scrollbar of its own. */
+  @container (max-width: 760px) {
+    .body { flex-direction: column; }
+    .rail {
+      width: auto; flex: 0 0 auto; max-height: 190px;
+      padding-right: 0; padding-bottom: 8px;
+      border-bottom: 1px solid #2a333d;
+    }
+    .inspector {
+      width: auto; flex: 0 0 auto; max-height: 420px;
+      padding-left: 0; border-left: 0;
+      padding-top: 8px; border-top: 1px solid #2a333d;
+    }
+    /* Two-up tiles rather than one wide one: the grid row is the whole width here. */
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 360px; }
+  }
+
 
   .vrail { display: flex; flex-direction: column; gap: 0; }
   .vrow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px;

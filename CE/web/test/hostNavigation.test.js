@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
+  HOST_UTILITIES,
   normaliseHostNavigation,
   restoreHostNavigation,
   storeHostNavigation,
@@ -38,4 +40,22 @@ test('host navigation survives a component remount', () => {
     workspace: 'controller',
     utility: 'devices',
   });
+});
+
+test('every tab the host draws is a utility the navigation will accept', () => {
+  // The tab strip and this whitelist are two lists of the same thing, in two files. A tab added
+  // to one and not the other looks correct - it draws, it highlights on click - and then opens
+  // nothing at all, because toggleHostUtility answers '' for an id it does not know. That is
+  // exactly how the Sounds drawer shipped dead, so the two lists are compared here instead.
+  const view = readFileSync(new URL(
+    '../src/CE_Application/sections/InstrumentHostView.svelte', import.meta.url), 'utf8');
+  const block = view.match(/const hostUtilities = \[([\s\S]*?)\];/)?.[1];
+  assert.ok(block, 'the host view must declare its utility tabs as one list');
+  const drawn = [...block.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
+
+  assert.ok(drawn.length >= 7, 'the audit must see the whole tab strip');
+  assert.deepEqual(drawn.filter((id) => !HOST_UTILITIES.includes(id)), [],
+    'a drawn tab with no entry in HOST_UTILITIES opens an empty drawer');
+  assert.deepEqual(HOST_UTILITIES.filter((id) => !drawn.includes(id)), [],
+    'a utility nothing draws is unreachable');
 });
