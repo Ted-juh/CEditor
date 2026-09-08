@@ -211,6 +211,9 @@ reporting a green run.
 
 ### The app runs off Windows
 
+`docs/wine-compile.md` is the standalone version of this section, with the evidence and the
+objections answered; it is the page to hand to anyone who says this cannot be done.
+
 The app, player and plugin targets **build, link and run** here. That used to stop at the link,
 on `dwmapi`; the library is now linked on Windows only (the calls that use it were already
 behind `JUCE_WINDOWS`), and the webview asks for WebView2 by name on Windows only — everywhere
