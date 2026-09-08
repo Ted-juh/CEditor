@@ -1223,7 +1223,27 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         else if (rack.getPerformance().findPart (partId) != nullptr)
             rack.panicPart (partId);
         else
+        {
             emitError ("Unknown rack part.");
+            return;
+        }
+        // The keyboard still believes those keys are down; the part no longer sounds them. A
+        // stuck-note row that outlives the panic would be reporting a fault just fixed.
+        forgetHeldNotesFor (partId);
+        evaluateMidiHealth (juce::Time::getMillisecondCounterHiRes(), lastPresentInputs);
+        return;
+    }
+
+    if (cmd == "dismissMidiIssue")
+    {
+        const auto key = payload.getProperty ("key", {}).toString();
+        if (key.isEmpty())
+        {
+            emitError ("Which issue?");
+            return;
+        }
+        dismissedMidiIssues.addIfNotAlreadyThere (key);
+        evaluateMidiHealth (juce::Time::getMillisecondCounterHiRes(), lastPresentInputs);
         return;
     }
 
@@ -13747,6 +13767,12 @@ void InstrumentHostService::drainEngineEvents()
 void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
                                               const juce::MidiMessage& message)
 {
+    noteMidiActivity (deviceName, message, juce::Time::getMillisecondCounterHiRes());
+}
+
+void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
+                                              const juce::MidiMessage& message, double nowMs)
+{
     // System-exclusive is the one non-voice message that means something here: while a patch
     // capture is armed it IS the payload. Taken before the indicator filter below, because it
     // is not activity to display — it is the thing being collected.
@@ -13785,6 +13811,53 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
     midiActivityValue = message.isController() ? message.getControllerValue()
                       : message.isNoteOn()     ? message.getVelocity() : 0;
     ++midiActivitySeq;
+
+    // Health bookkeeping, still under the lock: the judging is the controlling thread's.
+    {
+        auto& health = midiInputHealth[deviceName];
+        if (health.messages == 0)
+            health.firstMs = nowMs;
+        health.lastMs = nowMs;
+        ++health.messages;
+        const auto channel = message.getChannel();
+
+        if (message.isNoteOn())
+            health.heldNotes[(channel << 8) | message.getNoteNumber()] = nowMs;
+        else if (message.isNoteOff())
+            health.heldNotes.erase ((channel << 8) | message.getNoteNumber());
+        else if (message.isAllNotesOff() || message.isAllSoundOff())
+        {
+            for (auto it = health.heldNotes.begin(); it != health.heldNotes.end();)
+                it = (it->first >> 8) == channel ? health.heldNotes.erase (it) : std::next (it);
+        }
+        else if (message.isController())
+        {
+            auto& c = health.controllers[(channel << 8) | message.getControllerNumber()];
+            const auto value = message.getControllerValue();
+            if (nowMs - c.windowStartMs > jitterWindowMs)
+            {
+                c.windowStartMs = nowMs;
+                c.changes = 0;
+                c.low = c.high = value;
+            }
+            if (value != c.lastValue)
+            {
+                ++c.changes;
+                c.low = juce::jmin (c.low, value);
+                c.high = juce::jmax (c.high, value);
+            }
+            c.lastValue = value;
+            c.lastMs = nowMs;
+        }
+        else if (message.isProgramChange())
+        {
+            auto& pc = health.programChanges[(channel << 8) | message.getProgramChangeNumber()];
+            pc.channel = channel;
+            pc.program = message.getProgramChangeNumber();
+            pc.lastMs = nowMs;
+            ++pc.count;
+        }
+    }
 
     // Notes for the slots — a pad, or a key standing in for one — only while something is
     // listening for them; the rest of the time playing the keyboard costs this nothing.
@@ -14464,6 +14537,7 @@ void InstrumentHostService::drainParameterEvents()
     tickEnvelopeGenerators();
     tickMsegs();
     tickRandomModulators();
+    tickMidiHealth();
 
     // The MIDI activity readout: at most one event per drain, carrying the latest message —
     // a UI light needs "something arrived, this is what", not a message log.
@@ -16441,7 +16515,250 @@ juce::var InstrumentHostService::reliabilityPayload() const
     root->setProperty ("recovery",       juce::var (recoveryObj));
     root->setProperty ("damagedState",   damaged);
     root->setProperty ("automaticFailover", juce::var (automaticFailover));
+    if (midiHealthCache.isVoid())
+    {
+        auto* quiet = new juce::DynamicObject();
+        quiet->setProperty ("inputs", juce::Array<juce::var>());
+        quiet->setProperty ("issues", juce::Array<juce::var>());
+        root->setProperty ("midi", juce::var (quiet));
+    }
+    else
+        root->setProperty ("midi", midiHealthCache);
     return juce::var (root);
+}
+
+// -- MIDI health ------------------------------------------------------------------------------
+
+void InstrumentHostService::tickMidiHealth()
+{
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (now - lastMidiHealthEvalMs < 500.0)
+        return;
+    lastMidiHealthEvalMs = now;
+
+    // Asking the system for its device list is not free on every platform; twice a second is
+    // plenty for "the keyboard is gone", which is a thing a person notices in seconds.
+    if (now - lastMidiInputPollMs >= 2000.0 || lastMidiInputPollMs == 0.0)
+    {
+        lastMidiInputPollMs = now;
+        lastPresentInputs.clear();
+        for (const auto& input : juce::MidiInput::getAvailableDevices())
+            lastPresentInputs.add (input.name);
+    }
+    evaluateMidiHealth (now, lastPresentInputs);
+}
+
+juce::Array<juce::var> InstrumentHostService::midiHealthPartsFor (int channel, int note) const
+{
+    juce::Array<juce::var> out;
+    const auto& performance = rack.getPerformance();
+    for (int i = 0; i < performance.parts.size(); ++i)
+    {
+        const auto& part = performance.parts.getReference (i);
+        if (! part.enabled || part.midiSourcePartId.isNotEmpty())
+            continue;
+        if (part.midi.channel != 0 && part.midi.channel != channel)
+            continue;
+        if (note >= 0 && (note < part.midi.keyLow || note > part.midi.keyHigh))
+            continue;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("partId", part.partId);
+        obj->setProperty ("name",   part.pluginName.isNotEmpty() ? part.pluginName
+                                    : part.hardware && part.midiOutputName.isNotEmpty() ? part.midiOutputName
+                                    : "Part " + juce::String (i + 1));
+        obj->setProperty ("hasInstrument", rack.partHasInstrument (part.partId) || part.hardware);
+        out.add (juce::var (obj));
+    }
+    return out;
+}
+
+void InstrumentHostService::forgetHeldNotesFor (const juce::String& partId)
+{
+    const auto* part = partId.isNotEmpty() ? rack.getPerformance().findPart (partId) : nullptr;
+    const std::scoped_lock lock (midiActivityLock);
+    for (auto& [device, health] : midiInputHealth)
+    {
+        juce::ignoreUnused (device);
+        if (part == nullptr)
+        {
+            health.heldNotes.clear();
+            continue;
+        }
+        for (auto it = health.heldNotes.begin(); it != health.heldNotes.end();)
+        {
+            const auto channel = it->first >> 8;
+            const auto note = it->first & 0xff;
+            const bool reaches = (part->midi.channel == 0 || part->midi.channel == channel)
+                              && note >= part->midi.keyLow && note <= part->midi.keyHigh;
+            it = reaches ? health.heldNotes.erase (it) : std::next (it);
+        }
+    }
+}
+
+void InstrumentHostService::evaluateMidiHealth (double nowMs, const juce::StringArray& presentInputNames)
+{
+    lastPresentInputs = presentInputNames;
+
+    // Judge a copy: the MIDI thread keeps writing while the controlling thread reads, and the
+    // few maps involved are small. The one write back — "the system has listed you" and the
+    // jitter hysteresis — goes under the lock as well.
+    std::map<juce::String, MidiInputHealth> snapshot;
+    {
+        const std::scoped_lock lock (midiActivityLock);
+        for (auto& [name, health] : midiInputHealth)
+        {
+            if (presentInputNames.contains (name))
+                health.listed = true;
+            for (auto& [key, c] : health.controllers)
+            {
+                juce::ignoreUnused (key);
+                const bool busy = nowMs - c.lastMs < jitterWindowMs;
+                if (c.changes >= jitterMinChanges && c.high - c.low <= jitterMaxRange && busy)
+                    c.jittering = true;
+                else if (! busy || c.high - c.low > jitterMaxRange)
+                    c.jittering = false;      // quiet, or actually being moved: not jitter
+            }
+        }
+        snapshot = midiInputHealth;
+    }
+
+    const auto seconds = [] (double ms) { return juce::String (juce::roundToInt (ms / 1000.0)); };
+    const auto noteName = [] (int note) { return juce::MidiMessage::getMidiNoteName (note, true, true, 4); };
+
+    juce::Array<juce::var> inputs, issues;
+    juce::String signature;
+    const auto addIssue = [&] (const juce::String& kind, const juce::String& key,
+                               juce::DynamicObject* obj)
+    {
+        if (dismissedMidiIssues.contains (key))
+        {
+            delete obj;
+            return;
+        }
+        obj->setProperty ("kind", kind);
+        obj->setProperty ("key",  key);
+        issues.add (juce::var (obj));
+        signature << kind << ':' << key << '\n';
+    };
+
+    for (const auto& [name, health] : snapshot)
+    {
+        const bool present = presentInputNames.contains (name);
+        const bool gone = health.listed && ! present;
+
+        auto* input = new juce::DynamicObject();
+        input->setProperty ("name",      name);
+        input->setProperty ("present",   present);
+        input->setProperty ("messages",  health.messages);
+        input->setProperty ("lastAgoMs", juce::jmax (0.0, nowMs - health.lastMs));
+        input->setProperty ("heldNotes", (int) health.heldNotes.size());
+        inputs.add (juce::var (input));
+
+        if (gone)
+        {
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("device",   name);
+            obj->setProperty ("count",    health.messages);
+            obj->setProperty ("agoMs",    juce::jmax (0.0, nowMs - health.lastMs));
+            obj->setProperty ("text",     name + " is no longer listed by the system. It sent "
+                                          + juce::String (health.messages) + " messages, the last "
+                                          + seconds (nowMs - health.lastMs) + " s ago"
+                                          + (health.heldNotes.empty() ? juce::String (".")
+                                             : juce::String (", with ") + juce::String ((int) health.heldNotes.size())
+                                               + (health.heldNotes.size() == 1 ? " note still down."
+                                                                                : " notes still down.")));
+            obj->setProperty ("parts",    midiHealthPartsFor (0, -1));
+            addIssue ("inputGone", "gone:" + name, obj);
+        }
+
+        for (const auto& [key, onMs] : health.heldNotes)
+        {
+            const auto age = nowMs - onMs;
+            if (age < stuckNoteMs && ! gone)
+                continue;
+            const auto channel = key >> 8;
+            const auto note = key & 0xff;
+            // Nothing from the keyboard since the key went down is the signature of a lost
+            // note-off: a hand does not hold one key for twenty seconds and touch nothing else.
+            // "Since" allows a second, so the other notes of the same chord do not count as
+            // playing on. A keyboard still talking makes it a long-held note, not a fault.
+            const bool stuck = gone || health.lastMs - onMs < 1000.0;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("device",   name);
+            obj->setProperty ("channel",  channel);
+            obj->setProperty ("note",     note);
+            obj->setProperty ("noteName", noteName (note));
+            obj->setProperty ("agoMs",    age);
+            obj->setProperty ("text",     noteName (note) + " on channel " + juce::String (channel)
+                                          + " from " + name
+                                          + (gone ? " has been down for " + seconds (age) + " s and the keyboard is gone: the note-off is never coming."
+                                           : stuck ? " has been down for " + seconds (age) + " s and the keyboard has sent nothing since: a lost note-off."
+                                                   : " has been down for " + seconds (age) + " s while the keyboard keeps playing — held, not stuck, unless you say so."));
+            obj->setProperty ("parts",    midiHealthPartsFor (channel, note));
+            addIssue (stuck ? "stuckNote" : "heldNote",
+                      (stuck ? "stuck:" : "held:") + name + ":" + juce::String (channel) + ":" + juce::String (note), obj);
+        }
+
+        for (const auto& [key, c] : health.controllers)
+        {
+            if (! c.jittering)
+                continue;
+            const auto channel = key >> 8;
+            const auto cc = key & 0xff;
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("device",   name);
+            obj->setProperty ("channel",  channel);
+            obj->setProperty ("cc",       cc);
+            obj->setProperty ("low",      c.low);
+            obj->setProperty ("high",     c.high);
+            obj->setProperty ("count",    c.changes);
+            obj->setProperty ("text",     "CC " + juce::String (cc) + " on channel " + juce::String (channel)
+                                          + " from " + name + " is jittering between " + juce::String (c.low)
+                                          + " and " + juce::String (c.high) + " (" + juce::String (c.changes)
+                                          + " changes in " + seconds (jitterWindowMs)
+                                          + " s). A noisy pot or a loose cable; nothing has to be touching it.");
+            obj->setProperty ("parts",    midiHealthPartsFor (channel, -1));
+            addIssue ("controllerJitter", "jitter:" + name + ":" + juce::String (channel) + ":" + juce::String (cc), obj);
+        }
+
+        for (const auto& [key, pc] : health.programChanges)
+        {
+            juce::ignoreUnused (key);
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("device",   name);
+            obj->setProperty ("channel",  pc.channel);
+            obj->setProperty ("program",  pc.program);
+            obj->setProperty ("count",    pc.count);
+            obj->setProperty ("agoMs",    juce::jmax (0.0, nowMs - pc.lastMs));
+            obj->setProperty ("text",     name + " sent program change " + juce::String (pc.program)
+                                          + " on channel " + juce::String (pc.channel)
+                                          + (pc.count > 1 ? " (" + juce::String (pc.count) + "×, last " : " (")
+                                          + seconds (nowMs - pc.lastMs) + " s ago). The zone passes it on, so an "
+                                            "instrument on that channel changes sound without a preset being "
+                                            "chosen here — usually a preset knob on the keyboard.");
+            obj->setProperty ("parts",    midiHealthPartsFor (pc.channel, -1));
+            addIssue ("programChange", "pc:" + name + ":" + juce::String (pc.channel) + ":" + juce::String (pc.program), obj);
+        }
+    }
+
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("inputs", inputs);
+    root->setProperty ("issues", issues);
+    midiHealthCache = juce::var (root);
+
+    // The set changed: state, so the tab warns and the panel redraws. While anything stands,
+    // a light event once a second keeps the ages honest without re-announcing the rack.
+    if (signature != midiHealthSignature)
+    {
+        midiHealthSignature = signature;
+        lastMidiHealthEmitMs = nowMs;
+        emitState();
+    }
+    else if (! issues.isEmpty() && nowMs - lastMidiHealthEmitMs >= 1000.0 && options.emit != nullptr)
+    {
+        lastMidiHealthEmitMs = nowMs;
+        options.emit ("instrumentHostMidiHealth", midiHealthCache);
+    }
 }
 
 // -- licensing (§19 "Trust", §20, §26.2, §27) -------------------------------------------------

@@ -237,6 +237,47 @@ empty when the module is on offer).
 
 ---
 
+## MIDI health
+
+The panel above answered for the product's own failures. The failures a player meets mid-set
+are mostly not the product's: a note that will not stop, a knob turning itself, the sound
+changing on its own, a keyboard that went quiet. Every one of them is visible in the incoming
+MIDI stream before it is audible, and the host was already listening to that stream for the
+activity light. So the same observer keeps a small ledger per input — the notes it has not
+released, the controllers it is moving, the program changes it sent — and the controlling
+thread judges it twice a second. The judgements are `reliability.midi.issues`, each naming the
+device, the channel, the cause and **the parts it reaches**, because a fault that names a part
+can be answered with a panic aimed at that part while the rest of the rack keeps playing.
+
+**Stuck, or held.** A note down for twenty seconds is not a fault: a pad player holds chords.
+A note down for twenty seconds with *nothing else from that keyboard since* is the signature
+of a lost note-off — a hand does not hold one key and touch nothing — and is reported as
+stuck. "Since" allows a second, so the other notes of the same chord are not counted as
+playing on. With the keyboard still talking, the same note is a held note, said so in as many
+words, and the row offers the panic without calling it a fault. Both end when the note-off
+arrives or a panic reaches the part; a panic also forgets the notes it silenced, because the
+keyboard will never send those offs and a row that outlived the silence would report a fault
+just fixed.
+
+**Jitter.** Twelve or more changes inside two seconds while moving three steps or fewer is a
+noisy pot or a loose cable, not a hand: a deliberate sweep at the same rate covers a range no
+pot noise has. The row ends when the controller has been quiet for two seconds.
+
+**Program changes.** The zone filter forwards them, so an instrument on that channel really
+does change sound without a preset being chosen here — usually a preset knob on the keyboard.
+Named, counted, and kept until dismissed: the fact does not expire because the knob stopped.
+
+**An input gone.** A device the system listed once and no longer lists is reported gone with
+its message count and last-heard time, and every note it left down is stuck at once. A device
+the system *never* listed is not reported gone — a virtual port may well be named otherwise —
+which is also why the evaluator takes the present-device list as an argument rather than
+asking the system itself: the pump passes the real list, the tests pass what they like.
+
+**Emit discipline.** State is re-announced only when the set of issues changes, so the Health
+tab can warn and the panel redraw. While anything stands, a light `instrumentHostMidiHealth`
+event once a second keeps the ages honest without re-sending the rack. A quiet rig costs a
+map copy twice a second and no traffic at all.
+
 ## State and schema migrations
 
 **None are required, and that is a decision rather than an omission.** Three additive fields
@@ -367,6 +408,14 @@ These are true of the tree as it stands and are recorded so they are not mistake
 ---
 
 ## Manual test plan
+
+MIDI health (automated in `InstrumentHostServiceTests`, `testMidiHealth`; by hand on Windows):
+hold one key, unplug the keyboard, and *expect* the Health tab to warn within two seconds, the
+MIDI block to say the input is no longer listed and the note is stuck, and Panic on the named
+part alone to end the note and the row. Turn a knob you know to be noisy and *expect* a jitter
+row that goes away two seconds after you stop. Press a preset button on the keyboard and
+*expect* a program-change row with the count, gone on Dismiss.
+
 
 Runs on Windows, against a build of the app or a generated product. Each step names what it
 proves; a step that cannot be run is a gap to report rather than a step to skip.

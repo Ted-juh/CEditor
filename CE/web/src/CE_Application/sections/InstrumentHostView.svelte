@@ -645,7 +645,8 @@
         <button type="button" class="utility-tab" class:on={activeUtility === utility.id}
                 class:warn={utility.id === 'health'
                             && ($hostState.reliability.recovery.interrupted
-                                || $hostState.reliability.safeMode.level !== 'normal')}
+                                || $hostState.reliability.safeMode.level !== 'normal'
+                                || $hostState.reliability.midi.issues.some((issue) => issue.kind !== 'heldNote'))}
                 data-testid={`host-utility-${utility.id}`}
                 onclick={() => chooseUtility(utility.id)}>{utility.label}</button>
       {/each}

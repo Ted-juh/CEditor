@@ -2430,6 +2430,174 @@ void testPresetMorphOnAMacro()
     ceditor::test::StubSynthProcessor::factoryPrograms = {};
 }
 
+
+void testMidiHealth()
+{
+    std::cout << "\nMIDI health: stuck notes, jitter, program changes, a keyboard gone" << std::endl;
+
+    const auto dir = freshDataDir ("midi-health");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 59 } });   // the left half
+
+    const auto noteOn  = [] (int ch, int n, int v) { return juce::MidiMessage::noteOn (ch, n, (juce::uint8) v); };
+    const auto noteOff = [] (int ch, int n)        { return juce::MidiMessage::noteOff (ch, n); };
+    const auto cc      = [] (int ch, int c, int v) { return juce::MidiMessage::controllerEvent (ch, c, v); };
+    const auto pc      = [] (int ch, int p)        { return juce::MidiMessage::programChange (ch, p); };
+
+    const auto midi = [&h]
+    {
+        h.cmd ("getState");
+        return h.emits.lastState()->getProperty ("reliability", {}).getProperty ("midi", {});
+    };
+    const auto issues = [&midi] { return midi().getProperty ("issues", {}); };
+    const auto ofKind = [&issues] (const juce::String& kind)
+    {
+        juce::var found;
+        const auto list = issues();
+        for (int i = 0; i < list.size(); ++i)
+            if (list[i].getProperty ("kind", {}).toString() == kind)
+                found = list[i];
+        return found;
+    };
+    const auto countOfKind = [&issues] (const juce::String& kind)
+    {
+        int n = 0;
+        const auto list = issues();
+        for (int i = 0; i < list.size(); ++i)
+            n += list[i].getProperty ("kind", {}).toString() == kind;
+        return n;
+    };
+    const juce::StringArray present { "Test Keys" };
+
+    h.service->evaluateMidiHealth (1000.0, present);
+    check (issues().size() == 0, "a quiet rig has no MIDI issues");
+
+    // A note that never came back up. Four seconds is a hand; twenty with nothing else from
+    // that keyboard is a lost note-off.
+    h.service->noteMidiActivity ("Test Keys", noteOn (1, 48, 100), 1000.0);
+    h.service->evaluateMidiHealth (5000.0, present);
+    check (issues().size() == 0, "four seconds down is nobody's business");
+    h.service->evaluateMidiHealth (22000.0, present);
+    auto stuck = ofKind ("stuckNote");
+    check (! stuck.isVoid(), "twenty seconds down with nothing since is a stuck note");
+    check (stuck.getProperty ("noteName", {}).toString() == "C3"
+             && stuck.getProperty ("device", {}).toString() == "Test Keys"
+             && stuck.getProperty ("text", {}).toString().contains ("lost note-off"),
+           "named by note, keyboard and cause");
+    check (stuck.getProperty ("parts", {}).size() == 1
+             && stuck.getProperty ("parts", {})[0].getProperty ("partId", {}).toString() == partId,
+           "and by the part the note reaches, which is where the panic goes");
+    const auto inputs = midi().getProperty ("inputs", {});
+    check (inputs.size() == 1 && inputs[0].getProperty ("name", {}).toString() == "Test Keys"
+             && (int) inputs[0].getProperty ("heldNotes", 0) == 1
+             && (bool) inputs[0].getProperty ("present", false),
+           "the input row counts what it still holds down");
+
+    // The keyboard plays on: the same note becomes a held note, said so, not a fault. The
+    // note it played sits above the zone, so it reaches no part at all.
+    h.service->noteMidiActivity ("Test Keys", noteOn (1, 72, 100), 22000.0);
+    h.service->noteMidiActivity ("Test Keys", noteOff (1, 72), 22500.0);
+    h.service->evaluateMidiHealth (23000.0, present);
+    check (ofKind ("stuckNote").isVoid() && ! ofKind ("heldNote").isVoid(),
+           "a keyboard that has played since makes it a held note, not a stuck one");
+    check (ofKind ("heldNote").getProperty ("text", {}).toString().contains ("held, not stuck"),
+           "and the wording refuses to call it a fault");
+
+    // Per-part panic: the notes that reached the part are silenced AND forgotten, because the
+    // keyboard will never send the off and a row that survived would report a fixed fault.
+    h.cmd ("panic", { { "partId", partId } });
+    check (issues().size() == 0, "a per-part panic clears the rows for the notes it silenced");
+
+    // The note-off arriving ends the row on its own.
+    h.service->noteMidiActivity ("Test Keys", noteOn (1, 50, 100), 30000.0);
+    h.service->evaluateMidiHealth (60000.0, present);
+    check (! ofKind ("stuckNote").isVoid(), "the next lost note is caught like the first");
+    h.service->noteMidiActivity ("Test Keys", noteOff (1, 50), 60000.0);
+    h.service->evaluateMidiHealth (60100.0, present);
+    check (issues().size() == 0, "the note-off arriving ends the row");
+
+    // Jitter: a controller flapping between two values, twenty times in a second.
+    for (int i = 0; i < 20; ++i)
+        h.service->noteMidiActivity ("Test Keys", cc (1, 74, 63 + (i & 1)), 70000.0 + i * 50.0);
+    h.service->evaluateMidiHealth (71100.0, present);
+    const auto jitter = ofKind ("controllerJitter");
+    check (! jitter.isVoid() && (int) jitter.getProperty ("cc", -1) == 74
+             && (int) jitter.getProperty ("low", -1) == 63 && (int) jitter.getProperty ("high", -1) == 64,
+           "a controller flapping between two values is jitter, named by number and range");
+    check (jitter.getProperty ("parts", {}).size() == 1, "and by the parts on its channel");
+    // A deliberate sweep has the same rate and a range no pot noise has.
+    for (int i = 0; i < 20; ++i)
+        h.service->noteMidiActivity ("Test Keys", cc (1, 1, 10 + i), 80000.0 + i * 50.0);
+    h.service->evaluateMidiHealth (81100.0, present);
+    check (countOfKind ("controllerJitter") == 0,
+           "a sweep is not jitter, and the flapping controller has gone quiet, so nothing is");
+    for (int i = 0; i < 20; ++i)
+        h.service->noteMidiActivity ("Test Keys", cc (1, 74, 63 + (i & 1)), 82000.0 + i * 50.0);
+    h.service->evaluateMidiHealth (83100.0, present);
+    check (countOfKind ("controllerJitter") == 1, "flapping again is jitter again");
+    h.service->evaluateMidiHealth (86000.0, present);
+    check (countOfKind ("controllerJitter") == 0, "two quiet seconds end it");
+
+    // Program changes: the zone forwards them, so they are named and counted, and stay until
+    // dismissed — the fact does not expire just because the knob stopped.
+    h.service->noteMidiActivity ("Test Keys", pc (1, 12), 90000.0);
+    h.service->noteMidiActivity ("Test Keys", pc (1, 12), 91000.0);
+    h.service->evaluateMidiHealth (92000.0, present);
+    const auto change = ofKind ("programChange");
+    check (! change.isVoid() && (int) change.getProperty ("program", -1) == 12
+             && (int) change.getProperty ("count", 0) == 2
+             && change.getProperty ("text", {}).toString().contains ("2×"),
+           "a program change from the keyboard is named and counted");
+    h.service->evaluateMidiHealth (200000.0, present);
+    check (! ofKind ("programChange").isVoid(), "and does not expire");
+    h.cmd ("dismissMidiIssue", { { "key", change.getProperty ("key", {}).toString() } });
+    check (ofKind ("programChange").isVoid(), "until dismissed");
+
+    // A keyboard that vanished: listed once, not listed now. Every note it left down is stuck
+    // at once — no note-off is coming from a device that is not there.
+    h.service->noteMidiActivity ("Test Keys", noteOn (1, 52, 100), 300000.0);
+    h.service->evaluateMidiHealth (300500.0, {});
+    const auto gone = ofKind ("inputGone");
+    check (! gone.isVoid() && gone.getProperty ("text", {}).toString().contains ("no longer listed"),
+           "an input the system listed and no longer lists is reported gone");
+    check (! ofKind ("stuckNote").isVoid()
+             && ofKind ("stuckNote").getProperty ("text", {}).toString().contains ("keyboard is gone"),
+           "and a note it left down is stuck without waiting twenty seconds");
+    h.service->noteMidiActivity ("Ghost Port", noteOn (2, 60, 100), 300600.0);
+    h.service->evaluateMidiHealth (300700.0, {});
+    check (countOfKind ("inputGone") == 1,
+           "an input the system never listed cannot be gone — a virtual port may be named otherwise");
+    h.service->evaluateMidiHealth (301000.0, present);
+    check (ofKind ("inputGone").isVoid() && ofKind ("stuckNote").isVoid(),
+           "listed again is not gone, and its young note is just a note again");
+
+    // Emit discipline: state when the set of issues changes, a light event once a second
+    // while anything stands, nothing at all when the rig is quiet.
+    h.emits.clear();
+    h.service->evaluateMidiHealth (302000.0, present);
+    check (h.emits.lastState() == nullptr && h.emits.last ("instrumentHostMidiHealth") == nullptr,
+           "no change and no issue means no traffic");
+    h.service->evaluateMidiHealth (321000.0, present);       // note 52 is now twenty seconds down
+    check (h.emits.lastState() != nullptr, "a new issue re-announces state");
+    h.emits.clear();
+    h.service->evaluateMidiHealth (321300.0, present);
+    check (h.emits.lastState() == nullptr && h.emits.last ("instrumentHostMidiHealth") == nullptr,
+           "the same issue a third of a second later says nothing");
+    h.service->evaluateMidiHealth (322100.0, present);
+    check (h.emits.lastState() == nullptr && h.emits.last ("instrumentHostMidiHealth") != nullptr,
+           "and a second later ticks the ages with a light event, not the whole rack");
+    check (h.emits.last ("instrumentHostMidiHealth")->getProperty ("issues", {}).size() >= 1,
+           "carrying the issues");
+
+    h.cmd ("panic");
+    check (issues().size() == 0, "a panic of everything forgets every note left down");
+}
+
 void testNearestSounds()
 {
     std::cout << "\nsounds like, and the substitute for a plug-in that has gone" << std::endl;
@@ -10448,6 +10616,7 @@ int main (int argc, char* argv[])
     testVersionRetention();
     testVersionsInTheService();
     testPresetMorphOnAMacro();
+    testMidiHealth();
     testSubstitutes();
     testBrowseOnSurface();
     testLibraryBrowsing();

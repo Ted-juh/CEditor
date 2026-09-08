@@ -26,6 +26,7 @@ import {
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
+  onInstrumentHostMidiHealth,
   onInstrumentHostSurface,
   onInstrumentHostSurfaceLayout,
   onInstrumentHostMidiLearn,
@@ -1428,6 +1429,42 @@ export function emptyReliability() {
     automaticFailover: {
       isolationAvailable: false, enabled: true, maxAttempts: 3, retryDelayMs: 500, events: [],
     },
+    midi: { inputs: [], issues: [] },
+  };
+}
+
+export const MIDI_ISSUE_KINDS = ['stuckNote', 'heldNote', 'controllerJitter', 'programChange', 'inputGone'];
+
+/** MIDI health as the native side judges it: each input the rig has heard from, and every
+    issue standing right now, each naming the parts it reaches so the panic can be aimed. */
+export function normalizeMidiHealth(payload) {
+  const m = payload && typeof payload === 'object' ? payload : {};
+  return {
+    inputs: (Array.isArray(m.inputs) ? m.inputs : []).map((input) => ({
+      name: String(input?.name ?? ''),
+      present: input?.present === true,
+      messages: Math.max(0, Math.round(Number(input?.messages ?? 0) || 0)),
+      lastAgoMs: Math.max(0, Number(input?.lastAgoMs ?? 0) || 0),
+      heldNotes: Math.max(0, Math.round(Number(input?.heldNotes ?? 0) || 0)),
+    })).filter((input) => input.name),
+    issues: (Array.isArray(m.issues) ? m.issues : []).map((issue) => ({
+      kind: MIDI_ISSUE_KINDS.includes(issue?.kind) ? issue.kind : 'heldNote',
+      key: String(issue?.key ?? ''),
+      device: String(issue?.device ?? ''),
+      text: String(issue?.text ?? ''),
+      channel: Math.max(0, Math.round(Number(issue?.channel ?? 0) || 0)),
+      note: Number.isInteger(issue?.note) ? issue.note : -1,
+      noteName: String(issue?.noteName ?? ''),
+      cc: Number.isInteger(issue?.cc) ? issue.cc : -1,
+      program: Number.isInteger(issue?.program) ? issue.program : -1,
+      count: Math.max(0, Math.round(Number(issue?.count ?? 0) || 0)),
+      agoMs: Math.max(0, Number(issue?.agoMs ?? 0) || 0),
+      parts: (Array.isArray(issue?.parts) ? issue.parts : []).map((part) => ({
+        partId: String(part?.partId ?? ''),
+        name: String(part?.name ?? ''),
+        hasInstrument: part?.hasInstrument === true,
+      })).filter((part) => part.partId),
+    })).filter((issue) => issue.key),
   };
 }
 
@@ -1485,6 +1522,7 @@ export function normalizeReliability(payload) {
         nextAttemptMs: Math.max(0, Number(event?.nextAttemptMs ?? 0) || 0),
       })).filter((event) => event.targetId),
     },
+    midi: normalizeMidiHealth(r.midi),
   };
 }
 
@@ -3300,6 +3338,21 @@ export function mockHostState() {
       damagedState: [],
       automaticFailover: {
         isolationAvailable: false, enabled: true, maxAttempts: 3, retryDelayMs: 500, events: [],
+      },
+      // The demo keyboard has two things wrong with it, so the Health panel's MIDI block can
+      // be seen without a broken cable to hand.
+      midi: {
+        inputs: [{ name: 'Mock Keys 61', present: true, messages: 1204, lastAgoMs: 32000, heldNotes: 1 }],
+        issues: [
+          { kind: 'stuckNote', key: 'stuck:Mock Keys 61:1:48', device: 'Mock Keys 61', channel: 1,
+            note: 48, noteName: 'C3', agoMs: 32000,
+            text: 'C3 on channel 1 from Mock Keys 61 has been down for 32 s and the keyboard has sent nothing since: a lost note-off.',
+            parts: [{ partId: 'mock-part-1', name: 'Stage Keys', hasInstrument: true }] },
+          { kind: 'programChange', key: 'pc:Mock Keys 61:1:12', device: 'Mock Keys 61', channel: 1,
+            program: 12, count: 2, agoMs: 95000,
+            text: 'Mock Keys 61 sent program change 12 on channel 1 (2×, last 95 s ago). The zone passes it on, so an instrument on that channel changes sound without a preset being chosen here — usually a preset knob on the keyboard.',
+            parts: [{ partId: 'mock-part-1', name: 'Stage Keys', hasInstrument: true }] },
+        ],
       },
     },
     performance: {
@@ -6058,6 +6111,10 @@ export function initInstrumentHostBridge() {
   }));
   onInstrumentHostSupportBundle((payload) => hostSupportBundle.set(normalizeSupportBundle(payload)));
   onInstrumentHostLicenceReceipt((payload) => hostLicenceReceipt.set(String(payload?.receipt ?? '')));
+  onInstrumentHostMidiHealth((payload) => hostState.update((state) => ({
+    ...state,
+    reliability: { ...state.reliability, midi: normalizeMidiHealth(payload) },
+  })));
   onInstrumentHostMidiActivity((payload) => hostMidiActivity.update((a) => ({
     device: String(payload?.device ?? ''),
     text: String(payload?.text ?? ''),
@@ -6713,6 +6770,24 @@ function send(payload) {
       return;
     }
     if (payload?.cmd === 'morphVersions') return;
+    if (payload?.cmd === 'dismissMidiIssue' || payload?.cmd === 'panic') {
+      // The native rules, mirrored: dismissing removes the one fact you read; a panic
+      // silences a part (or everything) and forgets the notes that reached it, since the
+      // keyboard will never send those offs.
+      hostState.update((state) => {
+        const midi = state.reliability.midi;
+        const issues = payload.cmd === 'dismissMidiIssue'
+          ? midi.issues.filter((issue) => issue.key !== payload.key)
+          : midi.issues.filter((issue) => !(
+              (issue.kind === 'stuckNote' || issue.kind === 'heldNote')
+              && (!payload.partId || issue.parts.some((part) => part.partId === payload.partId))));
+        const inputs = payload.cmd === 'panic'
+          ? midi.inputs.map((input) => ({ ...input, heldNotes: 0 }))
+          : midi.inputs;
+        return { ...state, reliability: { ...state.reliability, midi: { inputs, issues } } };
+      });
+      return;
+    }
     if (payload?.cmd === 'setMorph' || payload?.cmd === 'clearMorph') {
       const state = get(hostState);
       const partId = payload.partId || state.rack.focusedPartId;
@@ -7066,6 +7141,9 @@ export const setPartMicrotuning = (partId, enabled) =>
 export const sendMicrotuning = (partId = '') =>
   send(partId ? { cmd: 'sendMicrotuning', partId } : { cmd: 'sendMicrotuning' });
 export const hostPanic = (partId) => send(partId ? { cmd: 'panic', partId } : { cmd: 'panic' });
+/** A MIDI health fact you have read — a program change, a vanished input — goes away. Stuck
+    notes are not dismissed: the note-off or a panic ends them. */
+export const dismissMidiIssue = (key) => send({ cmd: 'dismissMidiIssue', key });
 export const openEditor = (partId) => send({ cmd: 'openEditor', partId });
 export const closeEditor = (partId = '') => send(partId
   ? { cmd: 'closeEditor', partId }

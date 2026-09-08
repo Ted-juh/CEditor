@@ -57,6 +57,12 @@
 //   sendMicrotuning {partId?}    (MTS SysEx; absent partId sends to every opted-in part)
 //   setPartMixer {partId, enabled?,mute?,solo?,volume?,pan?}    (absent fields untouched)
 //   loadInstrument {partId, ceId} | unloadInstrument {partId} | panic {partId?}
+//   dismissMidiIssue {key}
+//     (MIDI health: stuck notes, a jittering controller, program changes from a keyboard and
+//      an input that vanished are detected on the incoming stream, named in state under
+//      reliability.midi with the parts they reach, and cleared by the event that ends them —
+//      a note-off, a quiet controller, a panic. Program changes and a vanished input are
+//      facts that stay until dismissed.)
 //   openEditor {partId} | closeEditor
 //   getAudioDevices | setAudioDevice {name} | setMidiInputEnabled {id, enabled}
 //     (getAudioDevices answers with instrumentHostAudioDevices — enumeration can touch
@@ -758,6 +764,31 @@ public:
         directly, which is the whole reason it is public. Only channel voice messages are
         noted — clock and active-sensing would light the indicator continuously. */
     void noteMidiActivity (const juce::String& deviceName, const juce::MidiMessage& message);
+    /** The same, stamped with the caller's clock (milliseconds, any epoch — only differences
+        are read). The two-argument form stamps the real clock; tests pass their own so "held
+        for twenty seconds" can be asserted in twenty microseconds. */
+    void noteMidiActivity (const juce::String& deviceName, const juce::MidiMessage& message,
+                           double nowMs);
+
+    /** MIDI health, judged from what the inputs have sent (§26.2's "test keys", grown up):
+        - a note down for stuckNoteMs with nothing else from its keyboard since is a stuck
+          note; down that long with the keyboard still talking is a long-held note, named
+          as such and not as a fault;
+        - a controller that changed jitterMinChanges times inside jitterWindowMs while moving
+          no more than jitterMaxRange steps is jittering — a noisy pot, nobody's hand;
+        - a program change from an input is named, because the zone filter forwards it and
+          the instrument on that channel changes sound without a preset being chosen here;
+        - an input the system listed once and no longer lists is gone, and every note it
+          left down is stuck by definition.
+        `presentInputNames` is the system's current list; the pump passes the real one,
+        tests pass what they like. Re-emits state when the set of issues changes, and a
+        light instrumentHostMidiHealth event while any issue stands so the ages tick. */
+    void evaluateMidiHealth (double nowMs, const juce::StringArray& presentInputNames);
+
+    static constexpr double stuckNoteMs = 20000.0;
+    static constexpr double jitterWindowMs = 2000.0;
+    static constexpr int jitterMinChanges = 12;
+    static constexpr int jitterMaxRange = 3;
 
     /** Controlling thread. Drains every part's parameter-change marks (vendor editors and
         automation report through listeners that may fire on the audio thread) and emits one
@@ -1515,6 +1546,46 @@ private:
     // Written on the MIDI thread, drained on the controlling thread; the mutex spans a few
     // string copies, far from any audio path.
     std::mutex midiActivityLock;
+
+    // -- MIDI health (see evaluateMidiHealth) --------------------------------------------
+    // Per input, what it has sent that could still be wrong: the notes it has not released,
+    // the controllers it is moving, the program changes it sent. Written on the MIDI thread
+    // under midiActivityLock — a map lookup and an integer or two per message — and read on
+    // the controlling thread, where the judging happens.
+    struct MidiInputHealth
+    {
+        double firstMs = 0.0, lastMs = 0.0;
+        juce::int64 messages = 0;
+        bool listed = false;                     // the system has named it at least once
+        std::map<int, double> heldNotes;         // (channel << 8 | note) → note-on time
+        struct Controller
+        {
+            int lastValue = -1;
+            double windowStartMs = 0.0, lastMs = 0.0;
+            int changes = 0, low = 128, high = -1;
+            bool jittering = false;
+        };
+        std::map<int, Controller> controllers;   // (channel << 8 | cc)
+        struct ProgramChange
+        {
+            int channel = 0, program = 0, count = 0;
+            double lastMs = 0.0;
+        };
+        std::map<int, ProgramChange> programChanges;   // (channel << 8 | program)
+    };
+    std::map<juce::String, MidiInputHealth> midiInputHealth;
+    juce::StringArray dismissedMidiIssues;
+    juce::StringArray lastPresentInputs;
+    juce::String midiHealthSignature;
+    juce::var midiHealthCache;
+    double lastMidiHealthEvalMs = 0.0, lastMidiInputPollMs = 0.0, lastMidiHealthEmitMs = 0.0;
+    void tickMidiHealth();
+    /** The rack parts a keyboard message on this channel (and note, or -1 for any) reaches:
+        enabled, fed by the keyboard rather than another part, zone admitting it. */
+    juce::Array<juce::var> midiHealthPartsFor (int channel, int note) const;
+    /** Forgets the held notes that reach `partId` (all of them when empty): a panic silenced
+        them, and a row that outlives the silence is a false alarm. */
+    void forgetHeldNotesFor (const juce::String& partId);
     // -- parameter learn -------------------------------------------------------------------
     // The answer to a plug-in with five hundred parameters, which is a list nobody can search
     // and a name nobody knows. Arm a slot, then move the control in the plug-in's OWN window:

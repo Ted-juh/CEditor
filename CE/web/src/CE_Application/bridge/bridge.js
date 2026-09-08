@@ -1068,6 +1068,15 @@ export function onInstrumentHostMidiActivity(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** MIDI health while something is wrong ({ inputs, issues }) — once a second at most, so the
+    ages in the Health panel tick without the whole rack being re-announced. The same block
+    travels in state as reliability.midi whenever the set of issues changes. */
+export function onInstrumentHostMidiHealth(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMidiHealth', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onInstrumentHostSurface(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostSurface', callback);

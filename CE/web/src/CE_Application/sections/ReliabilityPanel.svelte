@@ -17,6 +17,7 @@
     acknowledgeRecovery, restoreLastKnownGood,
     setAutomaticFailover, retryFailedProcessor, dismissFailoverEvent,
     previewSupportBundle, exportSupportBundle, clearQuarantine,
+    hostPanic, dismissMidiIssue,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
@@ -24,7 +25,30 @@
   let safeMode = $derived(reliability.safeMode);
   let recovery = $derived(reliability.recovery);
   let failover = $derived(reliability.automaticFailover);
+  let midi = $derived(reliability.midi);
   let bundle = $derived($hostSupportBundle);
+  // Every part that can sound a note: the per-part panic row. A hardware part counts — its
+  // synth holds notes of its own and the panic reaches it over the wire.
+  let soundingParts = $derived($hostState.rack.parts.filter((p) => p.hasInstrument || p.hardware));
+
+  const midiKindLabel = {
+    stuckNote: 'Stuck note',
+    heldNote: 'Held note',
+    controllerJitter: 'Controller jitter',
+    programChange: 'Program change',
+    inputGone: 'Input gone',
+  };
+  // A stuck note and a vanished input are faults; a held note and a program change are facts
+  // to know about. The colour says which without a word.
+  const midiFault = (issue) => issue.kind === 'stuckNote' || issue.kind === 'inputGone'
+    || issue.kind === 'controllerJitter';
+  const ago = (ms) => (ms < 1500 ? 'just now' : ms < 90000 ? `${Math.round(ms / 1000)} s ago`
+    : `${Math.round(ms / 60000)} min ago`);
+  function partName(partId, fallback) {
+    const index = $hostState.rack.parts.findIndex((p) => p.partId === partId);
+    const part = $hostState.rack.parts[index];
+    return part?.pluginName || fallback || (index >= 0 ? `Part ${index + 1}` : partId);
+  }
 
   // Every module the scan touched that produced nothing loadable, and why. This is the whole
   // of what the browser used to show, minus the healthy rows — a module that yielded classes
@@ -121,6 +145,73 @@
         <button type="button" class="ghost" onclick={() => restoreLastKnownGood()}>
           Go back to it
         </button>
+      {/if}
+    </section>
+
+    <!-- MIDI, right now. What a person opens Health for mid-set: a note that will not stop, a
+         knob turning itself, a sound that changed on its own, a keyboard that went quiet.
+         Each row names the parts it reaches so the panic can be aimed at one part and the
+         rest keep playing. -->
+    <section class="block" data-testid="reliability-midi">
+      <strong>MIDI, right now</strong>
+      {#if midi.issues.length === 0}
+        <p class="note quiet" data-testid="reliability-midi-quiet">
+          Nothing is stuck, jittering or changing programs on its own.
+        </p>
+      {:else}
+        <div class="midi-issues" data-testid="reliability-midi-issues">
+          {#each midi.issues as issue (issue.key)}
+            <div class="midi-issue" class:fault={midiFault(issue)} data-testid="reliability-midi-issue"
+                 data-kind={issue.kind}>
+              <span class="midi-kind">{midiKindLabel[issue.kind]}</span>
+              <span class="midi-text">{issue.text}</span>
+              <span class="midi-actions">
+                {#if issue.kind === 'stuckNote' || issue.kind === 'heldNote'}
+                  {#each issue.parts as part (part.partId)}
+                    <button type="button" class="ghost" data-testid="reliability-midi-panic-part"
+                            title={`All notes off on ${partName(part.partId, part.name)} only`}
+                            onclick={() => hostPanic(part.partId)}>Panic {partName(part.partId, part.name)}</button>
+                  {/each}
+                  {#if issue.parts.length === 0}
+                    <span class="detail">reaches no part</span>
+                  {/if}
+                {:else}
+                  <button type="button" class="ghost" data-testid="reliability-midi-dismiss"
+                          title="Seen it. The row goes; the next occurrence comes back."
+                          onclick={() => dismissMidiIssue(issue.key)}>Dismiss</button>
+                {/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if midi.inputs.length > 0}
+        <div class="matrix tight" data-testid="reliability-midi-inputs">
+          {#each midi.inputs as input (input.name)}
+            <span class="name" class:bad={!input.present}>{input.name}</span>
+            <span class="detail">
+              {input.present ? 'listening' : 'not listed by the system'}
+              · {input.messages} {input.messages === 1 ? 'message' : 'messages'}, last {ago(input.lastAgoMs)}
+              {#if input.heldNotes > 0}· {input.heldNotes} {input.heldNotes === 1 ? 'note' : 'notes'} down{/if}
+            </span>
+          {/each}
+        </div>
+      {:else}
+        <p class="note quiet">No MIDI input has sent anything yet.</p>
+      {/if}
+
+      {#if soundingParts.length > 0}
+        <div class="panic-row" data-testid="reliability-panic-row">
+          <span class="label">Panic</span>
+          {#each soundingParts as part (part.partId)}
+            <button type="button" class="ghost" data-testid="reliability-panic-part"
+                    title={`All notes off on ${partName(part.partId)} only — the other parts keep playing`}
+                    onclick={() => hostPanic(part.partId)}>{partName(part.partId)}</button>
+          {/each}
+          <button type="button" class="ghost all" title="All notes off, every part"
+                  data-testid="reliability-panic-all" onclick={() => hostPanic()}>Everything</button>
+        </div>
       {/if}
     </section>
 
@@ -450,4 +541,21 @@
   .bundle-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   button.ghost { align-self: flex-start; }
+
+  .midi-issues { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+  .midi-issue {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline;
+    padding: 6px 8px; border-radius: 4px; background: #1c2126; border-left: 3px solid #7d8894;
+  }
+  .midi-issue.fault { border-left-color: #e0725c; background: #e0725c14; }
+  .midi-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #7d8894; white-space: nowrap; }
+  .midi-issue.fault .midi-kind { color: #e0725c; }
+  .midi-text { font-size: 11.5px; line-height: 1.4; }
+  .midi-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
+  .midi-actions button.ghost { font-size: 10.5px; padding: 1px 7px; }
+  .panic-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+  .panic-row .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #7d8894; margin-right: 4px; }
+  .panic-row button.ghost { font-size: 10.5px; padding: 1px 8px; }
+  .panic-row button.all { color: #e0725c; }
+  .matrix .name.bad { color: #e0725c; }
 </style>

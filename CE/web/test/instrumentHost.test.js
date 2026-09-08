@@ -4157,3 +4157,49 @@ test('mock reducer: a morph is two sounds of the focused part\'s plug-in, ridden
   assert.ok(!get(hostParameters).parameters.some((d) => d.id === '@morph'),
     'and the address goes with it');
 });
+
+// --- MIDI health --------------------------------------------------------------------------------
+
+import { normalizeMidiHealth, dismissMidiIssue, hostPanic } from '../src/CE_Application/stores/instrumentHost.js';
+
+test('normalize: reliability carries the MIDI health block, shaped and defaulted', () => {
+  const state = normalizeHostState({ reliability: { midi: {
+    inputs: [{ name: 'Keys', present: true, messages: '12', lastAgoMs: 500, heldNotes: 1 }, { name: '' }],
+    issues: [
+      { kind: 'stuckNote', key: 'stuck:Keys:1:48', device: 'Keys', channel: 1, note: 48, noteName: 'C3',
+        agoMs: 21000, text: 'stuck', parts: [{ partId: 'p1', name: 'Synth', hasInstrument: true }, { name: 'nobody' }] },
+      { kind: 'somethingNew', key: 'x', text: 'unknown kinds read as held notes, the mildest word' },
+      { kind: 'programChange', text: 'no key, no row' },
+    ],
+  } } });
+  const midi = state.reliability.midi;
+  assert.equal(midi.inputs.length, 1, 'an input needs a name');
+  assert.equal(midi.inputs[0].messages, 12);
+  assert.equal(midi.issues.length, 2, 'an issue needs a key');
+  assert.equal(midi.issues[0].parts.length, 1, 'a part needs an id');
+  assert.equal(midi.issues[0].noteName, 'C3');
+  assert.equal(midi.issues[1].kind, 'heldNote');
+  assert.equal(midi.issues[1].cc, -1, 'not a controller');
+  assert.deepEqual(normalizeMidiHealth(undefined), { inputs: [], issues: [] });
+  assert.deepEqual(emptyHostState().reliability.midi, { inputs: [], issues: [] });
+});
+
+test('mock reducer: a panic forgets the stuck notes that reached the part; dismiss removes a fact', () => {
+  hostStateStore.set(mockHostState());
+  const midi = () => get(hostStateStore).reliability.midi;
+  assert.ok(midi().issues.some((i) => i.kind === 'stuckNote'), 'the demo keyboard has a stuck note');
+  assert.ok(midi().issues.some((i) => i.kind === 'programChange'), 'and sent a program change');
+
+  hostPanic('mock-part-2');
+  assert.ok(midi().issues.some((i) => i.kind === 'stuckNote'),
+    'panicking a part the note does not reach leaves the row — that part was not the problem');
+  hostPanic('mock-part-1');
+  assert.ok(!midi().issues.some((i) => i.kind === 'stuckNote'), 'panicking the part it reaches clears it');
+  assert.equal(midi().inputs[0].heldNotes, 0, 'and the input holds nothing down');
+  assert.ok(midi().issues.some((i) => i.kind === 'programChange'),
+    'a panic is not a dismissal: the program change is still a fact');
+
+  const key = midi().issues.find((i) => i.kind === 'programChange').key;
+  dismissMidiIssue(key);
+  assert.equal(midi().issues.length, 0, 'dismissing removes the one fact you read');
+});
