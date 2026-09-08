@@ -121,6 +121,13 @@ public:
         return any;
     }
 
+    /** Controlling thread only. True once when the plug-in has announced, since the last
+        call, that its program list changed — JUCE forwards a VST3's notifyProgramListChange
+        and restartComponent as a "program changed" detail. A plug-in that fills its program
+        names in after its bank loads announces exactly this, and the library that ingested
+        the names at load time has to look again. */
+    bool takeProgramsChanged()                            { return programsChanged.exchange (false); }
+
     const juce::String partId;
 
 private:
@@ -154,7 +161,11 @@ private:
         push (index, gestureEnded);
     }
 
-    void audioProcessorChanged (juce::AudioProcessor*, const ChangeDetails&) override {}
+    void audioProcessorChanged (juce::AudioProcessor*, const ChangeDetails& details) override
+    {
+        if (details.programChanged)
+            programsChanged.store (true, std::memory_order_relaxed);
+    }
 
     struct Event { int index; int kind; };
 
@@ -163,6 +174,7 @@ private:
     juce::AbstractFifo fifo { capacity };
     Event events[capacity] = {};
     std::atomic<bool> overflowed { false };
+    std::atomic<bool> programsChanged { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PartParameterSync)
 };

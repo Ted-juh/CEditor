@@ -2598,6 +2598,92 @@ void testMidiHealth()
     check (issues().size() == 0, "a panic of everything forgets every note left down");
 }
 
+
+void testProgramListPlaceholdersAndLateNames()
+{
+    std::cout << "\nprogram lists: empty slots are not sounds, and late names are looked at again" << std::endl;
+
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    const auto dir = freshDataDir ("program-placeholders");
+    seedCatalog (dir);
+
+    // What an earlier build left behind: two hundred slots called Empty, in this class's scope.
+    {
+        Library stale;
+        for (int i = 0; i < 3; ++i)
+        {
+            LibraryRecord record;
+            record.type = "preset";
+            record.sourceType = "programList";
+            record.factory = true;
+            record.name = "Empty";
+            record.sourceLocator = "program://VST3-good-synth/" + juce::String (i);
+            record.targetCeId = "VST3-good-synth";
+            record.fingerprint = "old" + juce::String (i);
+            stale.addCapturedRecord (record);
+        }
+        stale.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    // The bank as a plug-in reports it before anything is loaded into it: every slot Empty,
+    // one with no name at all.
+    ceditor::test::StubSynthProcessor::factoryPrograms = {
+        { "Empty", 0.5f }, { "Empty", 0.5f }, { "", 0.5f }, { "Empty", 0.5f } };
+
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+
+    const auto programRecords = [&h]
+    {
+        h.emits.clear();
+        h.cmd ("getLibrary");
+        juce::StringArray names;
+        for (const auto& r : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (r.getProperty ("sourceType", {}).toString() == "programList")
+                names.add (r.getProperty ("name", {}).toString());
+        return names;
+    };
+
+    check (programRecords().isEmpty(),
+           "a bank of empty slots puts nothing in the library, and the Empty records an older "
+           "build made are gone with it");
+
+    // The plug-in loads its bank and says so — the way a VST3 does through its program-list
+    // notification, which JUCE reports as a program change. The pump looks again.
+    stub->programs = { { "Warm Pad", 0.3f }, { "Glass Keys", 0.8f }, { "Empty", 0.5f }, { "Bells", 0.9f } };
+    stub->updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    h.emits.clear();
+    h.service->drainParameterEvents();
+    check (h.emits.last ("instrumentHostLibrary") != nullptr,
+           "a program list that changed after load reaches the library, and the browser is told");
+    const auto names = programRecords();
+    check (names.size() == 3 && names.contains ("Warm Pad") && names.contains ("Glass Keys")
+             && names.contains ("Bells") && ! names.contains ("Empty"),
+           "with the named slots in and the empty one left out");
+
+    // A name repeated is not a list: a plug-in whose program parameter reads "Program" for
+    // every step says nothing worth two hundred records.
+    stub->programs = { { "Program", 0.1f }, { "Program", 0.2f }, { "Program", 0.3f } };
+    stub->updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    h.service->drainParameterEvents();
+    const auto after = programRecords();
+    check (! after.contains ("Program"), "one name repeated is not ingested as a list");
+
+    // Nothing announced, nothing re-read: the pump does not poll the plug-in's list.
+    stub->programs = { { "Quietly", 0.1f }, { "Renamed", 0.2f } };
+    h.service->drainParameterEvents();
+    check (! programRecords().contains ("Quietly"),
+           "a list that changed without an announcement is not re-read on every tick");
+
+    ceditor::test::StubSynthProcessor::factoryPrograms = {};
+}
+
 void testNearestSounds()
 {
     std::cout << "\nsounds like, and the substitute for a plug-in that has gone" << std::endl;
@@ -10617,6 +10703,7 @@ int main (int argc, char* argv[])
     testVersionsInTheService();
     testPresetMorphOnAMacro();
     testMidiHealth();
+    testProgramListPlaceholdersAndLateNames();
     testSubstitutes();
     testBrowseOnSurface();
     testLibraryBrowsing();

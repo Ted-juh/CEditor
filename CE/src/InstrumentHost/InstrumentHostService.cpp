@@ -10450,18 +10450,35 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
     if (count <= 1)
         return false;
 
+    // A slot with nothing in it is not a sound. Plug-ins with a bank of user slots report
+    // the unused ones as "Empty" (or as no name at all), and a library with two hundred
+    // records called Empty is a library nobody browses. Such slots are left out; a list
+    // that is nothing but such slots — the bank not loaded yet, or never filled — says
+    // nothing, and a list that is one name repeated says no more.
+    const auto placeholder = [] (const juce::String& name)
+    {
+        const auto lower = name.trim().toLowerCase();
+        return lower.isEmpty() || lower == "empty" || lower == "(empty)" || lower == "<empty>"
+            || lower == "[empty]" || lower.containsOnly ("-_.…");
+    };
+
     ensureLibrary();
     const auto scope = "program://" + part->pluginCeId + "/";
     juce::Array<LibraryRecord> scanned;
+    juce::StringArray distinctNames;
     for (int i = 0; i < count; ++i)
     {
+        const auto reported = instrument->getProgramName (i);
+        if (placeholder (reported))
+            continue;
+        distinctNames.addIfNotAlreadyThere (reported.trim().toLowerCase());
+
         LibraryRecord record;
         record.type = "preset";
         record.sourceType = "programList";
         record.factory = true;
         record.sourceLocator = scope + juce::String (i);
-        const auto reported = instrument->getProgramName (i);
-        record.name = reported.isNotEmpty() ? reported : "Program " + juce::String (i + 1);
+        record.name = reported;
         record.instrument = part->pluginName;
         record.manufacturer = part->pluginVendor;
         record.targetCeId = part->pluginCeId;
@@ -10470,6 +10487,23 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
         record.fingerprint = juce::String::toHexString (
             (record.sourceLocator + "|" + record.name).hashCode64());
         scanned.add (std::move (record));
+    }
+
+    // Records an earlier build made out of placeholder slots go, whatever the list says now:
+    // they never named a sound, so there is nothing for "missing" to be repaired back to.
+    juce::StringArray stale;
+    for (const auto& record : library.allRecords())
+        if (record.sourceType == "programList" && record.sourceLocator.startsWith (scope)
+            && placeholder (record.name))
+            stale.add (record.recordId);
+    for (const auto& id : stale)
+        library.removeRecord (id);
+
+    if (scanned.size() < 2 || distinctNames.size() < 2)
+    {
+        if (! stale.isEmpty())
+            library.saveTo (libraryFile());
+        return ! stale.isEmpty();
     }
 
     // Scoped to this class so refreshing one plug-in's list never marks another's missing.
@@ -14628,6 +14662,11 @@ void InstrumentHostService::drainParameterEvents()
 
     for (auto& [partId, part] : partParameters)
     {
+        // The plug-in says its program list changed: names that read "Empty" at load time
+        // may be sounds now that its bank is in. Look again, and tell the browser if so.
+        if (part.sync->takeProgramsChanged() && ingestProgramList (partId))
+            emitLibrary (libraryView);
+
         juce::SortedSet<int> changed;
         juce::Array<PartParameterSync::Gesture> gestures;
         if (! part.sync->drain (changed, gestures))
