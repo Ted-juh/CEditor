@@ -1736,6 +1736,43 @@ void testSonicProbe()
                "the probe renders hold plus tail, releasing where the hold ends");
     }
 
+    // A plug-in that loads its program on a thread of its own answers the first blocks with
+    // silence and drops the MIDI that arrived meanwhile - Surge XT does exactly this. The probe
+    // waits for it; without the wait the note is gone before the sound exists, and half a
+    // library measures "silent". The second check is the old behaviour, kept so the first one
+    // is known to be the wait and not the stub.
+    {
+        struct DeferredLoadProcessor final : ToneProbeProcessor
+        {
+            std::chrono::steady_clock::time_point readyAt;
+            void prepareToPlay (double rate, int block) override
+            {
+                ToneProbeProcessor::prepareToPlay (rate, block);
+                readyAt = std::chrono::steady_clock::now() + std::chrono::milliseconds (30);
+            }
+            void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& midi) override
+            {
+                if (std::chrono::steady_clock::now() < readyAt)
+                {
+                    audio.clear();
+                    midi.clear();
+                    return;
+                }
+                ToneProbeProcessor::processBlock (audio, midi);
+            }
+        };
+        DeferredLoadProcessor lateLoader;
+        const auto heard = probeProcessor (lateLoader, spec);
+        check (heard.measured && ! heard.silent,
+               "a plug-in still loading its program is given time before the note is played");
+        auto impatient = spec;
+        impatient.settleWallMs = 0.0;
+        impatient.settleMinBlocks = 0;
+        DeferredLoadProcessor lateLoaderAgain;
+        const auto missed = probeProcessor (lateLoaderAgain, impatient);
+        check (missed.silent, "and without that wait the same plug-in measures as silent");
+    }
+
     // BRIGHTNESS is a spectral centroid, so a sound an octave and a half up must measure
     // brighter, and the centroid must land on the tone that produced it.
     const auto dark = probe ([] (auto& p) { p.frequency = 220.0f; });

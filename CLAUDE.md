@@ -90,8 +90,8 @@ of work here as an excuse not to check anything at all off it.
 
 **Only two things genuinely need the runner:**
 
-1. **The final link of the app, player and plugin targets.** One library: `dwmapi`. That is the
-   whole of it.
+1. **Nothing in the link any more.** `dwmapi` was the one library, and it is now linked on
+   Windows only; the app links and runs here (see [The app runs off Windows](#the-app-runs-off-windows)).
 2. **MSVC's opinion of the source.** Not a formality — commit `ba41774` fixed a `C3861` that both
    GCC and Clang accept, caused by a function sitting behind the wrong `#if`. A clean local
    compile is a strong check and is not a substitute for this.
@@ -99,10 +99,10 @@ of work here as an excuse not to check anything at all off it.
 **Everything else builds here**, and did all along:
 
 - All thirty translation units of the `CEditor` target, `Main.cpp` included, with the real app
-  defines (`JUCE_WEB_BROWSER=1`, `JUCE_USE_WIN_WEBVIEW2=1`). WebView2LoaderStatic.lib even goes
-  through the linker without complaint.
+  defines (`JUCE_WEB_BROWSER=1`, `JUCE_USE_WIN_WEBVIEW2=1`) — and now the link and the run.
+  WebView2LoaderStatic.lib even goes through the linker without complaint.
 - `juceaide` and the generated binary data. The vendored `.exe` runs under Wine and bakes
-  `BinaryData.h` correctly. See [the app target off Windows](#the-app-target-off-windows).
+  `BinaryData.h` correctly. See [the app runs off Windows](#the-app-runs-off-windows).
 
 So a change to `CE/src/**` that never gets compiled locally is a choice, not a limitation. Compile
 it first; the run then confirms the two things above rather than telling you something a local
@@ -209,14 +209,19 @@ That leaves the device-profile engine and the panel-parameter model unverified. 
 touches `CE/src/DeviceProfile/` or panel parameters, that is a real gap — say so rather than
 reporting a green run.
 
-### The app target off Windows
+### The app runs off Windows
 
-The app, player and plugin targets compile here. Only the link fails, on `dwmapi`. Do this before
-spending a CI run on anything under `CE/src/**`:
+The app, player and plugin targets **build, link and run** here. That used to stop at the link,
+on `dwmapi`; the library is now linked on Windows only (the calls that use it were already
+behind `JUCE_WINDOWS`), and the webview asks for WebView2 by name on Windows only — everywhere
+else JUCE's `areOptionsSupported` accepts the platform default alone, so naming it meant the
+"runtime unavailable" message and a blank window. JUCE then runs the same UI in WebKitGTK, and
+the bridge is JUCE's own `window.__JUCE__` on every backend.
 
 ```bash
 apt-get install -y wine libgtk-3-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev \
-                   libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev
+                   libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev \
+                   xvfb scrot xdotool
 
 # juceaide is vendored as a Windows .exe and there is no source to build a native one from.
 # It runs under Wine, so wrap it. The wrappers keep the .exe names: JUCEConfig.cmake hardcodes
@@ -229,14 +234,52 @@ for h in juceaide juce_lv2_helper juce_vst3_helper; do
 done
 
 cmake -B build/app -G Ninja -DCMAKE_BUILD_TYPE=Release -DCEDITOR_BUILD_APP=ON \
+      -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCANNER_WORKER=ON \
       -DCEDITOR_JUCE_HELPER_DIR=/tmp/juce-wine \
-      -DCMAKE_CXX_FLAGS="$(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1)"
-cmake --build build/app --target CEditor -- -k 0
+      -DCMAKE_CXX_FLAGS="$(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1) -DJUCE_LOAD_CURL_SYMBOLS_LAZILY=1"
+cmake --build build/app --target CEditor CEditorPluginScanner
+ln -sfn "$PWD/build/app/CEditorPluginScanner" build/app/CEditor_artefacts/Release/   # the app looks beside itself
 ```
 
-Expected result: **every translation unit compiles**, then `/usr/bin/ld: cannot find -ldwmapi` and
-nothing else. That line is success — it means the whole app is semantically clean under the real
-app defines. Anything above it is a genuine error you have just saved a Windows run on.
+Three things in that configure are not decoration:
+
+- `-DJUCE_LOAD_CURL_SYMBOLS_LAZILY=1` — `juce_core` on Linux references libcurl and the app target
+  does not link it. Loading the symbols at run time is JUCE's own answer; the test targets say
+  `JUCE_USE_CURL=0` instead.
+- `-DCEDITOR_SCANNER_WORKER=ON` — it defaults to the `CEDITOR_BUILD_APP` default, which is OFF off
+  Windows, and without the worker beside the binary every scan reports "scanner worker not found".
+- `(cd CE/web && npm run build)` first — the app serves `CE/web/dist` from disk (walking up from
+  the binary to find it), not from BinaryData.
+
+**Running it.** No display, no audio device: use Xvfb, and tell WebKit not to look for a GPU.
+The page takes 60-90 seconds to paint the first time under software rendering; a white window
+for a minute is not a failure.
+
+```bash
+Xvfb :99 -screen 0 1920x1080x24 &
+DISPLAY=:99 WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1 \
+  build/app/CEditor_artefacts/Release/CEditor &
+DISPLAY=:99 scrot shot.png          # xdotool drives clicks; File > Hostage… opens the host
+```
+
+Data lives in `~/.config/CEditor/instrument-host/`. Seed `scan-paths.json` with
+`{"paths":["/dir/containing/vst3s"]}` before the first run and the Instruments column scans it
+(the default Windows VST3 roots do not exist here, and `~/.vst3` is not searched). Vendor
+`.vstpreset` files are read from `~/Documents/VST3 Presets/<Vendor>/<Plugin>/`.
+
+**What this is and is not.** Off Windows there is no live plug-in worker, so a part loads its
+instrument **in-process** (`PluginInstantiator.h` says why that is gated by platform: a crash in
+the plug-in is then a crash of Hostage). Everything else is the real thing — the out-of-process
+scanner, program-list ingestion, `.vstpreset` scanning, and the child-process auditioner with
+its crash isolation: a library of 3,600 Surge XT programs was measured here with eighteen patches
+crashing the worker, each one named and skipped, the app untouched. Two findings from that run
+are now fixed and tested: a loaded plug-in's programs reached the library without the browser
+being told, and a plug-in that loads its program on a thread of its own (Surge does) was measured
+before the sound existed. One lives in vendored JUCE: the Linux webview bridge framed messages in
+characters and sent bytes, so any non-ASCII patch name desynchronised the pipe for good.
+
+Note that the eleven C++ test targets, the Windows-only `#if JUCE_WINDOWS` branches and MSVC's
+opinion of the source are still what they were: a green run here is not a Windows run.
 
 For a single file, `-fsyntax-only` is faster than standing the whole thing up, and catches the same
 class of mistake:
@@ -253,6 +296,8 @@ g++ -fsyntax-only -std=gnu++23 -I CE/src -I JUCE/include/JUCE-8.0.7/modules \
 
 Two things this does **not** cover, and you should say so rather than claim a clean build:
 `#if JUCE_WINDOWS` branches are not compiled, and GCC is not MSVC.
+
+---
 
 ### Matching CI's configure
 

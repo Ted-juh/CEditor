@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <thread>
 #include <cmath>
 
 namespace ceditor::host
@@ -160,6 +161,28 @@ ProbeRender renderProbe (juce::AudioProcessor& processor, const ProbeSpec& spec,
     juce::AudioBuffer<float> block (juce::jmax (channels, processor.getTotalNumInputChannels()),
                                     spec.blockSize);
     juce::MidiBuffer midi;
+
+
+    // Let the preset land before the note does. See ProbeSpec::settleWallMs for why a wait and
+    // not a length: what is being waited for is another thread, not the audio.
+    if (spec.settleWallMs > 0.0 || spec.settleMinBlocks > 0)
+    {
+        const auto settleStart = std::chrono::steady_clock::now();
+        for (int rendered = 0;; ++rendered)
+        {
+            block.clear();
+            midi.clear();
+            juce::AudioBuffer<float> view (block.getArrayOfWritePointers(), block.getNumChannels(),
+                                           0, spec.blockSize);
+            processor.processBlock (view, midi);
+            const auto waited = std::chrono::duration<double, std::milli> (
+                std::chrono::steady_clock::now() - settleStart).count();
+            if (rendered + 1 >= spec.settleMinBlocks && waited >= spec.settleWallMs)
+                break;
+            if (waited < spec.settleWallMs)
+                std::this_thread::sleep_for (std::chrono::milliseconds (4));
+        }
+    }
 
     const auto started = std::chrono::steady_clock::now();
 

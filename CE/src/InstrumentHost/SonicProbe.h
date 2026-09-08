@@ -38,6 +38,15 @@ struct ProbeSpec
     int quietVelocity = 40;        // the touch pass
     double holdSeconds = 1.2;
     double tailSeconds = 0.8;
+    /** The note is not played until the plug-in has had this long, wall clock, of silent blocks
+        after its preset went in. Plug-ins that load a program on their own audio thread, or on
+        a thread of their own (Surge XT spawns one), answer the first blocks with silence and
+        drop whatever MIDI arrived meanwhile - and a note that never sounded measures as a sound
+        that is silent. Off-line rendering is faster than time, so this is a wait, not a length;
+        it costs about this much per preset and nothing when the plug-in was ready. Zero disables
+        it, for tests that want the first sample to be the note. */
+    double settleWallMs = 80.0;
+    int settleMinBlocks = 2;
 
     int holdSamples() const { return (int) (holdSeconds * sampleRate); }
     int totalSamples() const { return (int) ((holdSeconds + tailSeconds) * sampleRate); }
