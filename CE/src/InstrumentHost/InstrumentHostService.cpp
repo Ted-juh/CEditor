@@ -11939,7 +11939,9 @@ void InstrumentHostService::finishMidiLoop()
     const auto elapsedSeconds = (double) (endSample - startSample) / sampleRate;
     const auto history = engine.recentMidi (juce::jmin (
         perf::MidiCaptureJournal::maxHistorySeconds, elapsedSeconds + 0.1));
-    auto notes = extractCapturedNotes (history, juce::jmax (startSample, history.startSample),
+    auto notes = extractCapturedNotes (history,
+                                      juce::jmax ((juce::int64) startSample,
+                                                  (juce::int64) history.startSample),
                                       endSample);
     if (notes.empty())
     {
@@ -12523,7 +12525,7 @@ void InstrumentHostService::drainPerformanceRecordingMidi()
         performanceRecordingMidi.push_back (event);
     }
     performanceRecordingMidiCursor = juce::jmax (performanceRecordingMidiCursor,
-                                                  snapshot.endSample);
+                                                  (juce::int64) snapshot.endSample);
 }
 
 void InstrumentHostService::recordPerformanceAction (const juce::var& payload)
