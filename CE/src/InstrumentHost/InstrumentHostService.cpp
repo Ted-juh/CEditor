@@ -10234,8 +10234,8 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
 
     // Scoped to this class so refreshing one plug-in's list never marks another's missing.
     library.mergeVendorScan ("programList", std::move (scanned), scope);
-    return true;
     library.saveTo (libraryFile());
+    return true;
 }
 
 void InstrumentHostService::stopPresetAudition()

@@ -504,7 +504,12 @@ public:
 
         auto json = JSON::toString (var (obj.get()));
 
-        auto jsonLength = static_cast<size_t> (json.length());
+        // The receiver frames in BYTES: it reads exactly this many and parses them. The payload
+        // is UTF-8, so the length must be the UTF-8 byte count - String::length() counts
+        // characters, and one accented name in a payload was enough to declare the message
+        // short, fail its parse, and leave the surplus bytes to desynchronise every message
+        // after it. (CEditor: vendored fix.)
+        auto jsonLength = static_cast<size_t> (json.getNumBytesAsUTF8());
         auto len        = sizeof (size_t) + jsonLength;
 
         HeapBlock<char> buffer (len);
@@ -515,13 +520,16 @@ public:
 
         memcpy (dst, json.toRawUTF8(), jsonLength);
 
-        ssize_t ret;
+        // A pipe may take a large message in more than one write; send until it is all gone.
+        size_t written = 0;
 
-        for (;;)
+        while (written < len)
         {
-            ret = write (outChannel, buffer.getData(), len);
+            const auto ret = write (outChannel, buffer.getData() + written, len - written);
 
-            if (ret != -1 || errno != EINTR)
+            if (ret >= 0)
+                written += static_cast<size_t> (ret);
+            else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
                 break;
         }
     }
