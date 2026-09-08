@@ -357,8 +357,15 @@ WebViewHost::WebViewHost (AppSettings* settings)
         .withUserDataFolder (installedWebViewProfile);
    #endif
 
+    // Ask for WebView2 by name only where it exists. Everywhere else JUCE's areOptionsSupported
+    // answers true for the platform default alone (WebKitGTK on Linux, WKWebView on macOS) and
+    // false for any named backend - so naming webview2 there is not "try WebView2", it is
+    // "show the missing-runtime message and stop". The bridge is JUCE's own window.__JUCE__
+    // integration on every backend, so nothing above this line cares which one it got.
     auto options = juce::WebBrowserComponent::Options()
+       #if JUCE_WINDOWS
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+       #endif
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withWinWebView2Options (webview2Options);
 

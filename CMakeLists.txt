@@ -65,7 +65,7 @@ if(WIN32)
 else()
     set(CEDITOR_BUILD_APP_DEFAULT OFF)
 endif()
-option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (links against Windows dwmapi; compiles anywhere)" ${CEDITOR_BUILD_APP_DEFAULT})
+option(CEDITOR_BUILD_APP "Build the GUI app, the standalone player and the VST (dwmapi is linked on Windows only; builds anywhere with a JUCE-supported webview)" ${CEDITOR_BUILD_APP_DEFAULT})
 
 # A worker minidump is only actionable when its exact linker PDB still exists. Release normally
 # omits debug information, so preserve optimized symbols for crash-contained helper processes in a
@@ -323,7 +323,10 @@ if(CEDITOR_BUILD_APP)
         juce::juce_gui_basics
         juce::juce_gui_extra
         "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-        dwmapi
+        # DWM is the Windows title-bar API and nothing else; the calls that use it sit behind
+        # JUCE_WINDOWS. Linking it unconditionally was the one line that stopped the app linking
+        # on Linux, where JUCE runs the same UI in WebKitGTK. Gate the link the way the calls are.
+        $<$<PLATFORM_ID:Windows>:dwmapi>
         CEditorData
     )
 
@@ -373,7 +376,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_gui_basics
         juce::juce_gui_extra
         "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-        dwmapi
+        $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
 
@@ -510,7 +513,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_gui_basics
         juce::juce_gui_extra
         "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-        dwmapi
+        $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
 
@@ -647,7 +650,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_gui_basics
         juce::juce_gui_extra
         "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-        dwmapi
+        $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
 
@@ -704,7 +707,7 @@ if(CEDITOR_BUILD_APP)
         juce::juce_gui_basics
         juce::juce_gui_extra
         "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
-        dwmapi
+        $<$<PLATFORM_ID:Windows>:dwmapi>
         PlayerWebData
     )
 endif()
