@@ -7214,7 +7214,10 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
             handOffAudition (partId);
 
             attachParameters (partId);
-            ingestProgramList (partId);
+            // A plug-in that brought a program list just put sounds into the library; the
+            // browser only knows if it is told, and emitState does not carry the library.
+            if (ingestProgramList (partId))
+                emitLibrary (libraryView);
             if (const auto* loadedPart = rack.getPerformance().findPart (partId);
                 loadedPart != nullptr && loadedPart->microtuningEnabled
                     && rack.getPerformance().microtuning.enabled)
@@ -10191,7 +10194,7 @@ void InstrumentHostService::scanVstPresets()
     library.mergeVendorScan ("vstpreset", std::move (scanned));
 }
 
-void InstrumentHostService::ingestProgramList (const juce::String& partId)
+bool InstrumentHostService::ingestProgramList (const juce::String& partId)
 {
     // Layer B of the layered preset engine (baseline §6.2): a plug-in that exposes its
     // factory programs through the program-list interface gets them into the ONE library,
@@ -10201,11 +10204,11 @@ void InstrumentHostService::ingestProgramList (const juce::String& partId)
     const auto* part = rack.getPerformance().findPart (partId);
     auto* instrument = rack.getInstrument (partId);
     if (part == nullptr || instrument == nullptr || part->pluginCeId.isEmpty())
-        return;
+        return false;
 
     const auto count = instrument->getNumPrograms();
     if (count <= 1)
-        return;
+        return false;
 
     ensureLibrary();
     const auto scope = "program://" + part->pluginCeId + "/";
@@ -10231,6 +10234,7 @@ void InstrumentHostService::ingestProgramList (const juce::String& partId)
 
     // Scoped to this class so refreshing one plug-in's list never marks another's missing.
     library.mergeVendorScan ("programList", std::move (scanned), scope);
+    return true;
     library.saveTo (libraryFile());
 }
 

@@ -4031,6 +4031,15 @@ void testPresetWalking()
         h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
         auto* stub = h.lastStub;
 
+        // The load itself tells the page. Nothing asked for the library here - no getLibrary,
+        // no scan pressed - and the records are already on the wire, because a merge the
+        // browser is not told about is a browser that keeps showing the count it had.
+        {
+            const auto* told = h.emits.last ("instrumentHostLibrary");
+            check (told != nullptr && told->getProperty ("records", {}).size() == 3,
+                   "loading an instrument with a program list re-emits the library by itself");
+        }
+
         // Ingestion happened at load, with no scan pressed.
         h.emits.clear();
         h.cmd ("getLibrary");

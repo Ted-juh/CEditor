@@ -845,7 +845,10 @@ private:
     void loadChainRecord (const LibraryRecord& record, const juce::String& partId);
     /** Layer B of the preset engine: enumerates the live instrument's program list into
         the library as vendor records, scoped to its class. No-op below two programs. */
-    void ingestProgramList (const juce::String& partId);
+    /** True when the plug-in had a list and it went into the library - the caller re-emits
+        the library then, because a merge nobody is told about is a browser that does not
+        show the sounds until something unrelated refreshes it. */
+    bool ingestProgramList (const juce::String& partId);
     void loadRackRecord (const LibraryRecord& record);
     void attachParameters (const juce::String& partId);
     void applyPerformance (Performance&& performance);
