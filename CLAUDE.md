@@ -271,8 +271,9 @@ Data lives in `~/.config/CEditor/instrument-host/`. Seed `scan-paths.json` with
 instrument **in-process** (`PluginInstantiator.h` says why that is gated by platform: a crash in
 the plug-in is then a crash of Hostage). Everything else is the real thing — the out-of-process
 scanner, program-list ingestion, `.vstpreset` scanning, and the child-process auditioner with
-its crash isolation: a library of 3,600 Surge XT programs was measured here with eighteen patches
-crashing the worker, each one named and skipped, the app untouched. Two findings from that run
+its crash isolation: a library of 3,600 Surge XT programs was measured here. On the first pass eighteen patches
+crashed the worker, each one named and skipped, the app untouched; once the auditioner waited
+for the plug-in to finish loading before playing, none did. Two findings from that run
 are now fixed and tested: a loaded plug-in's programs reached the library without the browser
 being told, and a plug-in that loads its program on a thread of its own (Surge does) was measured
 before the sound existed. One lives in vendored JUCE: the Linux webview bridge framed messages in
