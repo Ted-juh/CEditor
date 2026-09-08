@@ -2,9 +2,10 @@
 
 **Status: done, not theorised.** On 2026-09-08 the full `CEditor` app was configured, compiled,
 linked and run on a plain Ubuntu 24.04 container with no Windows anywhere near it. It opened
-Hostage, scanned three VST3 instruments through the real out-of-process scanner, loaded them onto
-rack parts, ingested 3,600 factory programs into the library, and measured all of them in the
-child-process auditioner. Screenshots and the numbers are at the end of this page. The commits
+Hostage, scanned three VST3 instruments through the real out-of-process scanner, ingested 3,600
+factory programs into the library (through a temporary in-process loader used for the
+investigation and since removed - see [What runs](#what-runs-and-what-does-not)), and measured all
+of them in the child-process auditioner. Screenshots and the numbers are at the end of this page. The commits
 that made the last two gaps close are `fba4f19` (the link) and `08a2c85` (the webview bridge);
 everything else was already true and merely undocumented.
 
@@ -153,19 +154,21 @@ the proxy even where GitHub's web pages are blocked.
 **Runs — the real thing, not a mock:**
 - The whole UI in WebKitGTK, driven by the real C++ host over JUCE's bridge.
 - The out-of-process VST3 scanner (`CEditorPluginScanner`), catalogue, fingerprints, quarantine.
-- Loading an instrument onto a rack part — **in-process** off Windows (see below).
-- Program-list ingestion, `.vstpreset` scanning, the library, versions, facets, the map,
-  "sounds like", the substitute memory.
+- `.vstpreset` scanning, the library, versions, facets, the map, "sounds like", the substitute
+  memory.
 - The child-process auditioner with its crash isolation: eighteen Surge patches crashed the
   worker on the first pass; each was named, recorded and skipped, and the app never noticed.
 
 **Does not, and why:**
-- **Live plug-in isolation.** The `PluginWorker*` stack is Windows-only by design
-  (`IsolatedPluginProxy.cpp`: "live plug-in isolation is currently available on Windows only").
-  Off Windows the rack instantiates the plug-in inside the Hostage process through JUCE's format
-  manager (`PluginInstantiator.h`, `makeInProcessPluginInstantiator`, gated by `#if ! JUCE_WINDOWS`).
-  A crash in the plug-in is then a crash of Hostage. That is the whole reason the Windows build
-  does not do this, and why it is a platform gate and not a switch.
+- **Loading an instrument onto a rack part.** The `PluginWorker*` stack is Windows-only by design
+  (`IsolatedPluginProxy.cpp`: "live plug-in isolation is currently available on Windows only"),
+  and the host process is not allowed to construct plug-ins itself — `hostProductBuild.test.js`
+  fails the build if `ValueTreeBridgeHandlers.cpp` so much as mentions an in-process loader,
+  because a crash in the plug-in would then be a crash of Hostage. Consequence: the library's
+  program-list layer, which needs a live instance, can only be exercised on Windows. (The Surge
+  and Dexed program lists in the evidence below were ingested through a temporary in-process
+  loader added for the investigation and removed when that guard caught it. The bugs it found,
+  and their tests, are platform-independent and remain.)
 - **Audio out.** No device in a container. The auditioner does not need one — it renders
   off-line — but nothing plays live.
 - **The `#if JUCE_WINDOWS` branches and MSVC's opinion of the source.** A green Linux run is not
@@ -208,9 +211,9 @@ disputes, and to run the commands in [The recipe](#the-recipe) before answering.
   *Debug* configuration; `ctest -C Release` runs *Release*. Pass `--config Release`.
 - **Eight library tests fail with counts off by three** → they read the real
   `~/Documents/VST3 Presets`. Move your own presets aside for the run.
-- **Plug-ins loaded before their data folder existed have no programs** → the instance keeps its
-  empty list; loading the same class onto the same part applies in place and does not
-  re-instantiate. Restart the app.
+- **A plug-in that reads a data folder at construction has no programs if the folder came later** →
+  the instance keeps its empty list; loading the same class onto the same part applies in place
+  and does not re-instantiate. Restart.
 - **`pgrep -f CEditorPluginScanner` from a script whose command line contains that string** →
   matches itself, forever. Anchor on the executable path.
 
@@ -225,7 +228,7 @@ The run on 2026-09-08, all on the Linux binary under Xvfb:
 | Link | `CEditor` 17.9 MB, `CEditorPluginScanner` 12.6 MB, zero errors |
 | First paint | ~70 s under software rendering |
 | Scan | Probe Synth, Dexed 1.0.1, Surge XT 1.4.0 catalogued through the real worker, `failureCount: 0` |
-| Load | each onto a rack part, in-process; Probe Synth with a `.vstpreset` applied |
+| Load | each onto a rack part through a temporary in-process loader, since removed (see above) |
 | Ingest | 3 vendor presets + 3 + 32 + 3,562 program-list records = 3,600 |
 | Measure, first pass | 3,582 heard or silent, 18 crashed the worker and were named; app untouched |
 | Measure, after the settle fix | 3,600 measured, 104 silent (audio-in templates, vocoders), 0 crashes |

@@ -1807,18 +1807,8 @@ void ValueTreeBridge::ensureInstrumentHost()
     // returned factory captures only worker/staging paths and outlives this command safely.
     const auto liveWorker = findLivePluginWorker();
     options.livePluginIsolationAvailable = liveWorker.existsAsFile();
-   #if JUCE_WINDOWS
     options.instantiate = ceditor::host::makeIsolatedPluginInstantiator (
         liveWorker, options.dataDirectory.getChildFile ("worker-staging"));
-   #else
-    // No live worker off Windows (PluginInstantiator.h says why): the instrument runs in
-    // this process. One format manager for the life of the app, because JUCE's instances
-    // keep a reference to the format that made them.
-    static juce::AudioPluginFormatManager inProcessFormats;
-    static const bool formatsAdded = [] { inProcessFormats.addDefaultFormats(); return true; }();
-    juce::ignoreUnused (formatsAdded);
-    options.instantiate = ceditor::host::makeInProcessPluginInstantiator (inProcessFormats);
-   #endif
     options.applyVstPreset = ceditor::host::applyVstPresetFile;
 
     // The auditioner's two rules: it runs off the controlling thread, and the two things that

@@ -270,17 +270,21 @@ Data lives in `~/.config/CEditor/instrument-host/`. Seed `scan-paths.json` with
 (the default Windows VST3 roots do not exist here, and `~/.vst3` is not searched). Vendor
 `.vstpreset` files are read from `~/Documents/VST3 Presets/<Vendor>/<Plugin>/`.
 
-**What this is and is not.** Off Windows there is no live plug-in worker, so a part loads its
-instrument **in-process** (`PluginInstantiator.h` says why that is gated by platform: a crash in
-the plug-in is then a crash of Hostage). Everything else is the real thing — the out-of-process
-scanner, program-list ingestion, `.vstpreset` scanning, and the child-process auditioner with
-its crash isolation: a library of 3,600 Surge XT programs was measured here. On the first pass eighteen patches
-crashed the worker, each one named and skipped, the app untouched; once the auditioner waited
-for the plug-in to finish loading before playing, none did. Two findings from that run
-are now fixed and tested: a loaded plug-in's programs reached the library without the browser
-being told, and a plug-in that loads its program on a thread of its own (Surge does) was measured
-before the sound existed. One lives in vendored JUCE: the Linux webview bridge framed messages in
-characters and sent bytes, so any non-ASCII patch name desynchronised the pipe for good.
+**What this is and is not.** Off Windows there is no live plug-in worker, and the host process
+does **not** load instruments itself: `hostProductBuild.test.js` asserts that the disposable
+worker owns the only third-party plug-in constructor, and that guard is the product's word on it.
+So a part cannot load an instrument here, and the program-list layer of the library (which needs
+a live instance) is Windows-only to exercise. Everything else is the real thing — the
+out-of-process scanner, `.vstpreset` scanning, and the child-process auditioner with its crash
+isolation: a library of 3,600 Surge XT programs was measured here. On the first pass eighteen
+patches crashed the worker, each one named and skipped, the app untouched; once the auditioner
+waited for the plug-in to finish loading before playing, none did. (That library was ingested
+with a temporary in-process loader that has since been removed for the reason above; the
+findings and their tests stand.) Two findings from that run are now fixed and tested: a loaded
+plug-in's programs reached the library without the browser being told, and a plug-in that loads
+its program on a thread of its own (Surge does) was measured before the sound existed. One lives
+in vendored JUCE: the Linux webview bridge framed messages in characters and sent bytes, so any
+non-ASCII patch name desynchronised the pipe for good.
 
 Note that the eleven C++ test targets, the Windows-only `#if JUCE_WINDOWS` branches and MSVC's
 opinion of the source are still what they were: a green run here is not a Windows run.
