@@ -1,14 +1,16 @@
 # What could go in the display panel
 
-Status: **a worklist.** Candidates 1 to 6 and 8 are built — Effects, Typography, Assets, Screen,
-API, Library and Animation are dock tabs now, each with its own design record. Candidate 7 was
-worked through and **turned down**: see [`fill-layers-not-a-tab.md`](fill-layers-not-a-tab.md).
-Three entries are worth noting for what they say about the list itself. Candidates 6 and 8 had
-their space arguments measured and rejected — both sections are capped and stop growing — and were
-built on their other findings instead; candidate 7 had no findings at all once checked, and is not
-built. The measurement is the point of this list, not the ranking. Nothing is removed from the
-properties panel yet. The rest of the list is for working through one entry at a time — is it worth
-it, and what does it look like.
+Status: **a worklist.** Candidates 1 to 6, 8 and 9 are built — Effects, Typography, Assets, Screen,
+API, Library, Animation and Designer are dock tabs now, each with its own design record. Candidate 7
+was worked through and **turned down**: see [`fill-layers-not-a-tab.md`](fill-layers-not-a-tab.md).
+Only candidate 10 is left.
+
+Four entries are worth noting for what they say about the list itself. Candidates 6 and 8 had their
+space arguments measured and rejected — both sections are capped and stop growing — and were built
+on their other findings instead. Candidate 7 had no findings at all once checked, and is not built.
+Candidate 9 is the inversion: it is the **largest** space in the list at 8,143px measured, and the
+tab recovers none of it, because what it adds is the part the panel does not have. The measurement
+is the point of this list, not the ranking. Nothing is removed from the properties panel yet.
 
 Companion to [`property-panel-space-plan.md`](property-panel-space-plan.md), which has the argument
 and the triage rule. This document is the inventory it implies.
@@ -57,7 +59,7 @@ proposal to argue about.
 | 6 | Component library | CustomPackageLibrary | 647px, capped | **built** — but not for the space |
 | 7 | Image / Texture layers | Background, Text, PanelCardContent | 510px per layer | **rejected** — already shared, no finding |
 | 8 | Animation | Animations *(only)* | 712px, capped | **built** — but not for the space |
-| 9 | Per-component designers | ~12 components | varies | medium, and the most interesting |
+| 9 | Per-component designers | 14 components | 8,143px measured | **built** — 3 designers of 14 |
 | 10 | Device bindings | DeviceBindings | 347px | weak |
 | — | Everything under 200px per owner | 235 instances | 27,410px | **no** |
 
@@ -205,9 +207,35 @@ there is nothing to lay along a time axis that the three numbers do not already 
 
 ---
 
-### 9. Per-component designers — the most interesting one
+### 9. Per-component designers — built, and the space was never the argument
 
-**What it is.** Twelve or so components have a section that is really a small editor: Arpeggiator
+**Built on 2026-09-10**, three designers of fourteen. Design record:
+[`designer-tab-design.md`](designer-tab-design.md).
+
+**The count and the heights were both low.** It is fourteen components, not twelve — Drum Pads, the
+tallest of them at 1,017px, was not listed. And the per-component numbers here came from a static
+cell-packing formula. Measured in a browser, with a default control and every section the editor
+draws: Drum Pads 1,017px, Phrase 943px, Recorder 912px, Harmoniser 831px, Arp 625px, Router 568px,
+Envelope 516px, Chord Pad 502px, Zone Splitter 476px, Kinetic 448px, Step Sequencer 388px, Transport
+347px, Turing 335px, Numpad 235px. **8,143px**, the largest figure in this list.
+
+**And it is not the argument.** This tab does not take a row out of the panel. What it adds is the
+part the panel does not have — which is the whole of the content:
+
+1. **Anything drawn in preview mode is thrown away.** `previewRehearsal.js` photographs the panels
+   store when preview starts and puts it back when it stops, on purpose, so a runtime script cannot
+   edit the author's file. Every drawing route in the app today is inside that bracket. Probed:
+   draw two cells into a Phrase during preview, leave preview, the pattern is its eight starter
+   cells again.
+2. **The Step Sequencer cannot be drawn even in preview.** `stepSequencerLayout.js` exports 24
+   things; seven are never imported anywhere and five of those are the editing half — `cellAtPoint`,
+   `cellAt`, `isCellOn`, `toggleCell`, `setCellVelocity`. Its default pattern is `{}`. So it draws an
+   empty grid and plays silence, everywhere.
+3. **The renderer draws a velocity nothing could set**, since `setCellVelocity` had no caller.
+
+**The original entry, kept because it was right about the shape:**
+
+**What it was.** Twelve or so components have a section that is really a small editor: Arpeggiator
 347px, Phrase Sequencer 482px, Zone Splitter 347px, Harmoniser 347px, Chord Pad 257px, Turing
 Modulator 302px, Kinetic 302px, Expression Router 302px, Transport 302px, Recorder 257px, Numpad,
 Drum Pads.
@@ -226,10 +254,18 @@ instrument host: *"Clicking a thumbnail opens its editor in a bottom display pan
 the step sequencer, the mixer, panning, whatever that node is. One dock, many editors."* If both were
 built they should be the same mechanism, not two.
 
-**Why it is not ranked first.** It is twelve editors, not one, so it is the largest piece of work
+**Why it was not ranked first.** It is twelve editors, not one, so it is the largest piece of work
 here — and unlike the others it needs a new drawing surface per component rather than a relayout of
 existing controls. Best treated as a pattern proved on one component first. `CustomArpeggiatorEditor.svelte`
 already draws an arpeggiator grid on the design surface, so that is the one to try.
+
+**What was built.** A registry — one tab, many editors — with three designers: the Step Sequencer's
+grid, the Envelope's curve and the Turing register's bars. Three rather than one, because they are
+three different shapes, so the frame had to be a frame. Each draws with the component's own renderer
+and writes through its own layout module. The eleven that are not built are named on screen.
+The Arpeggiator suggested here is one of them — its lane is a good next one, and the finding is not
+where this entry guessed: the walk is already previewed as text, and what has no editor is the
+mute list, which the panel prints as `mutes.join(', ')`.
 
 ---
 

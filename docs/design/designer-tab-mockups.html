@@ -1,0 +1,340 @@
+<title>Designer tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* App palette, as with the other mockups. NOTHING HERE IS BUILT. */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --green:#39D98A; --gold:#F2C94C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:18ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:66ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:28ch}
+h4{margin:0 0 8px;font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4)}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+pre.probe{margin:18px 0 0;border:1px solid var(--rule);border-radius:8px;background:#0C0F12;padding:14px 16px;
+  font:400 13px/1.7 var(--mono);color:var(--ink-3);overflow-x:auto;max-width:640px}
+pre.probe b{color:var(--warn);font-weight:600}
+
+table{border-collapse:collapse;margin-top:18px;width:100%;max-width:660px;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule)}
+th{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4)}
+td{color:var(--ink-2)} td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.dead{color:var(--warn);font-weight:600}
+td.mono{font:400 13px/1 var(--mono)}
+tr.total td{border-bottom:0;font-weight:700;color:#E8EEF5}
+
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule);align-items:center;flex-wrap:wrap}
+.dtabs button{border:1px solid transparent;background:transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.dtabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.headrow{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--rule)}
+.who{font:500 9.5px/1 var(--mono);color:var(--ink-4);white-space:nowrap}
+.who b{color:#8FEDE3}.who em{font-style:normal;margin-left:6px;color:var(--ink-3)}
+.tools{margin-left:auto;display:flex;gap:4px}
+.tools span{border:1px solid var(--rule-2);background:#12171A;color:#9AA6AE;font:600 9px/1 var(--sans);padding:5px 8px;border-radius:3px}
+
+.cols{display:flex;gap:10px;padding:10px;align-items:stretch}
+.stagecol{flex:1 1 0;min-width:0}
+.railcol{flex:0 0 216px;min-width:0}
+.colh{display:flex;align-items:center;gap:6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin-bottom:7px;white-space:nowrap}
+.colh s{margin-left:auto;text-decoration:none;font-size:8px;letter-spacing:.04em}
+.stage{border:1px solid #2E3540;border-radius:4px;background:#0C0F12;overflow:hidden}
+.stage svg{display:block}
+
+.trk{display:grid;grid-template-columns:9px minmax(0,1fr) auto;align-items:center;gap:6px;padding:5px 6px;border:1px solid #2E3540;border-radius:3px;background:#12171A;margin-bottom:2px}
+.trk.sel{border-color:var(--label);background:#173449}
+.sw{width:9px;height:9px;border-radius:2px;display:block}
+.tn{font:500 10px/1.2 var(--sans);color:var(--ink-2)}
+.tc{font:400 8.5px/1 var(--mono);color:var(--ink-4)}
+.box{margin-top:8px;border:1px solid var(--rule-2);border-radius:4px;background:#1A1D20;padding:6px 8px 9px}
+.grp{font:600 8px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:#4B545C;margin:9px 0 2px;padding-bottom:3px;border-bottom:1px solid #262B30}
+.grp:first-child{margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chip{border:1px solid #333B42;background:#12171A;color:#9AA6AE;font:600 9px/1 var(--sans);padding:5px 7px;border-radius:3px}
+.chip.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.r{display:grid;grid-template-columns:56px minmax(0,1fr);gap:6px;align-items:center;margin-top:6px}
+.r>label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.f{height:26px;display:flex;align-items:center;padding:0 6px;background:var(--field);border:1px solid var(--rule-2);border-radius:3px;color:var(--ink);font:400 11px/1 var(--sans)}
+.f .u{color:var(--label);font:500 9px/1 var(--mono);text-transform:uppercase;margin-right:auto}
+.hint{margin:6px 0 0;font:400 9px/1.5 var(--sans);color:var(--ink-4)}
+.wipe{margin-top:10px;text-align:center;border:1px solid #5C3A3A;background:#1A1315;color:var(--bad);font:600 9px/1 var(--sans);padding:6px;border-radius:3px}
+.foot{margin:0;padding:0 10px 10px;font:400 9px/1.5 var(--sans);color:#4B545C}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;align-items:start}
+.before{border:1px solid #4A2A2A;border-radius:8px;background:#1A1315;padding:14px 16px}
+.before h4{color:var(--bad)}
+.before pre{margin:0;font:400 11px/1.6 var(--mono);color:#9AA6AE;white-space:pre-wrap}
+.after{border:1px solid #1E4A42;border-radius:8px;background:#0E1A18;padding:14px 16px}
+.after h4{color:#8FEDE3}
+@media (max-width:900px){ .grid2{grid-template-columns:1fr} }
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; display panel &nbsp;·&nbsp; candidate 9 &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>The Designer tab</h1>
+  <p class="lede">Fourteen components have content that is a drawing. None of it can be authored:
+    the properties panel has no drawing surface, and preview mode throws away what you draw in it.</p>
+  <div class="warnbar"><b>Built on 2026-09-10, three designers of fourteen.</b> The candidate list
+    called this "the largest piece of work here" and said to prove the pattern on one component
+    first. Three prove it better than one, because they are three different shapes. The eleven that
+    are not built are named on screen rather than silently absent.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>Whatever you draw in preview is thrown away</h2>
+  <p>Several of these components <i>can</i> be drawn on — in preview mode. And
+    <code>stores/previewRehearsal.js</code> photographs the panels store when preview starts and
+    puts it back when preview stops. That is deliberate and right: before it, a runtime script's
+    <code>set()</code> edited the author's file and autosaved it, with no undo step they would
+    recognise. The bracket fixed that.</p>
+  <p><b>What it also means</b> is that every drawing route in the application today is inside that
+    bracket. Measured, driving the real stores:</p>
+
+  <pre class="probe">before preview        : 8 cells      <span style="color:#4B545C">(a Phrase ships with a starter pattern)</span>
+drawn during preview  : 2 cells
+after leaving preview : <b>8 cells</b></pre>
+
+  <p>Preview also turns off selection, dragging, the context menu and the marquee, so it is not a
+    mode you design in anyway. It is a mode you enter, and leave.</p>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>And the Step Sequencer cannot be drawn even there</h2>
+  <p><code>utils/stepSequencerLayout.js</code> exports 24 things. Seven are never imported anywhere,
+    and five of those seven are exactly the editing half:</p>
+
+  <table>
+    <tr><th>Export</th><th>What it does</th><th>Imported by</th></tr>
+    <tr><td class="mono">cellAtPoint</td><td>which cell is under the pointer</td><td class="dead">nothing</td></tr>
+    <tr><td class="mono">cellAt</td><td>read one cell</td><td class="dead">nothing</td></tr>
+    <tr><td class="mono">isCellOn</td><td>is it lit</td><td class="dead">nothing</td></tr>
+    <tr><td class="mono">toggleCell</td><td>turn one on or off</td><td class="dead">nothing</td></tr>
+    <tr><td class="mono">setCellVelocity</td><td>set its velocity</td><td class="dead">nothing</td></tr>
+  </table>
+
+  <p>The default pattern is <code>{}</code>. The properties panel section edits steps, tempo,
+    direction, tracks and colours and never the pattern. The preview surface imports the sequencer's
+    <b>clock</b> half — <code>advanceStep</code>, <code>stepMs</code>, <code>stepNotes</code> — and
+    none of its editing half.</p>
+  <p><b>So a Step Sequencer draws an empty grid and plays silence.</b> In the editor, in preview, and
+    in the exported player. It has done since it shipped.</p>
+  <p>There is a third thing in that. The renderer draws each lit cell's opacity from its velocity —
+    so the picture has always had a dimension the data could not carry, because nothing could write
+    one.</p>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 3</div>
+  <h2>A curve, as rows of numbers</h2>
+  <p>This is the Envelope in the properties panel today, and it is the shape of the whole
+    complaint: the thing being edited is a picture, and the editor is a list.</p>
+
+  <div class="grid2">
+    <div class="before">
+      <h4>Now · the properties panel</h4>
+      <pre>NODES                    + Add
+1   [ 0.00 ] [ 0.00 ]  linear ▾  ✕
+2   [ 0.25 ] [ 1.00 ]  exp    ▾  ✕
+3   [ 0.50 ] [ 0.60 ]  exp    ▾  ✕
+4   [ 1.00 ] [ 0.00 ]  exp    ▾  ✕</pre>
+      <p style="font-size:13px">Which one is the sustain node? It is a number in another section.
+        Where does "+ Add" put a node? In the widest gap; you find it afterwards.</p>
+    </div>
+    <div class="after">
+      <h4>Built · the tab</h4>
+      <div class="ui stage">
+        <svg width="100%" height="150" viewBox="0 0 300 150" preserveAspectRatio="none">
+          <line x1="0" y1="112" x2="300" y2="112" stroke="#1E242A"/>
+          <line x1="0" y1="75" x2="300" y2="75" stroke="#1E242A"/>
+          <line x1="0" y1="38" x2="300" y2="38" stroke="#1E242A"/>
+          <path d="M8 140 C 40 130, 62 20, 78 14 C 110 14, 130 60, 150 66 C 210 72, 250 120, 292 140 L292 142 L8 142 Z" fill="#5B9BD5" opacity="0.16"/>
+          <path d="M8 140 C 40 130, 62 20, 78 14 C 110 14, 130 60, 150 66 C 210 72, 250 120, 292 140" fill="none" stroke="#5B9BD5" stroke-width="1.75"/>
+          <line x1="150" y1="8" x2="150" y2="142" stroke="#F2C94C" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"/>
+          <circle cx="8" cy="140" r="4.5" fill="#5B9BD5" stroke="#0C0F12" stroke-width="1.5"/>
+          <circle cx="78" cy="14" r="4.5" fill="#5B9BD5" stroke="#0C0F12" stroke-width="1.5"/>
+          <circle cx="150" cy="66" r="6" fill="#F2C94C" stroke="#0C0F12" stroke-width="1.5"/>
+          <circle cx="292" cy="140" r="4.5" fill="#5B9BD5" stroke="#0C0F12" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <p style="font-size:13px">Drag a node. Click empty space to add one <b>where you clicked</b>.
+        The sustain node is gold, with a line through the curve.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 4</div>
+  <h2>The whole tab, on a Step Sequencer</h2>
+  <p>The stage is <code>StepSequencerRenderer</code> — the component the canvas draws with, at dock
+    size, with a transparent hit layer over it. The geometry and the writes are the component's own
+    layout module. Nothing here is a second drawing of anything.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui dock" style="min-width:1040px">
+        <div class="dtabs">
+          <button>Effects</button><button>Type</button><button>Assets</button><button>Screen</button>
+          <button>API</button><button>Library</button><button>Animation</button><button class="on">Designer</button>
+        </div>
+        <div class="headrow">
+          <span class="who">designing <b>Big Drums</b> <em>Step Sequencer</em></span>
+          <span class="tools"><span>Use selection</span><span>Clear</span></span>
+        </div>
+
+        <div class="cols">
+          <div class="stagecol">
+            <div class="colh">Pattern <s>17 cells lit · 16 × 3</s></div>
+            <div class="stage">
+              <svg width="100%" height="196" viewBox="0 0 760 196" preserveAspectRatio="none">
+                <text x="8" y="42" fill="#B9B9B9" font-size="9" font-family="sans-serif">Kick</text>
+                <text x="8" y="106" fill="#B9B9B9" font-size="9" font-family="sans-serif">Snare</text>
+                <text x="8" y="170" fill="#B9B9B9" font-size="9" font-family="sans-serif">Hat</text>
+                <!-- 16 columns x 3 rows -->
+                <g>
+                  <!-- Kick: every 4 -->
+                  <rect x="70" y="8"  width="40" height="56" rx="2" fill="#5B9BD5"/>
+                  <rect x="242" y="8" width="40" height="56" rx="2" fill="#5B9BD5"/>
+                  <rect x="414" y="8" width="40" height="56" rx="2" fill="#5B9BD5"/>
+                  <rect x="586" y="8" width="40" height="56" rx="2" fill="#5B9BD5"/>
+                  <!-- Snare: off-beat -->
+                  <rect x="156" y="72" width="40" height="56" rx="2" fill="#F2C94C"/>
+                  <rect x="328" y="72" width="40" height="56" rx="2" fill="#F2C94C"/>
+                  <rect x="500" y="72" width="40" height="56" rx="2" fill="#F2C94C"/>
+                  <rect x="672" y="72" width="40" height="56" rx="2" fill="#F2C94C"/>
+                  <!-- Hat: every 2, one at half velocity -->
+                  <rect x="70" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="156" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="242" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="328" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="371" y="136" width="40" height="52" rx="2" fill="#39D98A" opacity="0.35"/>
+                  <rect x="414" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="500" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="586" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                  <rect x="672" y="136" width="40" height="52" rx="2" fill="#39D98A"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div class="railcol">
+            <div class="colh">Tracks <s>3</s></div>
+            <div class="trk"><i class="sw" style="background:#5B9BD5"></i><span class="tn">Kick</span><span class="tc">4</span></div>
+            <div class="trk"><i class="sw" style="background:#F2C94C"></i><span class="tn">Snare</span><span class="tc">4</span></div>
+            <div class="trk sel"><i class="sw" style="background:#39D98A"></i><span class="tn">Hat</span><span class="tc">9</span></div>
+            <div class="box">
+              <div class="grp">Fill Hat</div>
+              <div class="chips"><span class="chip">/1</span><span class="chip">/2</span><span class="chip">/3</span><span class="chip">/4</span><span class="chip">/8</span><span class="chip">off</span></div>
+              <div class="grp">Move it</div>
+              <div class="chips"><span class="chip">‹</span><span class="chip">›</span><span class="chip">invert</span><span class="chip">row</span></div>
+              <div class="grp">Velocity</div>
+              <div class="r"><label>Step 8</label><div class="f"><span class="u">vel</span>45</div></div>
+              <p class="hint">The grid draws a cell's velocity as its opacity. Nothing could set it
+                before this, so every lit cell drew the same.</p>
+              <div class="wipe">Clear the whole pattern</div>
+            </div>
+          </div>
+        </div>
+        <p class="foot">Also on this panel with nothing to draw with yet: Phrase Sequencer.</p>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 4</div>
+      <p class="ct">Four-on-the-floor is one click rather than four; off-beat hats are one click
+        rather than eight. The pale hat on step 8 is a cell at velocity 45 — the first velocity the
+        application has ever been able to write.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 5</div>
+  <h2>The space is the biggest number in the list, and this tab recovers none of it</h2>
+  <p>Measured — each section editor mounted in Chromium at a 340px panel width with a default
+    control, every section it draws included.</p>
+
+  <table>
+    <tr><th>Component</th><th style="text-align:right">Panel height</th><th>Designer</th></tr>
+    <tr><td>Drum Pads</td><td class="num">1,017px</td><td>—</td></tr>
+    <tr><td>Phrase Sequencer</td><td class="num">943px</td><td>—</td></tr>
+    <tr><td>Phrase Recorder</td><td class="num">912px</td><td>—</td></tr>
+    <tr><td>Harmoniser</td><td class="num">831px</td><td>—</td></tr>
+    <tr><td>Arpeggiator</td><td class="num">625px</td><td>—</td></tr>
+    <tr><td>Expression Router</td><td class="num">568px</td><td>—</td></tr>
+    <tr><td>Envelope</td><td class="num">516px</td><td style="color:#8FEDE3">built</td></tr>
+    <tr><td>Chord Pad</td><td class="num">502px</td><td>—</td></tr>
+    <tr><td>Zone Splitter</td><td class="num">476px</td><td>—</td></tr>
+    <tr><td>Kinetic Modulator</td><td class="num">448px</td><td>—</td></tr>
+    <tr><td>Step Sequencer</td><td class="num">388px</td><td style="color:#8FEDE3">built</td></tr>
+    <tr><td>Transport</td><td class="num">347px</td><td>—</td></tr>
+    <tr><td>Turing Modulator</td><td class="num">335px</td><td style="color:#8FEDE3">built</td></tr>
+    <tr><td>Numpad</td><td class="num">235px</td><td>—</td></tr>
+    <tr class="total"><td>total</td><td class="num">8,143px</td><td>3 of 14</td></tr>
+  </table>
+
+  <p>Twice the API tab's 4,183px, and the biggest figure anywhere in the candidate list. It is also,
+    for the first time, <b>not the argument</b>. This tab does not take a single row out of the
+    panel, because what it adds is the part the panel does not have. The space and the defect point
+    at different things here, and the defect is the one worth building for.</p>
+</section>
+
+<section class="sec">
+  <h2>Decided while building</h2>
+  <ul>
+    <li><b>One tab, many editors — a registry, not a switch.</b> The registry lists all fourteen with
+      the section they edit and the shape their content is. Adding a designer is a row and an import.
+      <code>rack-canvas-plan.md</code> proposes the same mechanism for the instrument host; if both
+      are built they should be one thing.</li>
+    <li><b>The designer is the renderer.</b> What you draw on is the component itself, at dock size,
+      not a sketch of it that is free to disagree — the rule <code>EffectPreview</code> already
+      settled here.</li>
+    <li><b>The Step Sequencer went first even though its section is the third shortest.</b> The
+      height was never the reason.</li>
+    <li><b><code>moveZoneEdge</code> looked dead and is not.</b> A first pass for unused exports
+      flagged it; it is called by <code>dragSplitPoint</code> in the same file, which the preview
+      surface calls. Checked before it went into a document. The same pass flagged
+      <code>phraseLayout.clearPattern</code>, which really is dead.</li>
+    <li><b>Nothing was removed.</b> All fourteen section editors still draw every row they drew.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="designer-tab-design.md" style="color:var(--teal)">designer-tab-design.md</a>,
+    which records what shipped.</p>
+</section>
+
+</div>

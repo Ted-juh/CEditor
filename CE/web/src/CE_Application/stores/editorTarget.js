@@ -56,6 +56,9 @@ export const EDITOR_TARGET_KINDS = {
   // Animation has no halves either. Which animation is selected is the tab's own state: the names
   // come from the control's own data, so there is no fixed list to validate against.
   animation: { tab: 'animation', domains: null },
+  // The Designer tab picks its editor from the control's own component type, so there is nothing
+  // for a domain to carry here either.
+  designer: { tab: 'designer', domains: null },
   // The Library tab has no target at all — it edits the library, not a control — so it is not
   // listed here. A kind exists only for a tab that has to be pointed at something.
 };
