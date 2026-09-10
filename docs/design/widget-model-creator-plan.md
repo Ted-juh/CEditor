@@ -2,6 +2,11 @@
 
 Status: **proposal only. Nothing here is built.**
 
+Six mockups of what this would look like are drawn in
+[`widget-model-mockups.html`](widget-model-mockups.html): the six editors one dial costs
+today, the proposed widget inspector next to the current one, the on-canvas handles, the
+palette and layer tree, Unpack, and three more inspectors testing the eight-control cap.
+
 ## The request
 
 Make the custom component creator feel more like a design tool (Adobe, Canva) and less like a form.

@@ -1,0 +1,752 @@
+<title>Widget model mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ---------------------------------------------------------------------------
+   Palette is the design surface's own, read out of CustomDesignSurfaceEditor.svelte
+   and its extracted components: shell #181818 on #2A2A2A rules, dock #15181B,
+   fields #101418 bordered #3B4650 with #E8EEF5 type, accent --surface-accent
+   #14B8A6, selection blue #173449/#3F6C92, warn #E5A029.
+
+   The mockups have to look like the application, so the document wears the
+   application's colours. Dark on purpose.
+
+   NOTHING HERE IS BUILT. These are drawings of a proposal. See
+   widget-model-creator-plan.md for the argument they illustrate.
+--------------------------------------------------------------------------- */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --shell:#181818; --dock:#15181B;
+  --raised:#1C2126; --sunk:#101418; --rule:#2A2A2A; --rule-2:#3B4650;
+  --ink:#E8EEF5; --ink-2:#B9C8D4; --ink-3:#8FA4B0; --ink-4:#65717C;
+  --teal:#14B8A6; --teal-dim:#0E7C70; --blue:#5B9BD5; --blue-deep:#3F6C92;
+  --blue-surface:#173449; --warn:#E5A029; --bad:#D98C8C; --ok:#58A879;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+     font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+
+/* document chrome */
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:20ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;
+         padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:62ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:24ch}
+h3{font:600 16px/1.35 var(--sans);margin:30px 0 0;color:var(--ink)}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:var(--ink);font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px}
+li b{color:var(--ink);font-weight:600}
+
+/* plates */
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);
+              border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+         color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+/* ---- shared editor chrome ------------------------------------------------ */
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink);min-width:0}
+.ui *{box-sizing:border-box}
+.dockpane{background:var(--dock);border:1px solid var(--rule);border-radius:5px;width:330px;flex:0 0 330px}
+.dockhead{display:flex;justify-content:space-between;align-items:center;gap:8px;
+          padding:8px 10px;border-bottom:1px solid var(--rule);background:#172129}
+.dockhead strong{font-size:12px;font-weight:600;letter-spacing:.01em}
+.dockhead span{font-size:10px;color:var(--ink-3)}
+.tabs{display:flex;gap:2px;padding:5px 6px;border-bottom:1px solid var(--rule);background:#111A21}
+.tabs button{border:1px solid transparent;background:transparent;color:#96A6B2;
+             font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px;cursor:default}
+.tabs button.on{border-color:var(--blue-deep);background:var(--blue-surface);color:#EAF5FF}
+.body{padding:9px 10px 12px}
+
+/* property rows */
+.row{display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:center;margin-top:7px}
+.row > label{font-size:10px;color:var(--ink-3);text-align:right;line-height:1.25}
+.fields{display:flex;gap:5px;align-items:center;min-width:0}
+.f{height:25px;border-radius:4px;background:var(--sunk);border:1px solid var(--rule-2);
+   color:var(--ink);font:500 10px/23px var(--mono);padding:0 7px;flex:1;min-width:0;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.f.n{flex:0 0 52px;text-align:right}
+.f.sel{border-color:#4A5A66;background:#0E1519;color:var(--ink-2);
+       display:flex;align-items:center;justify-content:space-between}
+.f.sel::after{content:'▾';color:var(--ink-4);font-size:9px;margin-left:6px}
+.sw{width:25px;height:25px;flex:0 0 25px;border-radius:4px;border:1px solid rgba(255,255,255,.2)}
+.tog{width:34px;height:18px;border-radius:9px;background:#22303A;border:1px solid var(--rule-2);
+     position:relative;flex:0 0 34px}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;
+            background:#6B7A85}
+.tog.on{background:#0F3A36;border-color:var(--teal-dim)}
+.tog.on::after{left:auto;right:2px;background:var(--teal)}
+.seg{display:flex;border:1px solid var(--rule-2);border-radius:4px;overflow:hidden;height:25px}
+.seg span{padding:0 8px;font:600 10px/23px var(--sans);color:var(--ink-3);background:var(--sunk);
+          border-right:1px solid var(--rule-2)}
+.seg span:last-child{border-right:0}
+.seg span.on{background:#0F3A36;color:#8FEDE3}
+.grp{font:600 9px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);
+     margin:14px 0 2px;padding-top:9px;border-top:1px solid #232A30}
+.grp:first-child{margin-top:0;padding-top:0;border-top:0}
+.more{margin-top:11px;border:1px dashed #33404A;border-radius:4px;background:#0F1418;
+      padding:7px 9px;font-size:10px;color:var(--ink-4);display:flex;justify-content:space-between;
+      align-items:center;gap:8px}
+.more b{color:var(--ink-3);font-weight:600}
+
+/* count badges on the "today" plate */
+.stack{display:flex;gap:10px;align-items:flex-start;min-width:max-content}
+.mini{width:176px;flex:0 0 176px;background:var(--dock);border:1px solid var(--rule);border-radius:5px}
+.mini > .h{padding:6px 8px;border-bottom:1px solid var(--rule);background:#172129;
+           display:flex;justify-content:space-between;align-items:center;gap:6px}
+.mini > .h b{font-size:10.5px;font-weight:600}
+.mini > .h i{font:600 9px/1 var(--mono);font-style:normal;color:var(--warn);
+             border:1px solid #4A3A1C;background:#241d10;border-radius:3px;padding:2px 4px}
+.mini > .b{padding:7px 8px 9px}
+.ln{height:19px;border-radius:3px;background:#0E1317;border:1px solid #29333B;margin-top:4px;
+    display:flex;align-items:center;padding:0 6px;font:400 9px/1 var(--mono);color:#6C7A85;
+    white-space:nowrap;overflow:hidden}
+.ln.w{width:70%} .ln.w2{width:84%} .ln.w3{width:58%}
+.fade{position:relative;height:34px;margin-top:2px;
+      background:linear-gradient(#0E1317 0,#0E131700 100%);border-radius:3px;overflow:hidden}
+.fade .ln{opacity:.5}
+.ellip{text-align:center;color:var(--ink-4);font:600 12px/1 var(--mono);padding:5px 0 1px}
+
+/* canvas plate */
+.canvas{background:#181818;border:1px solid var(--rule);border-radius:5px;
+        position:relative;overflow:hidden}
+.artboard{background:
+   linear-gradient(#ffffff06 1px,transparent 1px) 0 0/12px 12px,
+   linear-gradient(90deg,#ffffff06 1px,transparent 1px) 0 0/12px 12px,
+   #101214;position:relative}
+.wsel{position:absolute;border:1px solid var(--teal);border-radius:2px}
+.wsel .tag{position:absolute;top:-17px;left:-1px;background:var(--teal);color:#04211E;
+           font:700 9px/1 var(--sans);padding:3px 5px;border-radius:2px;white-space:nowrap}
+.hnd{position:absolute;width:7px;height:7px;background:#0E1317;border:1.5px solid var(--teal);
+     border-radius:50%}
+.hnd.sq{border-radius:1px;background:var(--teal)}
+.gizmo{position:absolute;background:#0B1416;border:1px solid var(--teal-dim);border-radius:3px;
+       color:#8FEDE3;font:600 9px/1 var(--mono);padding:3px 5px;white-space:nowrap}
+.gutter{background:#12171B;border-left:1px solid var(--rule);width:150px;flex:0 0 150px;padding:8px}
+.gutter .gh{font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+            color:var(--ink-4);margin-bottom:7px}
+.pin{display:flex;align-items:center;gap:6px;background:#0E1418;border:1px solid #26313A;
+     border-radius:4px;padding:5px 6px;margin-top:5px}
+.pin i{width:6px;height:6px;border-radius:50%;background:var(--teal);flex:0 0 6px;font-style:normal}
+.pin b{font-size:10px;font-weight:600;color:var(--ink-2)}
+.pin s{margin-left:auto;font:400 9px/1 var(--mono);color:var(--ink-4);text-decoration:none}
+.pin.off i{background:#3E4A52}
+
+/* palette + tree */
+.rail{width:186px;flex:0 0 186px;background:#15181B;border:1px solid var(--rule);border-radius:5px;padding:8px}
+.railh{font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);
+       margin:10px 0 6px}
+.railh:first-child{margin-top:0}
+.wgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.wg{aspect-ratio:1;border:1px solid #29333B;border-radius:4px;background:#0F1317;
+    display:flex;align-items:center;justify-content:center}
+.wg.on{border-color:var(--teal);background:#0B2320}
+.tree{width:280px;flex:0 0 280px;background:var(--dock);border:1px solid var(--rule);border-radius:5px}
+.tr{display:flex;align-items:center;gap:7px;padding:5px 9px;border-bottom:1px solid #1F262C;font-size:11px}
+.tr.on{background:var(--blue-surface)}
+.tr .ic{width:16px;height:16px;border-radius:3px;flex:0 0 16px;display:flex;align-items:center;justify-content:center}
+.tr .nm{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr.on .nm{color:#EAF5FF}
+.tr .ty{margin-left:auto;font:500 9px/1 var(--mono);color:var(--ink-4);white-space:nowrap}
+.tr.child{padding-left:26px}
+.tr.child .nm{color:var(--ink-4)}
+.badge{border:1px solid var(--teal-dim);background:#0B2320;color:#8FEDE3;
+       font:600 9px/1 var(--mono);border-radius:3px;padding:2px 4px}
+
+/* before/after columns */
+.ba{display:flex;gap:14px;align-items:flex-start;min-width:max-content}
+.ba > div{min-width:0}
+.balabel{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+         color:var(--ink-4);margin-bottom:8px}
+.balabel.a{color:var(--teal)}
+.arrowcol{display:flex;align-items:center;align-self:stretch;color:var(--ink-4);font-size:20px;padding:0 2px}
+
+/* counts table */
+.cmp{width:100%;border-collapse:collapse;margin-top:22px;font-size:14px}
+.cmp th{text-align:left;font:600 10px/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;
+        color:var(--ink-4);padding:0 12px 9px 0;border-bottom:1px solid var(--rule-2)}
+.cmp td{padding:11px 12px 11px 0;border-bottom:1px solid var(--rule);vertical-align:top;color:var(--ink-2)}
+.cmp td:first-child{color:var(--ink);font-weight:600;width:40%}
+.cmp td.n{font:600 14px/1 var(--mono);text-align:right;width:16%;color:var(--warn)}
+.cmp td.n.g{color:var(--teal)}
+.cmp tr.total td{border-bottom:0;padding-top:14px}
+.cmp tr.total td:first-child{color:var(--ink)}
+.cmp tr.total td.n{font-size:18px}
+
+@media (max-width:640px){
+  .wrap{padding-left:16px;padding-right:16px}
+  .plate-scroll{padding:12px}
+}
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; custom component creator &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>A widget model, drawn</h1>
+  <p class="lede">Six mockups of the proposal in
+    <a href="widget-model-creator-plan.md" style="color:var(--teal)">widget-model-creator-plan.md</a>:
+    what one dial costs to author today, what a widget inspector would hold instead, and the
+    on-canvas handles that replace the number fields.</p>
+  <div class="warnbar"><b>Nothing here is built.</b> These are drawings, not screenshots. Every
+    colour and control metric is taken from the real surface so the pictures sit next to the
+    application honestly, but no code in this repository produces any of these screens.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>What one dial costs today</h2>
+  <p>To author a single dial an author visits six editors. Every panel below is a real editor in the
+    current creator, and the amber badge is the number of leaf fields that editor can reach for this
+    one control. None of these six knows about the other five: they are joined by matching name
+    strings such as <code>targetBehavior: 'mainSlider'</code>.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui stack">
+
+        <div class="mini">
+          <div class="h"><b>Layout</b><i>30</i></div>
+          <div class="b">
+            <div class="ln">x 50 · y 50 · unit %</div>
+            <div class="ln w2">w 100 · h 100 · unit px</div>
+            <div class="ln w">anchorX centre</div>
+            <div class="ln w3">anchorY centre</div>
+            <div class="ln w2">rotation 0 · scale 1</div>
+            <div class="ln w">pivotX 50 · pivotY 50</div>
+            <div class="fade"><div class="ln w2">padding L/R/T/B</div><div class="ln w">offsetX · offsetY</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="h"><b>Background</b><i>234</i></div>
+          <div class="b">
+            <div class="ln">Fill · colour · gradient</div>
+            <div class="ln w2">Fill · solidEnabled</div>
+            <div class="ln w">Border · thickness</div>
+            <div class="ln w2">Border · per-segment ×4</div>
+            <div class="ln w3">Corners · radius</div>
+            <div class="ln w2">Corners · per-corner ×4</div>
+            <div class="fade"><div class="ln w2">Corners · style, bevel…</div><div class="ln w">Border · dash, inset…</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="h"><b>ValueChannel</b><i>23</i></div>
+          <div class="b">
+            <div class="ln">min 0 · max 1 · step .01</div>
+            <div class="ln w2">defaultValue 0.5</div>
+            <div class="ln w">type float</div>
+            <div class="ln w2">format · precision, suffix</div>
+            <div class="ln w3">snap · curve</div>
+            <div class="ln w2">publicInput · publicOutput</div>
+            <div class="fade"><div class="ln w2">constraints · paired…</div><div class="ln w">deviceBindable</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="h"><b>Behavior</b><i>13</i></div>
+          <div class="b">
+            <div class="ln">type dial · role dial</div>
+            <div class="ln w2">valueChannel mainValue</div>
+            <div class="ln w">geometry circular</div>
+            <div class="ln w2">dragMode auto</div>
+            <div class="ln w3">reverseMouseDirection</div>
+            <div class="ln w2">interaction · pointer…</div>
+            <div class="fade"><div class="ln w2">interaction · wheel, keys</div><div class="ln w">enabled</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="h"><b>HitZone</b><i>22</i></div>
+          <div class="b">
+            <div class="ln">shape circle</div>
+            <div class="ln w2">source part:ring</div>
+            <div class="ln w">targetBehavior …</div>
+            <div class="ln w2">targetValueChannel …</div>
+            <div class="ln w3">inflate x/y · minTouch</div>
+            <div class="ln w2">cursor · priority · action</div>
+            <div class="fade"><div class="ln w2">condition · bounds…</div><div class="ln w">visibleInEditor</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+        <div class="mini">
+          <div class="h"><b>Text</b><i>185</i></div>
+          <div class="b">
+            <div class="ln">content · Fill colour</div>
+            <div class="ln w2">Font · family, size, weight</div>
+            <div class="ln w">Position · justification</div>
+            <div class="ln w2">Effects · shadow ×n</div>
+            <div class="ln w3">Multiline · wrap, lines</div>
+            <div class="ln w2">Effects · outline, glow</div>
+            <div class="fade"><div class="ln w2">Position · offset, rotate</div><div class="ln w">Font · tracking…</div></div>
+            <div class="ellip">⋮</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 1</div>
+      <p class="ct">The six editors visited for one dial, with the leaf-field count each one can
+        reach. Drawn from <code>sectionDefaults.js</code> and <code>customComponentFactory.js</code>.</p>
+    </div>
+  </div>
+
+  <table class="cmp">
+    <tr><th>Editor</th><th style="text-align:right">Fields</th><th>Of which a dial actually needs</th></tr>
+    <tr><td>Part + Layout</td><td class="n">30</td><td>position and size — 4</td></tr>
+    <tr><td>Background</td><td class="n">234</td><td>track colour and thickness — 2</td></tr>
+    <tr><td>Text</td><td class="n">185</td><td>usually none</td></tr>
+    <tr><td>ValueChannel</td><td class="n">23</td><td>min, max, default, step — 4</td></tr>
+    <tr><td>Behavior</td><td class="n">13</td><td>drag axis — 1</td></tr>
+    <tr><td>HitZone</td><td class="n">22</td><td>none, if the widget owns it</td></tr>
+    <tr class="total"><td>Reachable for one dial</td><td class="n">~507</td><td style="color:var(--teal)">In practice about 8</td></tr>
+  </table>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>The widget inspector</h2>
+  <p>The same dial, selected as a widget. Eight controls, one panel, no name strings. The
+    <b>More</b> footer is the only route to the 500 fields, and it opens the existing editors
+    unchanged — nothing is deleted, it just stops being the default path.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+
+        <div>
+          <div class="balabel">Today — four tabs, and five other editors elsewhere</div>
+          <div class="dockpane">
+            <div class="dockhead"><strong>ring</strong><span>Part · rectangle</span></div>
+            <div class="tabs">
+              <button class="on">Object</button><button>Display</button>
+              <button>Behavior</button><button>Preview</button>
+            </div>
+            <div class="body">
+              <div class="grp">Frame</div>
+              <div class="row"><label>X / Y</label><div class="fields"><span class="f n">36</span><span class="f n">36</span></div></div>
+              <div class="row"><label>W / H</label><div class="fields"><span class="f n">108</span><span class="f n">108</span></div></div>
+              <div class="row"><label>Rotation</label><div class="fields"><span class="f n">0</span></div></div>
+              <div class="grp">Paint</div>
+              <div class="row"><label>Fill</label><div class="fields"><span class="sw" style="background:#2B3742"></span><span class="f">2B3742</span></div></div>
+              <div class="row"><label>Border</label><div class="fields"><span class="sw" style="background:rgba(255,255,255,.33)"></span><span class="f n">1</span></div></div>
+              <div class="row"><label>Radius</label><div class="fields"><span class="f n">54</span></div></div>
+              <div class="grp">Arc</div>
+              <div class="row"><label>Start</label><div class="fields"><span class="f n">-135</span></div></div>
+              <div class="row"><label>Sweep</label><div class="fields"><span class="f n">270</span></div></div>
+              <div class="row"><label>Thickness</label><div class="fields"><span class="f n">6</span></div></div>
+              <div class="row"><label>Direction</label><div class="fields"><span class="f sel">cw</span></div></div>
+              <div class="more" style="border-color:#4A3A1C;background:#241d10;color:#F1D8A1">
+                <span>Value, drag feel, grab area and publishing are in
+                  <b style="color:var(--warn)">five other editors</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel a">Proposed — one widget, eight controls</div>
+          <div class="dockpane">
+            <div class="dockhead"><strong>Cutoff</strong><span>Dial widget</span></div>
+            <div class="tabs">
+              <button class="on">Essentials</button><button>Style</button><button>Advanced</button>
+            </div>
+            <div class="body">
+              <div class="grp">Value</div>
+              <div class="row"><label>Range</label><div class="fields">
+                <span class="f n">0</span><span style="color:var(--ink-4);font-size:10px">to</span><span class="f n">127</span>
+                <span style="color:var(--ink-4);font-size:10px">def</span><span class="f n">64</span></div></div>
+              <div class="row"><label>Steps</label><div class="fields"><div class="seg" style="flex:1">
+                <span class="on">Smooth</span><span>Stepped</span><span>List</span></div></div></div>
+              <div class="grp">Shape</div>
+              <div class="row"><label>Arc</label><div class="fields">
+                <span class="f" style="flex:1;color:#8FEDE3;border-color:var(--teal-dim);background:#0B1416">−135° → 135°&nbsp; ✎ on canvas</span></div></div>
+              <div class="grp">Paint</div>
+              <div class="row"><label>Track</label><div class="fields"><span class="sw" style="background:#2B3742"></span><span class="f n">6</span></div></div>
+              <div class="row"><label>Fill</label><div class="fields"><span class="sw" style="background:#14B8A6"></span><span class="f">14B8A6</span></div></div>
+              <div class="row"><label>Pointer</label><div class="fields"><span class="f sel" style="flex:1">Line</span><span class="sw" style="background:#E8EEF5"></span></div></div>
+              <div class="grp">Feel</div>
+              <div class="row"><label>Drag</label><div class="fields"><div class="seg" style="flex:1">
+                <span>Circular</span><span class="on">Vertical</span><span>Both</span></div></div></div>
+              <div class="grp">Publish</div>
+              <div class="row"><label>Name</label><div class="fields"><span class="f">cutoff</span>
+                <span class="tog on"></span></div></div>
+              <div class="more">
+                <span><b>8 of 8</b> &nbsp;·&nbsp; every other field, unchanged</span>
+                <b>More ▸</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 2</div>
+      <p class="ct">Left: the dial's ring part as the inspector shows it now, with a note of where
+        the rest lives. Right: the proposed widget inspector. Eight controls is the cap, checked by
+        a unit test over the widget manifest.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 3</div>
+  <h2>Handles instead of number fields</h2>
+  <p>The properties that are spatial are edited on the artboard. Arc start and sweep become two
+    draggable end points; LED and step counts become a handle you pull; the grab area becomes a
+    dashed outline you drag outward. All three are numbers in a tab today.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui" style="display:flex;min-width:max-content;border:1px solid var(--rule);border-radius:5px;overflow:hidden">
+
+        <div class="artboard" style="width:520px;height:330px">
+
+          <!-- dial with arc handles -->
+          <svg width="180" height="180" viewBox="0 0 180 180" style="position:absolute;left:26px;top:52px">
+            <path d="M 49 131 A 58 58 0 1 1 131 131" fill="none" stroke="#2B3742" stroke-width="9" stroke-linecap="round"/>
+            <path d="M 49 131 A 58 58 0 0 1 127.7 45.9" fill="none" stroke="#14B8A6" stroke-width="9" stroke-linecap="round"/>
+            <circle cx="90" cy="90" r="34" fill="#171B1F" stroke="#333E47" stroke-width="1"/>
+            <line x1="103" y1="74.8" x2="122.5" y2="52" stroke="#E8EEF5" stroke-width="3" stroke-linecap="round"/>
+            <!-- guide radii to the arc ends -->
+            <line x1="90" y1="90" x2="49" y2="131" stroke="#14B8A6" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
+            <line x1="90" y1="90" x2="131" y2="131" stroke="#14B8A6" stroke-width="1" stroke-dasharray="3 3" opacity=".65"/>
+          </svg>
+          <div class="wsel" style="left:32px;top:58px;width:168px;height:168px;border-radius:50%">
+            <span class="tag" style="left:50%;transform:translateX(-50%)">Dial · Cutoff</span>
+          </div>
+          <div class="hnd" style="left:71px;top:179px"></div>
+          <div class="hnd" style="left:153px;top:179px"></div>
+          <div class="gizmo" style="left:20px;top:196px">start −135°</div>
+          <div class="gizmo" style="left:150px;top:196px">sweep 270°</div>
+
+          <!-- step bar with count handle -->
+          <div style="position:absolute;left:238px;top:74px;width:248px">
+            <div style="display:flex;gap:4px;align-items:flex-end;height:52px">
+              <div style="flex:1;height:16px;border-radius:2px;background:#14B8A6"></div>
+              <div style="flex:1;height:26px;border-radius:2px;background:#14B8A6"></div>
+              <div style="flex:1;height:40px;border-radius:2px;background:#14B8A6"></div>
+              <div style="flex:1;height:52px;border-radius:2px;background:#14B8A6"></div>
+              <div style="flex:1;height:38px;border-radius:2px;background:#14B8A6"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#2B3742"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#2B3742"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#2B3742"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#2B3742"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#1F2830;opacity:.55"></div>
+              <div style="flex:1;height:22px;border-radius:2px;background:#1F2830;opacity:.35"></div>
+            </div>
+          </div>
+          <div class="wsel" style="left:232px;top:68px;width:260px;height:64px">
+            <span class="tag">Step Bar · Levels</span>
+          </div>
+          <div class="hnd sq" style="left:489px;top:96px;cursor:ew-resize"></div>
+          <div class="gizmo" style="left:432px;top:140px">◂ drag: 11 steps</div>
+
+          <!-- toggle with inflate outline -->
+          <div style="position:absolute;left:250px;top:212px;width:104px;height:34px;
+                      border-radius:6px;background:#20272E;border:1px solid #3B4650;
+                      display:flex;align-items:center;justify-content:center;
+                      font:600 11px/1 var(--sans);color:#B9C8D4">SYNC</div>
+          <div class="wsel" style="left:249px;top:211px;width:106px;height:36px;border-radius:6px">
+            <span class="tag">Toggle · Sync</span>
+          </div>
+          <div style="position:absolute;left:237px;top:199px;width:130px;height:60px;
+                      border:1px dashed var(--teal);border-radius:9px;opacity:.75"></div>
+          <div class="hnd" style="left:363px;top:225px"></div>
+          <div class="gizmo" style="left:374px;top:265px">grab +12px</div>
+        </div>
+
+        <div class="gutter">
+          <div class="gh">Published</div>
+          <div class="pin"><i></i><b>cutoff</b><s>0–127</s></div>
+          <div class="pin"><i></i><b>levels</b><s>array</s></div>
+          <div class="pin"><i></i><b>sync</b><s>bool</s></div>
+          <div class="pin off"><i></i><b>resonance</b><s>hidden</s></div>
+          <div style="margin-top:12px;font-size:10px;color:var(--ink-4);line-height:1.45">
+            Each pin links to the widget that owns it. An empty gutter means the component
+            publishes nothing — visible without opening a tab.
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 3</div>
+      <p class="ct">Three handle types and the publish gutter. The dashed grab outline is already
+        drawn today as the hit-zone overlay; it is not yet draggable as an <code>inflate</code> value.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 4</div>
+  <h2>The palette and the layer tree</h2>
+  <p>The left rail leads with widgets rather than shapes. Shapes stay — a rounded rectangle is still
+    a rounded rectangle — but they stop being the way in. In the tree a widget is one row that
+    expands, instead of the eleven unrelated rows a starter leaves behind today.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+
+        <div class="rail">
+          <div class="railh">Widgets</div>
+          <div class="wgrid">
+            <div class="wg on"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#14B8A6" stroke-width="2"/><line x1="10" y1="10" x2="10" y2="4" stroke="#14B8A6" stroke-width="2"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="9" width="16" height="2" fill="#8FA4B0"/><rect x="11" y="5" width="4" height="10" rx="1" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="6" width="16" height="8" rx="4" fill="none" stroke="#8FA4B0" stroke-width="1.6"/><circle cx="13" cy="10" r="2.4" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3" y="5" width="14" height="10" rx="2" fill="none" stroke="#8FA4B0" stroke-width="1.6"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1.5" fill="none" stroke="#8FA4B0" stroke-width="1.4"/><circle cx="12" cy="8" r="2" fill="#8FA4B0"/><line x1="3" y1="8" x2="17" y2="8" stroke="#8FA4B0" stroke-width=".7"/><line x1="12" y1="3" x2="12" y2="17" stroke="#8FA4B0" stroke-width=".7"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="9" width="16" height="2" fill="#8FA4B0"/><circle cx="6" cy="10" r="2.6" fill="#8FA4B0"/><circle cx="14" cy="10" r="2.6" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#3B4650" stroke-width="1"/><circle cx="10" cy="3.4" r="1.4" fill="#8FA4B0"/><circle cx="15.6" cy="6.7" r="1.4" fill="#8FA4B0"/><circle cx="15.6" cy="13.3" r="1.4" fill="#3B4650"/><circle cx="10" cy="16.6" r="1.4" fill="#3B4650"/><circle cx="4.4" cy="13.3" r="1.4" fill="#3B4650"/><circle cx="4.4" cy="6.7" r="1.4" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3" y="11" width="2.4" height="5" fill="#8FA4B0"/><rect x="7" y="7" width="2.4" height="9" fill="#8FA4B0"/><rect x="11" y="4" width="2.4" height="12" fill="#8FA4B0"/><rect x="15" y="9" width="2.4" height="7" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><line x1="10" y1="2" x2="10" y2="5" stroke="#8FA4B0" stroke-width="1.4"/><line x1="16" y1="6" x2="13.5" y2="7.5" stroke="#8FA4B0" stroke-width="1.4"/><line x1="4" y1="6" x2="6.5" y2="7.5" stroke="#8FA4B0" stroke-width="1.4"/><circle cx="10" cy="11" r="5" fill="none" stroke="#3B4650" stroke-width="1"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="4" width="16" height="12" fill="none" stroke="#8FA4B0" stroke-width="1.2"/><rect x="4.5" y="4" width="2" height="7" fill="#8FA4B0"/><rect x="9" y="4" width="2" height="7" fill="#8FA4B0"/><rect x="13.5" y="4" width="2" height="7" fill="#8FA4B0"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M3 15 L7 6 L11 12 L17 5" fill="none" stroke="#8FA4B0" stroke-width="1.6"/></svg></div>
+            <div class="wg"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="6" width="16" height="8" rx="1" fill="none" stroke="#8FA4B0" stroke-width="1.3"/><text x="10" y="13" font-size="7" font-family="monospace" fill="#8FA4B0" text-anchor="middle">64</text></svg></div>
+          </div>
+          <div class="railh">Shapes</div>
+          <div class="wgrid">
+            <div class="wg"><svg width="18" height="18" viewBox="0 0 18 18"><rect x="3" y="4" width="12" height="10" fill="none" stroke="#65717C" stroke-width="1.4"/></svg></div>
+            <div class="wg"><svg width="18" height="18" viewBox="0 0 18 18"><rect x="3" y="4" width="12" height="10" rx="3" fill="none" stroke="#65717C" stroke-width="1.4"/></svg></div>
+            <div class="wg"><svg width="18" height="18" viewBox="0 0 18 18"><ellipse cx="9" cy="9" rx="6" ry="5" fill="none" stroke="#65717C" stroke-width="1.4"/></svg></div>
+            <div class="wg"><svg width="18" height="18" viewBox="0 0 18 18"><text x="9" y="13" font-size="11" font-family="serif" fill="#65717C" text-anchor="middle">T</text></svg></div>
+          </div>
+          <div style="margin-top:12px;font-size:9.5px;color:var(--ink-4);line-height:1.5">
+            Dial · Slider · Toggle · Button · XY Pad · Range · LED Ring · Step Bar · Ticks · Keys ·
+            Envelope · Readout
+          </div>
+        </div>
+
+        <div>
+          <div class="balabel">Today — after applying <code style="font-size:11px">starter.circularTickSlider</code></div>
+          <div class="tree">
+            <div class="tr"><span class="ic" style="background:#2B3742"></span><span class="nm">background</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#2B3742"></span><span class="nm">ring</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#14B8A6"></span><span class="nm">valueArc</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#E8EEF5"></span><span class="nm">pointer</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#3B4650"></span><span class="nm">tickMajor_1…12</span><span class="ty">generated</span></div>
+            <div class="tr"><span class="ic" style="background:#3B4650"></span><span class="nm">tickMinor_1…36</span><span class="ty">generated</span></div>
+            <div class="tr"><span class="ic" style="background:#1F2830"></span><span class="nm">mainDragArea</span><span class="ty">zone</span></div>
+            <div class="tr" style="border-bottom:0;padding-top:8px;padding-bottom:8px">
+              <span class="nm" style="color:var(--warn);font-size:10px;white-space:normal;overflow:visible">
+                + mainValue, mainSlider, ticks — in three other tabs</span></div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel a">Proposed — the same thing, as two widgets</div>
+          <div class="tree">
+            <div class="tr on"><span class="ic" style="background:#0B2320;border:1px solid var(--teal)">
+              <svg width="10" height="10" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="none" stroke="#14B8A6" stroke-width="2.6"/></svg></span>
+              <span class="nm">Cutoff</span><span class="badge">Dial</span></div>
+            <div class="tr child"><span class="ic" style="background:#2B3742"></span><span class="nm">ring</span><span class="ty">owned</span></div>
+            <div class="tr child"><span class="ic" style="background:#14B8A6"></span><span class="nm">valueArc</span><span class="ty">owned</span></div>
+            <div class="tr child"><span class="ic" style="background:#E8EEF5"></span><span class="nm">pointer</span><span class="ty">owned</span></div>
+            <div class="tr child"><span class="ic" style="background:#1F2830"></span><span class="nm">grab area</span><span class="ty">owned</span></div>
+            <div class="tr"><span class="ic" style="background:#0B2320;border:1px solid var(--teal-dim)">
+              <svg width="10" height="10" viewBox="0 0 20 20"><line x1="10" y1="2" x2="10" y2="6" stroke="#14B8A6" stroke-width="3"/></svg></span>
+              <span class="nm">Scale</span><span class="badge">Ticks</span></div>
+            <div class="tr"><span class="ic" style="background:#2B3742"></span><span class="nm">background</span><span class="ty">part</span></div>
+            <div class="tr" style="border-bottom:0;padding-top:8px;padding-bottom:8px">
+              <span class="nm" style="color:var(--teal);font-size:10px;white-space:normal;overflow:visible">
+                Two selectable objects. Nothing hidden — the owned rows expand.</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 4</div>
+      <p class="ct">Left: the proposed palette. Middle: what a starter leaves in the tree today.
+        Right: the same component with the grouping stored rather than inferred.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 5</div>
+  <h2>Unpack</h2>
+  <p>One command, one direction. The widget node is deleted, its parts, channel, behavior and zone
+    are released into the flat lists, and nothing rebuilds over the top afterwards. This is Figma's
+    "detach instance" and Illustrator's "expand", and it reuses the scissors control already in the
+    inspector header for generated layers.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+
+        <div>
+          <div class="balabel a">Before — a widget</div>
+          <div class="dockpane" style="width:290px;flex:0 0 290px">
+            <div class="dockhead"><strong>Cutoff</strong><span>Dial widget</span></div>
+            <div class="body">
+              <div class="row"><label>Range</label><div class="fields"><span class="f n">0</span><span class="f n">127</span></div></div>
+              <div class="row"><label>Track</label><div class="fields"><span class="sw" style="background:#2B3742"></span><span class="f n">6</span></div></div>
+              <div class="row"><label>Publish</label><div class="fields"><span class="f">cutoff</span><span class="tog on"></span></div></div>
+              <div style="margin-top:14px;padding-top:11px;border-top:1px solid #232A30">
+                <div style="display:flex;align-items:center;gap:7px;border:1px solid #4A3A1C;
+                            background:#241d10;border-radius:4px;padding:7px 9px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E5A029" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                  <b style="color:#F1D8A1;font-size:10.5px;font-weight:600">Unpack widget</b>
+                </div>
+                <div style="font-size:9.5px;color:var(--ink-4);margin-top:6px;line-height:1.5">
+                  Releases 4 parts, 1 channel, 1 behavior and 1 zone. Cannot be undone by
+                  re-grouping — you would build a new widget.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel">After — the graph, exactly as it is today</div>
+          <div class="tree" style="width:290px;flex:0 0 290px">
+            <div class="tr"><span class="ic" style="background:#2B3742"></span><span class="nm">ring</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#14B8A6"></span><span class="nm">valueArc</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#E8EEF5"></span><span class="nm">pointer</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#2B3742"></span><span class="nm">cap</span><span class="ty">part</span></div>
+            <div class="tr"><span class="ic" style="background:#1F2830"></span><span class="nm">cutoffZone</span><span class="ty">zone</span></div>
+            <div class="tr"><span class="ic" style="background:#243746"></span><span class="nm">cutoffValue</span><span class="ty">channel</span></div>
+            <div class="tr" style="border-bottom:0"><span class="ic" style="background:#243746"></span><span class="nm">cutoffBehavior</span><span class="ty">behavior</span></div>
+          </div>
+          <div style="font-size:10px;color:var(--ink-4);margin-top:9px;max-width:290px;line-height:1.5">
+            Same names, same values, same runtime output. The only thing lost is the eight-control
+            panel.
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 5</div>
+      <p class="ct">Unpack is one-way on purpose. A two-way link between a spec and hand-edited
+        output is where this kind of feature usually causes silent data loss.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 6</div>
+  <h2>Does the eight-control cap hold?</h2>
+  <p>It has to hold for every widget type, or it is not a cap. Three more inspectors, drawn to the
+    same rule. If a type cannot be useful in eight controls, that is evidence the type is wrong —
+    the fix is fewer, broader widget types, not a bigger panel.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui" style="display:flex;gap:12px;min-width:max-content">
+
+        <div class="dockpane" style="width:250px;flex:0 0 250px">
+          <div class="dockhead"><strong>Volume</strong><span>Slider widget</span></div>
+          <div class="body">
+            <div class="row"><label>Range</label><div class="fields"><span class="f n">-60</span><span class="f n">6</span></div></div>
+            <div class="row"><label>Default</label><div class="fields"><span class="f n">0</span></div></div>
+            <div class="row"><label>Axis</label><div class="fields"><div class="seg" style="flex:1"><span>Horiz</span><span class="on">Vert</span></div></div></div>
+            <div class="row"><label>Track</label><div class="fields"><span class="sw" style="background:#2B3742"></span><span class="f n">4</span></div></div>
+            <div class="row"><label>Fill</label><div class="fields"><span class="sw" style="background:#14B8A6"></span><span class="f">14B8A6</span></div></div>
+            <div class="row"><label>Handle</label><div class="fields"><span class="f sel" style="flex:1">Capsule</span></div></div>
+            <div class="row"><label>Steps</label><div class="fields"><div class="seg" style="flex:1"><span class="on">Smooth</span><span>Stepped</span></div></div></div>
+            <div class="row"><label>Publish</label><div class="fields"><span class="f">volume</span><span class="tog on"></span></div></div>
+            <div class="more"><span>8 of 8</span><b>More ▸</b></div>
+          </div>
+        </div>
+
+        <div class="dockpane" style="width:250px;flex:0 0 250px">
+          <div class="dockhead"><strong>Levels</strong><span>LED Ring widget</span></div>
+          <div class="body">
+            <div class="row"><label>Count</label><div class="fields">
+              <span class="f n">16</span><span style="font-size:9px;color:var(--teal)">✎ canvas</span></div></div>
+            <div class="row"><label>Range</label><div class="fields"><span class="f n">0</span><span class="f n">127</span></div></div>
+            <div class="row"><label>Arc</label><div class="fields">
+              <span class="f" style="flex:1;color:#8FEDE3;border-color:var(--teal-dim);background:#0B1416">−140° → 140°</span></div></div>
+            <div class="row"><label>Lit</label><div class="fields"><span class="sw" style="background:#14B8A6"></span><span class="f">14B8A6</span></div></div>
+            <div class="row"><label>Unlit</label><div class="fields"><span class="sw" style="background:#2B3742"></span><span class="f">2B3742</span></div></div>
+            <div class="row"><label>LED size</label><div class="fields"><span class="f n">9</span></div></div>
+            <div class="row"><label>Mode</label><div class="fields"><div class="seg" style="flex:1"><span class="on">Fill</span><span>Single</span><span>Centre</span></div></div></div>
+            <div class="row"><label>Publish</label><div class="fields"><span class="f">levels</span><span class="tog on"></span></div></div>
+            <div class="more"><span>8 of 8</span><b>More ▸</b></div>
+          </div>
+        </div>
+
+        <div class="dockpane" style="width:250px;flex:0 0 250px">
+          <div class="dockhead"><strong>Sync</strong><span>Toggle widget</span></div>
+          <div class="body">
+            <div class="row"><label>Label</label><div class="fields"><span class="f">SYNC</span></div></div>
+            <div class="row"><label>Default</label><div class="fields"><div class="seg" style="flex:1"><span class="on">Off</span><span>On</span></div></div></div>
+            <div class="row"><label>Action</label><div class="fields"><div class="seg" style="flex:1"><span class="on">Toggle</span><span>Hold</span></div></div></div>
+            <div class="row"><label>Off</label><div class="fields"><span class="sw" style="background:#20272E"></span><span class="f">20272E</span></div></div>
+            <div class="row"><label>On</label><div class="fields"><span class="sw" style="background:#14B8A6"></span><span class="f">14B8A6</span></div></div>
+            <div class="row"><label>Shape</label><div class="fields"><span class="f sel" style="flex:1">Rounded</span></div></div>
+            <div class="row"><label>Grab</label><div class="fields">
+              <span class="f n">+12</span><span style="font-size:9px;color:var(--teal)">✎ canvas</span></div></div>
+            <div class="row"><label>Publish</label><div class="fields"><span class="f">sync</span><span class="tog on"></span></div></div>
+            <div class="more"><span>8 of 8</span><b>More ▸</b></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 6</div>
+      <p class="ct">Slider, LED Ring and Toggle at the same budget. The ✎ marks are properties whose
+        primary editor is a canvas handle; the number field is the readout, not the way in.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <h2>What these drawings assume</h2>
+  <p>Worth stating, because a mockup can quietly assume a decision that has not been made:</p>
+  <ul>
+    <li><b>Widgets do not nest.</b> There is no "Filter Section" widget containing three dials.
+      That is deliberately out of scope for the first five phases; the package and library system
+      is the composition story instead.</li>
+    <li><b>A widget owns its primitives exclusively.</b> The child rows in Plate 4 are readable and
+      selectable, but not independently editable while the widget exists. Editing them means Unpack.</li>
+    <li><b>The runtime does not change.</b> Everything drawn here compiles down to the Parts,
+      ValueChannels, Behaviors and HitZones the player renders today. The player never sees a widget.</li>
+    <li><b>Advanced mode survives.</b> The <b>More ▸</b> footer opens the existing editors unchanged.
+      Nothing in the current creator is removed.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="widget-model-creator-plan.md" style="color:var(--teal)">widget-model-creator-plan.md</a>.
+    Colours read out of <code>CustomDesignSurfaceEditor.svelte</code>. Nothing here is built.</p>
+</section>
+
+</div>
