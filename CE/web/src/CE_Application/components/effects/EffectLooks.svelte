@@ -20,14 +20,22 @@
   let looks = $derived(looksFor(domain));
 </script>
 
+<!--
+  A radiogroup, not a list. These are mutually exclusive — applying one replaces the whole stack, and
+  `current` marks the one in force — so `role="radio"` with `aria-checked` says what the buttons
+  actually do. It was `role="list"` with `role="listitem"` buttons, which Svelte rejects outright
+  (`a11y_no_interactive_element_to_noninteractive_role`): a button is interactive and a list item is
+  not. The warning was the right complaint about the wrong markup rather than a rule to silence.
+-->
 {#if looks.length}
-  <div class="looks" role="list">
+  <div class="looks" role="radiogroup" aria-label={`${domain} looks`}>
     {#each looks as look (look.id)}
       <button
         type="button"
         class="look"
         class:on={look.id === current}
-        role="listitem"
+        role="radio"
+        aria-checked={look.id === current}
         title={`Apply the ${look.label} look — replaces the whole stack`}
         onclick={() => onapply(look)}
       >
