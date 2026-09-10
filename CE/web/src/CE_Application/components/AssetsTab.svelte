@@ -6,9 +6,10 @@
    * things are worth knowing before editing this file.
    *
    * FIRST, the tab exists because of a defect, not only because of space. `InteractivePartRenderer`
-   * slices a filmstrip with proportional CSS background positioning, so a strip whose length along
-   * the frame axis does not divide evenly by its frame count renders frames that drift. Nothing in
-   * the application has ever checked that, and the check is one modulo — see `utils/assetsModel.js`.
+   * takes the whole strip image to be exactly `frameCount` frames, so a file carrying anything else
+   * — stray rows, or a count that is simply wrong — is sliced at the wrong pitch and the error grows
+   * to a whole frame or more by the end. Nothing in the application has ever checked that, and the
+   * check is one modulo. `utils/assetsModel.js` has the mechanism, measured rather than assumed.
    * Running it needs the image's NATURAL size, which the asset does not store, so this file
    * measures and caches it. That measurement is never written back on its own: recording it is an
    * action the user takes, because a tab that dirties the document by being opened is a tab people

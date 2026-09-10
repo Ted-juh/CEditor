@@ -39,17 +39,40 @@ background-size: 100% ${frameCount * 100}%
 background-position: 0% ${(frameIndex / (frameCount - 1)) * 100}%
 ```
 
-That is proportional, not pixel-snapped. So if the strip's height does not divide evenly by
-`frameCount` the frames drift, and at the extremes a frame shows a sliver of its neighbour. A
-128-frame strip baked at 127, or imported with the wrong count typed in, is broken in a way that
-looks like a rendering bug.
+> **Corrected 2026-09-10, after measuring.** The first version of this section said that
+> positioning is "proportional, not pixel-snapped", so frames drift and show slivers of their
+> neighbours. **That was wrong**, and it was wrong because it was reasoned about rather than
+> measured. Driven in Chromium, the maths is exact: the browser lands frame *i* on the *i*-th of
+> `frameCount` equal slices of the image, divisible or not, to within the nearest-neighbour pixel.
+> What follows is what actually happens, and it is pinned by checks in
+> `browser-checks/assetsTab.mjs`.
 
-**The check is arithmetic the app already has everything for and has never done.** The asset stores
-`source`, and the natural dimensions are one `Image()` away — `imageDimensions()` in the editor
-already measures them on import. `height % frameCount === 0` is the whole test.
+The renderer takes the **whole image** to be exactly `frameCount` frames. If the file contains
+anything else — a few stray rows at the bottom, or a count that is simply wrong — the slice pitch
+it uses is not the pitch the frames were drawn at, and the error accumulates from nothing at the
+first frame to the full excess at the last.
 
-The current preview cannot answer it either: it draws the strip as one image in a box capped at
-178px, so 128 frames are a grey smear with no frame boundaries on it.
+Measured, with 128 frames drawn at a whole 7px each:
+
+| File | `height % 128` | Frame 0 | Frame 64 | Frame 127 |
+|---|---:|---|---|---|
+| 896px, nothing but frames | 0 | frame 0 | frame 64 | frame 127 |
+| 900px, four stray rows | 4 | frame 0 | frame 64 | **the stray rows** |
+| 904px, eight stray rows | 8 | frame 0 | **frame 65** | **the stray rows** |
+
+**The check is arithmetic the app already has everything for and has never done.** Frames drawn at
+whole pixels always divide evenly, so `height % frameCount === 0` catches exactly the files above.
+The asset stores `source`, and the natural dimensions are one `Image()` away — `imageDimensions()`
+in the editor already measures them on import.
+
+Two causes produce a remainder and they want different repairs. A mistyped count is fixed by
+changing the count, and the nearest divisor is usually the truth. A file with stray rows is fixed
+by cropping or re-exporting, and changing the count to a divisor would be arithmetic rather than a
+repair. The tab offers divisors only within a factor of four of the count in use, and says so
+plainly when none qualifies.
+
+The current preview cannot answer any of this: it draws the strip as one image in a box capped at
+178px, so 128 frames are a grey smear.
 
 ## Layout
 
@@ -85,7 +108,8 @@ controls, and the divisibility check under it. This is where the tab earns its p
    An off-by-one becomes visible rather than inferred. Cheap: the count and the orientation are
    already stored.
 2. **The divisibility check.** `height % frameCount` with the natural dimensions measured from the
-   asset — a defect the app can detect and currently ships silently.
+   asset — a defect the app can detect and currently ships silently. Its mechanism is measured in
+   the browser rather than argued from the spec, and the measurement is a test.
 3. **Stepping the frames.** Seeing frame 41 of 128 in isolation is what a filmstrip is for, and no
    surface in the editor shows it today.
 
@@ -161,12 +185,33 @@ still draws all five of its sections and still edits every field. Nothing is rel
 parts that copied the source. A rename is a move with references to follow. The name is shown and
 not editable rather than pretending otherwise and breaking links quietly.
 
+### Corrected after review
+
+The tab shipped and then two things about it turned out to be wrong. Both are recorded here rather
+than quietly fixed, because the first one is the argument the tab was built on.
+
+- **The account of the defect was wrong.** See the corrected finding above. The positioning maths
+  does not drift; the assumption that the image is nothing but frames is what breaks. The corrected
+  version is a stronger case, not a weaker one — the failure is a whole frame out by the middle of
+  a strip with eight stray rows, not a sub-pixel sliver — but it was asserted before it was
+  measured, in a commit message, a design record and a code comment at once. The measurement is now
+  four checks in `browser-checks/assetsTab.mjs` that drive the real CSS in Chromium.
+- **The stage did not fill.** Frame boxes were a single row at a fixed height, which left most of a
+  148px box empty for the square frames real knob strips have. It is a contact sheet now:
+  `frameGrid()` tries each row count, keeps the frame's true shape, discards anything too small to
+  read, and takes the biggest layout that can show the whole strip — or the fullest one when it
+  cannot. A short strip gets large frames; a long one gets twenty readable ones.
+- The harness fixture was part of how the first mistake survived. It was a 34×900 strip of
+  seven-pixel frames, which nothing exports, so the screenshots showed something nobody would ever
+  see and the layout fault hid behind the oddity. It is a 96×3072 strip of square frames now, with
+  32 real frames and 30 typed in — the way this actually goes wrong.
+
 ## Still open
 
 1. **Nothing is relocated yet**, and the panel needs its search index extended before anything is.
-2. **Wide frames leave the stage half empty.** Frame boxes keep the frame's real shape, so a strip
-   of 34×7 frames draws a thin row in a 148px box. Real filmstrips are square-framed and fill it;
-   a variable-height stage was rejected because the dock jumping between assets is worse.
+2. **Very wide frames still leave space.** A strip whose frames are much wider than they are tall
+   cannot fill a landscape stage at its true aspect, whatever the tiling. Rows help; they do not
+   eliminate it, and distorting the frame to fill the box would be worse.
 3. **The import frame count is a guess.** A strip is measured and the count taken as the axis
    divided by the cross length, rounded. That is right for square frames and visibly wrong for
    anything else — which is the point: the check bar and its repair buttons are directly underneath.
@@ -175,3 +220,5 @@ not editable rather than pretending otherwise and breaking links quietly.
 
 - 2026-09-10: Written. Nothing built.
 - 2026-09-10: Built. Three open questions decided as above; the properties panel left alone.
+- 2026-09-10: Corrected. The renderer's behaviour measured rather than assumed, the stage retiled,
+  the fixture made realistic. See [Corrected after review](#corrected-after-review).

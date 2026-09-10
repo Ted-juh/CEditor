@@ -137,12 +137,16 @@ li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
 <section class="sec">
   <div class="kicker">Plate 1</div>
   <h2>The frame count can be wrong, and nothing says so</h2>
-  <p>This is the finding the tab is worth building for.
-    <code>InteractivePartRenderer</code> slices a filmstrip with proportional CSS background
-    positioning — <code>background-size: 100% (frameCount × 100)%</code> — so if the strip's height
-    does not divide evenly by the frame count the frames drift, and at the extremes one shows a
-    sliver of its neighbour. A 128-frame strip with 127 typed in is broken in a way that looks like a
-    rendering bug.</p>
+  <p>This is the finding the tab is worth building for — and the version below is the corrected
+    one. <code>InteractivePartRenderer</code> takes the <b>whole image</b> to be exactly
+    <code>frameCount</code> frames. If the file holds anything else — stray rows at the bottom, or a
+    count that is simply wrong — it is sliced at a pitch the frames were not drawn at, and the error
+    grows from nothing at the first frame to the full excess at the last. Measured in Chromium: 128
+    frames of 7px in a 900px file shows the stray rows instead of frame 127; at 904px the error is a
+    whole frame by frame 64.</p>
+  <p style="color:var(--ink-4)">An earlier version of this page said the proportional positioning
+    itself drifts. It does not — that maths is exact — and the claim was reasoned about rather than
+    driven in a browser. <code>browser-checks/assetsTab.mjs</code> measures it now.</p>
   <p><b>The check is arithmetic the app already has everything for.</b> The asset stores its source;
     <code>imageDimensions()</code> in the editor already measures the natural size on import.
     <code>height % frameCount === 0</code> is the whole test, and it has never been run.</p>
@@ -196,8 +200,8 @@ li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
             </div>
             <div class="checkbar bad">
               <b>⚠ 900 ÷ 128 = 7.03px per frame — not a whole number.</b>
-              The renderer positions frames proportionally, so these will drift and the last one will
-              show part of its neighbour.
+              The renderer treats the whole image as exactly 128 frames, so 4px that belong to no
+              frame get spread across the strip and the last frame shows them instead.
               <div class="fixrow">
                 <button>use 100 (9px)</button>
                 <button>use 90 (10px)</button>
@@ -210,9 +214,10 @@ li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
     </div>
     <div class="cap">
       <div class="cn">Plate 1</div>
-      <p class="ct">The frame boundaries are dashed teal lines at every edge. The offered counts are
-        the divisors of the measured height nearest the current value — one click, and the drift is
-        gone.</p>
+      <p class="ct">In the shipped tab the boundaries are the gaps between separate frame boxes
+        rather than drawn lines, and the frames tile the stage instead of sitting in one row. The
+        offered counts are divisors of the measured height near the current value, limited to ones
+        that are a plausible repair — one click and the frames line up.</p>
     </div>
   </div>
 </section>

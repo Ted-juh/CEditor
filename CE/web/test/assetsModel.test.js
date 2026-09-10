@@ -25,7 +25,8 @@ import {
   describeAsset,
   clampFrameIndex,
   stepFrame,
-  frameWindow,
+  framePage,
+  frameGrid,
   frameBackground,
   frameDivision,
   divisorsOf,
@@ -171,8 +172,19 @@ test('suggestFrameCounts never offers the count already in use', () => {
   assert.ok(!suggestFrameCounts(896, 128, 5).includes(128));
 });
 
-test('a prime-length strip has nothing useful to offer', () => {
-  assert.deepEqual(suggestFrameCounts(901 * 0 + 907, 128, 3), [1, 907]);
+test('the true count is the first offer when the count was simply mistyped', () => {
+  // A 32-frame strip of 96px squares with 30 typed in. 32 is both the nearest divisor and correct.
+  assert.equal(suggestFrameCounts(3072, 30, 3)[0], 32);
+});
+
+test('an absurd divisor is not offered, however near it is', () => {
+  // 3076 = 2^2 x 769. Its divisors are 1, 2, 4, 769, 1538, 3076: "use 4" would turn a 32-frame
+  // knob into a four-frame one on one click, which is arithmetic rather than a repair.
+  assert.deepEqual(suggestFrameCounts(3076, 32, 3), []);
+});
+
+test('a prime-length strip has nothing to offer at all', () => {
+  assert.deepEqual(suggestFrameCounts(907, 128, 3), []);
 });
 
 test('frameCountPatch moves the frame sizes with the count', () => {
@@ -203,27 +215,92 @@ test('frameCountPatch refuses an image', () => {
   assert.deepEqual(frameCountPatch({ kind: 'image', name: 'x', frameCount: 4 }), {});
 });
 
-// --- The stage window -------------------------------------------------------
+// --- The stage page ---------------------------------------------------------
 
-test('frameWindow centres on the current frame', () => {
-  const window = frameWindow({ frameCount: 128, frameIndex: 41, capacity: 9 });
-  assert.equal(window.indices.length, 9);
-  assert.ok(window.indices.includes(41));
-  assert.equal(window.start, 37);
+test('framePage shows the page the current frame falls in', () => {
+  const page = framePage({ frameCount: 128, frameIndex: 41, capacity: 16 });
+  assert.equal(page.start, 32);
+  assert.equal(page.indices.length, 16);
+  assert.ok(page.indices.includes(41));
+  assert.equal(page.page, 2);
+  assert.equal(page.pageCount, 8);
 });
 
-test('frameWindow stops at both ends instead of running off', () => {
-  assert.equal(frameWindow({ frameCount: 128, frameIndex: 0, capacity: 9 }).start, 0);
-  const last = frameWindow({ frameCount: 128, frameIndex: 127, capacity: 9 });
-  assert.equal(last.indices.at(-1), 127);
+test('framePage holds still while you step inside it', () => {
+  const a = framePage({ frameCount: 128, frameIndex: 32, capacity: 16 });
+  const b = framePage({ frameCount: 128, frameIndex: 47, capacity: 16 });
+  assert.equal(a.start, b.start, 'stepping within a page must not reshuffle the grid');
+  assert.equal(framePage({ frameCount: 128, frameIndex: 48, capacity: 16 }).start, 48);
+});
+
+test('framePage stops at both ends instead of running off', () => {
+  const first = framePage({ frameCount: 128, frameIndex: 0, capacity: 16 });
+  assert.equal(first.start, 0);
+  assert.equal(first.atStart, true);
+  const last = framePage({ frameCount: 130, frameIndex: 129, capacity: 16 });
+  assert.equal(last.indices.at(-1), 129);
+  assert.equal(last.indices.length, 2, 'a short last page is short, not padded');
   assert.equal(last.atEnd, true);
 });
 
-test('frameWindow never asks for more frames than exist', () => {
-  const window = frameWindow({ frameCount: 3, frameIndex: 1, capacity: 9 });
-  assert.deepEqual(window.indices, [0, 1, 2]);
-  assert.equal(window.atStart, true);
-  assert.equal(window.atEnd, true);
+test('framePage never asks for more frames than exist', () => {
+  const page = framePage({ frameCount: 3, frameIndex: 1, capacity: 16 });
+  assert.deepEqual(page.indices, [0, 1, 2]);
+  assert.equal(page.pageCount, 1);
+});
+
+// --- The stage grid ---------------------------------------------------------
+
+test('frameGrid tiles the stage instead of leaving a short row in it', () => {
+  // The shape a knob strip actually has, and a strip too long to show whole: one row of 132px boxes
+  // shows five and wastes most of the width, so two rows of ten wins.
+  const grid = frameGrid({ width: 710, height: 132, aspect: 1, want: 24 });
+  assert.equal(grid.rows, 2);
+  assert.equal(grid.boxHeight, 64);
+  assert.equal(grid.capacity, 20);
+  assert.ok(grid.rows * (grid.boxHeight + 3) - 3 <= 132, 'the rows must fit the stage');
+  assert.ok(grid.cols * (grid.boxWidth + 3) - 3 <= 710, 'the columns must fit the stage');
+});
+
+test('a short strip gets big frames rather than small ones in a corner', () => {
+  const four = frameGrid({ width: 710, height: 132, aspect: 1, want: 4 });
+  assert.equal(four.boxHeight, 132, 'four frames should fill the height');
+  assert.ok(four.capacity >= 4);
+  const eight = frameGrid({ width: 710, height: 132, aspect: 1, want: 8 });
+  assert.ok(eight.capacity >= 8, 'all eight should be on screen');
+  assert.ok(eight.boxHeight >= 48, `and still readable: ${eight.boxHeight}px`);
+});
+
+test('frameGrid keeps a wide frame wide instead of stretching it', () => {
+  const grid = frameGrid({ width: 710, height: 132, aspect: 34 / 7, want: 24 });
+  assert.ok(grid.rows > 1, 'a wide frame should wrap into rows rather than fill one');
+  assert.ok(Math.abs(grid.boxWidth / grid.boxHeight - 34 / 7) < 0.25, 'the aspect must survive');
+  assert.ok(grid.cols * (grid.boxWidth + 3) - 3 <= 710);
+});
+
+test('frameGrid gives a tall frame one big row', () => {
+  const grid = frameGrid({ width: 710, height: 132, aspect: 0.5, want: 24 });
+  assert.equal(grid.rows, 1);
+  assert.equal(grid.boxHeight, 132);
+});
+
+test('frameGrid rejects boxes too small to be a picture', () => {
+  const grid = frameGrid({ width: 710, height: 132, aspect: 1, want: 200, minArea: 2400 });
+  assert.ok(grid.boxWidth * grid.boxHeight >= 2400, `${grid.boxWidth}x${grid.boxHeight} is a swatch, not a frame`);
+});
+
+test('frameGrid still shows something when a frame cannot fit at its true shape', () => {
+  const grid = frameGrid({ width: 120, height: 132, aspect: 40, want: 24 });
+  assert.equal(grid.capacity, 1);
+  assert.ok(grid.boxWidth <= 120);
+  assert.ok(grid.boxHeight >= 20);
+});
+
+test('frameGrid never returns a box below the floor', () => {
+  for (const aspect of [0.05, 0.5, 1, 3, 20]) {
+    const grid = frameGrid({ width: 300, height: 90, aspect, want: 24, min: 20 });
+    assert.ok(grid.boxWidth >= 20 && grid.boxHeight >= 20, `aspect ${aspect} produced ${grid.boxWidth}x${grid.boxHeight}`);
+  }
 });
 
 test('clampFrameIndex and stepFrame stay inside the strip', () => {

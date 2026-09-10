@@ -7,13 +7,27 @@
  * maps picked from two `<select>` dropdowns today, and that a filmstrip's frame count can be
  * arithmetically wrong with nothing in the application checking it.
  *
- * THE FRAME COUNT CHECK IS THE POINT OF THIS FILE. `InteractivePartRenderer` slices a strip with
- * proportional CSS background positioning, not pixel offsets, so a strip whose length along the
- * frame axis does not divide evenly by `frameCount` renders frames that drift and, at the far end,
- * show a sliver of a neighbour. `frameDivision()` is that test, and `suggestFrameCounts()` is the
- * repair. Both need the image's NATURAL size, which the asset does not store — `frameWidth` and
- * `frameHeight` are set at import as `round(total / frameCount)`, which has already thrown the
- * remainder away. The caller measures and passes it in.
+ * THE FRAME COUNT CHECK IS THE POINT OF THIS FILE, and what it is checking was measured rather
+ * than reasoned about — see `browser-checks/assetsTab.mjs`, which drives the real CSS in Chromium.
+ *
+ * `InteractivePartRenderer` scales the strip to exactly `frameCount` box-heights and steps the
+ * background position by `i / (frameCount - 1)`. That maths is EXACT: the browser lands each frame
+ * on the i-th of `frameCount` equal slices of the image, whether or not the height divides evenly.
+ * An earlier version of this comment said the positioning drifts because it is "proportional rather
+ * than pixel-snapped". It does not, and that was wrong.
+ *
+ * What actually breaks is the assumption underneath: the renderer takes the WHOLE image to be
+ * exactly `frameCount` frames. If the file carries anything else — a few stray rows at the bottom,
+ * or a count that is simply wrong — the slice pitch it uses is not the pitch the frames were drawn
+ * at, and the error accumulates from nothing at the first frame to the full excess at the last.
+ * Measured: 128 frames drawn at 7px in a 900px file (four rows of tail) shows the tail instead of
+ * frame 127; at 904px the error is a whole frame by frame 64.
+ *
+ * `height % frameCount` catches exactly that, because frames drawn at whole pixels always divide
+ * evenly. `frameDivision()` is the test and `suggestFrameCounts()` is the repair for the common
+ * cause — a mistyped count. Both need the image's NATURAL size, which the asset does not store:
+ * `frameWidth` and `frameHeight` are set at import as `round(total / frameCount)`, which has
+ * already thrown the remainder away. The caller measures and passes it in.
  */
 
 /** Which map on `Assets` holds each kind. */
@@ -129,29 +143,92 @@ export function stepFrame(index, delta, frameCount) {
 /**
  * The run of frames the stage draws.
  *
- * A 128-frame strip cannot be shown a frame at a time and cannot be shown all at once either, so
- * the stage is a window: `capacity` consecutive frames with the current one inside it, kept in
- * range at both ends. Centring is what makes stepping feel like moving along the strip rather than
- * flicking between pictures.
+ * A 128-frame strip cannot be shown a frame at a time and cannot be shown all at once, so the stage
+ * shows a PAGE of `capacity` frames — the page the current frame falls in. Paging rather than
+ * centring on the current frame: once the frames wrap onto more than one row, a window that slides
+ * by one reshuffles every box on every step, which is noise around the one box you are looking at.
+ * A page holds still until you step off the end of it.
  */
-export function frameWindow({ frameCount = 1, frameIndex = 0, capacity = 9 } = {}) {
+export function framePage({ frameCount = 1, frameIndex = 0, capacity = 9 } = {}) {
   const total = Math.max(1, Math.round(numberOr(frameCount, 1)));
   const room = Math.max(1, Math.min(total, Math.round(numberOr(capacity, 9))));
   const current = clampFrameIndex(frameIndex, total);
-  let start = current - Math.floor((room - 1) / 2);
-  start = Math.max(0, Math.min(total - room, start));
+  const pageCount = Math.ceil(total / room);
+  const page = Math.floor(current / room);
+  const start = page * room;
   const indices = [];
-  for (let i = 0; i < room; i += 1) indices.push(start + i);
-  return { start, count: room, indices, atStart: start === 0, atEnd: start + room >= total };
+  for (let i = start; i < Math.min(total, start + room); i += 1) indices.push(i);
+  return { start, count: indices.length, indices, page, pageCount, atStart: page === 0, atEnd: page === pageCount - 1 };
+}
+
+/**
+ * How to tile the stage with frames of a given shape.
+ *
+ * The first version sized frame boxes to a fixed height and laid them in one row. It left the stage
+ * half empty for square frames and nearly all empty for wide ones — a knob strip's frames are
+ * square, so a 132px-tall row of 59px boxes wasted 70px of a box that exists to show pictures.
+ *
+ * The rule now: try each row count, keep the frame's true shape, throw away any layout whose boxes
+ * are too small to read (`minArea`, plus a hard floor on each side), and then pick by what the
+ * strip needs. If a layout can show `want` frames — normally the whole strip, capped so a
+ * 128-frame strip does not ask for 128 postage stamps — take the BIGGEST such layout, because an
+ * eight-frame strip should be eight large frames and not eight small ones in a corner. If none can,
+ * take the one that shows the most.
+ */
+export function frameGrid({
+  width = 0,
+  height = 0,
+  aspect = 1,
+  want = 24,
+  gap = 3,
+  min = 20,
+  minArea = 2400,
+  maxRows = 8,
+} = {}) {
+  const w = Math.max(min, Math.round(numberOr(width, 0)));
+  const h = Math.max(min, Math.round(numberOr(height, 0)));
+  const ratio = numberOr(aspect, 1) > 0 ? numberOr(aspect, 1) : 1;
+  const need = Math.max(1, Math.round(numberOr(want, 24)));
+
+  const layouts = [];
+  for (let rows = 1; rows <= maxRows; rows += 1) {
+    const boxHeight = Math.floor((h - (rows - 1) * gap) / rows);
+    if (boxHeight < min) break;
+    const boxWidth = Math.round(boxHeight * ratio);
+    if (boxWidth < min || boxWidth > w) continue;
+    if (boxWidth * boxHeight < minArea) continue;
+    const cols = Math.floor((w + gap) / (boxWidth + gap));
+    if (cols < 1) continue;
+    layouts.push({ rows, cols, capacity: rows * cols, boxWidth, boxHeight });
+  }
+
+  if (layouts.length) {
+    const enough = layouts.filter((layout) => layout.capacity >= need);
+    const pool = enough.length ? enough : layouts;
+    const key = enough.length
+      ? (layout) => [layout.boxHeight, layout.capacity]        // big enough already: prefer big frames
+      : (layout) => [layout.capacity, layout.boxHeight];       // cannot fit them all: prefer more frames
+    return pool.reduce((best, layout) => {
+      const [a, b] = key(layout);
+      const [x, y] = key(best);
+      return a > x || (a === x && b > y) ? layout : best;
+    });
+  }
+
+  // Nothing fits at its true shape — a frame wider than the whole stage, or thinner than the floor.
+  // One box, fitted rather than tiled, so an extreme strip still shows something honest.
+  const boxWidth = Math.min(w, Math.max(min, Math.round(h * ratio)));
+  const boxHeight = Math.max(min, Math.min(h, Math.round(boxWidth / ratio)));
+  return { rows: 1, cols: 1, capacity: 1, boxWidth, boxHeight };
 }
 
 /**
  * The CSS that shows one frame of a strip.
  *
  * MIRRORED FROM `editor/InteractivePartRenderer.svelte`, deliberately and exactly. The preview is
- * only evidence about the renderer if it does what the renderer does — including the part that is
- * wrong for a strip that does not divide evenly. Computing frame offsets in pixels here would give
- * a tidy preview of a defect that ships, which is worse than no preview.
+ * only evidence about the renderer if it does what the renderer does — so a strip with a wrong
+ * count shows the same wrong frames here as on the canvas. Computing frame offsets in pixels here
+ * would give a tidy preview of a defect that ships, which is worse than no preview.
  */
 export function frameBackground({ frameCount = 1, frameIndex = 0, orientation = 'vertical' } = {}) {
   const total = Math.max(1, Math.round(numberOr(frameCount, 1)));
@@ -168,6 +245,11 @@ export function frameBackground({ frameCount = 1, frameIndex = 0, orientation = 
  * `width` and `height` are the image's measured natural size. Pass zeroes when it has not been
  * measured yet and the result reports `known: false` rather than inventing a verdict — an
  * unmeasured strip is not a passing strip.
+ *
+ * `remainder` is the interesting number when it is not zero: it is how many pixels the renderer
+ * has to spread across the strip that are not part of any frame, and therefore how far off the
+ * LAST frame will be. Four stray pixels on a seven-pixel frame means the last frame is more than
+ * half a frame wrong.
  */
 export function frameDivision({ width = 0, height = 0, frameCount = 1, orientation = 'vertical' } = {}) {
   const axis = normalizeOrientation(orientation) === 'horizontal' ? 'width' : 'height';
@@ -207,13 +289,22 @@ export function divisorsOf(total) {
 /**
  * The frame counts nearest the current one that DO divide the strip evenly.
  *
- * Sorted by distance from the count in use, so the first offer is the smallest change that fixes
- * the drift. A prime-length strip only has 1 and itself, and the caller says so rather than
- * offering "use 1".
+ * Sorted by distance from the count in use, so the first offer is the smallest change.
+ *
+ * `within` is a plausibility band, and it matters. Changing the count is the right repair for one
+ * of the two causes — somebody typed the wrong number — and the wrong repair for the other, which
+ * is a file carrying stray rows. A 3,076px strip of 32 frames divides only by 1, 2, 4 and 769;
+ * offering "use 4" would be arithmetically true and practically absurd, and would turn a 32-frame
+ * knob into a four-frame one on one click. So offers are limited to a factor of `within` either
+ * side of the count in use, and an empty result is the signal that the strip itself is the problem.
  */
-export function suggestFrameCounts(total, frameCount, limit = 3) {
+export function suggestFrameCounts(total, frameCount, limit = 3, within = 4) {
   const current = Math.max(1, Math.round(numberOr(frameCount, 1)));
-  const candidates = divisorsOf(total).filter((value) => value !== current);
+  const factor = Math.max(1, numberOr(within, 4));
+  const low = current / factor;
+  const high = current * factor;
+  const candidates = divisorsOf(total)
+    .filter((value) => value !== current && value >= low && value <= high);
   candidates.sort((left, right) => Math.abs(left - current) - Math.abs(right - current) || left - right);
   return candidates.slice(0, Math.max(0, Math.round(numberOr(limit, 3))));
 }

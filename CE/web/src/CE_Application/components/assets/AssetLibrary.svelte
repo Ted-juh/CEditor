@@ -28,22 +28,42 @@
   let imageInput = $state(null);
   let stripInput = $state(null);
 
-  // The first frame of a strip, drawn the way the renderer draws it. A strip shown whole in a
-  // 46px tile is a grey smear; one frame is a picture.
-  function tileStyle(entry) {
+  // The first frame of a strip, drawn the way the renderer draws it. A strip shown whole in a 46px
+  // tile is a grey smear; one frame is a picture.
+  //
+  // A filmstrip's frame goes in an inner box of the frame's own shape rather than on the tile
+  // itself. `background-size: 100% N00%` fills whatever it is given, so putting it straight on a
+  // 46x44 tile turns a round knob into an oval — and the point of the grid is to recognise the
+  // picture. `aspect-ratio` with `max-width` is the plain-CSS way to letterbox it.
+  function frameStyle(entry) {
     if (!entry.hasSource) return '';
     const rendering = entry.interpolation === 'nearest' ? 'pixelated' : 'auto';
-    if (entry.kind !== 'filmstrip') {
-      return `background-image:url("${entry.source.replaceAll('"', '\\"')}");background-size:contain;background-position:center;background-repeat:no-repeat;image-rendering:${rendering}`;
-    }
     const css = frameBackground({ frameCount: entry.frameCount, frameIndex: 0, orientation: entry.orientation });
     return [
+      `aspect-ratio:${frameAspect(entry)}`,
       `background-image:url("${entry.source.replaceAll('"', '\\"')}")`,
       `background-size:${css.backgroundSize}`,
       `background-position:${css.backgroundPosition}`,
       'background-repeat:no-repeat',
       `image-rendering:${rendering}`,
     ].join(';');
+  }
+
+  function frameAspect(entry) {
+    if (entry.frameWidth > 0 && entry.frameHeight > 0) return entry.frameWidth / entry.frameHeight;
+    if (entry.width > 0 && entry.height > 0 && entry.frameCount > 0) {
+      return entry.orientation === 'horizontal'
+        ? (entry.width / entry.frameCount) / entry.height
+        : entry.width / (entry.height / entry.frameCount);
+    }
+    return 1;
+  }
+
+  // An image needs none of that: `contain` already letterboxes it.
+  function imageStyle(entry) {
+    if (!entry.hasSource) return '';
+    const rendering = entry.interpolation === 'nearest' ? 'pixelated' : 'auto';
+    return `background-image:url("${entry.source.replaceAll('"', '\\"')}");background-size:contain;background-position:center;background-repeat:no-repeat;image-rendering:${rendering}`;
   }
 
   function sizeNote(entry) {
@@ -81,8 +101,12 @@
           <span class="badge" class:film={entry.kind === 'filmstrip'}>
             {#if entry.kind === 'filmstrip'}<Film size={9} />{:else}<ImageIcon size={9} />{/if}
           </span>
-          <span class="box" style={tileStyle(entry)}>
-            {#if !entry.hasSource}<i>no source</i>{/if}
+          <span class="box" style={entry.kind === 'filmstrip' ? '' : imageStyle(entry)}>
+            {#if !entry.hasSource}
+              <i>no source</i>
+            {:else if entry.kind === 'filmstrip'}
+              <b class="fr" style={frameStyle(entry)}></b>
+            {/if}
           </span>
           <span class="name">{entry.name}</span>
           <span class="note">{sizeNote(entry)}</span>
@@ -166,6 +190,14 @@
     font: 400 8px/1 'IBM Plex Mono', ui-monospace, monospace;
     font-style: normal;
     color: #4B545C;
+  }
+
+  /* One frame at its own shape, letterboxed inside the tile. `aspect-ratio` sets the width from the
+     height, and `max-width` pulls both back in when the frame is wider than the tile. */
+  .fr {
+    height: 100%;
+    max-width: 100%;
+    display: block;
   }
 
   .name {

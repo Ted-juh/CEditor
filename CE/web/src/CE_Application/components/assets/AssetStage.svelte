@@ -2,24 +2,29 @@
   /**
    * The asset, at a size you can judge — and, for a filmstrip, the arithmetic checked.
    *
-   * A filmstrip is drawn as a run of frames with the boundaries visible, not as one tall image.
-   * The properties panel shows the whole strip in a box capped at 178px, so 128 frames arrive as a
-   * grey smear and the question "does this strip really hold 128 frames?" is not answerable from
-   * the picture. Here each frame is its own box, positioned by `frameBackground` — the same
-   * proportional CSS `InteractivePartRenderer` uses — so a strip that does not divide evenly shows
-   * the drift rather than hiding it. Computing pixel offsets here instead would draw a tidy strip
-   * and ship a broken one.
+   * A filmstrip is drawn as a contact sheet of frames, not as one tall image. The properties panel
+   * shows the whole strip in a box capped at 178px, so 128 frames arrive as a grey smear and the
+   * question "does this strip really hold 128 frames?" is not answerable from the picture. Here each
+   * frame is its own box carrying the same CSS `InteractivePartRenderer` emits, so a strip whose
+   * count is wrong shows the same wrong frames here as it will on the canvas. Computing pixel
+   * offsets here instead would draw a tidy strip and ship a broken one.
    *
-   * The check bar under it is the finding this tab was built for: `height % frameCount === 0` is
-   * the whole test, the application has never run it, and when it fails the nearest counts that do
-   * divide are one click away.
+   * `frameGrid` decides the tiling. It is not a fixed row: frames keep their true shape and the
+   * layout that best fills the stage wins, because a knob strip's frames are square and a single
+   * row of them left most of the box empty.
+   *
+   * The check bar under it is the finding this tab was built for. `height % frameCount === 0` is
+   * the whole test and the application has never run it; when it fails, the nearest plausible
+   * counts that do divide are one click away, and when there are none the message says the strip
+   * itself is what needs fixing.
    */
   import ChevronLeft from 'lucide-svelte/icons/chevron-left';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import NumberCell from '../../properties/NumberCell.svelte';
   import {
     frameBackground,
-    frameWindow,
+    frameGrid,
+    framePage,
     frameDivision,
     suggestFrameCounts,
     imageSizeCheck,
@@ -38,9 +43,9 @@
   const GAP = 3;
   /** Inner height of the stage box, less its padding. */
   const STAGE_HEIGHT = 132;
-  /** How many frames the stage aims to show. Enough that stepping reads as movement along a strip
-   *  rather than a slideshow, few enough that each frame is still a picture. */
-  const TARGET_FRAMES = 9;
+  /** The most frames the stage will try to fit. Above this a strip is an overview rather than
+   *  something you read, and the frames stop being pictures. */
+  const MAX_TILED = 24;
   const MIN_BOX = 20;
 
   let stageWidth = $state(560);
@@ -61,21 +66,18 @@
     return 1;
   });
 
-  // Frame boxes are sized from the space, not from a fixed height. A 34x7 frame blown up to a
-  // 128px-tall box would be five hundred pixels wide and two of them would fill the stage; a square
-  // one at the same height leaves the row half empty. So: aim for TARGET_FRAMES across, keep the
-  // frame's real shape, and let the height fall out of that — capped by the stage, floored so a
-  // very wide frame does not become a line.
   let innerWidth = $derived(Math.max(40, stageWidth - 16));
-  let boxWidth = $derived.by(() => {
-    const share = Math.floor((innerWidth + GAP) / TARGET_FRAMES) - GAP;
-    const byHeight = STAGE_HEIGHT * frameAspect;
-    return Math.max(MIN_BOX, Math.min(innerWidth, Math.round(Math.min(share, byHeight))));
-  });
-  let boxHeight = $derived(Math.max(MIN_BOX, Math.min(STAGE_HEIGHT, Math.round(boxWidth / frameAspect))));
-  let capacity = $derived(Math.max(1, Math.floor((innerWidth + GAP) / (boxWidth + GAP))));
+  let grid = $derived(frameGrid({
+    width: innerWidth,
+    height: STAGE_HEIGHT,
+    aspect: frameAspect,
+    // A short strip gets big frames; a long one gets as many as stay readable.
+    want: Math.min(entry?.frameCount ?? 1, MAX_TILED),
+    gap: GAP,
+    min: MIN_BOX,
+  }));
   // Not called `window`: shadowing the global inside a component is legal and a trap.
-  let visibleFrames = $derived(frameWindow({ frameCount: entry?.frameCount ?? 1, frameIndex, capacity }));
+  let visibleFrames = $derived(framePage({ frameCount: entry?.frameCount ?? 1, frameIndex, capacity: grid.capacity }));
 
   let division = $derived(frameDivision({
     width: natural.width,
@@ -91,11 +93,11 @@
   }));
 
   function boxStyle(index) {
-    if (!entry?.hasSource) return `width:${boxWidth}px;height:${boxHeight}px`;
+    if (!entry?.hasSource) return `width:${grid.boxWidth}px;height:${grid.boxHeight}px`;
     const css = frameBackground({ frameCount: entry.frameCount, frameIndex: index, orientation: entry.orientation });
     return [
-      `width:${boxWidth}px`,
-      `height:${boxHeight}px`,
+      `width:${grid.boxWidth}px`,
+      `height:${grid.boxHeight}px`,
       `background-image:url("${entry.source.replaceAll('"', '\\"')}")`,
       `background-size:${css.backgroundSize}`,
       `background-position:${css.backgroundPosition}`,
@@ -115,7 +117,7 @@
       {#if !entry.hasSource}
         <p class="nosource">This asset has no image yet. Import one, or paste a source in the properties panel.</p>
       {:else if isFilm}
-        <div class="strip" style={`gap:${GAP}px`}>
+        <div class="strip" style={`gap:${GAP}px;max-width:${grid.cols * (grid.boxWidth + GAP) - GAP}px`}>
           {#each visibleFrames.indices as index (index)}
             <button
               type="button"
@@ -180,8 +182,9 @@
       {:else}
         <div class="check bad">
           <b>{division.total} ÷ {division.frameCount} = {division.framePixels.toFixed(2)}px per frame — not whole.</b>
-          The renderer positions frames proportionally, so these drift and the last frames show part
-          of a neighbour.
+          The renderer treats the whole image as exactly {division.frameCount} frames, so
+          {division.remainder}px that belong to no frame get spread across the strip. The error grows
+          from nothing at the first frame to all {division.remainder}px at the last.
           {#if offers.length}
             <span class="fixes">
               {#each offers as offer (offer)}
@@ -191,7 +194,10 @@
               {/each}
             </span>
           {:else}
-            <span class="nofix">No smaller frame count divides {division.total} evenly — the strip itself needs re-exporting.</span>
+            <span class="nofix">
+              No sensible frame count divides {division.total} evenly, so the count is probably right
+              and the image is not: crop the {division.remainder}px or re-export the strip.
+            </span>
           {/if}
         </div>
       {/if}
@@ -232,7 +238,16 @@
     box-sizing: border-box;
   }
 
-  .strip { display: flex; align-items: center; height: 100%; }
+  /* Wraps: `frameGrid` sizes the boxes so a whole number of them fits each row, and the row count
+     it chose is what the max-width above enforces. */
+  .strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    align-content: center;
+    height: 100%;
+  }
 
   /* Each frame is a box of its own, so the gap between them IS the frame boundary — no drawn
      lines to fall out of step with the arithmetic. */

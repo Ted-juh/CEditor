@@ -2,9 +2,12 @@
  * The Assets tab, driven in Chromium. Run with the rest: `npm run test:browser`.
  *
  * What it checks, in order of how badly it would hurt:
+ *   - what the renderer's CSS really does with a frame count, measured in the browser rather than
+ *     argued from the spec — the tab's whole justification rests on this, and the first version of
+ *     it rested on a wrong account of it
  *   - a strip whose height does not divide by its frame count is CALLED OUT, and a clean one is not
  *   - the offered repair writes the count and both frame sizes, and the warning then clears
- *   - the frames drawn use the renderer's own proportional CSS, not tidied pixel offsets
+ *   - the frames drawn use the renderer's own CSS, not tidied pixel offsets
  *   - an image whose recorded size no longer matches what is on disk says so
  *   - both kinds of asset appear in one library, and picking one changes the stage
  *   - there is not a single slider in the tab
@@ -46,6 +49,73 @@ await page.waitForTimeout(400);
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
 
+// --- What the renderer actually does ----------------------------------------------------------
+//
+// Every frame of the probe strip is filled with its own index as a colour, the element gets exactly
+// the CSS InteractivePartRenderer emits, and the screenshot is decoded back to a frame number.
+
+const PROBE_BOX = 64;
+
+async function whichFrame(source, frameCount, frameIndex) {
+  await ev(([s, n, i, b]) => window.__probe.mount(s, n, i, b), [source, frameCount, frameIndex, PROBE_BOX]);
+  const shot = await page.locator('#probe-box').screenshot();
+  return ev(([d, b]) => window.__probe.read(d, b), [`data:image/png;base64,${shot.toString('base64')}`, PROBE_BOX]);
+}
+
+{
+  const PROBED = [0, 32, 64, 100, 127];
+  const seenFor = async (source, frameCount) => {
+    const out = [];
+    for (const i of PROBED) out.push(await whichFrame(source, frameCount, i));
+    return out;
+  };
+  // Nearest-neighbour sampling puts the odd probe within a pixel of a frame boundary, so the middle
+  // of the strip is checked as a deviation with a bound rather than an exact frame number. The two
+  // ends are not borderline and are checked exactly.
+  const drift = (seen) => PROBED.map((asked, i) => (seen[i] === 'tail' ? 'tail' : seen[i] - asked));
+
+  // 128 frames of 7px and nothing else in the file: 896 tall, divides exactly.
+  const exact = await ev(() => window.__probe.strip(128, 7, 0));
+  const exactDrift = drift(await seenFor(exact.source, 128));
+  check('a strip that is nothing but its frames shows every frame exactly', () => {
+    assert.equal(exact.height, 896);
+    assert.deepEqual(exactDrift, [0, 0, 0, 0, 0], `drift: ${exactDrift.join(', ')}`);
+  });
+
+  // The same frames with four stray rows on the end: 900 tall, 900 % 128 = 4.
+  const tail4 = await ev(() => window.__probe.strip(128, 7, 4));
+  const tail4Drift = drift(await seenFor(tail4.source, 128));
+  check('four stray rows cost the last frame and leave the start of the strip alone', () => {
+    assert.equal(tail4.height, 900);
+    assert.equal(tail4Drift[0], 0, 'the first frame is always right — the error starts at zero');
+    assert.ok(tail4Drift.slice(1, 4).every((d) => d !== 'tail' && Math.abs(d) <= 1),
+      `the middle should be within a frame: ${tail4Drift.join(', ')}`);
+    assert.equal(tail4Drift[4], 'tail', 'frame 127 should be showing the stray rows, not frame 127');
+  });
+
+  // Eight stray rows, and the error is a whole frame by the middle of the strip.
+  const tail8 = await ev(() => window.__probe.strip(128, 7, 8));
+  const tail8Drift = drift(await seenFor(tail8.source, 128));
+  check('eight stray rows are a whole frame out by the middle — the error grows along the strip', () => {
+    assert.equal(tail8.height, 904);
+    assert.equal(tail8Drift[0], 0);
+    assert.equal(tail8Drift[2], 1, 'asked for frame 64');
+    assert.equal(tail8Drift[3], 1, 'asked for frame 100');
+    assert.equal(tail8Drift[4], 'tail');
+    assert.ok(tail8Drift[1] <= tail8Drift[2], 'the error must not shrink towards the end');
+  });
+
+  check('and the divisibility check is exactly what tells those three apart', () => {
+    // The whole justification for the check bar: the two broken files are the two that leave a
+    // remainder, and nothing else in the application looks at it.
+    assert.equal(896 % 128, 0);
+    assert.equal(900 % 128, 4);
+    assert.equal(904 % 128, 8);
+  });
+
+  await ev(() => document.getElementById('probe-box')?.remove());
+}
+
 // --- One library ------------------------------------------------------------------------------
 
 assert.equal((await ev(() => window.__as.target())).controlId, 'ctrl_as_1');
@@ -63,9 +133,19 @@ check('every tile drew a picture', () => {
 });
 
 const tilePositions = await ev(() => window.__as.tilePositions());
+const tileAspects = await ev(() => window.__as.tileAspects());
 check('a filmstrip tile shows its first frame, not the whole smear', () => {
   assert.equal(tilePositions[0], '0% 0%');
   assert.equal(tilePositions[1], '0% 0%');
+});
+
+check('and shows it at the frame shape the asset declares, so a round knob is round', () => {
+  // Painted straight onto the 46x44 tile, `background-size: 100% N00%` fills whatever box it is
+  // given and a round knob comes out an oval. cleanStrip declares 96x96 and is square here.
+  assert.ok(Math.abs(tileAspects[0] - 1) < 0.05, `cleanStrip frame is ${tileAspects[0]}:1`);
+  // driftStrip declares 96x102 — the frame size that follows from its wrong count — and the tile
+  // shows exactly that, slightly squashed. The thumbnail reports the asset, not a tidied version.
+  assert.ok(Math.abs(tileAspects[1] - 96 / 102) < 0.03, `driftStrip frame is ${tileAspects[1]}:1`);
 });
 
 // --- The finding ------------------------------------------------------------------------------
@@ -77,44 +157,50 @@ const driftCheck = await ev(() => window.__as.check());
 const driftClass = await ev(() => window.__as.checkClass());
 check('a strip that does not divide evenly is called out', () => {
   assert.ok(driftClass.includes('bad'), `check class: ${driftClass}`);
-  assert.ok(/900 ÷ 128/.test(driftCheck), `check text: ${driftCheck}`);
-  assert.ok(/7\.03/.test(driftCheck), `should show the fractional frame height: ${driftCheck}`);
+  assert.ok(/3072 ÷ 30/.test(driftCheck), `check text: ${driftCheck}`);
+  assert.ok(/102\.40px/.test(driftCheck), `should show the fractional frame height: ${driftCheck}`);
+  assert.ok(/12px/.test(driftCheck), `should name the pixels that belong to no frame: ${driftCheck}`);
 });
 
 const fixes = await ev(() => window.__as.fixes());
-check('the nearest counts that do divide are offered', () => {
+check('the true count is the first thing offered', () => {
+  // The fixture is a real 32-frame strip with 30 typed in, which is how this actually goes wrong.
   assert.equal(fixes.length, 3, `offers: ${fixes.join(' | ')}`);
-  assert.ok(/use 150/.test(fixes[0]), `first offer should be the smallest change: ${fixes[0]}`);
-  assert.ok(/\(6px\)/.test(fixes[0]), `and should say what a frame becomes: ${fixes[0]}`);
+  assert.ok(/use 32/.test(fixes[0]), `first offer should be the smallest change: ${fixes[0]}`);
+  assert.ok(/\(96px\)/.test(fixes[0]), `and should say what a frame becomes: ${fixes[0]}`);
 });
 
 // --- The frames drawn -------------------------------------------------------------------------
 
 const sizes = await ev(() => window.__as.frameSizes());
 const positions = await ev(() => window.__as.framePositions());
-check('frames are positioned the way the renderer positions them', () => {
-  assert.ok(sizes.length > 3, `only ${sizes.length} frames drawn`);
-  assert.ok(sizes.every((size) => size === '100% 12800%'), `sizes: ${[...new Set(sizes)].join(', ')}`);
-  // frame 0 of 128 → 0%; frame 1 → 1/127 of 100%. Proportional, exactly as InteractivePartRenderer
-  // does it, which is why the strip above is wrong on screen and not merely wrong on paper.
+const drawn = await ev(() => window.__as.frameCount());
+check('frames are positioned with the renderer\'s own CSS, not tidied pixel offsets', () => {
+  assert.ok(drawn >= 8, `only ${drawn} frames drawn — the stage should be tiled, not a short row`);
+  assert.ok(sizes.every((size) => size === '100% 3000%'), `sizes: ${[...new Set(sizes)].join(', ')}`);
+  // frame 0 of 30 → 0%; frame 1 → 1/29 of 100%. The same expression the renderer evaluates, which
+  // is what makes this preview evidence rather than a second opinion.
   assert.equal(positions[0], '0% 0%');
-  assert.ok(positions[1].startsWith('0% 0.78'), `second frame: ${positions[1]}`);
+  assert.ok(positions[1].startsWith('0% 3.44'), `second frame: ${positions[1]}`);
 });
 
 check('the stage opens on the first frame', async () => {});
 assert.equal(await ev(() => window.__as.currentFrame()), 0);
-assert.match(await ev(() => window.__as.readout()), /frame 1 of 128/);
+assert.match(await ev(() => window.__as.readout()), /frame 1 of 30/);
 
 await ev(() => window.__as.stepForward());
 await page.waitForTimeout(120);
 check('stepping moves one frame, with no slider anywhere in sight', async () => {});
-assert.match(await ev(() => window.__as.readout()), /frame 2 of 128/);
+assert.match(await ev(() => window.__as.readout()), /frame 2 of 30/);
 
+const beforeClick = await ev(() => window.__as.framePositions());
 await ev(() => window.__as.clickFrame(4));
 await page.waitForTimeout(120);
 const clicked = await ev(() => window.__as.readout());
-check('the strip itself is a picker', () => {
-  assert.ok(/frame (5|6) of 128/.test(clicked), `after clicking the fifth box: ${clicked}`);
+const afterClick = await ev(() => window.__as.framePositions());
+check('the strip itself is a picker, and picking does not reshuffle the sheet', () => {
+  assert.match(clicked, /frame 5 of 30/, `after clicking the fifth box: ${clicked}`);
+  assert.deepEqual(afterClick, beforeClick, 'the page must hold still while you step inside it');
 });
 
 // --- The repair -------------------------------------------------------------------------------
@@ -124,18 +210,18 @@ await page.waitForTimeout(300);
 
 const repaired = await ev(() => window.__as.strip('driftStrip'));
 check('the offered repair writes the count, both frame sizes and the strip size', () => {
-  assert.equal(repaired.frameCount, 150);
-  assert.equal(repaired.frameHeight, 6, '900 / 150');
-  assert.equal(repaired.frameWidth, 34);
-  assert.equal(repaired.width, 34, 'the exporter reads width/height and nothing used to write them');
-  assert.equal(repaired.height, 900);
+  assert.equal(repaired.frameCount, 32);
+  assert.equal(repaired.frameHeight, 96, '3072 / 32');
+  assert.equal(repaired.frameWidth, 96);
+  assert.equal(repaired.width, 96, 'the exporter reads width/height and nothing used to write them');
+  assert.equal(repaired.height, 3072);
 });
 
 const afterFix = await ev(() => window.__as.check());
 const afterFixClass = await ev(() => window.__as.checkClass());
 check('and the warning turns into a pass', () => {
   assert.ok(afterFixClass.includes('good'), `check class after the fix: ${afterFixClass}`);
-  assert.ok(/900 ÷ 150 = 6px/.test(afterFix), `check text after the fix: ${afterFix}`);
+  assert.ok(/3072 ÷ 32 = 96px/.test(afterFix), `check text after the fix: ${afterFix}`);
 });
 
 // --- The clean strip --------------------------------------------------------------------------
@@ -146,7 +232,7 @@ const cleanCheck = await ev(() => window.__as.check());
 const cleanClass = await ev(() => window.__as.checkClass());
 check('a strip that does divide evenly is not nagged at', () => {
   assert.ok(cleanClass.includes('good'), `check class: ${cleanClass}`);
-  assert.ok(/896 ÷ 128 = 7px/.test(cleanCheck), `check text: ${cleanCheck}`);
+  assert.ok(/3072 ÷ 32 = 96px/.test(cleanCheck), `check text: ${cleanCheck}`);
 });
 
 // --- The image half ---------------------------------------------------------------------------

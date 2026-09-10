@@ -16,25 +16,30 @@ import { activateEditorTarget, editorTarget } from '../src/CE_Application/stores
 
 const CONTROL_ID = 'ctrl_as_1';
 
-/** A vertical strip of `frames` cells, each one a dial rotated a little further than the last. */
-function makeStrip({ width, height, frames }) {
+/**
+ * A knob filmstrip the shape real ones are: `frames` square cells stacked, each a dial turned a
+ * little further than the last. The fixture used to be 34x900 with seven-pixel frames, which is
+ * nothing anybody exports and made the tab look far stranger in a screenshot than it does in use.
+ */
+function makeStrip({ size, frames, ink }) {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = size;
+  canvas.height = size * frames;
   const ctx = canvas.getContext('2d');
-  const cell = height / frames;
   for (let i = 0; i < frames; i += 1) {
     const angle = (-135 + (270 * i) / Math.max(1, frames - 1)) * (Math.PI / 180);
+    const top = i * size;
     ctx.fillStyle = i % 2 ? '#16222A' : '#101A20';
-    ctx.fillRect(0, i * cell, width, cell);
-    ctx.strokeStyle = '#4E6272';
-    ctx.lineWidth = 2;
+    ctx.fillRect(0, top, size, size);
+    const cx = size / 2;
+    const cy = top + size / 2;
+    const r = size / 2 - 6;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    const cx = width / 2;
-    const cy = i * cell + cell / 2;
-    const r = Math.min(width, cell) / 2 - 2;
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.sin(angle) * r, cy - Math.cos(angle) * r);
@@ -61,28 +66,30 @@ control._children.Core.name = 'Big Knob';
 control._children.Transform.width = 120;
 control._children.Transform.height = 120;
 
-// 900 does not divide by 128 — this is the defect the tab exists to show.
+// A real 32-frame strip with 30 typed in — the common way this goes wrong. 3072 does not divide by
+// 30, so the renderer slices at 102.4px against frames drawn at 96px and is a frame and a half out
+// by the end. The nearest divisor is 32, which is also the truth.
 control._children.Assets.filmstrips.driftStrip = {
   _type: 'FilmstripAsset',
   name: 'driftStrip',
-  source: makeStrip({ width: 34, height: 900, frames: 30 }),
-  frameCount: 128,
-  frameWidth: 34,
-  frameHeight: 7,
+  source: makeStrip({ size: 96, frames: 32, ink: '#C08A4E' }),
+  frameCount: 30,
+  frameWidth: 96,
+  frameHeight: 102,
   orientation: 'vertical',
   interpolation: 'nearest',
   valueSource: 'mainValue',
   package: true,
 };
 
-// 896 divides by 128 exactly.
+// The same strip with the count it really has.
 control._children.Assets.filmstrips.cleanStrip = {
   _type: 'FilmstripAsset',
   name: 'cleanStrip',
-  source: makeStrip({ width: 32, height: 896, frames: 28 }),
-  frameCount: 128,
-  frameWidth: 32,
-  frameHeight: 7,
+  source: makeStrip({ size: 96, frames: 32, ink: '#4E6272' }),
+  frameCount: 32,
+  frameWidth: 96,
+  frameHeight: 96,
   orientation: 'vertical',
   interpolation: 'nearest',
   valueSource: 'mainValue',
@@ -114,8 +121,15 @@ window.__as = {
 
   tiles: () => [...document.querySelectorAll('.tile')].map((tile) => textOf(tile.querySelector('.name'))),
   tileKinds: () => [...document.querySelectorAll('.tile')].map((tile) => (tile.querySelector('.badge')?.classList.contains('film') ? 'film' : 'img')),
-  tileInk: () => [...document.querySelectorAll('.tile .box')].map((box) => (getComputedStyle(box).backgroundImage || 'none').length),
-  tilePositions: () => [...document.querySelectorAll('.tile .box')].map((box) => getComputedStyle(box).backgroundPosition),
+  // A filmstrip tile paints one frame on an inner box of the frame's own shape; an image paints
+  // straight on the tile. Look at whichever is carrying the picture.
+  tilePainted: () => [...document.querySelectorAll('.tile .box')].map((box) => box.querySelector('.fr') ?? box),
+  tileInk: () => window.__as.tilePainted().map((el) => (getComputedStyle(el).backgroundImage || 'none').length),
+  tilePositions: () => window.__as.tilePainted().map((el) => getComputedStyle(el).backgroundPosition),
+  tileAspects: () => window.__as.tilePainted().map((el) => {
+    const box = el.getBoundingClientRect();
+    return box.height > 0 ? Number((box.width / box.height).toFixed(2)) : 0;
+  }),
   select: (name) => {
     const tile = [...document.querySelectorAll('.tile')].find((t) => textOf(t.querySelector('.name')) === name);
     tile?.click();
@@ -166,4 +180,68 @@ window.__as = {
   bakeEstimate: () => textOf(document.querySelector('.bake .est')),
 
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
+};
+
+/**
+ * A probe for what the renderer's CSS ACTUALLY does with a frame count.
+ *
+ * This exists because the first version of the Assets tab shipped with the wrong explanation of its
+ * own finding — it said the proportional background positioning drifts, and it does not: the
+ * browser lands every frame exactly on the i-th of `frameCount` equal slices of the image, divisible
+ * or not. What breaks is the assumption that the image is nothing but frames. The driver builds a
+ * strip whose every frame is filled with its own index as a colour, gives an element exactly the CSS
+ * InteractivePartRenderer emits, and reads back which frame appeared. No reasoning about percentage
+ * semantics — the browser answers.
+ */
+window.__probe = {
+  /** `tail` extra rows that belong to no frame, the way a badly exported strip carries them. */
+  strip: (frames, pitch, tail) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = frames * pitch + tail;
+    const ctx = canvas.getContext('2d');
+    for (let f = 0; f < frames; f += 1) {
+      ctx.fillStyle = `rgb(${f % 256}, ${Math.floor(f / 256)}, 128)`;
+      ctx.fillRect(0, f * pitch, 8, pitch);
+    }
+    ctx.fillStyle = 'rgb(255,255,0)';
+    ctx.fillRect(0, frames * pitch, 8, tail);
+    return { source: canvas.toDataURL('image/png'), height: canvas.height };
+  },
+
+  mount: (source, frameCount, frameIndex, box) => {
+    let el = document.getElementById('probe-box');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'probe-box';
+      el.style.position = 'fixed';
+      el.style.left = '0';
+      el.style.bottom = '0';
+      document.body.appendChild(el);
+    }
+    const offset = frameCount <= 1 ? 0 : (frameIndex / (frameCount - 1)) * 100;
+    el.style.width = `${box}px`;
+    el.style.height = `${box}px`;
+    el.style.backgroundImage = `url("${source}")`;
+    el.style.backgroundRepeat = 'no-repeat';
+    el.style.imageRendering = 'pixelated';
+    el.style.backgroundSize = `100% ${frameCount * 100}%`;
+    el.style.backgroundPosition = `0% ${offset}%`;
+  },
+
+  /** Decode a screenshot of the probe box and say which frame its centre pixel came from. */
+  read: (dataUrl, box) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const mid = Math.floor(box / 2);
+      const px = ctx.getImageData(mid, mid, 1, 1).data;
+      resolve(px[0] === 255 && px[1] === 255 && px[2] === 0 ? 'tail' : px[0] + px[1] * 256);
+    };
+    img.src = dataUrl;
+  }),
 };
