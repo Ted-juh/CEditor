@@ -70,8 +70,48 @@
   let filterActive = $derived(filter !== '');
   let titleMatches = $derived(filterActive && title.toLowerCase().includes(filter));
 
-  // Visible-row counter, maintained by child PropertyCells via report(+/-1).
-  let visibleCount = $state(0);
+  /*
+   * Visible-row counter, maintained by child PropertyCells via report(+/-1).
+   *
+   * THE COUNTER IS NOT REACTIVE, AND THAT IS THE FIX. It used to be `$state`, and every search in
+   * the properties panel then died with `effect_update_depth_exceeded` — measured on a bare
+   * `BehaviorEditor` with nothing else on the page: "x", "gl", "t" and "to" all looped, while "glow"
+   * (which matches none of its rows) did not. So it fired on any PARTIAL match, which is every
+   * keystroke on the way to a real query: typing "glow" passes through "g", "gl" and "glo".
+   *
+   * The cycle is child-writes-parent-state: a cell's effect reports into the parent's `$state`, the
+   * parent's derived and template re-run, the cells' effects re-run and report again. So the count
+   * stays a plain number and only the BOOLEAN the template needs is mirrored into `$state`, once,
+   * in a microtask after every cell in this flush has spoken — and only when it actually changes.
+   */
+  let rawVisible = 0;
+  let anyVisible = $state(false);
+  let flushQueued = false;
+
+  function flushVisible() {
+    flushQueued = false;
+    const next = rawVisible > 0;
+    if (next !== anyVisible) anyVisible = next;
+  }
+
+  /*
+   * A new filter opens the section until its rows have had a chance to match, so nothing is hidden
+   * for the frame between the filter changing and the cells reporting — and then schedules the
+   * flush itself. That second half matters: a filter that matches NO row in this section produces
+   * no `report` call at all, so without this the section would stay open on the optimistic `true`
+   * and nothing would ever hide.
+   */
+  $effect(() => {
+    filter;
+    anyVisible = true;
+    queueFlush();
+  });
+
+  function queueFlush() {
+    if (flushQueued) return;
+    flushQueued = true;
+    queueMicrotask(flushVisible);
+  }
 
   // Shared with descendant cells via a $state proxy so reads stay reactive
   // across the component boundary; an effect mirrors the derived filter state in.
@@ -82,14 +122,17 @@
   });
   setContext('propertySection', {
     shared,
-    report(delta) { visibleCount += delta; },
+    report(delta) {
+      rawVisible += delta;
+      queueFlush();
+    },
   });
 
   // While filtering, force the grid open so matching rows can show (and report)
   // even if the user had collapsed the section.
   let renderGrid = $derived(!isCollapsed || filterActive);
   // Hide the whole section when a filter matches neither its title nor any row.
-  let hideSection = $derived(filterActive && !titleMatches && visibleCount === 0);
+  let hideSection = $derived(filterActive && !titleMatches && !anyVisible);
 
   function toggle() {
     const next = !isCollapsed;

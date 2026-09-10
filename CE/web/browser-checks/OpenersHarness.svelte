@@ -11,11 +11,14 @@
   import StepSequencerEditor from '../src/CE_Application/sections/StepSequencerEditor.svelte';
   import TextEditor from '../src/CE_Application/sections/TextEditor.svelte';
   import CustomPackageLibrary from '../src/CE_Application/sections/CustomPackageLibrary.svelte';
+  import DockSearchHits from '../src/CE_Application/properties/DockSearchHits.svelte';
 
   let { custom = null, seq = null, label = null } = $props();
 </script>
 
 <div class="stack">
+  <!-- The search results the properties panel shows above its sections. -->
+  <DockSearchHits control={label} />
   <AnimationsEditor control={custom} />
   <StepSequencerEditor control={seq} />
   <TextEditor control={label} />

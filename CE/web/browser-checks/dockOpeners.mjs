@@ -147,6 +147,43 @@ check('clicking the button does not collapse the section it sits in', () => {
   assert.equal(after, before, 'an opener vanished, so its section collapsed under the click');
 });
 
+// --- The search index -----------------------------------------------------------------------
+
+await ev(() => window.__ho.clearSearch());
+await settle();
+check('with no search there are no search results', async () => {});
+assert.deepEqual(await ev(() => window.__ho.hitRows()), []);
+
+await ev(() => window.__ho.search('x'));
+await settle();
+check('and a one-character search still has none — it would match half the index', async () => {});
+assert.deepEqual(await ev(() => window.__ho.hitRows()), []);
+
+await ev(() => window.__ho.search('glow'));
+await settle();
+const glowRows = await ev(() => window.__ho.hitRows());
+const glowTabs = await ev(() => window.__ho.hitTabs());
+check('searching for a property a tab owns says which tab, and what it matched', () => {
+  assert.equal(glowRows.length, 1, `rows: ${glowRows.join(' | ')}`);
+  assert.match(glowRows[0], /^Effects/);
+  assert.match(glowRows[0], /Glow/);
+  assert.deepEqual(glowTabs, ['effects']);
+});
+
+await ev(() => window.__ho.clearTarget());
+await ev(() => window.__ho.clickHit('effects'));
+await settle();
+check('and the result opens that tab on the control the panel is showing', () => {});
+assert.equal(await ev(() => window.__ho.activeTab()), 'Effects');
+assert.equal(await ev(() => window.__ho.target()), 'effects:ctrl_label:-');
+
+await ev(() => window.__ho.search('nothingcalledthis'));
+await settle();
+check('a search that matches nothing offers nothing', async () => {});
+assert.deepEqual(await ev(() => window.__ho.hitRows()), []);
+await ev(() => window.__ho.clearSearch());
+await settle();
+
 // --- And the dock still works by hand -----------------------------------------------------------
 
 await ev(() => window.__ho.clickDockTab('Colors'));

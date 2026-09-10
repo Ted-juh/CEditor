@@ -18,6 +18,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createCustomComponentPartsDefaults } from '../src/CE_Application/utils/customComponentFactory.js';
 import { editorTarget, clearEditorTarget } from '../src/CE_Application/stores/editorTarget.js';
 import { displayTabRequest } from '../src/CE_Application/stores/displayTab.js';
+import { propertyFilter, clearPropertyFilter } from '../src/CE_Application/stores/propertyFilter.js';
 
 const IDS = { custom: 'ctrl_custom', seq: 'ctrl_seq', label: 'ctrl_label' };
 
@@ -94,6 +95,17 @@ window.__ho = {
   dockHasPane: () => !!document.querySelector('#dock .tab-pane'),
   clickDockTab: (label) => {
     const btn = [...document.querySelectorAll('#dock .studio-tab')].find((b) => textOf(b) === label);
+    btn?.click();
+    return !!btn;
+  },
+
+  // --- the search index ------------------------------------------------------------------
+  search: (value) => propertyFilter.set(value),
+  clearSearch: () => clearPropertyFilter(),
+  hitRows: () => [...document.querySelectorAll('.dh-row')].map((row) => textOf(row.querySelector('.dh-what'))),
+  hitTabs: () => [...document.querySelectorAll('.dh-row .open-in-dock')].map((b) => (b.dataset.open ?? '').split(':')[0]),
+  clickHit: (tab) => {
+    const btn = [...document.querySelectorAll('.dh-row .open-in-dock')].find((b) => (b.dataset.open ?? '').startsWith(`${tab}:`));
     btn?.click();
     return !!btn;
   },

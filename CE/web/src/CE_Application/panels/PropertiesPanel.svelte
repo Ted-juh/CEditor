@@ -54,6 +54,7 @@
   import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
+  import DockSearchHits from '../properties/DockSearchHits.svelte';
   import PreviewInspector from './PreviewInspector.svelte';
   import TabIconBar from './TabIconBar.svelte';
   import TabContentArea from './TabContentArea.svelte';
@@ -482,6 +483,13 @@
       ontoggleview={toggleViewMode}
       ontogglepreview={togglePreviewMode}
     />
+
+    <!-- A property the panel no longer draws — or never drew — is still findable. The search hides
+         rows that do not match, so without this it returns nothing for anything a dock tab owns,
+         which reads as "this application does not have that". See utils/dockFieldIndex.js. -->
+    {#if !$previewModeEnabled}
+      <DockSearchHits control={$selectedControl} />
+    {/if}
 
     {#if $previewModeEnabled}
       <div class="preview-wrapper">
