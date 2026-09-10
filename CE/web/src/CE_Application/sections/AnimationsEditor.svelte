@@ -6,6 +6,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import HeaderPill from '../properties/HeaderPill.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Play from 'lucide-svelte/icons/play';
   import Target from 'lucide-svelte/icons/target';
   import Pencil from 'lucide-svelte/icons/pencil';
@@ -194,10 +195,20 @@
   });
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openAnimationTab()}
+  <OpenInDock tab="animation" controlId={core?.id ?? ''} what="this control's animations" compact />
+{/snippet}
+
 {#if multiEdit}
   <div class="placeholder">Animation editing is single-selection only right now.</div>
 {:else if animations}
-  <PropertySection title="Animation List" icon={Play}>
+  <PropertySection title="Animation List" icon={Play} tools={openAnimationTab}>
     <PropertyCell label="Add" span={3} hint="Create a new animation node.">
       <input class="val" type="text" bind:value={newAnimationName} placeholder="Animation name" />
     </PropertyCell>

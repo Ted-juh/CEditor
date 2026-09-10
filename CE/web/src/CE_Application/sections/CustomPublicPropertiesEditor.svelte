@@ -15,6 +15,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
 
   let { control = null } = $props();
 
@@ -222,7 +223,17 @@
   }
 </script>
 
-<PropertySection title="Public API" icon={Share2}>
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openApiTab()}
+  <OpenInDock tab="api" controlId={core?.id ?? ''} what="this component's contract" compact />
+{/snippet}
+
+<PropertySection title="Public API" icon={Share2} tools={openApiTab}>
   <PropertyCell label="Name" span={1} hint="The name this component is addressed by when a panel places it.">
     <div class="contract-card">
       <strong>{contractLabel}</strong>

@@ -81,7 +81,9 @@
     <div class="stage" bind:clientWidth={stageW} bind:clientHeight={stageH}
          onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
       {#if stageW > 0 && stageH > 0}
-        <TuringRenderer {control} width={stageW} height={stageH} />
+        <div class="fill">
+          <TuringRenderer {control} width={stageW} height={stageH} />
+        </div>
         <svg class="handles" width={stageW} height={stageH} viewBox={`0 0 ${stageW} ${stageH}`}>
           <!-- The gate threshold, which the panel sets as a number and shows nowhere. -->
           <line x1={geom.x0} y1={gateY} x2={geom.x0 + geom.w} y2={gateY}
@@ -172,6 +174,15 @@
     margin-bottom: 7px; white-space: nowrap; overflow: hidden;
   }
   .colh s { margin-left: auto; text-decoration: none; letter-spacing: 0.06em; }
+
+    /* The renderer and the hit layer are taken OUT OF FLOW on purpose.
+
+     `.stage` is `flex: 1 1 auto` and reports its size back through `bind:clientWidth/clientHeight`,
+     which the renderer is then drawn at. Leave the renderer in flow and that is a loop: the SVG's
+     height contributes to the container's height, which resizes the SVG, which... Svelte stops it
+     with `effect_update_depth_exceeded` and the tab freezes on whatever it had. Absolute positioning
+     means the drawing can never influence the box it is measured from. */
+  .fill { position: absolute; inset: 0; }
 
   .stage {
     position: relative; flex: 1 1 auto; min-height: 180px;

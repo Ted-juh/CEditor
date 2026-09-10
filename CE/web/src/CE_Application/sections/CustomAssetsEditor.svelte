@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Package from 'lucide-svelte/icons/package';
   import ImageIcon from 'lucide-svelte/icons/image';
   import Film from 'lucide-svelte/icons/film';
@@ -339,6 +340,20 @@
   }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openFilmstripsTab()}
+  <OpenInDock tab="assets" controlId={core?.id ?? ''} what="this component's filmstrips" compact />
+{/snippet}
+
+{#snippet openImagesTab()}
+  <OpenInDock tab="assets" controlId={core?.id ?? ''} what="this component's images" compact />
+{/snippet}
+
 {#if assets}
   <PropertySection title="Packaging" icon={Package}>
     <PropertyCell label="Embed" span={1} hint="Package images and filmstrips with saved components.">
@@ -355,7 +370,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Images" icon={ImageIcon}>
+  <PropertySection title="Images" icon={ImageIcon} tools={openImagesTab}>
     <PropertyCell label="Add" span={3} hint="Create a reusable image asset slot for this component package.">
       <input class="val" type="text" bind:value={newImageName} placeholder="imageName" />
     </PropertyCell>
@@ -404,7 +419,7 @@
     {/if}
   </PropertySection>
 
-  <PropertySection title="Filmstrips" icon={Film}>
+  <PropertySection title="Filmstrips" icon={Film} tools={openFilmstripsTab}>
     <PropertyCell label="Add" span={3} hint="Create a KnobMan-style filmstrip asset definition.">
       <input class="val" type="text" bind:value={newFilmstrip} placeholder="filmstripName" />
     </PropertyCell>

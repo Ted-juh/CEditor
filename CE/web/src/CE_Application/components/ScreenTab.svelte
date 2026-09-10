@@ -38,6 +38,7 @@
   import {
     editorTarget,
     activateEditorTarget,
+    armEditorTargetIfIdle,
     clearEditorTarget,
     targetOfKind,
   } from '../stores/editorTarget.js';
@@ -113,10 +114,13 @@
 
   // Opening the tab arms it on whatever is selected right now, and that is the only moment it
   // retargets — from then on it stays put and the header says what it is holding.
-  onMount(() => {
+    // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
+  // A target of another kind means another tab is being opened right now, and stealing it is how
+  // the properties panel's opener buttons looked broken. See stores/editorTarget.js.
+onMount(() => {
     if (mine) return;
     const first = [...($selectedComponentIds ?? [])][0];
-    if (first) activateEditorTarget('screen', first);
+    if (first) armEditorTargetIfIdle('screen', first);
   });
 
   function armFromSelection() {

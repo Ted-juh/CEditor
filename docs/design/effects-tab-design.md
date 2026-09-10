@@ -213,9 +213,10 @@ measured 1,067px is not yet recovered — that comes with the later, separate ch
 
 1. **Nothing is relocated yet.** Stripping the panel's Effects sections down to the toggle row plus
    an opener is the next change, and it needs the search-index work first.
-2. **No opener in the panel.** The tab is reached from the dock's tab strip, which arms it on the
-   current selection. A button in the panel's Effects section would be the obvious addition, and it
-   belongs with the stripping change rather than before it.
+2. **The opener is built** (2026-09-10). The Effects sections in `Text`, `EffectsEditor` and both
+   display editors carry a button into this tab — see
+   [`panel-to-dock-handoff.md`](panel-to-dock-handoff.md). Icon effects deliberately have none:
+   this tab does not cover them.
 3. **Lighting has the thinnest coverage.** `LIGHTING_GROUPS` carries backlight and dot matrix; the
    brightness/backlight *source* bindings stayed in the panel because they are parameter wiring, not
    something you judge by looking.

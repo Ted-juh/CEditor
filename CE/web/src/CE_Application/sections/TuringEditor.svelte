@@ -6,6 +6,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import Dices from 'lucide-svelte/icons/dices';
   import LogOut from 'lucide-svelte/icons/log-out';
@@ -42,8 +43,18 @@
   let rndPct = $derived(Math.round(clamp01(num(tr?.randomness, 0)) * 100));
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openDesignerTab()}
+  <OpenInDock tab="designer" controlId={core?.id ?? ''} what="this register" compact />
+{/snippet}
+
 {#if tr}
-  <PropertySection title="Turing Modulator" icon={Dices}>
+  <PropertySection title="Turing Modulator" icon={Dices} tools={openDesignerTab}>
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player.">
       <PropertyToggle value={tr.running !== false} onchange={() => set('running', !(tr.running !== false))} />
     </PropertyCell>

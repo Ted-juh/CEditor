@@ -2,6 +2,7 @@
   import { getSection, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import { creatorMode } from '../stores/creatorMode.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import {
@@ -493,8 +494,18 @@
   }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openLibraryTab()}
+  <OpenInDock tab="library" controlId={core?.id ?? ''} compact />
+{/snippet}
+
 {#if designer}
-  <PropertySection title="Library" icon={LibraryBig}>
+  <PropertySection title="Library" icon={LibraryBig} tools={openLibraryTab}>
     {#if $creatorMode === 'advanced' && currentSourcePackage}
       <PropertyCell label="Source" span={4} hint="Package provenance kept when this component was inserted or loaded from a reusable package.">
         <div class="source-package" class:changed={!currentPackageMatchesSource}>

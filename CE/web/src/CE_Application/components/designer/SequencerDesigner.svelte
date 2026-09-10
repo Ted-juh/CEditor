@@ -106,7 +106,9 @@
       onpointercancel={up}
     >
       {#if stageW > 0 && stageH > 0}
-        <StepSequencerRenderer {control} width={stageW} height={stageH} />
+        <div class="fill">
+          <StepSequencerRenderer {control} width={stageW} height={stageH} />
+        </div>
       {/if}
       {#if !lit}
         <p class="blank">Click a cell. Nothing in the application could do this before — the grid
@@ -196,6 +198,15 @@
     margin-bottom: 7px; white-space: nowrap; overflow: hidden;
   }
   .colh s { margin-left: auto; text-decoration: none; letter-spacing: 0.06em; }
+
+    /* The renderer and the hit layer are taken OUT OF FLOW on purpose.
+
+     `.stage` is `flex: 1 1 auto` and reports its size back through `bind:clientWidth/clientHeight`,
+     which the renderer is then drawn at. Leave the renderer in flow and that is a loop: the SVG's
+     height contributes to the container's height, which resizes the SVG, which... Svelte stops it
+     with `effect_update_depth_exceeded` and the tab freezes on whatever it had. Absolute positioning
+     means the drawing can never influence the box it is measured from. */
+  .fill { position: absolute; inset: 0; }
 
   .stage {
     position: relative;

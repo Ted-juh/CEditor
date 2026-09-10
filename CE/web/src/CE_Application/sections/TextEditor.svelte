@@ -27,6 +27,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { stateEditScope } from '../stores/stateEditScope.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
@@ -734,6 +735,28 @@
   }
 </script>
 
+<!--
+  The way into the dock tabs that cover these sections, in PropertySection's `tools` slot.
+
+  Type, Flow and Effects each have a tab now, and until this button existed none of them could be
+  reached from here — the only way in was to find the tab in the dock strip yourself and press "Use
+  selection". See utils/dockOpeners.js for why the handoff is two halves rather than one.
+
+  Three snippets rather than one because the target carries a DOMAIN: Font Settings, Typography and
+  Multiline are the Type tab's "type" half, Flow is its "flow" half, and Effects is the Effects
+  tab's "text" domain. One snippet with a computed domain would have to know which section rendered
+  it, which a snippet does not.
+-->
+{#snippet openType()}
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="type" what="this text's typography" compact />
+{/snippet}
+{#snippet openFlow()}
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="flow" what="this text's flow" compact />
+{/snippet}
+{#snippet openTextEffects()}
+  <OpenInDock tab="effects" controlId={core?.id ?? ''} domain="text" what="these text effects" compact />
+{/snippet}
+
 {#if text}
   <div class="text-editor-sections">
     <PropertySection
@@ -768,6 +791,7 @@
         icon={Type}
         collapsed={fontSectionCollapsed}
         ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
+        tools={openType}
       >
         <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
           <select
@@ -851,6 +875,7 @@
       icon={CaseSensitive}
       collapsed={typographySectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('typography'), value)}
+      tools={openType}
     >
       <PropertyCell label="Case" span={2} hint="Apply text case transforms including title, sentence, and small caps modes.">
         <select class="text-select" value={caseModeValue()} onchange={(event) => set('Text.Font.caseMode', event.target.value)}>
@@ -921,6 +946,7 @@
       icon={TextAlignJustify}
       collapsed={multilineSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('multiline'), value)}
+      tools={openType}
     >
       <PropertyCell
         label="Wrap"
@@ -1297,6 +1323,7 @@
       icon={Spline}
       collapsed={orientationSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('orientation'), value)}
+      tools={openFlow}
     >
       <PropertyCell label="Reading" span={4} hint="Choose the reading direction or mirror the text glyphs.">
         <div class="reading-row">
@@ -1514,6 +1541,7 @@
       icon={Sparkles}
       collapsed={effectsSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('effects'), value)}
+      tools={openTextEffects}
     >
       <PropertyCell label="Effects" span={4} hint="Apply text-specific effects to glyphs instead of the whole control box.">
         <div class="effect-toggle-grid">

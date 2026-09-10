@@ -12,6 +12,7 @@
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Grip from 'lucide-svelte/icons/grip';
   import Palette from 'lucide-svelte/icons/palette';
   import Ghost from 'lucide-svelte/icons/ghost';
@@ -333,9 +334,23 @@
   function removeScope(i) { const next = [...activeScope]; next.splice(i, 1); set('activeScope', next); }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openLightingTab()}
+  <OpenInDock tab="effects" controlId={core?.id ?? ''} domain="lighting" what="this screen's lighting" compact />
+{/snippet}
+
+{#snippet openScreenTab()}
+  <OpenInDock tab="screen" controlId={core?.id ?? ''} what="this screen's pages and elements" compact />
+{/snippet}
+
 {#if pixel}
   <div class="lcd-inspector">
-  <PropertySection title="Screen" icon={Monitor}>
+  <PropertySection title="Screen" icon={Monitor} tools={openScreenTab}>
     <PropertyCell label="Pixels W" span={1} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
       <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
@@ -843,7 +858,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting" icon={Lamp}>
+  <PropertySection title="Lighting" icon={Lamp} tools={openLightingTab}>
     <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>

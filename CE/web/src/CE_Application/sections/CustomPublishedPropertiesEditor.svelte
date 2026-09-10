@@ -7,6 +7,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import ArrowRightToLine from 'lucide-svelte/icons/arrow-right-to-line';
   import ArrowRightFromLine from 'lucide-svelte/icons/arrow-right-from-line';
   import Share2 from 'lucide-svelte/icons/share-2';
@@ -430,8 +431,18 @@
   }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openApiTab()}
+  <OpenInDock tab="api" controlId={core?.id ?? ''} what="this component's contract" compact />
+{/snippet}
+
 {#if published}
-  <PropertySection title="Public API" icon={Share2}>
+  <PropertySection title="Public API" icon={Share2} tools={openApiTab}>
     <PropertyCell label="Name" span={2} hint="Addressable name for external links and future scripts.">
       <input class="val" type="text" value={api?.addressableName ?? ''} onchange={(event) => set('ExternalAPI.addressableName', event.target.value)} />
     </PropertyCell>

@@ -91,6 +91,31 @@ export function activateEditorTarget(kind, controlId, domain = null) {
   return target;
 }
 
+/**
+ * Arm from the selection ONLY when nothing is armed at all.
+ *
+ * Every one of these tabs opens with "if nothing is pointed at me, point me at the selection", and
+ * for a long time that read "if nothing of MY kind is pointed at me" — which is a different thing,
+ * and wrong, because there is one target store and one dock. Measured the day the properties panel
+ * grew buttons that open these tabs:
+ *
+ *   click the opener on the Animations section  ->  target = animation:ctrl_custom, dock on Animation
+ *   click the opener on the Sequence section    ->  target = designer:ctrl_seq
+ *                                               ->  AnimationTab mounts, sees no ANIMATION target,
+ *                                                   and arms animation:ctrl_custom over the top
+ *
+ * The Designer tab never got its control, the dock went back to Animation, and the button looked
+ * broken. A target of another kind is not "nothing armed" — it means another tab is being opened
+ * right now, and a tab that is not that tab has no business overwriting it.
+ *
+ * The explicit "Use selection" button in each tab still calls `activateEditorTarget` directly: that
+ * is the user saying so out loud, which is allowed to take the target from whoever holds it.
+ */
+export function armEditorTargetIfIdle(kind, controlId, domain = null) {
+  if (get(editorTarget)) return null;
+  return activateEditorTarget(kind, controlId, domain);
+}
+
 /** Switch domain without re-arming, so a tab's own sub-switch keeps the same control. */
 export function setEditorTargetDomain(domain) {
   editorTarget.update((target) => {

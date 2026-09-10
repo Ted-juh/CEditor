@@ -121,7 +121,9 @@
       onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
     >
       {#if stageW > 0 && stageH > 0}
-        <EnvelopeRenderer {control} width={stageW} height={stageH} activeIndex={index} />
+        <div class="fill">
+          <EnvelopeRenderer {control} width={stageW} height={stageH} activeIndex={index} />
+        </div>
         <svg class="handles" width={stageW} height={stageH} viewBox={`0 0 ${stageW} ${stageH}`}>
           {#each dots as dot (dot.id)}
             <circle cx={dot.px} cy={dot.py} r={dot.index === index ? 6 : 4.5}
@@ -201,6 +203,15 @@
   }
   .colh s { margin-left: auto; text-decoration: none; letter-spacing: 0.04em; font-size: 8px; }
   .colh.nodes { margin-top: 10px; }
+
+    /* The renderer and the hit layer are taken OUT OF FLOW on purpose.
+
+     `.stage` is `flex: 1 1 auto` and reports its size back through `bind:clientWidth/clientHeight`,
+     which the renderer is then drawn at. Leave the renderer in flow and that is a loop: the SVG's
+     height contributes to the container's height, which resizes the SVG, which... Svelte stops it
+     with `effect_update_depth_exceeded` and the tab freezes on whatever it had. Absolute positioning
+     means the drawing can never influence the box it is measured from. */
+  .fill { position: absolute; inset: 0; }
 
   .stage {
     position: relative; flex: 1 1 auto; min-height: 180px;

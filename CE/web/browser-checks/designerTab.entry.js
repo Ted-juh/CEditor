@@ -52,7 +52,8 @@ window.__des = {
 
   // --- the stage is the component's own renderer -------------------------------------------
   stageSvgs: () => document.querySelectorAll('.stage svg').length,
-  rendererClass: () => [...document.querySelectorAll('.stage > svg')].map((s) => s.getAttribute('class')),
+  // The renderer sits in an absolutely-positioned .fill layer, so this is a descendant match.
+  rendererClass: () => [...document.querySelectorAll('.stage svg')].map((s) => s.getAttribute('class')),
   stageRects: () => document.querySelectorAll('.stage svg rect').length,
   stageBox: () => {
     const el = document.querySelector('.stage');

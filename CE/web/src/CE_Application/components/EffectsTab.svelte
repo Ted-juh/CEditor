@@ -25,6 +25,7 @@
   import {
     editorTarget,
     activateEditorTarget,
+    armEditorTargetIfIdle,
     setEditorTargetDomain,
     clearEditorTarget,
     targetOfKind,
@@ -74,10 +75,13 @@
   // Opening the tab arms it on whatever is selected right now, and that is the only moment it
   // retargets — from then on it stays put and the header says what it is holding. See
   // editorTarget.js for why that is the opposite of the Colors tab.
-  onMount(() => {
+    // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
+  // A target of another kind means another tab is being opened right now, and stealing it is how
+  // the properties panel's opener buttons looked broken. See stores/editorTarget.js.
+onMount(() => {
     if (mine) return;
     const first = [...($selectedComponentIds ?? [])][0];
-    if (first) activateEditorTarget('effects', first);
+    if (first) armEditorTargetIfIdle('effects', first);
   });
 
   // A row that vanishes (domain switch, or a shadow deleted from the array) must not leave the

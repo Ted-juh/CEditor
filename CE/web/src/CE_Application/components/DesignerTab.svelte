@@ -35,6 +35,7 @@
   import {
     editorTarget,
     activateEditorTarget,
+    armEditorTargetIfIdle,
     clearEditorTarget,
     targetOfKind,
   } from '../stores/editorTarget.js';
@@ -72,11 +73,16 @@
       .map((row) => row.label)
   );
 
+  // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
+  // A target of another kind means another tab is being opened right now, and stealing it is how
+  // the properties panel's opener buttons looked broken. See stores/editorTarget.js.
   onMount(() => {
     if (mine) return;
-    armFromSelection();
+    const first = [...($selectedComponentIds ?? [])][0];
+    if (first) armEditorTargetIfIdle('designer', first);
   });
 
+  /** The explicit button: the user saying so out loud, which may take the target from another tab. */
   function armFromSelection() {
     const first = [...($selectedComponentIds ?? [])][0];
     if (first) activateEditorTarget('designer', first);

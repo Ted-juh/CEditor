@@ -21,6 +21,7 @@
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Ghost from 'lucide-svelte/icons/ghost';
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
@@ -301,9 +302,23 @@
   function removeScope(i) { const next = [...activeScope]; next.splice(i, 1); set('activeScope', next); }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openLightingTab()}
+  <OpenInDock tab="effects" controlId={core?.id ?? ''} domain="lighting" what="this screen's lighting" compact />
+{/snippet}
+
+{#snippet openScreenTab()}
+  <OpenInDock tab="screen" controlId={core?.id ?? ''} what="this screen's pages and zones" compact />
+{/snippet}
+
 {#if display}
   <div class="lcd-inspector">
-  <PropertySection title="Screen" icon={Monitor}>
+  <PropertySection title="Screen" icon={Monitor} tools={openScreenTab}>
     <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
@@ -743,7 +758,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Lighting" icon={Lamp}>
+  <PropertySection title="Lighting" icon={Lamp} tools={openLightingTab}>
     <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
