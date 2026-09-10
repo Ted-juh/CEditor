@@ -1,0 +1,270 @@
+<title>API tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* App palette, as with the other mockups. NOTHING HERE IS BUILT. */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:18ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:64ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:26ch}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule);align-items:center}
+.dtabs button{border:1px solid transparent;background:transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.dtabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.dtabs .who{margin-left:auto;font:500 9px/1 var(--mono);color:var(--ink-4);padding-right:4px}
+.dtabs .who b{color:#8FEDE3}
+.cols{display:flex;gap:10px;padding:10px;align-items:flex-start}
+.colh{display:flex;align-items:center;gap:6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin-bottom:7px;white-space:nowrap}
+.colh s{margin-left:auto;text-decoration:none;font-size:8.5px}
+
+
+/* --- the contract table ----------------------------------------------- */
+.tablecol{flex:1 1 0;min-width:0}
+.setcol{flex:0 0 272px;min-width:0}
+.tbl{border:1px solid #2E3540;border-radius:4px;background:#12171A;overflow:hidden}
+.thead,.tr{display:grid;grid-template-columns:30px minmax(0,1.5fr) 54px minmax(0,1.7fr) 78px 62px 30px;align-items:center;gap:6px;padding:0 6px}
+.thead{background:#171D22;border-bottom:1px solid #2E3540}
+.th{padding:5px 0;font:600 8px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#4B545C;white-space:nowrap}
+.th.sorted{color:var(--teal)}
+.th.range,.th.def,.th.on{text-align:right}
+.tr{border-bottom:1px solid #1E242A;font:400 10px/1.3 var(--mono);color:var(--ink-2);padding:4px 6px}
+.tr:last-child{border-bottom:0}
+.tr.sel{background:#173449;box-shadow:inset 2px 0 0 var(--label)}
+.tr.off{opacity:.45}
+.tr.bad{background:#221D12;box-shadow:inset 2px 0 0 var(--warn)}
+.tr.bad.sel{background:#2A2417;box-shadow:inset 2px 0 0 var(--label)}
+.td{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td.dir{color:#69737B}
+.td.nm{color:#E8EEF5}
+.td.nm i{font-style:normal;color:var(--ink-4);margin-left:5px}
+.td.ty{color:var(--ink-3)}
+.td.tg{color:#93B0C4}
+.td.tg.miss{color:var(--warn)}
+.td.range,.td.def{text-align:right;color:var(--ink-3)}
+.td.on{display:flex;justify-content:flex-end}
+.dot{width:9px;height:9px;border-radius:50%;border:1px solid #3A434A;background:#2A2F33;display:block}
+.dot.lit{background:var(--teal);border-color:var(--teal-dim)}
+
+.alarm{font:600 9px/1 var(--sans);color:#F0D48A;border:1px solid #6B4A1E;background:#241d10;border-radius:3px;padding:4px 7px;white-space:nowrap}
+
+.setbox{border:1px solid var(--rule-2);border-radius:4px;background:#1A1D20;padding:6px 8px 9px}
+.grp{font:600 8px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:#4B545C;margin:9px 0 2px;padding-bottom:3px;border-bottom:1px solid #262B30}
+.grp:first-child{margin-top:2px}
+.r{display:grid;grid-template-columns:54px minmax(0,1fr);gap:6px;align-items:center;margin-top:6px}
+.r>label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.f{height:24px;display:flex;align-items:center;padding:0 6px;border:1px solid #2A2F33;border-radius:3px;background:#141719;font:500 10px/1 var(--mono);color:#9AA6AE}
+.f.stale{border-color:#4A3A1C;background:#241d10;color:var(--warn)}
+.sel2{height:26px;display:flex;align-items:center;padding:0 6px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);font:400 11px/1 var(--sans);color:var(--ink)}
+.seg{display:flex;height:26px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);overflow:hidden}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;font:500 10px/1 var(--sans);color:#8A949C}
+.seg span.on{background:#1B4972;color:#EAF5FF}
+.issue{border:1px solid #6B4A1E;background:#221D12;border-radius:4px;padding:6px 8px;margin-bottom:4px;font:400 9.5px/1.5 var(--sans);color:#D9BE8A}
+.issue b{display:block;color:#F0D48A;font-weight:600}
+.issue button{margin-top:5px;border:1px solid #6B4A1E;background:#2A2213;color:#F0D48A;font:600 9px/1 var(--sans);padding:4px 7px;border-radius:3px}
+
+/* before/after */
+.ba{display:grid;grid-template-columns:1fr 44px 1fr;gap:14px;align-items:start}
+.balabel{font:600 8.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);margin-bottom:8px}
+.balabel.a{color:var(--teal)}
+.arrowcol{display:flex;align-items:center;justify-content:center;color:var(--ink-4);font-size:20px;padding-top:70px}
+.pp{background:var(--panel);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.pphead{display:flex;gap:6px;padding:5px 8px;background:#181818;border-bottom:1px solid var(--rule);font:600 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+.pphead b{color:#8FEDE3}
+.pphead span{margin-left:auto}
+.ppsech{padding:5px 8px;background:#1a1a1a;border-bottom:1px solid #262626;font:600 8.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);text-align:right}
+.ppbody{padding:8px}
+.ppr{display:grid;grid-template-columns:54px minmax(0,1fr);gap:7px;align-items:center;margin-top:6px}
+.ppr>label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.tallytab{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.tally{border:1px solid var(--rule);border-radius:8px;background:var(--ground-2);padding:14px 16px}
+.tally h4{margin:0 0 8px;font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4)}
+.tally .big{font:700 30px/1 var(--sans);color:#E8EEF5;letter-spacing:-.02em}
+.tally .big.same{color:var(--warn)}
+.tally p{margin:8px 0 0;font-size:13px}
+@media (max-width:900px){ .ba{grid-template-columns:1fr}.arrowcol{display:none;padding:0}.tallytab{grid-template-columns:1fr} }
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; display panel &nbsp;·&nbsp; candidate 5 &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>The API tab</h1>
+  <p class="lede">A contract you cannot see, three answers to whether an entry works, and a shipped
+    default that publishes something no consumer will ever get.</p>
+  <div class="warnbar"><b>Built on 2026-09-10.</b> These are drawings; the shipped tab matches them
+    closely. Every number and every disagreement below was measured first — both editors mounted in
+    Chromium for the heights, and the shipped package validator run side by side with the shipped
+    path resolver for the rest.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>The height does not depend on the contract</h2>
+  <p>This is not the usual "the panel is too tall" case. It is the opposite. The sections that
+    <b>define</b> what a component publishes show one entry at a time behind a dropdown, so they
+    render at the same height whether the contract has eight entries or fifty. The section that
+    <b>lists</b> the contract is read-only and sits right underneath.</p>
+
+  <div class="tallytab">
+    <div class="tally">
+      <h4>Author · Published Inputs</h4>
+      <div class="big same">198px → 198px</div>
+      <p>8 entries, then 50. Outputs the same; Editable Properties 256px → 256px. Not one pixel,
+        because a dropdown does not grow.</p>
+    </div>
+    <div class="tally">
+      <h4>Consumer · the instance panel</h4>
+      <div class="big">860px → 2,203px</div>
+      <p>The surface that only <i>uses</i> the contract is the one that lists it.</p>
+    </div>
+  </div>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+        <div>
+          <div class="balabel">Today — one entry at a time, three times over</div>
+          <div class="pp">
+            <div class="pphead"><b>Publish</b><span>Contract</span></div>
+            <div class="ppsech">Published Inputs</div>
+            <div class="ppbody">
+              <div class="ppr"><label>Selected</label><div class="sel2">accentColour ▾</div></div>
+              <div class="ppr"><label>Enabled</label><div class="seg"><span>Off</span><span class="on">On</span></div></div>
+              <div class="ppr"><label>Label</label><div class="sel2">Accent Colour</div></div>
+              <div class="ppr"><label>Channel</label><div class="sel2">none ▾</div></div>
+              <div class="ppr"><label>Type</label><div class="sel2">color ▾</div></div>
+              <p style="font-size:10px;color:var(--ink-4);margin:10px 0 0">
+                Its channel is “none”, so the instance panel drops it. Nothing here says so, and the
+                other six entries are behind that dropdown.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel a">Proposed — the whole contract, and what each row really does</div>
+          <div class="tbl">
+            <div class="thead">
+              <span class="th sorted">Dir ▲</span><span class="th">Name</span><span class="th">Type</span>
+              <span class="th">Target</span><span class="th range">Range</span><span class="th def">Default</span><span class="th on">On</span>
+            </div>
+            <div class="tr bad sel"><span class="td dir">→</span><span class="td nm">accentColour <i>Accent Colour</i></span><span class="td ty">color</span><span class="td tg miss">mainValue</span><span class="td range">—</span><span class="td def">—</span><span class="td on"><i class="dot lit"></i></span></div>
+            <div class="tr"><span class="td dir">→</span><span class="td nm">gain <i>Gain</i></span><span class="td ty">float</span><span class="td tg">mainValue</span><span class="td range">0 … 1</span><span class="td def">0.5</span><span class="td on"><i class="dot lit"></i></span></div>
+            <div class="tr bad"><span class="td dir">→</span><span class="td nm">ghost <i>Ghost</i></span><span class="td ty">float</span><span class="td tg miss">noSuchChannel</span><span class="td range">—</span><span class="td def">—</span><span class="td on"><i class="dot lit"></i></span></div>
+            <div class="tr off"><span class="td dir">→</span><span class="td nm">muted <i>Muted</i></span><span class="td ty">float</span><span class="td tg">noSuchChannel</span><span class="td range">—</span><span class="td def">—</span><span class="td on"><i class="dot"></i></span></div>
+            <div class="tr"><span class="td dir">←</span><span class="td nm">level <i>Level</i></span><span class="td ty">float</span><span class="td tg">mainValue</span><span class="td range">—</span><span class="td def">—</span><span class="td on"><i class="dot lit"></i></span></div>
+            <div class="tr bad"><span class="td dir">·</span><span class="td nm">bogus <i>Bogus</i></span><span class="td ty">color</span><span class="td tg miss">Parts.…Fill.nonsenseKey</span><span class="td range">—</span><span class="td def">—</span><span class="td on"><i class="dot lit"></i></span></div>
+            <div class="tr"><span class="td dir">·</span><span class="td nm">caption <i>Caption</i></span><span class="td ty">text</span><span class="td tg">Parts.label.Text.content</span><span class="td range"></span><span class="td def">INIT</span><span class="td on"><i class="dot lit"></i></span></div>
+          </div>
+          <p style="font-size:10px;color:var(--ink-4);margin:10px 0 0">
+            Seven entries, one glance. Amber is “a consumer will never see this”; the dim row is
+            withheld on purpose, which is not the same thing.</p>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 1</div>
+      <p class="ct">Every column sorts. The dot publishes and withholds without leaving the table.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>Three answers to one question</h2>
+  <p>An editable property whose path is <code>Parts.background.Background.Fill.nonsenseKey</code>, on
+    a component that really does have a <code>background</code> part:</p>
+  <ul>
+    <li><b>The package validator</b> checks the FIRST segment of a path and passes everything after
+      it, so it reports nothing.</li>
+    <li><b>The author's editor</b> tests only whether the path is an empty string, so it reports
+      nothing.</li>
+    <li><b>The instance panel</b> resolves the whole path, gets <code>undefined</code>, and drops the
+      row — with no message anywhere.</li>
+  </ul>
+  <p>The author is the only person who can fix it and the only one not told. The tab gives the
+    author the instance panel's answer, because that is the one that decides whether the entry
+    exists at all.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui" style="max-width:300px">
+        <div class="setbox">
+          <div class="issue">
+            <b>Input “accentColour” never reaches a consumer.</b>
+            It targets variable "mainValue", which nothing reads — the instance panel drops it.
+            <button>target the "mainValue" channel instead</button>
+          </div>
+          <div class="grp">Entry</div>
+          <div class="r"><label>Name</label><div class="f">accentColour</div></div>
+          <div class="r"><label>Label</label><div class="sel2">Accent Colour</div></div>
+          <div class="r"><label>Type</label><div class="sel2">color ▾</div></div>
+          <div class="r"><label>Publish</label><div class="seg"><span>No</span><span class="on">Yes</span></div></div>
+          <div class="grp">Channel</div>
+          <div class="r"><label>Channel</label><div class="sel2">(none) ▾</div></div>
+          <div class="r"><label>Variable</label><div class="f stale">mainValue</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 2</div>
+      <p class="ct">The third finding, in one panel: the application's own factory publishes
+        <code>accentColour</code> against a <code>variable</code> rather than a channel, and nothing
+        in the application reads <code>variable</code>. Every custom component made from that
+        factory ships with an input the instance panel refuses to show. Applying the repair writes
+        the channel <i>and clears the stale field beside it</i> — leaving it would be the next
+        reader trusting it.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Decided while building</h2>
+  <ul>
+    <li><b>The tab reports the shipped default, it does not change it.</b> Changing
+      <code>createCustomComponentPublishedPropertiesDefaults</code> changes what every new component
+      gets, which is the owner's call rather than a side effect of a dock tab.</li>
+    <li><b>A withheld entry is not a broken one.</b> The first draft flagged any unresolvable
+      target; saying a switched-off entry "never reaches a consumer" is true and useless.</li>
+    <li><b>Adding and removing entries stays in the panel.</b> This tab edits the contract that
+      exists — one job, done properly.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="api-tab-design.md" style="color:var(--teal)">api-tab-design.md</a>,
+    which records what shipped.</p>
+</section>
+
+</div>
