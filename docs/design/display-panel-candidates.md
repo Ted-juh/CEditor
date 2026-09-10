@@ -1,9 +1,12 @@
 # What could go in the display panel
 
 Status: **a worklist.** Candidates 1 to 6 are built — Effects, Typography, Assets, Screen, API and
-Library are dock tabs now, each with its own design record. Candidate 6 is worth noting: its space
-argument was measured and REJECTED (the section is capped and stops growing), and it was built on
-its other findings instead. The measurement is the point of this list, not the ranking. Nothing is removed from the properties panel yet. The
+Library are dock tabs now, each with its own design record. Candidate 7 was worked through and
+**turned down**: see [`fill-layers-not-a-tab.md`](fill-layers-not-a-tab.md). Two entries are worth
+noting for what they say about the list itself. Candidate 6's space argument was measured and
+rejected (the section is capped and stops growing) and it was built on its other findings instead;
+candidate 7 had no findings at all once checked, and is not built. The measurement is the point of
+this list, not the ranking. Nothing is removed from the properties panel yet. The
 rest of the list is for working through one entry at a time — is it worth it, and what does it look
 like.
 
@@ -52,7 +55,7 @@ proposal to argue about.
 | 4 | The screen (LcdDisplay, PixelDisplay) | 2 | 3,814px measured | **built** |
 | 5 | Published API | CustomPublicProperties, CustomPublishedProperties | 4,183px measured | **built** |
 | 6 | Component library | CustomPackageLibrary | 647px, capped | **built** — but not for the space |
-| 7 | Image / Texture layers | Background, Text, PanelCardContent | ~890px | medium |
+| 7 | Image / Texture layers | Background, Text, PanelCardContent | 510px per layer | **rejected** — already shared, no finding |
 | 8 | Animation | Animations, Display, PixelDisplay | ~870px | medium |
 | 9 | Per-component designers | ~12 components | varies | medium, and the most interesting |
 | 10 | Device bindings | DeviceBindings | 347px | weak |
