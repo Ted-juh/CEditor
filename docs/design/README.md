@@ -75,11 +75,12 @@ outlived them is here rather than in a document that reads as open:
   nobody acted on are in [known-issues.md](../known-issues.md). Pinned by
   `CE/web/test/surfaceDecomposition.test.js`.
 
-A fifth document is open rather than retired:
+Two documents are open rather than retired, and they are a pair — read the space plan first:
 
 | Document | What it is |
 |---|---|
-| [A widget model for the creator](widget-model-creator-plan.md) | *Nothing built.* The creator already has most of the canvas tooling a design tool needs, so the reason it feels property-heavy is elsewhere: it offers a graph of nine primitive lists joined by name strings, or a starter patch that dissolves into that graph, with no persistent object in between. Counts the cost (about 500 addressable fields behind one dial) and proposes a `Widget` node that stores the grouping instead of inferring it, caps its Essentials panel at eight controls, compiles down to the primitives the runtime already renders, and unpacks one way when the graph is wanted. Five phases, each useful on its own. Drawn in [`widget-model-mockups.html`](widget-model-mockups.html). |
+| [Making room in the properties panel](property-panel-space-plan.md) | *Nothing built.* The panel is 600px wide, four columns, 65 tabs, and the Text tab renders 3,090px tall — four and a half screens, of which two sections are 56%. The proposal is to relocate wide property groups (effects, typography, image layers) into display-panel tabs and compound in-panel widgets, on the argument that the panel is portrait and the dock is landscape and can show you the result while you edit. Establishes that three versions of this already ship — the colour/gradient target stores, `BorderCornerWidget` collapsing 178 fields into one diagram, and `LayerEffectsSection` serving four owners — so the work is generalising a mechanism rather than inventing one. Names the two things that would bite: the panel's search box would stop finding relocated properties, and the dock write path appears not to honour multi-selection. Drawn in [`property-panel-space-mockups.html`](property-panel-space-mockups.html). |
+| [A widget model for the creator](widget-model-creator-plan.md) | *Nothing built. Reordered behind the space plan.* Why a starter leaves eleven anonymous nodes: the creator offers a graph of nine primitive lists joined by name strings, or a one-shot patch that dissolves into it, with no persistent object between. Proposes a `Widget` node that stores the grouping instead of inferring it, compiles down to the primitives the runtime already renders, and unpacks one way. Two things were withdrawn after review: the eight-control cap (the space plan supersedes it — the count is not the problem) and the arc, endpoint and inflate canvas handles (too fiddly; only the count handle survives). Drawn in [`widget-model-mockups.html`](widget-model-mockups.html). |
 
 ## Post-beta bets
 

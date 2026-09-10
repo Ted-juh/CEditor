@@ -1,6 +1,14 @@
 # A widget model for the custom component creator
 
-Status: **proposal only. Nothing here is built.**
+Status: **proposal only. Nothing here is built. Reordered 2026-09-10 — see below.**
+
+**This plan now runs second.** [`property-panel-space-plan.md`](property-panel-space-plan.md)
+proposes relocating wide property groups (effects, typography, image layers) into display-panel tabs
+and compound widgets. That is cheaper, needs no data model change, and improves all 65 editors
+rather than only custom components, so it goes first. Two things in this document were withdrawn as
+a result: the eight-control cap (§ Property budget) and most of the on-canvas handles
+(§ On-canvas handles). What survives is the part relocation does not fix — that the primitive lists
+reference each other by name string and a compound control has no object you can select.
 
 Six mockups of what this would look like are drawn in
 [`widget-model-mockups.html`](widget-model-mockups.html): the six editors one dial costs
@@ -117,14 +125,21 @@ the flat lists, and the author is back to editing them directly with nothing reb
 top. This matches Figma's "detach instance" and Illustrator's "expand", and it uses the idea already
 in the inspector header (`detachSelectedLayer`, the scissors button).
 
-## Property budget
+## Property budget — withdrawn
 
-Proposed rule:
+This section proposed that a widget's Essentials panel hold at most eight controls, enforced by a
+unit test. **That is withdrawn**, and the reasoning is worth keeping rather than deleting, because
+the cap was a plausible answer to the wrong question.
 
-> A widget type's Essentials panel holds at most eight controls, and the limit is checked by a unit
-> test over the widget manifest.
+The cap treated the *number* of properties as the problem. It is not: a font legitimately has forty
+settings, and hiding thirty-two of them behind a **More** button does not make a font easier to set
+— it makes it harder to find. The problem is the *space* forty settings occupy in a 600px portrait
+strip four columns wide. The space plan measures this: the Text tab is 3,090px tall, of which two
+sections are 56%.
 
-Without a test, the schema grows back over time and the result is a rename rather than a change.
+So a widget inspector holds what the widget needs, and its wide groups route to the dock the same
+way every other editor's do. The example below is still the right shape for a dial — it is just no
+longer a budget being met.
 
 ### Example: the Dial
 
@@ -140,7 +155,7 @@ Under this proposal, one Dial widget with one inspector:
 | Control | What it sets |
 |---|---|
 | Range | min, max, default |
-| Arc | start angle and sweep, as an on-canvas handle rather than two number fields |
+| Arc | start angle and sweep |
 | Track | colour and thickness |
 | Fill | colour of the value arc |
 | Pointer | shape and colour |
@@ -148,7 +163,8 @@ Under this proposal, one Dial widget with one inspector:
 | Steps | continuous, stepped (n), or enum list |
 | Publish | name and exposed toggle |
 
-Everything else stays reachable through Advanced mode or Unpack. Nothing is removed.
+Everything else stays reachable through Advanced mode or Unpack. Nothing is removed, and
+nothing is capped.
 
 ### Proposed widget list
 
@@ -165,22 +181,26 @@ All of these already exist as capabilities. None needs new runtime code:
 About eighteen types. All of them are things the player renders today. None of them is currently
 visible as a single object.
 
-## On-canvas handles
+## On-canvas handles — mostly withdrawn
 
-These depend on widgets existing first, since a handle needs an owner for the property it edits.
+The first draft proposed dragging arc start and sweep on the artboard, dragging slider track
+endpoints, and dragging radial handles. **Those are withdrawn as too fiddly**, which is the right
+call: an angle you set by dragging a 7px dot on a 168px circle is a worse control than a number
+field, not a better one, and it cannot be typed, nudged or copied. A handle has to beat the field it
+replaces, and for a value with an exact number in it the field usually wins.
 
-- **Dial and Arc**: drag the arc's start and end points on the artboard instead of typing two
-  angles.
-- **Slider and Range**: drag the track endpoints; min and max handles snap to them.
-- **LED Ring, Step Bar, Ticks, Pad Grid**: a count handle you drag to add or remove elements. Today
-  `count`, `rows` and `columns` are numbers in the Generators tab and you cannot see the result
-  until you stop typing.
-- **Hit zone inflate**: a dashed outline you drag outward. The overlay is already drawn
-  (`hit-zone`); it is not draggable as an inflate value.
-- **Publish gutter**: a strip down the right edge listing exposed properties with a line to the
-  widget that owns each one, so an empty contract is visible without opening a tab.
-- **Style swatches on the widget on hover**: track, fill, pointer, instead of a colour picker three
-  tabs away.
+What survives is the case where there is no good field to begin with — a count, where the field
+tells you nothing until you stop typing and look:
+
+- **Count handle** — LED Ring, Step Bar, Ticks, Pad Grid. Drag to add or remove elements and watch
+  them appear. Today `count`, `rows` and `columns` are numbers in the Generators tab and the result
+  is invisible while you type. This is the one worth building.
+- **Publish gutter** — a strip down the right edge listing exposed properties with a line to the
+  widget that owns each one, so an empty contract is visible without opening a tab. Not a handle;
+  it edits nothing. Kept because it answers "what does this component expose" at a glance.
+
+Dropped: arc start/sweep handles, slider and range track endpoints, the draggable grab-area
+outline, and hover style swatches on the widget. Angles, endpoints and inflate stay as fields.
 
 ## Where widgets come from
 
@@ -226,19 +246,20 @@ acceptance test for the migration, and it should be written before the migration
 
 ## Phases
 
-Each phase is useful on its own.
+These run **after** the space plan's phases 0 to 3. Each is useful on its own.
 
 | Phase | What | Value if work stops here |
 |---|---|---|
-| 0 | `widgetTypes.js`: a pure manifest of id, label, icon, essential schema (max 8), materializer, handle list, unpack rule. Plus the max-8 test. | Nothing shipped yet, but it is the file everything else reads and it is cheap to review before code exists. |
-| 1 | A `Widgets` section on `CustomComponent`, the v1 to v2 migration, and declared widgets replacing derived clusters and `meta.kitId` groups in the layer tree. | Kits become real objects you can select, name and delete as a unit. |
-| 2 | `WidgetInspector.svelte`, replacing the Object/Display/Behavior tabs when the selection is a widget. Raw parts keep the existing four tabs. | This is the phase that answers the original request: about 8 controls instead of about 500. |
-| 3 | On-canvas handles: arc ends, track endpoints, count handle, inflate outline, publish gutter. | The most visible improvement, but it needs phases 1 and 2 first. |
-| 4 | Starters and recipes re-expressed as widget presets; palette becomes a widget palette. | Replaces two parallel systems with one. |
+| W0 | `widgetTypes.js`: a pure manifest of id, label, icon, property schema, materializer, unpack rule. No cap, no cap test. | Nothing shipped yet, but it is the file everything else reads and it is cheap to review before code exists. |
+| W1 | A `Widgets` section on `CustomComponent`, the v1 to v2 migration, and declared widgets replacing derived clusters and `meta.kitId` groups in the layer tree. | Kits become real objects you can select, name and delete as a unit. |
+| W2 | `WidgetInspector.svelte`, replacing the Object/Display/Behavior tabs when the selection is a widget. Raw parts keep the existing four tabs. Wide groups route to the dock like every other editor's. | One coherent panel for a control that today is edited across six. |
+| W3 | The count handle for LED Ring, Step Bar, Ticks and Pad Grid, and the publish gutter. | The two on-canvas ideas that survived review. |
+| W4 | Starters and recipes re-expressed as widget presets; palette becomes a widget palette. | Replaces two parallel systems with one. |
 
-Phase 2 is the one to judge the plan by. If phases 0 and 1 land and the inspector still needs twenty
-controls to be useful, the widget list is wrong and the fix is fewer, broader widget types rather
-than a larger panel.
+W1 is now the phase to judge this by, not W2. Its whole claim is that storing the grouping beats
+inferring it — if declared widgets do not visibly beat `deriveInteractClusters` and `meta.kitId` in
+the layer tree, the rest does not follow. W2's original claim (about 8 controls instead of about
+500) belonged to the withdrawn cap and to the space plan.
 
 ## Open questions
 
@@ -253,11 +274,17 @@ than a larger panel.
 3. **Who owns the published contract?** If a widget publishes its property automatically, the
    `PublishedProperties` list becomes partly derived and partly authored. That split needs deciding
    before phase 1.
-4. **Does the Simple/Advanced toggle still earn its place?** If Essentials is capped at eight, Simple
-   mode may have nothing left to hide.
+4. **Does the Simple/Advanced toggle still earn its place?** Open, but for a different reason now
+   that the cap is gone: if the space plan moves the wide groups out, Simple mode may be hiding
+   tabs that were no longer crowded.
 
 ## Notes
 
 New ideas go here rather than in the sections above.
 
 - 2026-09-10: Written. Phases 0 to 4 as above, nothing built.
+- 2026-09-10: Reordered behind [`property-panel-space-plan.md`](property-panel-space-plan.md) after
+  the owner pointed out that the problem is the space properties occupy, not how many there are, and
+  that the display panel's colour and gradient tabs are already the pattern for fixing it. Two things
+  withdrawn: the eight-control cap, and the arc, endpoint and inflate handles as too fiddly. Phases
+  renumbered W0 to W4 to make the dependency visible.
