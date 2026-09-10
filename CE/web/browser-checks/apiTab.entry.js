@@ -52,6 +52,29 @@ const live = () => get(panels)[0].controls[0]._children.PublishedProperties;
 
 window.__api = {
   target: () => get(editorTarget),
+
+  // --- making and unmaking an entry ------------------------------------------------------
+  storedNames: (map) => Object.keys(live()?.[map] ?? {}),
+  pickKind: (kind) => {
+    const select = document.querySelector('.addrow select');
+    if (!select) return false;
+    select.value = kind;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  },
+  typeName: (value) => {
+    const input = document.querySelector('.addrow input');
+    if (!input) return false;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  },
+  clickAdd: () => { document.querySelector('.addrow .mk')?.click(); },
+  removeRow: (name) => {
+    const row = [...document.querySelectorAll('.tr')].find((r) => textOf(r.querySelector('.name')).split(' ')[0] === name);
+    row?.querySelector('.drop')?.click();
+    return !!row;
+  },
   head: () => textOf(document.querySelector('.who')),
   alarm: () => textOf(document.querySelector('.alarm')),
 

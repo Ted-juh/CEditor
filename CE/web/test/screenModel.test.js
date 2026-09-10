@@ -36,6 +36,13 @@ import {
   pointToCell,
   renderedRect,
   offGridEdge,
+  itemListPath,
+  itemIdPrefix,
+  nextItemId,
+  newScreenItem,
+  itemsWithAdded,
+  itemsWithRemoved,
+  itemsWithDuplicated,
 } from '../src/CE_Application/utils/screenModel.js';
 import { composeLayout, resolveActiveLayoutId } from '../src/CE_Application/utils/lcdZones.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
@@ -347,4 +354,63 @@ test('a pixel element hanging over the edge is drawn as the part that survives',
     { x: 120, y: 0, w: 8, h: 8 });
   assert.equal(renderedRect(element({ x: 500, y: 0 }), pixGrid, 'pixel'), null);
   assert.equal(offGridEdge(element({ x: 500, y: 0 }), pixGrid, 'pixel'), 'right');
+});
+
+
+// --- Making and unmaking an item --------------------------------------------
+// Adding, removing and duplicating a zone used to stay in the properties panel, which is a gap the
+// moment the panel's rows come out. The shapes live in the model so both surfaces make the same
+// thing.
+
+test('an item list writes back to the path its layout lives at', () => {
+  assert.equal(itemListPath('lcd', { flat: true }), 'Display.zones');
+  assert.equal(itemListPath('lcd', { flat: false, index: 2 }), 'Display.layouts.2.zones');
+  assert.equal(itemListPath('pixel', { flat: true }), 'Pixel.elements');
+  assert.equal(itemListPath('pixel', { flat: false, index: 0 }), 'Pixel.layouts.0.elements');
+  assert.equal(itemListPath('lcd', null), '');
+  assert.equal(itemListPath('nope', { flat: true }), '');
+});
+
+test('a new id is the lowest one free, not a timestamp', () => {
+  // The panel's genId is time-based, so two things made in the same millisecond collide.
+  assert.equal(nextItemId([], 'z_'), 'z_0');
+  assert.equal(nextItemId([{ id: 'z_0' }, { id: 'z_1' }], 'z_'), 'z_2');
+  assert.equal(nextItemId([{ id: 'z_1' }], 'z_'), 'z_0', 'a gap is reused');
+  assert.equal(itemIdPrefix('lcd'), 'z_');
+  assert.equal(itemIdPrefix('pixel'), 'el_');
+});
+
+test('a new zone is the shape the LCD editor makes', () => {
+  const zone = newScreenItem('lcd', [], { cols: 16 });
+  assert.equal(zone.id, 'z_0');
+  assert.equal(zone.row, 1);
+  assert.equal(zone.colStart, 1);
+  assert.equal(zone.colEnd, 8, 'eight columns, or the width if it is narrower');
+  assert.equal(zone.show, 'static');
+  assert.equal(newScreenItem('lcd', [], { cols: 5 }).colEnd, 5);
+});
+
+test('and a new element is the shape the pixel editor makes', () => {
+  const element = newScreenItem('pixel', [], { h: 32 });
+  assert.equal(element.id, 'el_0');
+  assert.equal(element.kind, 'vbar');
+  assert.equal(element.h, 24, 'eight pixels shy of the screen');
+  assert.equal(element.visible, true);
+  assert.equal(newScreenItem('pixel', [], { h: 10 }).h, 8, 'never below eight');
+});
+
+test('adding, removing and duplicating all return a new list', () => {
+  const items = [{ id: 'z_0', row: 1 }, { id: 'z_1', row: 2 }];
+  assert.equal(itemsWithAdded(items, { id: 'z_2' }).length, 3);
+  assert.equal(items.length, 2, 'the original is untouched');
+  assert.deepEqual(itemsWithRemoved(items, 0).map((i) => i.id), ['z_1']);
+  assert.deepEqual(itemsWithRemoved(items, 9).map((i) => i.id), ['z_0', 'z_1'], 'an index off the end changes nothing');
+});
+
+test('a duplicate sits after its original and carries an id of its own', () => {
+  const items = [{ id: 'z_0', row: 1, text: 'A' }, { id: 'z_1', row: 2 }];
+  const next = itemsWithDuplicated(items, 0, 'z_');
+  assert.deepEqual(next.map((i) => i.id), ['z_0', 'z_2', 'z_1']);
+  assert.equal(next[1].text, 'A', 'and everything else about it');
+  assert.deepEqual(itemsWithDuplicated(items, 5, 'z_').map((i) => i.id), ['z_0', 'z_1']);
 });

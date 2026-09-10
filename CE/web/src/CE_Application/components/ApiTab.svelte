@@ -22,10 +22,11 @@
    * panel's rows come out.
    */
   import { onMount } from 'svelte';
+  import Plus from 'lucide-svelte/icons/plus';
   import ContractTable from './api/ContractTable.svelte';
   import EntrySettings from './api/EntrySettings.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { applyControlPatch, updateControlProperty, getSection } from '../stores/controls.js';
+  import { applyControlPatch, updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
   import { flatControls } from '../utils/containment.js';
   import { validateCustomComponentPackage } from '../utils/customComponentPackage.js';
   import {
@@ -41,6 +42,9 @@
     sortRows,
     contractCounts,
     entryPath,
+    uniqueEntryName,
+    newEntryShape,
+    API_KINDS,
     API_KIND_META,
   } from '../utils/publicApiModel.js';
 
@@ -124,6 +128,33 @@ onMount(() => {
     updateControlProperty(controlId, entryPath(row.kind, row.name, 'enabled'), !row.enabled);
   }
 
+  // --- Making and unmaking an entry ------------------------------------------------------------
+  // This used to stay in the properties panel, which is fine while the panel still draws it and a
+  // gap the moment it does not. The shapes are publicApiModel's, so both surfaces make the same
+  // thing — and unlike the panel's three Add functions, a duplicate name is suffixed rather than
+  // silently doing nothing.
+  let newKind = $state('input');
+  let newName = $state('');
+
+  function addEntry() {
+    if (!controlId) return;
+    const taken = rows.filter((row) => row.kind === newKind).map((row) => row.name);
+    const meta = API_KIND_META[newKind];
+    const name = uniqueEntryName(taken, newName, meta?.one ?? 'entry');
+    const target = newKind === 'property' ? (pathSuggestions[0] ?? '') : (channels[0] ?? '');
+    const shape = newEntryShape(newKind, name, target);
+    if (!shape) return;
+    updateControlProperty(controlId, entryPath(newKind, name), shape);
+    newName = '';
+    wantedKey = `${newKind}:${name}`;
+  }
+
+  function removeEntry(row) {
+    if (!controlId || !row) return;
+    removeControlNode(controlId, entryPath(row.kind, row.name));
+    if (wantedKey === row.key) wantedKey = '';
+  }
+
   /**
    * Applying a repair clears the field it replaces. A `variable` left beside the `channel` that
    * supersedes it is the stale spelling still sitting there for the next reader to trust.
@@ -184,6 +215,7 @@ onMount(() => {
         <div class="colh">Contract <s>{counts.total} {counts.total === 1 ? 'entry' : 'entries'}</s></div>
         <ContractTable
           rows={sorted}
+          onremove={removeEntry}
           {selectedKey}
           {sortColumn}
           {sortDirection}
@@ -195,6 +227,17 @@ onMount(() => {
 
       <div class="setcol">
         <div class="colh">{selected ? API_KIND_META[selected.kind].label : 'Entry'}</div>
+        <div class="addrow">
+          <select class="mini" value={newKind} aria-label="Kind to add"
+                  onchange={(event) => { newKind = event.currentTarget.value; }}>
+            {#each API_KINDS as kind (kind)}<option value={kind}>{API_KIND_META[kind].label}</option>{/each}
+          </select>
+          <input class="mini txt" type="text" value={newName} placeholder={API_KIND_META[newKind].one}
+                 aria-label="New entry name"
+                 oninput={(event) => { newName = event.currentTarget.value; }}
+                 onkeydown={(event) => { if (event.key === 'Enter') addEntry(); }} />
+          <button type="button" class="mk" onclick={addEntry}><Plus size={11} /> Add</button>
+        </div>
         <EntrySettings
           row={selected}
           {channels}
@@ -208,6 +251,22 @@ onMount(() => {
 </div>
 
 <style>
+  .addrow { display: flex; gap: 4px; margin-bottom: 8px; }
+  .mini {
+    box-sizing: border-box; height: 24px; min-width: 0;
+    background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD;
+    font: 400 10px/1 'IBM Plex Sans', system-ui, sans-serif; padding: 0 5px; outline: none;
+  }
+  .mini.txt { flex: 1 1 auto; }
+  .mini:focus { border-color: #5B9BD5; }
+  .mk {
+    display: inline-flex; align-items: center; gap: 3px;
+    border: 1px solid #0E7C70; background: #0B2320; color: #8FEDE3;
+    font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif;
+    padding: 0 7px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .mk:hover { border-color: #14B8A6; color: #C9FFF8; }
+
   .api-tab {
     height: 100%;
     display: flex;

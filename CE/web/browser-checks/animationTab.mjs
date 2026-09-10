@@ -45,6 +45,7 @@ await page.waitForTimeout(500);
 
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
+const settle = () => page.waitForTimeout(320);
 
 // --- The dead targets, which is why the tab exists --------------------------------------------
 
@@ -163,6 +164,52 @@ const rootTargets = await ev(() => window.__anim.targetVerdicts());
 check('selecting the other animation shows its own targets', () => {
   assert.deepEqual(rootTargets, ['opacity'], `rows: ${rootTargets.join(' | ')}`);
 });
+
+// --- Making and unmaking an animation ----------------------------------------------------------
+
+const namesBefore = await ev(() => window.__anim.storedNames());
+await ev(() => window.__anim.typeNewName('fadeOut'));
+await settle();
+await ev(() => window.__anim.clickAdd());
+await settle();
+check('an animation can be created here — it used to need the properties panel', () => {
+  assert.deepEqual(namesBefore, ['pressMotion', 'hoverGlow']);
+});
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'fadeOut']);
+assert.deepEqual(await ev(() => window.__anim.animationNames()), ['pressMotion', 'hoverGlow', 'fadeOut']);
+
+await ev(() => window.__anim.typeNewName('fadeOut'));
+await settle();
+await ev(() => window.__anim.clickAdd());
+await settle();
+check('and a duplicate name is suffixed rather than silently doing nothing', async () => {});
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'fadeOut', 'fadeOut2']);
+
+check('the Add button is dead until something is typed', async () => {});
+assert.equal(await ev(() => window.__anim.addDisabled()), true);
+
+await ev(() => window.__anim.beginRename('fadeOut2'));
+await settle();
+await ev(() => window.__anim.typeRename('fadeOut'));
+await settle();
+const clash = await ev(() => window.__anim.renameError());
+check('a rename onto a name in use says so instead of losing one', () => {
+  assert.match(clash, /already an animation called fadeOut/);
+});
+
+await ev(() => window.__anim.typeRename('fadeSlow'));
+await settle();
+await ev(() => window.__anim.clickRename());
+await settle();
+check('and a rename that works moves the animation, keeping what was in it', async () => {});
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow', 'fadeOut', 'fadeSlow']);
+
+await ev(() => window.__anim.removeAnimation('fadeSlow'));
+await settle();
+await ev(() => window.__anim.removeAnimation('fadeOut'));
+await settle();
+check('and deleting takes them back off', async () => {});
+assert.deepEqual(await ev(() => window.__anim.storedNames()), ['pressMotion', 'hoverGlow']);
 
 // --- The rules --------------------------------------------------------------------------------
 

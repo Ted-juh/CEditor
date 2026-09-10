@@ -26,6 +26,9 @@
    * losing it rather than moving it.
    */
   import { onMount } from 'svelte';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import PageList from './screen/PageList.svelte';
   import ScreenStage from './screen/ScreenStage.svelte';
   import ItemSettings from './screen/ItemSettings.svelte';
@@ -49,6 +52,12 @@
     layoutsOf,
     findScreenLayout,
     itemPathBase,
+    itemListPath,
+    itemIdPrefix,
+    newScreenItem,
+    itemsWithAdded,
+    itemsWithRemoved,
+    itemsWithDuplicated,
     rectPatch,
     placementIssue,
     placementIssues,
@@ -154,6 +163,40 @@ onMount(() => {
     setRect(selectedIndex, rect);
   }
 
+  // --- Making and unmaking an item -------------------------------------------------------------
+  // This used to stay in the properties panel, which is fine while the panel still draws it and a
+  // gap the moment it does not. The shapes are screenModel's, so both surfaces make the same thing.
+  function writeItems(next) {
+    const path = itemListPath(kind, layout);
+    if (!controlId || !path) return;
+    updateControlProperty(controlId, path, next);
+  }
+
+  function addItem() {
+    if (!layout) return;
+    const at = items.length;
+    writeItems(itemsWithAdded(items, newScreenItem(kind, items, grid)));
+    rawIndex = at;
+  }
+
+  function removeItem(index) {
+    if (!layout || index < 0) return;
+    // Read the length BEFORE the write: `items` is derived from the control and is already the new
+    // list by the next line, which selected the wrong row.
+    const was = items.length;
+    writeItems(itemsWithRemoved(items, index));
+    // Select whatever took its place, the way a list does. Clearing to -1 would look like nothing
+    // is selected and is not: `selectedIndex` falls back to the first item, so a second click on
+    // Remove would delete something at the other end of the list.
+    rawIndex = was > 1 ? Math.min(index, was - 2) : -1;
+  }
+
+  function duplicateItem(index) {
+    if (!layout || index < 0) return;
+    writeItems(itemsWithDuplicated(items, index, itemIdPrefix(kind)));
+    rawIndex = index + 1;
+  }
+
   function reorder(from, to) {
     if (!controlId || !screen) return;
     const section = SCREEN_SECTION_BY_KIND[kind];
@@ -221,6 +264,14 @@ onMount(() => {
         <div class="colh">
           {layout?.name ?? 'Screen'}
           <s>{items.length} {items.length === 1 ? names.one : names.many}</s>
+          <span class="itemtools">
+            <button type="button" disabled={!layout} title={`Add another ${names.one} to this layout`}
+                    onclick={addItem}><Plus size={10} /> {names.one}</button>
+            <button type="button" disabled={selectedIndex < 0} title={`Duplicate ${names.one} ${selectedIndex + 1}`}
+                    onclick={() => duplicateItem(selectedIndex)}><Copy size={10} /></button>
+            <button type="button" class="del" disabled={selectedIndex < 0} title={`Remove ${names.one} ${selectedIndex + 1}`}
+                    onclick={() => removeItem(selectedIndex)}><Trash2 size={10} /></button>
+          </span>
         </div>
         <ScreenStage
           {control}
@@ -275,6 +326,18 @@ onMount(() => {
 </div>
 
 <style>
+  .itemtools { display: flex; gap: 3px; margin-left: 8px; }
+  .itemtools button {
+    display: inline-flex; align-items: center; gap: 3px;
+    border: 1px solid #333B42; background: #12171A; color: #9AA6AE;
+    font: 600 8.5px/1 'IBM Plex Sans', system-ui, sans-serif;
+    letter-spacing: 0; text-transform: none;
+    padding: 3px 5px; border-radius: 3px; cursor: pointer;
+  }
+  .itemtools button:hover:not(:disabled) { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; }
+  .itemtools button.del:hover:not(:disabled) { border-color: #8A4A4A; background: #1A1315; color: #D98C8C; }
+  .itemtools button:disabled { opacity: 0.35; cursor: default; }
+
   .screen-tab {
     height: 100%;
     display: flex;

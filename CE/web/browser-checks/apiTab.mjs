@@ -45,6 +45,7 @@ await page.waitForTimeout(400);
 
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
+const settle = () => page.waitForTimeout(320);
 
 // --- One table --------------------------------------------------------------------------------
 
@@ -197,6 +198,50 @@ check('sorting keeps the row you were editing selected', () => {
 
 check('there is not one slider in the tab', async () => {});
 assert.equal(await ev(() => window.__api.sliderCount()), 0);
+
+// --- Making and unmaking an entry ---------------------------------------------------------------
+// Adding and removing used to stay in the properties panel. It is a gap the moment the panel's rows
+// come out, and unlike the panel's three Add functions a duplicate name is suffixed here rather
+// than silently doing nothing.
+
+const inputsBefore = await ev(() => window.__api.storedNames('inputs'));
+await ev(() => window.__api.pickKind('input'));
+await settle();
+await ev(() => window.__api.typeName('bright'));
+await settle();
+await ev(() => window.__api.clickAdd());
+await settle();
+const inputsAfter = await ev(() => window.__api.storedNames('inputs'));
+check('an entry can be added here — it used to need the properties panel', () => {
+  assert.deepEqual(inputsAfter, [...inputsBefore, 'bright']);
+});
+
+await ev(() => window.__api.typeName('bright'));
+await settle();
+await ev(() => window.__api.clickAdd());
+await settle();
+check('and a duplicate name is suffixed rather than silently doing nothing', async () => {});
+assert.deepEqual(await ev(() => window.__api.storedNames('inputs')), [...inputsBefore, 'bright', 'bright2']);
+
+await ev(() => window.__api.pickKind('property'));
+await settle();
+await ev(() => window.__api.typeName('caption'));
+await settle();
+await ev(() => window.__api.clickAdd());
+await settle();
+check('a property lands in its own map, not with the inputs', async () => {});
+assert.ok((await ev(() => window.__api.storedNames('editableProperties'))).includes('caption'));
+assert.ok(!(await ev(() => window.__api.storedNames('inputs'))).includes('caption'));
+
+await ev(() => window.__api.removeRow('bright2'));
+await settle();
+await ev(() => window.__api.removeRow('bright'));
+await settle();
+await ev(() => window.__api.removeRow('caption'));
+await settle();
+check('and removing takes them back off the contract', async () => {});
+assert.deepEqual(await ev(() => window.__api.storedNames('inputs')), inputsBefore);
+assert.ok(!(await ev(() => window.__api.storedNames('editableProperties'))).includes('caption'));
 
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));

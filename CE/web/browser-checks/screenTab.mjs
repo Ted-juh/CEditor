@@ -46,6 +46,7 @@ await page.waitForTimeout(400);
 
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
+const settle = () => page.waitForTimeout(320);
 
 // --- Pages ------------------------------------------------------------------------------------
 
@@ -214,6 +215,59 @@ check('and its repair writes the element back onto the screen', () => {
 
 check('there is not one slider in the tab', async () => {});
 assert.equal(await ev(() => window.__sc.sliderCount()), 0);
+
+// --- Making and unmaking an item ----------------------------------------------------------------
+// Adding, removing and duplicating used to stay in the properties panel. It is a gap the moment the
+// panel's rows come out, and it has to work in both units — a zone on an LCD, an element on a pixel
+// screen — which is why it is checked on both.
+
+// The pixel display is the one armed at this point.
+const elementsBefore = await ev(() => window.__sc.storedElementIds());
+await ev(() => window.__sc.itemTool('Add another element'));
+await settle();
+const elementsAdded = await ev(() => window.__sc.storedElementIds());
+check('an element can be added here — it used to need the properties panel', () => {
+  assert.equal(elementsAdded.length, elementsBefore.length + 1, `${elementsBefore.join(',')} -> ${elementsAdded.join(',')}`);
+  assert.equal(new Set(elementsAdded).size, elementsAdded.length, 'and its id is its own');
+});
+
+await ev(() => window.__sc.itemTool('Duplicate element'));
+await settle();
+const elementsDuped = await ev(() => window.__sc.storedElementIds());
+check('duplicating gives the copy an id of its own rather than sharing one', () => {
+  assert.equal(elementsDuped.length, elementsAdded.length + 1);
+  assert.equal(new Set(elementsDuped).size, elementsDuped.length);
+});
+
+await ev(() => window.__sc.itemTool('Remove element'));
+await settle();
+await ev(() => window.__sc.itemTool('Remove element'));
+await settle();
+check('and two Removes take off the two that were added, not two at the other end', () => {
+  // Removing used to clear the selection, and a cleared selection falls back to the FIRST item —
+  // so a second click deleted something the user never pointed at. It now selects what took the
+  // removed one's place, the way a list does.
+});
+assert.deepEqual(await ev(() => window.__sc.storedElementIds()), elementsBefore);
+
+// And the same three on the LCD half, where the item is a zone in a named layout.
+await ev(() => window.__sc.armLcd());
+await settle();
+await ev(() => window.__sc.pickPage('Home'));
+await settle();
+const zonesBefore = await ev(() => window.__sc.storedZoneIds());
+await ev(() => window.__sc.itemTool('Add another zone'));
+await settle();
+const zonesAdded = await ev(() => window.__sc.storedZoneIds());
+check('a zone can be added to the layout on screen, not to whichever one is first', () => {
+  assert.equal(zonesAdded.length, zonesBefore.length + 1, `${zonesBefore.join(',')} -> ${zonesAdded.join(',')}`);
+  assert.equal(new Set(zonesAdded).size, zonesAdded.length);
+});
+
+await ev(() => window.__sc.itemTool('Remove zone'));
+await settle();
+check('and removing it leaves the layout as it was', async () => {});
+assert.deepEqual(await ev(() => window.__sc.storedZoneIds()), zonesBefore);
 
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));

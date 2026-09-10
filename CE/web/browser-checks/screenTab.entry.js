@@ -80,6 +80,24 @@ const zonesOf = (layoutId = 'l1') =>
 
 window.__sc = {
   target: () => get(editorTarget),
+
+  // --- making and unmaking a zone --------------------------------------------------------
+  storedZoneIds: (layoutId = 'l1') => zonesOf(layoutId).map((z) => String(z.id)),
+  storedElementIds: () => control(PIX_ID)._children.Pixel.elements.map((e) => String(e.id)),
+  armLcd: () => {
+    selectedComponentIds.set(new Set([LCD_ID]));
+    activateEditorTarget('screen', LCD_ID);
+  },
+  itemTool: (label) => {
+    const btn = [...document.querySelectorAll('.itemtools button')].find((b) => (b.title ?? '').startsWith(label));
+    if (!btn || btn.disabled) return false;
+    btn.click();
+    return true;
+  },
+  itemToolDisabled: (label) => {
+    const btn = [...document.querySelectorAll('.itemtools button')].find((b) => (b.title ?? '').startsWith(label));
+    return btn ? btn.disabled === true : null;
+  },
   head: () => textOf(document.querySelector('.who')),
 
   pages: () => [...document.querySelectorAll('.prow .pn')].map(textOf),

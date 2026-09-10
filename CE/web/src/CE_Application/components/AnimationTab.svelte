@@ -30,7 +30,7 @@
   import Segmented from '../properties/Segmented.svelte';
   import PropertySelect from '../properties/PropertySelect.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { updateControlProperty, getSection } from '../stores/controls.js';
+  import { updateControlProperty, removeControlNode, getSection } from '../stores/controls.js';
   import { flatControls } from '../utils/containment.js';
   import {
     editorTarget,
@@ -52,6 +52,9 @@
     TRIGGER_TYPES,
     EASING_NAMES,
     targetStatus,
+    newAnimationShape,
+    uniqueAnimationName,
+    renameBlockedBecause,
   } from '../utils/animationModel.js';
 
   let mine = $derived(targetOfKind($editorTarget, 'animation'));
@@ -132,6 +135,53 @@ onMount(() => {
     writeTargets(moveTarget(selected.targets, from, to));
   }
 
+  // --- Making and unmaking an animation --------------------------------------------------------
+  // This used to stay in the properties panel, which is fine while the panel still draws it and a
+  // gap the moment it does not. The shape is animationModel's, so both surfaces make the same thing.
+  let newName = $state('');
+  let renaming = $state('');
+  let renameDraft = $state('');
+  let renameError = $derived(
+    renaming ? renameBlockedBecause(rows.map((row) => row.name), renaming, renameDraft) : ''
+  );
+
+  function addAnimation() {
+    if (!controlId) return;
+    const name = uniqueAnimationName(rows.map((row) => row.name), newName);
+    if (!name) return;
+    updateControlProperty(controlId, `Animations.${name}`, newAnimationShape(name));
+    newName = '';
+    wantedName = name;
+    rawTargetIndex = -1;
+  }
+
+  function removeAnimation(name) {
+    if (!controlId || !name) return;
+    removeControlNode(controlId, `Animations.${name}`);
+    if (wantedName === name) wantedName = '';
+    rawTargetIndex = -1;
+  }
+
+  function beginRename(name) {
+    renaming = name;
+    renameDraft = name;
+  }
+
+  function commitRename() {
+    const from = renaming;
+    const to = renameDraft.trim();
+    renaming = '';
+    if (!controlId || !from || renameBlockedBecause(rows.map((row) => row.name), from, to)) return;
+    if (to === from) return;
+    // An animation is a keyed child, so a rename is a move: write the new key with the old value's
+    // fields, then drop the old one. `name` travels inside the value too and has to follow.
+    const source = rows.find((row) => row.name === from)?.animation;
+    if (!source) return;
+    updateControlProperty(controlId, `Animations.${to}`, { ...source, name: to });
+    removeControlNode(controlId, `Animations.${from}`);
+    wantedName = to;
+  }
+
   function toggleAll() {
     if (!controlId) return;
     updateControlProperty(controlId, 'Animations.enabled', !allOn);
@@ -195,10 +245,31 @@ onMount(() => {
           {partNames}
           {selectedName}
           onselect={(name) => { wantedName = name; rawTargetIndex = -1; }}
+          onrename={beginRename}
+          onremove={removeAnimation}
           ontoggle={(row) => {
             if (controlId) updateControlProperty(controlId, `Animations.${row.name}.enabled`, !row.enabled);
           }}
         />
+
+        <div class="newrow">
+          {#if renaming}
+            <input class="txt" type="text" value={renameDraft} aria-label="New name"
+                   onchange={(event) => { renameDraft = event.currentTarget.value; }}
+                   oninput={(event) => { renameDraft = event.currentTarget.value; }}
+                   onkeydown={(event) => { if (event.key === 'Enter') commitRename(); if (event.key === 'Escape') renaming = ''; }} />
+            <button type="button" class="mk" disabled={!!renameError} onclick={commitRename}>Rename</button>
+            <button type="button" class="mk" onclick={() => { renaming = ''; }}>Cancel</button>
+          {:else}
+            <input class="txt" type="text" value={newName} placeholder="new animation" aria-label="New animation name"
+                   oninput={(event) => { newName = event.currentTarget.value; }}
+                   onkeydown={(event) => { if (event.key === 'Enter') addAnimation(); }} />
+            <button type="button" class="mk" disabled={!newName.trim()} onclick={addAnimation}>
+              <Plus size={11} /> Add
+            </button>
+          {/if}
+        </div>
+        {#if renameError}<p class="renerr">{renameError}</p>{/if}
       </div>
 
       {#if selected}
@@ -379,6 +450,18 @@ onMount(() => {
   }
 
   .listcol { flex: 0 0 224px; min-width: 0; }
+
+  .newrow { display: flex; gap: 4px; margin-top: 6px; }
+  .newrow .txt { flex: 1 1 auto; height: 24px; }
+  .mk {
+    display: inline-flex; align-items: center; gap: 3px;
+    border: 1px solid #0E7C70; background: #0B2320; color: #8FEDE3;
+    font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif;
+    padding: 0 7px; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .mk:hover:not(:disabled) { border-color: #14B8A6; color: #C9FFF8; }
+  .mk:disabled { opacity: 0.35; cursor: default; }
+  .renerr { margin: 5px 0 0; font: 400 9px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #E5A029; }
   .setcol { flex: 0 0 300px; min-width: 0; }
   .targetcol { flex: 1 1 0; min-width: 280px; }
 

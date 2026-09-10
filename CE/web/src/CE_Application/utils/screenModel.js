@@ -406,6 +406,78 @@ export function shadowedRuleIndex(rules, index) {
  * `show`/`kind` and `sourceId` are deliberately NOT here: they are the two the tab draws itself,
  * because their option lists come from the control's own sources and from `ZONE_SHOW_KINDS`.
  */
+// --- Making and unmaking an item ---------------------------------------------
+// This tab edited the zones and elements a layout already had, and adding, removing and duplicating
+// one stayed in the properties panel. That is a gap the moment the panel's rows come out, so the
+// shapes live here — one definition of what a new zone is, rather than the panel's and the tab's
+// drifting apart.
+
+/** The array path an item list lives at, which is what an add or a remove has to write back. */
+export function itemListPath(kind, layout) {
+  const section = SCREEN_SECTION_BY_KIND[kind];
+  const itemKey = SCREEN_ITEM_BY_KIND[kind]?.key;
+  if (!section || !itemKey || !layout) return '';
+  return layout.flat ? `${section}.${itemKey}` : `${section}.layouts.${layout.index}.${itemKey}`;
+}
+
+/**
+ * The lowest `<prefix><n>` not already taken.
+ *
+ * The panel's own `genId` is time-based, which collides when two things are made in the same
+ * millisecond — `nextPointId` in envelopeLayout.js records the same choice for the same reason.
+ */
+export function nextItemId(items, prefix) {
+  const taken = new Set((Array.isArray(items) ? items : []).map((item) => String(item?.id ?? '')));
+  for (let n = 0; ; n += 1) {
+    const id = `${prefix}${n}`;
+    if (!taken.has(id)) return id;
+  }
+}
+
+/** A new zone or element, in the shape the shipped panel editors make. */
+export function newScreenItem(kind, items, grid = {}) {
+  if (kind === 'pixel') {
+    const height = Math.max(1, Math.round(numberOr(grid.h ?? grid.rows, 32)));
+    return {
+      id: nextItemId(items, 'el_'), kind: 'vbar', x: 4, y: 4,
+      w: 12, h: Math.max(8, height - 8),
+      sourceId: '', align: 'left', precision: 0, prefix: '', suffix: '', label: '',
+      frame: false, ticks: false, peakHold: false, smooth: false, visible: true,
+    };
+  }
+  const cols = Math.max(1, Math.round(numberOr(grid.cols ?? grid.w, 16)));
+  return {
+    id: nextItemId(items, 'z_'), row: 1, colStart: 1, colEnd: Math.min(cols, 8),
+    show: 'static', sourceId: '', text: 'TEXT', align: 'left', radix: 'dec',
+  };
+}
+
+export function itemsWithAdded(items, made) {
+  return [...(Array.isArray(items) ? items : []), made];
+}
+
+export function itemsWithRemoved(items, at) {
+  const list = Array.isArray(items) ? [...items] : [];
+  if (at < 0 || at >= list.length) return list;
+  list.splice(at, 1);
+  return list;
+}
+
+/** A copy sits directly after its original, with an id of its own — the panel's behaviour. */
+export function itemsWithDuplicated(items, at, prefix) {
+  const list = Array.isArray(items) ? [...items] : [];
+  const source = list[at];
+  if (!source) return list;
+  const copy = { ...source, id: nextItemId(list, prefix) };
+  list.splice(at + 1, 0, copy);
+  return list;
+}
+
+/** The id prefix a kind's items use, so a caller need not know. */
+export function itemIdPrefix(kind) {
+  return kind === 'pixel' ? 'el_' : 'z_';
+}
+
 export const SCREEN_ITEM_FIELDS = {
   lcd: [
     { key: 'align', label: 'Align', kind: 'choice', options: ['left', 'center', 'right'], hint: 'Where the content sits inside the zone.' },
@@ -433,7 +505,7 @@ export function itemFields(kind) {
  * the day these rows leave the panel the search has to be fed from here instead.
  */
 export function allScreenFieldLabels() {
-  const labels = new Set(['Row', 'Cols', 'X', 'Y', 'W', 'H', 'Kind', 'Source']);
+  const labels = new Set(['Zone', 'Element', 'Row', 'Cols', 'X', 'Y', 'W', 'H', 'Kind', 'Source']);
   for (const kind of SCREEN_KINDS) {
     for (const field of itemFields(kind)) labels.add(field.label);
   }

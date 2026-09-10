@@ -267,6 +267,57 @@ export function unofferedEasings(offered = ['linear', 'outQuad', 'inOutQuad', 'o
   return EASING_NAMES.filter((name) => !offered.includes(name));
 }
 
+// --- Making and unmaking an animation ---------------------------------------
+// Until now this tab edited the animations a control already had, and creating one stayed in the
+// properties panel. That is a gap the moment the panel's rows come out, so the shape lives here —
+// one definition of what a new animation is, rather than the panel's and the tab's drifting apart.
+
+/** What the properties panel's "Add" makes, so both surfaces make the same thing. */
+export function newAnimationShape(name) {
+  return {
+    _type: 'Animation',
+    name: String(name ?? ''),
+    enabled: true,
+    kind: 'transition',
+    trigger: { type: 'stateChange', from: ['*'], to: ['hover'] },
+    targets: [],
+    duration: 120,
+    delay: 0,
+    easing: 'outQuad',
+  };
+}
+
+/** Animation names are object keys, so they have to be usable as a path segment. */
+export function cleanAnimationName(wanted) {
+  return String(wanted ?? '').trim().replace(/[^A-Za-z0-9_]+/g, '');
+}
+
+/**
+ * A name not already taken, or '' when there is nothing usable in what was typed.
+ *
+ * The panel's Add silently does nothing on a duplicate — `if (… || animations?._children?.[name])
+ * return;` — which looks like a broken button. This suffixes instead.
+ */
+export function uniqueAnimationName(existingNames, wanted) {
+  const base = cleanAnimationName(wanted);
+  if (!base) return '';
+  const taken = new Set((existingNames ?? []).map(String));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n += 1) {
+    const candidate = `${base}${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/** Why a rename cannot go through, or '' when it can. */
+export function renameBlockedBecause(existingNames, from, to) {
+  const clean = cleanAnimationName(to);
+  if (!clean) return 'A name needs letters, digits or underscores.';
+  if (clean === from) return '';
+  if ((existingNames ?? []).map(String).includes(clean)) return `There is already an animation called ${clean}.`;
+  return '';
+}
+
 /**
  * Every label this tab can edit.
  *
@@ -274,5 +325,5 @@ export function unofferedEasings(offered = ['linear', 'outQuad', 'inOutQuad', 'o
  * leave the panel, the search has to be fed from here instead.
  */
 export function allAnimationFieldLabels() {
-  return ['Kind', 'Duration', 'Delay', 'Easing', 'Trigger', 'From', 'To', 'Source', 'Targets'];
+  return ['Kind', 'Duration', 'Delay', 'Easing', 'Trigger', 'From', 'To', 'Source', 'Targets', 'Animation'];
 }

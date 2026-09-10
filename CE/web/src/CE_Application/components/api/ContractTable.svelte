@@ -18,6 +18,7 @@
   import ArrowRight from 'lucide-svelte/icons/arrow-right';
   import ArrowLeft from 'lucide-svelte/icons/arrow-left';
   import Dot from 'lucide-svelte/icons/dot';
+  import X from 'lucide-svelte/icons/x';
   import { API_COLUMNS, API_KIND_META, rangeText } from '../../utils/publicApiModel.js';
 
   let {
@@ -28,6 +29,7 @@
     onselect = () => {},
     onsort = () => {},
     ontoggle = () => {},
+    onremove = () => {},
   } = $props();
 
   const ICONS = { input: ArrowRight, output: ArrowLeft, property: Dot };
@@ -96,6 +98,13 @@
             title={row.enabled ? 'Published — click to withhold' : 'Withheld — click to publish'}
             onclick={(event) => { event.stopPropagation(); ontoggle(row); }}
           ></button>
+          <button
+            type="button"
+            class="drop"
+            aria-label={`Remove ${row.name}`}
+            title={`Remove ${API_KIND_META[row.kind].label.toLowerCase()} "${row.name}" from the contract`}
+            onclick={(event) => { event.stopPropagation(); onremove(row); }}
+          ><X size={9} /></button>
         </span>
       </div>
     {/each}
@@ -107,6 +116,15 @@
 </div>
 
 <style>
+  .td.enabled { display: flex; align-items: center; gap: 4px; }
+  .drop {
+    width: 15px; height: 15px; display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 1px solid transparent; border-radius: 3px; background: transparent;
+    color: #3A434A; cursor: pointer; opacity: 0;
+  }
+  .tr:hover .drop, .tr.sel .drop, .drop:focus-visible { opacity: 1; }
+  .drop:hover { border-color: #5C3A3A; color: #D98C8C; }
+
   .table {
     border: 1px solid #2E3540;
     border-radius: 4px;

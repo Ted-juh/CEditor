@@ -211,9 +211,11 @@ section and still edit every field. Nothing is relocated, so the 3,814px is not 
 ## Still open
 
 1. **Nothing is relocated yet**, and the panel needs its search index extended before anything is.
-2. **The zone list is still the panel's.** Adding, removing and duplicating a zone stays in
-   `DisplayEditor` for now — this tab edits the ones that exist. Adding one on the screen (drag on
-   empty cells) is the obvious next gesture and was left out to keep the first version to one.
+2. **Adding, removing and duplicating an item are built here now** (2026-09-10, step 3 of the panel
+   cleanup), in both units — a zone on an LCD, an element on a pixel screen. `newScreenItem` is one
+   definition of what a new one is, and ids come from `nextItemId` (the lowest free) rather than the
+   panel's time-based `genId`, which collides when two are made in the same millisecond. Adding one
+   by dragging on empty cells is still the obvious next gesture and is still not built.
 3. **`priority` is still a trap.** `composeLayout` sorts by it, nothing writes it, and the ▲▼
    buttons work only because the sort is stable. This tab does not write it either, which keeps the
    trap closed without pretending it is fixed.

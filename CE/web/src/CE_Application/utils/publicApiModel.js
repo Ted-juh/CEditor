@@ -201,6 +201,51 @@ export function attachValidation(rows, messages = []) {
 // --- The table --------------------------------------------------------------
 
 /** The columns the table draws, and how each one sorts. */
+// --- Making and unmaking an entry --------------------------------------------
+// This tab edited the contract that existed, and adding or removing an entry stayed in the
+// properties panel. That is a gap the moment the panel's rows come out, so the shapes live here —
+// one definition of what a new entry is, rather than the panel's and the tab's drifting apart.
+
+/** Entry names are object keys, so they have to be usable as a path segment. */
+export function cleanEntryName(wanted) {
+  return String(wanted ?? '').trim().replace(/[^A-Za-z0-9_]+/g, '');
+}
+
+/**
+ * A name not already taken in that map, or '' when there is nothing usable.
+ *
+ * The panel's three Add functions all bail silently on a duplicate — `if (published?.inputs?[name])
+ * return;` — which looks like a broken button. This suffixes instead.
+ */
+export function uniqueEntryName(existingNames, wanted, fallback = 'entry') {
+  const base = cleanEntryName(wanted) || cleanEntryName(fallback) || 'entry';
+  const taken = new Set((existingNames ?? []).map(String));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n += 1) {
+    const candidate = `${base}${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/**
+ * A new entry, in the shape the shipped panel editor makes.
+ *
+ * An input and an output point at a value CHANNEL; a property points at a section PATH. `target` is
+ * whichever of those the caller has, and the field it lands in comes from `API_KIND_META`.
+ */
+export function newEntryShape(kind, name, target = '', { label = '', type = '' } = {}) {
+  const meta = API_KIND_META[kind];
+  if (!meta) return null;
+  const entry = {
+    [meta.targetField]: String(target ?? ''),
+    label: String(label || name || ''),
+    type: String(type || (kind === 'property' ? 'text' : 'float')),
+    enabled: true,
+  };
+  if (kind === 'property') entry.defaultValue = '';
+  return entry;
+}
+
 export const API_COLUMNS = [
   { key: 'kind', label: 'Dir', width: 46, sort: (row) => API_KINDS.indexOf(row.kind) },
   { key: 'name', label: 'Name', width: 0, sort: (row) => row.name.toLowerCase() },

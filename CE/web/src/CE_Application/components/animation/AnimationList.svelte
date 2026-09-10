@@ -7,6 +7,8 @@
    * nothing.
    */
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
+  import Pencil from 'lucide-svelte/icons/pencil';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import { deadTargetCount } from '../../utils/animationModel.js';
 
   let {
@@ -15,6 +17,8 @@
     selectedName = '',
     onselect = () => {},
     ontoggle = () => {},
+    onrename = () => {},
+    onremove = () => {},
   } = $props();
 </script>
 
@@ -50,11 +54,22 @@
           </i>
         {/if}
       </span>
+
+      <span class="rowtools">
+        <button type="button" class="rt" title={`Rename ${row.name}`} aria-label={`Rename ${row.name}`}
+                onclick={(event) => { event.stopPropagation(); onrename(row.name); }}>
+          <Pencil size={9} />
+        </button>
+        <button type="button" class="rt del" title={`Delete ${row.name}`} aria-label={`Delete ${row.name}`}
+                onclick={(event) => { event.stopPropagation(); onremove(row.name); }}>
+          <Trash2 size={9} />
+        </button>
+      </span>
     </div>
   {/each}
 
   {#if !rows.length}
-    <p class="none">No animations yet. Add one in the properties panel.</p>
+    <p class="none">No animations yet. Name one below and add it.</p>
   {/if}
 </div>
 
@@ -70,7 +85,7 @@
 
   .arow {
     display: grid;
-    grid-template-columns: 10px minmax(0, 1fr) auto;
+    grid-template-columns: 10px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 6px;
     padding: 5px 6px;
@@ -120,6 +135,16 @@
     font-style: normal;
     color: #E5A029;
   }
+
+  .rowtools { display: flex; gap: 2px; opacity: 0; }
+  .arow:hover .rowtools, .arow.sel .rowtools, .rowtools:focus-within { opacity: 1; }
+  .rt {
+    width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+    padding: 0; border: 1px solid transparent; border-radius: 3px; background: transparent;
+    color: #4B545C; cursor: pointer;
+  }
+  .rt:hover { border-color: #4A555E; color: #E8EEF5; }
+  .rt.del:hover { border-color: #5C3A3A; color: #D98C8C; }
 
   .none {
     margin: 0;

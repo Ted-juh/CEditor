@@ -125,6 +125,48 @@ window.__anim = {
   addWarning: () => textOf(document.querySelector('.addbox .warn')),
   add: () => { document.querySelector('.addbtn')?.click(); },
 
+  // --- making and unmaking ---------------------------------------------------------------
+  storedNames: () => Object.keys(live()._children.Animations._children),
+  typeNewName: (value) => {
+    const input = [...document.querySelectorAll('.newrow input')][0];
+    if (!input) return false;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  },
+  clickAdd: () => {
+    const btn = [...document.querySelectorAll('.newrow .mk')].find((b) => textOf(b).includes('Add'));
+    btn?.click();
+    return !!btn;
+  },
+  addDisabled: () => {
+    const btn = [...document.querySelectorAll('.newrow .mk')].find((b) => textOf(b).includes('Add'));
+    return btn ? btn.disabled === true : null;
+  },
+  removeAnimation: (name) => {
+    const row = [...document.querySelectorAll('.arow')].find((r) => textOf(r.querySelector('.nm')) === name);
+    row?.querySelector('.rt.del')?.click();
+    return !!row;
+  },
+  beginRename: (name) => {
+    const row = [...document.querySelectorAll('.arow')].find((r) => textOf(r.querySelector('.nm')) === name);
+    row?.querySelector('.rt:not(.del)')?.click();
+    return !!row;
+  },
+  typeRename: (value) => {
+    const input = [...document.querySelectorAll('.newrow input')][0];
+    if (!input) return false;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  },
+  clickRename: () => {
+    const btn = [...document.querySelectorAll('.newrow .mk')].find((b) => textOf(b) === 'Rename');
+    btn?.click();
+    return !!btn;
+  },
+  renameError: () => textOf(document.querySelector('.renerr')),
+
   sliderCount: () => document.querySelectorAll('input[type=range], .slider, [role=slider]').length,
   jsonBoxes: () => document.querySelectorAll('textarea').length,
 };

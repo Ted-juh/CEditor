@@ -11,6 +11,10 @@ import { readFileSync } from 'node:fs';
 
 import {
   ANIMATION_KINDS,
+  newAnimationShape,
+  cleanAnimationName,
+  uniqueAnimationName,
+  renameBlockedBecause,
   TRIGGER_TYPES,
   PART_PATHS,
   ROOT_PATHS,
@@ -255,6 +259,47 @@ test('field labels are collected for when the panel rows come out', () => {
   const labels = allAnimationFieldLabels();
   assert.ok(labels.includes('Easing'));
   assert.equal(new Set(labels).size, labels.length);
+});
+
+// --- Making and unmaking an animation ---------------------------------------
+// Creating one used to stay in the properties panel, which is a gap the moment the panel's rows
+// come out. The shape lives in the model so both surfaces make the same thing.
+
+test('a new animation is the shape the properties panel makes', () => {
+  const made = newAnimationShape('hoverGlow');
+  assert.equal(made.name, 'hoverGlow');
+  assert.equal(made.kind, 'transition');
+  assert.equal(made.easing, 'outQuad');
+  assert.equal(made.duration, 120);
+  assert.deepEqual(made.targets, []);
+  assert.deepEqual(made.trigger, { type: 'stateChange', from: ['*'], to: ['hover'] });
+  // And it reads back through the tab's own reader without special-casing.
+  const described = describeAnimation('hoverGlow', made);
+  assert.equal(described.enabled, true);
+  assert.equal(described.triggerType, 'stateChange');
+});
+
+test('a name is cleaned to something usable as a path segment', () => {
+  assert.equal(cleanAnimationName('  hover glow!  '), 'hoverglow');
+  assert.equal(cleanAnimationName('press_2'), 'press_2');
+  assert.equal(cleanAnimationName('   '), '');
+  assert.equal(cleanAnimationName(null), '');
+});
+
+test('a duplicate name is suffixed rather than silently doing nothing', () => {
+  // The panel's Add bails on a duplicate — `if (… || animations?._children?.[name]) return;` — which
+  // looks like a broken button.
+  assert.equal(uniqueAnimationName(['a'], 'a'), 'a2');
+  assert.equal(uniqueAnimationName(['a', 'a2'], 'a'), 'a3');
+  assert.equal(uniqueAnimationName([], 'fresh'), 'fresh');
+  assert.equal(uniqueAnimationName([], '  '), '', 'nothing usable means nothing made');
+});
+
+test('a rename says why it cannot happen', () => {
+  assert.equal(renameBlockedBecause(['a', 'b'], 'a', 'c'), '');
+  assert.equal(renameBlockedBecause(['a', 'b'], 'a', 'a'), '', 'renaming to itself is fine');
+  assert.match(renameBlockedBecause(['a', 'b'], 'a', 'b'), /already an animation called b/);
+  assert.match(renameBlockedBecause(['a'], 'a', '   '), /letters, digits or underscores/);
 });
 
 // --- What the properties panel still does -----------------------------------

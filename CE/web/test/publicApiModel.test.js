@@ -31,6 +31,9 @@ import {
   isNumericApiType,
   isEnumApiType,
   allApiFieldLabels,
+  cleanEntryName,
+  uniqueEntryName,
+  newEntryShape,
 } from '../src/CE_Application/utils/publicApiModel.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
@@ -305,4 +308,55 @@ test('every column can sort every row without throwing', () => {
   for (const column of API_COLUMNS) {
     assert.equal(sortRows(sortable, column.key).length, sortable.length, `${column.key} failed`);
   }
+});
+
+
+// --- Making and unmaking an entry -------------------------------------------
+// Adding an entry used to stay in the properties panel, which is a gap the moment the panel's rows
+// come out. The shapes live in the model so both surfaces make the same thing.
+
+test('an entry name is cleaned to something usable as a path segment', () => {
+  assert.equal(cleanEntryName('  my value!  '), 'myvalue');
+  assert.equal(cleanEntryName('gain_2'), 'gain_2');
+  assert.equal(cleanEntryName(null), '');
+});
+
+test('a duplicate name is suffixed rather than silently doing nothing', () => {
+  // All three of the panel's Add functions bail on a duplicate, which looks like a broken button.
+  assert.equal(uniqueEntryName(['gain'], 'gain'), 'gain2');
+  assert.equal(uniqueEntryName(['gain', 'gain2'], 'gain'), 'gain3');
+  assert.equal(uniqueEntryName([], '', 'input'), 'input', 'an empty name falls back to the kind');
+  assert.equal(uniqueEntryName([], '', ''), 'entry');
+});
+
+test('an input and an output point at a channel; a property points at a path', () => {
+  const input = newEntryShape('input', 'gain', 'mainValue');
+  assert.equal(input.channel, 'mainValue');
+  assert.equal(input.label, 'gain');
+  assert.equal(input.enabled, true);
+  assert.ok(!('path' in input));
+
+  const property = newEntryShape('property', 'size', 'Layout.w');
+  assert.equal(property.path, 'Layout.w');
+  assert.equal(property.type, 'text');
+  assert.equal(property.defaultValue, '');
+  assert.ok(!('channel' in property));
+
+  assert.equal(newEntryShape('nope', 'x'), null);
+});
+
+test('and a new entry reads back through the tab own reader', () => {
+  // The whole point of putting the shape here: what is written is what contractRows understands.
+  const control = createControl('CustomComponent');
+  control._children.PublishedProperties = {
+    _type: 'PublishedProperties',
+    inputs: { gain: newEntryShape('input', 'gain', 'mainValue') },
+    outputs: {},
+    editableProperties: {},
+  };
+  const rows = contractRows(control);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, 'input');
+  assert.equal(rows[0].name, 'gain');
+  assert.equal(rows[0].enabled, true);
 });

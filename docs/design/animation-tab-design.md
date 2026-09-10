@@ -182,8 +182,10 @@ the panel's rows do come out.
 ## Still open
 
 1. **Nothing is relocated yet**, and the panel needs its search index extended before anything is.
-2. **Adding and deleting a whole animation stay in the panel**, along with its quick-add buttons.
-   This tab edits the animations a control has; creating one is naming it, which is a form.
+2. **Adding, deleting and renaming an animation are built here now** (2026-09-10, step 3 of the
+   panel cleanup). `newAnimationShape` is one definition of what a new animation is, so the panel's
+   Add and this one make the same thing — and unlike the panel's, a duplicate name is suffixed
+   rather than silently doing nothing. The panel's quick-add buttons stay where they are.
 3. **No timeline.** The candidate list wanted one. With one duration, one delay and one easing per
    animation there is nothing to lay out along a time axis that the three numbers do not already
    say. If animations ever get keyframes, that changes.

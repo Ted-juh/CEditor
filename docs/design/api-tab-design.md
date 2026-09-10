@@ -140,9 +140,10 @@ place for when it is.
 ## Still open
 
 1. **Nothing is relocated yet**, and the panel needs its search index extended before anything is.
-2. **Adding and removing entries stays in the panel.** This tab edits the contract that exists.
-   Adding is a name and a kind, which is a small form, and it was left out to keep the first version
-   to one job.
+2. **Adding and removing entries are built here now** (2026-09-10, step 3 of the panel cleanup).
+   `newEntryShape` is one definition of what a new entry is, so the panel's three Add functions and
+   this one make the same thing — and unlike theirs, a duplicate name is suffixed rather than
+   silently doing nothing.
 3. **The `variable` spelling is reported, not repaired at the source.** The shipped default still
    produces it. Changing that default changes what every new component gets, which is the owner's
    call rather than a side effect of this tab.

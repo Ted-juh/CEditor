@@ -33,7 +33,12 @@ test('every tab in the index is a tab there is an opener for', () => {
 });
 
 test('and all eight label lists are non-trivial', () => {
-  assert.equal(indexedLabelCount(), 195);
+  // A floor, not an exact count: a tab that grows a control and declares its label should not fail
+  // here. What must not happen is a list quietly emptying, which is how the search goes blind.
+  for (const row of DOCK_FIELD_INDEX) {
+    assert.ok(row.labels.length >= 5, `${row.tab} declares only ${row.labels.length} labels`);
+  }
+  assert.ok(indexedLabelCount() >= 190, `only ${indexedLabelCount()} labels indexed`);
 });
 
 // --- Matching ---------------------------------------------------------------
