@@ -44,7 +44,7 @@ export const DISPLAY_DOCK_MIN_CEILING = 140;
  * alongside), not to a fraction of the window. Only ever applied to a dock the
  * user has never resized.
  */
-export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380 };
+export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380, effects: 380 };
 
 /** Tallest the dock may be on this viewport. */
 export function maxDisplayDockHeight(viewportHeight) {
@@ -94,10 +94,16 @@ export function impliedDockTab({
   tabRequest = null,
   gradientTarget = null,
   colorTarget = null,
+  effectsTarget = null,
   lastTab = 'colors',
 } = {}) {
   if (tabRequest?.tab) return tabRequest.tab;
   if (gradientTarget) return 'gradient';
   if (colorTarget) return 'colors';
+  // Effects ranks below colour and gradient on purpose: unlike those two, an effects target is not
+  // cleared when the selection changes (see stores/effectsTarget.js), so it is armed far more
+  // often than it is the thing you just did. A long-lived target that outranked a fresh swatch
+  // click would drag the dock back to Effects every time.
+  if (effectsTarget) return 'effects';
   return lastTab;
 }

@@ -1,6 +1,6 @@
 # The Effects tab
 
-Status: **a design, not a commitment.** Nothing is built.
+Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
 
 Candidate 1 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in
 [`effects-tab-mockups.html`](effects-tab-mockups.html).
@@ -158,20 +158,67 @@ a user who types "glow" and gets nothing concludes the feature was removed.
 The tab does the editing. That is the rule the deleted `effects` placeholder broke, and the reason
 `DisplayPanel.svelte` still carries a comment about it.
 
-## Open questions
+## Decisions taken
 
-1. **Does the tab follow the selection?** Colour clears its target on a selection change. Effects
-   probably wants to follow instead — select another control, the tab retargets. That makes it a
-   second properties panel in one respect, which needs to be a deliberate answer rather than a
-   default.
-2. **Component effects and Lighting in the same tab?** Component `Effects` is a different shape
-   (`Shadows.items[]` is an array, plus `Filters` — brightness, contrast, saturation, hue, grayscale,
-   sepia, invert — and `Blend.mode`). Filters are a colour grade, not a stack. Probably a second
-   mode in the same tab rather than a second tab, but it may be cleaner to ship text effects first
-   and decide after.
-3. **Should the tie be fixed?** `bevelOrder` and `innerShadowOrder` both default to 60. Once the
-   stack is draggable the tie is expressible, but existing documents carry it. Leaving it and
-   letting `priority` resolve it keeps them rendering identically, which argues for leaving it.
+The three open questions, answered by the owner before building.
+
+1. **The tab does NOT follow the selection.** It stays on the control you opened it with, and the
+   header names that control at all times — with a "not selected" badge when the selection has moved
+   on. Opening the tab is the one moment it arms itself, from whatever is selected then. The reason
+   the header matters is in `stores/effectsTarget.js`: what made the old colour dock dangerous was a
+   live write-route with nothing on screen saying what it was writing to.
+2. **All three domains ship together**, switched by Text / Layer / Screen in the header, and a
+   control only offers the ones it has. Layer effects keep their own shape rather than being forced
+   into a stack — the shadow array drags, `Filters` and `Blend` do not, because a colour grade is
+   not a layer.
+3. **The order-60 tie is left alone.** `bevelOrder` and `innerShadowOrder` both ship at 60 and saved
+   panels depend on `priority` resolving it, so the model reproduces the tie rather than fixing it.
+   The stack shows a warning bar naming the two effects, and dragging either one separates them —
+   which is the first time that has been expressible at all.
+
+## What was built
+
+| Piece | File |
+|---|---|
+| The model — descriptors, the derived stack, reorder patches, preview clones | `utils/effectStack.js` |
+| Named looks | `utils/effectLooks.js` |
+| The target store | `stores/effectsTarget.js` |
+| The tab | `components/EffectsTab.svelte` |
+| The four columns | `components/effects/EffectStackList · EffectSpecimen · EffectSettings · EffectLooks` |
+| The shared preview renderer | `components/effects/EffectPreview.svelte` |
+| In-place colour editing | `components/effects/EffectColourPopover.svelte` |
+| Registration | `panels/DisplayPanel.svelte`, `utils/displayDock.js` |
+| Tests | `test/effectStack.test.js` (25), `browser-checks/effectsTab.mjs` (15) |
+
+**The properties panel is untouched.** Every section this tab edits is still there and still works.
+Nothing has been relocated, on purpose: the tab has to be shown to work before anything is taken
+away. Until then the two are simply two ways into the same properties, which is also why the
+measured 1,067px is not yet recovered — that comes with the later, separate change, and
+`allEffectFieldLabels()` exists ready to keep the panel's search index whole when it does.
+
+### Three things found while building
+
+- **`structuredClone` would have blanked the dock.** The first draft used it for the preview clones.
+  `test/deepCloneProxySafety.test.js` catches it: on a Svelte `$state` proxy it throws
+  `DataCloneError` and takes out the render around it. All six calls are `deepClone` now.
+- **Two tests pinned the Effects tab as deleted.** `editorChromeSurfaces.test.js` asserted no
+  `id: 'effects'` and no branch to reach, from the B10 removal. They now pin the *rule* behind that
+  removal instead — the tab must mount the four columns and write properties itself, rather than
+  pointing at the properties panel. If it is ever reduced to a link again, they fail again.
+- **A cover-fitted row thumbnail showed the control's own border** as two grey lines across a 22px
+  box, which was the loudest thing in a picture meant to show one effect. `EffectPreview` takes a
+  `zoom` that overshoots the fit so the crop eats the edges.
+
+## Still open
+
+1. **Nothing is relocated yet.** Stripping the panel's Effects sections down to the toggle row plus
+   an opener is the next change, and it needs the search-index work first.
+2. **No opener in the panel.** The tab is reached from the dock's tab strip, which arms it on the
+   current selection. A button in the panel's Effects section would be the obvious addition, and it
+   belongs with the stripping change rather than before it.
+3. **Lighting has the thinnest coverage.** `LIGHTING_GROUPS` carries backlight and dot matrix; the
+   brightness/backlight *source* bindings stayed in the panel because they are parameter wiring, not
+   something you judge by looking.
 
 ## Notes
 

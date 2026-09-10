@@ -11,6 +11,7 @@
   import Play from 'lucide-svelte/icons/play';
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
   import Terminal from 'lucide-svelte/icons/terminal';
   import Activity from 'lucide-svelte/icons/activity';
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
@@ -29,6 +30,7 @@
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { effectsTarget } from '../stores/effectsTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
@@ -44,16 +46,17 @@
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
-  // 'effects' is gone, not renamed: it was a placeholder tab reading "full
-  // editing coming soon" in a prime slot next to Colors and Gradient (B10).
-  // Effects have real editing in the properties panel; a tab that only points
-  // elsewhere costs a slot and a click and teaches the user that the tabs here
-  // may be empty. Left out of this set too, so an install that had it stored as
-  // its last tab sanitises to Colors rather than to nothing at all.
-  // ('layers' was missing here while shipping as a tab — same sanitiser, same
-  // consequence, so it is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  // 'effects' is BACK, and the reason it went is why this one is built the way it is. The first
+  // one was a placeholder reading "full editing coming soon" in a prime slot next to Colors and
+  // Gradient (B10), and it was deleted because a tab that only points elsewhere costs a slot and a
+  // click and teaches the user that the tabs here may be empty. EffectsTab does the editing — the
+  // stack, the specimen, the settings and the looks are all in it — which is the bar that rule
+  // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
+  // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
+  // is listed now.)
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
+    effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
@@ -281,6 +284,22 @@
       currentGradient = deepClone(t._initialGradient);
       openTabForAction(impliedDockTab({ gradientTarget: t, lastTab: activeTab }));
     });
+  });
+
+  // --- Effects target: bring the tab up when something arms it from outside ---
+  // Unlike colour and gradient there is no value to copy in: the tab reads the control itself, so
+  // this only has to notice a NEW target and open the tab for it. The id guard is what keeps it
+  // from re-opening the tab on every unrelated re-run, since an effects target is long-lived by
+  // design (see stores/effectsTarget.js).
+  let lastEffectsTargetId = null;
+  $effect(() => {
+    const t = $effectsTarget;
+    const id = t ? `${t.controlId}:${t.domain ?? ''}` : null;
+    if (id && id !== lastEffectsTargetId) {
+      lastEffectsTargetId = id;
+      openTabForAction(impliedDockTab({ effectsTarget: t, lastTab: activeTab }));
+    }
+    if (!t) lastEffectsTargetId = null;
   });
 
   // Stop color editing mode
@@ -655,6 +674,7 @@
   const tabs = [
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
+    { id: 'effects',  label: 'Effects',  icon: Sparkles },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -781,6 +801,11 @@
             onswatchrightclick={handleSwatchRightClick}
           />
         </div>
+      </div>
+    {:else if activeTab === 'effects' && activeTabComponent?.default}
+      {@const EffectsTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <EffectsTab />
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}
