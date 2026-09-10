@@ -17,7 +17,7 @@ import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
  * two is a separate job; this stops the bleeding.
  *
  * Target shape:
- *   { kind: 'effects' | 'typography', type: 'control', controlId: 'ctrl_1', domain: string|null }
+ *   { kind: 'effects' | 'typography' | 'assets', type: 'control', controlId: 'ctrl_1', domain: string|null }
  *   null — nothing armed; the tab shows its empty state.
  *
  * WHY IT DOES NOT FOLLOW THE SELECTION. Decided for the Effects tab and inherited here. The Colors
@@ -44,6 +44,10 @@ export const editorTarget = writable(null);
 export const EDITOR_TARGET_KINDS = {
   effects: { tab: 'effects', domains: ['text', 'component', 'lighting'] },
   typography: { tab: 'type', domains: ['type', 'flow'] },
+  // Assets has no halves — one library, one stage — so it has no domains. Which asset is selected
+  // is the tab's own state and deliberately not carried here: `domains` is a fixed list validated
+  // on the way in, and an asset name is neither fixed nor known to this file.
+  assets: { tab: 'assets', domains: null },
 };
 
 export function isEditorTargetKind(kind) {

@@ -32,7 +32,7 @@
  * `displayDock.test.js` asserts the two agree, so a kind added in one place and not the other
  * fails rather than silently routing to the last tab.
  */
-export const EDITOR_TAB_BY_KIND = { effects: 'effects', typography: 'type' };
+export const EDITOR_TAB_BY_KIND = { effects: 'effects', typography: 'type', assets: 'assets' };
 
 /** Matches the splitter's own lower bound (App.svelte's displayResizeScrub). */
 export const DISPLAY_DOCK_MIN_HEIGHT = 80;
@@ -54,7 +54,7 @@ export const DISPLAY_DOCK_MIN_CEILING = 140;
  * alongside), not to a fraction of the window. Only ever applied to a dock the
  * user has never resized.
  */
-export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380, effects: 380, type: 380 };
+export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380, effects: 380, type: 380, assets: 380 };
 
 /** Tallest the dock may be on this viewport. */
 export function maxDisplayDockHeight(viewportHeight) {

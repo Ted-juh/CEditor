@@ -13,6 +13,7 @@
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import TypeIcon from 'lucide-svelte/icons/type';
+  import Boxes from 'lucide-svelte/icons/boxes';
   import Terminal from 'lucide-svelte/icons/terminal';
   import Activity from 'lucide-svelte/icons/activity';
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
@@ -55,10 +56,11 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
     type: () => import('../components/TypographyTab.svelte').then((module) => ({ default: module.default })),
+    assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
@@ -678,6 +680,7 @@
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
     { id: 'effects',  label: 'Effects',  icon: Sparkles },
     { id: 'type',     label: 'Type',     icon: TypeIcon },
+    { id: 'assets',   label: 'Assets',   icon: Boxes },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -814,6 +817,11 @@
       {@const TypographyTab = activeTabComponent.default}
       <div class="tab-pane">
         <TypographyTab />
+      </div>
+    {:else if activeTab === 'assets' && activeTabComponent?.default}
+      {@const AssetsTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <AssetsTab />
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}

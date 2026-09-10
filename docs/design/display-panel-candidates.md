@@ -1,7 +1,9 @@
 # What could go in the display panel
 
-Status: **a worklist, not a decision.** Nothing here is built. The list is for working through one
-entry at a time — is it worth it, and what does it look like.
+Status: **a worklist.** Candidates 1, 2 and 3 are built — Effects, Typography and Assets are dock
+tabs now, each with its own design record. Nothing is removed from the properties panel yet. The
+rest of the list is for working through one entry at a time — is it worth it, and what does it look
+like.
 
 Companion to [`property-panel-space-plan.md`](property-panel-space-plan.md), which has the argument
 and the triage rule. This document is the inventory it implies.
@@ -42,9 +44,9 @@ proposal to argue about.
 |---|---|---|---:|---|
 | 0a | Colours | 53 call sites | — | **shipped** |
 | 0b | Gradient | 3 sections + call sites | — | **shipped** |
-| 1 | Effects | Text, Effects, Display, PixelDisplay | 1,902px | strong |
-| 2 | Typography | Text | 1,163px | strong |
-| 3 | Assets (images, filmstrips) | CustomAssets | 1,073px | strong |
+| 1 | Effects | Text, Effects, Display, PixelDisplay | 1,902px | **built** |
+| 2 | Typography | Text | 1,163px | **built** |
+| 3 | Assets (images, filmstrips) | CustomAssets | 1,073px | **built** |
 | 4 | The screen (Display, PixelDisplay) | 2 | ~1,876px | strong |
 | 5 | Published API | CustomPublicProperties, CustomPublishedProperties | 1,343px | strong |
 | 6 | Component library | CustomPackageLibrary | 842px | medium |
