@@ -1,0 +1,282 @@
+<title>Library tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* App palette, as with the other mockups. NOTHING HERE IS BUILT. */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:18ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:64ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:26ch}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule);align-items:center}
+.dtabs button{border:1px solid transparent;background:transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.dtabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.dtabs .who{margin-left:auto;font:500 9px/1 var(--mono);color:var(--ink-4);padding-right:4px}
+.dtabs .who b{color:#8FEDE3}
+.cols{display:flex;gap:10px;padding:10px;align-items:flex-start}
+.colh{display:flex;align-items:center;gap:6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin-bottom:7px;white-space:nowrap}
+.colh s{margin-left:auto;text-decoration:none;font-size:8.5px}
+
+
+/* --- the palette ------------------------------------------------------ */
+.gridcol{flex:1 1 0;min-width:0}
+.detailcol{flex:0 0 262px;min-width:0}
+.cardgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.card{position:relative;display:flex;flex-direction:column;gap:3px;padding:5px;border:1px solid #2E3540;border-radius:5px;background:#12171A}
+.card.sel{border-color:var(--label);background:#173449}
+.shot{height:70px;border:1px solid #223038;border-radius:3px;background:#0C0F12;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.cname{font:500 10px/1.2 var(--sans);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.sel .cname{color:#EAF5FF}
+.cmeta{font:400 8px/1.3 var(--mono);color:var(--ink-4)}
+.loss{font:400 7.5px/1.3 var(--mono);color:#8A7340}
+.pin{position:absolute;top:7px;right:7px;width:17px;height:17px;border:1px solid #333B42;border-radius:3px;background:rgba(10,14,18,.78);color:#69737B;font-size:9px;display:flex;align-items:center;justify-content:center}
+.tagrow{display:flex;gap:4px;margin-top:8px}
+.tagrow span{border:1px solid #2E3540;background:#12171A;color:#8FA4B0;font:500 8.5px/1 var(--mono);padding:4px 6px;border-radius:3px}
+.tagrow span i{font-style:normal;opacity:.55;margin-left:3px}
+
+.setbox{border:1px solid var(--rule-2);border-radius:4px;background:#1A1D20;padding:6px 8px 9px}
+.grp{font:600 8px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:#4B545C;margin:9px 0 2px;padding-bottom:3px;border-bottom:1px solid #262B30}
+.grp:first-child{margin-top:2px}
+.r{display:grid;grid-template-columns:54px minmax(0,1fr);gap:6px;align-items:center;margin-top:6px}
+.r>label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.f{height:24px;display:flex;align-items:center;padding:0 6px;border:1px solid #2A2F33;border-radius:3px;background:#141719;font:500 10px/1 var(--mono);color:#9AA6AE}
+.metrics{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:7px}
+.metrics span{font:400 9px/1 var(--mono);color:var(--ink-4)}
+.metrics b{color:var(--ink-2);font-weight:600}
+.note{margin-top:8px;border:1px solid #333B42;background:#12171A;border-radius:4px;padding:6px 8px;font:400 9px/1.5 var(--sans);color:var(--ink-3)}
+.note b{color:var(--ink-2);font-weight:600}
+.acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.acts span{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:4px;border:1px solid #333B42;background:#12171A;color:#9AA6AE;font:600 9px/1 var(--sans);padding:6px;border-radius:3px}
+.acts .go{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3;flex-basis:100%}
+.caution{margin:6px 0 0;font:400 8.5px/1.45 var(--sans);color:#8A7340}
+.caution b{color:#D9BE8A;font-weight:600}
+
+.headrow{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.headrow .who{font:500 9.5px/1 var(--mono);color:var(--ink-4)}
+.headrow .who b{color:#8FEDE3}
+.headrow .search{margin-left:auto;display:flex;align-items:center;height:24px;padding:0 7px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);color:var(--ink-4);font:400 10px/1 var(--sans);min-width:180px}
+.headrow .sorts{display:flex;gap:2px}
+.headrow .sorts span{color:#96A6B2;font:600 9px/1 var(--sans);padding:5px 8px;border-radius:3px;border:1px solid transparent}
+.headrow .sorts span.on{border-color:var(--label);background:#173449;color:#EAF5FF}
+
+/* the stack diagram */
+.stack{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:20px}
+.stackcol{border:1px solid var(--rule);border-radius:8px;background:var(--ground-2);padding:14px}
+.stackcol h4{margin:0 0 10px;font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4)}
+.bar{display:flex;flex-direction:column-reverse;gap:2px}
+.bar i{height:9px;border-radius:2px;background:#2C3A44;display:block}
+.bar i.kept{background:var(--teal-dim)}
+.bar i.lost{background:#4A3A1C;opacity:.65}
+.stackcol p{margin:10px 0 0;font-size:12px;color:var(--ink-3)}
+.tallytab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.tally{border:1px solid var(--rule);border-radius:8px;background:var(--ground-2);padding:14px 16px}
+.tally h4{margin:0 0 8px;font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4)}
+.tally .big{font:700 26px/1 var(--sans);color:#E8EEF5;letter-spacing:-.02em}
+.tally .big.same{color:var(--warn)}
+.tally p{margin:8px 0 0;font-size:13px}
+@media (max-width:900px){ .stack,.tallytab{grid-template-columns:1fr}.cardgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; display panel &nbsp;·&nbsp; candidate 6 &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>The Library tab</h1>
+  <p class="lede">A library you cannot place from, a palette that shows six, and a picture of each
+    saved component that is missing both ends of its layer stack.</p>
+  <div class="warnbar"><b>Built on 2026-09-10.</b> The space argument for this candidate was measured
+    first and <b>rejected</b> — see below. What is built rests on the three findings, each checked
+    against the shipped code before this page was written.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>The space argument fails</h2>
+  <p>The candidate list guessed 842px and doubted itself out loud: <i>"a dock tab is for things you
+    keep open while working"</i>. Measured at three library sizes, <code>CustomPackageLibrary</code>
+    stops growing, because its card grid is capped at 282px with a scrollbar.</p>
+
+  <div class="tallytab">
+    <div class="tally"><h4>Empty</h4><div class="big">459px</div><p>Save, import, export and metadata, with nowhere to put anything.</p></div>
+    <div class="tally"><h4>3 packages</h4><div class="big">647px</div><p>The grid appears.</p></div>
+    <div class="tally"><h4>12 packages</h4><div class="big same">647px</div><p>Identical. Nine more components, no more height — and no more visible, either.</p></div>
+  </div>
+
+  <p>So this was not built for the space. It was built because neither existing surface is a
+    component palette: the one with the pictures cannot place a component, and the one that places
+    shows six of them with no pictures at all.</p>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>Fourteen of twenty-two, missing from both ends</h2>
+  <p><code>createCustomComponentThumbnail</code> reduces a component to at most 18 coloured
+    rectangles; the card then draws the first 14 of those. Two caps, in two files, and neither says
+    anything when it bites. The envelope sorts by z-index ascending and keeps the last 18 — so what
+    it discards is the <b>bottom</b> of the stack, the background before anything else.</p>
+
+  <div class="stack">
+    <div class="stackcol">
+      <h4>The component · 22 parts</h4>
+      <div class="bar">
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+      </div>
+      <p>Bottom of the stack at the bottom.</p>
+    </div>
+    <div class="stackcol">
+      <h4>The envelope · keeps 18</h4>
+      <div class="bar">
+        <i class="lost"></i><i class="lost"></i><i class="lost"></i><i class="lost"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+      </div>
+      <p><code>.slice(-18)</code> — the background goes first.</p>
+    </div>
+    <div class="stackcol">
+      <h4>The card · draws 14</h4>
+      <div class="bar">
+        <i class="lost"></i><i class="lost"></i><i class="lost"></i><i class="lost"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i><i class="kept"></i>
+        <i class="kept"></i><i class="kept"></i>
+        <i class="lost"></i><i class="lost"></i><i class="lost"></i><i class="lost"></i>
+      </div>
+      <p><code>.slice(0, 14)</code> — and now the top four as well.</p>
+    </div>
+  </div>
+
+  <p>The entry carries <code>envelope.component</code>, the whole control. The tab draws that, with
+    the renderer that draws it on the canvas.</p>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 3</div>
+  <h2>The whole tab</h2>
+  <p>Click to select, double-click or <b>Place a copy</b> to add one to the panel, or drag a card
+    onto the canvas — through the payload <code>EditorCanvas</code> already reads.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui dock" style="min-width:1040px">
+        <div class="dtabs">
+          <button>Effects</button><button>Type</button><button>Assets</button><button>Screen</button>
+          <button>API</button><button class="on">Library</button>
+        </div>
+        <div class="headrow">
+          <span class="who"><b>4</b> saved · 1 with issues</span>
+          <span class="search">Search name, author, tag</span>
+          <span class="sorts"><span class="on">Recent</span><span>Name</span><span>Most used</span><span>Readiness</span></span>
+        </div>
+
+        <div class="cols">
+          <div class="gridcol">
+            <div class="colh">Components <s>4</s></div>
+            <div class="cardgrid">
+              <div class="card"><span class="pin">⚲</span>
+                <span class="shot"><svg width="86" height="52"><circle cx="43" cy="26" r="19" fill="#243642" stroke="#5B9BD5" stroke-width="2"/><line x1="43" y1="26" x2="43" y2="10" stroke="#8FEDE3" stroke-width="2"/></svg></span>
+                <span class="cname">Big Knob</span><span class="cmeta">5 parts · 2 api · used 3×</span></div>
+              <div class="card sel"><span class="pin">⚲</span>
+                <span class="shot"><svg width="86" height="52"><circle cx="43" cy="26" r="20" fill="#1A2833" stroke="#6E8A4E" stroke-width="2"/><circle cx="43" cy="26" r="11" fill="#243642"/><line x1="43" y1="26" x2="55" y2="15" stroke="#C08A4E" stroke-width="2"/></svg></span>
+                <span class="cname">Layered Knob ⚠</span><span class="cmeta">22 parts · 5 api · just now</span>
+                <span class="loss">panel shows 14 of 22 parts</span></div>
+              <div class="card"><span class="pin">⚲</span>
+                <span class="shot"><svg width="86" height="52"><rect x="8" y="23" width="70" height="6" rx="3" fill="#243642"/><rect x="8" y="23" width="34" height="6" rx="3" fill="#5B9BD5"/><circle cx="42" cy="26" r="7" fill="#DDE6EC"/></svg></span>
+                <span class="cname">Slim Fader</span><span class="cmeta">5 parts · 2 api · 2d ago</span></div>
+              <div class="card"><span class="pin">⚲</span>
+                <span class="shot"><svg width="86" height="52"><circle cx="43" cy="26" r="10" fill="#E5A029"/><circle cx="43" cy="26" r="16" fill="none" stroke="#4A3A1C" stroke-width="2"/></svg></span>
+                <span class="cname">Amber LED</span><span class="cmeta">3 parts · 1 api · 5d ago</span></div>
+            </div>
+            <div class="tagrow">
+              <span>knob <i>2</i></span><span>complex <i>1</i></span><span>fader <i>1</i></span><span>led <i>1</i></span>
+            </div>
+          </div>
+
+          <div class="detailcol">
+            <div class="colh">Layered Knob</div>
+            <div class="setbox">
+              <div class="grp">Package</div>
+              <div class="r"><label>Name</label><div class="f">Layered Knob</div></div>
+              <div class="r"><label>Version</label><div class="f">1.0.0</div></div>
+              <div class="r"><label>Saved</label><div class="f">just now</div></div>
+              <div class="grp">Publishes</div>
+              <div class="metrics"><span><b>22</b> parts</span><span><b>2</b> values</span><span><b>3</b> in</span><span><b>2</b> out</span><span><b>63%</b> ready</span></div>
+              <div class="note">The properties panel's own thumbnail of this package draws
+                <b>14 of 22 parts</b> — 4 missing from the bottom of the layer stack and 4 from the
+                top. The picture above is the real renderer.</div>
+              <div class="grp">Use it</div>
+              <div class="acts">
+                <span class="go">+ Place a copy</span>
+                <span>⇄ Replace On Canvas</span>
+                <span>🗑 Forget</span>
+              </div>
+              <p class="caution">Replacing swaps every section of <b>On Canvas</b> for this
+                package's. Its position stays.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 3</div>
+      <p class="ct">Both ways to use a package, named for what they do. Placing a copy has never been
+        available from this data; replacing has been the only option, and has never said whose
+        sections it was about to take.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>Decided while building</h2>
+  <ul>
+    <li><b>This tab follows the selection</b>, unlike the four editing tabs which stay on the control
+      they were opened with. Replace must overwrite what you are pointing at, and a stale target here
+      would destroy the wrong component.</li>
+    <li><b>Nothing was removed.</b> Save, import, export, metadata and validation stay in the
+      properties panel — the parts of this that really are the modal task the candidate list
+      suspected. The Insert panel is untouched too.</li>
+    <li><b>The two thumbnail caps stay.</b> The tab draws the real thing and reports the loss;
+      changing what a saved envelope contains is a data-format change, not a dock tab's to make.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="library-tab-design.md" style="color:var(--teal)">library-tab-design.md</a>,
+    which records what shipped.</p>
+</section>
+
+</div>

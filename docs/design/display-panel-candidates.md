@@ -1,7 +1,9 @@
 # What could go in the display panel
 
-Status: **a worklist.** Candidates 1 to 5 are built — Effects, Typography, Assets, Screen and API
-are dock tabs now, each with its own design record. Nothing is removed from the properties panel yet. The
+Status: **a worklist.** Candidates 1 to 6 are built — Effects, Typography, Assets, Screen, API and
+Library are dock tabs now, each with its own design record. Candidate 6 is worth noting: its space
+argument was measured and REJECTED (the section is capped and stops growing), and it was built on
+its other findings instead. The measurement is the point of this list, not the ranking. Nothing is removed from the properties panel yet. The
 rest of the list is for working through one entry at a time — is it worth it, and what does it look
 like.
 
@@ -49,7 +51,7 @@ proposal to argue about.
 | 3 | Assets (images, filmstrips) | CustomAssets | 1,073px | **built** |
 | 4 | The screen (LcdDisplay, PixelDisplay) | 2 | 3,814px measured | **built** |
 | 5 | Published API | CustomPublicProperties, CustomPublishedProperties | 4,183px measured | **built** |
-| 6 | Component library | CustomPackageLibrary | 842px | medium |
+| 6 | Component library | CustomPackageLibrary | 647px, capped | **built** — but not for the space |
 | 7 | Image / Texture layers | Background, Text, PanelCardContent | ~890px | medium |
 | 8 | Animation | Animations, Display, PixelDisplay | ~870px | medium |
 | 9 | Per-component designers | ~12 components | varies | medium, and the most interesting |

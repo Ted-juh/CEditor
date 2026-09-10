@@ -18,6 +18,7 @@
   // Braces: Share2 is Routes' and Cable is Device's, and a strip where two tabs wear the same
   // icon is a strip you cannot scan.
   import Braces from 'lucide-svelte/icons/braces';
+  import LibraryBig from 'lucide-svelte/icons/library-big';
   import Terminal from 'lucide-svelte/icons/terminal';
   import Activity from 'lucide-svelte/icons/activity';
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
@@ -60,13 +61,14 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'screen', 'api', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'screen', 'api', 'library', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
     type: () => import('../components/TypographyTab.svelte').then((module) => ({ default: module.default })),
     assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
     screen: () => import('../components/ScreenTab.svelte').then((module) => ({ default: module.default })),
     api: () => import('../components/ApiTab.svelte').then((module) => ({ default: module.default })),
+    library: () => import('../components/LibraryTab.svelte').then((module) => ({ default: module.default })),
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
@@ -689,6 +691,7 @@
     { id: 'assets',   label: 'Assets',   icon: Boxes },
     { id: 'screen',   label: 'Screen',   icon: MonitorIcon },
     { id: 'api',      label: 'API',      icon: Braces },
+    { id: 'library',  label: 'Library',  icon: LibraryBig },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -840,6 +843,11 @@
       {@const ApiTab = activeTabComponent.default}
       <div class="tab-pane">
         <ApiTab />
+      </div>
+    {:else if activeTab === 'library' && activeTabComponent?.default}
+      {@const LibraryTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <LibraryTab />
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}
