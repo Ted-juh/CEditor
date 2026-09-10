@@ -125,18 +125,6 @@
   let reflectionEffectActive = $derived.by(() =>
     textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
   );
-  let textEffectControlsVisible = $derived.by(() =>
-    textEffects?.outlineEnabled === true
-    || textEffects?.stroke2Enabled === true
-    || textEffects?.shadowEnabled === true
-    || textEffects?.glowEnabled === true
-    || textEffects?.innerGlowEnabled === true
-    || textEffects?.innerShadowEnabled === true
-    || textEffects?.blurEnabled === true
-    || textEffects?.motionEnabled === true
-    || textEffects?.bevelEnabled === true
-    || reflectionEffectActive
-  );
   let visibleTypographyFeatureOptions = $derived.by(() => {
     if (!selectedFontFeatureSupportKnown) return [];
     return TYPOGRAPHY_FEATURE_OPTIONS.filter((option) =>
@@ -596,9 +584,6 @@
     );
   }
 
-  function effectProp(name, fallback) {
-    return textEffects?.[name] ?? fallback;
-  }
 
   function toggleTextEffect(name) {
     set(`Text.Effects.${name}`, !(textEffects?.[name] === true));
@@ -608,24 +593,6 @@
     set('Text.Effects.reflectionEnabled', !reflectionEffectActive);
   }
 
-  function setEffectNumber(name, value, step = 0.5) {
-    set(`Text.Effects.${name}`, roundLineValue(value, step));
-  }
-
-  function setEffectColor(name, value) {
-    let normalized = String(value ?? '').replace(/^#/, '').toUpperCase();
-    if (normalized.length === 6) normalized = `FF${normalized}`;
-    if (normalized.length !== 8) return;
-    set(`Text.Effects.${name}`, normalized);
-  }
-
-  function handleEffectColorSwatch(name, fallback) {
-    if (!core?.id) return;
-    activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Text.Effects.${name}` },
-      String(effectProp(name, fallback))
-    );
-  }
 
   function normalizeColorValue(value, fallback = 'FFFFFFFF') {
     let normalized = String(value ?? '').replace(/^#/, '').toUpperCase();
@@ -1559,420 +1526,13 @@
         </div>
       </PropertyCell>
 
-      {#if textEffectControlsVisible}
-        <PropertyCell label="Text Effects" span={4} hint="Detailed controls for the currently active text effects.">
-          <div class="effect-divider"></div>
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.outlineEnabled === true}
-        <PropertyCell label="Outline Thickness" span={1} compact hint="Extra outline thickness outside the glyph fill, in pixels.">
-          <NumberCell
-            label="Thick"
-            value={Math.max(1, effectProp('outlineThickness', effectProp('outlineWidth', 1)))}
-            min={1}
-            step={1}
-            defaultValue={1}
-            onchange={(value) => {
-              setEffectNumber('outlineThickness', value);
-              setEffectNumber('outlineWidth', value);
-            }}
-          />
-        </PropertyCell>
-        <PropertyCell label="Outline Distance" span={1} compact hint="Gap between the glyph and the outline band, in pixels.">
-          <NumberCell
-            label="Dist"
-            value={Math.max(0, effectProp('outlineDistance', 0))}
-            min={0}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('outlineDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Outline Fill" span={1} hint="Fill from the glyph edge outward, or show only the outer outline band.">
-          <select
-            class="text-select"
-            value={effectProp('outlineFill', true) === false ? 'no' : 'yes'}
-            onchange={(event) => set('Text.Effects.outlineFill', event.target.value !== 'no')}
-          >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Outline Join" span={1} hint="Corner style of the expanded outline on angular glyphs.">
-          <select
-            class="text-select"
-            value={String(effectProp('outlineJoin', 'round'))}
-            onchange={(event) => set('Text.Effects.outlineJoin', event.target.value)}
-          >
-            <option value="round">Round</option>
-            <option value="miter">Miter</option>
-            <option value="bevel">Bevel</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Outline Colour" span={4} hint="AARRGGBB outline colour.">
-          <PropertyColor
-            value={String(effectProp('outlineColour', 'FF000000'))}
-            onchange={(value) => setEffectColor('outlineColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('outlineColour', 'FF000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Placement" span={1} hint="Where the outline band should sit relative to the glyph edge.">
-          <select class="text-select" value={String(effectProp('outlinePlacement', 'outer'))} onchange={(event) => set('Text.Effects.outlinePlacement', event.target.value)}>
-            <option value="outer">Outer</option>
-            <option value="center">Center</option>
-            <option value="inner">Inner</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash" span={1} hint="Render the outline as a dashed stroke.">
-          <select class="text-select" value={effectProp('outlineDashEnabled', false) === true ? 'yes' : 'no'} onchange={(event) => set('Text.Effects.outlineDashEnabled', event.target.value === 'yes')}>
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Length of each outline dash.">
-          <NumberCell label="Len" value={Number(effectProp('outlineDashLength', 8))} min={1} step={1} defaultValue={8} onchange={(value) => setEffectNumber('outlineDashLength', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Gap" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Gap between dashed outline segments.">
-          <NumberCell label="Gap" value={Number(effectProp('outlineDashGap', 4))} min={1} step={1} defaultValue={4} onchange={(value) => setEffectNumber('outlineDashGap', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the outline layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('outlineOrder', 40))} step={1} defaultValue={40} onchange={(value) => setEffectNumber('outlineOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.stroke2Enabled === true}
-        <PropertyCell label="2nd Thickness" span={1} compact hint="Thickness of the secondary stroke.">
-          <NumberCell label="Thick" value={Number(effectProp('stroke2Thickness', 1))} min={1} step={1} defaultValue={1} onchange={(value) => setEffectNumber('stroke2Thickness', value, 1)} />
-        </PropertyCell>
-        <PropertyCell label="Placement" span={1} hint="Place the secondary stroke inside, centered on, or outside the glyph edge.">
-          <select class="text-select" value={String(effectProp('stroke2Placement', 'inner'))} onchange={(event) => set('Text.Effects.stroke2Placement', event.target.value)}>
-            <option value="inner">Inner</option>
-            <option value="center">Center</option>
-            <option value="outer">Outer</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash" span={1} hint="Render the secondary stroke as a dashed line.">
-          <select class="text-select" value={effectProp('stroke2DashEnabled', false) === true ? 'yes' : 'no'} onchange={(event) => set('Text.Effects.stroke2DashEnabled', event.target.value === 'yes')}>
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Length of each secondary stroke dash.">
-          <NumberCell label="Len" value={Number(effectProp('stroke2DashLength', 6))} min={1} step={1} defaultValue={6} onchange={(value) => setEffectNumber('stroke2DashLength', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Gap" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Gap between secondary stroke dashes.">
-          <NumberCell label="Gap" value={Number(effectProp('stroke2DashGap', 3))} min={1} step={1} defaultValue={3} onchange={(value) => setEffectNumber('stroke2DashGap', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Stroke Colour" span={2} hint="AARRGGBB colour for the secondary stroke.">
-          <PropertyColor
-            value={String(effectProp('stroke2Colour', 'FFFFFFFF'))}
-            onchange={(value) => setEffectColor('stroke2Colour', value)}
-            onswatchclick={() => handleEffectColorSwatch('stroke2Colour', 'FFFFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('stroke2Order', 45))} step={1} defaultValue={45} onchange={(value) => setEffectNumber('stroke2Order', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.shadowEnabled === true}
-        <PropertyCell label="Style" span={1} hint="Soft uses blur, Long casts repeated flat copies, Extrude builds a hard stacked edge.">
-          <select class="text-select" value={String(effectProp('shadowStyle', 'soft'))} onchange={(event) => set('Text.Effects.shadowStyle', event.target.value)}>
-            <option value="soft">Soft</option>
-            <option value="long">Long</option>
-            <option value="extrude">Extrude</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Shadow X" span={1} compact hint="Horizontal shadow offset in pixels.">
-          <NumberCell
-            label="X"
-            value={effectProp('shadowOffsetX', 1)}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('shadowOffsetX', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Y" span={1} compact hint="Vertical shadow offset in pixels.">
-          <NumberCell
-            label="Y"
-            value={effectProp('shadowOffsetY', 1)}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('shadowOffsetY', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Blur" span={1} compact hint="Blur radius for the text shadow.">
-          <NumberCell
-            label="Blur"
-            value={effectProp('shadowBlur', 2)}
-            min={0}
-            step={0.5}
-            defaultValue={2}
-            onchange={(value) => setEffectNumber('shadowBlur', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Colour" span={1} hint="AARRGGBB shadow colour.">
-          <PropertyColor
-            value={String(effectProp('shadowColour', '80000000'))}
-            onchange={(value) => setEffectColor('shadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('shadowColour', '80000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Length used by long-shadow and extrude shadow styles.">
-          <NumberCell label="Dist" value={Number(effectProp('shadowDistance', 12))} min={0} step={1} defaultValue={12} onchange={(value) => setEffectNumber('shadowDistance', value, 1)} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
-        </PropertyCell>
-        <PropertyCell label="Steps" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Number of repeated copies used for long-shadow and extrude styles.">
-          <NumberCell label="Steps" value={Number(effectProp('shadowSteps', 8))} min={1} step={1} defaultValue={8} onchange={(value) => set('Text.Effects.shadowSteps', Math.max(1, Math.round(Number(value) || 1)))} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the shadow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('shadowOrder', 10))} step={1} defaultValue={10} onchange={(value) => setEffectNumber('shadowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.glowEnabled === true}
-        <PropertyCell label="Glow Size" span={1} compact hint="Blur radius for the outer text glow.">
-          <NumberCell
-            label="Size"
-            value={effectProp('glowSize', 4)}
-            min={0}
-            step={0.5}
-            defaultValue={4}
-            onchange={(value) => setEffectNumber('glowSize', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Glow Intensity" span={1} compact hint="Strength of the glow at the chosen size. Higher values stack a brighter halo.">
-          <NumberCell
-            label="Int"
-            value={effectProp('glowIntensity', 1)}
-            min={0}
-            step={0.25}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('glowIntensity', value, 0.25)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Glow Colour" span={2} hint="AARRGGBB glow colour.">
-          <PropertyColor
-            value={String(effectProp('glowColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('glowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('glowColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('glowOrder', 20))} step={1} defaultValue={20} onchange={(value) => setEffectNumber('glowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.innerGlowEnabled === true}
-        <PropertyCell label="Inner Glow" span={1} compact hint="Blur radius for the inner glow clipped inside glyphs.">
-          <NumberCell
-            label="Size"
-            value={effectProp('innerGlowSize', 3)}
-            min={0}
-            step={0.5}
-            defaultValue={3}
-            onchange={(value) => setEffectNumber('innerGlowSize', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Inner Glow Colour" span={3} hint="AARRGGBB inner glow colour.">
-          <PropertyColor
-            value={String(effectProp('innerGlowColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('innerGlowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('innerGlowColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the inner glow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('innerGlowOrder', 80))} step={1} defaultValue={80} onchange={(value) => setEffectNumber('innerGlowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.innerShadowEnabled === true}
-        <PropertyCell label="Inner X" span={1} compact hint="Horizontal offset of the inner shadow.">
-          <NumberCell label="X" value={Number(effectProp('innerShadowOffsetX', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetX', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Y" span={1} compact hint="Vertical offset of the inner shadow.">
-          <NumberCell label="Y" value={Number(effectProp('innerShadowOffsetY', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetY', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Blur" span={1} compact hint="Blur radius for the inner shadow.">
-          <NumberCell label="Blur" value={Number(effectProp('innerShadowBlur', 2))} min={0} step={0.5} defaultValue={2} onchange={(value) => setEffectNumber('innerShadowBlur', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Colour" span={1} hint="AARRGGBB inner shadow colour.">
-          <PropertyColor
-            value={String(effectProp('innerShadowColour', '80000000'))}
-            onchange={(value) => setEffectColor('innerShadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('innerShadowColour', '80000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the inner shadow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('innerShadowOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('innerShadowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.blurEnabled === true}
-        <PropertyCell label="Blur" span={4} compact hint="Blur applied to the main text fill and outline.">
-          <NumberCell
-            label="Blur"
-            value={effectProp('blurAmount', 1)}
-            min={0}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('blurAmount', value)}
-          />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.motionEnabled === true}
-        <PropertyCell label="Motion Angle" span={1} compact hint="Direction of the smear in degrees.">
-          <NumberCell
-            label="Angle"
-            value={effectProp('motionAngle', 0)}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('motionAngle', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact hint="Total smear distance in pixels.">
-          <NumberCell
-            label="Dist"
-            value={effectProp('motionDistance', 8)}
-            min={0}
-            step={0.5}
-            defaultValue={8}
-            onchange={(value) => setEffectNumber('motionDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Steps" span={1} compact hint="Number of layered copies used for the smear.">
-          <NumberCell
-            label="Steps"
-            value={effectProp('motionSteps', 4)}
-            min={1}
-            step={1}
-            defaultValue={4}
-            onchange={(value) => set('Text.Effects.motionSteps', Math.max(1, Math.round(Number(value) || 1)))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Motion Colour" span={1} hint="AARRGGBB motion smear colour.">
-          <PropertyColor
-            value={String(effectProp('motionColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('motionColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('motionColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the motion layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('motionOrder', 30))} step={1} defaultValue={30} onchange={(value) => setEffectNumber('motionOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.bevelEnabled === true}
-        <PropertyCell label="Bevel Style" span={1} hint="Embossed highlight/shadow treatment.">
-          <select
-            class="text-select"
-            value={String(effectProp('bevelStyle', 'emboss'))}
-            onchange={(event) => set('Text.Effects.bevelStyle', event.target.value)}
-          >
-            <option value="emboss">Emboss</option>
-            <option value="inner">Inner</option>
-            <option value="outer">Outer</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Depth" span={1} compact hint="Offset depth of the highlight/shadow copies.">
-          <NumberCell
-            label="Depth"
-            value={effectProp('bevelDepth', 1.5)}
-            min={0}
-            step={0.5}
-            defaultValue={1.5}
-            onchange={(value) => setEffectNumber('bevelDepth', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Highlight" span={1} hint="AARRGGBB highlight colour.">
-          <PropertyColor
-            value={String(effectProp('bevelHighlightColour', '99FFFFFF'))}
-            onchange={(value) => setEffectColor('bevelHighlightColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('bevelHighlightColour', '99FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow" span={1} hint="AARRGGBB bevel shadow colour.">
-          <PropertyColor
-            value={String(effectProp('bevelShadowColour', '99000000'))}
-            onchange={(value) => setEffectColor('bevelShadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('bevelShadowColour', '99000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the bevel layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('bevelOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('bevelOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if reflectionEffectActive}
-        <PropertyCell label="Angle" span={1} compact hint="Direction from the text toward the reflection, in degrees. 0=Up, 90=Right, 180=Down, 270=Left.">
-          <NumberCell
-            label="Angle"
-            value={reflectionProp('reflectionAngle', 180)}
-            step={1}
-            defaultValue={180}
-            onchange={(value) => set('Text.Effects.reflectionAngle', reflectionStoredAngleFromDisplay(value))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact hint="Distance from the text to the mirrored reflection.">
-          <NumberCell
-            label="Dist"
-            value={reflectionProp('reflectionDistance', 8)}
-            min={0}
-            step={0.5}
-            defaultValue={8}
-            onchange={(value) => setEffectNumber('reflectionDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Intensity" span={1} compact hint="Opacity of the reflection layer.">
-          <NumberCell
-            label="Int"
-            value={reflectionProp('reflectionIntensity', 0.45)}
-            min={0}
-            max={1}
-            step={0.05}
-            defaultValue={0.45}
-            onchange={(value) => set('Text.Effects.reflectionIntensity', Math.max(0, Math.min(1, Number(value) || 0)))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Blur" span={1} compact hint="Blur applied to the reflection.">
-          <NumberCell
-            label="Blur"
-            value={reflectionProp('reflectionBlur', 2)}
-            min={0}
-            step={0.5}
-            defaultValue={2}
-            onchange={(value) => setEffectNumber('reflectionBlur', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Fade" span={2} hint="Fade the reflection in, out, or not at all along the reflection distance.">
-          <div class="style-row">
-            <button class="style-btn" onclick={cycleReflectionFadeMode}>
-              {reflectionFadeModeLabel()}
-            </button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Fade Amount" span={1} compact hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
-          <NumberCell
-            label="Fade"
-            value={reflectionProp('reflectionFadeAmount', 0)}
-            min={0}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('reflectionFadeAmount', value, 1)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Reflection Colour" span={4} hint="AARRGGBB colour for the mirrored reflection layer.">
-          <PropertyColor
-            value={reflectionColorValue()}
-            onchange={(value) => setEffectColor('reflectionColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('reflectionColour', reflectionColorValue())}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the reflection layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('reflectionOrder', 5))} step={1} defaultValue={5} onchange={(value) => setEffectNumber('reflectionOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
+      <PropertyCell label="" span={4} compact
+        hint="Thickness, distance, colour, dash, order and the rest — with a live specimen beside them.">
+        <p class="effects-moved">
+          Switch an effect on here; its settings are in the <b>Effects</b> tab, with the stack in the
+          order the canvas draws it.
+        </p>
+      </PropertyCell>
     </PropertySection>
 
     <PropertySection
@@ -2090,8 +1650,6 @@
     display: flex;
     flex-direction: column;
   }
-
-
 
 
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
@@ -2318,6 +1876,13 @@
     gap: 4px;
   }
 
+  .effects-moved {
+    margin: 0;
+    font: 400 10.5px/1.5 'IBM Plex Sans', system-ui, sans-serif;
+    color: #8a8a94;
+  }
+  .effects-moved b { color: #8FEDE3; font-weight: 600; }
+
   .effect-toggle-grid {
     width: 100%;
     display: grid;
@@ -2332,13 +1897,6 @@
     align-items: center;
     color: #777;
     font-size: 11px;
-  }
-
-  .effect-divider {
-    width: 100%;
-    height: 1px;
-    background: #2a2a2a;
-    margin-top: 4px;
   }
 
   .flow-mode-btn {

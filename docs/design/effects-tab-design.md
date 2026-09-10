@@ -211,8 +211,12 @@ measured 1,067px is not yet recovered — that comes with the later, separate ch
 
 ## Still open
 
-1. **Nothing is relocated yet.** Stripping the panel's Effects sections down to the toggle row plus
-   an opener is the next change, and it needs the search-index work first.
+1. **`Text` → Effects is stripped** (2026-09-10) to exactly that: the toggle row plus an opener,
+   1,127px down to 174px. See [`panel-strip.md`](panel-strip.md). The Component/Text Effects
+   sections in `EffectsEditor` and Lighting in the two display editors are still whole.
+   Checking coverage first turned up one thing this tab does not do at all: **Hollow**
+   (`knockout`), which `CanvasControl` reads and no row here writes. Its toggle stays in the
+   panel, which is the whole of it.
 2. **The opener is built** (2026-09-10). The Effects sections in `Text`, `EffectsEditor` and both
    display editors carry a button into this tab — see
    [`panel-to-dock-handoff.md`](panel-to-dock-handoff.md). Icon effects deliberately have none:
