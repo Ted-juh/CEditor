@@ -1,14 +1,14 @@
 # What could go in the display panel
 
-Status: **a worklist.** Candidates 1 to 6 are built — Effects, Typography, Assets, Screen, API and
-Library are dock tabs now, each with its own design record. Candidate 7 was worked through and
-**turned down**: see [`fill-layers-not-a-tab.md`](fill-layers-not-a-tab.md). Two entries are worth
-noting for what they say about the list itself. Candidate 6's space argument was measured and
-rejected (the section is capped and stops growing) and it was built on its other findings instead;
-candidate 7 had no findings at all once checked, and is not built. The measurement is the point of
-this list, not the ranking. Nothing is removed from the properties panel yet. The
-rest of the list is for working through one entry at a time — is it worth it, and what does it look
-like.
+Status: **a worklist.** Candidates 1 to 6 and 8 are built — Effects, Typography, Assets, Screen,
+API, Library and Animation are dock tabs now, each with its own design record. Candidate 7 was
+worked through and **turned down**: see [`fill-layers-not-a-tab.md`](fill-layers-not-a-tab.md).
+Three entries are worth noting for what they say about the list itself. Candidates 6 and 8 had
+their space arguments measured and rejected — both sections are capped and stop growing — and were
+built on their other findings instead; candidate 7 had no findings at all once checked, and is not
+built. The measurement is the point of this list, not the ranking. Nothing is removed from the
+properties panel yet. The rest of the list is for working through one entry at a time — is it worth
+it, and what does it look like.
 
 Companion to [`property-panel-space-plan.md`](property-panel-space-plan.md), which has the argument
 and the triage rule. This document is the inventory it implies.
@@ -56,7 +56,7 @@ proposal to argue about.
 | 5 | Published API | CustomPublicProperties, CustomPublishedProperties | 4,183px measured | **built** |
 | 6 | Component library | CustomPackageLibrary | 647px, capped | **built** — but not for the space |
 | 7 | Image / Texture layers | Background, Text, PanelCardContent | 510px per layer | **rejected** — already shared, no finding |
-| 8 | Animation | Animations, Display, PixelDisplay | ~870px | medium |
+| 8 | Animation | Animations *(only)* | 712px, capped | **built** — but not for the space |
 | 9 | Per-component designers | ~12 components | varies | medium, and the most interesting |
 | 10 | Device bindings | DeviceBindings | 347px | weak |
 | — | Everything under 200px per owner | 235 instances | 27,410px | **no** |
@@ -175,17 +175,33 @@ owners rather than recovering height from any one.
 
 ---
 
-### 8. Animation — about 870px over three owners
+### 8. Animation — built, and both halves of this entry were wrong
 
-**Where it is now.** `Animations` 642px, plus the Animation section in `Display` and `PixelDisplay`
-at 242px each.
+**Built on 2026-09-10.** Design record: [`animation-tab-design.md`](animation-tab-design.md).
 
-**Why it might qualify.** Timing and easing are time-based and want a timeline. `ResponseCurveDesigner.svelte`
-already exists and draws curves.
+**The space was wrong twice.** Measured — `AnimationsEditor` is 121px with no animations and
+**712px** with one, three or eight. It does not grow, because it shows one animation at a time
+behind a dropdown. And the other two sections counted here are a **different feature**: Animation in
+`Display` and `PixelDisplay` plays a GIF or a sprite sheet behind a dot-matrix screen. This list
+grouped the three by name. They stay where they are.
 
-**Why it might not.** Much of the Animations editor is targets and triggers — which property, which
-state — and that is list work, not visual work. This may split: the curve goes to the dock, the
-wiring stays.
+**Why it was built anyway.** Four findings, all checked against the shipped code:
+
+1. Two of the seven properties the editor's dropdown offers — **Fill Colour and Text Colour** —
+   animate nothing. The runtime fills transform, opacity or size buckets and has no colour bucket.
+   Measured by running the real runtime over each of the seven.
+2. What an animation changes is a **twelve-row JSON textarea**. You can append; to delete or reorder
+   you edit the JSON by hand.
+3. Easing is **four names with no picture**, though the runtime knows five (`inQuad` is never
+   offered) and the app draws curves elsewhere.
+4. `kind` is a free text box. The mildest of the four — the cell's own hint already says transition
+   is the only kind that works.
+
+**"The wiring stays" was wrong too.** This entry guessed the tab would be the curve alone. The
+list work is where the defect is: a target that does nothing is a list row, not a curve.
+
+**No timeline**, which this entry wanted. One duration, one delay and one easing per animation —
+there is nothing to lay along a time axis that the three numbers do not already say.
 
 ---
 

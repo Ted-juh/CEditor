@@ -13,7 +13,7 @@
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "docs:help": "node scripts/generate-help-bundle.mjs",
     "test:all": "npm test && npm run test:script-exports",
-    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/effectsTab.mjs && node browser-checks/typographyTab.mjs && node browser-checks/assetsTab.mjs && node browser-checks/screenTab.mjs && node browser-checks/apiTab.mjs && node browser-checks/libraryTab.mjs && node browser-checks/panelShot.mjs"
+    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/effectsTab.mjs && node browser-checks/typographyTab.mjs && node browser-checks/assetsTab.mjs && node browser-checks/screenTab.mjs && node browser-checks/apiTab.mjs && node browser-checks/libraryTab.mjs && node browser-checks/animationTab.mjs && node browser-checks/panelShot.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",

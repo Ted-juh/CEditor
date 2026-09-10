@@ -53,6 +53,9 @@ export const EDITOR_TARGET_KINDS = {
   screen: { tab: 'screen', domains: null },
   // The API tab has no halves either: which row is selected is the tab's own state.
   api: { tab: 'api', domains: null },
+  // Animation has no halves either. Which animation is selected is the tab's own state: the names
+  // come from the control's own data, so there is no fixed list to validate against.
+  animation: { tab: 'animation', domains: null },
   // The Library tab has no target at all — it edits the library, not a control — so it is not
   // listed here. A kind exists only for a tab that has to be pointed at something.
 };
