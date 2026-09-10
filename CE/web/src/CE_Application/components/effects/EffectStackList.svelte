@@ -46,7 +46,10 @@
     event.preventDefault();
     dragKey = row.key;
     dropIndex = stackable.findIndex((entry) => entry.key === row.key);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    // Capture is an optimisation, not the mechanism: pointermove and pointerup are bound on the
+    // container, so the drag works without it. It throws NotFoundError when the id names no active
+    // pointer, and letting that escape would abort the drag before it started.
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* not capturable */ }
   }
 
   function moveDrag(event) {

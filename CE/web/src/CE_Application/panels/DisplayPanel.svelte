@@ -12,6 +12,7 @@
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import TypeIcon from 'lucide-svelte/icons/type';
   import Terminal from 'lucide-svelte/icons/terminal';
   import Activity from 'lucide-svelte/icons/activity';
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
@@ -30,7 +31,7 @@
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
-  import { effectsTarget } from '../stores/effectsTarget.js';
+  import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
@@ -54,9 +55,10 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
+    type: () => import('../components/TypographyTab.svelte').then((module) => ({ default: module.default })),
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
@@ -286,20 +288,20 @@
     });
   });
 
-  // --- Effects target: bring the tab up when something arms it from outside ---
-  // Unlike colour and gradient there is no value to copy in: the tab reads the control itself, so
-  // this only has to notice a NEW target and open the tab for it. The id guard is what keeps it
-  // from re-opening the tab on every unrelated re-run, since an effects target is long-lived by
-  // design (see stores/effectsTarget.js).
-  let lastEffectsTargetId = null;
+  // --- Editor target: bring the right tab up when something arms it from outside ---
+  // Unlike colour and gradient there is no value to copy in: these tabs read the control itself, so
+  // this only has to notice a NEW target and open its tab. The id guard is what keeps it from
+  // re-opening on every unrelated re-run, since an editor target is long-lived by design (see
+  // stores/editorTarget.js). The kind decides the tab, so adding a tab needs no change here.
+  let lastEditorTargetId = null;
   $effect(() => {
-    const t = $effectsTarget;
-    const id = t ? `${t.controlId}:${t.domain ?? ''}` : null;
-    if (id && id !== lastEffectsTargetId) {
-      lastEffectsTargetId = id;
-      openTabForAction(impliedDockTab({ effectsTarget: t, lastTab: activeTab }));
+    const t = $editorTarget;
+    const id = t ? `${t.kind}:${t.controlId}:${t.domain ?? ''}` : null;
+    if (id && id !== lastEditorTargetId) {
+      lastEditorTargetId = id;
+      openTabForAction(impliedDockTab({ editorTarget: t, lastTab: activeTab }));
     }
-    if (!t) lastEffectsTargetId = null;
+    if (!t) lastEditorTargetId = null;
   });
 
   // Stop color editing mode
@@ -675,6 +677,7 @@
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
     { id: 'effects',  label: 'Effects',  icon: Sparkles },
+    { id: 'type',     label: 'Type',     icon: TypeIcon },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -806,6 +809,11 @@
       {@const EffectsTab = activeTabComponent.default}
       <div class="tab-pane">
         <EffectsTab />
+      </div>
+    {:else if activeTab === 'type' && activeTabComponent?.default}
+      {@const TypographyTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <TypographyTab />
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}

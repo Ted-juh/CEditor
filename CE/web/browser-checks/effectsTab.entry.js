@@ -12,7 +12,7 @@ import { get } from 'svelte/store';
 import EffectsTab from '../src/CE_Application/components/EffectsTab.svelte';
 import { panels, activePanelId, selectedComponentIds } from '../src/CE_Application/stores/panels.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { activateEffectsTarget, effectsTarget } from '../src/CE_Application/stores/effectsTarget.js';
+import { activateEditorTarget, editorTarget } from '../src/CE_Application/stores/editorTarget.js';
 
 const CONTROL_ID = 'ctrl_fx_1';
 
@@ -62,7 +62,7 @@ label._children.States = {
 panels.set([{ id: 'p1', name: 'Check', width: 640, height: 360, bgColour: 'FF1E1E1E', controls: [label] }]);
 activePanelId.set('p1');
 selectedComponentIds.set(new Set([CONTROL_ID]));
-activateEffectsTarget(CONTROL_ID, 'text');
+activateEditorTarget('effects', CONTROL_ID, 'text');
 
 mount(EffectsTab, { target: document.getElementById('host') });
 
@@ -82,7 +82,7 @@ const byName = (name) => [...rowNodes(), ...looseNodes()].find((node) => nameOf(
 const previewInk = (node) => (node?.querySelector('.effect-preview')?.innerHTML ?? '').length;
 
 window.__fx = {
-  target: () => get(effectsTarget),
+  target: () => get(editorTarget),
 
   rows: rowNames,
 

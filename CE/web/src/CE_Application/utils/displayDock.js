@@ -24,6 +24,16 @@
  * like — that is your call, not the dock's.
  */
 
+/**
+ * kind → dock tab, mirrored from `stores/editorTarget.js`.
+ *
+ * Duplicated rather than imported because this module is pure and deliberately store-free — the
+ * dock-height maths is unit-tested without a Svelte runtime. The mirror is small and
+ * `displayDock.test.js` asserts the two agree, so a kind added in one place and not the other
+ * fails rather than silently routing to the last tab.
+ */
+export const EDITOR_TAB_BY_KIND = { effects: 'effects', typography: 'type' };
+
 /** Matches the splitter's own lower bound (App.svelte's displayResizeScrub). */
 export const DISPLAY_DOCK_MIN_HEIGHT = 80;
 
@@ -44,7 +54,7 @@ export const DISPLAY_DOCK_MIN_CEILING = 140;
  * alongside), not to a fraction of the window. Only ever applied to a dock the
  * user has never resized.
  */
-export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380, effects: 380 };
+export const DISPLAY_DOCK_TAB_DEFAULT_HEIGHTS = { colors: 320, gradient: 380, effects: 380, type: 380 };
 
 /** Tallest the dock may be on this viewport. */
 export function maxDisplayDockHeight(viewportHeight) {
@@ -94,16 +104,20 @@ export function impliedDockTab({
   tabRequest = null,
   gradientTarget = null,
   colorTarget = null,
-  effectsTarget = null,
+  editorTarget = null,
   lastTab = 'colors',
 } = {}) {
   if (tabRequest?.tab) return tabRequest.tab;
   if (gradientTarget) return 'gradient';
   if (colorTarget) return 'colors';
-  // Effects ranks below colour and gradient on purpose: unlike those two, an effects target is not
-  // cleared when the selection changes (see stores/effectsTarget.js), so it is armed far more
-  // often than it is the thing you just did. A long-lived target that outranked a fresh swatch
-  // click would drag the dock back to Effects every time.
-  if (effectsTarget) return 'effects';
+  // An editor target ranks below colour and gradient on purpose: unlike those two it is not cleared
+  // when the selection changes (see stores/editorTarget.js), so it is armed far more often than it
+  // is the thing you just did. A long-lived target that outranked a fresh swatch click would drag
+  // the dock back to Effects or Type every time.
+  //
+  // The tab comes from the target's kind rather than a name written here, so a new tab is a row in
+  // EDITOR_TARGET_KINDS and nothing in this file.
+  if (editorTarget?.tab) return editorTarget.tab;
+  if (editorTarget?.kind) return EDITOR_TAB_BY_KIND[editorTarget.kind] ?? lastTab;
   return lastTab;
 }

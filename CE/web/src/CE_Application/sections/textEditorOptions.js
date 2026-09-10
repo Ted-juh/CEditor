@@ -24,27 +24,15 @@ export const DEFAULT_TEXT_FILL_GRADIENT = {
 // the icon components in this file along with them. Re-exported so every existing importer of
 // textEditorOptions keeps working unchanged.
 export {
+  FLOW_MODE_OPTIONS,
   TEXT_CASE_OPTIONS,
   TEXT_POSITION_OPTIONS,
   TEXT_SCRIPT_OPTIONS,
   TYPOGRAPHY_FEATURE_OPTIONS,
 } from './textEditorVocabulary.js';
 
-export const FLOW_MODE_OPTIONS = [
-  { value: 'rotate', label: 'Rotate' },
-  { value: 'line', label: 'Line' },
-  { value: 'stair', label: 'Stair' },
-  { value: 'arc', label: 'Arc' },
-  { value: 'circle', label: 'Circle' },
-  { value: 'vertical', label: 'Vertical' },
-  { value: 'wave', label: 'Wave' },
-  { value: 'zigzag', label: 'Zigzag' },
-  { value: 'spiral', label: 'Spiral' },
-  { value: 'perimeter', label: 'Perimeter' },
-  { value: 'polyline', label: 'Polyline' },
-  { value: 'bezier', label: 'Bezier' },
-  { value: 'freehand', label: 'Freehand' },
-];
+// FLOW_MODE_OPTIONS moved to textEditorVocabulary.js — pure data, and typographyModel.js needs
+// it without the icons. Re-exported below so every existing import still resolves.
 
 export const TEXT_READING_OPTIONS = [
   { value: 'ltr', label: 'L->R', icon: ArrowRight, span: 1 },

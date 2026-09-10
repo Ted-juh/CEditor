@@ -24,6 +24,7 @@
     fit = 'contain',
     zoom = 1,
     label = '',
+    children = null,
   } = $props();
 
   const numberOr = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
@@ -68,16 +69,29 @@
   aria-label={label || undefined}
 >
   {#if positioned}
-    <div class="stage" style="width:{naturalWidth}px;height:{naturalHeight}px;transform:scale({scale});">
-      <CanvasControl
-        control={positioned}
-        scale={1}
-        panelLocked={false}
-        allControls={[positioned]}
-        panelWidth={naturalWidth}
-        panelHeight={naturalHeight}
-        editorInteractionEnabled={false}
-      />
+    <!--
+      Two boxes on purpose. `.stage` is the control at its NATURAL size, CSS-scaled from its top
+      left; `.stage-box` is that size after scaling, so it is exactly the rectangle the control
+      occupies on screen. An overlay goes in the box rather than the stage, which means its
+      coordinates are the control's own 0-100% and its handles keep their real pixel size instead of
+      shrinking with the preview. Overlaying the whole preview instead would put a path handle
+      wherever the padding happened to be.
+    -->
+    <div class="stage-box" style="width:{naturalWidth * scale}px;height:{naturalHeight * scale}px;">
+      <div class="stage" style="width:{naturalWidth}px;height:{naturalHeight}px;transform:scale({scale});">
+        <CanvasControl
+          control={positioned}
+          scale={1}
+          panelLocked={false}
+          allControls={[positioned]}
+          panelWidth={naturalWidth}
+          panelHeight={naturalHeight}
+          editorInteractionEnabled={false}
+        />
+      </div>
+      {#if children}
+        <div class="overlay">{@render children()}</div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -96,9 +110,22 @@
     user-select: none;
   }
 
-  .stage {
+  .stage-box {
     position: relative;
-    transform-origin: center center;
     flex: 0 0 auto;
+  }
+
+  .stage {
+    position: absolute;
+    inset: 0;
+    transform-origin: top left;
+  }
+
+  /* The preview itself takes no pointer events (it is a picture); an overlay is the exception,
+     because it is the one part you are meant to touch. */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
   }
 </style>

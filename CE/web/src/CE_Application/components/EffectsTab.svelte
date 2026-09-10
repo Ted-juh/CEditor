@@ -6,7 +6,7 @@
    * domains: Text effects, layer Effects and screen Lighting. See `docs/design/effects-tab-design.md`
    * for the argument; the two things worth knowing before editing this file are in
    * `utils/effectStack.js` (the stack is the renderer's own, not a second copy) and in
-   * `stores/effectsTarget.js` (this tab does NOT follow the selection, deliberately).
+   * `stores/editorTarget.js` (this tab does NOT follow the selection, deliberately).
    *
    * THE PROPERTIES PANEL IS UNTOUCHED. Every section this tab edits is still in the panel and
    * still editable there — nothing has been relocated yet. That is on purpose: the tab has to be
@@ -23,11 +23,12 @@
   import { applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { flatControls } from '../utils/containment.js';
   import {
-    effectsTarget,
-    activateEffectsTarget,
-    setEffectsDomain,
-    clearEffectsTarget,
-  } from '../stores/effectsTarget.js';
+    editorTarget,
+    activateEditorTarget,
+    setEditorTargetDomain,
+    clearEditorTarget,
+    targetOfKind,
+  } from '../stores/editorTarget.js';
   import {
     DOMAINS,
     availableDomains,
@@ -44,17 +45,18 @@
   let muted = $state([]);
   let activeState = $state('base');
 
+  let mine = $derived(targetOfKind($editorTarget, 'effects'));
   let panelControls = $derived(flatControls($activePanel?.controls ?? []));
 
   let control = $derived(
-    $effectsTarget?.controlId
-      ? panelControls.find((entry) => entry._children?.Core?.id === $effectsTarget.controlId) ?? null
+    mine?.controlId
+      ? panelControls.find((entry) => entry._children?.Core?.id === mine.controlId) ?? null
       : null
   );
 
   let domainsHere = $derived(availableDomains(control));
   let domain = $derived(
-    domainsHere.includes($effectsTarget?.domain) ? $effectsTarget.domain : (domainsHere[0] ?? 'text')
+    domainsHere.includes(mine?.domain) ? mine.domain : (domainsHere[0] ?? 'text')
   );
 
   let built = $derived(buildDomain(control, domain));
@@ -71,11 +73,11 @@
 
   // Opening the tab arms it on whatever is selected right now, and that is the only moment it
   // retargets — from then on it stays put and the header says what it is holding. See
-  // effectsTarget.js for why that is the opposite of the Colors tab.
+  // editorTarget.js for why that is the opposite of the Colors tab.
   onMount(() => {
-    if ($effectsTarget) return;
+    if (mine) return;
     const first = [...($selectedComponentIds ?? [])][0];
-    if (first) activateEffectsTarget(first);
+    if (first) activateEditorTarget('effects', first);
   });
 
   // A row that vanishes (domain switch, or a shadow deleted from the array) must not leave the
@@ -86,7 +88,7 @@
 
   function armFromSelection() {
     const first = [...($selectedComponentIds ?? [])][0];
-    if (first) activateEffectsTarget(first, domain);
+    if (first) activateEditorTarget('effects', first, domain);
   }
 
   function setField(row, key, value) {
@@ -148,7 +150,7 @@
               role="tab"
               class:on={entry.id === domain}
               aria-selected={entry.id === domain}
-              onclick={() => setEffectsDomain(entry.id)}
+              onclick={() => setEditorTargetDomain(entry.id)}
             >{entry.label}</button>
           {/each}
         </div>
@@ -157,7 +159,7 @@
       <div class="headtools">
         <button type="button" class="retarget" disabled={!($selectedComponentIds?.size)} onclick={armFromSelection}
                 title="Point this tab at the control that is selected now">Use selection</button>
-        <button type="button" class="close" onclick={clearEffectsTarget} title="Stop editing this control">Clear</button>
+        <button type="button" class="close" onclick={clearEditorTarget} title="Stop editing this control">Clear</button>
       </div>
     </div>
 
