@@ -1,7 +1,7 @@
 # What could go in the display panel
 
-Status: **a worklist.** Candidates 1, 2 and 3 are built — Effects, Typography and Assets are dock
-tabs now, each with its own design record. Nothing is removed from the properties panel yet. The
+Status: **a worklist.** Candidates 1 to 4 are built — Effects, Typography, Assets and Screen are
+dock tabs now, each with its own design record. Nothing is removed from the properties panel yet. The
 rest of the list is for working through one entry at a time — is it worth it, and what does it look
 like.
 
@@ -47,7 +47,7 @@ proposal to argue about.
 | 1 | Effects | Text, Effects, Display, PixelDisplay | 1,902px | **built** |
 | 2 | Typography | Text | 1,163px | **built** |
 | 3 | Assets (images, filmstrips) | CustomAssets | 1,073px | **built** |
-| 4 | The screen (Display, PixelDisplay) | 2 | ~1,876px | strong |
+| 4 | The screen (LcdDisplay, PixelDisplay) | 2 | 3,814px measured | **built** |
 | 5 | Published API | CustomPublicProperties, CustomPublishedProperties | 1,343px | strong |
 | 6 | Component library | CustomPackageLibrary | 842px | medium |
 | 7 | Image / Texture layers | Background, Text, PanelCardContent | ~890px | medium |

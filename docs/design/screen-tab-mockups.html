@@ -1,0 +1,326 @@
+<title>Screen tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* App palette, as with the other mockups. NOTHING HERE IS BUILT. */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:18ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:64ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:26ch}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule);align-items:center}
+.dtabs button{border:1px solid transparent;background:transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.dtabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.dtabs .who{margin-left:auto;font:500 9px/1 var(--mono);color:var(--ink-4);padding-right:4px}
+.dtabs .who b{color:#8FEDE3}
+.cols{display:flex;gap:10px;padding:10px;align-items:flex-start}
+.colh{display:flex;align-items:center;gap:6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin-bottom:7px;white-space:nowrap}
+.colh s{margin-left:auto;text-decoration:none;font-size:8.5px}
+
+
+/* --- the screen ------------------------------------------------------- */
+.pagecol{flex:0 0 236px;min-width:0}
+.screencol{flex:1 1 0;min-width:0}
+.zonecol{flex:0 0 268px;min-width:0}
+
+.pagelist{background:#12171A;border:1px solid #2E3540;border-radius:4px;overflow:hidden}
+.pagerow{display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid #242A30;cursor:default}
+.pagerow:last-child{border-bottom:0}
+.pagerow.on{background:#173449;box-shadow:inset 2px 0 0 var(--label)}
+.pagerow .pn{flex:1;min-width:0;font:500 10px/1.2 var(--sans);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pagerow.on .pn{color:#EAF5FF}
+.pagerow .pc{font:400 8px/1 var(--mono);color:var(--ink-4)}
+.thumb{flex:0 0 74px;height:22px;border:1px solid #223038;border-radius:2px;background:#07120C;display:flex;flex-direction:column;justify-content:center;padding:2px 3px;gap:1px}
+.thumb i{display:block;font:500 5.5px/1 var(--mono);color:#2BE86A;white-space:pre;font-style:normal;letter-spacing:.4px}
+
+.ruleshead{display:flex;align-items:center;margin:9px 0 6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4)}
+.ruleshead s{margin-left:auto;text-decoration:none}
+.rules{background:#12171A;border:1px solid #2E3540;border-radius:4px;overflow:hidden}
+.rule{display:flex;align-items:center;gap:5px;padding:4px 5px;border-bottom:1px solid #242A30;font:400 9.5px/1.3 var(--mono);color:var(--ink-2)}
+.rule:last-child{border-bottom:0}
+.rule .grip{color:#4B545C;font-size:10px;cursor:grab}
+.rule .cond{flex:0 0 auto;color:#C3D0DA}
+.rule .arrow{color:var(--ink-4)}
+.rule .to{flex:1;min-width:0;color:#C3D0DA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rule.live{background:#0B2320;box-shadow:inset 2px 0 0 var(--teal)}
+.rule .livedot{font:600 7.5px/1 var(--mono);color:#8FEDE3;border:1px solid var(--teal-dim);border-radius:2px;padding:2px 4px}
+.rule.shadowed{opacity:.5}
+.addrule{width:100%;margin-top:5px;border:1px solid #333B42;background:#12171A;color:#9AA6AE;font:600 9px/1 var(--sans);padding:6px;border-radius:3px}
+
+/* the simulated LCD */
+.glass{background:#07120C;border:1px solid #223038;border-radius:5px;padding:14px;position:relative}
+.lcd{position:relative;font:500 22px/1.42 var(--mono);letter-spacing:2px;color:#2BE86A;white-space:pre;text-shadow:0 0 8px #2BE86A66}
+.lcd .dim{color:#2BE86A33}
+.zbox{position:absolute;border:1px solid var(--teal);border-radius:2px;background:#14b8a614;pointer-events:none}
+.zbox.sel{border-color:#8FEDE3;background:#8feee31f;box-shadow:0 0 0 1px #8FEDE355}
+.zbox b{position:absolute;top:-8px;left:-1px;font:600 7px/1 var(--mono);background:var(--teal-dim);color:#04211D;padding:1px 3px;border-radius:2px;font-weight:600}
+.zbox .h{position:absolute;width:6px;height:6px;background:#8FEDE3;border-radius:1px}
+.zbox .h.l{left:-3px;top:50%;margin-top:-3px}
+.zbox .h.r{right:-3px;top:50%;margin-top:-3px}
+.zbox.off{border-color:var(--warn);background:#e5a02914;border-style:dashed}
+.zbox.off b{background:#6B4A1E;color:#F0D48A}
+
+.screenfoot{display:flex;align-items:center;gap:8px;margin-top:7px;font:400 9.5px/1 var(--mono);color:var(--ink-4)}
+.screenfoot .grid{color:var(--ink-3)}
+.warnrow{margin-top:7px;border:1px solid #6B4A1E;background:#221D12;border-radius:4px;padding:6px 8px;font:400 9.5px/1.5 var(--sans);color:#D9BE8A}
+.warnrow b{color:#F0D48A;font-weight:600}
+.warnrow .fixes{display:flex;gap:4px;margin-top:5px}
+.warnrow .fixes button{border:1px solid #6B4A1E;background:#2A2213;color:#F0D48A;font:600 9px/1 var(--sans);padding:4px 7px;border-radius:3px}
+.okrow{margin-top:7px;border:1px solid #2C5A44;background:#10201A;border-radius:4px;padding:6px 8px;font:400 9.5px/1.5 var(--sans);color:#93C4AC}
+.okrow b{color:#A9E7C9;font-weight:600}
+
+/* settings column */
+.setbox{border:1px solid var(--rule-2);border-radius:4px;background:#1A1D20;padding:6px 8px 9px}
+.grp{font:600 8px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:#4B545C;margin:9px 0 2px;padding-bottom:3px;border-bottom:1px solid #262B30}
+.grp:first-child{margin-top:2px}
+.r{display:grid;grid-template-columns:58px minmax(0,1fr);gap:7px;align-items:center;margin-top:6px}
+.r>label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.f{height:24px;display:flex;align-items:center;padding:0 6px;border:1px solid #2A2F33;border-radius:3px;background:#141719;font:500 10px/1 var(--mono);color:#9AA6AE;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel{height:26px;display:flex;align-items:center;padding:0 6px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);font:400 11px/1 var(--sans);color:var(--ink)}
+.seg{display:flex;height:26px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);overflow:hidden}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;font:500 10px/1 var(--sans);color:#8A949C}
+.seg span.on{background:#1B4972;color:#EAF5FF}
+.nc{display:flex;height:26px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);overflow:hidden;align-items:stretch}
+.nc i{display:flex;align-items:center;padding:0 6px;font:600 8px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--label);font-style:normal}
+.nc em{flex:1;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;font:500 11px/1 var(--mono);color:var(--ink);font-style:normal}
+.nc u{width:14px;border-left:1px solid var(--rule-2);text-decoration:none;font:400 6px/7px var(--mono);color:#69737B;display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* before/after */
+.ba{display:grid;grid-template-columns:1fr 44px 1fr;gap:14px;align-items:start}
+.balabel{font:600 8.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);margin-bottom:8px}
+.balabel.a{color:var(--teal)}
+.arrowcol{display:flex;align-items:center;justify-content:center;color:var(--ink-4);font-size:20px;padding-top:60px}
+.pp{background:var(--panel);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.pphead{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#181818;border-bottom:1px solid var(--rule);font:600 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+.pphead b{color:#8FEDE3}
+.pphead span{margin-left:auto}
+.ppsech{padding:5px 8px;background:#1a1a1a;border-bottom:1px solid #262626;font:600 8.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);text-align:right}
+.ppbody{padding:8px}
+.ztable{width:100%;border-collapse:collapse;font:400 8.5px/1 var(--mono)}
+.ztable th{font:600 7.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-4);padding:0 2px 4px;text-align:left;font-weight:600}
+.ztable td{padding:1px 2px}
+.ztable .cell{height:20px;border:1px solid var(--rule-2);border-radius:2px;background:var(--field);display:flex;align-items:center;padding:0 3px;color:var(--ink);font-size:8.5px;white-space:nowrap;overflow:hidden}
+.ztable .num{justify-content:flex-end}
+@media (max-width:900px){ .ba{grid-template-columns:1fr}.arrowcol{display:none;padding:0} }
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; display panel &nbsp;·&nbsp; candidate 4 &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>The Screen tab</h1>
+  <p class="lede">3,814px across two editors, a page order that cannot be reordered, and a zone that
+    can slide off the screen with nothing anywhere saying so.</p>
+  <div class="warnbar"><b>Built on 2026-09-10.</b> These are still drawings, and the shipped tab
+    differs from them in one place: an out-of-range region is drawn where the renderer will
+    <i>really</i> paint it — a clamped zone on the cell it collapses to, one that paints nowhere as a
+    tab on the edge it fell off — rather than as a box at its literal numbers, which put an amber
+    rectangle over the settings column. The heights were measured for real, both editors mounted in
+    Chromium with <code>getBoundingClientRect()</code>, and the placement arithmetic is quoted out of
+    <code>utils/lcdZones.js</code>.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>A zone can fall off the screen, and nothing says so</h2>
+  <p>This is the finding the tab is worth building for. <code>composeLayout</code> drops a zone whose
+    row is past the last row, and <b>clamps</b> one whose columns are past the last column — which is
+    worse, because a clamped zone still paints. Nine cells at columns 20–28 on a 16-column screen
+    become one cell hard against the right edge.</p>
+  <p>The trigger is two clicks. <b>Rows</b> and <b>Cols</b> are number wells at the top of the same
+    panel; taking a 4×20 screen down to 2×16 sends half the layout somewhere you cannot see, and the
+    table still shows the numbers you typed.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+        <div>
+          <div class="balabel">Today — nine columns of numbers, no screen</div>
+          <div class="pp">
+            <div class="pphead"><b>LcdDisplay</b><span>Layouts</span></div>
+            <div class="ppsech">Layouts</div>
+            <div class="ppbody">
+              <table class="ztable">
+                <tr><th>#</th><th>Row</th><th>Start</th><th>End</th><th>Show</th><th>Source</th><th>Al</th></tr>
+                <tr><td>1</td><td><div class="cell num">1</div></td><td><div class="cell num">1</div></td><td><div class="cell num">8</div></td><td><div class="cell">name</div></td><td><div class="cell">Cutoff</div></td><td><div class="cell">L</div></td></tr>
+                <tr><td>2</td><td><div class="cell num">1</div></td><td><div class="cell num">9</div></td><td><div class="cell num">16</div></td><td><div class="cell">value</div></td><td><div class="cell">Cutoff</div></td><td><div class="cell">R</div></td></tr>
+                <tr><td>3</td><td><div class="cell num">2</div></td><td><div class="cell num">1</div></td><td><div class="cell num">16</div></td><td><div class="cell">bar</div></td><td><div class="cell">Cutoff</div></td><td><div class="cell">L</div></td></tr>
+                <tr><td>4</td><td><div class="cell num">3</div></td><td><div class="cell num">1</div></td><td><div class="cell num">16</div></td><td><div class="cell">name</div></td><td><div class="cell">Reso</div></td><td><div class="cell">L</div></td></tr>
+                <tr><td>5</td><td><div class="cell num">1</div></td><td><div class="cell num">20</div></td><td><div class="cell num">28</div></td><td><div class="cell">value</div></td><td><div class="cell">Reso</div></td><td><div class="cell">R</div></td></tr>
+              </table>
+              <p style="font-size:10px;color:var(--ink-4);margin:10px 0 0">Rows 4 and 5 are on a
+                2×16 screen. One never paints; the other paints one character wide against the right
+                edge. Nothing in this picture says either thing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel a">Proposed — the screen, and the arithmetic checked</div>
+          <div class="screencol" style="flex:none">
+            <div class="glass">
+              <div class="lcd">CUTOFF     <span style="color:#2BE86A">1240</span>
+<span>████████░░░░░░░░</span></div>
+              <div class="zbox" style="left:14px;top:14px;width:128px;height:31px"><b>1 name</b></div>
+              <div class="zbox sel" style="left:150px;top:14px;width:120px;height:31px"><b>2 value</b><i class="h l"></i><i class="h r"></i></div>
+              <div class="zbox" style="left:14px;top:47px;width:256px;height:31px"><b>3 bar</b></div>
+              <div class="zbox off" style="left:14px;top:82px;width:256px;height:14px"><b>4 · row 3 of 2</b></div>
+              <div class="zbox off" style="left:246px;top:14px;width:24px;height:31px"><b>5 · clamped</b></div>
+            </div>
+            <div class="screenfoot"><span class="grid">16 × 2 characters</span><span>·</span><span>drag a zone to move it, its ends to resize</span></div>
+            <div class="warnrow">
+              <b>⚠ Two zones are not where their numbers say.</b>
+              Zone 4 is on row 3 of a 2-row screen and never paints. Zone 5 runs to column 28 on a
+              16-column screen and is clamped to one cell at the right edge.
+              <div class="fixes">
+                <button>bring zone 4 onto row 2</button>
+                <button>fit zone 5 to the screen</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 1</div>
+      <p class="ct">Off-screen zones are drawn in the margin in amber rather than hidden, so the
+        thing that is wrong is the thing you can see. The two offers are the two repairs the
+        arithmetic already knows how to make.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>The whole tab</h2>
+  <p>Pages on the left, each with a thumbnail of itself rendered by the same
+    <code>composeLayout</code> the canvas uses. Under them the rules — <b>draggable</b>, which they
+    have never been, and with the one that currently matches marked live.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui dock" style="min-width:1040px">
+        <div class="dtabs">
+          <button>Colors</button><button>Gradient</button><button>Effects</button><button>Type</button>
+          <button>Assets</button><button class="on">Screen</button><button>Layers</button>
+          <span class="who">editing <b>Main LCD</b> · 16 × 2 · 4 pages</span>
+        </div>
+
+        <div class="cols">
+          <div class="pagecol">
+            <div class="colh">Pages <s>4</s></div>
+            <div class="pagelist">
+              <div class="pagerow on"><span class="pn">Home</span><span class="pc">3</span>
+                <span class="thumb"><i>CUTOFF      1240</i><i>████████░░░░░░░░</i></span></div>
+              <div class="pagerow"><span class="pn">Edit</span><span class="pc">1</span>
+                <span class="thumb"><i>NAME: INIT      </i><i>                </i></span></div>
+              <div class="pagerow"><span class="pn">Meters</span><span class="pc">4</span>
+                <span class="thumb"><i>L ▁▃▅▇  R ▁▃▅▇ </i><i>PEAK -3.2   -1.8</i></span></div>
+              <div class="pagerow"><span class="pn">About</span><span class="pc">1</span>
+                <span class="thumb"><i>CEDITOR  v0.2.0 </i><i>                </i></span></div>
+            </div>
+
+            <div class="ruleshead">Rules <s>selector: Mode</s></div>
+            <div class="rules">
+              <div class="rule live"><span class="grip">⠿</span><span class="cond">= 0</span><span class="arrow">→</span><span class="to">Home</span><span class="livedot">LIVE</span></div>
+              <div class="rule"><span class="grip">⠿</span><span class="cond">= 1</span><span class="arrow">→</span><span class="to">Edit</span></div>
+              <div class="rule"><span class="grip">⠿</span><span class="cond">≥ 2</span><span class="arrow">→</span><span class="to">Meters</span></div>
+              <div class="rule shadowed"><span class="grip">⠿</span><span class="cond">= 3</span><span class="arrow">→</span><span class="to">About</span></div>
+            </div>
+            <button class="addrule">+ Rule</button>
+          </div>
+
+          <div class="screencol">
+            <div class="colh">Home <s>3 zones</s></div>
+            <div class="glass">
+              <div class="lcd">CUTOFF     <span style="color:#2BE86A">1240</span>
+<span>████████░░░░░░░░</span></div>
+              <div class="zbox" style="left:14px;top:14px;width:128px;height:31px"><b>1 name</b></div>
+              <div class="zbox sel" style="left:150px;top:14px;width:120px;height:31px"><b>2 value</b><i class="h l"></i><i class="h r"></i></div>
+              <div class="zbox" style="left:14px;top:47px;width:256px;height:31px"><b>3 bar</b></div>
+            </div>
+            <div class="screenfoot"><span class="grid">16 × 2 characters</span><span>·</span><span>zone 2 · row 1 · cols 9–16</span></div>
+            <div class="okrow"><b>✓ Every zone is on the screen.</b> Three zones cover all 32 cells.</div>
+          </div>
+
+          <div class="zonecol">
+            <div class="colh">Zone 2</div>
+            <div class="setbox">
+              <div class="grp">Shows</div>
+              <div class="r"><label>Kind</label><div class="sel">value</div></div>
+              <div class="r"><label>Source</label><div class="sel">Filter Cutoff</div></div>
+              <div class="grp">Region</div>
+              <div class="r"><label>Row</label><div class="nc"><i>ROW</i><em>1</em><u>▴<br>▾</u></div></div>
+              <div class="r"><label>Cols</label><div class="nc"><i>9 – 16</i><em>8</em><u>▴<br>▾</u></div></div>
+              <div class="r"><label>Align</label><div class="seg"><span>L</span><span>C</span><span class="on">R</span></div></div>
+              <div class="grp">Format</div>
+              <div class="r"><label>Radix</label><div class="seg"><span class="on">dec</span><span>hex</span></div></div>
+              <div class="r"><label>Overflow</label><div class="seg"><span class="on">Clip</span><span>Scroll</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 2</div>
+      <p class="ct">The greyed rule is shadowed: <code>= 3</code> can never match, because
+        <code>≥ 2</code> sits above it and <code>resolveActiveLayoutId</code> takes the first hit.
+        That is the same arithmetic as the live marker, read the other way.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>How the three open questions were decided</h2>
+  <ul>
+    <li><b>One tab, two modes.</b> The model speaks in rects over a grid and converts at the edges,
+      so layouts, page rules and the check are written once. The stage is the one place the two are
+      not flattened — and for a good reason: <code>PixelDisplayRenderer</code> already drags and
+      resizes its elements, with snapping and grouped moves, while <code>LcdDisplayRenderer</code>
+      has no drag code at all. The tab uses the shipped one and adds the missing one.</li>
+    <li><b>The spatial half only.</b> Layouts, Pages and Zones/Elements. Screen size, Colour,
+      Lighting and Motion stay in the panel: a dock that took them all would be a second properties
+      panel.</li>
+    <li><b>Drag the box, drag its ends</b>, snapped to cells, with the numbers beside it — the
+      Typography settlement, where handles are for values that are a shape and the numbers stay.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="screen-tab-design.md" style="color:var(--teal)">screen-tab-design.md</a>,
+    which records what shipped.</p>
+</section>
+
+</div>
