@@ -75,6 +75,12 @@ outlived them is here rather than in a document that reads as open:
   nobody acted on are in [known-issues.md](../known-issues.md). Pinned by
   `CE/web/test/surfaceDecomposition.test.js`.
 
+A fifth document is open rather than retired:
+
+| Document | What it is |
+|---|---|
+| [A widget model for the creator](widget-model-creator-plan.md) | *Nothing built.* The creator already has most of the canvas tooling a design tool needs, so the reason it feels property-heavy is elsewhere: it offers a graph of nine primitive lists joined by name strings, or a starter patch that dissolves into that graph, with no persistent object in between. Counts the cost (about 500 addressable fields behind one dial) and proposes a `Widget` node that stores the grouping instead of inferring it, caps its Essentials panel at eight controls, compiles down to the primitives the runtime already renders, and unpacks one way when the graph is wanted. Five phases, each useful on its own. |
+
 ## Post-beta bets
 
 Plans, not commitments. Each says what the thing is, why it would matter, and what it would cost —
