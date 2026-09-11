@@ -13,7 +13,6 @@
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
-  import InsertPanel from './InsertPanel.svelte';
   import InsertFlyout from './InsertFlyout.svelte';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { CATEGORY_ICONS, FALLBACK_TYPE_ICON } from '../models/insertCatalogIcons.js';
@@ -48,7 +47,6 @@
   // items would be dead there.
   $effect(() => {
     if (!insertEnabled) {
-      insertPanelOpen = false;
       customLibraryOpen = false;
       closeFlyout(true);
     }
@@ -102,24 +100,19 @@
 
   const customLibraryKinds = ['all', 'button', 'slider', 'multi', 'grid', 'piano', 'filmstrip', 'linked'];
 
-  // Two ways in, and they are not the same job.
+  // --- The insert rail ---------------------------------------------------------------------------
   //
-  // The five CATEGORY BUTTONS open their group on hover — the fast path, for when you know you want
-  // a Knob. `insertCatalog.js` was written for these; its own header calls them "the icon rail's
+  // Six buttons, one panel. The + is at the top and is the SEARCH: type and the matching components
+  // and saved packages appear in the same flyout the categories open in. Below it, the five
+  // CATEGORY buttons open their group on hover — the fast path, for when you already know you want
+  // a Knob. `insertCatalog.js` was written for those; its own header calls them "the icon rail's
   // category flyouts".
   //
-  // The + button opens the Insert panel, which does what a flyout cannot: search across all 56
-  // types, a Recents row, and the saved custom packages inline.
+  // There used to be a 394-line drawer behind the +, listing every category out again — the same
+  // browsing the category buttons now do, one click further away. It is gone, and what it could do
+  // that a flyout could not (search everything, recents, the saved packages) is the search mode.
   //
-  // Only one thing open at a time, whichever kind it is.
-  let insertPanelOpen = $state(false);
-
-  function toggleInsertPanel() {
-    insertPanelOpen = !insertPanelOpen;
-    if (insertPanelOpen) { customLibraryOpen = false; closeFlyout(true); }
-  }
-
-  // --- The category flyouts ---------------------------------------------------------------------
+  // Only one thing open at a time, whichever button opened it.
   // The close is DELAYED and the open is not. Two gaps have to be survivable: the pointer moving
   // from the button into the panel, and the pointer travelling down the rail from one category
   // button to the next (which would otherwise flash five menus on the way). Opening immediately is
@@ -133,8 +126,8 @@
 
   const FLYOUT_CLOSE_MS = 220;
 
+  /** '' when nothing is open, 'search' for the +, otherwise a category id. */
   let openFlyoutId = $state('');
-  let flyoutTop = $state(0);
   let flyoutCloseTimer = null;
 
   function cancelFlyoutClose() {
@@ -143,13 +136,11 @@
     flyoutCloseTimer = null;
   }
 
-  function openFlyout(id, event) {
+  function openFlyout(id) {
     cancelFlyoutClose();
-    // Beside its own button, and never so low that the panel runs off the bottom.
-    const box = event?.currentTarget?.getBoundingClientRect?.();
-    if (box) flyoutTop = Math.max(48, Math.min(box.top - 4, window.innerHeight - 140));
+    // No per-button position: the panel is the editor's height whichever button opened it, so it
+    // does not jump up and down the screen as the pointer travels along the rail.
     openFlyoutId = id;
-    insertPanelOpen = false;
     customLibraryOpen = false;
   }
 
@@ -165,18 +156,16 @@
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       if (openFlyoutId === id) closeFlyout(true);
-      else openFlyout(id, event);
+      else openFlyout(id);
     }
   }
 
-  function openLibraryFromInsert() {
-    insertPanelOpen = false;
-    customLibraryOpen = true;
-  }
 
+  // Escape closes whatever the rail has open, innermost first. The flyout stops the event when it
+  // is focused; this is the case where focus is elsewhere on the page.
   function handleWindowKeydown(event) {
     if (event.key !== 'Escape') return;
-    if (insertPanelOpen) insertPanelOpen = false;
+    if (openFlyoutId) closeFlyout(true);
     else if (customLibraryOpen) customLibraryOpen = false;
   }
 
@@ -188,7 +177,7 @@
 
   function toggleCustomLibrary() {
     customLibraryOpen = !customLibraryOpen;
-    if (customLibraryOpen) insertPanelOpen = false;
+    if (customLibraryOpen) closeFlyout(true);
   }
 
   function thumbnailPartStyle(part) {
@@ -241,6 +230,25 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="icon-panel">
+  <div class="insert-section">
+    <button
+      class="icon-btn insert-btn"
+      class:active={openFlyoutId === 'search'}
+      title="Search every component and saved package"
+      aria-haspopup="dialog"
+      aria-expanded={openFlyoutId === 'search'}
+      onpointerenter={() => openFlyout('search')}
+      onpointerleave={() => closeFlyout()}
+      onfocus={() => openFlyout('search')}
+      onkeydown={(event) => flyoutKeydown('search', event)}
+      onclick={() => openFlyout('search')}
+    >
+      <Plus size={20} strokeWidth={1.8} />
+    </button>
+  </div>
+
+  <div class="separator"></div>
+
   <div class="insert-section category-section">
     {#each CATEGORY_BUTTONS as category (category.id)}
       {@const Icon = category.icon}
@@ -250,31 +258,15 @@
         title={`${category.label} — ${category.count} components`}
         aria-haspopup="menu"
         aria-expanded={openFlyoutId === category.id}
-        onpointerenter={(event) => openFlyout(category.id, event)}
+        onpointerenter={() => openFlyout(category.id)}
         onpointerleave={() => closeFlyout()}
-        onfocus={(event) => openFlyout(category.id, event)}
+        onfocus={() => openFlyout(category.id)}
         onkeydown={(event) => flyoutKeydown(category.id, event)}
-        onclick={(event) => openFlyout(category.id, event)}
+        onclick={() => openFlyout(category.id)}
       >
         <Icon size={18} strokeWidth={1.6} />
       </button>
     {/each}
-  </div>
-
-  <div class="separator"></div>
-
-  <div class="insert-section">
-    <button
-      class="icon-btn insert-btn"
-      class:active={insertPanelOpen}
-      title="Search every component, recents and saved packages"
-      aria-haspopup="dialog"
-      aria-expanded={insertPanelOpen}
-      onpointerenter={() => closeFlyout()}
-      onclick={toggleInsertPanel}
-    >
-      <Plus size={20} strokeWidth={1.8} />
-    </button>
   </div>
 
   {#if ($customComponentLibrary ?? []).length}
@@ -377,22 +369,16 @@
 </div>
 
 {#if openFlyoutId}
-  <InsertFlyout
-    categoryId={openFlyoutId}
-    top={flyoutTop}
-    {hasActivePanel}
-    onenter={cancelFlyoutClose}
-    onleave={() => closeFlyout()}
-    onclose={() => closeFlyout(true)}
-  />
-{/if}
-
-{#if insertPanelOpen}
-  <InsertPanel
-    {hasActivePanel}
-    onclose={() => insertPanelOpen = false}
-    onopenlibrary={openLibraryFromInsert}
-  />
+  {#key openFlyoutId}
+    <InsertFlyout
+      mode={openFlyoutId === 'search' ? 'search' : 'category'}
+      categoryId={openFlyoutId}
+      {hasActivePanel}
+      onenter={cancelFlyoutClose}
+      onleave={() => closeFlyout()}
+      onclose={() => closeFlyout(true)}
+    />
+  {/key}
 {/if}
 
 {#if customLibraryOpen}
@@ -651,9 +637,12 @@
 
   .custom-library-drawer {
     position: fixed;
-    left: 46px;
-    top: 48px;
-    bottom: 42px;
+    /* The editor band and the real rail width, the same as the insert flyout: App.svelte's shell is
+       `grid-template-rows: 28px 1fr 24px`. This said 48px/42px, from a taller menu bar than the one
+       that ships. */
+    left: var(--icon-width, 48px);
+    top: 28px;
+    bottom: 24px;
     width: 260px;
     z-index: 80;
     display: flex;

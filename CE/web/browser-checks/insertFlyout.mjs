@@ -36,6 +36,11 @@ page.on('pageerror', (error) => failures.push(String(error)));
 await page.goto(`http://127.0.0.1:${server.address().port}/insertFlyout.html`);
 await page.waitForFunction(() => window.__fly && window.__fly.categoryCount() > 0);
 await page.waitForTimeout(400);
+await page.evaluate(() => {
+  window.__fly.seedPackage('Big Knob');
+  window.__fly.seedRecents(['Knob', 'Label']);
+});
+await page.waitForTimeout(200);
 
 const check = (name, fn) => { fn(); console.log(`  ok  ${name}`); };
 const ev = (fn, arg) => page.evaluate(fn, arg);
@@ -141,22 +146,86 @@ await afterClose();
 await ev(() => window.__fly.restorePanel());
 await settle();
 
-// --- The drawer is still there ---------------------------------------------------------------
+// --- The + is the search, and it is at the top ------------------------------------------------
 
-check('the + button survives — it does the search, Recents and packages a flyout cannot', async () => {});
-assert.equal(await ev(() => window.__fly.plusButton()), true);
+const order = await ev(() => window.__fly.railOrder());
+check('the + is the first button on the rail, above the five groups', () => {
+  assert.deepEqual(order, ['plus', 'category', 'category', 'category', 'category', 'category']);
+});
 
-await ev(() => window.__fly.clickPlus());
+await ev(() => window.__fly.hoverPlus());
 await settle();
-check('and it still opens the drawer, with its search box', () => {});
-assert.equal(await ev(() => window.__fly.drawerOpen()), true);
-assert.equal(await ev(() => window.__fly.drawerHasSearch()), true);
-
-await ev(() => window.__fly.hover(0));
-await settle();
-check('opening a flyout closes the drawer — one thing open at a time', () => {});
-assert.equal(await ev(() => window.__fly.drawerOpen()), false);
+check('hovering it opens the search, in the same panel the groups open in', () => {});
+assert.equal(await ev(() => window.__fly.open()), 'Search');
+assert.equal(await ev(() => window.__fly.hasSearchBox()), true);
 assert.equal(await ev(() => window.__fly.openCount()), 1);
+
+check('and the box has focus, so it is ready to type into', async () => {});
+assert.equal(await ev(() => window.__fly.searchFocused()), true);
+
+await ev(() => window.__fly.type('knob'));
+await settle();
+const knobHits = await ev(() => window.__fly.items());
+check('typing shows what matches, in that same flyout', () => {
+  assert.ok(knobHits.includes('Knob'), `hits: ${knobHits.join(', ')}`);
+  assert.ok(knobHits.length < 56, 'it narrowed to something');
+});
+
+await ev(() => window.__fly.type('slider'));
+await settle();
+const sliderHits = await ev(() => window.__fly.items());
+check('and the match is on the name, the type id or the group it lives in', () => {
+  assert.ok(sliderHits.includes('Slider'));
+  // "Values & Sliders" is a group name, so every one of its twelve comes back too.
+  assert.ok(sliderHits.length >= 12, `hits: ${sliderHits.length}`);
+});
+
+await ev(() => window.__fly.type('zzzznothing'));
+await settle();
+check('a search that finds nothing says so rather than showing an empty box', () => {
+  assert.equal(0, 0);
+});
+assert.match(await ev(() => window.__fly.emptyNote()), /Nothing matches/);
+
+await ev(() => window.__fly.type(''));
+await settle();
+const emptyGroups = await ev(() => window.__fly.groups());
+check('with the box empty it offers what you used last', () => {
+  assert.deepEqual(emptyGroups, ['Recent'], `groups: ${emptyGroups.join(', ')}`);
+});
+
+await ev(() => window.__fly.type('big'));
+await settle();
+const packages = await ev(() => window.__fly.packageItems());
+const withPackages = await ev(() => window.__fly.groups());
+check('a saved package is findable in the same search', () => {
+  assert.deepEqual(packages, ['Big Knob'], `packages: ${packages.join(', ')}`);
+  assert.ok(withPackages.includes('Saved packages'), `groups: ${withPackages.join(', ')}`);
+});
+
+await ev(() => window.__fly.clickItem('Big Knob'));
+await settle();
+check('and inserting it adds the package to the panel', async () => {});
+assert.deepEqual(await ev(() => window.__fly.controls()), ['CustomComponent']);
+
+// --- Everything opens at the editor's height ---------------------------------------------------
+
+await ev(() => window.__fly.clearPanel());
+await ev(() => window.__fly.hoverPlus());
+await settle();
+const searchBox = await ev(() => window.__fly.flyoutBox());
+await ev(() => window.__fly.unhoverPlus());
+await ev(() => window.__fly.hover(4));
+await settle();
+const categoryBox = await ev(() => window.__fly.flyoutBox());
+check('every flyout fills the editor band — 28px under the menu bar, 24px above the status bar', () => {
+  // App.svelte's shell is `grid-template-rows: 28px 1fr 24px`.
+  assert.deepEqual(searchBox, { top: 28, bottom: 24, left: 48 }, JSON.stringify(searchBox));
+});
+
+check('and the last group opens in exactly the same place as the first — no jumping', () => {
+  assert.deepEqual(categoryBox, searchBox, `${JSON.stringify(categoryBox)} vs ${JSON.stringify(searchBox)}`);
+});
 
 if (failures.length) {
   console.error('\nconsole/page errors:\n' + failures.join('\n'));

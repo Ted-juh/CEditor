@@ -10,6 +10,9 @@ import { get } from 'svelte/store';
 import IconPanel from '../src/CE_Application/layout/IconPanel.svelte';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { INSERT_CATEGORIES } from '../src/CE_Application/models/insertCatalog.js';
+import { insertRecents } from '../src/CE_Application/stores/insertRecents.js';
+import { customComponentLibrary } from '../src/CE_Application/stores/customComponentLibrary.js';
+import { createControl } from '../src/CE_Application/models/componentTypes.js';
 
 panels.set([{ id: 'p1', name: 'Check', width: 900, height: 400, bgColour: 'FF1E1E1E', controls: [] }]);
 activePanelId.set('p1');
@@ -61,11 +64,42 @@ window.__fly = {
     return captured;
   },
 
-  // The + drawer has to survive alongside them.
+  // --- the + , which is the search ---------------------------------------------------------
   plusButton: () => !!document.querySelector('.insert-btn'),
-  clickPlus: () => { document.querySelector('.insert-btn')?.click(); },
-  drawerOpen: () => !!document.querySelector('.insert-panel'),
-  drawerHasSearch: () => !!document.querySelector('.insert-panel .search-row input'),
+  hoverPlus: () => { const b = document.querySelector('.insert-btn'); if (!b) return false; pointer(b, 'pointerenter'); return true; },
+  unhoverPlus: () => { const b = document.querySelector('.insert-btn'); if (!b) return false; pointer(b, 'pointerleave'); return true; },
+  /** Rail button order, so "the + is at the top" is a fact rather than a look. */
+  railOrder: () => [...document.querySelectorAll('.icon-panel button')]
+    .map((b) => (b.classList.contains('insert-btn') ? 'plus'
+      : b.classList.contains('category-btn') ? 'category' : ''))
+    .filter(Boolean),
+  hasSearchBox: () => !!document.querySelector('.insert-flyout .fly-search'),
+  searchFocused: () => document.activeElement === document.querySelector('.insert-flyout .fly-search'),
+  type: (value) => {
+    const input = document.querySelector('.insert-flyout .fly-search');
+    if (!input) return false;
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  },
+  groups: () => [...document.querySelectorAll('.insert-flyout .fly-group')].map(textOf),
+  emptyNote: () => textOf(document.querySelector('.insert-flyout .fly-none')),
+  headCount: () => textOf(document.querySelector('.insert-flyout .fly-head s')),
+  packageItems: () => [...document.querySelectorAll('.insert-flyout .fly-item.package span')].map(textOf),
+
+  /** The editor band: App.svelte's shell is `28px 1fr 24px`. */
+  flyoutBox: () => {
+    const el = document.querySelector('.insert-flyout');
+    if (!el) return null;
+    const box = el.getBoundingClientRect();
+    return { top: Math.round(box.top), bottom: Math.round(window.innerHeight - box.bottom), left: Math.round(box.left) };
+  },
+  seedRecents: (types) => insertRecents.set(types),
+  seedPackage: (name) => {
+    const control = createControl('CustomComponent');
+    control._children.Core.name = name;
+    customComponentLibrary.saveControl(control, { name, author: 'me', category: 'knobs', tags: [] });
+  },
 
   controls: () => get(panels)[0].controls.map((c) => c._children.Core.controlType),
   clearPanel: () => panels.update((list) => [{ ...list[0], controls: [] }]),

@@ -1,4 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>insert flyout</title></head>
 <body style="margin:0;background:#1E1E1E;height:100vh">
-<div id="host" style="width:46px;height:100vh"></div>
+<!-- The rail's real width, and the custom property the flyout reads, so "flush against the rail"
+     is measured against the same number the app uses (workspaceChrome.iconWidth). -->
+<div id="host" style="--icon-width:48px;width:48px;height:100vh"></div>
 <script type="module" src="./insertFlyout.entry.js"></script></body></html>
