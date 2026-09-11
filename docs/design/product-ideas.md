@@ -1147,6 +1147,254 @@ layouts you can switch between, rather than rearranging by hand every time.
 
 **Cost:** low.
 
+---
+
+# 17. Shipping a panel, and keeping it alive afterwards
+
+The export half of the product has had more engineering than any user can see, and two of its
+decisions turn out to enable features nobody has named yet.
+
+## A shipped panel can update itself, and it costs a file copy
+
+**The fact this rests on.** `CEDITOR_TEMPLATE_PLAYER=ON` builds a panel-agnostic player that reads
+**both its identity and its panel** from the single `.cepanel` beside it, which is what made
+compiler-free export possible (`tools/scripts/export-panel-template.mjs`, and §3a of
+[`scripting-language-options-and-shippable-export.md`](../scripting-language-options-and-shippable-export.md)).
+
+**What nobody has said out loud:** if the panel is a *file* the player reads, then **updating a
+shipped panel is replacing that file.** Not rebuilding a plugin. Not redistributing a binary. Not
+asking fifty people to uninstall anything.
+
+So: a panel that checks for a newer `.cepanel` — beside it, or at a URL its author chose — and
+offers to take it. You ship a panel, somebody finds a bug in your filter section, you fix it, and
+every user gets the fix without a new VST3 existing anywhere.
+
+**Why no competitor can copy this.** Their exports are binaries; the panel *is* the compiled thing.
+Here the binary is generic and the panel is data, which was done for a build-cost reason and turns
+out to be a distribution capability.
+
+**Awkward, and these are not optional:**
+
+- **A panel that fetches code is a panel that can fetch bad code.** Scripts run in the sandbox, but
+  the trust question is the same one raised in §12 for shared behaviours: the author must be
+  identified, the user must consent, and the default must be to ask rather than to take. The
+  `UpdateCheck.h` precedent is exactly right — a check that sends this machine's IP to a server is
+  *"not something a program should do on its own the first time it starts"*, so the setting defaults
+  off and choosing the menu item **is** the consent.
+- **The identity must not move.** A panel update must keep the same FUID or a DAW session stops
+  finding its plugin. Since identity is in the sidecar, an update that changes it is a different
+  plugin wearing the same name — so the updater must refuse an identity change rather than apply it.
+- **Rollback.** Replacing a working panel with a broken one, on stage, with no way back, is the
+  worst outcome. Keep the previous file.
+
+**Cost:** low-to-medium. The mechanism exists; the work is consent, identity checking and rollback —
+which is to say the work is all in the manners.
+
+## Ship a standalone to somebody who does not have CEditor
+
+The same fact, pointed the other way. A standalone app has no FUID contract at all — §3a already
+says a prebuilt standalone plus a sidecar is viable — so a panel becomes **a folder you send
+somebody**. They double-click it. They do not install CEditor, do not buy anything, and do not need
+to know what CEditor is.
+
+That is a distribution story for panel authors: build an editor for a synth, hand it to everybody
+else who owns that synth. It is also, incidentally, the best possible advertisement, since the
+program's name is on a working editor in the hands of somebody who never downloaded it.
+
+**Cost:** low, given the template player.
+
+## Preflight, before the build starts
+
+Today a bad export fails partway through, in a compiler.
+
+Check first, in two seconds: assets over the thresholds the package format already defines
+(`CUSTOM_COMPONENT_ASSET_WARNING_BYTES` is 2 MB, the package warning 8 MB); scripts that do not
+validate; an identity that collides with something already shipped; and — the one that actually
+bites — whether the toolchain for the languages this panel uses is installed at all.
+
+**Cost:** low. Every check exists somewhere already; none of them is wired to the moment before a
+build.
+
+## A toolchain doctor
+
+C# pulls roughly 230 MB of .NET and Java roughly 195 MB of JDK, installed as optional components by
+the installer (`tools/installer/CEditor.iss` triggers `provision.cmd` per component). When that goes
+wrong — and a 230 MB download during setup sometimes goes wrong — the user meets it as a failed
+export with a compiler error.
+
+`node tools/toolchains/languages.mjs status` already answers the question on a command line. Put it
+on a screen: what is installed, what is missing, how big it is, what it is for, and a button to
+fetch it.
+
+**Cost:** very low. The command exists; this is a view.
+
+## Optimise assets on the way out
+
+Panels get fat quickly because people drop in 4-megapixel photographs of front panels. Convert to
+WebP, strip camera metadata, downscale to the size actually displayed, and report what was saved.
+
+The package format already *warns* about size. This fixes it instead of mentioning it.
+
+**Awkward:** never touch the source assets, only the exported copy, and never silently — a panel
+author who chose a lossless PNG deserves to be told what happened to it.
+
+**Cost:** low.
+
+## Say what AGPL means, at the moment it starts mattering
+
+**The finding:** there is no licence text anywhere near the export path. Checked — no mention of
+AGPL, licence or source offer in the export settings or in `panelPackage.js`.
+
+A panel somebody distributes carries obligations under AGPLv3, and the person distributing it
+almost certainly does not know that. `beta-differentiation.md` already flagged this for the unbuilt
+panel exchange; it applies to plain export today.
+
+An export-time notice, and a generated licence and written-offer file in the output folder, is
+cheap, honest, and protects the user rather than the project. It also fits the tone of
+[`licence-and-sunset-policy.md`](../licence-and-sunset-policy.md), which is the most trustworthy
+document in the repository and should not have an unexplained gap next to it.
+
+**Cost:** very low, and it is mostly writing.
+
+## An export diff
+
+What changed in this VST3 since the last one you shipped: identity, panel, scripts, modules, size.
+Release notes for your own export, generated rather than remembered.
+
+Pairs with the self-update above — if users are taking new panels from you, you want to be able to
+say what is in one.
+
+**Cost:** low.
+
+## Reproducible export
+
+Same panel in, byte-identical plugin out.
+
+Two things it buys. "Did anything actually change?" becomes answerable without reading a diff. And
+for anybody distributing panels, a build that reproduces is a build somebody else can verify — which
+matters more the moment panels start being shared.
+
+**Awkward:** timestamps and build paths are the usual culprits and both are solvable; the toolchain
+version is not, and the honest claim is "reproducible on the same toolchain", stated rather than
+implied.
+
+**Cost:** medium, and worth doing before a panel exchange exists rather than after.
+
+---
+
+# 18. Knowing what you have
+
+## "Where is this used?"
+
+Custom component packages already carry a **stable content hash** — a deterministic stringify and an
+FNV-1a over it (`utils/customComponentPackage.js`). So identity across copies is already a solved
+problem, and nothing uses it to answer the obvious question.
+
+Which panels use this component. Which panels run this script. Which controls bind this device
+parameter. Change a shared thing and see what you are about to break, instead of finding out by
+breaking it.
+
+**Cost:** low-to-medium. The hash exists; this is an index and a panel.
+
+## "What is in this file?"
+
+Drag a `.cepanel` onto the window and see, without opening it: which device it is for, how many
+controls, which languages it scripts in, which modules it needs, how much it weighs, and whether
+anything it depends on is missing.
+
+Useful for a panel somebody sent you, and more useful for one you made in 2025 and cannot remember.
+
+**Cost:** low. Panels are JSON and the package format already knows how to read one.
+
+## Back up and move your whole setup
+
+Panels, profiles, the sound library, settings, scan paths, the licence file. One file out, one file
+in.
+
+Moving to a new machine currently means finding things in AppData and guessing what matters. The
+support bundle already demonstrates the allowlist pattern this needs — gather what is named, nothing
+else.
+
+**Cost:** low-to-medium.
+
+---
+
+# 19. Quality, for the user's work rather than yours
+
+Everything in this section already exists as internal tooling and is pointed at the project's own
+code. Pointing it at the user's work is the idea.
+
+## Visual regression for components
+
+There is a headless-browser harness (`CE/web/browser-checks/`) and a panel screenshot tool that
+renders at a device pixel ratio so legends stay readable. Both are aimed at the project's own QA
+panels.
+
+Aim them at the user's components: *this component renders differently from last version — here is
+the pixel diff.* A component author currently has no way to know that a change to a shared part
+broke a variant they were not looking at.
+
+**Awkward:** a pixel diff has false positives (anti-aliasing, font fallback), so the threshold and
+the "accept this as the new truth" button matter more than the diff itself.
+
+**Cost:** medium. The harness exists; the per-user framing is the work.
+
+## Track panel weight over time, not only now
+
+§2 proposes showing what a panel weighs while you build it. The version of that idea with teeth is
+recording it **per save**, so the question is not "is this panel heavy" but "which change made it
+heavy" — which is the question somebody can actually act on.
+
+Pairs with panel history (§6).
+
+**Cost:** low, given either of the two things it sits on.
+
+## An editor crash should produce an editor bundle
+
+The instrument host has a support bundle gathered by allowlist. The editor does not, and the editor
+is where people spend their time.
+
+**Cost:** low. The host's version is the template, including the allowlist discipline.
+
+---
+
+# 20. Jobs that take a long time
+
+Several ideas across both documents are slow by nature: probing a library of thousands of presets,
+scanning plugins, auto-sampling a synth (§11), verifying profiles against hardware, rendering
+audition clips.
+
+Each of them currently implies a progress dialog and a person waiting.
+
+**The feature is one queue.** Add jobs, go to bed, read the log in the morning. Jobs survive a
+restart, report what they did, and say what failed and why rather than stopping at the first
+problem.
+
+**Stands on:** the out-of-process worker pattern is already established three times over — the
+plugin scanner, the audition worker, and the sonic analysis worker, the last of which already
+reports a line per preset so that a crash at preset 300 keeps the 299 before it.
+
+**Why it is worth naming separately:** without it, four separate features each grow their own
+half-finished progress UI. With it, they are all just jobs.
+
+**Cost:** medium, and it gets cheaper for every slow feature that comes after it.
+
+---
+
+# 21. Print the synth's reference sheet
+
+Every parameter, its range, its unit, its enum labels, and its CC or NRPN number or SysEx address —
+laid out and printable, generated from the profile.
+
+People have been making these by hand in spreadsheets for thirty years. Yours would be generated,
+correct, and updated when the profile learns something.
+
+Two audiences: somebody programming the synth from its own front panel and wanting the numbers, and
+somebody profiling a device who wants to see the map they have built so far — which is the coverage
+map from §13 wearing different clothes.
+
+**Cost:** low. The data is the profile, and SVG rendering already exists for panel parts.
+
 # The shortlist
 
 If only a few of these ever happen:
@@ -1161,6 +1409,8 @@ If only a few of these ever happen:
 | **Auto-sampling** | The largest item in either document, and every piece it needs already exists for another reason. It is also the only feature here that survives the hardware being sold. |
 | **The profile coverage map** | The rigour is built and invisible. This is a view over data you already have, and it answers the one question everybody asks about every editor ever written. |
 | **Preview-versus-real script check** | Two implementations of one script can disagree, and today the user finds out after shipping. The build harness that would catch it already exists. |
+| **Self-updating panels** | A shipped panel is a file the generic player reads, so fixing it for everybody is a file copy. Nobody whose export is a binary can answer this. |
+| **Export preflight + toolchain doctor** | Two low-cost screens that turn a four-minute compiler error into a two-second answer. |
 | **The Lua block editor** | The round-trip is proven on real files, the palette generates itself from a file a test already guards, and it is discoverability for 214 commands rather than a beginner mode. Do the mapping first; the canvas is the deferrable half. |
 
 **For the video:** panel from a photo.
