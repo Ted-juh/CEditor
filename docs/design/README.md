@@ -89,6 +89,7 @@ written to be argued with before anybody builds one. The overview is
 | [Capture Session](capture-session-plan.md) | Learning a synth from the synth: turn its knobs, watch what it sends, write the profile. |
 | [Total Recall](total-recall-plan.md) | Hardware that behaves like a plugin — the session restores the rig's state. |
 | [Ctrlr import](ctrlr-import-plan.md) | Reading the existing Ctrlr panel library, so a user's collection is not stranded. |
+| [The MIDI frontier](midi-frontier.md) | *Nothing built.* An idea record, not a plan: thirty-odd things this program could do with a cable that other editors structurally cannot, organised as seven theses — hardware that has an undo, MIDI that is not late, a synth that describes itself by sound as well as by bytes, patches as data with arithmetic, the panel playing like hardware that costs more, a rig that verifies itself before the gig, and a section of deliberately unhinged ones. Each entry names what it stands on in the tree and carries its limits in the same breath as its pitch. Ends with a ranking, a pick of three, and the one property they all descend from: the device layer compiles intent, not messages. |
 
 ## Deleted records
 
