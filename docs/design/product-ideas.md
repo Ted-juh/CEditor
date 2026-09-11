@@ -1817,6 +1817,207 @@ Either raise the cap, or compose the remainder into a flattened backdrop rather 
 
 **Cost:** very low.
 
+---
+
+# 28. The sound library
+
+The library is one of the better-built things here — records for presets, racks and chains, versions
+with a retention rule, measured sonic profiles, facets, ranges, duplicate detection, smart
+collections, and per-record curation. Most of what follows is a field that exists and is never spent.
+
+## Genealogy is recorded and used only to enable a button
+
+Every record carries `branchedFromRecordId` (`CE/src/InstrumentHost/Library.h:126`). The Sound
+Browser shows a **version rail** — a linear list of saves, newest first, each restorable, with a
+"WHAT CHANGED?" diff between the first and now. That part is good.
+
+But `branchedFrom` is used for exactly one thing: as a condition on whether the diff button appears.
+Nothing lets you walk **up** to a sound's parent, **sideways** to its siblings, or **down** to what
+descended from it.
+
+**The feature.** The tree, drawn. *This pad came from that pad, which came from the factory preset.
+Six sounds descend from this one, and here is what each changed.*
+
+**Why it is worth more than it sounds.** Sound design is iterative and mostly forgotten — people
+save "Pad 3 final v2" and lose the thread by Thursday. A genealogy says which experiment a sound
+actually came from, and it makes the diff machinery answer a much better question than "what changed
+since the first save": *what changed at this fork.*
+
+It is also the library-side half of the version-control idea in
+[`midi-frontier.md`](midi-frontier.md) §1.4, arriving from the other direction and much cheaper,
+because the edges are already recorded.
+
+**Cost:** low-to-medium. The data exists and is already in the browser's record shape
+(`branchedFrom`, `branchedFromName` in `stores/instrumentHost.js`); this is a view and a walk.
+
+## Heal a library that moved
+
+`missing` is a first-class flag: the source file vanished, and the record and all its metadata
+**stay**. That is exactly the right design — losing somebody's ratings because a drive letter
+changed would be unforgivable.
+
+What is absent is the repair. Somebody who reorganises a preset folder gets four hundred records
+marked missing and no way to say *they are all over here now.*
+
+**The feature.** Point at a folder. Match the missing records against what is in it — by
+`fingerprint` first, then `classIdHex`, then name and manufacturer — and relink in one pass,
+reporting what matched, what matched ambiguously, and what genuinely is not there.
+
+**Stands on:** the fingerprint is already content identity *"for change detection and matching"*,
+which is this feature's own description.
+
+**Cost:** low.
+
+## Smart collections that notice
+
+A `SmartCollection` is a saved `LibraryQuery`. It answers when you open it and never volunteers
+anything.
+
+*Twenty-three new sounds match "bright, plucky, short tail" since you last looked.* That turns a
+saved search into something that brings you things, which is the difference between a filter and a
+collection.
+
+**Awkward:** it needs a per-collection "last seen" marker and it must never become a badge that
+nags. Counted quietly, shown where the collection is listed.
+
+**Cost:** low.
+
+## `sonicRefusal` is a worklist nobody sees
+
+When the probe cannot measure a sound it records **why** — `sonicRefusal` on the record, beside
+`sonicFingerprint`. That is a considerate design and the answer goes nowhere.
+
+Collected, it is a to-do list for finishing the measurement of a library: *forty sounds could not be
+measured — thirty-one because the plug-in is missing, six because they were silent, three because
+the worker crashed on them.* Each of those has a different fix and two of them are one click.
+
+**Cost:** very low. It is a group-by over a field.
+
+## Dedupe should merge curation, not bury it
+
+`LibraryDuplicateSet` exists and duplicates can be folded. The thing that must not be lost when
+folding is the **curation**: one copy is rated four stars, another sits in two collections, a third
+carries the note explaining what the sound is for.
+
+Merge them into the survivor — union the tags and collections, keep the highest rating, concatenate
+the notes with their sources named — rather than keeping whichever record won and silently
+discarding the rest.
+
+**Cost:** low, and it is the difference between a dedupe people run and one they are afraid of.
+
+## Curation does not travel
+
+`favourite`, `rating`, `notes`, `tags`, `collections` are per-record and personal. Share a rack or a
+chain and every one of them is lost.
+
+Some of that is correct — your five-star rating is yours. But the **notes** are often the most
+valuable thing in the record (*"this is the one that sits under the vocal"*), and tags are usually
+descriptive rather than personal.
+
+**The feature is a decision, not a mechanism:** mark which curation fields are descriptive and
+travel with a shared record, and which are personal and do not. Then honour it in both directions.
+This is the same split as unit notes versus model notes in §22, and it should be made the same way
+twice rather than differently.
+
+**Cost:** low.
+
+## What you own versus what you play
+
+The library knows what has been auditioned, rated, loaded and captured. Nobody has ever told the
+user which parts of it they have never once opened.
+
+*You own 12,000 presets. You have played 40 of them this year. Here are 200 that match the things
+you actually reach for.* The last clause is what turns a guilt-inducing statistic into a
+recommendation, and the machinery for it — `sonicDistance` over the measured axes — is already
+shipping for "sounds like".
+
+**Cost:** low, given the measurements.
+
+---
+
+# 29. The pattern engine
+
+More is built here than the earlier rounds of this document assumed, and one entry elsewhere has
+been corrected because of it.
+
+## Groove: application is built, stealing is not
+
+**Correction to [`midi-frontier.md`](midi-frontier.md) §5.3.** That entry proposed groove transplant
+as though little existed, naming only the capture journal and Humanize. In fact
+`CE/src/Performance/PatternModel.h` already carries a **`GrooveTemplate`** type — a reusable groove
+cycle with timing as fractions of its own step — plus `factoryTemplates()`, `applyGrooveTemplate`
+which commits a groove into a pattern's real step data with an optional velocity pass, and
+`appliedGrooveId` / `appliedGrooveAmount` recorded on the pattern so it knows what it is wearing.
+
+So the feature is **one half of what was described, and therefore much cheaper.** What is missing is
+extraction: producing a `GrooveTemplate` from what somebody just played, from a clip, or from a MIDI
+file, rather than choosing from the factory set.
+
+The journal already holds sample positions; the target type already exists and is already applied
+and serialised. This is a measurement and a constructor.
+
+**Cost:** low.
+
+## Seeds should be something you can hold
+
+`Pattern.seed` is deterministic randomness, so a generated variation is exactly reproducible — the
+same seed and amount give the same pattern, every time.
+
+That makes the seed an artefact, and it is currently internal. Show it, let it be typed in, let it be
+copied. *"I liked variation 7"* becomes a number somebody can write on paper, put in a forum post,
+or come back to in a year.
+
+**Why it fits this program in particular:** it is the same instinct as everything else here —
+deterministic, inspectable, and shareable without a server. A pattern becomes a seed plus a rule,
+which is a few bytes.
+
+**Cost:** very low. The seed exists and is already stored.
+
+## Draw the follow graph
+
+A `Clip` carries `followClipId`, `followAfterLoops` and `followAction` — `none`, `clip`, `next`,
+`random`, `stop`. That is a song-form engine: clips that hand off to other clips after a number of
+loops, branch randomly, or end the set.
+
+It is expressed as dropdowns in `PerformancePanel.svelte`, which means the shape of a set exists
+only in the user's head. Drawn as a graph — boxes and arrows, with the random branches forking — it
+is a map of the performance, and it is the one view that would show a mistake before a gig rather
+than during one.
+
+**Pairs with** the rack canvas plan's argument, which is the same argument about a different graph:
+the document is already a graph and the interface is a list of text rows.
+
+**Cost:** low-to-medium. The edges are all in the model.
+
+## Variations above the pattern
+
+`makePatternVariation (source, label, amount)` generates an A / B / C / D variant of a pattern at a
+given intensity, with `variationGroupId`, `variationLabel` and `variationSourcePatternId` recorded so
+the family is traceable. That is a genuinely good mechanism.
+
+It stops at one pattern. The same idea one level up — *give me a B version of this whole scene, 40 %
+different* — is where it earns its keep on stage, because what a performer wants is a variation of
+the **thing they are playing**, not of one lane of it.
+
+**Awkward:** a scene is heterogeneous (patterns, macro values, parameter values), so "40 % different"
+has to mean something different per kind — which is exactly the per-parameter-kind policy that
+`utils/snapshotModel.js` already defines for blending. Same problem, already solved once.
+
+**Cost:** medium.
+
+## A gesture library
+
+Gesture clips are recorded automation performances — `gestureClip`, `gesturePasses` — a human hand
+movement captured and replayable.
+
+There is a groove template library for the timing of notes and no equivalent for the shape of
+gestures, though they are the same kind of reusable human artefact: the sweep you do at the end of a
+build, the wobble you always put on the filter.
+
+Factory ones, saved ones, applied to any parameter at any length.
+
+**Cost:** low-to-medium. The recording exists; the library is storage, naming and retargeting.
+
 # The shortlist
 
 If only a few of these ever happen:

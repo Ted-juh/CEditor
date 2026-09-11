@@ -627,12 +627,21 @@ Capture the microtiming and velocity of a passage and turn it into a groove temp
 the phrase sequencer and the step sequencer all wear. Extract from a MIDI file, from a recording of
 your own playing, or live from the keyboard part arriving on an input right now.
 
-**Why here.** `MidiCaptureJournal` already stores sample positions, which is the measurement.
-`NoteModules.h` already has Humanize — bounded jitter on when a note lands and how hard — which is
-the same knob with a random source instead of a stolen one. Replacing the source is a small change
-to a shipped module.
+**Why here — and this entry originally undersold it.** `CE/src/Performance/PatternModel.h` already
+carries a **`GrooveTemplate`**: a reusable groove cycle whose timing is fractions of its own step,
+with `factoryTemplates()`, an `applyGrooveTemplate` that commits one into a pattern's real step data
+with an optional velocity pass, and `appliedGrooveId` / `appliedGrooveAmount` recorded on the pattern
+so it knows what it is wearing. The *wearing* of a groove is built and serialised.
 
-**Cost.** Low.
+What is missing is only **extraction** — producing a template from what somebody just played, from a
+clip, or from a MIDI file, instead of choosing from the factory set. `MidiCaptureJournal` already
+stores sample positions, which is the measurement, and the target type already exists and is already
+applied. This is a measurement and a constructor, not a feature.
+
+(`NoteModules.h`'s Humanize is the same knob with a random source instead of a stolen one, and stays
+the right thing to reach for when no groove is wanted.)
+
+**Cost.** Low — and lower than this entry first claimed.
 
 ## 5.4 Follow the band — key and chord detection driving the note players
 
