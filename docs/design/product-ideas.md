@@ -706,25 +706,169 @@ the user's code instead of at yours.
 To do anything at all, you write a function. That is fine for a programmer and a wall for everybody
 else — and the people this product is for are synth owners, not developers.
 
-**The feature, and the emphasis is on the second half.** A small builder for the common cases — when
-this control passes that value, do this — which then **shows the code it generated, in whichever of
-the seven languages the user picked.**
+> An earlier draft answered this with "a small builder for the common cases": pick a trigger, pick
+> an action, fill in the blanks. That is a template filler, and template fillers are abandoned the
+> first time somebody wants something the templates do not cover. **The proposal below replaces it**
+> and is the owner's idea rather than mine: a *block editor* — a general surface, not a form.
 
-Plenty of tools offer no-code builders. Almost none of them show you what they wrote. Showing it
-turns the builder into a teaching tool: somebody who cannot write Lua builds the behaviour, reads
-the six lines it produced, and the next time writes them. That is a path from non-coder to coder
-that costs nothing extra, because a code generator has to exist either way.
+## The block editor
 
-**Stands on:** every API entry in `panelApi.js` already carries per-language snippets — that is the
-generator, three-quarters built, for a different reason. `ConditionBuilder.svelte` is the interface
-pattern, proven.
+**What it is.** Build a function out of snap-together blocks, the way Scratch and Blockly do.
+Lua first, and possibly only Lua.
 
-**Awkward:** the builder must cover a deliberately small set of cases and say so. A visual builder
-that tries to express everything becomes a worse programming language operated with a mouse, and
-the escape hatch — drop to source, never come back — has to be a one-way door that is obvious from
-the start.
+**Why Lua first is exactly right**, in increasing order of importance:
 
-**Cost:** medium.
+1. It is already first in `SCRIPT_LANGUAGES` and the default language for a new script.
+2. Its syntax is small, so the block set is small — far smaller than C++ or Java would need.
+3. `acorn` and `luaparse` are both already dependencies, and `scripting/languageService.js` already
+   parses Lua to a located AST **on every keystroke** for live error reporting. The hard direction
+   is half-built, for an unrelated reason.
+4. Lua runs live in the editor through wasmoon **and** is the C++ host's native engine through
+   Sol3. So blocks → Lua → runs everywhere, with no compile step. C++, C# and Java would drag the
+   whole export toolchain into the loop.
+
+### The decision that decides everything else
+
+**Are blocks the source of truth, or a view over Lua?**
+
+A view. The architecture already says so — `scriptModel.js` states the rule the whole system rests
+on: *"A script is REAL source code in one language, stored and run as-is — never converted."* A
+stored block workspace would be a second source of truth, and the moment somebody edits the text by
+hand the blocks are stale. That is the classic failure of every hybrid block editor ever shipped.
+
+And the house pattern for this already exists one level down. `sections/ConditionBuilder.svelte`
+reads and writes a plain condition string *"so storage stays unchanged"*, presents it as structured
+rows, and drops to a raw-text escape hatch for anything it cannot parse *"so no expression is ever
+locked out of editing."*
+
+The block editor is that same design, one level up:
+
+> **Lua stays the file. Blocks are a lens. Anything the lens cannot draw appears as a raw-Lua block,
+> still editable, and the script still runs.**
+
+That also disposes of the two-editor problem before it starts: there is one script, in one language,
+and two ways of looking at it.
+
+### The blocks generate themselves
+
+There are 214 API commands, each already declared as data with typed parameters:
+
+```js
+{ id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
+  summary: 'Send a raw MIDI CC.',
+  params: [ { name: 'channel', type: 'number', required: true },
+            { name: 'cc',      type: 'number', required: true },
+            { name: 'value',   type: 'value',  required: true } ] }
+```
+
+That is a block definition already: label, palette category, typed sockets, tooltip. So the palette
+is **generated from `panelApi.js`** — the same file that generates the manual, the API explorer and
+the per-language snippets, and which `panelApiParity.test.js` refuses to let drift from the runtime.
+Add a command to the API and its block appears. Nobody hand-maintains 214 blocks.
+
+Hand-written blocks are the dozen or so structural ones: if/else, comparison, arithmetic, variables,
+a bounded loop, `self`, and the raw-Lua escape block.
+
+### Do not position this as a beginner mode
+
+Worth stating because it changes the design. There are 214 commands across thirteen namespaces.
+*Nobody* remembers `ce.device.setTiming(name, ms, role)`. A categorised palette with typed sockets
+is **discoverability**, and a competent Lua programmer would use it to find a command and then drop
+to text.
+
+Calling it "easy mode" gets it dismissed by the people it would help most and makes everyone who
+uses it feel like a beginner. Calling it a second way into a large API is both more accurate and
+more appealing — and Max and Pure Data mean this market has no prejudice against visual programming
+to overcome.
+
+### It was tested before it was written up
+
+The round-trip is the claim the whole feature stands on, and it is the one people assume rather than
+check. So it was built: about 150 lines against the `luaparse` already in the tree, in
+[`tools/scripts/spikes/lua-blocks/`](../../tools/scripts/spikes/lua-blocks/), with its own README.
+
+Eleven cases — six scripts written against the real `ce.*` API, and **all five actual Lua files in
+`tools/ctrl49/`**, 78 to 154 lines of working code. A case passes when Lua → blocks → Lua re-parses
+to an AST identical to the original's once positions and literal spellings are stripped: same
+meaning, not same string.
+
+**Eleven of eleven pass.**
+
+```
+PASS  CEditor_Bridge.lua      154 lines,  38 top-level blocks, fallbacks: 0 stmt / 18 expr
+PASS  CEditor_Knob_Test.lua    81 lines,  19 top-level blocks, fallbacks: 0 stmt /  5 expr
+PASS  CEditor_MultiKnob.lua   114 lines,  24 top-level blocks, fallbacks: 0 stmt / 11 expr
+PASS  CEditor_PresetList.lua   78 lines,  21 top-level blocks, fallbacks: 0 stmt /  7 expr
+PASS  Hostage_MultiKnob.lua   131 lines,  29 top-level blocks, fallbacks: 0 stmt / 12 expr
+```
+
+So the two directions are **not equally unconditional**, and the difference matters:
+
+- **blocks → Lua: yes, always.** Every arrangement produces valid Lua. There is no failure mode.
+- **Lua → blocks: never rejected, but the fallback column is doing real work.** Zero
+  statement-level fallbacks on real code — every statement became a block. But five to eighteen
+  *expression*-level ones per file: table constructors, anonymous functions, `#args`. Those come
+  back as a raw-Lua chip in the socket where a block would be. It round-trips perfectly and it is
+  honest, and it is not a picture.
+
+A deliberately hostile case — coroutines, metatables, varargs, `goto` — also passed, with four
+expression fallbacks. It survives as blocks wrapped around mostly text.
+
+**The honest summary: it never breaks, but how useful the view is varies with the code.** An
+ordinary panel script — `onValueChanged`, set a control, send a CC, an if/else — comes back with
+zero fallbacks of either kind and reads as pure blocks. The CTRL49 screen code comes back as blocks
+with text in the gaps. Both are fine; only one is a demo.
+
+### What the spike found in ten minutes
+
+**On the first run, all five real files failed.** `local function foo()` regenerated as
+`function foo()` — the block dropped `isLocal`.
+
+That is not cosmetic. It turns a local into a global, which changes scope, and a block editor
+shipping that bug would quietly break people's scripts in a way nobody would trace back to the
+editor.
+
+One line to fix. And it would have been **invisible behind a canvas**, found weeks later, after the
+expensive part was built on top of it.
+
+### Which is the staging argument
+
+> Build the mapping headless and test it against real files **before anyone draws a block.**
+
+Three pure functions over data — `panelApi` entry → block definition, blocks → Lua, Lua AST →
+blocks — with round-trip tests over a corpus of real scripts. That is exactly the shape this
+repository tests well, and it puts the expensive-to-reverse decision (the model) first and the
+swappable one (the canvas) second.
+
+If the round-trip holds on a real corpus, the idea is proven. If it does not, that is learned for
+the price of an afternoon rather than after a canvas exists.
+
+### The rest of the hard parts
+
+- **Auto-layout of parsed blocks.** Generating Lua from blocks is easy; coming back you have an AST
+  with no coordinates and must lay blocks out sensibly. Solvable — statement order, top to bottom —
+  but a script that returns visibly rearranged *feels* broken even when it is provably not.
+- **Publish the subset.** Closures, metatables, coroutines, varargs and multiple returns get no
+  blocks. The rule to state up front, not discover: *if the lens cannot draw it, it shows as Lua,
+  and nothing is ever locked out.*
+- **Comments and blank lines.** An AST round-trip loses them unless they are deliberately carried.
+  `luaparse` can retain comments; where they re-attach is a decision somebody has to make, and
+  losing a user's comments once is unforgivable.
+- **It is worse for screen readers.** Block canvases are notoriously bad for them, so this must
+  never become the only way in. Given §3, that tension is worth stating rather than discovering.
+
+### Build or buy
+
+Blockly is the obvious candidate — mature, and it ships an official Lua generator. Two reservations:
+its workspace model pushes towards "blocks are the source", which is the decision argued against
+above, and it will always look slightly like Blockly inside this application's own design language.
+
+But that is not the first decision, and treating it as one is how this feature goes wrong. Do the
+mapping first. The canvas is the part you can defer, prototype, or buy.
+
+**Cost.** The mapping is low — a spike reached eleven of eleven in an afternoon. The canvas is
+medium-to-high and is most of the work. Generating the palette from `panelApi.js` is low and is the
+part that makes the whole thing maintainable rather than a 214-block millstone.
 
 ### Gap 3 — Blame: nothing says which script made the panel feel bad
 
@@ -1017,6 +1161,7 @@ If only a few of these ever happen:
 | **Auto-sampling** | The largest item in either document, and every piece it needs already exists for another reason. It is also the only feature here that survives the hardware being sold. |
 | **The profile coverage map** | The rigour is built and invisible. This is a view over data you already have, and it answers the one question everybody asks about every editor ever written. |
 | **Preview-versus-real script check** | Two implementations of one script can disagree, and today the user finds out after shipping. The build harness that would catch it already exists. |
+| **The Lua block editor** | The round-trip is proven on real files, the palette generates itself from a file a test already guards, and it is discoverability for 214 commands rather than a beginner mode. Do the mapping first; the canvas is the deferrable half. |
 
 **For the video:** panel from a photo.
 
