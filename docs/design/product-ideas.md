@@ -538,6 +538,328 @@ counter or a trade stand or a screen behind you on stage.
 
 ---
 
+---
+
+# 11. Turn the synth into something you can take with you
+
+## Auto-sample a hardware synth into a playable instrument
+
+**What it is.** Play every third note across the keyboard at three velocities, record each one,
+trim it, and write out a sampled instrument — SFZ or DecentSampler or similar. Then repeat for the
+next patch, overnight, unattended.
+
+**Why anyone cares.** This is an entire product category. People pay real money for SampleRobot and
+the Chicken Systems tools, and the reason is simple: hardware does not fit in a rucksack, and a
+sampled copy of it does. It is also the only way to keep a sound after the hardware dies, gets
+sold, or stops booting.
+
+**What it stands on, and this is the point:** you already have every piece.
+
+| Needed | Where it is |
+|---|---|
+| Play a note, hold it, release it | The note players, and `sendNote` in the panel API |
+| Change patch between rounds | `recallPreset`, and the librarian's bank |
+| Hear the result | Audio input on the exported plugin (`CE/src/Player/PluginProcessor.h:74-76`); `juce::AudioDeviceManager` in the host (`InstrumentHost/InstrumentHostService.h:1531`) |
+| Know when the sound started and ended | `SonicProbe` already decides this from a buffer, and it already caught a bug where a note was measured before the plug-in had loaded |
+| Do it without a person present | The audition worker already plays thousands of presets unattended, in a child process, surviving crashes |
+
+**Awkward:**
+
+- Sampling is long. A 61-key synth at every third note, three velocities, with a five-second tail
+  is roughly forty minutes per patch. So it has to be a queue you leave running, with a progress
+  view and the ability to stop and resume — not a modal dialog.
+- Loop points are the hard part of sampling and always have been. The honest first version does not
+  loop at all: record the full tail, accept the file size, and say so. Loop detection is a later
+  stage and a genuinely difficult one.
+- Anything that moves on its own — an LFO, a slow filter sweep, a chorus — samples badly, because
+  every note freezes the modulation at a different point. Detect it (the sonic measurement can see
+  a sound that changes over time) and warn rather than silently producing something that sounds
+  wrong in chords.
+- Noise floor and levels need a calibration pass, or the quiet samples come back with hiss baked
+  into them.
+
+**Cost:** medium-to-high, and it is the largest single item in either document. It is also the one
+that produces a thing the user can hold — a folder of files that works in any sampler, forever,
+with no CEditor and no hardware.
+
+## Is the plugin emulation any good?
+
+Measure your real Juno and a Juno emulation playing the same patch, on the axes you already
+measure, and show the difference.
+
+**Why:** it is fun, it is argumentative, people will post the results, and it genuinely helps
+somebody decide whether a heavy and fragile thing has earned its space on the desk.
+
+**Stands on:** `SonicProfile` and `sonicDistance` (`CE/src/InstrumentHost/Library.h:46-82`) —
+measuring two sounds and reporting how far apart they are, per axis, is already written and is
+already used to offer "the nearest thing you own" when a rack's plug-in has gone.
+
+**Awkward:** the comparison is only as fair as the patch match, and "same patch" across hardware and
+an emulation is exactly the cross-device translation problem. Start with the emulation's own factory
+preset against the hardware preset it is named after, which is a fair test and needs no translation.
+
+**Cost:** low. The measurement exists; this is a screen.
+
+---
+
+# 12. Scripting
+
+## The preview lies, and you can prove it
+
+**The problem, and it is a real one hiding in plain sight.** Scripts run two different ways. In the
+editor's live preview, *every* language — including C++, C# and Java — runs through a small
+JavaScript subset interpreter (`cppPreview.js`, `csharpPreview.js`, `javaPreview.js`). At export,
+those three are compiled for real, against real toolchains: clang for C++, Roslyn and a
+self-contained CoreCLR for C#, javac plus jlink and a JNI shim for Java.
+
+Two implementations of the same script means they can disagree. And when they do, the script works
+in the editor and behaves differently in the shipped plugin — which is the worst possible place to
+find out, because by then it is on somebody else's machine.
+
+**The feature.** A "check the preview against the real thing" pass: build the real module, run both
+it and the interpreter against the same inputs, and show where the answers differ. Green means the
+preview is telling the truth for this script. Red names the handler and the input that split them.
+
+**Stands on:** `tools/scripts/nativeHandlers/verify-all.mjs` already builds and dispatches each
+language for real when the toolchain is present, and degrades to a structural check when it is not.
+That harness is most of this. What is new is running the interpreter beside it and diffing.
+
+**Awkward:** the three toolchains are large and not everybody has them installed, so this is a check
+you can run, not one that runs constantly. And a difference is not always a bug — some are
+legitimate (timing, float formatting) and need to be explainable rather than just flagged.
+
+**Cost:** low-to-medium. Most of the machinery exists and was built to catch exactly this class of
+problem — the design record notes that building all three for real caught bugs the type checks
+could not, including an ABI fix.
+
+## Behaviours without writing code
+
+**What it is.** A small visual builder for the common cases — when this control passes that value,
+do this other thing — and then **show the generated code in whichever of the seven languages the
+user picked.**
+
+**Why the second half matters more than the first.** Plenty of tools offer no-code builders. Almost
+none of them show you what they wrote. Showing it turns the builder into a teaching tool: somebody
+who cannot write Lua builds the behaviour, reads the six lines it produced, and next time writes
+them. That is a path from non-coder to coder that costs you nothing extra, because the code
+generator has to exist anyway.
+
+**Stands on:** `sections/ConditionBuilder.svelte` already exists, and the API is already described
+as structured data in `scripting/panelApi.js` with per-language snippets — the manual and the API
+explorer are both generated from it. The snippets are the generator, half-built, for a different
+reason.
+
+**Awkward:** the builder must cover a genuinely small set of cases and say so. A visual builder that
+tries to express everything becomes a worse programming language with a mouse.
+
+**Cost:** medium.
+
+## A speed budget for scripts
+
+Scripts run where the interface runs. One script with a greedy timer makes the whole panel feel
+broken, and the user blames the program rather than the script.
+
+Show which script is costing what: time per handler, how often the timers fire, and which one is
+responsible when a frame is missed.
+
+**Stands on:** there is already a timer system (`Scripting/TimerManager.h`) and loop guards in the
+sandbox. This is measurement on top of a boundary that already exists.
+
+**Cost:** low.
+
+---
+
+# 13. Authoring a device profile
+
+## Show coverage as a picture
+
+You have `deviceCoverage` in the panel API, and profiles carry test vectors that genuinely run — the
+library's curation layer treats a round trip as a hard gate and its own comment says
+`verifiedFullDump` is earned rather than declared.
+
+**The user sees none of this.** A map would fix that: green for parameters verified against real
+hardware, amber for typed in from a manual and never checked, grey for nobody knows.
+
+Two things it gives you at once. It tells an author where to spend the next twenty minutes, and it
+is the honest answer to the question every user of every editor has always asked — *does this
+profile actually work?* In a category whose folklore is "that panel works except for the filter
+section", being able to show which section is which is worth more than most features.
+
+**Cost:** low. The data exists and the gate exists; this is a view.
+
+## Record test vectors while people just use it
+
+Every time a message goes out and a response comes back, that is a candidate test vector. Offer to
+keep it — quietly, in a tray, reviewable later.
+
+The profile then becomes self-verifying as a **side effect of somebody using it**, rather than as a
+separate chore that nobody does. And a profile that accumulates evidence while being used is a
+profile that gets more trustworthy over time without anybody deciding to make it so.
+
+**Stands on:** the monitor stream, the existing test-vector runner, and the same echo-suppression
+and origin tracking that keeps the panel from learning its own transmissions.
+
+**Awkward:** most traffic is not worth keeping, so the filter matters more than the capture. Prefer
+the first time a parameter is ever exercised, and anything where the response was a surprise.
+
+**Cost:** low-to-medium.
+
+## A device request board
+
+"Nobody has profiled the Kawai K4." Somebody who owns one sees that, and an absence becomes a task
+with a name on it.
+
+This is the cheapest possible community feature and it points effort exactly where the product needs
+it. Pair it with the coverage map above and a request can be partially answered — "three people have
+started this one, the filter section is done."
+
+**Awkward:** it needs somewhere to live that is not a server you have to run. A file in a Git
+repository with a pull request per profile is a legitimate and free answer, and it matches how the
+library is already curated.
+
+**Cost:** low, and mostly not code.
+
+---
+
+# 14. Playing and performing
+
+## Capture what you just played
+
+You noodle for two minutes, something good happens, and it is gone.
+
+Except it is not. `CE/src/Performance/MidiCaptureJournal.h` is already writing every channel-voice
+message into a lock-free ring — 32,768 events, up to two minutes of history, from the audio thread,
+**including while the transport is stopped.** Its own header names retrospective capture as one of
+the things it exists for.
+
+So: a button that turns the last eight bars into a clip. The pattern and clip model is already
+there (`Performance/PatternModel.h` has `PatternStep`, `Pattern`, `Clip`, `Scene`).
+
+**Why people love this.** Ableton and Logic both have it and it is one of those features that
+changes how people work — you stop deciding in advance whether you are recording, because you always
+were.
+
+**Awkward:** "the last eight bars" needs a tempo and a bar line, which the transport has when it is
+running and has to infer when it is not. Offer "the last N seconds" as the honest fallback rather
+than guessing at bars.
+
+**Cost:** low-to-medium. The hard half — the lock-free ring written from the audio thread — is done.
+
+## Scenes that morph
+
+Scenes already hold macro values and parameter values (`SceneMacroValue`, `SceneParameterValue` in
+`PatternModel.h`), and you already blend between whole states with an explicit policy per parameter
+kind (`utils/snapshotModel.js`).
+
+So: move from one scene to the next over four bars instead of jumping. The interpolation rules are
+written; what is missing is a duration and something to drive it.
+
+**Cost:** low.
+
+---
+
+# 15. Who can use this at all
+
+## There are no translations
+
+**The finding:** there is no translation system anywhere in the tree. The only hits for anything
+locale-shaped are `localeCompare`, used for sorting lists. Every string in the interface is English,
+written inline.
+
+**Why it matters here more than in most software.** The devices this program exists for are
+disproportionately Japanese, and a large share of the people sitting on an un-editable 1987 synth do
+not read English. They are also, by definition, people no existing editor serves — which is the
+same audience the whole product is aimed at.
+
+**Why it is cheap here.** The interface is HTML. Extracting strings and swapping them at runtime is
+one of the best-understood problems in web development, with the entire industry's tooling available
+to it. Every competitor draws their interface with a graphics library, where text layout and
+translation are genuinely painful.
+
+**Awkward:** doing it late is much more expensive than doing it early, because every new string
+written between now and then is another one to extract. That argues for putting the mechanism in
+before the strings multiply, even if no translation ever ships.
+
+**Cost:** medium to put the mechanism in, low per language after that — and the per-language part
+can be done by users who care, for free, if the files are plain.
+
+## One-switch and large-target input
+
+Separate from screen readers, and a separate audience: people with limited motor control. What they
+need is scanning input (one switch cycles through controls, a second selects), large hit areas, and
+dwell clicking.
+
+**Why you are well placed:** your components already treat **hit zones** as a first-class concept
+with their own editor (`sections/CustomHitZonesEditor.svelte`), which means "make the target bigger
+without changing how it looks" is already an expressible idea in the model. That is normally the
+hard part.
+
+**Cost:** medium, and it shares most of its work with the keyboard navigation that screen-reader
+support needs anyway.
+
+## Teach synthesis on the user's own synth
+
+"What does resonance actually do?"
+
+Every synthesis tutorial ever written answers that with a software synth the reader does not own.
+This program could answer it by sweeping the parameter on **the machine on their desk**, playing the
+result, and showing the measurement move as it goes.
+
+**Stands on:** the semantic parameter model knows which parameter is which; the sonic probe measures
+what changed; the panel can play the note. All three exist for other reasons.
+
+**Why it is worth more than it looks.** The people who most need this — somebody who bought a
+second-hand synth with no manual and does not know what half the panel does — are exactly the people
+the product is trying to reach, and they currently have no reason to believe a parameter editor will
+help them. "It will teach you your synth" is a different and better promise than "it will let you
+edit your synth."
+
+**Cost:** low-to-medium. Mostly content and a screen, over machinery that exists.
+
+---
+
+# 16. Smaller things that remove real friction
+
+## A real first run
+
+Not a welcome screen. A job: find your synth, identify it, build a panel, play a note. Ten minutes
+from installing to a working editor for *their* machine.
+
+Every piece of this exists — port enumeration, identity request, MIDI-CI discovery, the Capture
+Session, Auto-Panel. **Nothing sequences them.** A new user currently lands on a blank canvas in a
+program with four designers behind it.
+
+**Cost:** low-to-medium, and it is assembly rather than invention.
+
+## Let the exported plugin say what is wrong
+
+In somebody else's DAW, an exported panel has almost no way to complain. No console, no log the user
+will ever find. It just quietly does nothing.
+
+A status line in the plugin window: port missing, device not answering, script error on line 12,
+restore refused by policy. One line, always visible, plain words.
+
+**Cost:** low. Everything it would report is already known internally.
+
+## Usage stats for your own rig
+
+Which synth have you actually used this year? Which patches? People own gear they have not touched
+since 2022 and genuinely do not know it.
+
+It cuts both ways, which is what makes it honest rather than a nag: it also tells you which machine
+has earned its space.
+
+**Cost:** low.
+
+## Workspace layouts per task
+
+Building a panel, profiling a device and playing live want completely different screens. Saved
+layouts you can switch between, rather than rearranging by hand every time.
+
+**Stands on:** `utils/workspaceChrome.js` and `utils/tabViewState.js` already model the workspace.
+
+**Cost:** low.
+
 # The shortlist
 
 If only a few of these ever happen:
@@ -549,6 +871,9 @@ If only a few of these ever happen:
 | **The remote panel** | The biggest single idea here, and the plumbing is one file. Gives you the second screen and the two-person panel for free. |
 | **Freeze a part to audio** | The actual daily problem with hardware in a DAW, and the plugin can already hear the synth. |
 | **Fix the plugin scan** | Worst first impression in the category, and you are already halfway there. |
+| **Auto-sampling** | The largest item in either document, and every piece it needs already exists for another reason. It is also the only feature here that survives the hardware being sold. |
+| **The profile coverage map** | The rigour is built and invisible. This is a view over data you already have, and it answers the one question everybody asks about every editor ever written. |
+| **Preview-versus-real script check** | Two implementations of one script can disagree, and today the user finds out after shipping. The build harness that would catch it already exists. |
 
 **For the video:** panel from a photo.
 
