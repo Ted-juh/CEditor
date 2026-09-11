@@ -1620,6 +1620,203 @@ compares against.
 
 **Cost:** low, given the baker.
 
+---
+
+# 27. The Custom Component designer
+
+The largest subsystem in the program — eighteen editors and around 16,000 lines in
+`sections/Custom*.svelte` alone, on top of sixteen pure modules in `utils/customComponent*.js` and two more for the design surface. It
+is a design tool inside a design tool, and it is more complete than anything else here.
+
+## What a custom component is, for anyone coming back to it
+
+| Piece | What it is |
+|---|---|
+| **Parts** | The visual layers — backgrounds, text, shapes, images. Each carries a semantic `role`: `background`, `track`, `fill`, `handle`, `label`, `dial`, `button`, `indicator`, `meter`, `keyboard`, `matrix` |
+| **Generators** | Produce parts at runtime rather than by hand — circular arrays, repeats, waveform icons, envelope paths. `customComponentMaterializer.js` resolves them |
+| **Hit zones** | Interaction regions, with conditions authored through `ConditionBuilder` |
+| **Behaviors** | What a hit zone does to a value channel |
+| **Value channels** | The component's own values, normalised, with types |
+| **Clusters** | A channel plus the behaviours driving it plus the hit zones feeding them. `customComponentClusters.js` makes the point that **membership in the cluster is the wiring** |
+| **Links / States / Variants** | Conditional wiring, conditional patches, alternative configurations |
+| **Public API** | `ExternalAPI` with an `addressableName`, published inputs and outputs — what the panel and its scripts can reach |
+| **Editable properties** | What an *instance* may change without editing the component |
+| **Assets** | Images and baked filmstrips, with a manifest and size thresholds |
+| **Package** | Format v1, a content fingerprint, validation, and an eight-step readiness checklist with one-click fixes |
+| **Scale policy** | `contentScaleMode` — stretch, or scale internals against a design size stamped at instantiation |
+
+Two details worth knowing because ideas below depend on them: the readiness checklist grades
+`required` / `recommended` / `optional` and offers a fix **only where it is mechanically safe**,
+leaving anything that encodes design intent navigate-only. And `fingerprintCustomComponent` hashes
+the whole control minus its id — a stable content address for a component.
+
+## 27.1 Instances and packages: the primitive is built, the operations are missing
+
+**What exists.** `Designer.sourcePackage` records where a component came from — name, version,
+fingerprint, readiness score, asset counts. `CustomPublicPropertiesEditor.svelte` computes the live
+fingerprint and compares it:
+
+```js
+let sourceMatches = $derived(!!sourcePackage?.fingerprint && sourcePackage.fingerprint === currentFingerprint);
+```
+
+**What it does with the answer.** Renders a card that says *"matches source package"* or *"edited
+since source package load"*. There is no action attached to it — no update from source, no push to
+source, no detach, no diff. Grepping for a re-sync path finds nothing.
+
+So the program **knows** an instance has drifted from its package and can only mention it.
+
+**The feature.** This is the symbol/instance problem, settled a decade ago by every serious design
+tool, and the operations are not in doubt:
+
+| Operation | What it means here |
+|---|---|
+| **Pull** | The package has a newer version — take it, keeping this instance's published-property overrides |
+| **Push** | These edits are the improvement — write them back as the package's next version |
+| **Detach** | Stop being an instance; keep the parts, drop the link |
+| **Reset** | Throw my overrides away, return to the package exactly |
+| **Diff** | Before any of the above: show what actually differs |
+
+**Why this matters more here than in a drawing tool.** A panel for a synth is dozens of instances of
+a handful of components. Improve your knob and today you improve it once, in one place, and every
+other copy stays as it was. That is the difference between a component system and a clipboard.
+
+**Diff is the one to build first**, and not only because the others need it: "edited since source
+package load" is a statement nobody can act on, and *"the handle colour and two hit-zone bounds
+differ"* is one they can.
+
+**Awkward:** overrides have to be separable from edits, or a pull discards the instance
+customisation it was supposed to keep. `InstanceProperties` and the published-property model already
+draw most of that line — the work is deciding what falls outside it and refusing to pull over it
+rather than silently winning.
+
+**Cost:** medium, and unusually well-defined for its size. The identity primitive exists, the
+override model exists, and the operations have known-good semantics to copy.
+
+## 27.2 Accessibility is already half-authored, and nobody spent it
+
+§3 makes the case that the panel runtime has no accessibility at all — no `aria-` attributes, no
+`tabindex`, anywhere in `CE/web/src/CE_Panel/` or `Player.svelte`. For custom components that is
+much cheaper to fix than it looks, because **the semantic information is already in the model.**
+
+Every part carries a `role`, authored for rendering and layout reasons: `handle`, `track`, `fill`,
+`label`, `indicator`, `meter`, `dial`, `button`. Alongside it the component has a primary kind, and
+the value channel has a type and a range.
+
+That is enough to derive, with no new authoring whatsoever:
+
+- a part with `role: 'handle'` on a dial, driven by a channel with a range → an ARIA slider with a
+  current value, a minimum and a maximum;
+- `role: 'label'` → the accessible name for the cluster it sits in;
+- `role: 'indicator'` on a boolean channel → a switch with a state;
+- `role: 'meter'` → a meter with its range.
+
+**Keyboard handling comes from the same place.** A behaviour already says what a hit zone does to a
+channel; arrow keys are that behaviour invoked with a step instead of a drag.
+
+**Awkward:** `role` defaults to `'custom'`, so components built before anyone cared will carry no
+useful roles and must degrade to "a control, unnamed" rather than to a lie. And a role is a
+rendering hint today — making it accessibility-load-bearing means the field's meaning is now a
+contract, which should be said out loud in the same breath.
+
+**Cost:** low-to-medium, and it is the cheapest accessibility work available anywhere in the
+program.
+
+## 27.3 Readiness counts things; it does not know whether the thing works
+
+The checklist is well made — eight steps, three severities, fixes offered only where they are
+mechanically safe. But **every step is a count.** One value channel present, so the Value Model step
+passes. Two behaviours, so Interaction passes. Nothing in it asks whether the component behaves.
+
+Meanwhile the test bench is 1,541 lines and **persists nothing**: you poke at the component live,
+and the poking evaporates when you navigate away.
+
+**The feature.** Record the poking. A short sequence of interactions with expected outcomes, saved
+with the component and replayed on demand — then a ninth readiness step: *has a passing test.*
+
+Two things change. Readiness stops meaning *assembled* and starts meaning *works*. And a component
+that ships with a test is a component somebody else can trust, which is the missing half of §12's
+shared-behaviour proposal applied to components instead of scripts.
+
+**Pairs with** the visual-regression idea (§19) and the variant contact sheet (§26): a recorded
+interaction says the behaviour is right, a rendered sheet says the appearance is.
+
+**Cost:** medium. The bench exists; recording, storage and replay are the work.
+
+## 27.4 Design at one size, ship at every size
+
+`contentScaleMode` decides whether an instance stretches or scales its internals against a design
+size stamped at instantiation (`utils/customComponentScale.js`). It is a real policy with very
+visible consequences — a 2× knob that looks like a 2× knob, versus a knob lost in a big box.
+
+The author designs at exactly one size and finds out about the others later.
+
+**The feature.** A strip beside the canvas showing the component at 0.5×, 1×, 2×, and at a couple of
+deliberately unkind aspect ratios, under the scale mode currently chosen. Layout breakage becomes
+visible while it is cheap to fix.
+
+**Cost:** low. Rendering a component at a size is what the materializer and the thumbnail already do.
+
+## 27.5 Extract to component
+
+You can place a package on a panel. You cannot select three shapes and a hit zone **on a panel** and
+say *this is a component now.* `makeComponent` exists only inside the stress-test generator.
+
+That is the most natural gesture in a tool like this, and it is the one that turns incidental work
+into reusable work. It is also how most component libraries actually start: somebody builds
+something good by accident and then wants it again.
+
+**Awkward:** the selection has to be promoted into the component model — parts keep their geometry
+relative to a new origin, any bindings become published inputs or are reported as lost, and a value
+channel has to be invented or chosen. The honest version reports what it could not carry, in the
+same shape as every importer in this repository.
+
+**Cost:** medium.
+
+## 27.6 A component cannot carry its own script
+
+Behaviours and links are declarative, and there is no escape hatch. A component is addressable
+*from* panel scripts through `ExternalAPI` and its published inputs and outputs — but it cannot hold
+a script of its own; nothing in the package format carries one.
+
+So the moment a component needs one conditional the declarative model does not express, that logic
+moves out to the panel, where it **no longer travels with the component.** Share the component and
+the behaviour stays behind.
+
+**The feature.** A component-scoped script, in the languages the panel already supports, packaged
+with the component and running against its own channels and parts rather than the panel's controls.
+`scope: 'component'` already exists in the scripting model — it currently means a script attached to
+a control, and this is the same word meaning the same thing one level in.
+
+**Awkward, and it is the same question §12 raises for shared behaviours:** a component that arrives
+from somebody else and carries code is code from a stranger. The sandbox exists; the trust model —
+what a component script may reach, what it must declare, whether it runs at all before the user
+says so — has to be decided before components are shared, not after.
+
+**Cost:** medium.
+
+## 27.7 Generators are invisible
+
+The materializer turns a generator into concrete parts at runtime. The author sees the parts and not
+the cause: there is no way to ask *which of these twenty-seven parts came from that generator*, or
+to highlight a generator's output on the canvas.
+
+For the thing that makes big components tractable — the GAIA's fader is 26 parts of which 22 are
+printed scale marks — that is a surprising blind spot.
+
+**Cost:** low. The materializer knows the answer while it works; it just does not keep it.
+
+## 27.8 A small one with teeth
+
+`createCustomComponentThumbnail` keeps `.slice(-18)` — the topmost eighteen parts by z-order. A
+component with more layers than that has a thumbnail that is quietly missing pieces, which is
+exactly the sort of thing that reads as "this tool is a bit broken" in a library view where the
+thumbnail is all anybody sees.
+
+Either raise the cap, or compose the remainder into a flattened backdrop rather than dropping it.
+
+**Cost:** very low.
+
 # The shortlist
 
 If only a few of these ever happen:
@@ -1634,6 +1831,7 @@ If only a few of these ever happen:
 | **Auto-sampling** | The largest item in either document, and every piece it needs already exists for another reason. It is also the only feature here that survives the hardware being sold. |
 | **The profile coverage map** | The rigour is built and invisible. This is a view over data you already have, and it answers the one question everybody asks about every editor ever written. |
 | **Preview-versus-real script check** | Two implementations of one script can disagree, and today the user finds out after shipping. The build harness that would catch it already exists. |
+| **Instance/package pull, push and diff** | The program already knows an instance has drifted from its package and can only say so. The identity primitive is built; the five operations are not, and their semantics are settled prior art. |
 | **Write the formats you already read** | Three importers, no exporters. A generated .midnam or Cubase map puts this program's output in front of people who never installed it, off data the profile already has. |
 | **Parameter notes and per-unit calibration** | The notes every hardware owner keeps on paper, and the fact that two Juno-106s are not the same instrument. Neither has anywhere to live today. |
 | **Self-updating panels** | A shipped panel is a file the generic player reads, so fixing it for everybody is a file copy. Nobody whose export is a binary can answer this. |
