@@ -604,68 +604,211 @@ preset against the hardware preset it is named after, which is a fair test and n
 
 # 12. Scripting
 
-## The preview lies, and you can prove it
+This section is longer than the rest because the scripting system is the most capable thing in the
+program and the least visible from outside it. Everything proposed here is small; what makes it
+worth writing down is *what it is small on top of.*
 
-**The problem, and it is a real one hiding in plain sight.** Scripts run two different ways. In the
-editor's live preview, *every* language — including C++, C# and Java — runs through a small
-JavaScript subset interpreter (`cppPreview.js`, `csharpPreview.js`, `javaPreview.js`). At export,
-those three are compiled for real, against real toolchains: clang for C++, Roslyn and a
-self-contained CoreCLR for C#, javac plus jlink and a JNI shim for Java.
+## What is actually there, for anyone coming back to it
 
-Two implementations of the same script means they can disagree. And when they do, the script works
-in the editor and behaves differently in the shipped plugin — which is the worst possible place to
-find out, because by then it is on somebody else's machine.
+**A script is real source code in one language, stored and run as that language — never converted.**
+That is the load-bearing decision and the rest follows from it. A script is
+`{ id, name, language, source, scope, event, target, enabled, description }`
+(`scripting/scriptModel.js`).
 
-**The feature.** A "check the preview against the real thing" pass: build the real module, run both
-it and the interpreter against the same inputs, and show where the answers differ. Green means the
-preview is telling the truth for this script. Red names the handler and the input that split them.
+| | |
+|---|---|
+| **Languages** | Seven, each run as itself: Lua 5.4 (Sol3), JavaScript, TypeScript, Python, C++, C#, Java |
+| **Scopes** | `component`, `panel`, `device`, `project`. In a component script `self` is the control it is attached to, so one script works on every copy of a reusable component without naming anything |
+| **Events** | 32 in total — 9 lifecycle hooks, 11 control events, 2 panel events, 10 device events |
+| **API** | One surface across all seven languages, in ~13 namespaces: `ce.core`, `ce.device`, `ce.midi`, `ce.math`, `ce.music`, `ce.time`, `ce.text`, `ce.ui`, `ce.draw`, `ce.image`, `ce.anim`, `ce.storage`, `ce.panel`, plus `ce.components.*` — one per panel component, twenty-eight of them |
 
-**Stands on:** `tools/scripts/nativeHandlers/verify-all.mjs` already builds and dispatches each
-language for real when the toolchain is present, and degrades to a structural check when it is not.
-That harness is most of this. What is new is running the interpreter beside it and diffing.
+**The lifecycle has a real order and the order matters.** `onPanelLoad` runs before the GUI exists
+(MIDI setup and init SysEx only — the controls are not there yet), then `onPanelBuild` creates,
+clones and parents controls, then `onPanelReady`. At the other end `onPanelClose` is the view
+closing while scripts keep running, and `onPanelDestroy` is the scripts themselves being torn down —
+the last place to restore the synth or send a final dump. There are also `onDraw`, `onError`, and
+`onDawSaveState` / `onDawRestoreState` for the exported plugin.
 
-**Awkward:** the three toolchains are large and not everybody has them installed, so this is a check
-you can run, not one that runs constantly. And a difference is not always a bug — some are
-legitimate (timing, float formatting) and need to be explainable rather than just flagged.
+**The API is declared as data, not written as prose.** `scripting/panelApi.js` is the single source:
+the scripting manual is generated from it, so is the browsable API explorer, so are the per-language
+snippets — and `CE/web/test/panelApiParity.test.js` fails when the runtime and the declaration drift
+apart **in either direction**. The runtime's own header explains why that test exists: `on`, `emit`
+and `run` were once empty stubs, eight declared events were missing from the handler probe list,
+fourteen encoding helpers did not exist and a fifteenth was spelled differently, and forty-seven
+panel verbs existed in the runtime and nowhere in the declaration.
 
-**Cost:** low-to-medium. Most of the machinery exists and was built to catch exactly this class of
-problem — the design record notes that building all three for real caught bugs the type checks
-could not, including an ABI fix.
+**Two runtimes.** In the editor, `scripting/panelRuntime.js` runs scripts in the WebView where the
+controls actually live, so `set("cutoff.value", 8000)` moves the real control with no round trip —
+Lua through wasmoon, Python through Pyodide, JS and TS natively, and C++, C# and Java through subset
+interpreters. In a shipped panel the C++ host is the engine, and those last three are compiled for
+real at export (clang, Roslyn and a self-contained CoreCLR, javac with jlink and a JNI shim).
 
-## Behaviours without writing code
+**Four things that exist and are probably forgotten:**
 
-**What it is.** A small visual builder for the common cases — when this control passes that value,
-do this other thing — and then **show the generated code in whichever of the seven languages the
-user picked.**
+- **Cross-language messaging.** `emit` announces a custom event and any script listening with `on`
+  reacts — "fire-and-forget, language-neutral". `run` calls a named action elsewhere and returns a
+  value, host-dispatched, across languages. A Lua script can emit and a Python script can answer.
+- **Watches.** `readWatch` plus a watcher table comparing value signatures, so a script can observe a
+  path rather than poll it.
+- **A script library** independent of any panel, copy-on-import so each panel owns its copy and
+  panels stay portable (`stores/scriptLibrary.js`).
+- **Per-script version history** — `utils/scriptHistory.js`, 25 versions per script in local
+  storage, edits within 20 seconds coalescing into one snapshot, surviving a reload that the
+  editor's own undo does not.
 
-**Why the second half matters more than the first.** Plenty of tools offer no-code builders. Almost
-none of them show you what they wrote. Showing it turns the builder into a teaching tool: somebody
-who cannot write Lua builds the behaviour, reads the six lines it produced, and next time writes
-them. That is a path from non-coder to coder that costs you nothing extra, because the code
-generator has to exist anyway.
+**And a measured cost model.** `scripting/moduleCost.generated.js` is produced by parsing the actual
+preludes rather than by asserting numbers in a manifest: `ce.anim` is 4,469 bytes of scripting
+surface in the JavaScript runtime and 21,412 in the WebView one. The Export tab shows it.
 
-**Stands on:** `sections/ConditionBuilder.svelte` already exists, and the API is already described
-as structured data in `scripting/panelApi.js` with per-language snippets — the manual and the API
-explorer are both generated from it. The snippets are the generator, half-built, for a different
-reason.
+### One correction to an earlier draft of this document
 
-**Awkward:** the builder must cover a genuinely small set of cases and say so. A visual builder that
-tries to express everything becomes a worse programming language with a mouse.
+An earlier version of this section said "you already have a condition builder" in the context of
+building behaviours without code. **That was wrong.** `sections/ConditionBuilder.svelte` has nothing
+to do with scripting — it is a structured editor for condition *strings* used by Links, Hit Zones
+and component States in the component designer, turning `mode == 'A' && level > 3` into
+channel/operator/value rows with an escape hatch back to raw text.
+
+It is still worth naming, but as **prior art rather than as a starting point**: it is exactly the
+shape of interface the no-code proposal below needs — structured rows, an AND/OR join, and a raw
+escape hatch so nothing is ever locked out of editing — already built, already working, already
+proven against three consumers, for a different feature.
+
+## The three gaps
+
+The engine is not the problem. The gaps are in three specific places, and each idea below exists to
+close one of them.
+
+### Gap 1 — Trust: is what I am seeing what ships?
+
+C++, C# and Java are previewed through JavaScript subset interpreters and exported compiled. Two
+implementations of one script can disagree, and when they do the script works in the editor and
+misbehaves in somebody else's DAW — the worst possible place to find out, because by then it is on
+a machine you cannot reach.
+
+**The feature.** A check that builds the real module, runs it and the interpreter against the same
+inputs, and reports either *for this script, the preview is telling you the truth* or the exact
+handler and input where they part company.
+
+**Stands on:** `tools/scripts/nativeHandlers/verify-all.mjs` already builds and dispatches all three
+languages for real when the toolchain is present, and degrades to a structural check when it is not.
+That harness is most of the work. What is new is running the interpreter beside it and diffing.
+
+**Awkward:** the three toolchains are large and not everyone has them, so this is a check you run
+rather than one that runs constantly. And not every difference is a bug — float formatting and
+timing will differ legitimately — so the report has to be explainable rather than a red light.
+
+**Cost:** low-to-medium. The design record already notes that building all three for real caught
+bugs the type checks could not, including a load-bearing ABI fix. This points the same technique at
+the user's code instead of at yours.
+
+### Gap 2 — Entry: the ladder has no bottom rung
+
+To do anything at all, you write a function. That is fine for a programmer and a wall for everybody
+else — and the people this product is for are synth owners, not developers.
+
+**The feature, and the emphasis is on the second half.** A small builder for the common cases — when
+this control passes that value, do this — which then **shows the code it generated, in whichever of
+the seven languages the user picked.**
+
+Plenty of tools offer no-code builders. Almost none of them show you what they wrote. Showing it
+turns the builder into a teaching tool: somebody who cannot write Lua builds the behaviour, reads
+the six lines it produced, and the next time writes them. That is a path from non-coder to coder
+that costs nothing extra, because a code generator has to exist either way.
+
+**Stands on:** every API entry in `panelApi.js` already carries per-language snippets — that is the
+generator, three-quarters built, for a different reason. `ConditionBuilder.svelte` is the interface
+pattern, proven.
+
+**Awkward:** the builder must cover a deliberately small set of cases and say so. A visual builder
+that tries to express everything becomes a worse programming language operated with a mouse, and
+the escape hatch — drop to source, never come back — has to be a one-way door that is obvious from
+the start.
 
 **Cost:** medium.
 
-## A speed budget for scripts
+### Gap 3 — Blame: nothing says which script made the panel feel bad
 
-Scripts run where the interface runs. One script with a greedy timer makes the whole panel feel
-broken, and the user blames the program rather than the script.
+Scripts run where the interface runs. One greedy `onTimer` makes the whole panel feel broken, and
+the user blames the program rather than the script.
 
-Show which script is costing what: time per handler, how often the timers fire, and which one is
-responsible when a frame is missed.
+**The feature.** A per-script cost readout: time per handler, how often each timer fires, and which
+script was responsible when a frame was missed.
 
-**Stands on:** there is already a timer system (`Scripting/TimerManager.h`) and loop guards in the
-sandbox. This is measurement on top of a boundary that already exists.
+**Stands on:** `Scripting/TimerManager.h` and the sandbox's loop guards — the boundary already
+exists, so this is measurement at a line that is already drawn. It is also the same idea as the
+panel weight readout in section 2, and the two belong in the same place in the interface.
 
 **Cost:** low.
+
+## Five more, from reading the system properly
+
+### Thirty-two events is a discovery problem
+
+A newcomer does not know whether they want `onValueChange` or `onValueChanged`, or that
+`onPanelBuild` is where you clone controls while `onPanelLoad` is too early to touch them at all.
+
+Instead of a list, ask two questions — *what should happen, and when?* — and pick the event for
+them. The data to drive that is already in the declaration, including the warnings: `onPanelLoad`'s
+own summary says "do not touch controls; they do not exist yet."
+
+**Cost:** low. It is a view over data that already exists and is already kept honest by a test.
+
+### Ship the fake synth
+
+`CE/web/test/support/fakeSynth.js` is a simulated device with a known parameter map, written
+deliberately awkward "because the easy devices were never the problem", and it exists so the capture
+inference has an answer key.
+
+Give users the same thing and a script becomes testable with no hardware: *pretend CC 74 arrived at
+value 90 — what does your script do?* On a train, at 2 a.m., with the synth in another building.
+
+**Why this is nearly free:** you built the hard part for your own test suite, and its awkwardness —
+the thing that makes it a good test fixture — is exactly what makes it a good teaching device.
+
+**Awkward:** a fixture built for a test suite has sharp edges and no interface. Expect the wrapper to
+cost more than the synth did.
+
+**Cost:** low-to-medium.
+
+### Autocomplete in all seven languages, from one declaration
+
+Because the API is data, it can generate Lua annotations, Python `.pyi` stubs, TypeScript types and
+C++ headers from the same source. Some of this already exists —
+`tools/scripts/nativeHandlers/cpp/ce_runtime.h` for C++, `tsService.js` for TypeScript.
+
+Doing it for all seven means the manual, the explorer, the snippets **and** editor completion all
+come from one file that a parity test already refuses to let drift. That is a rare position to be
+in, and it is currently only half spent.
+
+**Cost:** low-to-medium per language, and each one is independent.
+
+### Record and replay
+
+Capture the event stream while a panel runs, then replay it against an edited script,
+deterministically. Every bug that begins *"it only happens when the synth sends…"* becomes
+reproducible on a machine that does not have the synth.
+
+**Shares its format with** the black box in [`midi-frontier.md`](midi-frontier.md) §6.3 — one
+recording, two uses, and the scripting one is where it pays off fastest because a script bug is
+otherwise almost impossible to report.
+
+**Cost:** low-to-medium, given the recording.
+
+### Share behaviours, not just keep them
+
+The script library is personal. What is missing is a behaviour arriving **from somebody else**: with
+its metadata, the `ce.*` modules it needs, and a test that proves it works.
+
+The module declarations and the measured costs already exist, so a shared script can state exactly
+what it requires and exactly what it will add to the export — which is more than most plugin
+ecosystems manage. Copy-on-import is already the library's rule, so the ownership question is
+already answered.
+
+**Awkward:** a shared script is code from a stranger running in the user's panel. The sandbox and
+loop guards exist, but the trust model — what a shared script may reach, and what it must declare
+before it runs — has to be decided before anything is shared, not after.
+
+**Cost:** medium, and most of it is the trust question rather than the plumbing.
 
 ---
 
