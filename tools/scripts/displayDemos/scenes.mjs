@@ -273,6 +273,60 @@ export const SCENES = [
 
   /* ------------------------------------------------------------------------------------------ */
   {
+    id: 'dotmatrix-gif',
+    title: 'A loaded GIF on the dot-matrix panel',
+    blurb: 'The same graphic panel playing an animation file, dithered to 1-bit, with live zones over it.',
+    size: [440, 210],
+    type: 'LcdDisplay',
+    section: 'Display',
+    // Built by displayDemos/sourceAnimation.mjs and injected as a data URL. Its 1500ms cycle is
+    // half the capture loop, so the panel plays it exactly twice and the recording still wraps.
+    animSource: 'torus',
+    sources: {
+      level: fader(0, 127, 100),
+    },
+    motion: {
+      level: pluck(8, 127, 3),
+    },
+    data: {
+      panelType: 'graphic',
+      ...GREEN_STN,
+      rows: 8,
+      cols: 24,
+      pixelWidth: 0,
+      pixelHeight: 0,
+      padding: 12,
+      fontScale: 1,
+      brightness: 100,
+      contrast: 40,
+      dotShape: 'round',
+      showGhost: true,
+      showGlass: true,
+      backlightOn: true,
+      scroll: 'off',
+      scrollSpeed: 0,
+      // animSrc is filled in by the recorder. Frame timings come from the file itself, so animFps
+      // is only consulted for sprite sheets — which this is not.
+      animMode: 'file',
+      animLoop: true,
+      imageDither: true,
+      pages: { defaultLayoutId: 'main', selectorSourceId: '', selectorMap: [], overlays: [] },
+      layouts: [{
+        id: 'main',
+        name: 'Main',
+        // Deliberately sparse. The animation plays BEHIND the zones, so a couple of live fields
+        // are enough to show they composite over it; a full dashboard would just hide the point.
+        zones: [
+          { id: 'z-file', show: 'static', text: 'TORUS.GIF', row: 1, colStart: 1, colEnd: 9 },
+          { id: 'z-lvl', show: 'pct', sourceId: 'src:level', row: 1, colStart: 20, colEnd: 24, suffix: '%', align: 'right' },
+          { id: 'z-bar', show: 'hbar', sourceId: 'src:level', row: 8, colStart: 1, colEnd: 24, smooth: true },
+        ],
+      }],
+    },
+  },
+
+  /* ------------------------------------------------------------------------------------------ */
+  {
     id: 'pixel',
     title: 'Free-pixel OLED/VFD',
     blurb: 'A 128x64 VFD: a synthesized oscillator, an ADSR curve, a rolling scope and a meter bank.',

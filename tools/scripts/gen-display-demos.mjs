@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import { decodePng, encodeGif } from './lib/animatedGif.mjs';
 import { LOOP_SECONDS, SCENES } from './displayDemos/scenes.mjs';
+import { buildTorusGif } from './displayDemos/sourceAnimation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
@@ -219,7 +220,11 @@ const PAGE_SETUP = `
   controls.unshift(display);
 
   panels.panels.update((list) => list.map((p) => ({ ...p, controls })));
-  await settle(400);
+  // An animation file has to be fetched and decoded frame by frame before the panel can draw it,
+  // and that happens off the rAF clock. The warm-up loops below are seconds of real time and would
+  // almost certainly cover it, but "almost certainly" is how a scene ends up recorded blank once
+  // in twenty runs.
+  await settle(scene.animSource ? 2000 : 400);
 
   window.__demo = {
     displayId,
@@ -317,13 +322,34 @@ async function record(page, scene, extraFrames = 0) {
 }
 
 /**
+ * Build a scene's loadable animation and hand it to the panel as a data URL.
+ *
+ * A data URL rather than a served file because that is what the app itself stores: an animation
+ * uploaded in the inspector is kept in `animSrc` as a data URL inside the panel document, so the
+ * panel stays one self-contained file. Feeding the demo the same way means the recording exercises
+ * the path a user's own upload takes, rather than a shortcut only this script can use.
+ *
+ * The source GIF is also written to docs/media, because "a GIF plays on the panel" is a claim the
+ * reader should be able to check against the GIF that was played.
+ */
+function attachSourceAnimation(scene) {
+  if (scene.animSource !== 'torus') return scene;
+  const gif = buildTorusGif();
+  writeFileSync(join(outDir, `display-source-${scene.animSource}.gif`), gif);
+  return {
+    ...scene,
+    data: { ...scene.data, animSrc: `data:image/gif;base64,${gif.toString('base64')}` },
+  };
+}
+
+/**
  * Strip the scene down to what can cross into the page.
  *
  * `motion` holds functions, which structured-clone refuses; they are sampled in Node anyway, so
  * the page never needs them. Everything else is plain data by construction.
  */
 function serialisableScene(scene) {
-  const { motion, ...rest } = scene;
+  const { motion, ...rest } = attachSourceAnimation(scene);
   return rest;
 }
 
