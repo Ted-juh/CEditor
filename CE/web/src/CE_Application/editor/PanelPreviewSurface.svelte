@@ -7,7 +7,10 @@
   import {
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
   } from '../utils/returnToRest.js';
-  import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
+  import {
+    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
+    pressTargetAt,
+  } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
@@ -558,6 +561,10 @@
   // both free-text with a caret — or a Combobox/Radio/Cyclic, which becomes a
   // choice cycler (no caret; wheel/arrows change the selected option).
   let lcdEdit = $state({ id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false });
+  // Which layout a soft key has navigated each display to: { [controlId]: layoutId }.
+  // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
+  // panel document, so it must not reach the store and must not survive leaving preview.
+  let lcdPressedLayout = $state({});
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
@@ -755,6 +762,54 @@
   }
   const LCD_EDIT_IDLE = { id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false };
 
+  /** The pressable zone under a pointer position on an LcdDisplay, or null. */
+  function lcdPressTargetFor(control, local) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') return null;
+    const display = lcdDisplayOf(control);
+    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return null;
+    const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
+    if (!layout) return null;
+    const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
+    return pressTargetAt(layout.zones ?? [], lcdCellFromPoint(control, local), cols);
+  }
+
+  /**
+   * Perform a soft key's action. Returns true when the press was consumed.
+   *
+   * Two actions, and both are deliberately things a performer does mid-song rather than things an
+   * author does once: navigate to another page, or move a control. Anything structural belongs in
+   * the inspector, which is the same line componentVerbs.js draws for script verbs.
+   */
+  function lcdPerformPress(control, zone) {
+    const controlId = getControlId(control);
+    const press = zone?.press ?? {};
+
+    const layoutId = String(press.layout ?? '');
+    if (layoutId) {
+      const display = lcdDisplayOf(control);
+      // An unknown layout id is a no-op rather than a blank screen: the same ruling the enum verbs
+      // make, and for the same reason — a typo that changes nothing is debuggable.
+      if (!(display?.layouts ?? []).some((l) => String(l?.id ?? '') === layoutId)) return false;
+      lcdPressedLayout = { ...lcdPressedLayout, [controlId]: layoutId };
+      return true;
+    }
+
+    const setName = String(press.set ?? '');
+    if (setName) {
+      // Addressed the way a script addresses a control — by NAME, falling back to an id — because
+      // a panel author typing into the inspector has the name in front of them and not the id.
+      const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === setName)
+        ?? controlById(setName);
+      if (!target) return false;
+      const behavior = getBehavior(target);
+      if (!isRangeBehavior(behavior)) return false;
+      const value = snapRangeValue(behavior, numberOr(press.to, getRangeMin(behavior)));
+      updatePanelPreviewSession(getControlId(target), { valueOverrideEnabled: true, valueOverride: value });
+      return true;
+    }
+    return false;
+  }
+
   // Text edit target read/write: '@edit' -> the display's own editText
   // (Display.editText or Pixel.editText), else a Label's content.
   function lcdEditText(control, sourceId) {
@@ -837,7 +892,15 @@
     // persisted) acts as the resting default while previewing from the editor.
     const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
     const hasDesign = designId && display.layouts.some((l) => String(l?.id ?? '') === designId);
-    const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    let effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    // A soft key beats the selector and the design default, because navigating by hand is the most
+    // recent thing the user said. It does NOT beat an overlay: an overlay is a transient
+    // interruption (a "saved" flash) and should be seen over whatever page you had navigated to.
+    const pressed = String(lcdPressedLayout[getControlId(control)] ?? '');
+    if (pressed && display.layouts.some((l) => String(l?.id ?? '') === pressed)) {
+      effPages = { ...effPages, defaultLayoutId: pressed };
+      return resolveActiveLayoutId(effPages, display.layouts, { activeOverlayLayoutId });
+    }
     return resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId });
   }
 
@@ -6540,10 +6603,24 @@
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
       lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId;
     }
+    // A SOFT KEY IS RESOLVED FIRST, and the order is the decision. A press and an edit are both
+    // clicks on the same screen, and a zone that declares an action is the more specific intent:
+    // an edit field is armed by clicking "somewhere on the display", while a soft key is a click on
+    // one named region. Resolving edits first would make a soft key beside an edit field
+    // unreachable, because the edit path falls back to its FIRST target when the click misses.
+    //
+    // It sets a flag rather than returning: the bookkeeping below (closing an open combobox,
+    // pointing the inspector at this control) is owed for every pointer-down on a control,
+    // including one that a soft key consumed.
+    const pressedZone = lcdPressTargetFor(control, pointerDownLocal);
+    const consumedByPress = pressedZone ? lcdPerformPress(control, pressedZone) : false;
+    // A press ends any edit in progress, the way a hardware soft key leaves the field.
+    if (consumedByPress && lcdEdit.active) lcdEdit = { ...LCD_EDIT_IDLE };
+
     // Clicking an LCD with an editable zone focuses it; clicking anything else
     // ends any active edit. Text targets place the caret at the end; a choice
     // target just arms the cycler (wheel/arrows change the option).
-    const editTargets = screenEditTargets(control);
+    const editTargets = consumedByPress ? [] : screenEditTargets(control);
     if (editTargets.length) {
       // Pick the edit field under the click (falling back to the first one);
       // clicking inside a text field places the caret at the clicked character.
@@ -6562,7 +6639,7 @@
           : 0;
       }
       lcdArmEdit(control, target, caret);
-    } else if (lcdEdit.active) {
+    } else if (!consumedByPress && lcdEdit.active) {
       lcdEdit = { ...LCD_EDIT_IDLE };
     }
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
