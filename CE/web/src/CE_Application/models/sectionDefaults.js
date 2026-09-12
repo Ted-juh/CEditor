@@ -757,12 +757,21 @@ export const SECTION_DEFAULTS = {
     // font:'custom' to use it. { src(dataURL), glyphW, glyphH, cols, first(charCode) }.
     customFont: null,
     // The scene: pixel-addressed elements. Each:
-    // { id, kind (static|name|value|pct|midiValue|note|text|state|
+    // { id, name, kind (static|name|value|pct|midiValue|note|text|state|
     //   hbar|vbar|hslider|vslider|needle), x, y, w, h, sourceId, align,
     //   precision, prefix, suffix, label, radix, frame, ticks, peakHold,
     //   smooth, visible }
     // Text kinds draw at (x, y) with font height h (w > 0 clips/aligns);
     // widget kinds fill the (x, y, w, h) rect.
+    //
+    // `name` is the SCRIPT HANDLE and nothing else — never drawn, unlike
+    // `label`. A script addresses an element by it (ce.components.pixel.text,
+    // .show, .x …), because the two keys that already existed cannot be used:
+    // the index is the paint order, which the inspector's arrows rewrite, and
+    // `id` is an `el_…` the UI never shows. The same name on two layouts is
+    // one element on two pages — duplicating a layout keeps names and mints
+    // new ids — and a verb writes every element carrying it.
+    // See utils/pixelElements.js and design/display-component-futures.md #2.
     elements: [],
     // Layouts/pages (same engine as the LCD): when layouts is non-empty the
     // active layout's elements replace the flat list above.

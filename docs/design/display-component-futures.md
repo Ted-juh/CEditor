@@ -36,8 +36,9 @@ which is the document's job rather than the picture's.
 ## The audit, in numbers
 
 **This table is the state that produced the list, not the state today.** It was counted on
-2026-09-12, before proposals 1, 3 and 4 were built — so the CGRAM row now reads differently, and
-the verb counts have grown by the verbs those proposals added. It is left as it was because it is
+2026-09-12, before any of the proposals were built — so the CGRAM row now reads differently, the
+`pixel.*` row's claim is the one proposal 2 went on to disprove, and both verb counts have grown
+by what the proposals added. It is left as it was because it is
 the evidence the proposals were argued from; the per-proposal sections say what has since changed.
 
 | Fact | Value |
@@ -48,7 +49,7 @@ the evidence the proposals were argued from; the per-proposal sections say what 
 | `exportValues`, both | `[]` — neither is host-automatable |
 | Zone `show` kinds | 16 |
 | `lcd.*` script verbs | 35 |
-| `pixel.*` script verbs | 19, **not one of which writes content** |
+| `pixel.*` script verbs | 19, **not one of which writes content** — *proposal 2 has since shipped eight that do* |
 | Hits for CGRAM / custom characters | 0 — *proposal 1 has since shipped* |
 
 The two verb counts are the whole flattened surface — the hand-written declarations, the
@@ -123,17 +124,17 @@ CGRAM is eight slots and an insert would mint a ninth that `\x00`–`\x07` canno
 script, not yet by drawing on a 5×8 grid in the UI. That is the obvious follow-up and it is
 ordinary UI work — the model, the rendering and the scripting all exist under it now.
 
-## 2. `PixelDisplay` cannot be scripted, only decorated
+## 2. `PixelDisplay` cannot be scripted, only decorated — **shipped**
 
-**What is missing.** Every one of the `pixel.*` verbs is chrome — see the full list in the audit
-above. Not one writes an element. The LCD at least has `lcd.text(row, line)` and `lcd.clear()`.
+**What was missing.** Every one of the `pixel.*` verbs was chrome — see the full list in the audit
+above. Not one wrote an element. The LCD at least had `lcd.text(row, line)` and `lcd.clear()`.
 
 The richest display in the product — the one with `wave`, `adsr`, `scope` and free pixel placement
-— is the one a script cannot write a word to. Its `elements` array is editable only in the
+— was the one a script could not write a word to. Its `elements` array was editable only in the
 inspector.
 
-**This one was attempted, and the attempt found the real problem.** It is written up here rather
-than smoothed over, because the finding is the useful part.
+**This one was attempted, failed, and the failure is the useful part.** It is written up in full
+because the record of *why* the obvious mechanism is wrong is worth more than the fix.
 
 The obvious mechanism is the `item` verb kind — "one property of one element of an array field,
 addressed 1-based" — exactly how `DrumPads` addresses a pad:
@@ -162,24 +163,79 @@ There were three bad ways out and all were rejected: seeding `SECTION_DEFAULTS.P
 (changes what a new display *is*), declaring a `count` resolver like `DrumPads` (a pad grid has an
 implied size; a blank screen has none), and weakening the test.
 
-**So the real decision is addressing, and it was hiding behind the API sketch.** Index is the wrong
-key for this list:
+**So the real decision was addressing**, and the note at the time recorded it as "do it, by id":
 
-| | Index (`item`, today's mechanism) | Id |
+| | Index (`item`, the mechanism that failed) | Id |
 | --- | --- | --- |
 | Blank display | Silent no-op | Same, but honestly — the id is absent |
 | Reorder in inspector | **Scripts silently retarget** | Stable |
 | Cost | One line per verb | A new reducer kind |
 
-Element ids already exist and are stable. `LINK` is precedent for a verb kind that resolves a
-*name* in the runtime rather than the reducer, so an id-addressed kind has somewhere to live.
+### What building it found: an id is stable and unreachable
 
-**Cost.** Higher than it first looked: a reducer kind, not a one-liner. Still low risk —
-`updateControlProperty` already writes into `Pixel.elements`, which is what the design-mode drag
-handles do when an element is moved.
+The table is right about index and wrong about id, and only writing the script shows it. Element
+ids are `el_9f3a`, minted by `genId`, and **the inspector never shows one** — the element row is
+headed `#1`, `#2`, and every other column is a property. A panel author has no way to learn an id,
+so a script cannot be written against one.
 
-**Verdict: do it, by id.** Still a hole rather than a boundary — but the shape of the fix is now
-known rather than assumed.
+That is the same fact the `LINK` verb kind already turns on, in its own words:
+
+> The verb takes a NAME and stores an id, because a script addresses controls by name and an opaque
+> `ctl_…` is not something it could have got hold of.
+
+So the shipped answer is neither of the two keys that existed. An element gains a **`name`** — typed
+in the inspector beside its group, never drawn, unlike `label` — and that is what the verbs take:
+
+```js
+ce.components.pixel.text(screen, "title", "SATURN VB")
+ce.components.pixel.show(screen, "meter")          -- no third argument toggles
+ce.components.pixel.x(screen, "title", 12)
+ce.components.pixel.read(screen, "text")           -- { title = "SATURN VB", el_1 = "" }
+```
+
+Eight of them: `text`, `label`, `show`, `blink`, `x`, `y`, `w`, `h`. The first four names are the
+four the failed attempt used, which is the shortest way to say what actually changed. `kind` and
+`sourceId` stay out — what an element *is* and what drives it are authoring choices — and `colour`
+is styling, which `componentVerbs.js` does not cross.
+
+### Three decisions the shape forced
+
+- **A name resolves across the flat scene AND every layout.** A Pixel holds `elements` and a
+  `layouts[].elements` per page, and when there are layouts *the flat list is not drawn at all*. A
+  verb that only knew about `elements` would work perfectly on a simple screen and do nothing,
+  silently, on any screen with pages — the same failure in a new place.
+- **A name addresses every element carrying it.** Not the first. Duplicating a layout re-mints the
+  element ids and keeps the names, so a three-page screen has three elements called `title` *by
+  construction*, and they are the same title. A bare `show` toggles from the first match so two
+  pages cannot drift apart, and only the places that actually differ are written. Duplicating one
+  *element* clears the name, because that copy is a different thing — which is what the +2,+2 nudge
+  beside it already says.
+- **`elem` is not a list kind.** `size`, `fill`, `insert` and `remove` all speak in positions, and a
+  name-addressed scene has no n-th anything: `size` would answer a number no verb takes. `read` has
+  its own branch instead, keyed by name, which is also how a script discovers what a display has.
+
+**A name the display has not got is a refusal, not a no-op** — and that is the whole difference
+from the attempt that failed. "There is no element called `tempo`" is something the console prints
+and a script can branch on. An index past the end of an empty array said nothing at all, and looked
+exactly like success.
+
+### Two things found on the way, neither of them this proposal
+
+Both were invisible because nothing compared the two halves that disagreed, which is the same
+shape as the bug above.
+
+- **Every published argument was marked required**, including the ones the signature line beside it
+  showed in brackets. `looperLane(target, index [, enabled])` toggles the lane when called with two
+  arguments, and the descriptor the editor reads said the third was mandatory. Both now come from
+  `verbArgOptional`, and a test asserts the descriptor against its own signature string.
+- **`drumPadsLabel` published its `index` as a string**, because both arguments were typed from the
+  verb's single kind and the label is a string. `verbArgKinds` gives one kind per argument.
+
+The `componentCoverage.test.js` exemption list was the third: `pixel.elements` sat there reading
+"an authoring surface, not a performance one" for exactly as long as it took to disprove it, and
+`lcd.editText` / `pixel.editText` had been left there after proposal 3 gave them verbs. That list
+already asserted that nothing in it names a field that no longer *exists*; it now also asserts that
+nothing in it names a field that has since *gained a verb*, which is what found the other two.
 
 ## 3. `editText` is invisible to everything except the keyboard — **shipped**
 
@@ -549,7 +605,7 @@ re-derives it.
 | 4 | Soft keys | Moderate | No, as it turned out — an exception, not a model | **Shipped** |
 | 3 | `editText` verbs | Very low | Partly (automation) | **Shipped** |
 | 1 | User glyphs | Small | No | **Shipped** |
-| 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
+| 2 | Pixel content verbs | Moderate — a reducer kind, and elements needed a name | No | **Shipped** |
 | 5 | `@param` zones | Moderate | Yes — and needed a device-state store | **Shipped** |
 | 6 | Layout state machine | High | Yes — layouts gained state | **Shipped** |
 | 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
@@ -572,7 +628,7 @@ without changing its model, because the click path was already there for edit fi
 | 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
-| 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
+| 2 | **Shipped** — eight scene verbs on a new `elem` kind, addressed by an element's name. |
 
 | 7, 8, 9 | Spike / later / on request. |
 
@@ -595,10 +651,11 @@ part; this one question is, and it is the owner's to answer:
 The second answer is more work and more honest. Either way, decide before writing code — a
 half-answered interaction model is the expensive kind of mistake.
 
-**Step 3 — ~~id-addressed element verbs, then `@param` zones~~. Half done.** `@param` shipped and
-settled the reserved-source story: a source that is not a control id resolves through its own
-branch, exactly as `@active` and `@edit` do. Proposal 2's id-addressed element verbs are the
-remaining half, and they now have a pattern to follow.
+**Step 3 — ~~id-addressed element verbs, then `@param` zones~~. Done, and the "id" was wrong.**
+`@param` settled the reserved-source story: a source that is not a control id resolves through its
+own branch, exactly as `@active` and `@edit` do. The element verbs then shipped on a new `elem`
+kind — but addressed by a **name** the author types, not by the id this note proposed, because the
+ids are `el_…` and the inspector never shows one. See proposal 2 for the whole finding.
 
 Proposal 6 is **done** — a press gets you in, a timeout brings you back, and the cursor moves. All
 three edges in the sketch are expressible, and the MENU screen is a menu rather than three lines of
@@ -608,8 +665,13 @@ text that look like one.
 
 Worth writing down so it can be checked rather than trusted: the numbers in the audit table were
 counted on 2026-09-12 against `componentVerbs.js`, `componentPorts.js`, `componentTypes.js` and
-`lcdZones.js`. If a later reader finds `pixel.*` has content verbs, or a `Mouse` section on a
-display, this note has been overtaken and the code is right.
+`lcdZones.js`. The test was: if a later reader finds `pixel.*` has content verbs, or a `Mouse`
+section on a display, this note has been overtaken and the code is right.
+
+**Half of that has happened, on purpose.** `pixel.*` has eight content verbs, because proposal 2
+was built — so read the audit table as dated evidence rather than as a description, which is what
+the paragraph above it now says. The other half is still the live check: a `Mouse` or `HitZones`
+section on a display would mean proposal 4's ruling was reversed, and nothing here would know.
 
 ## Deliberately not proposed
 

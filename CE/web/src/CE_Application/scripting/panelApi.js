@@ -28,6 +28,7 @@
 import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
+  verbArgKinds, verbArgOptional,
 } from './componentVerbs.js';
 import { HAND_WRITTEN_VALUES } from './componentTables.js';
 // The legal values an option accepts come from the table its own implementation reads, for the
@@ -3100,10 +3101,14 @@ export const COMMANDS = [
 // `target` is the component's control name. All are panel/component scope: a device script
 // runs before the GUI exists, so there is no component to talk to yet.
 
-// Argument types, from the verb kind. `targetRef` stays the first argument of every verb.
+// Argument types. `targetRef` stays the first argument of every verb; the rest are keyed by the
+// kind of the ARGUMENT, which componentVerbs.verbArgKinds gives one of per name — not by the kind
+// of the verb. Those are different things for anything addressed: the index of
+// `drumPadsLabel(target, index, label)` is a number and its label is a string, and typing both from
+// the verb's one kind published the index as a string. `list` is what fill() takes.
 const PARAM_TYPE_FOR = {
   num: 'number', int: 'number', bool: 'boolean', str: 'string', enum: 'string',
-  xy: 'number', cell: 'number', line: 'value',
+  list: 'value',
 };
 
 const panelVerb = (id, signature, summary, params) => ({
@@ -3281,14 +3286,19 @@ export const PANEL_COMMANDS = [
   // a verb's field, kind, range and prose, and the descriptor, the implementation, the C++ stub
   // name and the documentation are all derived from it. A verb that exists in one place and not
   // another stops being possible.
-  ...COMPONENT_VERBS.map((verb) => panelVerb(verb.id, verbSignature(verb), verbSummary(verb),
-    [T, ...verbArgs(verb).map((name) => ({
-      name,
-      type: PARAM_TYPE_FOR[verb.k === 'item' ? verb.kind : verb.k] ?? 'value',
-      // A boolean verb toggles when called bare, so its argument is genuinely optional. Every
-      // other argument is required — calling `arpRate(target)` is a mistake, not a query.
-      required: !(verb.k === 'bool' && verb.toggle),
-    }))])),
+  ...COMPONENT_VERBS.map((verb) => {
+    const kinds = verbArgKinds(verb);
+    const optional = verbArgOptional(verb);
+    return panelVerb(verb.id, verbSignature(verb), verbSummary(verb),
+      [T, ...verbArgs(verb).map((name, i) => ({
+        name,
+        type: PARAM_TYPE_FOR[kinds[i]] ?? 'value',
+        // Both halves come from the spec rather than from this file's reading of it, and
+        // componentVerbs.test.js holds them to the signature line — which is how the two used to
+        // disagree, every optional argument being published as required.
+        required: !optional[i],
+      }))]);
+  }),
 ];
 
 /* ------------------------------------------------------------------- helpers */

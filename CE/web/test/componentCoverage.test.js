@@ -47,16 +47,17 @@ const EXEMPT = {
   'lcd.fields': 'a display layout is an authoring surface, not a performance one',
   'lcd.layouts': 'ditto',
   'lcd.pages': 'ditto',
-  'pixel.elements': 'ditto',
-  'pixel.layouts': 'ditto',
+  // …and pixel.elements is NOT here any more: the scene is reachable by element name (the `elem`
+  // verb kind). The pages around it still are — which layout is showing is the selector's job.
+  'pixel.layouts': 'the pages are an authoring surface; the elements inside them are addressable by name',
   'pixel.pages': 'ditto',
   'pixel.customFont': 'a font file, chosen once',
-  // Text-entry plumbing: the state of an editing session, owned by the editor.
-  'lcd.editText': 'the state of an in-progress edit, owned by the editor',
-  'lcd.editCharset': 'ditto',
+  // Text-entry plumbing: what an edit is ALLOWED to be, which the inspector decides once. The
+  // buffer itself is no longer here — `editText` gained a verb (proposal 3), and the two entries
+  // that used to excuse it were found by the assertion below rather than by anybody remembering.
+  'lcd.editCharset': 'which characters an edit may use — an authoring choice, not a performance one',
   'lcd.editMaxLength': 'ditto',
   'lcd.activeScope': 'ditto',
-  'pixel.editText': 'ditto',
   'pixel.editCharset': 'ditto',
   'pixel.editMaxLength': 'ditto',
   'pixel.activeScope': 'ditto',
@@ -126,6 +127,19 @@ test('nothing is exempt or excluded from a field that no longer exists', () => {
   }
   assert.deepEqual(Object.keys(EXEMPT).filter((k) => !real.has(k)), [],
     'EXEMPT names a field no component has');
+
+  // The same rot from the other direction, and the one that actually happened: a field that GAINS
+  // a verb leaves its excuse behind, and the excuse then reads as a standing decision not to give
+  // it one. `pixel.elements` sat here saying "an authoring surface, not a performance one" for as
+  // long as it took to build the verbs that disprove it.
+  const covered = new Set();
+  for (const fam of COMPONENT_FAMILIES) {
+    for (const verb of fam.verbs) {
+      for (const f of [verb.f, verb.fx, verb.fy]) if (f) covered.add(`${fam.id}.${f}`);
+    }
+  }
+  assert.deepEqual(Object.keys(EXEMPT).filter((k) => covered.has(k)), [],
+    'EXEMPT excuses a field that now has a verb — delete the entry');
 
   const anyField = new Set();
   for (const fam of COMPONENT_FAMILIES) {

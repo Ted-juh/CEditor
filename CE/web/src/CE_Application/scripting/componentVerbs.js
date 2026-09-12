@@ -28,6 +28,7 @@
 //  enum   one of `values` — anything else is a no-op rather than a wrong setting
 //  xy     two numbers at once (a probe, a puck), each clamped to [min, max]
 //  item   one property of one element of an array field, addressed 1-BASED
+//  elem   one property of one element of a pixel display's scene, addressed BY NAME
 //  cell   one entry of a flat row-major grid (the Matrix), addressed 1-BASED
 //  line   one entry of an array of strings (the LCD), addressed 1-BASED
 //
@@ -40,9 +41,16 @@ import { SOURCE_KINDS } from '../utils/controlSources.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
+import { elementSites, elementAt, elementsPatch } from '../utils/pixelElements.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
+// One property of one element of a pixel display's scene, addressed by the NAME the author typed
+// beside it. Not `item`, and the two reasons are written out in utils/pixelElements.js: the list
+// starts empty, so an index addresses nothing on a fresh display; and the index is the paint order,
+// which the inspector's own ▲/▼ buttons rewrite. A name survives both.
+const ELEM = 'elem';
+export const ELEM_KIND = ELEM;
 // A sorted list of INDICES that are on — the Arpeggiator stores its muted steps that way,
 // as a set rather than a boolean per step, so neither `item` nor `cell` fits it.
 const INDEXSET = 'indexset';
@@ -57,7 +65,13 @@ export const LINK_KIND = LINK;
 export const READ_KINDS = [READ, SIZE];
 export const ARRAY_KINDS = [FILL, INSERT, REMOVE];
 /** The kinds that address an array by a verb name — what `size`, `fill`, `insert` and `remove`
- *  take, and what `read` returns a list for. */
+ *  take, and what `read` returns a list for.
+ *
+ *  `elem` is deliberately NOT one of them. Those four all speak in positions — fill writes the
+ *  n-th value, size answers how many there are — and a name-addressed scene has no n-th anything.
+ *  Their answers would be about the stored array rather than about what a script can address, which
+ *  is worse than not answering: `size` would report a number no verb takes. `read` has its own
+ *  branch for it instead, keyed by name. */
 export const LIST_KINDS = [ITEM, CELL, LINE];
 
 /** A verb: v = name inside the namespace, f = the field it writes, k = kind. */
@@ -603,21 +617,42 @@ export const COMPONENT_FAMILIES = [
     id: 'pixel', section: 'Pixel', prefix: 'pixel', label: 'Pixel Display',
     summary: 'Drive a pixel display: its elements\' text, visibility and position, plus backlight, brightness and animation.',
     verbs: [
-      // NO CONTENT VERBS HERE YET, and the gap is deliberate rather than forgotten — see
-      // docs/design/display-component-futures.md, proposal 2.
+      // THE SCENE, ADDRESSED BY NAME. These eight are why the `elem` kind exists; the reasoning is
+      // in utils/pixelElements.js and the short version is that neither of the two obvious keys
+      // works. An index addresses nothing on a display whose elements have not been drawn yet, and
+      // it is the paint order, which the inspector's ▲/▼ buttons rewrite under any script holding
+      // one. An id is stable and unreachable: `el_9f3a` is never shown anywhere in the UI.
       //
-      // `item` is the obvious mechanism: one property of one element of `Pixel.elements`, exactly
-      // as DrumPads addresses a pad. It does not fit, and componentVerbs.test.js is what says so.
-      // Every other `item` list in this file has a non-empty default — six orbit nodes are six
-      // stored objects — so element 1 is always there to write to. `Pixel.elements` defaults to
-      // EMPTY, because a pixel display starts blank by design, so an index-addressed verb is a
-      // silent no-op on every display whose elements have not already been added in the inspector.
-      // That is the precise failure the "every verb either changes something" test exists to
-      // catch, and it caught it.
-      //
-      // The fix is a decision, not a patch: address elements by their `id` rather than their
-      // position. Ids are stable across reordering, which index is not, and it needs a reducer
-      // kind this file does not have. Until that is decided, no half-working verb.
+      // So the element carries a `name` the author types, beside its group, and these address that.
+      // The four names below are the same four the index-addressed attempt used and failed with —
+      // pixelText, pixelShow, pixelX, pixelY — which is the neatest way to say what changed.
+      v('text', 'elements', ELEM, { item: 'text', kind: STR,
+        doc: 'The text of one element, by name. What a `static` element draws.' }),
+      v('label', 'elements', ELEM, { item: 'label', kind: STR,
+        doc: 'The caption under one element, by name — or the name override on a `name` element.' }),
+      v('show', 'elements', ELEM, { item: 'visible', kind: BOOL,
+        doc: 'Show or hide one element, by name. No third argument toggles.' }),
+      v('blink', 'elements', ELEM, { item: 'blink', kind: BOOL,
+        doc: 'Blink one element, by name. No third argument toggles.' }),
+      // Position and size in GRID pixels, which is what the inspector's X/Y/W/H columns are. The
+      // range is wider than any panel in both directions on purpose: sliding an element off the
+      // left edge and back is how a script animates one in, and clamping that to 0 would park it.
+      v('x', 'elements', ELEM, { item: 'x', kind: INT, min: -4096, max: 4096,
+        doc: 'Move one element, by name, to an x in grid pixels.' }),
+      v('y', 'elements', ELEM, { item: 'y', kind: INT, min: -4096, max: 4096,
+        doc: 'Move one element, by name, to a y in grid pixels.' }),
+      v('w', 'elements', ELEM, { item: 'w', kind: INT, min: 0, max: 4096,
+        doc: 'The width of one element, by name, in grid pixels. For text kinds this is the align/clip box.' }),
+      v('h', 'elements', ELEM, { item: 'h', kind: INT, min: 0, max: 4096,
+        doc: 'The height of one element, by name, in grid pixels. For text kinds this is the font height.' }),
+      // Three element properties are STILL NOT HERE, each for a reason rather than by omission.
+      // `kind` and `sourceId` are authoring choices — what an element IS and what drives it — and
+      // rewriting those mid-song is a different panel, not a performance. `colour` is styling,
+      // which this file does not cross.
+
+      // The on-screen editable field, as on the LCD: the buffer an `edit` element bound to '@edit'
+      // shows. It was reachable by typing at the screen and by a device binding, and by nothing
+      // else — so no script could read the patch name the user had just entered.
       v('editText', 'editText', STR,
         { doc: 'The screen\'s editable text field (a patch name). Reads back what is in it.' }),
       v('backlight', 'backlightOn', BOOL, { toggle: true }),
@@ -921,6 +956,21 @@ export function componentScriptPatch(verb, cfg, args = []) {
       return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
     }
 
+    case ELEM: {
+      // One property of every element answering to a name — across the flat scene AND every
+      // layout, because a display with pages does not draw the flat list at all and a verb that
+      // only knew about it would work on simple screens and silently fail on real ones.
+      //
+      // The FIRST match decides what a toggle toggles from. Two elements of the same name are the
+      // same element on two pages (duplicating a layout keeps names and re-mints ids), so letting
+      // each flip from its own state would drive them apart on the first `show` with no argument.
+      const sites = elementSites(c, a);
+      if (!sites.length) return {};
+      const next = coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]);
+      if (next === null) return {};
+      return elementsPatch(c, sites, verb.item, next);
+    }
+
     case CELL: {
       const list = Array.isArray(c[verb.f]) ? c[verb.f] : null;
       if (!list) return {};
@@ -1022,6 +1072,15 @@ export function componentRequestLegal(verb, cfg, args = []) {
       if (at === null) return false;
       return coerce(verb.kind, b, verb, itemCurrent(verb, c, at)) !== null;
     }
+    case ELEM: {
+      // A name this display has nothing under is a REFUSAL, not a no-op, and that is the whole
+      // difference between this and the index-addressed attempt: "there is no element called
+      // tempo" is something the console can say and a script can branch on. An index past the end
+      // of an empty list said nothing at all.
+      const sites = elementSites(c, a);
+      if (!sites.length) return false;
+      return coerce(verb.kind, b, verb, elementAt(c, sites[0])?.[verb.item]) !== null;
+    }
     case LINE: {
       const list = listOf(verb.f);
       return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null;
@@ -1053,6 +1112,7 @@ export function verbArgs(verb) {
   switch (verb.k) {
     case XY: return verb.args ?? ['x', 'y'];
     case ITEM: return ['index', verb.item];
+    case ELEM: return ['name', verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
     case LINE: return verb.clear ? [] : ['row', 'text'];
     case INDEXSET: return ['index', 'on'];
@@ -1065,6 +1125,53 @@ export function verbArgs(verb) {
     case FILL: return ['name', 'values'];
     case INSERT: case REMOVE: return ['name', 'index'];
     default: return [verb.v];
+  }
+}
+
+/**
+ * The KIND of each argument, one per name `verbArgs` gives.
+ *
+ * It exists because the descriptor generator had been taking every argument's type from the verb's
+ * own kind, and an addressed verb has two different ones: `drumPadsLabel(target, index, label)` was
+ * published with `index` typed as a string, because the label is a string. Nobody noticed, because
+ * the signature line beside it was right — which is the argument for deriving both from one place.
+ */
+export function verbArgKinds(verb) {
+  switch (verb.k) {
+    case XY: return [NUM, NUM];
+    case ITEM: return [INT, verb.kind];
+    case ELEM: return [STR, verb.kind];
+    case CELL: return verb.clear ? [] : (verb.grid ? [INT, INT, NUM] : [INT, NUM]);
+    case LINE: return verb.clear ? [] : [INT, STR];
+    case INDEXSET: return [INT, BOOL];
+    case LINK: return [STR];
+    case READ: return [STR, INT];
+    case SIZE: return [STR];
+    case FILL: return [STR, 'list'];
+    case INSERT: case REMOVE: return [STR, INT];
+    default: return [verb.k];
+  }
+}
+
+/**
+ * Which arguments may be left out, one per name `verbArgs` gives.
+ *
+ * Kept beside verbArgKinds and asserted against verbSignature, because the two used to disagree:
+ * every generated descriptor marked every argument required, including the ones the signature line
+ * showed in brackets. A toggling boolean is the case that matters — `looperLane(t, 1)` flips the
+ * lane, and the reference said the second argument was mandatory.
+ */
+export function verbArgOptional(verb) {
+  const boolValue = (verb.k === ITEM || verb.k === ELEM) && verb.kind === BOOL;
+  switch (verb.k) {
+    case READ: return [true, true];
+    case SIZE: case LINK: return [true];
+    case FILL: return [false, false];
+    case INSERT: case REMOVE: return [false, true];
+    case INDEXSET: return [false, true];
+    case ITEM: case ELEM: return [false, boolValue];
+    case BOOL: return [Boolean(verb.toggle)];
+    default: return verbArgs(verb).map(() => false);
   }
 }
 
@@ -1086,9 +1193,17 @@ export function verbSignature(verb) {
   // A boolean with no argument toggles, and an index set does the same with its second, so both
   // show that argument as optional.
   let call;
-  if (verb.k === BOOL && verb.toggle) call = `${verb.id}(target [, ${args[0]}])`;
-  else if (verb.k === INDEXSET) call = `${verb.id}(target, index [, on])`;
-  else call = `${verb.id}(${['target', ...args].join(', ')})`;
+  //
+  // …and an addressed verb whose VALUE is a boolean toggles the same way — `lane(t, 1)` flips the
+  // lane, `show(scr, "title")` flips the element — so the brackets are derived from verbArgOptional
+  // rather than from the verb's own kind, which only knew about the scalar case.
+  const optional = verbArgOptional(verb);
+  if (verb.k === INDEXSET) call = `${verb.id}(target, index [, on])`;
+  else {
+    const head = ['target', ...args.filter((_, i) => !optional[i])].join(', ');
+    const tail = args.filter((_, i) => optional[i]).map((name) => ` [, ${name}]`).join('');
+    call = `${verb.id}(${head}${tail})`;
+  }
   return `${call} -> boolean`;
 }
 
@@ -1100,7 +1215,8 @@ export function verbSummary(verb) {
       + `${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a control'}. No argument, or an empty name, `
       + 'unlinks it. Reads back as the name, never as an id.';
   }
-  const label = verb.k === ITEM ? `${verb.item} of one ${verb.f.replace(/s$/, '')}` : verb.f;
+  const label = (verb.k === ITEM || verb.k === ELEM)
+    ? `${verb.item} of one ${verb.f.replace(/s$/, '')}` : verb.f;
   // The range, where the verb declares one. "Set `baseNote`." told a reader nothing they did not
   // already have from the name, and the bounds were sitting right there on the verb — which is the
   // whole reason validation can reject an out-of-range value while the docs could not say so.
@@ -1111,6 +1227,7 @@ export function verbSummary(verb) {
     case BOOL: return `Set \`${label}\`. Calling it with no argument toggles.`;
     case ENUM: return `Set \`${label}\` — one of ${verb.values.map((x) => `"${x}"`).join(', ')}.`;
     case ITEM: return `Set the ${label}, 1-based.${range}`;
+    case ELEM: return `Set the ${label}, by the name it was given in the inspector.${range}`;
     default: return `Set \`${label}\`.${range}`;
   }
 }
