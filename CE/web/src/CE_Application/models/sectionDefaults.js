@@ -602,6 +602,20 @@ export const SECTION_DEFAULTS = {
     showGhost: true,               // faint unlit cells behind the text
     showScanlines: false,          // horizontal scanline overlay
     showGrid: false,               // faint pixel/cell grid lines
+    // CGRAM — eight user-definable 5x8 glyphs, exactly as a real HD44780 has. ALWAYS EIGHT SLOTS,
+    // initially blank, because that is what the hardware is: an empty slot draws nothing and is not
+    // a glyph. (It also means an index-addressed script verb always has a slot to write to, which
+    // Pixel.elements — an array that starts empty — does not. See
+    // docs/design/display-component-futures.md, proposal 2.)
+    //   bits  eight rows of 5, '#'/'.' separated by '|'; '1'/'0' and no separators also parse
+    //   for   an ordinary character this glyph stands in for wherever it appears, e.g. '█', which
+    //         is how `bar` becomes a segmented bargraph with a baseline without the zone engine
+    //         knowing glyphs exist. A claim on \x00..\x07 is refused: it would displace a slot.
+    // Addressed in zone text as \x00..\x07, the way the hardware addresses CGRAM.
+    glyphs: [
+      { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' },
+      { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' },
+    ],
     dotMatrix: false,              // render glyphs as a dot grid (dot-matrix look)
     dotShape: 'round',             // round | square
     dotPitch: 0,                   // dot cell size px (0 = auto from cell size)

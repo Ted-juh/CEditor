@@ -580,6 +580,17 @@ export const COMPONENT_FAMILIES = [
       v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range' }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
       v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
+      // CGRAM, 1-based. This one CAN be an `item` verb where Pixel.elements could not, and the
+      // difference is the hardware: a display has exactly eight glyph slots and always has, so
+      // slot 1 is always there to write to. `Pixel.elements` starts empty, which is what made the
+      // same mechanism a silent no-op there. See display-component-futures.md, proposal 2.
+      //
+      // `fixed`, for the same reason the Drum Pads' override array is: this list does not grow from
+      // a script. CGRAM is eight slots on the hardware and eight here, always — an insert would
+      // mint a ninth that nothing can address, since the addressing is \\x00..\\x07. Without it the
+      // family picks up insert/remove for free, which scriptComponents.test.js catches.
+      v('glyph', 'glyphs', ITEM, { item: 'bits', kind: STR, fixed: true,
+        doc: 'Define one of the eight user glyphs, 1-based: eight rows of 5, \'#\'/\'.\' separated by \'|\'. Shown by \\x00..\\x07 in zone text.' }),
       // The on-screen editable field — the buffer a zone with show:'edit' bound to '@edit' shows,
       // and the one genuinely EDITABLE value a display owns. It was reachable by typing at the
       // screen and by a device binding on the `text` port, and by nothing else: no script could
