@@ -443,6 +443,30 @@
     ].join('; ');
   });
 
+  // --- Pressed soft key (inverse video) ---
+  // The preview injects display.__press = { row, c0, c1 } (0-based) for ~140ms when a pressable
+  // zone is clicked. It arrives as a REGION rather than a zone id on purpose: a press that changes
+  // the page leaves its own zone behind on the old layout, so there would be nothing to look up.
+  //
+  // Character panels only, and that is a real limit rather than an oversight. On a SEGMENT panel
+  // "inverse" has no meaning — a starburst glyph has lit segments and unlit ones, and lighting all
+  // of them spells nothing. On a GRAPHIC panel the cells are drawn into a canvas bitmap, so
+  // inverting a region means flipping bits after the stamp rather than styling a span; worth
+  // doing, but it is canvas work and does not belong in this commit.
+  let pressedRegion = $derived.by(() => {
+    const press = display?.__press;
+    if (!press || isSegment || isGraphic) return null;
+    const row = Math.round(numberOr(press.row, -1));
+    if (row < 0 || row >= rows) return null;
+    const c0 = clamp(Math.round(numberOr(press.c0, 0)), 0, cols - 1);
+    const c1 = clamp(Math.round(numberOr(press.c1, 0)), c0, cols - 1);
+    return { row, c0, c1 };
+  });
+
+  function isPressedCell(r, c) {
+    return pressedRegion !== null && r === pressedRegion.row && c >= pressedRegion.c0 && c <= pressedRegion.c1;
+  }
+
   let backlightOn = $derived(display?.backlightOn !== false);
   let showGhost = $derived(display?.showGhost !== false);
   let showScanlines = $derived(display?.showScanlines === true);
@@ -522,6 +546,7 @@
         <div class="lcd-line" style={lineStyle}>
           {#each line as ch, c (c)}
             {@const isCursor = cursorVisible && r === cursorRow && c === cursorCol}
+            {@const isPressed = isPressedCell(r, c)}
             <span class="lcd-cell" style={cellStyle}>
               {#if isSegment}
                 {@const glyph = getSegmentGlyph(segmentType, ch)}
@@ -548,11 +573,11 @@
                 {#if showGhost}
                   <span class="lcd-ghost" style={ghostStyle}>█</span>
                 {/if}
-                {#if isCursor && effectiveCursorMode === 'block'}
+                {#if isPressed || (isCursor && effectiveCursorMode === 'block')}
                   <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
                 {/if}
                 {#if blinkOn}
-                  <span class="lcd-char" style={isCursor && effectiveCursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
+                  <span class="lcd-char" style={isPressed || (isCursor && effectiveCursorMode === 'block') ? charInvertStyle : charStyle}>{ch}</span>
                 {/if}
               {/if}
               {#if isCursor && effectiveCursorMode === 'underline'}

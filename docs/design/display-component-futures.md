@@ -19,13 +19,15 @@ Two kinds, and they must not be confused:
   controls; nothing in them is a feature the components lack. See [the gallery](../display-gallery.md).
 - **`docs/media/mockup-*.png`** illustrate *this document*. They are rendered by the same
   machinery (`gen-display-demos.mjs --mockups`, scenes in `displayDemos/mockups.mjs`). Most show
-  things that do not exist. The soft-key pair is the exception: proposal 4 has since shipped, so
-  those two now document a feature — except for the pressed-state highlight, which is still
-  hand-drawn because the renderer does not draw one.
+  things that do not exist. **The soft-key pair is now the exception in both directions:** proposal
+  4 shipped, and so did the pressed state that followed it, so those two are recordings of a
+  working feature — the second captured mid-press, with the inverse video drawn by the renderer.
 
 Most of the mockups below draw with today's renderer, because in most cases what is missing is
-**behaviour, not pixels** — a zone that can be pressed looks exactly like a zone that cannot. Where
-a mockup shows something genuinely un-renderable, it says which renderer is standing in.
+**behaviour, not pixels**. That was true of the soft keys until they shipped: a zone that could be
+pressed looked exactly like one that could not, which is why the pressed state was worth building
+straight after. Where a mockup shows something genuinely un-renderable, it says which renderer is
+standing in.
 
 ## The audit, in numbers
 
@@ -249,9 +251,27 @@ of opening a new one, so no display acquired a `Mouse` or `HitZones` section and
   thing the user said — but not an overlay, which is a transient interruption that should be seen
   over whatever page you had navigated to.
 
-**Still missing, and worth knowing:** there is **no pressed-state rendering**. Nothing inverts
-under the finger, so the "FLT pressed" picture above is hand-drawn by swapping the label's text.
-And `PixelDisplay` elements are not pressable — this is `LcdDisplay` zones only.
+**The pressed state shipped too**, so the picture above is a real capture rather than a drawing:
+the key inverts — lit ground, dark glyphs — for 140ms.
+
+Two decisions there were forced by measurement rather than taste:
+
+- **It is a flash, not a held state.** Holding the highlight until pointer-up reads better in
+  principle and gets *stuck* in practice: press, drag off the display, release, and the pointer-up
+  never reaches the control, leaving a key lit with nothing to turn it off. 140ms because a click
+  can be shorter than a frame, so tying the flash to the real press duration makes a fast click
+  produce no feedback at all.
+- **The flash is a frozen region, not a zone id.** A `{ layout }` press changes the page, so by the
+  time anything paints, the pressed zone belongs to the layout the screen has just *left* — looking
+  it up by id finds nothing and the key never lights. Measured: zero inverted cells. Freezing the
+  row and column span at press time lights the place the finger was, over whatever page arrives,
+  which is what hardware does — soft-key rows sit in the same place across pages.
+
+**Still missing:** inverse video is **character panels only**. On a *segment* panel "inverse" has
+no meaning — a starburst has lit segments and unlit ones, and lighting all of them spells nothing.
+On a *graphic* panel the cells are stamped into a canvas bitmap, so inverting a region means
+flipping bits after the stamp rather than styling a span: worth doing, and canvas work. And
+`PixelDisplay` elements are not pressable at all — this is `LcdDisplay` zones only.
 
 ## 5. Let a zone bind a device parameter directly
 
@@ -426,7 +446,7 @@ without changing its model, because the click path was already there for edit fi
 
 | # | State |
 | --- | --- |
-| 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`. No pressed-state rendering; LcdDisplay only. |
+| 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
 | 1, 5, 6 | Not started. |

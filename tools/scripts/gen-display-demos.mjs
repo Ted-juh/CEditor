@@ -313,6 +313,23 @@ async function record(page, scene, extraFrames = 0) {
 
   if (scene.still) {
     await page.evaluate(([v, dt]) => window.__demo.step(v, dt), [signal[0], FRAME_MS]);
+
+    // `pressAt` clicks a character cell before the shot, so a still can show a state that only
+    // exists while something is being pressed. The soft-key highlight is a 140ms flash, and an
+    // element screenshot takes longer than that to COMPLETE — but it captures at the moment it is
+    // called, so the shot is taken immediately after the click rather than after a settle.
+    if (scene.pressAt) {
+      const box = await target.boundingBox();
+      const d = scene.data;
+      const pad = Number(d.padding ?? 10);
+      const cellW = (box.width - pad * 2) / Math.max(1, Number(d.cols ?? 16));
+      const rowH = (box.height - pad * 2) / Math.max(1, Number(d.rows ?? 2));
+      await page.mouse.click(
+        box.x + pad + (scene.pressAt.col - 0.5) * cellW,
+        box.y + pad + (scene.pressAt.row - 0.5) * rowH,
+      );
+    }
+
     const png = await target.screenshot({ type: 'png' });
     writeFileSync(fileOf(scene), png);
     const { width, height } = decodePng(png);

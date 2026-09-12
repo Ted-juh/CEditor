@@ -74,10 +74,9 @@ const cell = (id, col, row, bits) => ({
 export const MOCKUPS = [
   /* --- 4. Soft keys: zones as hit targets ------------------------------- IMPLEMENTED --------- */
   //
-  // These were mockups of a proposal; the proposal shipped, and the zones below now carry real
-  // `press` actions. What is still hand-authored is the SECOND picture: there is no automatic
-  // pressed-state rendering, so "FLT held down" is drawn by swapping the label's text. A real
-  // pressed state (inverse video under the finger) is the obvious follow-up and does not exist.
+  // These were mockups of a proposal; the proposal shipped, and so did the pressed state that
+  // followed it. Both pictures are now recordings of a working feature: the second one is captured
+  // mid-press, with the inverse video drawn by the renderer rather than by the scene.
   {
     id: 'softkeys-idle',
     still: true,
@@ -119,7 +118,11 @@ export const MOCKUPS = [
   {
     id: 'softkeys-pressed',
     still: true,
-    caption: 'FLT pressed — the navigation is real; the highlight is still hand-drawn',
+    // A REAL press, captured. The recorder clicks the middle of the FLT key and shoots inside the
+    // 140ms flash, so the inverse video below is the renderer's, not a drawing. The key's action
+    // re-selects the layout it is already on, which is what keeps the rest of the screen still.
+    pressAt: { col: 8, row: 4 },
+    caption: 'FLT held down — inverse video, captured mid-press from the real renderer',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',
@@ -146,7 +149,7 @@ export const MOCKUPS = [
           { id: 'z-rb', show: 'bar', sourceId: 'src:reso', row: 3, colStart: 5, colEnd: 15 },
           { id: 'z-rv', show: 'midiValue', sourceId: 'src:reso', row: 3, colStart: 17, colEnd: 20, radix: 'hex', prefix: '$', align: 'right' },
           { id: 'k1', show: 'static', text: '[OSC]', row: 4, colStart: 1, colEnd: 5, press: { layout: 'main' } },
-          { id: 'k2', show: 'static', text: '▶FLT◀', row: 4, colStart: 6, colEnd: 10, press: { layout: 'main' } },
+          { id: 'k2', show: 'static', text: '[FLT]', row: 4, colStart: 6, colEnd: 10, press: { layout: 'main' } },
           { id: 'k3', show: 'static', text: '[ENV]', row: 4, colStart: 11, colEnd: 15, press: { layout: 'main' } },
           { id: 'k4', show: 'static', text: '[FX ]', row: 4, colStart: 16, colEnd: 20, press: { layout: 'main' } },
         ],

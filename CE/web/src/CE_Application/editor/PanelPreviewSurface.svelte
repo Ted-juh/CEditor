@@ -561,6 +561,11 @@
   // both free-text with a caret — or a Combobox/Radio/Cyclic, which becomes a
   // choice cycler (no caret; wheel/arrows change the selected option).
   let lcdEdit = $state({ id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false });
+  // The soft key currently flashing, as a REGION rather than a zone id: { id, row, c0, c1 },
+  // 0-based. See lcdFlashPress for why it is a region, and why it is timed.
+  let lcdPress = $state({ id: '', row: -1, c0: 0, c1: 0 });
+  let lcdPressTimer = 0;
+
   // Which layout a soft key has navigated each display to: { [controlId]: layoutId }.
   // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
   // panel document, so it must not reach the store and must not survive leaving preview.
@@ -780,6 +785,38 @@
    * author does once: navigate to another page, or move a control. Anything structural belongs in
    * the inspector, which is the same line componentVerbs.js draws for script verbs.
    */
+  /**
+   * Light a soft key for long enough to be seen.
+   *
+   * A FLASH, NOT A HELD STATE, and that is a decision rather than a shortcut. Holding the
+   * highlight until pointer-up reads better in principle and gets STUCK in practice: press a key,
+   * drag off the display, release, and the pointer-up never arrives at this control — leaving a
+   * key lit with nothing to turn it off. A soft key fires on press and is momentary, so the
+   * feedback is momentary too, on its own timer, and cannot outlive itself.
+   *
+   * 140ms because a click can be shorter than a frame at 60Hz: tying the flash to the real press
+   * duration would make a fast click produce no visible feedback at all.
+   *
+   * A REGION, NOT A ZONE ID, and that one is not a preference either. A `{ layout }` press changes
+   * the page, so by the time anything paints, the zone that was pressed belongs to the layout the
+   * screen has just LEFT — looking it up by id in the now-active layout finds nothing and the key
+   * never lights. (Measured: zero inverted cells.) Freezing the row and column span at press time
+   * lights the place the finger was, over whatever page arrives, which is what a hardware soft key
+   * does: the feedback is positional, and soft-key rows sit in the same place across pages.
+   */
+  function lcdFlashPress(control, zone) {
+    if (lcdPressTimer) clearTimeout(lcdPressTimer);
+    const cols = Math.max(1, Math.round(numberOr(lcdDisplayOf(control)?.cols, 16)));
+    const row = Math.max(0, Math.round(numberOr(zone?.row, 1)) - 1);
+    const c0 = Math.max(0, Math.min(cols - 1, Math.round(numberOr(zone?.colStart, 1)) - 1));
+    const c1 = Math.max(c0, Math.min(cols - 1, Math.round(numberOr(zone?.colEnd, cols)) - 1));
+    lcdPress = { id: getControlId(control), row, c0, c1 };
+    lcdPressTimer = setTimeout(() => {
+      lcdPress = { id: '', row: -1, c0: 0, c1: 0 };
+      lcdPressTimer = 0;
+    }, 140);
+  }
+
   function lcdPerformPress(control, zone) {
     const controlId = getControlId(control);
     const press = zone?.press ?? {};
@@ -791,6 +828,7 @@
       // make, and for the same reason — a typo that changes nothing is debuggable.
       if (!(display?.layouts ?? []).some((l) => String(l?.id ?? '') === layoutId)) return false;
       lcdPressedLayout = { ...lcdPressedLayout, [controlId]: layoutId };
+      lcdFlashPress(control, zone);
       return true;
     }
 
@@ -805,6 +843,7 @@
       if (!isRangeBehavior(behavior)) return false;
       const value = snapRangeValue(behavior, numberOr(press.to, getRangeMin(behavior)));
       updatePanelPreviewSession(getControlId(target), { valueOverrideEnabled: true, valueOverride: value });
+      lcdFlashPress(control, zone);
       return true;
     }
     return false;
@@ -1107,6 +1146,9 @@
         // Live edit marker: text edits carry the caret; a choice edit highlights
         // the armed zone (the renderer parks the block on its first cell).
         const controlId = getControlId(control);
+        // Which soft key is lit right now, for the renderer to draw in inverse.
+        cd.__press = (lcdPress.id === controlId && lcdPress.row >= 0)
+          ? { row: lcdPress.row, c0: lcdPress.c0, c1: lcdPress.c1 } : null;
         cd.__edit = (lcdEdit.active && lcdEdit.id === controlId)
           ? { active: true, caret: lcdEdit.caret, zoneId: lcdEdit.zoneId, kind: lcdEdit.kind } : null;
       }
