@@ -1,26 +1,21 @@
-// mockups.mjs — the proposals in docs/design/display-component-futures.md, rendered.
+// mockups.mjs — the figures for docs/design/display-component-futures.md.
 //
-// These are pictures of PROPOSALS. Everything in scenes.mjs is a picture of what the components
-// do; everything here illustrates the design record, and the two must never get filed together.
+// It started as pictures of proposals. Two of the three have since shipped, so most of what is
+// here is now a RECORDING of a working feature and the file has to say which is which:
 //
-// One of them has since shipped: the soft keys below carry real `press` actions now, so that pair
-// documents a feature rather than a proposal. It is kept here rather than moved because the second
-// picture still hand-draws a pressed state the renderer does not draw, which is exactly the kind
-// of thing this file is for.
+//   softkeys-*     shipped. Real `press` actions, and the pressed one is captured mid-press with
+//                  the inverse video drawn by the renderer rather than by the scene.
+//   glyphs-*       shipped. Both are the same character LCD on the same panel type; the only
+//                  difference between them is eight glyph definitions. The "after" used to be a
+//                  PixelDisplay impersonating a character LCD, because the character LCD could not
+//                  place artwork in a cell. It can now, so the impersonation is gone.
+//   state-*        STILL A PROPOSAL. The three screens render today; what does not exist is an
+//                  edge between them that is not a value change — a layout entered on a timeout —
+//                  and no still can show that. The document has to argue it in words.
 //
-// The distinction is kept honest in three ways:
-//
-//   1. They are written as stills (`still: true`), so nothing here can be mistaken for one of the
-//      moving recordings.
-//   2. They go to docs/media/mockup-*.png, not display-*.gif.
-//   3. Where a mockup shows something the component genuinely cannot do, it says which renderer is
-//      standing in for it — see the glyph pair below, where a PixelDisplay impersonates a character
-//      LCD precisely because the character LCD is the one that cannot do it.
-//
-// What IS real in here is worth knowing, because it is most of it: the soft-key row and the menu
-// screens are ordinary zones and lines that render today. For the menu screens the proposal is
-// still behaviour no still can show — a layout *entered* on a timeout — which the document has to
-// argue in words.
+// They stay separate from scenes.mjs and land on docs/media/mockup-*.png rather than
+// display-*.gif, because the moving recordings are a different claim and the two must not be
+// filed together.
 
 /** A source control the mockups can link to. Static: the mockups carry no motion. */
 const knob = (min, max, value) => ({ type: 'Knob', Behavior: { family: 'range', role: 'knob', min, max, defaultValue: value } });
@@ -57,19 +52,13 @@ const glyph = (...rows) => rows.join('').replace(/#/g, '1').replace(/\./g, '0');
 // The four glyphs a bargraph actually needs. Eight CGRAM slots is the hardware budget, and a bar
 // that fills smoothly plus a baseline costs four of them — which is why real panels have exactly
 // this and not more.
-const BAR_FULL = glyph('.....', '.###.', '.###.', '.###.', '.###.', '.###.', '.###.', '#####');
-const BAR_HALF = glyph('.....', '.....', '.....', '.....', '.###.', '.###.', '.###.', '#####');
-const BAR_EMPTY = glyph('.....', '.....', '.....', '.....', '.....', '.....', '.....', '#####');
+const BAR_FULL_G = glyph('.....', '.###.', '.###.', '.###.', '.###.', '.###.', '.###.', '#####');
+const BAR_HALF_G = glyph('.....', '.....', '.....', '.....', '.###.', '.###.', '.###.', '#####');
 
 // Three icons, because the other half of what CGRAM buys is symbols no font has.
 const ICON_NOTE = glyph('...#.', '...##', '...#.', '...#.', '...#.', '.###.', '###..', '.#...');
 const ICON_PLUG = glyph('.###.', '#...#', '#.#.#', '#...#', '#####', '..#..', '..#..', '.###.');
 const ICON_LEVEL = glyph('...#.', '..##.', '.###.', '####.', '####.', '.###.', '..##.', '...#.');
-
-/** Place a 5×8 glyph at character cell (col, row), 1-based, on a 6×8 pixel grid. */
-const cell = (id, col, row, bits) => ({
-  id, kind: 'bitmap', x: (col - 1) * 6, y: (row - 1) * 8, w: 5, h: 8, bits,
-});
 
 export const MOCKUPS = [
   /* --- 4. Soft keys: zones as hit targets ------------------------------- IMPLEMENTED --------- */
@@ -157,86 +146,84 @@ export const MOCKUPS = [
     },
   },
 
-  /* --- 1. User-definable glyphs -------------------------------------------------------------- */
+  /* --- 1. User-definable glyphs ---------------------------------------- IMPLEMENTED --------- */
   //
-  // The honest pair. "Now" is a real character LCD. "Proposed" is a PixelDisplay standing in for
-  // one — 20×4 cells at the 6×8 character pitch — because a PixelDisplay is the only renderer here
-  // that can place arbitrary 5×8 artwork in a cell, which is exactly the capability the character
-  // LCD lacks and this proposal asks for.
+  // This pair used to be a mockup, with a PixelDisplay impersonating a character LCD because the
+  // character LCD could not place artwork in a cell. It can now, so BOTH are the same renderer on
+  // the same panel type, and the only difference between them is eight glyph definitions.
+  //
+  // The bar is driven by a real linked knob in both, so what changes is purely how the characters
+  // `bar` composes get DRAWN: as the system font's block characters, or as 5x8 bitmaps with a foot.
   {
-    id: 'glyphs-now',
+    id: 'glyphs-blocks',
     still: true,
-    caption: 'Today: the bar is Unicode block characters, and there are no symbols at all',
-    size: [440, 80],
+    caption: 'Without glyphs: the bar is the system font\u2019s block characters, and symbols are words',
+    size: [440, 120],
     type: 'LcdDisplay',
     section: 'Display',
-    sources: {},
+    sources: { level: knob(0, 127, 71.4375) },
     motion: {},
     data: {
       ...CHAR_LCD,
       ...GREEN_STN,
       rows: 2,
-      // No layouts, so `lines` is what renders. A mockup wants exact characters, not a link.
-      lines: [
-        // Exactly twenty columns: LEVEL(1-5) _ bar(7-14) _ -12dB(16-20). Longer and the LCD
-        // truncates it, which is its own small lesson about designing for a fixed grid.
-        'LEVEL █████▌   -12dB',
-        'MIDI  CH 1   PRG 041',
-      ],
-      layouts: [],
-      pages: { defaultLayoutId: '', selectorSourceId: '', selectorMap: [], overlays: [] },
+      pages: { defaultLayoutId: 'main', selectorSourceId: '', selectorMap: [], overlays: [] },
+      layouts: [{
+        id: 'main',
+        name: 'Main',
+        zones: [
+          { id: 'l', show: 'static', text: 'LEVEL', row: 1, colStart: 1, colEnd: 5 },
+          { id: 'b', show: 'bar', sourceId: 'src:level', row: 1, colStart: 7, colEnd: 14 },
+          { id: 'd', show: 'static', text: '-12dB', row: 1, colStart: 16, colEnd: 20 },
+          { id: 'm', show: 'static', text: 'MIDI', row: 2, colStart: 1, colEnd: 4 },
+          { id: 'c', show: 'static', text: 'CH 1', row: 2, colStart: 6, colEnd: 9 },
+          { id: 'p', show: 'static', text: 'PRG 041', row: 2, colStart: 12, colEnd: 18 },
+        ],
+      }],
     },
   },
   {
-    id: 'glyphs-proposed',
+    id: 'glyphs-cgram',
     still: true,
-    caption: 'With 8 CGRAM glyphs: a segmented bar with a baseline, and symbols no font carries',
-    // 120×16 grid = 20 × 2 cells at the 6×8 character pitch, so this is a character LCD's geometry
-    // exactly — only the cell contents are free. The box is sized so that grid lands on SQUARE
-    // dots: 416px of screen across 120 columns is 3.47 each, so 16 rows need ~56px, not the 96 a
-    // taller box would stretch them into.
-    size: [440, 80],
-    type: 'PixelDisplay',
-    section: 'Pixel',
-    sources: {},
+    caption: 'With eight CGRAM glyphs: the same bar, drawn from 5x8 bitmaps, and symbols no font has',
+    size: [440, 120],
+    type: 'LcdDisplay',
+    section: 'Display',
+    sources: { level: knob(0, 127, 71.4375) },
     motion: {},
     data: {
-      pixelsW: 120,
-      pixelsH: 16,
+      ...CHAR_LCD,
       ...GREEN_STN,
-      padding: 12,
-      brightness: 100,
-      contrast: 55,
-      glow: 0.2,
-      dotShape: 'round',
-      showGhost: true,
-      showGlass: true,
-      backlightOn: true,
-      layouts: [],
-      pages: { defaultLayoutId: '', selectorSourceId: '', selectorMap: [], overlays: [] },
-      elements: [
-        { id: 't1', kind: 'static', text: 'LEVEL', x: 0, y: 0, w: 30, h: 8 },
-        { id: 't2', kind: 'static', text: '-12dB', x: 90, y: 0, w: 30, h: 8 },
-
-        // The bar sits cell-for-cell over the row above it: five full, one half, two empty. All
-        // three glyphs are on show, and the baseline runs unbroken underneath — which is the part
-        // Unicode blocks cannot do, because no block character carries a foot.
-        ...[0, 1, 2, 3, 4].map((i) => cell(`b${i}`, 7 + i, 1, BAR_FULL)),
-        cell('b5', 12, 1, BAR_HALF),
-        cell('b6', 13, 1, BAR_EMPTY),
-        cell('b7', 14, 1, BAR_EMPTY),
-
-        // Row two: symbols doing the job words were doing — the other half of what eight user
-        // glyphs buy, and the reason every real panel spends them.
-        cell('i1', 1, 2, ICON_PLUG),
-        { id: 't4', kind: 'static', text: 'CH 1', x: 12, y: 8, w: 24, h: 8 },
-        cell('i2', 9, 2, ICON_NOTE),
-        { id: 't5', kind: 'static', text: '041', x: 60, y: 8, w: 18, h: 8 },
-        cell('i3', 16, 2, ICON_LEVEL),
-        cell('m1', 18, 2, BAR_FULL),
-        cell('m2', 19, 2, BAR_HALF),
-        cell('m3', 20, 2, BAR_EMPTY),
+      rows: 2,
+      // Slots 0 and 1 CLAIM the block characters `bar` composes, which is what converts an ordinary
+      // bargraph into a segmented one without the zone engine knowing glyphs exist. Slots 2-4 are
+      // reached directly as \x02..\x04 in static text, the way the hardware addresses CGRAM.
+      glyphs: [
+        { bits: BAR_FULL_G, for: '\u2588' },
+        { bits: BAR_HALF_G, for: '\u258C' },
+        { bits: ICON_PLUG, for: '' },
+        { bits: ICON_NOTE, for: '' },
+        { bits: ICON_LEVEL, for: '' },
+        { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' },
       ],
+      pages: { defaultLayoutId: 'main', selectorSourceId: '', selectorMap: [], overlays: [] },
+      layouts: [{
+        id: 'main',
+        name: 'Main',
+        zones: [
+          { id: 'l', show: 'static', text: 'LEVEL', row: 1, colStart: 1, colEnd: 5 },
+          { id: 'b', show: 'bar', sourceId: 'src:level', row: 1, colStart: 7, colEnd: 14 },
+          { id: 'd', show: 'static', text: '-12dB', row: 1, colStart: 16, colEnd: 20 },
+          // The same two facts as the row above, said in symbols instead of eleven columns of words.
+          { id: 'i1', show: 'static', text: '\u0002', row: 2, colStart: 1, colEnd: 1 },
+          { id: 'c', show: 'static', text: 'CH 1', row: 2, colStart: 3, colEnd: 6 },
+          { id: 'i2', show: 'static', text: '\u0003', row: 2, colStart: 9, colEnd: 9 },
+          { id: 'p', show: 'static', text: '041', row: 2, colStart: 11, colEnd: 13 },
+          { id: 'i3', show: 'static', text: '\u0004', row: 2, colStart: 16, colEnd: 16 },
+          // Addressed by slot rather than by claim: a mini meter drawn from the bar glyphs directly.
+          { id: 'mm', show: 'static', text: '\u0000\u0000\u0001', row: 2, colStart: 18, colEnd: 20 },
+        ],
+      }],
     },
   },
 

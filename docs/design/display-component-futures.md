@@ -17,21 +17,26 @@ Two kinds, and they must not be confused:
 
 - **`docs/media/display-*.gif`** are *recordings*. They are the real renderers driven by real
   controls; nothing in them is a feature the components lack. See [the gallery](../display-gallery.md).
-- **`docs/media/mockup-*.png`** illustrate *this document*. They are rendered by the same
-  machinery (`gen-display-demos.mjs --mockups`, scenes in `displayDemos/mockups.mjs`). Most show
-  things that do not exist. **The soft-key pair is now the exception in both directions:** proposal
-  4 shipped, and so did the pressed state that followed it, so those two are recordings of a
-  working feature — the second captured mid-press, with the inverse video drawn by the renderer.
+- **`docs/media/mockup-*.png`** illustrate *this document*, rendered by the same machinery
+  (`gen-display-demos.mjs --mockups`, scenes in `displayDemos/mockups.mjs`). **Most of them are now
+  recordings of shipped features rather than pictures of proposals**, because two of the three
+  proposals they illustrate have since been built:
 
-Most of the mockups below draw with today's renderer, because in most cases what is missing is
-**behaviour, not pixels**. That was true of the soft keys until they shipped: a zone that could be
-pressed looked exactly like one that could not, which is why the pressed state was worth building
-straight after. Where a mockup shows something genuinely un-renderable, it says which renderer is
-standing in.
+  | Figure | What it is now |
+  | --- | --- |
+  | `mockup-softkeys-*` | Shipped. Real `press` actions; the pressed one captured mid-press, with the inverse video drawn by the renderer. |
+  | `mockup-glyphs-*` | Shipped. The same character LCD twice, differing only in eight glyph definitions. The "after" used to be a `PixelDisplay` impersonating a character LCD; that impersonation is gone. |
+  | `mockup-state-*` | **Still a proposal.** The screens render today; the *edges* between them do not. |
+
+The state screens are the remaining case of what made these mockups necessary: what is missing is
+**behaviour, not pixels**, and no still can show a layout entered on a timeout.
 
 ## The audit, in numbers
 
-Facts this note rests on, all checked on 2026-09-12 rather than assumed:
+**This table is the state that produced the list, not the state today.** It was counted on
+2026-09-12, before proposals 1, 3 and 4 were built — so the CGRAM row now reads differently, and
+the verb counts have grown by the verbs those proposals added. It is left as it was because it is
+the evidence the proposals were argued from; the per-proposal sections say what has since changed.
 
 | Fact | Value |
 | --- | --- |
@@ -42,7 +47,7 @@ Facts this note rests on, all checked on 2026-09-12 rather than assumed:
 | Zone `show` kinds | 16 |
 | `lcd.*` script verbs | 35 |
 | `pixel.*` script verbs | 19, **not one of which writes content** |
-| Hits for CGRAM / custom characters | 0 |
+| Hits for CGRAM / custom characters | 0 — *proposal 1 has since shipped* |
 
 The two verb counts are the whole flattened surface — the hand-written declarations, the
 `showGlass`/`showGhost`/`showScanlines`/`showGrid` chrome appended to every family, and the
@@ -63,9 +68,9 @@ giving a display an interaction model of its own.
 
 These three are asymmetries. Nothing was decided against; they were not reached.
 
-## 1. User-definable glyphs on the character LCD
+## 1. User-definable glyphs on the character LCD — **shipped**
 
-**What is missing.** Zero hits for CGRAM, custom characters or user glyphs anywhere in the tree.
+**What was missing.** Zero hits for CGRAM, custom characters or user glyphs anywhere in the tree.
 Every real HD44780 has eight programmable 5×8 characters, and `PixelDisplay` already has *two*
 mechanisms for arbitrary artwork — `bitmap` elements with a `bits` string, and a `customFont`
 sprite sheet. The character LCD has neither.
@@ -75,37 +80,46 @@ partial-block characters `▏▎▍▌▋▊▉`. That is a clever fallback and 
 appearance depends on the *system font* carrying those glyphs, and no block character has a foot,
 so a bar can never have the baseline that real panel bargraphs use to stay readable at a glance.
 
-Today, and the same screen with eight user glyphs (the second is a `PixelDisplay` at the 6×8
-character pitch, standing in because the character LCD is precisely the renderer that cannot do it):
+Both of these are now the **same renderer on the same panel type**, driven by the same linked knob
+through the same `bar` zone. The only difference between them is eight glyph definitions:
 
-![Today](../media/mockup-glyphs-now.png)
+![Without glyphs](../media/mockup-glyphs-blocks.png)
 
-![With user glyphs](../media/mockup-glyphs-proposed.png)
+![With eight CGRAM glyphs](../media/mockup-glyphs-cgram.png)
 
-The difference is not decoration. The bar gains a continuous baseline and per-segment gaps, so
-its length reads without counting; and `MIDI`/`PRG` stop spending eleven of twenty columns on
-words a symbol says in one.
+The difference is not decoration. Each bar segment gains a foot and a gap, so the bar's length
+reads without counting it; and `MIDI`/`PRG` stop spending eleven of twenty columns on words a
+symbol says in one.
 
-**API sketch.** Eight slots in the `Display` section, authored the way a datasheet writes them:
+**What shipped.** Eight slots on the `Display` section, authored the way a datasheet writes them:
 
 ```js
 Display: {
   glyphs: [
-    { id: 0, bits: '.....|.###.|.###.|.###.|.###.|.###.|.###.|#####' },  // bar, full
-    { id: 1, bits: '.....|.....|.....|.....|.###.|.###.|.###.|#####' },  // bar, half
+    { bits: '.....|.###.|.###.|.###.|.###.|.###.|.###.|#####', for: '█' },  // bar, full
+    { bits: '.....|.....|.....|.....|.###.|.###.|.###.|#####', for: '▌' },  // bar, half
+    { bits: '.###.|#...#|#.#.#|#...#|#####|..#..|..#..|.###.', for: '' },   // a MIDI plug
   ],
 }
 ```
 
-Reachable from a zone as `\x00`–`\x07` in `static` text (which is literally how the hardware does
-it), and used automatically by `bar` when a full/partial set is defined.
+**Two ways to reach a glyph, because the hardware's way and the useful way differ.** *By slot:*
+glyph n is the character with code n, `\x00`–`\x07`, in any zone's text — literally how CGRAM is
+addressed. *By claim:* a glyph can name an ordinary character it stands in for. That last one is
+what makes `bar` work without touching it: `resolveZoneContent` keeps composing block characters,
+and a glyph claiming `█` turns them into a segmented bargraph at draw time. Teaching the pure zone
+engine about glyphs would have pushed display state into it for no gain.
 
-**Cost.** Small and contained. The renderer already has a per-cell glyph pipeline — segment mode
-swaps in an SVG per cell, so the seam for "render this cell from a bitmap instead of a font glyph"
-exists. The work is the inspector editor (an 5×8 checkbox grid), serialization, and making `bar`
-prefer glyphs when present.
+**`glyphs` defaults to eight blank slots, and that detail earns its keep twice.** It is what the
+hardware is — an empty slot draws nothing and is not a glyph — and it is why `lcd.glyph(n, bits)`
+could be an index-addressed `item` verb where the identical mechanism was a dead no-op on
+`Pixel.elements` (proposal 2). The verb is marked `fixed`, like the Drum Pads' override array:
+CGRAM is eight slots and an insert would mint a ninth that `\x00`–`\x07` cannot address.
+`scriptComponents.test.js` caught that before it shipped.
 
-**Verdict: do it.** Cheapest item on the list and the most authentic.
+**Not done: the inspector editor.** Glyphs are authorable from the panel document and from a
+script, not yet by drawing on a 5×8 grid in the UI. That is the obvious follow-up and it is
+ordinary UI work — the model, the rendering and the scripting all exist under it now.
 
 ## 2. `PixelDisplay` cannot be scripted, only decorated
 
@@ -427,7 +441,7 @@ re-derives it.
 | --- | --- | --- | --- | --- |
 | 4 | Soft keys | Moderate | No, as it turned out — an exception, not a model | **Shipped** |
 | 3 | `editText` verbs | Very low | Partly (automation) | **Shipped** |
-| 1 | User glyphs | Small | No | **Next** |
+| 1 | User glyphs | Small | No | **Shipped** |
 | 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
 | 5 | `@param` zones | Moderate | Yes — removes the proxy | Yes |
 | 6 | Layout state machine | High | Yes — layouts gain state | Now unblocked |
@@ -446,19 +460,19 @@ without changing its model, because the click path was already there for edit fi
 
 | # | State |
 | --- | --- |
+| 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
-| 1, 5, 6 | Not started. |
+| 5, 6 | Not started. |
 | 7, 8, 9 | Spike / later / on request. |
 
 ### The next three steps, in order
 
-**Step 1 — user glyphs (proposal 1).** Unblocked, self-contained, and no decision is waiting on
-anyone. Sequenced first *because* it is independent: it touches `sectionDefaults`, the renderer's
-per-cell path and one inspector editor, and it collides with nothing else on this list. The
-acceptance test is that `bar` prefers glyphs when a full/partial set is defined and falls back to
-the block characters when it is not.
+**Step 1 — ~~user glyphs~~. Done, except the inspector.** `bar` now draws from glyphs when a
+claiming set is defined and falls back to block characters when it is not, which was the acceptance
+test. What remains is a 5×8 drawing grid in the UI — ordinary work, with the model, the renderer
+and the scripting already under it.
 
 **Step 2 — settle the soft-key question, then build it (proposal 4).** The code is not the hard
 part; this one question is, and it is the owner's to answer:
