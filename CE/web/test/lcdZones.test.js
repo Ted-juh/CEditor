@@ -455,3 +455,58 @@ test('every press action counts as pressable, or the key silently does nothing',
   assert.equal(isPressableZone(z({ cursor: 'down' })), false);
   assert.equal(isPressableZone(z({})), false);
 });
+
+/* ------------------------------------------------ what the review found (PR #25) */
+
+test('a choice parameter reads as its label, not as the bottom of a range it has not got', () => {
+  const { parameterInfo } = ZONES;
+  // A profile stores a choice as an ID — "square", not 2 — so the numeric path answered `min` for
+  // every setting the parameter had, and printed the unit where the name belongs.
+  const wave = {
+    id: 'osc.wave', name: 'Waveform', type: 'choice',
+    choices: [{ id: 'saw', label: 'Saw', value: 0 },
+              { id: 'square', label: 'Square', value: 1 },
+              { id: 'noise', label: 'Noise', value: 2 }],
+    default: 'saw',
+  };
+  const info = parameterInfo(wave, 'square');
+  assert.equal(info.text, 'Square', 'the human label, not the unit');
+  assert.equal(info.selector, 'square', 'and the id, so a page can switch on it');
+  assert.equal(info.value, 1, 'the position in the list');
+  assert.equal(info.max, 2, 'which makes pct and bar mean something');
+  assert.equal(resolveZoneContent({ show: 'value' }, info, 6), '1');
+  assert.equal(resolveZoneContent({ show: 'name' }, info, 10), 'Waveform');
+
+  // A value arriving from the device is the WIRE byte, and has to land on the same choice.
+  assert.equal(parameterInfo(wave, 2).text, 'Noise');
+  // Unset falls back to the parameter's default, as every other kind does.
+  assert.equal(parameterInfo(wave, undefined).text, 'Saw');
+  // A value the profile does not have is position 0 rather than a wrong label.
+  assert.equal(parameterInfo(wave, 'triangle').text, '');
+});
+
+test('an inert zone that painted nothing does not swallow the soft key underneath it', () => {
+  const { pressTargetAt } = ZONES;
+  // composeLayout skips a zone whose content resolves to '' and leaves what is beneath on screen.
+  // Hit testing used to block on it anyway, so the user pressed a key they could plainly see and
+  // nothing happened. The two now ask the same question of the same resolved content.
+  const key = { id: 'k', show: 'static', text: '[GO]', row: 1, colStart: 1, colEnd: 4,
+                priority: 0, press: { layout: 'x' } };
+  const idle = { id: 'idle', show: 'value', sourceId: '@active#range', row: 1,
+                 colStart: 1, colEnd: 4, priority: 5 };
+  const cell = { row: 0, col: 1 };
+  const zones = [key, idle];
+
+  // Nothing is active, so `idle` resolves to nothing and paints nothing.
+  const absent = () => null;
+  assert.deepEqual(composeLayout(zones, 1, 6, absent), ['[GO]  '], 'the key is what is on screen');
+  assert.equal(pressTargetAt(zones, cell, 6, {}, absent)?.id, 'k', 'so the key is what takes the press');
+
+  // …and when the source IS present, the zone paints over the key and blocks it, as before.
+  const present = () => ({ present: true, name: 'Cutoff', value: 64, min: 0, max: 127, text: '', on: false });
+  assert.notEqual(composeLayout(zones, 1, 6, present)[0], '[GO]  ');
+  assert.equal(pressTargetAt(zones, cell, 6, {}, present), null, 'covered by something drawn');
+
+  // With no resolver at all the old conservative behaviour stands: block rather than guess.
+  assert.equal(pressTargetAt(zones, cell, 6, {}), null);
+});

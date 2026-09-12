@@ -13,7 +13,8 @@
     isStateSource, stateKeyOf, stateInfo, moveCursor,
   } from '../utils/lcdZones.js';
   import { deviceParameterValues } from '../stores/deviceParameterValues.js';
-  import { profileParameters, deviceRoleMappings } from '../stores/deviceProfileStores.js';
+  import { profileParameters, deviceRoleMappings, profileParameterPages } from '../stores/deviceProfileStores.js';
+  import { refreshProfileParameters } from '../stores/deviceProfileSession.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
@@ -531,6 +532,31 @@
     return parameterInfo(parameter, $deviceParameterValues?.[parsed.role]?.[parsed.parameterId]);
   }
 
+  /**
+   * What one source id currently reads as — the single resolver for every kind of zone source.
+   *
+   * "@active"/"@active#kind" resolve to the most recently touched control (restricted to this
+   * display's activeScope and to the kind filter); '@state:' reads the display's own record; a
+   * '@param:' source resolves through the profile and the device's live state; anything else is
+   * still a control id, resolved as it always was.
+   *
+   * It is a function rather than three inline branches because TWO callers need it and they must
+   * not disagree: the live map composition paints from, and the hit test that decides whether a
+   * zone painted anything at all. When only composition knew how to resolve a source, a zone that
+   * drew nothing still swallowed presses aimed at the soft key showing through underneath it.
+   */
+  function lcdLiveInfoFor(control, display, id) {
+    if (isParamSource(id)) return lcdParamInfo(id);
+    if (isStateSource(id)) {
+      const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+      const key = stateKeyOf(id);
+      return key ? stateInfo(lcdStateFor(control)[key], layout?.cursorMax) : null;
+    }
+    const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
+    const src = resolvedId ? controlById(resolvedId) : null;
+    return src ? lcdSourceInfo(src) : null;
+  }
+
   // Rich live info about a source control for the zones engine: value/range, its
   // name, an On/Off or choice text, and a selector key for page switching.
   function lcdSourceInfo(src) {
@@ -809,7 +835,7 @@
     if (!layout) return null;
     const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
     return pressTargetAt(layout.zones ?? [], lcdCellFromPoint(control, local), cols,
-      lcdStateFor(control));
+      lcdStateFor(control), (id) => lcdLiveInfoFor(control, display, id));
   }
 
   /**
@@ -904,6 +930,24 @@
     return cursor > max ? { ...held, cursor: max } : held;
   }
 
+  /**
+   * Auto-return counts from the LAST INTERACTION, not from arrival.
+   *
+   * The timer used to start only on the press that navigated, so moving the cursor near the
+   * deadline could be answered by the page leaving under your finger a moment later. The state
+   * diagram this was built from says "5s idle", and idle means idle — every press that the page
+   * consumed is activity.
+   *
+   * Only a layout REACHED BY A PRESS restarts, which is the same rule that decides whether the
+   * timer runs at all: restarting on a selector-chosen layout would start a timer the selector
+   * would immediately fight.
+   */
+  function lcdRestartLayoutTimeout(control) {
+    const controlId = getControlId(control);
+    if (!lcdPressedLayout[controlId]) return;
+    lcdScheduleLayoutTimeout(control, lcdPressedLayout[controlId]);
+  }
+
   function lcdPerformPress(control, zone) {
     const controlId = getControlId(control);
     const press = zone?.press ?? {};
@@ -933,6 +977,7 @@
         ...lcdDisplayState,
         [controlId]: { ...(lcdDisplayState[controlId] ?? {}), cursor: next },
       };
+      lcdRestartLayoutTimeout(control);
       lcdFlashPress(control, zone);
       return true;
     }
@@ -947,7 +992,13 @@
       const behavior = getBehavior(target);
       if (!isRangeBehavior(behavior)) return false;
       const value = snapRangeValue(behavior, numberOr(press.to, getRangeMin(behavior)));
-      updatePanelPreviewSession(getControlId(target), { valueOverrideEnabled: true, valueOverride: value });
+      // THROUGH patchControlSession, NOT updatePanelPreviewSession. The two differ by one line —
+      // `emitDeviceBindingsForPatch` — and that line is the difference between moving a number on
+      // screen and sending the parameter to the instrument. Writing the session directly made the
+      // soft key look like it worked while the device never heard it, which is the worst shape a
+      // bug can take on a control surface.
+      patchControlSession(getControlId(target), { valueOverrideEnabled: true, valueOverride: value });
+      lcdRestartLayoutTimeout(control);
       lcdFlashPress(control, zone);
       return true;
     }
@@ -1099,6 +1150,56 @@
   // A reactive clock bumped by timers so timed overlays auto-dismiss while idle.
   let overlayClock = $state(0);
   const lcdPrevValue = {};
+  /* --- Parameter metadata for '@param:' zones ------------------------------------------------
+   *
+   * A '@param:' zone resolves through `profileParameters`, and NOTHING WAS FILLING THAT STORE for
+   * a panel the user just opened. The only thing that asks is the Device tab's browser, on mount —
+   * so a panel whose screen reports eight parameters showed eight blanks until you happened to
+   * visit a tab that has nothing to do with it. Worse quietly: that request is paginated at 160, so
+   * on the profiles this feature is most for — the GAIA's 793 parameters, the AN1x's 1,296 —
+   * anything past the first page stayed blank even after visiting it.
+   *
+   * So the preview asks for what its own zones name. `askedParameterPages` makes it exactly once
+   * per (profile, offset): the effect re-runs whenever the store it reads changes, and a request
+   * that did not guard itself would answer its own reply forever.
+   */
+  const askedParameterPages = new Set();
+
+  /** Every profile id the visible displays' '@param:' zones actually need. */
+  function paramProfilesNeeded() {
+    const wanted = new Map();
+    for (const control of orderedControls) {
+      const type = String(control?._children?.Core?.controlType ?? '');
+      const section = type === 'LcdDisplay' ? control?._children?.Display
+        : type === 'PixelDisplay' ? control?._children?.Pixel : null;
+      if (!section) continue;
+      for (const id of collectSourceIds(section)) {
+        if (!isParamSource(id)) continue;
+        const parsed = parseParamSource(id, DEFAULT_DEVICE_ROLE);
+        const profileId = String($deviceRoleMappings?.[parsed?.role]?.profileId ?? '');
+        if (parsed && profileId) wanted.set(profileId, parsed.role);
+      }
+    }
+    return wanted;
+  }
+
+  $effect(() => {
+    for (const [profileId, role] of paramProfilesNeeded()) {
+      const page = $profileParameterPages?.[profileId];
+      const loaded = Array.isArray($profileParameters?.[profileId])
+        ? $profileParameters[profileId].length : 0;
+      // Nothing yet, or a page boundary with more behind it. `hasMore` is the browser's own
+      // paging flag, so this walks the list the same way and stops where it stops.
+      const complete = page && page.hasMore === false;
+      if (loaded && complete) continue;
+      const offset = loaded;
+      const key = `${profileId}:${offset}`;
+      if (askedParameterPages.has(key)) continue;
+      askedParameterPages.add(key);
+      refreshProfileParameters(profileId, role, { offset });
+    }
+  });
+
   let overlayTimers = [];
 
   // Schedule a re-render at each distinct timer-overlay duration so an overlay
@@ -1198,26 +1299,7 @@
     const live = {};
     if (hasLayouts) {
       for (const id of collectSourceIds(display)) {
-        // "@active"/"@active#kind" resolve to the most recently touched control
-        // (restricted to this display's activeScope, and to the kind filter);
-        // a fixed id resolves to that control. Keyed by the raw id so each
-        // filtered "@active#kind" zone reads its own live value.
-        // A parameter source resolves through the profile and the device's live state; everything
-        // else is still a control id, resolved as it always was.
-        if (isParamSource(id)) {
-          const paramInfo = lcdParamInfo(id);
-          if (paramInfo) live[id] = paramInfo;
-          continue;
-        }
-        if (isStateSource(id)) {
-          const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
-          const key = stateKeyOf(id);
-          if (key) live[id] = stateInfo(lcdStateFor(control)[key], layout?.cursorMax);
-          continue;
-        }
-        const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
-        const src = resolvedId ? controlById(resolvedId) : null;
-        const info = src ? lcdSourceInfo(src) : null;
+        const info = lcdLiveInfoFor(control, display, id);
         if (info) live[id] = info;
       }
     }
