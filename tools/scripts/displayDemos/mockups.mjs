@@ -1,8 +1,14 @@
 // mockups.mjs — the proposals in docs/design/display-component-futures.md, rendered.
 //
-// These are NOT recordings of features. Everything in scenes.mjs is a picture of what the
-// components do; everything here is a picture of what they might do, and the two must never get
-// filed together. The distinction is kept honest in three ways:
+// These are pictures of PROPOSALS. Everything in scenes.mjs is a picture of what the components
+// do; everything here illustrates the design record, and the two must never get filed together.
+//
+// One of them has since shipped: the soft keys below carry real `press` actions now, so that pair
+// documents a feature rather than a proposal. It is kept here rather than moved because the second
+// picture still hand-draws a pressed state the renderer does not draw, which is exactly the kind
+// of thing this file is for.
+//
+// The distinction is kept honest in three ways:
 //
 //   1. They are written as stills (`still: true`), so nothing here can be mistaken for one of the
 //      moving recordings.
@@ -12,9 +18,9 @@
 //      LCD precisely because the character LCD is the one that cannot do it.
 //
 // What IS real in here is worth knowing, because it is most of it: the soft-key row and the menu
-// screens are ordinary zones and lines that render today. The proposal in those cases is not the
-// picture, it is that a zone could be *pressed* or a layout could be *entered* — behaviour, which
-// no still can show and which the document has to argue in words.
+// screens are ordinary zones and lines that render today. For the menu screens the proposal is
+// still behaviour no still can show — a layout *entered* on a timeout — which the document has to
+// argue in words.
 
 /** A source control the mockups can link to. Static: the mockups carry no motion. */
 const knob = (min, max, value) => ({ type: 'Knob', Behavior: { family: 'range', role: 'knob', min, max, defaultValue: value } });
@@ -66,15 +72,16 @@ const cell = (id, col, row, bits) => ({
 });
 
 export const MOCKUPS = [
-  /* --- 4. Soft keys: zones as hit targets ---------------------------------------------------- */
+  /* --- 4. Soft keys: zones as hit targets ------------------------------- IMPLEMENTED --------- */
   //
-  // Both of these render today — the soft-key row is four static zones. What does NOT exist is the
-  // press: there is no Mouse section, no HitZones section, and no way to give a zone an action. The
-  // pair exists to show that the *only* thing missing between them is behaviour.
+  // These were mockups of a proposal; the proposal shipped, and the zones below now carry real
+  // `press` actions. What is still hand-authored is the SECOND picture: there is no automatic
+  // pressed-state rendering, so "FLT held down" is drawn by swapping the label's text. A real
+  // pressed state (inverse video under the finger) is the obvious follow-up and does not exist.
   {
     id: 'softkeys-idle',
     still: true,
-    caption: 'Soft keys at rest — four static zones on row 4',
+    caption: 'Soft keys at rest — four pressable zones on row 4',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',
@@ -101,10 +108,10 @@ export const MOCKUPS = [
           { id: 'z-rb', show: 'bar', sourceId: 'src:reso', row: 3, colStart: 5, colEnd: 15 },
           { id: 'z-rv', show: 'midiValue', sourceId: 'src:reso', row: 3, colStart: 17, colEnd: 20, radix: 'hex', prefix: '$', align: 'right' },
           // The soft-key row. Five characters each, four of them, exactly twenty columns.
-          { id: 'k1', show: 'static', text: '[OSC]', row: 4, colStart: 1, colEnd: 5 },
-          { id: 'k2', show: 'static', text: '[FLT]', row: 4, colStart: 6, colEnd: 10 },
-          { id: 'k3', show: 'static', text: '[ENV]', row: 4, colStart: 11, colEnd: 15 },
-          { id: 'k4', show: 'static', text: '[FX ]', row: 4, colStart: 16, colEnd: 20 },
+          { id: 'k1', show: 'static', text: '[OSC]', row: 4, colStart: 1, colEnd: 5, press: { layout: 'main' } },
+          { id: 'k2', show: 'static', text: '[FLT]', row: 4, colStart: 6, colEnd: 10, press: { layout: 'main' } },
+          { id: 'k3', show: 'static', text: '[ENV]', row: 4, colStart: 11, colEnd: 15, press: { layout: 'main' } },
+          { id: 'k4', show: 'static', text: '[FX ]', row: 4, colStart: 16, colEnd: 20, press: { layout: 'main' } },
         ],
       }],
     },
@@ -112,7 +119,7 @@ export const MOCKUPS = [
   {
     id: 'softkeys-pressed',
     still: true,
-    caption: 'FLT pressed — the proposal is that this is a zone action, not a repaint',
+    caption: 'FLT pressed — the navigation is real; the highlight is still hand-drawn',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',
@@ -138,10 +145,10 @@ export const MOCKUPS = [
           { id: 'z-rl', show: 'static', text: 'RES', row: 3, colStart: 1, colEnd: 3 },
           { id: 'z-rb', show: 'bar', sourceId: 'src:reso', row: 3, colStart: 5, colEnd: 15 },
           { id: 'z-rv', show: 'midiValue', sourceId: 'src:reso', row: 3, colStart: 17, colEnd: 20, radix: 'hex', prefix: '$', align: 'right' },
-          { id: 'k1', show: 'static', text: '[OSC]', row: 4, colStart: 1, colEnd: 5 },
-          { id: 'k2', show: 'static', text: '▶FLT◀', row: 4, colStart: 6, colEnd: 10 },
-          { id: 'k3', show: 'static', text: '[ENV]', row: 4, colStart: 11, colEnd: 15 },
-          { id: 'k4', show: 'static', text: '[FX ]', row: 4, colStart: 16, colEnd: 20 },
+          { id: 'k1', show: 'static', text: '[OSC]', row: 4, colStart: 1, colEnd: 5, press: { layout: 'main' } },
+          { id: 'k2', show: 'static', text: '▶FLT◀', row: 4, colStart: 6, colEnd: 10, press: { layout: 'main' } },
+          { id: 'k3', show: 'static', text: '[ENV]', row: 4, colStart: 11, colEnd: 15, press: { layout: 'main' } },
+          { id: 'k4', show: 'static', text: '[FX ]', row: 4, colStart: 16, colEnd: 20, press: { layout: 'main' } },
         ],
       }],
     },

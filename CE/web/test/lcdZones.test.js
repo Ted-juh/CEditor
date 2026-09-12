@@ -188,3 +188,82 @@ test('regionStartOffset agrees with fitToRegion placement (caret alignment)', as
   // Overflow: offset is 0 (content is sliced, no padding).
   assert.equal(regionStartOffset(4, 10, 'right'), 0);
 });
+
+/* ------------------------------------------------------- pressable zones (soft keys) */
+
+const ZONES = await import('../src/CE_Application/utils/lcdZones.js');
+
+const softKey = (id, colStart, colEnd, press) => ({
+  id, show: 'static', text: `[${id}]`, row: 4, colStart, colEnd, press,
+});
+
+test('a zone is only pressable when it declares an action it could perform', () => {
+  const { isPressableZone } = ZONES;
+  assert.equal(isPressableZone(softKey('k', 1, 5, { layout: 'edit' })), true);
+  assert.equal(isPressableZone(softKey('k', 1, 5, { set: 'cutoff', to: 64 })), true);
+  // No action, an empty one, or a shape that is not an object: all inert.
+  assert.equal(isPressableZone(softKey('k', 1, 5, undefined)), false);
+  assert.equal(isPressableZone(softKey('k', 1, 5, {})), false);
+  assert.equal(isPressableZone(softKey('k', 1, 5, { layout: '' })), false);
+  assert.equal(isPressableZone(softKey('k', 1, 5, 'edit')), false);
+  // Hidden is not pressable — an invisible soft key would be a trap.
+  assert.equal(isPressableZone({ ...softKey('k', 1, 5, { layout: 'x' }), visible: false }), false);
+});
+
+test('a press resolves to the zone the user can see, not the one underneath', () => {
+  const { pressTargetAt } = ZONES;
+  // Two zones over the same cells. composeLayout paints in priority order, so the
+  // HIGHER priority is what the eye sees — and must be what the press hits.
+  const under = { ...softKey('under', 1, 20, { layout: 'under' }), priority: 0 };
+  const over = { ...softKey('over', 1, 5, { layout: 'over' }), priority: 5 };
+  const hit = pressTargetAt([under, over], { row: 3, col: 2 }, 20);
+  assert.equal(hit.id, 'over');
+  // Outside the covering zone, the one beneath is reached normally.
+  assert.equal(pressTargetAt([under, over], { row: 3, col: 9 }, 20).id, 'under');
+});
+
+test('an inert zone on top blocks the pressable one beneath it', () => {
+  const { pressTargetAt } = ZONES;
+  // The user pressed what they could see, and what they could see does nothing.
+  // Falling through to a hidden soft key would fire an action from nowhere.
+  const under = { ...softKey('under', 1, 20, { layout: 'under' }), priority: 0 };
+  const cover = { id: 'cover', show: 'static', text: 'BUSY', row: 4, colStart: 1, colEnd: 20, priority: 9 };
+  assert.equal(pressTargetAt([under, cover], { row: 3, col: 4 }, 20), null);
+});
+
+test('a press outside every zone is nothing at all', () => {
+  const { pressTargetAt } = ZONES;
+  const keys = [softKey('a', 1, 5, { layout: 'a' }), softKey('b', 6, 10, { layout: 'b' })];
+  assert.equal(pressTargetAt(keys, { row: 3, col: 12 }, 20), null);  // past the keys
+  assert.equal(pressTargetAt(keys, { row: 0, col: 2 }, 20), null);   // a different row
+  assert.equal(pressTargetAt([], { row: 3, col: 2 }, 20), null);
+  assert.equal(pressTargetAt(null, { row: 3, col: 2 }, 20), null);
+});
+
+test('the four-key row maps every column to exactly one key', () => {
+  const { pressTargetAt } = ZONES;
+  // The mockup's own layout: 20 columns, four keys of five. Every column must
+  // land on one key and no column may fall between two of them.
+  const keys = [
+    softKey('OSC', 1, 5, { layout: 'osc' }), softKey('FLT', 6, 10, { layout: 'flt' }),
+    softKey('ENV', 11, 15, { layout: 'env' }), softKey('FX', 16, 20, { layout: 'fx' }),
+  ];
+  const hits = [];
+  for (let col = 0; col < 20; col += 1) hits.push(pressTargetAt(keys, { row: 3, col }, 20)?.id ?? null);
+  assert.deepEqual(hits, [
+    'OSC', 'OSC', 'OSC', 'OSC', 'OSC', 'FLT', 'FLT', 'FLT', 'FLT', 'FLT',
+    'ENV', 'ENV', 'ENV', 'ENV', 'ENV', 'FX', 'FX', 'FX', 'FX', 'FX',
+  ]);
+});
+
+test('a zone region is clamped to the screen, so a wide colEnd cannot swallow the row', () => {
+  const { zoneCoversCell } = ZONES;
+  // colStart/colEnd are 1-BASED in the data and the cell is 0-based, so colStart 18 is
+  // column index 17 — the zone's own first column, not the one before it.
+  const wide = softKey('wide', 18, 99, { layout: 'x' });
+  assert.equal(zoneCoversCell(wide, { row: 3, col: 19 }, 20), true);   // clamped to the last column
+  assert.equal(zoneCoversCell(wide, { row: 3, col: 17 }, 20), true);   // its first column
+  assert.equal(zoneCoversCell(wide, { row: 3, col: 16 }, 20), false);  // one before it
+  // colStart past the end collapses onto the last column rather than matching nothing.
+  assert.equal(zoneCoversCell(softKey('past', 99, 99, { layout: 'x' }), { row: 3, col: 19 }, 20), true);
+});

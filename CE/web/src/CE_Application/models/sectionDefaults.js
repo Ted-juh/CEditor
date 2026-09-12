@@ -639,7 +639,14 @@ export const SECTION_DEFAULTS = {
     // Zones / layouts / pages. When layouts is non-empty the display composes its
     // rows from the active layout's zones instead of the lines/tokens above.
     // layout: { id, name, zones:[ { id,name,row,colStart,colEnd,show,sourceId,
-    //   text,label,precision,prefix,suffix,radix,align,priority,visible } ] }.
+    //   text,label,precision,prefix,suffix,radix,align,priority,visible,press } ] }.
+    //
+    // `press` makes a zone a SOFT KEY — the region it already occupies becomes a hit target, the
+    // way F1..F6 sit under a hardware screen. One of:
+    //   { layout: 'id' }        navigate to another layout
+    //   { set: 'name', to: n }  write a value to another control, addressed by name
+    // A zone without one is inert, and the display stays display-only otherwise: only a zone that
+    // DECLARES an action takes a press. See docs/design/display-component-futures.md, proposal 4.
     layouts: [],
     // pages: which layout is active. selector maps a control's value to a layout;
     // overlays transiently show a layout on a trigger for a duration / until change.

@@ -17,9 +17,11 @@ Two kinds, and they must not be confused:
 
 - **`docs/media/display-*.gif`** are *recordings*. They are the real renderers driven by real
   controls; nothing in them is a feature the components lack. See [the gallery](../display-gallery.md).
-- **`docs/media/mockup-*.png`** are *proposals*. They are rendered by the same machinery
-  (`gen-display-demos.mjs --mockups`, scenes in `displayDemos/mockups.mjs`) but they illustrate
-  things that do not exist.
+- **`docs/media/mockup-*.png`** illustrate *this document*. They are rendered by the same
+  machinery (`gen-display-demos.mjs --mockups`, scenes in `displayDemos/mockups.mjs`). Most show
+  things that do not exist. The soft-key pair is the exception: proposal 4 has since shipped, so
+  those two now document a feature — except for the pressed-state highlight, which is still
+  hand-drawn because the renderer does not draw one.
 
 Most of the mockups below draw with today's renderer, because in most cases what is missing is
 **behaviour, not pixels** — a zone that can be pressed looks exactly like a zone that cannot. Where
@@ -49,7 +51,9 @@ animSpeed, animLoop, animFps, layoutTransition, transitionMs, brightnessSource, 
 showGlass, showGhost, showScanlines, showGrid, read` — every one of them chrome.)
 
 Two of those rows are the whole of Tier 1. Neither component has a `Mouse`, `Behavior` or
-`HitZones` section — that is the whole of proposal 4.
+`HitZones` section — that was the whole of proposal 4, and it is **still true after that proposal
+shipped**: pressable zones were built as an exception on the existing click path rather than by
+giving a display an interaction model of its own.
 
 ---
 
@@ -103,10 +107,8 @@ prefer glyphs when present.
 
 ## 2. `PixelDisplay` cannot be scripted, only decorated
 
-**What is missing.** All 14 `pixel.*` verbs are chrome: `backlight`, `brightness`, `contrast`,
-`gamma`, `glow`, `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`, `layoutTransition`,
-`transitionMs`, `brightnessSource`, `backlightSource`. Not one writes an element. The LCD at least
-has `lcd.text(row, line)` and `lcd.clear()`.
+**What is missing.** Every one of the `pixel.*` verbs is chrome — see the full list in the audit
+above. Not one writes an element. The LCD at least has `lcd.text(row, line)` and `lcd.clear()`.
 
 The richest display in the product — the one with `wave`, `adsr`, `scope` and free pixel placement
 — is the one a script cannot write a word to. Its `elements` array is editable only in the
@@ -194,9 +196,11 @@ because a patch name is a value a DAW might reasonably want to see. Not decided 
 
 # Tier 2 — these change what the component is
 
-## 4. Soft keys: zones as hit targets
+## 4. Soft keys: zones as hit targets — **shipped**
 
-**This is my recommendation.** It is the only proposal that moves the component between categories.
+**The decision was made: yes, as an exception to the rule.** A display stays display-only; only a
+zone that *declares* a `press` action takes a click. The general pointer-transparency rule in
+`displayMode.js` is untouched.
 
 **What is missing.** `LcdDisplay`'s sections are `Background, Display, Effects, DeviceBindings,
 Scripts`. There is no `Mouse`, no `Behavior`, no `HitZones`. The component has **no interaction
@@ -212,22 +216,42 @@ Every hardware synth screen has F1–F6 underneath it. Both of these render *tod
 The row is four `static` zones, five columns each. The only thing separating the two pictures is
 that the second one is a lie: nothing can press a zone.
 
-**API sketch.** A zone gains an action, reusing the verb vocabulary panels already speak:
+**What shipped.** A zone gains a `press`:
 
 ```js
 { id: 'k2', show: 'static', text: '[FLT]', row: 4, colStart: 6, colEnd: 10,
-  press: { layout: 'edit-filter' } }          // or { set: 'cutoff', to: 64 }, or { script: 'onSoftKey' }
+  press: { layout: 'edit-filter' } }          // or { set: 'cutoff', to: 64 }
 ```
 
-**Cost.** Moderate, and mostly design rather than code. The geometry is free — `composeLayout`
-already resolves every zone to a row/column rectangle, and the renderer knows each cell's pixel
-box. What needs deciding is the hit-testing precedence against the existing edit path, and whether
-a display with pressable zones stops being "display-only" for the purposes of `displayMode.js`.
+Two actions, both things a performer does mid-song rather than things an author does once —
+the same line `componentVerbs.js` draws for script verbs. `{ script: ... }` was sketched and left
+out: firing a hook from a press is a bigger question about who owns the event.
 
-**The honest risk:** `interactionPolicy` in `displayMode.js` makes a read-only control transparent
-to the pointer *specifically so* a meter laid over a knob passes the click through. Displays are
-not controls and do not go through that path today — but if zones become pressable, the two ideas
-of "a display" need reconciling, and that is the part to think about before writing code.
+**It turned out cheaper than estimated, because the exception already existed.** An `edit` zone has
+been clickable since the edit field was added — `PanelPreviewSurface`'s pointer-down handler
+already resolved a clicked cell and armed an edit target. Pressable zones extend that path instead
+of opening a new one, so no display acquired a `Mouse` or `HitZones` section and
+`displayMode.js` was not touched at all.
+
+**Three decisions worth recording:**
+
+- **A press resolves before an edit.** A zone that declares an action is the more specific intent:
+  an edit field is armed by clicking "somewhere on the display" and falls back to its *first*
+  target when the click misses, so resolving edits first would make a soft key beside an edit field
+  unreachable.
+- **A press is resolved in paint order, read backwards.** Zones overlap by design, so the zone a
+  user can *see* at a cell is the last one to paint there. `pressTargetAt` walks
+  `composeLayout`'s ordering in reverse. An inert zone on top **blocks** a pressable one beneath
+  it, for the same reason it hides it: the user pressed what they could see, and what they could
+  see does nothing.
+- **The navigated layout is transient**, held beside `lcdEdit` rather than written to the panel
+  document. It beats the selector and the design default — navigating by hand is the most recent
+  thing the user said — but not an overlay, which is a transient interruption that should be seen
+  over whatever page you had navigated to.
+
+**Still missing, and worth knowing:** there is **no pressed-state rendering**. Nothing inverts
+under the finger, so the "FLT pressed" picture above is hand-drawn by swapping the label's text.
+And `PixelDisplay` elements are not pressable — this is `LcdDisplay` zones only.
 
 ## 5. Let a zone bind a device parameter directly
 
@@ -381,18 +405,18 @@ re-derives it.
 
 | # | Proposal | Effort | Changes the model? | Do it? |
 | --- | --- | --- | --- | --- |
-| 4 | Soft keys | Moderate | **Yes** — output becomes UI | **First** |
-| 1 | User glyphs | Small | No | **Yes** |
-| 2 | Pixel content verbs | Low | No | **Yes** |
-| 3 | `editText` verbs | Very low | Partly (automation) | Yes |
-| 5 | `@param` zones | Moderate | Yes — removes the proxy | After 4 |
-| 6 | Layout state machine | High | Yes — layouts gain state | After 4 |
+| 4 | Soft keys | Moderate | No, as it turned out — an exception, not a model | **Shipped** |
+| 3 | `editText` verbs | Very low | Partly (automation) | **Shipped** |
+| 1 | User glyphs | Small | No | **Next** |
+| 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
+| 5 | `@param` zones | Moderate | Yes — removes the proxy | Yes |
+| 6 | Layout state machine | High | Yes — layouts gain state | Now unblocked |
 | 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
 | 8 | Real-audio scope | High | No (host work) | Later |
 | 9 | Device screen mirror | Per-device | No | On request |
 
-**If one: soft keys.** It is the only one that changes the component's category, and the absence of
-`Mouse`/`HitZones` sections means you are adding a model rather than fighting one.
+**Soft keys are done.** They changed the component's category — a display is now a UI surface —
+without changing its model, because the click path was already there for edit fields.
 
 **If one cheap: user glyphs.** The renderer already has a per-cell glyph pipeline to hang them on.
 
@@ -402,9 +426,10 @@ re-derives it.
 
 | # | State |
 | --- | --- |
+| 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`. No pressed-state rendering; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
-| 1, 4, 5, 6 | Not started. |
+| 1, 5, 6 | Not started. |
 | 7, 8, 9 | Spike / later / on request. |
 
 ### The next three steps, in order
@@ -431,7 +456,9 @@ half-answered interaction model is the expensive kind of mistake.
 addressing problems and they rhyme: one lets a script name an element, the other lets a zone name a
 parameter. Doing them together means designing the reserved-source/id-resolution story once.
 
-Proposal 6 stays parked until 4 lands, because `on: { press }` has nothing to hang on until then.
+Proposal 6 is **no longer parked** — `on: { press }` now has something to hang on, and the
+transient per-display layout that soft keys introduced is the state a menu needs. What it still
+lacks is the *other* kind of edge: a timeout, which no value change can express.
 
 ### What would make this note wrong
 

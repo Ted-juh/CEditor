@@ -265,6 +265,73 @@ export function findLayout(layouts, id) {
   return (Array.isArray(layouts) ? layouts : []).find((l) => String(l?.id ?? '') === String(id)) ?? null;
 }
 
+// --- Pressable zones (soft keys) -------------------------------------------
+//
+// A zone may carry a `press` action, which makes it a HIT TARGET: the region it
+// already occupies becomes a soft key, the way F1..F6 sit under a hardware
+// screen. The action is one of:
+//
+//   { layout: 'id' }        switch the active layout — screen navigation
+//   { set: 'name', to: n }  write a value to another control
+//
+// WHY THIS IS AN EXCEPTION AND NOT A NEW MODEL. A display has no Mouse,
+// Behavior or HitZones section; it is an output, and `displayMode.js` makes a
+// read-only control transparent to the pointer precisely so a meter laid over
+// a knob passes the click through. Pressable zones do not overturn that — the
+// display stays display-only, and only a zone that DECLARES an action takes a
+// press. The precedent is already here: an `edit` zone has been clickable
+// since the edit field was added, resolved through this same cell geometry.
+
+/** True when a zone declares a press action a user could actually trigger. */
+export function isPressableZone(zone) {
+  if (!zone || zone.visible === false) return false;
+  const press = zone.press;
+  if (!press || typeof press !== 'object') return false;
+  return String(press.layout ?? '') !== '' || String(press.set ?? '') !== '';
+}
+
+/** Does a zone's region cover this 0-based character cell? */
+export function zoneCoversCell(zone, cell, cols) {
+  if (!zone || !cell) return false;
+  const row = Math.round(numberOr(zone?.row, 1)) - 1;
+  if (cell.row !== row) return false;
+  const nCols = Math.max(1, Math.round(numberOr(cols, 16)));
+  const c0 = clamp(Math.round(numberOr(zone?.colStart, 1)) - 1, 0, nCols - 1);
+  const c1 = clamp(Math.round(numberOr(zone?.colEnd, nCols)) - 1, c0, nCols - 1);
+  return cell.col >= c0 && cell.col <= c1;
+}
+
+/**
+ * The pressable zone a click at `cell` (0-based row/col) lands on, or null.
+ *
+ * ORDERED LIKE THE PAINT, AND THAT IS THE WHOLE SUBTLETY. Zones overlap on
+ * purpose — composeLayout sorts by priority ascending and lets a later zone
+ * paint over an earlier one — so the zone a user can SEE at a cell is the last
+ * one to paint there. A press has to resolve to the same zone the eye picked,
+ * so this walks the identical ordering backwards and returns the first hit.
+ * Resolving it forwards would hand the press to a zone hidden underneath.
+ */
+export function pressTargetAt(zones, cell, cols) {
+  const ordered = (Array.isArray(zones) ? zones : [])
+    .filter((z) => z && z.visible !== false)
+    .slice()
+    .sort((a, b) => numberOr(a?.priority, 0) - numberOr(b?.priority, 0));
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    const zone = ordered[i];
+    if (!zoneCoversCell(zone, cell, cols)) continue;
+    // A zone that covers the cell but takes no press BLOCKS the ones beneath it,
+    // for the same reason it hides them visually: the user pressed what they
+    // could see, and what they could see does nothing.
+    return isPressableZone(zone) ? zone : null;
+  }
+  return null;
+}
+
+/** Every pressable zone of a layout, for a surface that wants to mark them. */
+export function pressableZones(zones) {
+  return (Array.isArray(zones) ? zones : []).filter(isPressableZone);
+}
+
 // Every sourceId referenced by a layout's zones (for the preview to gather live
 // values) plus the page selector + overlay sources.
 export function collectSourceIds(display) {
