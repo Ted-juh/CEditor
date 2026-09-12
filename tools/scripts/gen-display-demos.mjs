@@ -288,7 +288,12 @@ async function record(page, scene, extraFrames = 0) {
     panel.scripting = { modules: api.MODULES.map((m) => m.id) };
     panel.controls = [];
     panels.addPanel(panel);
-    preview.setPreviewModeEnabled(true);
+    // NOT for an inspector shot, and this cost an hour. Entering preview snapshots the document so
+    // live interaction cannot dirty it, and LEAVING preview restores that snapshot — which was
+    // taken here, before the scene's controls were added. So a capture that turned preview off to
+    // reach the properties rail was photographing an empty panel: the rail showed the two tabs
+    // every control has and none of the sections the figure was about.
+    preview.setPreviewModeEnabled(!payload.scene.inspect);
 
     const settle = (ms) => new Promise((r) => { setTimeout(r, ms); });
     const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
@@ -309,6 +314,16 @@ async function record(page, scene, extraFrames = 0) {
   for (let i = 0; i < warmupSteps; i += 1) {
     // eslint-disable-next-line no-await-in-loop
     await page.evaluate(([v, dt]) => window.__demo.step(v, dt), [signal[i % FRAMES], FRAME_MS]);
+  }
+
+  // A scene may photograph the INSPECTOR rather than the display. Everything above still applies
+  // — the panel is real, the control is real — but the subject is the editing UI for a feature
+  // rather than its output, which is the one thing a still is genuinely better at than a GIF.
+  if (scene.inspect) {
+    const shot = await captureInspector(page, scene, displayId);
+    writeFileSync(fileOf(scene), shot);
+    const { width, height } = decodePng(shot);
+    return { still: true, width, height, bytes: shot.length };
   }
 
   if (scene.still) {
@@ -352,6 +367,48 @@ async function record(page, scene, extraFrames = 0) {
   if (pageError) throw new Error(`the page threw while animating: ${pageError}`);
 
   return frames;
+}
+
+/**
+ * Photograph one section of the properties inspector for the scene's control.
+ *
+ * Two things have to happen that the display capture never needs, and a third is what the scene
+ * setup does differently — see the preview-mode comment there, which is the trap.
+ *
+ *   select the control   the inspector shows the panel's own properties until something is picked.
+ *   open the tab         sections live behind the icon rail, addressed by the label in its title.
+ *
+ * `clicks` are button labels pressed before the shot, so a figure can show a state that only
+ * exists after somebody has done something — which for the glyph editor is the whole point.
+ */
+async function captureInspector(page, scene, displayId) {
+  const { tab, selector, clicks = [] } = scene.inspect;
+  await page.evaluate(async (id) => {
+    const panels = await import('/src/CE_Application/stores/panels.js');
+    panels.selectedComponentIds.set(new Set([id]));
+  }, displayId);
+  await page.waitForTimeout(600);
+
+  const tabButton = page.locator(`button[title="${tab}"]`).first();
+  if (!await tabButton.count()) {
+    // Naming what IS there, because the two ways this fails — previewing, or nothing selected —
+    // both present as one timeout on a selector, and the difference is the whole diagnosis.
+    const titles = await page.locator('button[title]').evaluateAll((els) => els.map((e) => e.title));
+    throw new Error(`no properties tab "${tab}". Buttons present: ${titles.join(' | ')}`);
+  }
+  await tabButton.click({ timeout: 10000 });
+  await page.waitForTimeout(400);
+  for (const label of clicks) {
+    // eslint-disable-next-line no-await-in-loop
+    await page.locator('button', { hasText: label }).first().click({ timeout: 10000 });
+    // eslint-disable-next-line no-await-in-loop
+    await page.waitForTimeout(400);
+  }
+
+  const anchor = page.locator(selector).first();
+  await anchor.waitFor({ state: 'visible', timeout: 10000 });
+  const section = anchor.locator('xpath=ancestor::div[contains(@class,"property-section")][1]');
+  return section.screenshot({ type: 'png' });
 }
 
 /**

@@ -3,7 +3,11 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
-  import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf, BAR_CHARS } from '../utils/lcdZones.js';
+  import {
+    GLYPH_SLOTS, GLYPH_W, GLYPH_H, parseGlyph, glyphPath, emptyGlyphSlots,
+    toggleGlyphBit, invertGlyphBits, shiftGlyphBits, barGlyphSet,
+  } from '../utils/lcdUserGlyphs.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   // Reset only appearance (never content: layouts/zones/text/sources).
@@ -36,6 +40,7 @@
   import Lamp from 'lucide-svelte/icons/lamp';
   import Play from 'lucide-svelte/icons/play';
   import Square from 'lucide-svelte/icons/square';
+  import PenTool from 'lucide-svelte/icons/pen-tool';
 
   let { control = null } = $props();
 
@@ -99,6 +104,39 @@
       if (Number.isFinite(Number(b.min))) setField(index, 'min', Number(b.min));
       if (Number.isFinite(Number(b.max))) setField(index, 'max', Number(b.max));
     }
+  }
+
+  /* --- The eight CGRAM slots -------------------------------------------------------------
+   *
+   * Until this the slots were reachable only from a script (`lcd.glyph`) or by hand-editing the
+   * saved panel, which made the feature real and unusable: the authoring form is forty characters
+   * of '#' and '.', and nobody draws a picture that way.
+   *
+   * One grid at a time rather than eight side by side. Eight 5x8 grids at a clickable size is
+   * 320 buttons and about 500px of a 550px-wide inspector, and the strip of previews above the
+   * grid does the job the eight grids would have done — you can see all eight at once and pick
+   * one. The previews are the SAME glyphPath the renderer draws from, so what the strip shows is
+   * what the screen will show rather than a second implementation of the picture.
+   */
+  let glyphs = $derived(() => {
+    const list = Array.isArray(display?.glyphs) ? display.glyphs : [];
+    // Always eight, exactly as CGRAM always is — a display saved before the slots existed, or one
+    // whose list was truncated, still edits rather than showing a short strip.
+    return Array.from({ length: GLYPH_SLOTS }, (_, i) => list[i] ?? { bits: '', for: '' });
+  });
+  let glyphSlot = $state(0);
+  let editedGlyph = $derived(glyphs()[glyphSlot] ?? { bits: '', for: '' });
+  let editedGlyphRows = $derived(parseGlyph(editedGlyph.bits));
+
+  function setGlyph(slot, prop, value) {
+    const next = glyphs().map((g, i) => (i === slot ? { ...g, [prop]: value } : g));
+    set('glyphs', next);
+  }
+  function paintGlyph(x, y) { setGlyph(glyphSlot, 'bits', toggleGlyphBit(editedGlyph.bits, x, y)); }
+  function nudgeGlyph(dx, dy) { setGlyph(glyphSlot, 'bits', shiftGlyphBits(editedGlyph.bits, dx, dy)); }
+  /** Claiming a character twice is last-one-wins in the renderer, so the picker says who has it. */
+  function glyphClaiming(ch) {
+    return glyphs().findIndex((g, i) => i !== glyphSlot && String(g?.for ?? '') === ch && parseGlyph(g?.bits));
   }
 
   function toggle(prop, defaultOn = true) {
@@ -428,6 +466,77 @@
       <NumberCell label="Len" value={display.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
+
+  {#if String(display.panelType ?? 'character') === 'character'}
+    <PropertySection title="Glyphs" icon={PenTool}>
+      {#snippet tools()}
+        <button class="hdr-add" type="button"
+                title="Fill all eight slots with a bargraph set: one glyph per block character the bar draws with, each with a baseline foot."
+                onclick={() => set('glyphs', barGlyphSet())}>Bar set</button>
+        <button class="hdr-add" type="button" title="Empty every slot." onclick={() => set('glyphs', emptyGlyphSlots())}>Clear all</button>
+      {/snippet}
+
+      <PropertyCell label="Slots" span={4} hint="A real HD44780 has eight programmable 5×8 characters, and so does this. Pick one to draw it below.">
+        <div class="gl-strip">
+          {#each glyphs() as g, slot (slot)}
+            {@const rows = parseGlyph(g?.bits)}
+            <button type="button" class="gl-slot" class:sel={slot === glyphSlot}
+                    title={`Slot ${slot + 1}${g?.for ? ` — stands in for ${g.for}` : ''}`}
+                    onclick={() => { glyphSlot = slot; }}>
+              <svg viewBox="0 0 5 8" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {#if rows}<path d={glyphPath(rows)} />{/if}
+              </svg>
+              <span class="gl-num">{slot + 1}</span>
+            </button>
+          {/each}
+        </div>
+      </PropertyCell>
+
+      <PropertyCell label={`Slot ${glyphSlot + 1}`} span={4} hint="Click a pixel to turn it on or off. An all-blank slot is 'not defined' and draws nothing — the same as empty CGRAM on the hardware.">
+        <div class="gl-edit">
+          <div class="gl-grid">
+            {#each Array.from({ length: GLYPH_H }) as _, y}
+              {#each Array.from({ length: GLYPH_W }) as _, x}
+                <button type="button" class="gl-px" class:on={editedGlyphRows?.[y]?.[x] === true}
+                        aria-label={`pixel ${x + 1},${y + 1}`} onclick={() => paintGlyph(x, y)}></button>
+              {/each}
+            {/each}
+          </div>
+          <div class="gl-tools">
+            <div class="gl-nudge">
+              <button class="val gbtn" type="button" title="Nudge up" onclick={() => nudgeGlyph(0, -1)}>▲</button>
+              <span class="gl-nudge-mid">
+                <button class="val gbtn" type="button" title="Nudge left" onclick={() => nudgeGlyph(-1, 0)}>◀</button>
+                <button class="val gbtn" type="button" title="Nudge right" onclick={() => nudgeGlyph(1, 0)}>▶</button>
+              </span>
+              <button class="val gbtn" type="button" title="Nudge down" onclick={() => nudgeGlyph(0, 1)}>▼</button>
+            </div>
+            <button class="val gwide" type="button" onclick={() => setGlyph(glyphSlot, 'bits', invertGlyphBits(editedGlyph.bits))}>Invert</button>
+            <button class="val gwide" type="button" onclick={() => setGlyph(glyphSlot, 'bits', '')}>Clear</button>
+          </div>
+        </div>
+      </PropertyCell>
+
+      <PropertyCell label="Stands in for" span={4} hint="Draw this glyph wherever that character appears. Claiming the eight block characters is what turns a 'bar' zone into a real segmented bargraph with a foot — the Bar set button does all eight at once. The buttons are labelled by the fraction each block fills rather than drawn as themselves, because whether the font has them at all is exactly what a glyph set stops mattering.">
+        <div class="gl-claim">
+          <input class="val gl-claim-in" type="text" maxlength="1" placeholder="(none)"
+                 value={editedGlyph.for ?? ''} onchange={(event) => setGlyph(glyphSlot, 'for', event.target.value.slice(0, 1))} />
+          {#each Array.from(BAR_CHARS) as ch, i (ch)}
+            {@const taken = glyphClaiming(ch)}
+            {@const eighths = i === 0 ? 8 : i}
+            <button type="button" class="gl-ch" class:sel={editedGlyph.for === ch} class:taken={taken >= 0}
+                    title={`${ch} — ${eighths}/8 of a cell`
+                      + (taken >= 0 ? `. Slot ${taken + 1} already claims it, and the later slot wins.` : '')}
+                    onclick={() => setGlyph(glyphSlot, 'for', editedGlyph.for === ch ? '' : ch)}>{eighths}/8</button>
+          {/each}
+        </div>
+      </PropertyCell>
+
+      <PropertyCell label="From a script" span={4} hint="The slot's own address, as on the hardware. A control character cannot be typed into a zone's text box, which is why claiming a character is the way to reach a glyph from the inspector.">
+        <span class="hint-note">ce.components.lcd.glyph(screen, {glyphSlot + 1}, "…") defines it; a zone reaches it as "\u000{glyphSlot}" in its text.</span>
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 
   <PropertySection title="Layouts" icon={LayoutGrid}>
     {#snippet tools()}
@@ -960,6 +1069,150 @@
     color: #CCC;
     border-color: #4A6E8C;
   }
+
+  /* --- The glyph editor -------------------------------------------------------------- */
+
+  .gl-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .gl-slot {
+    position: relative;
+    width: 26px;
+    height: 38px;
+    padding: 2px;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    background: #141414;
+    cursor: pointer;
+  }
+
+  .gl-slot svg {
+    width: 100%;
+    height: 100%;
+    fill: #2BE86A;
+  }
+
+  .gl-slot.sel {
+    border-color: #5B9BD5;
+    background: #16222e;
+  }
+
+  .gl-num {
+    position: absolute;
+    right: 2px;
+    bottom: 0;
+    font-size: 9px;
+    color: #777;
+    pointer-events: none;
+  }
+
+  .gl-edit {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  /* 5 wide, 8 tall — the shape of CGRAM, not a layout choice. */
+  .gl-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: #333;
+    border: 1px solid #333;
+    width: fit-content;
+  }
+
+  .gl-px {
+    width: 17px;
+    height: 17px;
+    padding: 0;
+    border: none;
+    background: #141414;
+    cursor: pointer;
+  }
+
+  .gl-px.on { background: #2BE86A; }
+
+  .gl-px:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: -2px;
+  }
+
+  .gl-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .gl-nudge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .gl-nudge-mid {
+    display: flex;
+    gap: 2px;
+  }
+
+  .gbtn {
+    width: 24px;
+    height: 20px;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .gwide { width: 74px; }
+
+  .gl-claim {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .gl-claim-in {
+    width: 40px;
+    text-align: center;
+  }
+
+  /* NOT `.val`, unlike the buttons above it. The inspector's shared field style carries
+     `background`, `border` and `color` as !important — which is right for a form field and fatal
+     for a button whose whole job is to show two states. These are a palette, not a field, so they
+     are styled here in full and the shared rule never sees them. */
+  .gl-ch {
+    width: 30px;
+    padding: 3px 0;
+    text-align: center;
+    font-size: 10px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #DDD;
+    cursor: pointer;
+  }
+
+  /* Which character THIS slot draws. Filled rather than outlined: the amber hairline below marks
+     the ones another slot has, and two outline states side by side are one too many to read. */
+  .gl-ch.sel {
+    border-color: #5B9BD5;
+    background: #2f6fa8;
+    color: #fff;
+  }
+
+  .gl-ch:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
+  }
+
+  /* Somebody else already draws this character. Not an error — the later slot wins — and after a
+     Bar set that is true of seven of the eight, so it is a hairline rather than a warning colour:
+     enough to notice while picking, not enough to read as a fault. */
+  .gl-ch.taken { border-bottom-color: #8a5c26; }
 
   .hint-note {
     font-size: 11px;

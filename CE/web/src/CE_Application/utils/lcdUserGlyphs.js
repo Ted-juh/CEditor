@@ -20,6 +20,8 @@
 //             was teaching resolveZoneContent about glyphs, which would push display state into the
 //             pure zone engine to no benefit.
 
+import { BAR_CHARS } from './lcdZones.js';
+
 /** A real HD44780 has exactly eight. Not a limit we chose, and the reason slots are always present. */
 export const GLYPH_SLOTS = 8;
 export const GLYPH_W = 5;
@@ -111,4 +113,79 @@ export function buildGlyphMap(glyphs) {
 /** The eight blank slots a display starts with — always present, exactly as CGRAM always is. */
 export function emptyGlyphSlots() {
   return Array.from({ length: GLYPH_SLOTS }, () => ({ bits: '', for: '' }));
+}
+
+/* ------------------------------------------------------------------- editing a glyph
+ *
+ * The inspector needs to draw one, and the only authoring form that existed was a forty-character
+ * string. Everything below is the pure half of a 5x8 drawing grid: bits in, bits out, so the
+ * editor holds no parallel copy of the picture and a test can drive the same calls a click does.
+ *
+ * They all round-trip through the CANONICAL form — eight rows of '#' and '.' joined by '|' — which
+ * is the one `parseGlyph` documents and the one a person reading the saved panel can see the
+ * picture in. The other two spellings parseGlyph accepts stay readable and stop being written.
+ */
+
+/** Eight rows of five booleans, blank where the glyph defines nothing. */
+function rowsOrBlank(bits) {
+  return parseGlyph(bits) ?? Array.from({ length: GLYPH_H }, () => new Array(GLYPH_W).fill(false));
+}
+
+/** Rows of booleans to the canonical '#.'-and-'|' form. All-blank is '', which is "not defined". */
+export function glyphBits(rows) {
+  const grid = Array.isArray(rows) ? rows : [];
+  if (!grid.some((row) => (row ?? []).some(Boolean))) return '';
+  return Array.from({ length: GLYPH_H }, (_, y) =>
+    Array.from({ length: GLYPH_W }, (_, x) => (grid[y]?.[x] ? '#' : '.')).join('')).join('|');
+}
+
+/** Flip one pixel. Out-of-range is a no-op rather than a grid that grows. */
+export function toggleGlyphBit(bits, x, y) {
+  if (x < 0 || x >= GLYPH_W || y < 0 || y >= GLYPH_H) return String(bits ?? '');
+  const rows = rowsOrBlank(bits);
+  rows[y] = rows[y].map((on, i) => (i === x ? !on : on));
+  return glyphBits(rows);
+}
+
+/** Swap lit for unlit. An empty slot inverts to a full block, which is a legitimate glyph. */
+export function invertGlyphBits(bits) {
+  return glyphBits(rowsOrBlank(bits).map((row) => row.map((on) => !on)));
+}
+
+/**
+ * Nudge the drawing by one cell. What falls off the edge is LOST rather than wrapped: a glyph is a
+ * picture in a 5x8 window, and a foot that reappears at the top is never what the nudge meant.
+ */
+export function shiftGlyphBits(bits, dx, dy) {
+  const from = rowsOrBlank(bits);
+  const out = Array.from({ length: GLYPH_H }, (_, y) => Array.from({ length: GLYPH_W }, (_, x) => {
+    const sy = y - Math.round(dy || 0);
+    const sx = x - Math.round(dx || 0);
+    return sy >= 0 && sy < GLYPH_H && sx >= 0 && sx < GLYPH_W ? from[sy][sx] : false;
+  }));
+  return glyphBits(out);
+}
+
+/**
+ * The eight slots that turn `bar` into a real bargraph: one per character `barString` emits, each
+ * claiming it, each with a baseline foot.
+ *
+ * This is the whole reason the feature exists, and asking somebody to hand-draw it was never a
+ * plan — the eight characters cannot even be typed into the claim box without finding them
+ * somewhere first. So the set is generated from `BAR_CHARS`, which is the bar renderer's own list.
+ *
+ * FIVE COLUMNS CANNOT SHOW EIGHT WIDTHS, and the duplicates are the truth rather than a bug: two
+ * adjacent eighths land on the same number of lit columns because a character cell is five pixels
+ * wide. What the glyphs buy over the block characters is the two things a font cannot give — the
+ * baseline under the bar, and not depending on the font carrying `▏▎▍▌▋▊▉` at all.
+ */
+export function barGlyphSet() {
+  return Array.from(BAR_CHARS).map((claim, i) => {
+    // Slot 0 is the full block; slots 1..7 are the i-eighths partials.
+    const lit = i === 0 ? GLYPH_W : Math.max(1, Math.round((i * GLYPH_W) / 8));
+    const rows = Array.from({ length: GLYPH_H }, (_, y) => Array.from({ length: GLYPH_W }, (_, x) =>
+      // The bottom row is the foot: solid all the way across, whatever the bar reads.
+      (y === GLYPH_H - 1 ? true : y > 0 && x < lit)));
+    return { bits: glyphBits(rows), for: claim };
+  });
 }

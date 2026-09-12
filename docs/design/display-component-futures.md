@@ -26,6 +26,7 @@ Two kinds, and they must not be confused:
   | --- | --- |
   | `mockup-softkeys-*` | Shipped. Real `press` actions; the pressed one captured mid-press, with the inverse video drawn by the renderer. |
   | `mockup-glyphs-*` | Shipped. The same character LCD twice, differing only in eight glyph definitions. The "after" used to be a `PixelDisplay` impersonating a character LCD; that impersonation is gone. |
+  | `mockup-glyph-editor` | Shipped, and the odd one out: it photographs the INSPECTOR rather than a screen. The thing that shipped there is a way of drawing, and input is the one subject a still is better at than a recording. |
   | `mockup-state-*` | Shipped. All three edges are real: a press in, a `timeoutMs` out, and a cursor that moves. MENU is now a working menu — `cursorMax`, a marker zone per row, and ▲/▼ keys that move the selection. |
 
 The state screens are what made these mockups necessary in the first place, and they are also the
@@ -120,9 +121,43 @@ could be an index-addressed `item` verb where the identical mechanism was a dead
 CGRAM is eight slots and an insert would mint a ninth that `\x00`–`\x07` cannot address.
 `scriptComponents.test.js` caught that before it shipped.
 
-**Not done: the inspector editor.** Glyphs are authorable from the panel document and from a
-script, not yet by drawing on a 5×8 grid in the UI. That is the obvious follow-up and it is
-ordinary UI work — the model, the rendering and the scripting all exist under it now.
+### The inspector editor, which was the last piece
+
+Until this the slots were reachable from a script and from hand-editing the saved panel, and from
+nowhere else. The authoring form is forty characters of `#` and `.`; nobody draws a picture that
+way, so the feature was real and unusable.
+
+![The CGRAM editor](../media/mockup-glyph-editor.png)
+
+Eight slots with live previews, a 5×8 grid for the selected one, and nudge / invert / clear. The
+previews are the same `glyphPath` the renderer draws from, so the strip shows what the screen will
+show rather than a second implementation of the picture. The editing itself is pure —
+`toggleGlyphBit`, `invertGlyphBits`, `shiftGlyphBits` in `lcdUserGlyphs.js`, bits in and bits out —
+so the inspector holds no parallel copy and a test drives the same calls a click does.
+
+Three things in that figure are decisions rather than layout:
+
+- **One grid, not eight.** Eight 5×8 grids at a clickable size is 320 buttons and about 500px of a
+  550px inspector. The preview strip does the job the eight grids would have — you can see all
+  eight at once and pick one.
+- **"Bar set" fills all eight in one press,** because that is the documented main use and asking
+  somebody to hand-draw it was never a plan: eight glyphs at forty clicks each, each claiming a
+  character they would first have to find somewhere to paste. The set is generated from the bar
+  renderer's own `BAR_CHARS`, so the editor and `barString` cannot disagree about which characters
+  a bargraph is made of. **Five columns cannot show eight widths** — two adjacent eighths land on
+  the same number of lit pixels — and that is the cell being five pixels wide, not the generator
+  being wrong. What the glyphs buy is the two things a font cannot: the baseline foot, and not
+  depending on the font carrying `▏▎▍▌▋▊▉` at all.
+- **The claim palette is labelled `8/8`, `1/8` … `7/8` rather than drawn as the characters
+  themselves.** Whether the font has them is exactly what a glyph set stops mattering, so a picker
+  that relies on it would be the one control in the feature that contradicts the feature. The
+  character is in each button's tooltip, and the free-text box beside them still takes any
+  character at all.
+
+**Slot addressing stays script-only, and that is not an oversight.** A zone reaches glyph *n* as
+the character `\x00`–`\x07`, which is how the hardware does it and which cannot be typed into a
+text box. So the inspector's way in is the claim, and the script's way in is the slot; the editor
+prints the slot's own address under the grid rather than pretending otherwise.
 
 ## 2. `PixelDisplay` cannot be scripted, only decorated — **shipped**
 
@@ -604,7 +639,7 @@ re-derives it.
 | --- | --- | --- | --- | --- |
 | 4 | Soft keys | Moderate | No, as it turned out — an exception, not a model | **Shipped** |
 | 3 | `editText` verbs | Very low | Partly (automation) | **Shipped** |
-| 1 | User glyphs | Small | No | **Shipped** |
+| 1 | User glyphs | Small | No | **Shipped**, editor and all |
 | 2 | Pixel content verbs | Moderate — a reducer kind, and elements needed a name | No | **Shipped** |
 | 5 | `@param` zones | Moderate | Yes — and needed a device-state store | **Shipped** |
 | 6 | Layout state machine | High | Yes — layouts gained state | **Shipped** |
@@ -625,22 +660,27 @@ without changing its model, because the click path was already there for edit fi
 | --- | --- |
 | 5 | **Shipped** — `@param:` zones, on a new device-parameter value store. |
 | 6 | **Shipped** — press in, timeout out, and a wrapping cursor with `visibleWhen` and `@state:`. |
-| 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
+| 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim, with a 5×8 editor and a one-press bar set. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Shipped** — eight scene verbs on a new `elem` kind, addressed by an element's name. |
+| 7, 8, 9 | Spike / later / on request — unchanged, and deliberately untouched. |
 
-| 7, 8, 9 | Spike / later / on request. |
+**Everything in Tiers 1 and 2 is built.** What is left is the three in Tier 3, which were
+speculative on purpose and still are.
 
-### The next three steps, in order
+### The three steps this note planned, and how they actually went
 
-**Step 1 — ~~user glyphs~~. Done, except the inspector.** `bar` now draws from glyphs when a
-claiming set is defined and falls back to block characters when it is not, which was the acceptance
-test. What remains is a 5×8 drawing grid in the UI — ordinary work, with the model, the renderer
-and the scripting already under it.
+Kept rather than deleted, because in all three cases the plan was wrong in a way worth reading.
 
-**Step 2 — settle the soft-key question, then build it (proposal 4).** The code is not the hard
-part; this one question is, and it is the owner's to answer:
+**Step 1 — ~~user glyphs~~. Done.** `bar` draws from glyphs when a claiming set is defined and
+falls back to block characters when it is not, which was the acceptance test; the 5×8 drawing grid
+that was the last piece is in the inspector, with the bargraph set one press away. The part the
+plan under-read: the eight characters a bargraph claims cannot be typed, so "an inspector editor"
+had to include a way to pick them.
+
+**Step 2 — ~~settle the soft-key question, then build it~~. Answered, then built.** The question
+was the owner's and this was it:
 
 > When a zone can be pressed, is the display still "display-only"? `interactionPolicy` makes a
 > read-only control transparent to the pointer *specifically so* a meter laid over a knob passes
@@ -648,8 +688,11 @@ part; this one question is, and it is the owner's to answer:
 > exception to that rule, or does the display acquire a real `Mouse`/`HitZones` section and stop
 > being display-only altogether?
 
-The second answer is more work and more honest. Either way, decide before writing code — a
-half-answered interaction model is the expensive kind of mistake.
+The answer was the first: *"a big yes, albeit exception to the rule."* So pressable zones were
+built on the existing click path — the one an `edit` zone has used since the edit field was added
+— and no display has a `Mouse` or `HitZones` section. This note said the second answer was "more
+work and more honest"; it was right about the work and wrong that the honesty was worth it, since
+a display with an interaction model would be a control that merely looks like a display.
 
 **Step 3 — ~~id-addressed element verbs, then `@param` zones~~. Done, and the "id" was wrong.**
 `@param` settled the reserved-source story: a source that is not a control id resolves through its
@@ -657,9 +700,9 @@ own branch, exactly as `@active` and `@edit` do. The element verbs then shipped 
 kind — but addressed by a **name** the author types, not by the id this note proposed, because the
 ids are `el_…` and the inspector never shows one. See proposal 2 for the whole finding.
 
-Proposal 6 is **done** — a press gets you in, a timeout brings you back, and the cursor moves. All
-three edges in the sketch are expressible, and the MENU screen is a menu rather than three lines of
-text that look like one.
+And proposal 6, which the three steps did not cover, is **done** as well — a press gets you in, a
+timeout brings you back, and the cursor moves. All three edges in its sketch are expressible, and
+the MENU screen is a menu rather than three lines of text that look like one.
 
 ### What would make this note wrong
 
