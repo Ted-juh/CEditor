@@ -36,9 +36,17 @@ Facts this note rests on, all checked on 2026-09-12 rather than assumed:
 | Device-binding ports, both | `text`, `value`, `brightness`, `backlight` |
 | `exportValues`, both | `[]` — neither is host-automatable |
 | Zone `show` kinds | 16 |
-| `lcd.*` script verbs | 28 |
-| `pixel.*` script verbs | 14, **none of which write content** |
+| `lcd.*` script verbs | 35 |
+| `pixel.*` script verbs | 19, **not one of which writes content** |
 | Hits for CGRAM / custom characters | 0 |
+
+The two verb counts are the whole flattened surface — the hand-written declarations, the
+`showGlass`/`showGhost`/`showScanlines`/`showGrid` chrome appended to every family, and the
+`read`/`size`/`fill` kinds each family gets for free. (An earlier draft of this note said 28 and 14,
+which counted only the hand-written `v(...)` lines. The corrected figures do not change the
+finding: the full `pixel` list is `backlight, brightness, contrast, gamma, glow, anim, animPreset,
+animSpeed, animLoop, animFps, layoutTransition, transitionMs, brightnessSource, backlightSource,
+showGlass, showGhost, showScanlines, showGrid, read` — every one of them chrome.)
 
 Two of those rows are the whole of Tier 1. Neither component has a `Mouse`, `Behavior` or
 `HitZones` section — that is the whole of proposal 4.
@@ -104,23 +112,56 @@ The richest display in the product — the one with `wave`, `adsr`, `scope` and 
 — is the one a script cannot write a word to. Its `elements` array is editable only in the
 inspector.
 
-**API sketch**, mirroring the verbs that already exist rather than inventing a vocabulary:
+**This one was attempted, and the attempt found the real problem.** It is written up here rather
+than smoothed over, because the finding is the useful part.
+
+The obvious mechanism is the `item` verb kind — "one property of one element of an array field,
+addressed 1-based" — exactly how `DrumPads` addresses a pad:
 
 ```js
-ce.components.pixel.text(C, 'title', 'SATURN VB');   // set a text element's content
-ce.components.pixel.move(C, 'cursor', 12, 40);       // x, y in grid pixels
-ce.components.pixel.show(C, 'warning', true);        // element visibility
-ce.components.pixel.bitmap(C, 'logo', bits);         // replace pixel art
-ce.components.pixel.clear(C);
+v('text', 'elements', ITEM, { item: 'text', kind: STR }),   // pixel.text(C, 1, 'SATURN VB')
+v('show', 'elements', ITEM, { item: 'visible', kind: BOOL }),
 ```
 
-**Cost.** Low. `updateControlProperty` already writes into `Pixel.elements` — the drag handles in
-`PixelDisplayRenderer` do exactly this when an element is moved in design mode. The verbs are a
-thin layer over a path that works.
+Four verbs on that pattern were written, and `componentVerbs.test.js` rejected all four:
 
-**Verdict: do it.** This is a hole, not a boundary.
+```
+verbs that did nothing:
+  pixelText: no patch     pixelShow: no patch
+  pixelX: no patch        pixelY: no patch
+```
 
-## 3. `editText` is invisible to everything except the keyboard
+**Why.** Every other `item` list in the spec has a **non-empty default** — six orbit nodes are six
+stored objects, so element 1 is always there to be written. `Pixel.elements` defaults to `[]`,
+because a pixel display starts blank by design. An index-addressed verb is therefore a silent no-op
+on every display whose elements have not already been added in the inspector. That is precisely the
+failure the test named *"every verb either changes something or explains why it cannot"* exists to
+catch, and there is no exemption list to add to — the assertion is absolute.
+
+There were three bad ways out and all were rejected: seeding `SECTION_DEFAULTS.Pixel.elements`
+(changes what a new display *is*), declaring a `count` resolver like `DrumPads` (a pad grid has an
+implied size; a blank screen has none), and weakening the test.
+
+**So the real decision is addressing, and it was hiding behind the API sketch.** Index is the wrong
+key for this list:
+
+| | Index (`item`, today's mechanism) | Id |
+| --- | --- | --- |
+| Blank display | Silent no-op | Same, but honestly — the id is absent |
+| Reorder in inspector | **Scripts silently retarget** | Stable |
+| Cost | One line per verb | A new reducer kind |
+
+Element ids already exist and are stable. `LINK` is precedent for a verb kind that resolves a
+*name* in the runtime rather than the reducer, so an id-addressed kind has somewhere to live.
+
+**Cost.** Higher than it first looked: a reducer kind, not a one-liner. Still low risk —
+`updateControlProperty` already writes into `Pixel.elements`, which is what the design-mode drag
+handles do when an element is moved.
+
+**Verdict: do it, by id.** Still a hole rather than a boundary — but the shape of the fix is now
+known rather than assumed.
+
+## 3. `editText` is invisible to everything except the keyboard — **shipped**
 
 `@edit` is a real interactive feature: a focusable field with a caret, keyboard entry, and a
 knob that cycles the character under it. And:
@@ -132,9 +173,22 @@ knob that cycles the character under it. And:
 A patch name is the one genuinely *editable* value a display owns. It should be readable by a
 script, bindable both ways, and arguably automatable.
 
-**Cost.** Very low for the verbs (`lcd.editText(C)` / `lcd.setEditText(C, s)`). The host-automation
-question is a real decision — the `exportValues: []` comment says an output has nothing to
-automate, which was written before `@edit` existed and should be revisited on its own terms.
+**The verb half is done.** `lcd.editText` and `pixel.editText` now exist — one line each in
+`componentVerbs.js`, one verb per family, reading back as well as writing because `read` is one of
+the five kinds every family gets for free:
+
+```js
+ce.components.lcd.editText(C, 'HYPERSAW BRASS');   // write
+const name = ce.components.lcd.editText(C);        // read
+```
+
+Adding them required regenerating the three C++ engine preludes
+(`gen-script-modules.mjs --write`) and the scripting manual (`npm run docs:manual`) — the parity
+tests fail until every runtime agrees a verb exists, which is the mechanism working as designed.
+
+**What is still open** is the host-automation half. `exportValues: []` says an output has nothing to
+automate; that ruling was written before `@edit` existed and deserves re-arguing on its own terms,
+because a patch name is a value a DAW might reasonably want to see. Not decided here.
 
 ---
 
@@ -341,6 +395,50 @@ re-derives it.
 `Mouse`/`HitZones` sections means you are adding a model rather than fighting one.
 
 **If one cheap: user glyphs.** The renderer already has a per-cell glyph pipeline to hang them on.
+
+---
+
+## Status and sequence
+
+| # | State |
+| --- | --- |
+| 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
+| 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
+| 1, 4, 5, 6 | Not started. |
+| 7, 8, 9 | Spike / later / on request. |
+
+### The next three steps, in order
+
+**Step 1 — user glyphs (proposal 1).** Unblocked, self-contained, and no decision is waiting on
+anyone. Sequenced first *because* it is independent: it touches `sectionDefaults`, the renderer's
+per-cell path and one inspector editor, and it collides with nothing else on this list. The
+acceptance test is that `bar` prefers glyphs when a full/partial set is defined and falls back to
+the block characters when it is not.
+
+**Step 2 — settle the soft-key question, then build it (proposal 4).** The code is not the hard
+part; this one question is, and it is the owner's to answer:
+
+> When a zone can be pressed, is the display still "display-only"? `interactionPolicy` makes a
+> read-only control transparent to the pointer *specifically so* a meter laid over a knob passes
+> the click through. Displays do not go through that path today. Do pressable zones become an
+> exception to that rule, or does the display acquire a real `Mouse`/`HitZones` section and stop
+> being display-only altogether?
+
+The second answer is more work and more honest. Either way, decide before writing code — a
+half-answered interaction model is the expensive kind of mistake.
+
+**Step 3 — id-addressed element verbs (proposal 2), then `@param` zones (proposal 5).** Both are
+addressing problems and they rhyme: one lets a script name an element, the other lets a zone name a
+parameter. Doing them together means designing the reserved-source/id-resolution story once.
+
+Proposal 6 stays parked until 4 lands, because `on: { press }` has nothing to hang on until then.
+
+### What would make this note wrong
+
+Worth writing down so it can be checked rather than trusted: the numbers in the audit table were
+counted on 2026-09-12 against `componentVerbs.js`, `componentPorts.js`, `componentTypes.js` and
+`lcdZones.js`. If a later reader finds `pixel.*` has content verbs, or a `Mouse` section on a
+display, this note has been overtaken and the code is right.
 
 ## Deliberately not proposed
 

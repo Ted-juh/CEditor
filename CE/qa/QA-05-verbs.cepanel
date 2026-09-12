@@ -15,7 +15,7 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 434 verbs",
+  "description": "QA-05 — 23 verb families, 436 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -114,7 +114,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 434 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 436 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -4384,7 +4384,7 @@
           }
         },
         "Text": {
-          "content": "35 verbs",
+          "content": "36 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -4429,7 +4429,7 @@
           }
         },
         "Text": {
-          "content": "lcd.text(line)                lcd.blinkRate(num)\nlcd.clear(line)               lcd.cursorBlink[on]\nlcd.backlight[on]             lcd.valueMin(num)\nlcd.brightness(num)           lcd.valueMax(num)\nlcd.contrast(num)             lcd.valuePrecision(int)\nlcd.scroll(enum)              lcd.valuePrefix(str)\nlcd.scrollSpeed(num)          lcd.valueSuffix(str)\nlcd.blink[on]                 lcd.valueSource(link)\nlcd.cursor(enum)              lcd.brightnessSource(link)\nlcd.cursorAt(xy)              lcd.backlightSource(link)\nlcd.value(num)                lcd.showGlass[on]\nlcd.anim(enum)                lcd.showGhost[on]\nlcd.animPreset(str)           lcd.showScanlines[on]\nlcd.animSpeed(num)            lcd.showGrid[on]\nlcd.animFps(num)              lcd.read(read)\nlcd.animLoop[on]              lcd.size(size)\nlcd.scrollMode(enum)          lcd.fill(fill)\nlcd.scrollRepeat(int)",
+          "content": "lcd.text(line)                lcd.blinkRate(num)\nlcd.clear(line)               lcd.cursorBlink[on]\nlcd.backlight[on]             lcd.valueMin(num)\nlcd.brightness(num)           lcd.valueMax(num)\nlcd.contrast(num)             lcd.valuePrecision(int)\nlcd.scroll(enum)              lcd.valuePrefix(str)\nlcd.scrollSpeed(num)          lcd.valueSuffix(str)\nlcd.blink[on]                 lcd.valueSource(link)\nlcd.cursor(enum)              lcd.brightnessSource(link)\nlcd.cursorAt(xy)              lcd.backlightSource(link)\nlcd.value(num)                lcd.editText(str)\nlcd.anim(enum)                lcd.showGlass[on]\nlcd.animPreset(str)           lcd.showGhost[on]\nlcd.animSpeed(num)            lcd.showScanlines[on]\nlcd.animFps(num)              lcd.showGrid[on]\nlcd.animLoop[on]              lcd.read(read)\nlcd.scrollMode(enum)          lcd.size(size)\nlcd.scrollRepeat(int)         lcd.fill(fill)",
           "_children": {
             "Font": {
               "family": "monospace",
@@ -4448,7 +4448,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_Pixel_Display_pixel_Drive_a_pixel_display_s_screen_state_backlight_brightness_and_its_animation_",
+          "name": "group_Pixel_Display_pixel_Drive_a_pixel_display_its_elements_text_visibility_and_position_plus_backlight_brightness_and_animation_",
           "id": "qa_group_22",
           "controlType": "Label"
         },
@@ -4473,7 +4473,7 @@
           }
         },
         "Text": {
-          "content": "Pixel Display — pixel.*  (Drive a pixel display's screen state: backlight, brightness, and its animation.)",
+          "content": "Pixel Display — pixel.*  (Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation.)",
           "_children": {
             "Font": {
               "size": 13,
@@ -4564,7 +4564,7 @@
           }
         },
         "Text": {
-          "content": "19 verbs",
+          "content": "20 verbs",
           "_children": {
             "Font": {
               "size": 11
@@ -4609,7 +4609,7 @@
           }
         },
         "Text": {
-          "content": "pixel.backlight[on]           pixel.layoutTransition(enum)\npixel.brightness(num)         pixel.transitionMs(num)\npixel.contrast(num)           pixel.brightnessSource(link)\npixel.gamma(num)              pixel.backlightSource(link)\npixel.glow(num)               pixel.showGlass[on]\npixel.anim(enum)              pixel.showGhost[on]\npixel.animPreset(str)         pixel.showScanlines[on]\npixel.animSpeed(num)          pixel.showGrid[on]\npixel.animLoop[on]            pixel.read(read)\npixel.animFps(num)",
+          "content": "pixel.editText(str)           pixel.animFps(num)\npixel.backlight[on]           pixel.layoutTransition(enum)\npixel.brightness(num)         pixel.transitionMs(num)\npixel.contrast(num)           pixel.brightnessSource(link)\npixel.gamma(num)              pixel.backlightSource(link)\npixel.glow(num)               pixel.showGlass[on]\npixel.anim(enum)              pixel.showGhost[on]\npixel.animPreset(str)         pixel.showScanlines[on]\npixel.animSpeed(num)          pixel.showGrid[on]\npixel.animLoop[on]            pixel.read(read)",
           "_children": {
             "Font": {
               "family": "monospace",
