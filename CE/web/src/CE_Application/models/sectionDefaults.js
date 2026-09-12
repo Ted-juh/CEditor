@@ -680,6 +680,13 @@ export const SECTION_DEFAULTS = {
     },
     // Which controls count as "@active" (Core.ids). Empty = any control.
     activeScope: [],
+    // A zone's sourceId is normally a control's Core.id. Three reserved forms are not:
+    //   '@active' / '@active#kind'   whichever control was last touched
+    //   '@edit'                      this display's own editText buffer
+    //   '@param:<id>'                a DEVICE PARAMETER, with no control in between — optionally
+    //                                '@param:<role>:<id>' for a panel driving more than one device.
+    //                                Its value comes from stores/deviceParameterValues.js, and its
+    //                                name and range from the role's profile.
     // Editable text field (e.g. a preset name). A zone with show:'edit' bound to
     // the reserved "@edit" source displays this buffer; in preview the screen is
     // focusable and edits it live (keyboard type/caret, or a knob/wheel cycling

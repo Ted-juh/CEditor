@@ -68,6 +68,81 @@ export const ACTIVE_SOURCE_ID = '@active';
 // A zone with show:'edit' bound to this shows/edits the preset-name field.
 export const EDIT_SOURCE_ID = '@edit';
 
+// A zone may name a DEVICE PARAMETER instead of a panel control.
+//
+// Until this existed, a zone's sourceId was always a control id, so showing a device parameter
+// meant creating a control, binding it, and pointing the zone at the control. A screen reporting
+// eight parameters needed eight controls that existed only to be read.
+//
+//   '@param:filter.cutoff'         the default device role
+//   '@param:synth:filter.cutoff'   a named role, for a panel driving more than one device
+//
+// The role is the part BEFORE the first colon when there are two segments, because a parameter id
+// is dotted (`filter.cutoff`) and a role is not. A parameter id containing a colon would parse
+// wrongly; none does, and the alternative was a second prefix nobody would remember.
+export const PARAM_SOURCE_PREFIX = '@param:';
+
+export function isParamSource(id) {
+  return String(id ?? '').startsWith(PARAM_SOURCE_PREFIX);
+}
+
+/** { role, parameterId } for a '@param:...' source, or null. An empty id is not a source. */
+export function parseParamSource(id, defaultRole = '') {
+  const s = String(id ?? '');
+  if (!isParamSource(s)) return null;
+  const rest = s.slice(PARAM_SOURCE_PREFIX.length);
+  const colon = rest.indexOf(':');
+  const role = colon >= 0 ? rest.slice(0, colon).trim() : String(defaultRole ?? '');
+  const parameterId = (colon >= 0 ? rest.slice(colon + 1) : rest).trim();
+  if (!parameterId) return null;
+  return { role, parameterId };
+}
+
+/**
+ * A zone `info` built from a profile's parameter definition plus its current value.
+ *
+ * The same shape `lcdSourceInfo` produces for a control, so every `show` kind works against a
+ * parameter without knowing the difference. `address` answers the parameter's own id, which is
+ * what the kind already showed when it reached through a control's binding to find one.
+ *
+ * A BOOLEAN parameter has no `range` — it carries falseValue/trueValue instead — so it is reported
+ * as 0..1 with `on` set. Reporting its raw 0/127 would make `pct` say 100% for "on", which is true
+ * of the wire and useless on a screen.
+ */
+export function parameterInfo(parameter, value) {
+  if (!parameter) return null;
+  const isBool = String(parameter?.type ?? '') === 'boolean';
+  const fallback = parameter?.default;
+  const raw = value === undefined || value === null ? fallback : value;
+
+  if (isBool) {
+    const on = raw === true || numberOr(raw, 0) >= numberOr(parameter?.trueValue, 1) / 2;
+    return {
+      present: true,
+      name: String(parameter?.name ?? parameter?.id ?? ''),
+      value: on ? 1 : 0,
+      min: 0,
+      max: 1,
+      text: on ? 'On' : 'Off',
+      on,
+      address: String(parameter?.id ?? ''),
+    };
+  }
+
+  const min = numberOr(parameter?.range?.min, 0);
+  const max = numberOr(parameter?.range?.max, 127);
+  return {
+    present: true,
+    name: String(parameter?.name ?? parameter?.id ?? ''),
+    value: numberOr(raw, min),
+    min,
+    max,
+    text: String(parameter?.display?.unit ?? ''),
+    on: false,
+    address: String(parameter?.id ?? ''),
+  };
+}
+
 export function isActiveSource(id) {
   return String(id ?? '') === ACTIVE_SOURCE_ID || String(id ?? '').startsWith(`${ACTIVE_SOURCE_ID}#`);
 }

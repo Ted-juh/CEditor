@@ -9,8 +9,10 @@
   } from '../utils/returnToRest.js';
   import {
     collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
-    pressTargetAt, layoutTimeout,
+    pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
   } from '../utils/lcdZones.js';
+  import { deviceParameterValues } from '../stores/deviceParameterValues.js';
+  import { profileParameters, deviceRoleMappings } from '../stores/deviceProfileStores.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
@@ -505,6 +507,27 @@
     if (!src) return null;
     const range = lcdSourceValueRange(src);
     return range && range.value !== undefined ? range : null;
+  }
+
+  /**
+   * Live info for a '@param:...' zone source: the profile's parameter definition, plus whatever
+   * the device's live state says it is set to.
+   *
+   * Read through the stores rather than through a bound control, which is the whole point — a zone
+   * naming a parameter needs no proxy control, and works whether or not one happens to exist.
+   * Missing profile, missing mapping or an unknown id all answer null, so the zone paints nothing
+   * and whatever sits under it survives; an invented value would be worse than a blank.
+   */
+  function lcdParamInfo(sourceId) {
+    const parsed = parseParamSource(sourceId, DEFAULT_DEVICE_ROLE);
+    if (!parsed) return null;
+    const profileId = String($deviceRoleMappings?.[parsed.role]?.profileId ?? '');
+    if (!profileId) return null;
+    const parameters = $profileParameters?.[profileId];
+    if (!Array.isArray(parameters)) return null;
+    const parameter = parameters.find((entry) => String(entry?.id ?? '') === parsed.parameterId);
+    if (!parameter) return null;
+    return parameterInfo(parameter, $deviceParameterValues?.[parsed.role]?.[parsed.parameterId]);
   }
 
   // Rich live info about a source control for the zones engine: value/range, its
@@ -1136,6 +1159,13 @@
         // (restricted to this display's activeScope, and to the kind filter);
         // a fixed id resolves to that control. Keyed by the raw id so each
         // filtered "@active#kind" zone reads its own live value.
+        // A parameter source resolves through the profile and the device's live state; everything
+        // else is still a control id, resolved as it always was.
+        if (isParamSource(id)) {
+          const paramInfo = lcdParamInfo(id);
+          if (paramInfo) live[id] = paramInfo;
+          continue;
+        }
         const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
         const src = resolvedId ? controlById(resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
