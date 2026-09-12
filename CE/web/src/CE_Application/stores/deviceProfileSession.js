@@ -2,6 +2,7 @@
 // listeners (exactly once, guarded by `initialized`), persists/restores the device session
 // via appSettings/projectDeviceSession, and owns role-mapping + profile/source refresh calls.
 import { get } from 'svelte/store';
+import { clearDeviceParameterValues } from './deviceParameterValues.js';
 import {
   getDeviceProfileSource,
   getProfileParameterDetail,
@@ -932,6 +933,13 @@ export function mapDeviceRole(role, profileId, options = {}) {
     variables: options.variables ?? get(deviceRoleMappings)?.[role]?.variables ?? {},
     timingOverrides: options.timingOverrides ?? get(deviceRoleMappings)?.[role]?.timingOverrides ?? {},
   };
+
+  // A role pointed at a different profile is a different device. Its recorded parameter values
+  // describe the old one, and two profiles sharing a parameter id (filter.cutoff is not rare)
+  // would otherwise show the previous device's setting as though it were this one's.
+  if (String(get(deviceRoleMappings)?.[role]?.profileId ?? '') !== String(profileId ?? '')) {
+    clearDeviceParameterValues(role);
+  }
 
   deviceRoleMappings.update((mappings) => ({
     ...mappings,

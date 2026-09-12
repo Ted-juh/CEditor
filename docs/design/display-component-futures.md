@@ -288,7 +288,7 @@ On a *graphic* panel the cells are stamped into a canvas bitmap, so inverting a 
 flipping bits after the stamp rather than styling a span: worth doing, and canvas work. And
 `PixelDisplay` elements are not pressable at all — this is `LcdDisplay` zones only.
 
-## 5. Let a zone bind a device parameter directly
+## 5. Let a zone bind a device parameter directly — **shipped**
 
 **What is missing.** A zone's `sourceId` is always a *control* id. The only exceptions are the two
 reserved sources, `@active` and `@edit`. To show a device parameter you must create a control, bind
@@ -307,16 +307,60 @@ flowchart LR
 
 For a screen that reports eight parameters, that is eight controls existing only to be read.
 
-**The plumbing half-exists.** The `address` show kind already reaches *through* a control into its
-`DeviceBindings` to print the CC/NRPN address — so the zone engine has already been taught that a
-device parameter is a thing a zone can talk about. `@param:<id>` extends the reserved-source
-mechanism that `@active` and `@edit` established.
+**Building it turned up the thing that was actually missing, and it was not the zone syntax.**
 
-**Cost.** Moderate. `collectSourceIds` and the preview's `__live` builder both need to resolve a
-parameter id against the profile rather than the control list; the profile already exposes
-parameters by id for the binding UI.
+A device parameter had no value. Not "a value that was hard to reach" — no value at all. An inbound
+CC was decoded against the profile and written into the preview session of every *control* bound to
+that parameter; an outbound change was read off the control that moved. So "what is the cutoff right
+now" had no answer unless some control happened to be bound to it. **The device's state was
+scattered across whichever widgets the panel author had drawn**, which is the same fact that forced
+the proxy controls this proposal set out to remove.
 
-**Verdict: worth doing, after 4.** It removes a real modelling wart.
+So the proposal needed a device-state model, and got one:
+`stores/deviceParameterValues.js`, keyed by role and parameter id.
+
+**What made it cheap is that both directions already funnel through exactly one function each**,
+and both carry the whole triple:
+
+| Direction | Funnel | Carries |
+| --- | --- | --- |
+| Inbound | `syncDeviceParameterToPanelPreview` | `(role, parameterId, value)` |
+| Outbound | `commitDeviceParameter` | `{ deviceRole, parameterId, value }` |
+
+Two writes, no new bookkeeping, and nothing else in the tree can move a parameter without passing
+one of them. The outbound write happens only *after* the send resolves, so a parameter the profile
+could not compile is not recorded as though it had been set.
+
+**The zone syntax was the easy half:**
+
+```js
+{ show: 'value', sourceId: '@param:filter.cutoff' }        // the default device role
+{ show: 'bar',   sourceId: '@param:pad:filter.cutoff' }    // a named role
+```
+
+The role is the part before the first colon when there are two segments — a parameter id is dotted
+and a role is not. Every `show` kind works unchanged, because `parameterInfo` builds the same shape
+`lcdSourceInfo` produces for a control. `address` answers the parameter's own id, which is what that
+kind already showed when it had to reach through a control's binding to find one.
+
+**Three judgements worth recording:**
+
+- **An unset parameter reads the profile's `default`, not zero.** A screen should open showing what
+  the device is meant to be at, not a filter claiming to be shut.
+- **A boolean parameter reports 0..1, not its wire values.** `falseValue`/`trueValue` are 0 and 127,
+  and reporting those would make `pct` say 100% for "on" — true of the wire, useless beside a bar.
+- **Remapping a role clears its recorded values.** They describe the old device, and two profiles
+  sharing a parameter id (`filter.cutoff` is not rare) would otherwise show the previous device's
+  setting as this one's.
+
+**Verified with no proxy anywhere:** a display whose four zones all name `@param:filter.cutoff`
+shows the profile default, then tracks two inbound values — with exactly one control on the panel,
+the display itself.
+
+**What this is not:** persistence, and not a patch. It is the editor's live picture of the device,
+dropped with the panel, and it says nothing about whether the device agreed — a parameter the
+device never confirms reads as whatever was last sent. That was already true of the bound control;
+this makes it explicit rather than worse.
 
 ## 6. Layouts as a state machine, not a lookup — **the edges shipped**
 
@@ -458,7 +502,7 @@ re-derives it.
 | 3 | `editText` verbs | Very low | Partly (automation) | **Shipped** |
 | 1 | User glyphs | Small | No | **Shipped** |
 | 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
-| 5 | `@param` zones | Moderate | Yes — removes the proxy | Yes |
+| 5 | `@param` zones | Moderate | Yes — and needed a device-state store | **Shipped** |
 | 6 | Layout state machine | High | Yes — layouts gain state | **Edges shipped** |
 | 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
 | 8 | Real-audio scope | High | No (host work) | Later |
@@ -475,12 +519,13 @@ without changing its model, because the click path was already there for edit fi
 
 | # | State |
 | --- | --- |
+| 5 | **Shipped** — `@param:` zones, on a new device-parameter value store. |
 | 6 | **Edges shipped** — press in, timeout out. Per-layout selection state still missing. |
 | 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
-| 5 | Not started. |
+
 | 7, 8, 9 | Spike / later / on request. |
 
 ### The next three steps, in order
@@ -502,9 +547,10 @@ part; this one question is, and it is the owner's to answer:
 The second answer is more work and more honest. Either way, decide before writing code — a
 half-answered interaction model is the expensive kind of mistake.
 
-**Step 3 — id-addressed element verbs (proposal 2), then `@param` zones (proposal 5).** Both are
-addressing problems and they rhyme: one lets a script name an element, the other lets a zone name a
-parameter. Doing them together means designing the reserved-source/id-resolution story once.
+**Step 3 — ~~id-addressed element verbs, then `@param` zones~~. Half done.** `@param` shipped and
+settled the reserved-source story: a source that is not a control id resolves through its own
+branch, exactly as `@active` and `@edit` do. Proposal 2's id-addressed element verbs are the
+remaining half, and they now have a pattern to follow.
 
 Proposal 6's **edges are done** — a press gets you in, a timeout brings you back. What remains of
 it is per-layout *selection* state: a menu that can be scrolled, not just entered and left.

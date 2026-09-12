@@ -297,3 +297,79 @@ test('a fractional timeout rounds rather than being refused', () => {
   const { layoutTimeout } = ZONES;
   assert.deepEqual(layoutTimeout({ timeoutMs: 1500.6, timeoutTo: 'home' }), { ms: 1501, to: 'home' });
 });
+
+/* ------------------------------------------------- a zone that names a device parameter */
+
+const CUTOFF = {
+  id: 'filter.cutoff', name: 'Filter Cutoff', type: 'bipolar',
+  range: { min: 0, max: 127 }, default: 64, display: { unit: 'Hz' },
+};
+const FILTER_ON = {
+  id: 'filter.enabled', name: 'Filter Enabled', type: 'boolean',
+  default: true, falseValue: 0, trueValue: 127,
+};
+
+test('a parameter source parses, with and without a role', () => {
+  const { isParamSource, parseParamSource } = ZONES;
+  assert.equal(isParamSource('@param:filter.cutoff'), true);
+  assert.equal(isParamSource('ctrl_123'), false);
+  assert.equal(isParamSource('@active'), false);
+
+  // No role: the caller's default. A parameter id is dotted, a role is not, which is what makes
+  // the one-colon form unambiguous.
+  assert.deepEqual(parseParamSource('@param:filter.cutoff', 'synth'),
+    { role: 'synth', parameterId: 'filter.cutoff' });
+  assert.deepEqual(parseParamSource('@param:pad:filter.cutoff', 'synth'),
+    { role: 'pad', parameterId: 'filter.cutoff' });
+  // Nothing after the prefix is not a source.
+  assert.equal(parseParamSource('@param:', 'synth'), null);
+  assert.equal(parseParamSource('ctrl_123', 'synth'), null);
+});
+
+test('a parameter renders through every show kind a control would', () => {
+  const { parameterInfo } = ZONES;
+  const info = parameterInfo(CUTOFF, 96);
+  assert.equal(resolveZoneContent({ show: 'name' }, info, 14), 'Filter Cutoff');
+  assert.equal(resolveZoneContent({ show: 'value' }, info, 6), '96');
+  assert.equal(resolveZoneContent({ show: 'pct', suffix: '%' }, info, 6), '76%');
+  assert.equal(resolveZoneContent({ show: 'midiValue', radix: 'hex' }, info, 4), '60');
+  // `address` answers the parameter's own id — the same thing the kind showed when it had to
+  // reach through a control's binding to find one.
+  assert.equal(resolveZoneContent({ show: 'address' }, info, 16), 'filter.cutoff');
+});
+
+test('an unset parameter falls back to the profile default, not to zero', () => {
+  const { parameterInfo } = ZONES;
+  // Nothing has moved it yet: a screen should open reading what the device is meant to be at.
+  assert.equal(parameterInfo(CUTOFF, undefined).value, 64);
+  assert.equal(parameterInfo(CUTOFF, null).value, 64);
+  assert.equal(parameterInfo(CUTOFF, 0).value, 0, 'but a real zero is a value, not "unset"');
+});
+
+test('a boolean parameter reports 0..1, not its wire values', () => {
+  const { parameterInfo } = ZONES;
+  // Reporting the raw 0/127 would make `pct` say 100% for "on" — true of the wire, useless on
+  // a screen next to a bargraph.
+  const on = parameterInfo(FILTER_ON, 127);
+  assert.equal(on.max, 1);
+  assert.equal(on.on, true);
+  assert.equal(resolveZoneContent({ show: 'state' }, on, 4), 'On');
+  assert.equal(resolveZoneContent({ show: 'pct', suffix: '%' }, on, 5), '100%');
+
+  const off = parameterInfo(FILTER_ON, 0);
+  assert.equal(off.on, false);
+  assert.equal(resolveZoneContent({ show: 'state' }, off, 4), 'Off');
+  assert.equal(resolveZoneContent({ show: 'pct', suffix: '%' }, off, 5), '0%');
+});
+
+test('no parameter is no info, so the zone paints nothing', () => {
+  // An invented value would be worse than a blank: whatever sits under the zone survives instead.
+  assert.equal(ZONES.parameterInfo(null, 5), null);
+  assert.equal(ZONES.parameterInfo(undefined, 5), null);
+});
+
+test('collectSourceIds gathers parameter sources like any other', () => {
+  // The preview has to know to fetch them, and it walks this list to find out.
+  const display = { layouts: [{ zones: [{ sourceId: '@param:filter.cutoff' }, { sourceId: 'ctrl_1' }] }] };
+  assert.deepEqual(collectSourceIds(display).sort(), ['@param:filter.cutoff', 'ctrl_1']);
+});
