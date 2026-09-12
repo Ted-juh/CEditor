@@ -4,10 +4,21 @@ A design record for `LcdDisplay` and `PixelDisplay`, written after an audit of w
 components actually do. Nine proposals, in three tiers: things that are simply absent, things that
 change what the component *is*, and three that are speculative on purpose.
 
+**Where it ended up: six built, one answered, two still speculative.** The note has been kept as a
+record rather than rewritten into a description, so each proposal now carries what shipped
+underneath what was proposed — including the three places the plan was wrong, which are the parts
+worth a reader's time:
+
+| Proposal | The plan | What building it found |
+| --- | --- | --- |
+| 2 | Address pixel elements by index, then by `id` | Neither works. The index is the paint order the inspector rewrites; the id is an `el_…` the UI never shows. Elements needed a **name**. |
+| 4 | Decide whether a display gains a real interaction model | It should not. Pressable zones are an **exception on the existing click path**, and a display with a `Mouse` section would be a control that merely looks like one. |
+| 7 | A one-day hardware spike on CTRL49 bandwidth | No spike needed, and bandwidth was the wrong question. The answer was in `CE/src/ControlSurface/`, already built. |
+
 **This note partly argues with [screen-builder-design.md](screen-builder-design.md).** That document
 rules out compiling CEditor panels to the CTRL49's screen, for good reasons. Proposal 7 does not
-overturn that; it points at the one component the reasoning does not cover. Read the non-goals
-there before reading 7 here.
+overturn that — and having been answered, it now hands that document a smaller idea rather than
+taking one from it. Read the non-goals there before reading 7 here.
 
 ---
 
@@ -713,10 +724,14 @@ re-derives it.
 | 8 | Real-audio scope | High | No (host work) | Later |
 | 9 | Device screen mirror | Per-device | No | On request |
 
-**Soft keys are done.** They changed the component's category — a display is now a UI surface —
-without changing its model, because the click path was already there for edit fields.
+**The "Changes the model?" column is the one that aged well.** Every proposal that answered "no"
+shipped roughly as estimated. Both that answered "yes" cost more than the effort column says, and
+in the same way: 5 needed a device-parameter store before a zone could read one, and 6 needed
+layouts to hold state before a menu could be scrolled. Neither was visible from the proposal.
 
-**If one cheap: user glyphs.** The renderer already has a per-cell glyph pipeline to hang them on.
+**The effort column aged worst on 2**, which is listed as moderate and was — after two false starts
+that the effort column could not have predicted, because both were about *addressing* rather than
+about work.
 
 ---
 
