@@ -251,7 +251,7 @@
   function addElement() {
     const next = cloneElements();
     next.push({
-      id: genId('el_'), kind: 'vbar', x: 4, y: 4,
+      id: genId('el_'), name: '', kind: 'vbar', x: 4, y: 4,
       w: 12, h: Math.max(8, pixelsH - 8),
       sourceId: '', align: 'left', precision: 0, prefix: '', suffix: '', label: '',
       frame: false, ticks: false, peakHold: false, smooth: false, visible: true,
@@ -269,6 +269,11 @@
     if (!src) return;
     const copy = $state.snapshot(src);
     copy.id = genId('el_');
+    // The copy is a DIFFERENT element — that is what the nudge below says — so it does not inherit
+    // the script name. (Duplicating a LAYOUT does keep the names, and should: those are the same
+    // elements on another page.) Two elements answering to one name are written together, which is
+    // right for a page copy and wrong for a second widget beside the first.
+    copy.name = '';
     // Nudge the copy so it doesn't sit exactly on the original.
     copy.x = Math.min(pixelsW - 1, (Number(copy.x) || 0) + 2);
     copy.y = Math.min(pixelsH - 1, (Number(copy.y) || 0) + 2);
@@ -647,6 +652,7 @@
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <PropertyToggle compact label="Vis" title="Element visible" value={el.visible !== false} onchange={(next) => setElement(i, 'visible', next)} />
             <PropertyToggle compact label="Blk" title="Blink this element on/off (~530ms)" value={el.blink === true} onchange={(next) => setElement(i, 'blink', next)} />
+            <input class="val enm" type="text" title="Script name — how ce.components.pixel.text/show/x… address this element. Never drawn." placeholder="name" value={el.name ?? ''} onchange={(event) => setElement(i, 'name', event.target.value.trim())} />
             <input class="val en" type="text" title="Group name — elements in a group drag and hide together" placeholder="grp" value={el.group ?? ''} onchange={(event) => setElement(i, 'group', event.target.value.trim())} />
             {#if WIDGET_KINDS.includes(el.kind)}
               <PropertyToggle compact label="Frm" title="Outline frame" value={el.frame === true} onchange={(next) => setElement(i, 'frame', next)} />
@@ -1095,6 +1101,13 @@
 
   .el-extra .en2 {
     width: 48px;
+    flex: 0 0 auto;
+  }
+
+  /* The script name. Wider than `grp` beside it because the things people call an element —
+     title, tempo, patchName — are words rather than the three-letter tag a group is. */
+  .el-extra .enm {
+    width: 74px;
     flex: 0 0 auto;
   }
 

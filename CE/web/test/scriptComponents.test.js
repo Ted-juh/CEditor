@@ -465,3 +465,81 @@ test('every read, size, fill, insert and remove answers on a real control', () =
     assert.deepEqual(dead, [], `verbs that did nothing:\n  ${dead.join('\n  ')}`);
   });
 });
+
+/* ------------------------------------------- the pixel scene, end to end (proposal 2) */
+
+/** Give the harness's PixelDisplay a scene: one named element flat, the same name on a layout. */
+function withPixelScene(fn) {
+  return withEveryComponent((api) => {
+    api.set('pixel.Pixel.elements', [
+      { id: 'el_0', name: 'title', kind: 'static', text: 'INIT', visible: true, x: 2, y: 2, w: 0, h: 8 },
+      { id: 'el_1', name: '', kind: 'vbar', visible: true, x: 40, y: 0, w: 8, h: 40 },
+    ]);
+    api.set('pixel.Pixel.layouts', [{
+      id: 'lay_0', name: 'Page 1',
+      elements: [{ id: 'el_2', name: 'title', kind: 'static', text: 'INIT', visible: true, x: 2, y: 2, w: 0, h: 8 }],
+    }]);
+    return fn(api);
+  });
+}
+
+test('a pixel element is written by name and reads back by name', () => {
+  withPixelScene((api) => {
+    assert.equal(api.pixelText('pixel', 'title', 'SATURN VB'), true);
+    assert.equal(api.pixelRead('pixel', 'text', 'title'), 'SATURN VB');
+    // Both places: the flat scene AND the page, which is what a display with layouts actually draws.
+    const layouts = api.get('pixel.Pixel.layouts');
+    assert.equal(layouts[0].elements[0].text, 'SATURN VB');
+  });
+});
+
+test('read("text") is also how a script discovers what the display has', () => {
+  withPixelScene((api) => {
+    const table = api.pixelRead('pixel', 'text');
+    assert.equal(table.title, 'INIT');
+    assert.ok('el_1' in table, 'an unnamed element appears under its id rather than vanishing');
+  });
+});
+
+test('a name the display has not got is refused, and says so', () => {
+  withPixelScene((api) => {
+    assert.equal(api.pixelText('pixel', 'tempo', 'X'), false, 'refused');
+    assert.equal(api.pixelText('pixel', 'title', 'INIT'), true, 'already that way is success');
+    assert.equal(api.pixelRead('pixel', 'text', 'tempo'), undefined);
+  });
+});
+
+test('show and blink toggle when called with nothing to set', () => {
+  withPixelScene((api) => {
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), true);
+    assert.equal(api.pixelShow('pixel', 'title'), true);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), false, 'a bare call toggles');
+    assert.equal(api.pixelShow('pixel', 'title', true), true);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), true);
+  });
+});
+
+test('the scene verbs clamp like every other number verb', () => {
+  withPixelScene((api) => {
+    assert.equal(api.pixelX('pixel', 'title', 999999), true);
+    assert.equal(api.pixelRead('pixel', 'x', 'title'), 4096);
+    // Off the left edge is a legal place to park an element while it slides in.
+    assert.equal(api.pixelX('pixel', 'title', -30), true);
+    assert.equal(api.pixelRead('pixel', 'x', 'title'), -30);
+    assert.equal(api.pixelW('pixel', 'title', -5), true, 'a width clamps to 0 rather than refusing');
+    assert.equal(api.pixelRead('pixel', 'w', 'title'), 0);
+  });
+});
+
+test('the scene is not a list, so it grew no size, fill, insert or remove', () => {
+  // `elem` is deliberately outside LIST_KINDS: those four all speak in positions, and a
+  // name-addressed scene has no n-th anything. A size() answering the stored array's length would
+  // be a number no verb takes.
+  withPixelScene((api) => {
+    assert.equal(verbId('pixel', 'size'), undefined);
+    assert.equal(verbId('pixel', 'fill'), undefined);
+    assert.equal(verbId('pixel', 'insert'), undefined);
+    assert.equal(verbId('pixel', 'remove'), undefined);
+    assert.ok(api.pixelRead, 'read is the one every family gets, and it answers by name');
+  });
+});

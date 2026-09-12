@@ -89,6 +89,7 @@ import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
 import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
+import { elementSites, elementAt, elementPropTable } from '../utils/pixelElements.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 // The arrangement maths — pure, and the SAME functions the canvas context menu runs. Two
@@ -104,7 +105,7 @@ import {
 } from './midiFilters.js';
 import {
   COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
-  itemListLength, LINK_KIND,
+  itemListLength, LINK_KIND, ELEM_KIND,
 } from './componentVerbs.js';
 import {
   SOURCE_KINDS, sourceAccepts, sourceByName, sourceName,
@@ -2498,6 +2499,22 @@ function componentReadAction(verb, path, args) {
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
+
+  // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a
+  // script discovers what the display has, or one element's value. A positional index would be the
+  // wrong question — see LIST_KINDS in componentVerbs.js — so it is refused rather than guessed at.
+  if (spec.k === ELEM_KIND) {
+    const table = elementPropTable(cfg, spec.item);
+    if (index === undefined || index === null || index === '') return table;
+    const sites = elementSites(cfg, index);
+    if (!sites.length) {
+      addScriptTrace('error', '',
+        `${verb.family}.read("${name}", "${index}"): this display has no element called `
+        + `"${index}". One of: ${Object.keys(table).join(', ') || '(none)'}.`);
+      return undefined;
+    }
+    return elementAt(cfg, sites[0])?.[spec.item];
+  }
 
   const list = componentListValue(cfg, spec);
   if (!list) return undefined;
