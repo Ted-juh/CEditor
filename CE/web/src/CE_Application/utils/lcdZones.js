@@ -204,6 +204,37 @@ export function parameterInfo(parameter, value) {
     };
   }
 
+  // A CHOICE PARAMETER IS NOT A NUMBER, and falling through to the numeric branch below silently
+  // turned one into the wrong number. A profile's choice stores its value as an id — "square", not
+  // 2 — so `numberOr(raw, min)` answered `min` for every setting the parameter had, and the text
+  // was the unit rather than the label. An `@param:osc.wave` zone therefore read 0 and drew no
+  // name, whichever waveform was selected.
+  //
+  // Shaped to match what a control-backed choice zone already produces (lcdSourceInfo): `text` is
+  // the human label so a screen shows "Bright" rather than "option_2", and `selector` is the id so
+  // a page can switch on it. The value is the POSITION in the list, which is what makes `pct` and
+  // `bar` mean something for a parameter that has no numeric range of its own.
+  const choices = Array.isArray(parameter?.choices) ? parameter.choices : [];
+  if (choices.length) {
+    const key = String(raw ?? '');
+    // By id first, then by wire value: a profile records the id, but a value arriving from the
+    // device is the wire byte, and both have to land on the same choice.
+    const at = choices.findIndex((c) => String(c?.id ?? '') === key
+      || String(c?.value ?? '') === key);
+    const chosen = at >= 0 ? choices[at] : null;
+    return {
+      present: true,
+      name: String(parameter?.name ?? parameter?.id ?? ''),
+      value: Math.max(0, at),
+      min: 0,
+      max: choices.length - 1,
+      text: String(chosen?.label ?? chosen?.id ?? ''),
+      on: false,
+      selector: String(chosen?.id ?? ''),
+      address: String(parameter?.id ?? ''),
+    };
+  }
+
   const min = numberOr(parameter?.range?.min, 0);
   const max = numberOr(parameter?.range?.max, 127);
   return {
@@ -500,7 +531,8 @@ export function zoneCoversCell(zone, cell, cols) {
  * so this walks the identical ordering backwards and returns the first hit.
  * Resolving it forwards would hand the press to a zone hidden underneath.
  */
-export function pressTargetAt(zones, cell, cols, state = {}) {
+export function pressTargetAt(zones, cell, cols, state = {}, getInfo = null) {
+  const nCols = Math.max(0, Math.round(numberOr(cols, 0)));
   const ordered = (Array.isArray(zones) ? zones : [])
     .filter((z) => zoneVisibleWith(z, state))
     .slice()
@@ -508,12 +540,29 @@ export function pressTargetAt(zones, cell, cols, state = {}) {
   for (let i = ordered.length - 1; i >= 0; i -= 1) {
     const zone = ordered[i];
     if (!zoneCoversCell(zone, cell, cols)) continue;
+    if (isPressableZone(zone)) return zone;
     // A zone that covers the cell but takes no press BLOCKS the ones beneath it,
     // for the same reason it hides them visually: the user pressed what they
     // could see, and what they could see does nothing.
-    return isPressableZone(zone) ? zone : null;
+    //
+    // …UNLESS IT PAINTED NOTHING, which is the case that argument does not cover.
+    // composeLayout skips a zone whose resolved content is empty — an idle
+    // '@active#kind' zone, or any source that is absent — and leaves whatever is
+    // underneath on screen. Blocking on it anyway made the two disagree: the eye
+    // saw the soft key below and the press hit a zone that was never drawn. So the
+    // same emptiness test decides both, from the same resolved content.
+    if (getInfo && nCols > 0 && zoneContentEmpty(zone, nCols, getInfo)) continue;
+    return null;
   }
   return null;
+}
+
+/** Did this zone resolve to nothing — the exact condition composeLayout skips on? */
+function zoneContentEmpty(zone, nCols, getInfo) {
+  const c0 = clamp(Math.round(numberOr(zone?.colStart, 1)) - 1, 0, nCols - 1);
+  const c1 = clamp(Math.round(numberOr(zone?.colEnd, nCols)) - 1, c0, nCols - 1);
+  const info = getInfo(String(zone?.sourceId ?? ''));
+  return resolveZoneContent(zone, info, c1 - c0 + 1) === '';
 }
 
 /** Every pressable zone of a layout, for a surface that wants to mark them. */
