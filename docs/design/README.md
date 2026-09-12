@@ -31,6 +31,7 @@ with an *as built* section per phase.
 
 | Document | What it is |
 |---|---|
+| [Display component futures](display-component-futures.md) | Nine proposals for `LcdDisplay` and `PixelDisplay`, from an audit of what the two actually do: user-definable glyphs, scriptable pixel content, zones as pressable soft keys, zones bound straight to device parameters, layouts as a state machine, and three speculative ones. Illustrated with rendered mockups (`docs/media/mockup-*.png`). Partly argues with the Screen Builder record above — read that document's non-goals first. Nothing in it is built. |
 | [Panel export pipeline plan](panel-export-pipeline-plan.md) | Turning a panel into a self-contained JUCE artifact — a VST3 or standalone built fresh per panel. The scripts that do it are `tools/scripts/export-panel-vst3.mjs` and friends. |
 | [Windows installer setup](windows-installer.md) | The Inno Setup 6 packaging flow and the `build/` layout it expects. The script is `tools/installer/CEditor.iss`. |
 

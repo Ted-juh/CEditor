@@ -6,6 +6,7 @@
 //   node tools/scripts/gen-display-demos.mjs --check       → non-zero if any GIF is missing
 //   node tools/scripts/gen-display-demos.mjs --png         → also keep frame 0 of each as a PNG
 //   node tools/scripts/gen-display-demos.mjs --verify      → prove determinism and loop closure
+//   node tools/scripts/gen-display-demos.mjs --mockups     → the design proposals, as stills
 //
 // Sibling of gen-manual-media.mjs and the same bargain: it drives the actual Vite dev server, the
 // actual LcdDisplayRenderer and PixelDisplayRenderer, and the actual preview machinery, so a
@@ -42,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 
 import { decodePng, encodeGif } from './lib/animatedGif.mjs';
 import { LOOP_SECONDS, SCENES } from './displayDemos/scenes.mjs';
+import { MOCKUPS } from './displayDemos/mockups.mjs';
 import { buildTorusGif } from './displayDemos/sourceAnimation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +57,9 @@ const FRAMES = LOOP_SECONDS * FPS;          // 60 frames over a 3s loop
 const FRAME_MS = 1000 / FPS;                // 50ms
 const DELAY_CS = Math.round(100 / FPS);     // GIF delays are in centiseconds: 5
 const WARMUP_LOOPS = 2;                     // settle smoothing / peak-hold / scope history
+// A still holds one value, so its ballistics converge geometrically (k = dt*14/1000 per step)
+// rather than having to reach a periodic orbit. Twenty steps is already past the last visible bit.
+const STILL_WARMUP = 20;
 const SCALE = 2;                            // device pixel ratio — the glyphs have to survive it
 
 const onlyArg = process.argv.indexOf('--only');
@@ -68,17 +73,21 @@ if (onlyArg > 0 && !only) {
 const checking = process.argv.includes('--check');
 const keepPng = process.argv.includes('--png');
 const verifying = process.argv.includes('--verify');
+// The design proposals live in a separate list and land on separate filenames, so a picture of
+// something the components might do can never be filed beside a recording of what they do.
+const mockingUp = process.argv.includes('--mockups');
 
-const scenes = SCENES.filter((s) => !only || s.id === only);
+const scenes = (mockingUp ? MOCKUPS : SCENES).filter((s) => !only || s.id === only);
 if (!scenes.length) {
   console.error(`gen-display-demos: no scene "${only}" (have: ${SCENES.map((s) => s.id).join(', ')})`);
   process.exit(1);
 }
 
-const nameOf = (scene) => `display-${scene.id}`;
+const nameOf = (scene) => `${scene.still ? 'mockup' : 'display'}-${scene.id}`;
+const fileOf = (scene) => join(outDir, `${nameOf(scene)}.${scene.still ? 'png' : 'gif'}`);
 
 if (checking) {
-  const missing = scenes.filter((s) => !existsSync(join(outDir, `${nameOf(s)}.gif`)));
+  const missing = scenes.filter((s) => !existsSync(fileOf(s)));
   if (missing.length) {
     console.error(`gen-display-demos: ${missing.length} recording(s) missing: ${missing.map(nameOf).join(', ')}`);
     process.exit(1);
@@ -296,11 +305,18 @@ async function record(page, scene, extraFrames = 0) {
 
   // Warm-up: the same signal, no screenshots. Peak-hold markers, meter smoothing and the scope's
   // history all need a run-up or frame 0 shows them mid-climb from zero.
-  for (let loop = 0; loop < WARMUP_LOOPS; loop += 1) {
-    for (const values of signal) {
-      // eslint-disable-next-line no-await-in-loop
-      await page.evaluate(([v, dt]) => window.__demo.step(v, dt), [values, FRAME_MS]);
-    }
+  const warmupSteps = scene.still ? STILL_WARMUP : WARMUP_LOOPS * FRAMES;
+  for (let i = 0; i < warmupSteps; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await page.evaluate(([v, dt]) => window.__demo.step(v, dt), [signal[i % FRAMES], FRAME_MS]);
+  }
+
+  if (scene.still) {
+    await page.evaluate(([v, dt]) => window.__demo.step(v, dt), [signal[0], FRAME_MS]);
+    const png = await target.screenshot({ type: 'png' });
+    writeFileSync(fileOf(scene), png);
+    const { width, height } = decodePng(png);
+    return { still: true, width, height, bytes: png.length };
   }
 
   const frames = [];
@@ -376,7 +392,12 @@ for (const scene of scenes) {
   const before = thrown.length;
   try {
     /* eslint-disable no-await-in-loop */
-    const captured = await record(page, scene, verifying ? 1 : 0);
+    const captured = await record(page, scene, verifying && !scene.still ? 1 : 0);
+    if (captured.still) {
+      console.log(`  ${nameOf(scene)}.png — ${captured.width}x${captured.height}, `
+        + `${(captured.bytes / 1024).toFixed(0)} KB`);
+      continue;
+    }
     const frames = captured.slice(0, FRAMES);
 
     if (verifying) {
