@@ -9,6 +9,11 @@
 //                  difference between them is eight glyph definitions. The "after" used to be a
 //                  PixelDisplay impersonating a character LCD, because the character LCD could not
 //                  place artwork in a cell. It can now, so the impersonation is gone.
+//   glyph-editor   shipped, and the odd one out: it photographs the INSPECTOR rather than a
+//                  screen, because what shipped for proposal 1's last piece is a way of DRAWING.
+//                  A still is better at input than a recording is. It needs the scene built with
+//                  preview mode off — see `inspect` in gen-display-demos.mjs and the comment
+//                  there about what leaving preview does to a panel.
 //   state-*        shipped, and the awkward case. All three edges between the screens are real now:
 //                  a press gets you in (proposal 4), a layout's own timeoutMs brings you back, and
 //                  the MENU cursor moves. But an edge is not a picture. MENU in particular looks
@@ -315,6 +320,34 @@ export const MOCKUPS = [
         ],
       }],
       pages: { defaultLayoutId: 'menu', selectorSourceId: '', selectorMap: [], overlays: [] },
+    },
+  },
+  {
+    id: 'glyph-editor',
+    still: true,
+    // The one figure here that photographs the EDITOR rather than the screen, because the thing
+    // that shipped is a way of drawing. Everything else in this file is output; this is input.
+    //
+    // The shot is taken after pressing "Bar set", which is the state worth showing: eight slots
+    // filled with a bargraph set, each claiming one of the characters `bar` composes from. Drawing
+    // that by hand is forty clicks per slot and needs eight characters nobody can type.
+    inspect: { tab: 'Display', selector: '.gl-strip', clicks: ['Bar set'] },
+    caption: 'The CGRAM editor: eight slots, a 5×8 grid, and the bargraph set in one press',
+    size: [440, 190],
+    type: 'LcdDisplay',
+    section: 'Display',
+    sources: { level: knob(0, 127, 90) },
+    motion: {},
+    data: {
+      ...CHAR_LCD,
+      ...GREEN_STN,
+      // A bar zone, so the panel behind the inspector is the thing the glyph set is FOR. It is not
+      // in the crop, but the control has to render for the editor to have anything to edit.
+      layouts: [{ id: 'm', name: 'Main', zones: [
+        { id: 'lab', show: 'static', text: 'LEVEL', row: 1, colStart: 1, colEnd: 6 },
+        { id: 'bar', show: 'bar', sourceId: 'src:level', row: 2, colStart: 1, colEnd: 12 },
+      ] }],
+      pages: { defaultLayoutId: 'm', selectorSourceId: '', selectorMap: [], overlays: [] },
     },
   },
 ];

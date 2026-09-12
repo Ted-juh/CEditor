@@ -24,6 +24,16 @@ export function infoFraction(info) {
 }
 
 const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
+
+/**
+ * Every character `barString` can emit, full block first and then the seven partials.
+ *
+ * Exported so the glyph editor can offer exactly these to claim, rather than re-spelling them:
+ * eight characters, which is exactly the eight CGRAM slots a hardware panel has, and that is not a
+ * coincidence — a claiming set for these is what a bargraph glyph set IS.
+ */
+export const BAR_CHARS = `█${BAR_EIGHTHS.slice(1)}`;
+
 export function barString(frac, width) {
   const w = Math.max(1, Math.round(width));
   const eighths = Math.round(clamp(frac, 0, 1) * w * 8);
