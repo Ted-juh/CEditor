@@ -580,12 +580,35 @@ export const COMPONENT_FAMILIES = [
       v('valueSource', 'valueSourceId', LINK, { sourceKind: 'range' }),
       v('brightnessSource', 'brightnessSourceId', LINK, { sourceKind: 'range' }),
       v('backlightSource', 'backlightSourceId', LINK, { sourceKind: 'any' }),
+      // The on-screen editable field — the buffer a zone with show:'edit' bound to '@edit' shows,
+      // and the one genuinely EDITABLE value a display owns. It was reachable by typing at the
+      // screen and by a device binding on the `text` port, and by nothing else: no script could
+      // read the patch name the user had just entered, which is the obvious thing to want.
+      v('editText', 'editText', STR,
+        { doc: 'The screen\'s editable text field (a patch name). Reads back what is in it.' }),
     ],
   },
   {
     id: 'pixel', section: 'Pixel', prefix: 'pixel', label: 'Pixel Display',
-    summary: 'Drive a pixel display\'s screen state: backlight, brightness, and its animation.',
+    summary: 'Drive a pixel display: its elements\' text, visibility and position, plus backlight, brightness and animation.',
     verbs: [
+      // NO CONTENT VERBS HERE YET, and the gap is deliberate rather than forgotten — see
+      // docs/design/display-component-futures.md, proposal 2.
+      //
+      // `item` is the obvious mechanism: one property of one element of `Pixel.elements`, exactly
+      // as DrumPads addresses a pad. It does not fit, and componentVerbs.test.js is what says so.
+      // Every other `item` list in this file has a non-empty default — six orbit nodes are six
+      // stored objects — so element 1 is always there to write to. `Pixel.elements` defaults to
+      // EMPTY, because a pixel display starts blank by design, so an index-addressed verb is a
+      // silent no-op on every display whose elements have not already been added in the inspector.
+      // That is the precise failure the "every verb either changes something" test exists to
+      // catch, and it caught it.
+      //
+      // The fix is a decision, not a patch: address elements by their `id` rather than their
+      // position. Ids are stable across reordering, which index is not, and it needs a reducer
+      // kind this file does not have. Until that is decided, no half-working verb.
+      v('editText', 'editText', STR,
+        { doc: 'The screen\'s editable text field (a patch name). Reads back what is in it.' }),
       v('backlight', 'backlightOn', BOOL, { toggle: true }),
       v('brightness', 'brightness', NUM, { min: 0, max: 100 }),
       v('contrast', 'contrast', NUM, { min: 0, max: 100 }),
