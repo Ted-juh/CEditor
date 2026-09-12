@@ -9,7 +9,7 @@
   } from '../utils/returnToRest.js';
   import {
     collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
-    pressTargetAt,
+    pressTargetAt, layoutTimeout,
   } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -566,6 +566,10 @@
   let lcdPress = $state({ id: '', row: -1, c0: 0, c1: 0 });
   let lcdPressTimer = 0;
 
+  // Auto-return timers, one per display: { [controlId]: timer }. Plain object rather than $state —
+  // nothing renders from it, and making it reactive would re-derive every display on every tick.
+  const lcdLayoutTimers = {};
+
   // Which layout a soft key has navigated each display to: { [controlId]: layoutId }.
   // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
   // panel document, so it must not reach the store and must not survive leaving preview.
@@ -817,6 +821,40 @@
     }, 140);
   }
 
+  /**
+   * Start (or restart) a navigated layout's auto-return.
+   *
+   * Only a layout reached BY PRESS gets a timer. Timing out of a layout the selector chose would
+   * fight the selector, which would just choose it again on the next frame — a screen that flickers
+   * rather than one that returns.
+   *
+   * It does not chain: the layout you land on does not start a timer of its own. Two pages whose
+   * timeouts point at each other would otherwise ping-pong forever on an idle panel, and a menu
+   * that returns you once is the behaviour anyone actually wants.
+   */
+  function lcdScheduleLayoutTimeout(control, layoutId) {
+    const controlId = getControlId(control);
+    if (lcdLayoutTimers[controlId]) clearTimeout(lcdLayoutTimers[controlId]);
+    delete lcdLayoutTimers[controlId];
+
+    const display = lcdDisplayOf(control);
+    const spec = layoutTimeout(findLayout(display?.layouts, layoutId));
+    if (!spec) return;
+
+    lcdLayoutTimers[controlId] = setTimeout(() => {
+      delete lcdLayoutTimers[controlId];
+      const back = spec.to && (display?.layouts ?? []).some((l) => String(l?.id ?? '') === spec.to)
+        ? spec.to : '';
+      if (back) {
+        lcdPressedLayout = { ...lcdPressedLayout, [controlId]: back };
+      } else {
+        // Stop overriding entirely, so the selector or the page default answers again.
+        const { [controlId]: _gone, ...rest } = lcdPressedLayout;
+        lcdPressedLayout = rest;
+      }
+    }, spec.ms);
+  }
+
   function lcdPerformPress(control, zone) {
     const controlId = getControlId(control);
     const press = zone?.press ?? {};
@@ -828,6 +866,7 @@
       // make, and for the same reason — a typo that changes nothing is debuggable.
       if (!(display?.layouts ?? []).some((l) => String(l?.id ?? '') === layoutId)) return false;
       lcdPressedLayout = { ...lcdPressedLayout, [controlId]: layoutId };
+      lcdScheduleLayoutTimeout(control, layoutId);
       lcdFlashPress(control, zone);
       return true;
     }
@@ -1041,6 +1080,12 @@
   });
 
   onDestroy(() => overlayTimers.forEach((t) => clearTimeout(t)));
+  // The soft-key timers, on the same terms as the overlay ones above: a pending auto-return or
+  // press flash would otherwise fire into a component that no longer exists.
+  onDestroy(() => {
+    for (const t of Object.values(lcdLayoutTimers)) clearTimeout(t);
+    if (lcdPressTimer) clearTimeout(lcdPressTimer);
+  });
   // Leaving preview drops the echoed notes. A keyboard unplugged mid-note never
   // sends its note-off, and a pad stuck lit forever looks like a bug.
   // Leaving preview silences the rig. A note the panel was holding has no other
