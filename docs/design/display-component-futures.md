@@ -26,11 +26,12 @@ Two kinds, and they must not be confused:
   | --- | --- |
   | `mockup-softkeys-*` | Shipped. Real `press` actions; the pressed one captured mid-press, with the inverse video drawn by the renderer. |
   | `mockup-glyphs-*` | Shipped. The same character LCD twice, differing only in eight glyph definitions. The "after" used to be a `PixelDisplay` impersonating a character LCD; that impersonation is gone. |
-  | `mockup-state-*` | **Partly shipped.** Both edges are real now — a press in, a `timeoutMs` out — but an edge is not a picture, so these stay stills of the screens. The MENU cursor is the part still missing. |
+  | `mockup-state-*` | Shipped. All three edges are real: a press in, a `timeoutMs` out, and a cursor that moves. MENU is now a working menu — `cursorMax`, a marker zone per row, and ▲/▼ keys that move the selection. |
 
-The state screens are what made these mockups necessary in the first place: what is missing there
-is **behaviour, not pixels**, and no still can show a page leaving on a timer. That is the document's
-job, not the picture's.
+The state screens are what made these mockups necessary in the first place, and they are also the
+clearest case for why a still is not enough: the MENU figure looks much like the drawing it
+replaced, because what changed is that pressing ▼ now moves the marker. Behaviour, not pixels —
+which is the document's job rather than the picture's.
 
 ## The audit, in numbers
 
@@ -362,7 +363,7 @@ dropped with the panel, and it says nothing about whether the device agreed — 
 device never confirms reads as whatever was last sent. That was already true of the bound control;
 this makes it explicit rather than worse.
 
-## 6. Layouts as a state machine, not a lookup — **the edges shipped**
+## 6. Layouts as a state machine, not a lookup — **shipped**
 
 **What exists.** `pages.selectorMap` maps a control's value to a layout, plus `overlays` that show
 a layout transiently on a trigger. Both are *stateless*: the active layout is a pure function of
@@ -376,7 +377,7 @@ Real device menus are not. Three screens, each of which renders today:
 
 ![MENU](../media/mockup-state-menu.png)
 
-What cannot be expressed is the *edges* between them:
+What could not be expressed, when this was written, were the *edges* between them:
 
 ```mermaid
 stateDiagram-v2
@@ -389,10 +390,10 @@ stateDiagram-v2
 ```
 
 "Press FLT" is not a value change. "5 s idle" is not a value at all. And `MENU → MENU` carries
-state — *which* item is selected — that no layout can hold, because a layout is a list of zones,
+state — *which* item is selected — that no layout could hold, because a layout is a list of zones,
 not a record.
 
-**Both edges now exist**, and they arrived from opposite directions rather than as one transitions
+**All three now exist**, and they arrived from three directions rather than as one transitions
 table:
 
 ```js
@@ -419,10 +420,57 @@ Two rules that fell out of building it:
   timeouts pointed at each other would ping-pong forever on an idle panel, and a menu that returns
   you once is what anyone actually wants.
 
-**What is still missing is the third thing in the sketch: per-layout state.** `MENU → MENU` as the
-selection moves needs the display to remember *which item is selected*, and a layout is a list of
-zones, not a record. `pages.state` with a `@state:cursor` source is the shape for it, and nothing
-is built. A menu can be entered and left; it cannot yet be scrolled.
+### `MENU → MENU`: the layout gets somewhere to keep a number
+
+The third edge is the one that needed a new idea rather than a new field. A press that changes the
+page is still stateless — the page *is* the state. A selection is not: the display has to remember
+which item is selected while nothing else about it changes.
+
+The display now keeps a small record of its own, and a layout declares how far its cursor may run:
+
+```js
+{ id: 'menu', name: 'Menu', cursorMax: 2, zones: [ ... ] }   // three items, 0..2
+```
+
+Three pieces make a menu out of that, and each is a field that already had a shape:
+
+```js
+// The ▲ / ▼ keys are ordinary pressable zones — proposal 4's `press`, with a third action.
+{ id: 'up', show: 'static', text: '[ ▲ ]', row: 4, colStart: 1, colEnd: 5, press: { cursor: -1 } },
+{ id: 'dn', show: 'static', text: '[ ▼ ]', row: 4, colStart: 7, colEnd: 11, press: { cursor: 1 } },
+
+// The marker is one zone per row, each shown only at its own index.
+{ id: 'a1', show: 'static', text: '▶', row: 3, colStart: 1, colEnd: 1, visibleWhen: { cursor: 1 } },
+
+// And the number itself is readable, through the same reserved-source branch as `@param`.
+{ id: 'pos', show: 'value', sourceId: '@state:cursor', row: 1, colStart: 19, colEnd: 20 },
+```
+
+The MENU figure above is a capture of exactly that layout, sitting at rest on item 0.
+
+Three decisions worth recording, because each had a plausible alternative:
+
+- **The cursor wraps.** `moveCursor` is modular over `cursorMax + 1`, so ▼ off the bottom item
+  lands on the top one. A three-item menu where ▼ stops dead at the bottom is a menu that needs
+  ▲ to be reachable at all, and hardware menus wrap.
+- **The state is the display's, and the bound is the layout's.** One `cursor` per display rather
+  than one per layout: a menu and its sub-menu sharing a position is the behaviour a real device
+  has, and `cursorMax` on the layout still stops a deep page from scrolling past its own items.
+  The cursor is folded into the active layout's range *when it is read*, not when a page is
+  entered, because a selector or a `timeoutMs` changes the page with no press to hang a clamp on —
+  and a selection sitting past the last item of a short page draws no marker at all, which reads as
+  a menu with nothing selected rather than as a number out of range.
+- **`visibleWhen` is a zone-level filter, not a marker feature.** It reads the same state record
+  and hides any zone, which is why the marker needed no new concept — `composeLayout` and
+  `pressTargetAt` both run zones through the one predicate, so an invisible zone is also not
+  pressable.
+
+The failure this shape is built to avoid is the one that actually happened during the work:
+`{ cursor: ±1 }` rendered correctly and did nothing, because the predicate that decides whether a
+zone is a hit target still only knew about `layout` and `set`. The unit tests passed — they
+exercised `moveCursor` and `zoneVisibleWith` in isolation, and both were right. Only driving the
+real editor found it. There is now a test named for that: a zone whose only action is a cursor
+move must be pressable.
 
 ---
 
@@ -503,7 +551,7 @@ re-derives it.
 | 1 | User glyphs | Small | No | **Shipped** |
 | 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
 | 5 | `@param` zones | Moderate | Yes — and needed a device-state store | **Shipped** |
-| 6 | Layout state machine | High | Yes — layouts gain state | **Edges shipped** |
+| 6 | Layout state machine | High | Yes — layouts gained state | **Shipped** |
 | 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
 | 8 | Real-audio scope | High | No (host work) | Later |
 | 9 | Device screen mirror | Per-device | No | On request |
@@ -520,7 +568,7 @@ without changing its model, because the click path was already there for edit fi
 | # | State |
 | --- | --- |
 | 5 | **Shipped** — `@param:` zones, on a new device-parameter value store. |
-| 6 | **Edges shipped** — press in, timeout out. Per-layout selection state still missing. |
+| 6 | **Shipped** — press in, timeout out, and a wrapping cursor with `visibleWhen` and `@state:`. |
 | 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
@@ -552,8 +600,9 @@ settled the reserved-source story: a source that is not a control id resolves th
 branch, exactly as `@active` and `@edit` do. Proposal 2's id-addressed element verbs are the
 remaining half, and they now have a pattern to follow.
 
-Proposal 6's **edges are done** — a press gets you in, a timeout brings you back. What remains of
-it is per-layout *selection* state: a menu that can be scrolled, not just entered and left.
+Proposal 6 is **done** — a press gets you in, a timeout brings you back, and the cursor moves. All
+three edges in the sketch are expressible, and the MENU screen is a menu rather than three lines of
+text that look like one.
 
 ### What would make this note wrong
 

@@ -1,7 +1,7 @@
 // mockups.mjs — the figures for docs/design/display-component-futures.md.
 //
-// It started as pictures of proposals. Two of the three have since shipped, so most of what is
-// here is now a RECORDING of a working feature and the file has to say which is which:
+// It started as pictures of proposals. All three have since shipped, so everything here is now a
+// RECORDING of a working feature rather than a drawing of an intended one:
 //
 //   softkeys-*     shipped. Real `press` actions, and the pressed one is captured mid-press with
 //                  the inverse video drawn by the renderer rather than by the scene.
@@ -9,12 +9,13 @@
 //                  difference between them is eight glyph definitions. The "after" used to be a
 //                  PixelDisplay impersonating a character LCD, because the character LCD could not
 //                  place artwork in a cell. It can now, so the impersonation is gone.
-//   state-*        PARTLY SHIPPED. The three screens render today, and both edges between them now
-//                  exist: a press gets you in (proposal 4) and a layout's own timeoutMs brings you
-//                  back (proposal 6). No still can show either — an edge is not a picture — so
-//                  these stay stills of the screens and the document argues the edges in words.
-//                  What is genuinely still missing is the MENU cursor: per-layout selection state,
-//                  which a layout has nowhere to keep.
+//   state-*        shipped, and the awkward case. All three edges between the screens are real now:
+//                  a press gets you in (proposal 4), a layout's own timeoutMs brings you back, and
+//                  the MENU cursor moves. But an edge is not a picture. MENU in particular looks
+//                  much as it did when it was a drawing — the difference is that its marker zones
+//                  are driven by `visibleWhen: { cursor: N }` off real display state, and its
+//                  UP/DOWN keys carry `press: { cursor: ±1 }`, so pressing one moves the selection.
+//                  The stills show the screens; the document argues the edges in words.
 //
 // They stay separate from scenes.mjs and land on docs/media/mockup-*.png rather than
 // display-*.gif, because the moving recordings are a different claim and the two must not be
@@ -282,7 +283,11 @@ export const MOCKUPS = [
   {
     id: 'state-menu',
     still: true,
-    caption: 'MENU — the selection arrow is the part still missing: a layout cannot hold a cursor',
+    // A REAL menu now, not lines of text: cursorMax gives the page three items, each row carries a
+    // marker zone shown only at its own index, and the UP/DOWN keys move the selection. The still
+    // shows it at rest on item 0 — which is what it looked like when this was a mockup, except
+    // that now pressing DOWN actually moves it.
+    caption: 'MENU — three items, a live selection marker, and UP/DOWN that move it',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',
@@ -291,14 +296,25 @@ export const MOCKUPS = [
     data: {
       ...CHAR_LCD,
       ...GREEN_STN,
-      lines: [
-        'MENU            1/3 ',
-        '▶ MIDI CHANNEL     1',
-        '  TRANSPOSE        0',
-        '[BAK][ ▲ ][ ▼ ][OK ]',
-      ],
-      layouts: [],
-      pages: { defaultLayoutId: '', selectorSourceId: '', selectorMap: [], overlays: [] },
+      layouts: [{
+        id: 'menu',
+        name: 'Menu',
+        cursorMax: 2,
+        zones: [
+          { id: 'title', show: 'static', text: 'MENU', row: 1, colStart: 1, colEnd: 4 },
+          { id: 'pos', show: 'value', sourceId: '@state:cursor', row: 1, colStart: 19, colEnd: 20, align: 'right' },
+
+          { id: 't0', show: 'static', text: 'MIDI CHANNEL    1', row: 2, colStart: 3, colEnd: 20 },
+          { id: 'a0', show: 'static', text: '\u25B6', row: 2, colStart: 1, colEnd: 1, visibleWhen: { cursor: 0 } },
+          { id: 't1', show: 'static', text: 'TRANSPOSE       0', row: 3, colStart: 3, colEnd: 20 },
+          { id: 'a1', show: 'static', text: '\u25B6', row: 3, colStart: 1, colEnd: 1, visibleWhen: { cursor: 1 } },
+
+          { id: 'up', show: 'static', text: '[ \u25B2 ]', row: 4, colStart: 1, colEnd: 5, press: { cursor: -1 } },
+          { id: 'dn', show: 'static', text: '[ \u25BC ]', row: 4, colStart: 7, colEnd: 11, press: { cursor: 1 } },
+          { id: 'ok', show: 'static', text: '[OK ]', row: 4, colStart: 16, colEnd: 20, press: { layout: 'menu' } },
+        ],
+      }],
+      pages: { defaultLayoutId: 'menu', selectorSourceId: '', selectorMap: [], overlays: [] },
     },
   },
 ];

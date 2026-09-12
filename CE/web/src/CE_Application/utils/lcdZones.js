@@ -68,6 +68,71 @@ export const ACTIVE_SOURCE_ID = '@active';
 // A zone with show:'edit' bound to this shows/edits the preset-name field.
 export const EDIT_SOURCE_ID = '@edit';
 
+// A zone may name the DISPLAY'S OWN STATE — today that is one thing, the menu cursor.
+//
+// `pages.selectorMap` and `overlays` answer from the panel's values, and `press`/`timeoutMs` move
+// between pages. None of them can hold "which item is selected", because a layout is a list of
+// zones and not a record. A menu could be entered and left but never scrolled.
+//
+//   '@state:cursor'   the selection index on this display, 0-based
+export const STATE_SOURCE_PREFIX = '@state:';
+
+export function isStateSource(id) {
+  return String(id ?? '').startsWith(STATE_SOURCE_PREFIX);
+}
+
+/** The state key a '@state:...' source names, or '' when it is not one. */
+export function stateKeyOf(id) {
+  return isStateSource(id) ? String(id).slice(STATE_SOURCE_PREFIX.length).trim() : '';
+}
+
+/**
+ * Move a selection index, wrapping at both ends.
+ *
+ * WRAPPING RATHER THAN CLAMPING. A three-item menu where holding the down key sticks on the last
+ * row reads as broken, and every hardware menu short enough to fit one of these screens wraps.
+ * Clamping would need a flag; nobody has asked for one, and a flag nobody asked for is a setting
+ * everyone has to read past.
+ */
+export function moveCursor(current, delta, max) {
+  const n = Math.max(0, Math.round(numberOr(max, 0)));
+  if (n === 0) return 0;                       // a page with no list: nowhere to move
+  const span = n + 1;
+  const at = Math.round(numberOr(current, 0)) + Math.round(numberOr(delta, 0));
+  return ((at % span) + span) % span;
+}
+
+/** Zone info for a state value, so `value`, `pct` and `bar` render it like anything else. */
+export function stateInfo(value, max) {
+  const n = Math.max(0, Math.round(numberOr(max, 0)));
+  return {
+    present: true,
+    name: '',
+    value: clamp(Math.round(numberOr(value, 0)), 0, n),
+    min: 0,
+    max: n,
+    text: '',
+    on: false,
+  };
+}
+
+/**
+ * Is a zone shown, given the display's state?
+ *
+ * `visibleWhen: { cursor: 1 }` is how a menu draws its selection marker: one arrow zone per row,
+ * each shown only on its own index. Authoring N zones for N rows is honest for a screen four rows
+ * tall, and it needs no new drawing — the zone engine already paints or skips a zone.
+ */
+export function zoneVisibleWith(zone, state = {}) {
+  if (!zone || zone.visible === false) return false;
+  const when = zone.visibleWhen;
+  if (!when || typeof when !== 'object') return true;
+  for (const [key, want] of Object.entries(when)) {
+    if (Math.round(numberOr(state?.[key], 0)) !== Math.round(numberOr(want, 0))) return false;
+  }
+  return true;
+}
+
 // A zone may name a DEVICE PARAMETER instead of a panel control.
 //
 // Until this existed, a zone's sourceId was always a control id, so showing a device parameter
@@ -254,18 +319,20 @@ export function zoneScrollWindow(content, width, elapsedChars) {
   return out;
 }
 
-// Compose `rows` strings of `cols` chars from a layout's zones. Later (higher
+// Compose `rows` strings of `cols` chars from a layout's zones. `state` gates zones that declare
+// `visibleWhen` — see zoneVisibleWith, and note that pressTargetAt filters through the same
+// predicate, so a zone that is not drawn cannot be pressed either. Later (higher
 // priority) zones paint over earlier ones. getInfo(sourceId) -> info | null.
 // `elapsedChars` drives per-zone marquee: a zone with scroll:true whose content
 // overflows its region scrolls within it instead of truncating.
-export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0) {
+export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}) {
   const nRows = Math.max(0, Math.round(rows));
   const nCols = Math.max(0, Math.round(cols));
   const grid = [];
   for (let r = 0; r < nRows; r += 1) grid.push(new Array(nCols).fill(' '));
 
   const ordered = (Array.isArray(zones) ? zones : [])
-    .filter((z) => z && z.visible !== false)
+    .filter((z) => zoneVisibleWith(z, state))
     .slice()
     .sort((a, b) => numberOr(a?.priority, 0) - numberOr(b?.priority, 0));
 
@@ -383,12 +450,23 @@ export function layoutTimeout(layout) {
 // press. The precedent is already here: an `edit` zone has been clickable
 // since the edit field was added, resolved through this same cell geometry.
 
-/** True when a zone declares a press action a user could actually trigger. */
+/**
+ * True when a zone declares a press action a user could actually trigger.
+ *
+ * EVERY ACTION HAS TO BE LISTED HERE. A zone whose action this does not recognise is not a hit
+ * target at all, so `pressTargetAt` returns null and the press does nothing — silently, and
+ * identically to a zone with no action. `{ cursor: ±1 }` shipped broken for exactly that reason:
+ * the unit tests exercised the cursor arithmetic and the visibility gate separately and both
+ * passed, while pressing the key in the real editor moved nothing.
+ */
 export function isPressableZone(zone) {
   if (!zone || zone.visible === false) return false;
   const press = zone.press;
   if (!press || typeof press !== 'object') return false;
-  return String(press.layout ?? '') !== '' || String(press.set ?? '') !== '';
+  if (String(press.layout ?? '') !== '') return true;
+  if (String(press.set ?? '') !== '') return true;
+  // 0 is not a move, so it is not an action — the same reading `moveCursor` takes.
+  return Number.isFinite(Number(press.cursor)) && Number(press.cursor) !== 0;
 }
 
 /** Does a zone's region cover this 0-based character cell? */
@@ -412,9 +490,9 @@ export function zoneCoversCell(zone, cell, cols) {
  * so this walks the identical ordering backwards and returns the first hit.
  * Resolving it forwards would hand the press to a zone hidden underneath.
  */
-export function pressTargetAt(zones, cell, cols) {
+export function pressTargetAt(zones, cell, cols, state = {}) {
   const ordered = (Array.isArray(zones) ? zones : [])
-    .filter((z) => z && z.visible !== false)
+    .filter((z) => zoneVisibleWith(z, state))
     .slice()
     .sort((a, b) => numberOr(a?.priority, 0) - numberOr(b?.priority, 0));
   for (let i = ordered.length - 1; i >= 0; i -= 1) {
