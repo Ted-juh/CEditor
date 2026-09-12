@@ -636,14 +636,22 @@ Both hand *arguments to a bound Lua script*, which blits from PNG objects alread
 There is no call that takes a framebuffer. So "push a frame" is not a draw — it is an **asset
 re-upload**, which is the expensive operation the whole architecture is shaped to do once.
 
-### (1) Bandwidth: the wrong question, and the right one was already answered
+### (1) Bandwidth: the rate is fine; the operation is the wrong one
 
-The proposal guessed the blocker would be throughput. It is not obviously that — a 128×64 1-bit
-PNG is a few hundred bytes, one chunk, and USB-MIDI is not a 31.25 kbaud DIN cable. The blocker is
-that the design record's own division of labour is **"fat scripts, thin SysEx: a state delta is
-~20–30 bytes instead of dozens of drawing commands"**, with animation host-clocked at a modest rate
-and a keepalive that must not be starved — the device's watchdog restores the stock screen if one
-is missed for ~900 ms. Re-uploading an object per frame inverts exactly that bargain.
+The proposal guessed the blocker would be throughput, and set the bar at "even 5 fps". The shipped
+broker already answers that with a number:
+
+```cpp
+double displayIntervalMs = 100.0;     // the demo's proven 10 Hz
+```
+
+**Ten hertz, and `Ctrl49SurfaceBroker.h` says what it sends at that rate: "service state onto the
+display at 10 Hz, only bytes that changed."** So the refresh budget is not the problem — it is
+twice what the proposal asked for. What the pipeline sends in each of those ticks is the problem.
+The division of labour is **"fat scripts, thin SysEx: a state delta is ~20–30 bytes instead of
+dozens of drawing commands"**, against a keepalive that must not be starved — the device's watchdog
+restores the stock screen if one is missed for ~900 ms. A framebuffer per tick is not a bigger
+delta; it is a different operation, and it inverts exactly that bargain.
 
 "Redraw cost / watchdog tolerance of slow draws" is still listed as an unsettled unknown in
 `screen-builder-design.md`, and this note does not settle it. It does not have to: the format
@@ -651,8 +659,10 @@ answer means there is no live-mirror path to measure.
 
 ### (3) Who owns the screen: already answered, exactly as guessed
 
-One resident broker owns the CTRL49; everything else is a client. `Ctrl49SurfaceBroker.cpp` is that
-broker. A panel's display would be a client of the bridge, as this proposal assumed.
+One resident broker owns the CTRL49; everything else is a client. `Ctrl49SurfaceBroker` is that
+broker, and it already does the arbitration — "claim the one hardware surface … two instances must
+not fight over a physical keyboard". A panel's display would be a client of it, exactly as this
+proposal assumed. The one question of the three that the proposal got right.
 
 ### The verdict, and the part that is better than "static only"
 
