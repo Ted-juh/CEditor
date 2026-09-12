@@ -9,9 +9,12 @@
 //                  difference between them is eight glyph definitions. The "after" used to be a
 //                  PixelDisplay impersonating a character LCD, because the character LCD could not
 //                  place artwork in a cell. It can now, so the impersonation is gone.
-//   state-*        STILL A PROPOSAL. The three screens render today; what does not exist is an
-//                  edge between them that is not a value change — a layout entered on a timeout —
-//                  and no still can show that. The document has to argue it in words.
+//   state-*        PARTLY SHIPPED. The three screens render today, and both edges between them now
+//                  exist: a press gets you in (proposal 4) and a layout's own timeoutMs brings you
+//                  back (proposal 6). No still can show either — an edge is not a picture — so
+//                  these stay stills of the screens and the document argues the edges in words.
+//                  What is genuinely still missing is the MENU cursor: per-layout selection state,
+//                  which a layout has nowhere to keep.
 //
 // They stay separate from scenes.mjs and land on docs/media/mockup-*.png rather than
 // display-*.gif, because the moving recordings are a different claim and the two must not be
@@ -257,7 +260,7 @@ export const MOCKUPS = [
   {
     id: 'state-edit',
     still: true,
-    caption: 'EDIT — entered by pressing FLT, left by a timeout',
+    caption: 'EDIT — entered by a soft key, left by the page\u2019s own timeoutMs. Both edges are real.',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',
@@ -279,7 +282,7 @@ export const MOCKUPS = [
   {
     id: 'state-menu',
     still: true,
-    caption: 'MENU — a list with a selection, which no current layout can express',
+    caption: 'MENU — the selection arrow is the part still missing: a layout cannot hold a cursor',
     size: [440, 190],
     type: 'LcdDisplay',
     section: 'Display',

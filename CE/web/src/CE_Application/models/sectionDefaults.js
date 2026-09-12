@@ -652,8 +652,16 @@ export const SECTION_DEFAULTS = {
     fields: [],
     // Zones / layouts / pages. When layouts is non-empty the display composes its
     // rows from the active layout's zones instead of the lines/tokens above.
-    // layout: { id, name, zones:[ { id,name,row,colStart,colEnd,show,sourceId,
-    //   text,label,precision,prefix,suffix,radix,align,priority,visible,press } ] }.
+    // layout: { id, name, timeoutMs, timeoutTo, zones:[ { id,name,row,colStart,colEnd,show,
+    //   sourceId,text,label,precision,prefix,suffix,radix,align,priority,visible,press } ] }.
+    //
+    // `timeoutMs`/`timeoutTo` are a layout's AUTO-RETURN, and the one page transition a value
+    // cannot express: selectorMap and overlays are pure functions of the current values, and
+    // "five seconds after you last touched it" is not a value. Declared on the page rather than on
+    // the key that opened it, because "this page does not stay" is true however you arrived.
+    // An empty `timeoutTo` means stop overriding — back to the selector or the default.
+    // Only a layout reached by a PRESS runs the timer; timing out of a selector-chosen layout
+    // would fight the selector, which would choose it again on the next frame.
     //
     // `press` makes a zone a SOFT KEY — the region it already occupies becomes a hit target, the
     // way F1..F6 sit under a hardware screen. One of:

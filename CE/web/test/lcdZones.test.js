@@ -267,3 +267,33 @@ test('a zone region is clamped to the screen, so a wide colEnd cannot swallow th
   // colStart past the end collapses onto the last column rather than matching nothing.
   assert.equal(zoneCoversCell(softKey('past', 99, 99, { layout: 'x' }), { row: 3, col: 19 }, 20), true);
 });
+
+/* -------------------------------------------------- a layout that does not stay (timeout) */
+
+test('a layout declares its own auto-return, or stays put', () => {
+  const { layoutTimeout } = ZONES;
+  assert.deepEqual(layoutTimeout({ id: 'edit', timeoutMs: 5000, timeoutTo: 'home' }),
+    { ms: 5000, to: 'home' });
+  // An empty target means "stop overriding" — back to the selector or the default.
+  assert.deepEqual(layoutTimeout({ id: 'edit', timeoutMs: 800 }), { ms: 800, to: '' });
+  // The ordinary case: no timeout at all.
+  assert.equal(layoutTimeout({ id: 'home' }), null);
+  assert.equal(layoutTimeout(null), null);
+});
+
+test('0 and nonsense mean no timeout, never an instant one', () => {
+  const { layoutTimeout } = ZONES;
+  // The alternative reading strands a user on a screen that vanishes before they see it.
+  assert.equal(layoutTimeout({ timeoutMs: 0 }), null);
+  assert.equal(layoutTimeout({ timeoutMs: -1000 }), null);
+  assert.equal(layoutTimeout({ timeoutMs: 'soon' }), null);
+  assert.equal(layoutTimeout({ timeoutMs: NaN }), null);
+  // Too short to read is refused rather than honoured.
+  assert.equal(layoutTimeout({ timeoutMs: 99 }), null);
+  assert.deepEqual(layoutTimeout({ timeoutMs: 100 }), { ms: 100, to: '' });
+});
+
+test('a fractional timeout rounds rather than being refused', () => {
+  const { layoutTimeout } = ZONES;
+  assert.deepEqual(layoutTimeout({ timeoutMs: 1500.6, timeoutTo: 'home' }), { ms: 1501, to: 'home' });
+});

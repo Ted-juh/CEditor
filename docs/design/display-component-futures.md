@@ -26,10 +26,11 @@ Two kinds, and they must not be confused:
   | --- | --- |
   | `mockup-softkeys-*` | Shipped. Real `press` actions; the pressed one captured mid-press, with the inverse video drawn by the renderer. |
   | `mockup-glyphs-*` | Shipped. The same character LCD twice, differing only in eight glyph definitions. The "after" used to be a `PixelDisplay` impersonating a character LCD; that impersonation is gone. |
-  | `mockup-state-*` | **Still a proposal.** The screens render today; the *edges* between them do not. |
+  | `mockup-state-*` | **Partly shipped.** Both edges are real now — a press in, a `timeoutMs` out — but an edge is not a picture, so these stay stills of the screens. The MENU cursor is the part still missing. |
 
-The state screens are the remaining case of what made these mockups necessary: what is missing is
-**behaviour, not pixels**, and no still can show a layout entered on a timeout.
+The state screens are what made these mockups necessary in the first place: what is missing there
+is **behaviour, not pixels**, and no still can show a page leaving on a timer. That is the document's
+job, not the picture's.
 
 ## The audit, in numbers
 
@@ -317,7 +318,7 @@ parameters by id for the binding UI.
 
 **Verdict: worth doing, after 4.** It removes a real modelling wart.
 
-## 6. Layouts as a state machine, not a lookup
+## 6. Layouts as a state machine, not a lookup — **the edges shipped**
 
 **What exists.** `pages.selectorMap` maps a control's value to a layout, plus `overlays` that show
 a layout transiently on a trigger. Both are *stateless*: the active layout is a pure function of
@@ -347,23 +348,37 @@ stateDiagram-v2
 state — *which* item is selected — that no layout can hold, because a layout is a list of zones,
 not a record.
 
-**API sketch.** `pages` gains transitions alongside the selector map, and the display gains a small
-amount of its own state:
+**Both edges now exist**, and they arrived from opposite directions rather than as one transitions
+table:
 
 ```js
-pages: {
-  defaultLayoutId: 'home',
-  transitions: [
-    { from: 'home', on: { press: 'k2' }, to: 'edit-filter' },
-    { from: 'edit-filter', on: { idle: 5000 }, to: 'home' },
-  ],
-  state: { cursor: 0 },     // readable by a zone as '@state:cursor'
-}
+// HOME -> EDIT is a press (proposal 4).
+{ id: 'k2', show: 'static', text: '[FLT]', row: 4, colStart: 6, colEnd: 10,
+  press: { layout: 'edit-filter' } }
+
+// EDIT -> HOME is a timeout, declared on the page that does not stay.
+{ id: 'edit-filter', name: 'Filter', timeoutMs: 5000, timeoutTo: '', zones: [...] }
 ```
 
-**Cost.** Higher, and it depends on 4 — `on: { press }` needs pressable zones to exist first.
-`resolveActiveLayoutId` becomes stateful, which means the preview has to own that state and reset
-it sensibly. Sequence this after soft keys or not at all.
+**The timeout is declared on the page, not on the key that opened it.** "This page does not stay"
+is true however you arrived — four soft keys and a selector can all lead to the same Edit screen,
+and every one of them wants the same behaviour. An empty `timeoutTo` means *stop overriding*: back
+to whatever the selector or the default says, which is the common case and one fewer id to keep in
+step.
+
+Two rules that fell out of building it:
+
+- **Only a layout reached by a press runs the timer.** Timing out of a selector-chosen layout would
+  fight the selector, which would simply choose it again on the next frame — a screen that flickers
+  rather than one that returns.
+- **It does not chain.** The layout you land on does not start a timer of its own. Two pages whose
+  timeouts pointed at each other would ping-pong forever on an idle panel, and a menu that returns
+  you once is what anyone actually wants.
+
+**What is still missing is the third thing in the sketch: per-layout state.** `MENU → MENU` as the
+selection moves needs the display to remember *which item is selected*, and a layout is a list of
+zones, not a record. `pages.state` with a `@state:cursor` source is the shape for it, and nothing
+is built. A menu can be entered and left; it cannot yet be scrolled.
 
 ---
 
@@ -444,7 +459,7 @@ re-derives it.
 | 1 | User glyphs | Small | No | **Shipped** |
 | 2 | Pixel content verbs | Low → moderate (id addressing) | No | Yes |
 | 5 | `@param` zones | Moderate | Yes — removes the proxy | Yes |
-| 6 | Layout state machine | High | Yes — layouts gain state | Now unblocked |
+| 6 | Layout state machine | High | Yes — layouts gain state | **Edges shipped** |
 | 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
 | 8 | Real-audio scope | High | No (host work) | Later |
 | 9 | Device screen mirror | Per-device | No | On request |
@@ -460,11 +475,12 @@ without changing its model, because the click path was already there for edit fi
 
 | # | State |
 | --- | --- |
+| 6 | **Edges shipped** — press in, timeout out. Per-layout selection state still missing. |
 | 1 | **Shipped** — eight CGRAM slots, addressed by code or by claim. Inspector editor still to do. |
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Attempted; redesigned.** Index addressing rejected by the spec test; needs an id-addressed reducer kind. |
-| 5, 6 | Not started. |
+| 5 | Not started. |
 | 7, 8, 9 | Spike / later / on request. |
 
 ### The next three steps, in order
@@ -490,9 +506,8 @@ half-answered interaction model is the expensive kind of mistake.
 addressing problems and they rhyme: one lets a script name an element, the other lets a zone name a
 parameter. Doing them together means designing the reserved-source/id-resolution story once.
 
-Proposal 6 is **no longer parked** — `on: { press }` now has something to hang on, and the
-transient per-display layout that soft keys introduced is the state a menu needs. What it still
-lacks is the *other* kind of edge: a timeout, which no value change can express.
+Proposal 6's **edges are done** — a press gets you in, a timeout brings you back. What remains of
+it is per-layout *selection* state: a menu that can be scrolled, not just entered and left.
 
 ### What would make this note wrong
 

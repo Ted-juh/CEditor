@@ -265,6 +265,32 @@ export function findLayout(layouts, id) {
   return (Array.isArray(layouts) ? layouts : []).find((l) => String(l?.id ?? '') === String(id)) ?? null;
 }
 
+/**
+ * A layout's auto-return, or null when it stays put.
+ *
+ * THE ONE EDGE A VALUE CANNOT EXPRESS. `pages.selectorMap` maps a control's value to a layout and
+ * `overlays` show one on a trigger, so both are pure functions of the current values: ask twice
+ * with the same values and you get the same answer. "Five seconds after you last touched it" is not
+ * a value at all, which is why a device's Edit page could be entered here but never left.
+ *
+ * DECLARED ON THE PAGE, NOT ON THE KEY THAT OPENED IT. "This page does not stay" is a property of
+ * the page — four soft keys and a selector can all lead to the same Edit screen, and every one of
+ * them wants the same behaviour on arrival. Putting `after` on the press would mean repeating it
+ * per key and getting it wrong on the fifth.
+ *
+ *   { id: 'edit', timeoutMs: 5000, timeoutTo: 'home', zones: [...] }
+ *
+ * `timeoutTo` empty means "stop overriding" — back to whatever the selector or the default says,
+ * which is the common case and one fewer id to keep in step.
+ */
+export function layoutTimeout(layout) {
+  const ms = numberOr(layout?.timeoutMs, 0);
+  // Sub-100ms would be a page nobody could read; 0 and negatives mean "no timeout" rather than
+  // "immediately", which is the reading that cannot strand a user on a screen they never saw.
+  if (!(ms >= 100)) return null;
+  return { ms: Math.round(ms), to: String(layout?.timeoutTo ?? '') };
+}
+
 // --- Pressable zones (soft keys) -------------------------------------------
 //
 // A zone may carry a `press` action, which makes it a HIT TARGET: the region it
