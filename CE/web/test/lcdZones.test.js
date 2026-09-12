@@ -373,3 +373,85 @@ test('collectSourceIds gathers parameter sources like any other', () => {
   const display = { layouts: [{ zones: [{ sourceId: '@param:filter.cutoff' }, { sourceId: 'ctrl_1' }] }] };
   assert.deepEqual(collectSourceIds(display).sort(), ['@param:filter.cutoff', 'ctrl_1']);
 });
+
+/* ------------------------------------------------------ the menu cursor (@state) */
+
+test('a cursor wraps at both ends rather than sticking', () => {
+  const { moveCursor } = ZONES;
+  // Three items, max index 2.
+  assert.equal(moveCursor(0, 1, 2), 1);
+  assert.equal(moveCursor(2, 1, 2), 0, 'past the end comes back to the top');
+  assert.equal(moveCursor(0, -1, 2), 2, 'and up from the top goes to the bottom');
+  // A page with no list has nowhere to go.
+  assert.equal(moveCursor(0, 1, 0), 0);
+  assert.equal(moveCursor(5, 3, 0), 0);
+  // Nonsense in, a valid index out.
+  assert.equal(moveCursor(NaN, NaN, 2), 0);
+  assert.equal(moveCursor(9, 0, 2), 0, 'an out-of-range cursor is brought back in range');
+});
+
+test('a state source parses and renders like any other value', () => {
+  const { isStateSource, stateKeyOf, stateInfo } = ZONES;
+  assert.equal(isStateSource('@state:cursor'), true);
+  assert.equal(isStateSource('@param:filter.cutoff'), false);
+  assert.equal(stateKeyOf('@state:cursor'), 'cursor');
+  assert.equal(stateKeyOf('ctrl_1'), '');
+
+  const info = stateInfo(1, 2);
+  assert.equal(resolveZoneContent({ show: 'value' }, info, 4), '1');
+  assert.equal(resolveZoneContent({ show: 'pct', suffix: '%' }, info, 5), '50%');
+  // Out of range is clamped, not reported as nonsense.
+  assert.equal(stateInfo(99, 2).value, 2);
+});
+
+test('visibleWhen shows a zone only on its own index — how a menu marks its selection', () => {
+  const { zoneVisibleWith } = ZONES;
+  const arrow = (row, index) => ({
+    id: `a${index}`, show: 'static', text: '▶', row, colStart: 1, colEnd: 1,
+    visibleWhen: { cursor: index },
+  });
+  assert.equal(zoneVisibleWith(arrow(2, 0), { cursor: 0 }), true);
+  assert.equal(zoneVisibleWith(arrow(2, 0), { cursor: 1 }), false);
+  // No condition means always, and an explicit visible:false still wins.
+  assert.equal(zoneVisibleWith({ show: 'static', text: 'X' }, { cursor: 3 }), true);
+  assert.equal(zoneVisibleWith({ show: 'static', visible: false, visibleWhen: { cursor: 0 } }, { cursor: 0 }), false);
+  // Missing state reads as 0, so an unset display shows the first row's marker.
+  assert.equal(zoneVisibleWith(arrow(2, 0), {}), true);
+});
+
+test('composeLayout paints only the zones state allows', () => {
+  const rows = [
+    { id: 'i0', show: 'static', text: 'ONE', row: 1, colStart: 3, colEnd: 5 },
+    { id: 'i1', show: 'static', text: 'TWO', row: 2, colStart: 3, colEnd: 5 },
+    { id: 'a0', show: 'static', text: '>', row: 1, colStart: 1, colEnd: 1, visibleWhen: { cursor: 0 } },
+    { id: 'a1', show: 'static', text: '>', row: 2, colStart: 1, colEnd: 1, visibleWhen: { cursor: 1 } },
+  ];
+  assert.deepEqual(composeLayout(rows, 2, 6, null, 0, { cursor: 0 }), ['> ONE ', '  TWO ']);
+  assert.deepEqual(composeLayout(rows, 2, 6, null, 0, { cursor: 1 }), ['  ONE ', '> TWO ']);
+});
+
+test('a zone hidden by state cannot be pressed either', () => {
+  const { pressTargetAt } = ZONES;
+  // A soft key you cannot see must not be hittable — otherwise a menu's hidden rows stay live.
+  const key = {
+    id: 'k', show: 'static', text: '[OK]', row: 1, colStart: 1, colEnd: 4,
+    press: { layout: 'x' }, visibleWhen: { cursor: 1 },
+  };
+  assert.equal(pressTargetAt([key], { row: 0, col: 2 }, 20, { cursor: 1 }).id, 'k');
+  assert.equal(pressTargetAt([key], { row: 0, col: 2 }, 20, { cursor: 0 }), null);
+});
+
+test('every press action counts as pressable, or the key silently does nothing', () => {
+  const { isPressableZone } = ZONES;
+  const z = (press) => ({ id: 'k', show: 'static', text: '[K]', row: 4, colStart: 1, colEnd: 3, press });
+  // This is the guard that `{ cursor }` originally failed: the arithmetic and the gate both worked
+  // in isolation, and the key did nothing because the zone was never a hit target.
+  assert.equal(isPressableZone(z({ layout: 'edit' })), true);
+  assert.equal(isPressableZone(z({ set: 'cutoff', to: 64 })), true);
+  assert.equal(isPressableZone(z({ cursor: 1 })), true);
+  assert.equal(isPressableZone(z({ cursor: -1 })), true);
+  // A move of nothing is not an action.
+  assert.equal(isPressableZone(z({ cursor: 0 })), false);
+  assert.equal(isPressableZone(z({ cursor: 'down' })), false);
+  assert.equal(isPressableZone(z({})), false);
+});

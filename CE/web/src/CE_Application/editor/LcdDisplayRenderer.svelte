@@ -365,7 +365,7 @@
       const zones = isGraphic
         ? (layout?.zones ?? []).filter((z) => !WIDGET_ZONE_KINDS.has(String(z?.show ?? '')))
         : (layout?.zones ?? []);
-      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed);
+      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed, display?.__state ?? {});
     }
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const out = [];

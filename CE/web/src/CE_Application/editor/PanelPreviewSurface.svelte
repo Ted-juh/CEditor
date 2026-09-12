@@ -10,6 +10,7 @@
   import {
     collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
     pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
+    isStateSource, stateKeyOf, stateInfo, moveCursor,
   } from '../utils/lcdZones.js';
   import { deviceParameterValues } from '../stores/deviceParameterValues.js';
   import { profileParameters, deviceRoleMappings } from '../stores/deviceProfileStores.js';
@@ -589,6 +590,11 @@
   let lcdPress = $state({ id: '', row: -1, c0: 0, c1: 0 });
   let lcdPressTimer = 0;
 
+  // Per-display state the layouts can read and the soft keys can move: { [controlId]: { cursor } }.
+  // Transient like everything else here — a menu's selection is where you are, not what the panel
+  // is, so it belongs beside lcdEdit rather than in the document.
+  let lcdDisplayState = $state({});
+
   // Auto-return timers, one per display: { [controlId]: timer }. Plain object rather than $state —
   // nothing renders from it, and making it reactive would re-derive every display on every tick.
   const lcdLayoutTimers = {};
@@ -802,7 +808,8 @@
     const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
     if (!layout) return null;
     const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
-    return pressTargetAt(layout.zones ?? [], lcdCellFromPoint(control, local), cols);
+    return pressTargetAt(layout.zones ?? [], lcdCellFromPoint(control, local), cols,
+      lcdStateFor(control));
   }
 
   /**
@@ -878,6 +885,25 @@
     }, spec.ms);
   }
 
+  /**
+   * The display's state as the ACTIVE LAYOUT sees it.
+   *
+   * The cursor belongs to the display and the bound belongs to the layout, so a page change can
+   * leave the selection past the new page's last item — and a marker zone that exists for no index
+   * the page has draws nothing at all, which reads as a menu with no selection rather than as a
+   * number out of range. Folding it here rather than on arrival covers the selector and the
+   * timeout too, which change the layout without any press to hang a clamp on.
+   */
+  function lcdStateFor(control) {
+    const held = lcdDisplayState[getControlId(control)];
+    if (!held) return {};
+    const display = lcdDisplayOf(control);
+    const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+    const max = Math.max(0, Math.round(numberOr(layout?.cursorMax, 0)));
+    const cursor = Math.round(numberOr(held.cursor, 0));
+    return cursor > max ? { ...held, cursor: max } : held;
+  }
+
   function lcdPerformPress(control, zone) {
     const controlId = getControlId(control);
     const press = zone?.press ?? {};
@@ -890,6 +916,23 @@
       if (!(display?.layouts ?? []).some((l) => String(l?.id ?? '') === layoutId)) return false;
       lcdPressedLayout = { ...lcdPressedLayout, [controlId]: layoutId };
       lcdScheduleLayoutTimeout(control, layoutId);
+      lcdFlashPress(control, zone);
+      return true;
+    }
+
+    // Move the selection. The range is the ACTIVE LAYOUT's, because how many items a page has is a
+    // property of that page — a two-item menu and a six-item one are different layouts.
+    if (press.cursor !== undefined && press.cursor !== null) {
+      const display = lcdDisplayOf(control);
+      const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+      const max = numberOr(layout?.cursorMax, 0);
+      if (max <= 0) return false;
+      const now = numberOr(lcdStateFor(control).cursor, 0);
+      const next = moveCursor(now, press.cursor, max);
+      lcdDisplayState = {
+        ...lcdDisplayState,
+        [controlId]: { ...(lcdDisplayState[controlId] ?? {}), cursor: next },
+      };
       lcdFlashPress(control, zone);
       return true;
     }
@@ -1166,6 +1209,12 @@
           if (paramInfo) live[id] = paramInfo;
           continue;
         }
+        if (isStateSource(id)) {
+          const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
+          const key = stateKeyOf(id);
+          if (key) live[id] = stateInfo(lcdStateFor(control)[key], layout?.cursorMax);
+          continue;
+        }
         const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
         const src = resolvedId ? controlById(resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
@@ -1221,6 +1270,8 @@
         // Live edit marker: text edits carry the caret; a choice edit highlights
         // the armed zone (the renderer parks the block on its first cell).
         const controlId = getControlId(control);
+        // The display's own state, for zones that declare `visibleWhen` and for '@state:' sources.
+        cd.__state = lcdStateFor(control);
         // Which soft key is lit right now, for the renderer to draw in inverse.
         cd.__press = (lcdPress.id === controlId && lcdPress.row >= 0)
           ? { row: lcdPress.row, c0: lcdPress.c0, c1: lcdPress.c1 } : null;

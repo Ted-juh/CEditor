@@ -667,6 +667,12 @@ export const SECTION_DEFAULTS = {
     // way F1..F6 sit under a hardware screen. One of:
     //   { layout: 'id' }        navigate to another layout
     //   { set: 'name', to: n }  write a value to another control, addressed by name
+    //   { cursor: 1 | -1 }      move the selection on this display, wrapping at both ends
+    //
+    // `visibleWhen: { cursor: N }` shows a zone only at one selection index — which is how a menu
+    // draws its marker: one arrow zone per row. A zone hidden this way is not pressable either.
+    // `cursorMax` on the LAYOUT is how many items that page has (0 = no list, the default), because
+    // a two-item menu and a six-item one are different pages.
     // A zone without one is inert, and the display stays display-only otherwise: only a zone that
     // DECLARES an action takes a press. See docs/design/display-component-futures.md, proposal 4.
     layouts: [],
@@ -683,6 +689,7 @@ export const SECTION_DEFAULTS = {
     // A zone's sourceId is normally a control's Core.id. Three reserved forms are not:
     //   '@active' / '@active#kind'   whichever control was last touched
     //   '@edit'                      this display's own editText buffer
+    //   '@state:<key>'               this display's own state; today the only key is 'cursor'
     //   '@param:<id>'                a DEVICE PARAMETER, with no control in between — optionally
     //                                '@param:<role>:<id>' for a panel driving more than one device.
     //                                Its value comes from stores/deviceParameterValues.js, and its
