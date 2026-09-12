@@ -567,16 +567,17 @@ move must be pressable.
 
 # Tier 3 — speculative on purpose
 
-## 7. A `PixelDisplay` on the CTRL49's real screen
+## 7. A `PixelDisplay` on the CTRL49's real screen — **answered, and closed**
 
 **Read the non-goal first.** `screen-builder-design.md` rules this out for panels, and the reason
 is sound: the firmware's Lua environment has 16 device functions — rectangles, text, and pre-made
 images — with no line or arc primitives, proven by live enumeration. Translating the panel editor's
 visual language into that would be "enormous effort for a degraded imitation".
 
-**The seam.** That reasoning is about *vector* content. A `PixelDisplay` is not vector content —
-it is a 1-bit framebuffer, and "pre-made image" is one of the sixteen things the firmware *can*
-draw. It is the one component in the product whose output is already in the hardware's vocabulary.
+**The seam this proposal found.** That reasoning is about *vector* content. A `PixelDisplay` is not
+vector content — it is a 1-bit framebuffer, and "pre-made image" is one of the sixteen things the
+firmware *can* draw. It is the one component in the product whose output is already in the
+hardware's vocabulary.
 
 ```mermaid
 flowchart LR
@@ -586,18 +587,83 @@ flowchart LR
   E["panel with knobs<br/>(vector)"] -. "no line/arc primitives" .-> F["✗ ruled out"]
 ```
 
-**What would have to be proven, in this order:**
+The proposal called for a one-day spike on hardware, in this order: **(1) bandwidth**, **(2) image
+format**, **(3) who owns the screen**. It turned out not to need hardware. `CE/src/ControlSurface/`
+was already built while this note sat unread — 6,200 lines of it, over 1,100 lines of golden-byte
+tests in `CE/tests/Ctrl49ProtocolTests.cpp`. So the spike ran against the protocol library instead,
+and **question 2 answers question 1 by making it moot.**
 
-1. **Bandwidth.** The design note's filmstrip approach implies pre-rendered assets are uploaded
-   ahead of time, not streamed. If a 128×64 1-bit frame (1 KB raw) cannot be pushed at even 5 fps,
-   this is a static-screen feature, not a live one — still useful, much less exciting.
-2. **Image format.** Whether `draw_image` accepts an arbitrary uploaded buffer or only assets
-   registered in the bundle.
-3. **Who owns the screen.** The broker model says exactly one process owns the CTRL49. A panel's
-   display would have to be a *client* of the bridge, like everything else.
+*What the evidence below is worth:* those tests take their expected bytes from the
+reverse-engineering handoff, where frames were "either proven live on the physical keyboard or
+decoded exactly from the captured VIP replay", with anything merely following the documented
+layouts marked `derived`. So the object types and the frame shapes are observed protocol; the
+encoding arithmetic is arithmetic. Neither is a throughput measurement, and this note does not
+claim one.
 
-**Verdict: a one-day spike, not a roadmap item.** Answer (1) first; if the answer is "static only",
-write that down next to the non-goal and stop.
+### (2) Image format: a PNG object in device RAM, and nothing else
+
+`Ctrl49Protocol.h` accepts exactly two kinds of object into the device:
+
+```cpp
+inline constexpr std::uint16_t kObjectTypeLua = 0x0010;  // UTF-8 source + one NUL terminator
+inline constexpr std::uint16_t kObjectTypePng = 0x000E;  // PNG file bytes + one NUL terminator
+```
+
+**There is no raw-buffer object type.** An image is a *PNG file*, uploaded by key as
+begin / N × chunk / end, 512 raw bytes per chunk (the size the header records as proven-safe), each
+chunk run through an LSB-first 8-bit→7-bit bitstream — `512 raw bytes -> 586 encoded`, asserted in
+the tests and exactly what the documented codec gives.
+
+And the draw side never sees pixels at all:
+
+```cpp
+Bytes buildDraw   (std::uint8_t target, const Bytes& args);                          // 02/3B
+Bytes buildLuaCall(std::uint8_t target, std::string_view function, const Bytes& args); // 02/3C
+```
+
+Both hand *arguments to a bound Lua script*, which blits from PNG objects already resident in RAM.
+There is no call that takes a framebuffer. So "push a frame" is not a draw — it is an **asset
+re-upload**, which is the expensive operation the whole architecture is shaped to do once.
+
+### (1) Bandwidth: the wrong question, and the right one was already answered
+
+The proposal guessed the blocker would be throughput. It is not obviously that — a 128×64 1-bit
+PNG is a few hundred bytes, one chunk, and USB-MIDI is not a 31.25 kbaud DIN cable. The blocker is
+that the design record's own division of labour is **"fat scripts, thin SysEx: a state delta is
+~20–30 bytes instead of dozens of drawing commands"**, with animation host-clocked at a modest rate
+and a keepalive that must not be starved — the device's watchdog restores the stock screen if one
+is missed for ~900 ms. Re-uploading an object per frame inverts exactly that bargain.
+
+"Redraw cost / watchdog tolerance of slow draws" is still listed as an unsettled unknown in
+`screen-builder-design.md`, and this note does not settle it. It does not have to: the format
+answer means there is no live-mirror path to measure.
+
+### (3) Who owns the screen: already answered, exactly as guessed
+
+One resident broker owns the CTRL49; everything else is a client. `Ctrl49SurfaceBroker.cpp` is that
+broker. A panel's display would be a client of the bridge, as this proposal assumed.
+
+### The verdict, and the part that is better than "static only"
+
+The design record's stop condition was: *"Answer (1) first; if the answer is 'static only', write
+that down next to the non-goal and stop."* So: **written down, and stopping.** But "static" undersells it,
+and the better answer is worth the paragraph.
+
+A filmstrip is *"a vertical strip of 128 pre-rendered frames; frame N shows the control at value
+N"*, blitted by one `draw_image` with source-rect arguments, and CEditor already *"generates strips
+mechanically from its own control rendering at compile time"*. A `PixelDisplay` is a 1-bit
+framebuffer. **A filmstrip is a stack of framebuffers** — they are the same data structure, and the
+seam this proposal found is real. It just lands one layer up from where it was aimed:
+
+> A `PixelDisplay` whose content is a pure function of one value — a meter, a bar, an envelope
+> shape, a scope of a stored waveform — compiles to a filmstrip at build time and animates from an
+> encoder at full smoothness. What cannot work is the live mirror: a display fed by `@active`, by
+> a clock, or by anything the host computes per frame.
+
+That is not a display-component change at all. It is a **filmstrip source** for the screen builder's
+existing asset pipeline, and it belongs in that document's phase list rather than this one. Which
+is the most useful outcome a spike can have: the idea survives, in somebody else's backlog, in a
+form that costs a fraction of what was proposed here.
 
 ## 8. A scope fed by real audio
 
@@ -643,7 +709,7 @@ re-derives it.
 | 2 | Pixel content verbs | Moderate — a reducer kind, and elements needed a name | No | **Shipped** |
 | 5 | `@param` zones | Moderate | Yes — and needed a device-state store | **Shipped** |
 | 6 | Layout state machine | High | Yes — layouts gained state | **Shipped** |
-| 7 | CTRL49 framebuffer | Spike | n/a | Spike only |
+| 7 | CTRL49 framebuffer | Spike — done on paper | n/a | **Closed**: value-indexed only, and it belongs to the screen builder |
 | 8 | Real-audio scope | High | No (host work) | Later |
 | 9 | Device screen mirror | Per-device | No | On request |
 
@@ -664,10 +730,12 @@ without changing its model, because the click path was already there for edit fi
 | 4 | **Shipped** — pressable zones, `{ layout }` and `{ set }`, with inverse-video feedback. Character panels only; LcdDisplay only. |
 | 3 | **Shipped** — `lcd.editText` / `pixel.editText`. Host automation still open. |
 | 2 | **Shipped** — eight scene verbs on a new `elem` kind, addressed by an element's name. |
-| 7, 8, 9 | Spike / later / on request — unchanged, and deliberately untouched. |
+| 7 | **Closed** — the spike ran against `CE/src/ControlSurface/` rather than hardware. No live mirror; a value-indexed filmstrip source for the screen builder instead. |
+| 8, 9 | Later / on request — deliberately untouched. |
 
-**Everything in Tiers 1 and 2 is built.** What is left is the three in Tier 3, which were
-speculative on purpose and still are.
+**Everything in Tiers 1 and 2 is built, and 7 is answered.** What is left is 8 and 9, which were
+speculative on purpose and still are — one is host work, the other waits for a device's users to
+ask.
 
 ### The three steps this note planned, and how they actually went
 
