@@ -43,12 +43,16 @@ renderer ever reading it.
 | Constraint | 10 | 26 | — | — | — |
 | Router | 20 | 35 | — | 3 | — |
 | Drum Pads | 36 | 59 | — | 2 | **2** |
+| Orbit | 15 | 30 | — | 2 | **1** (surface-wide) |
+| Timbre | 14 | 16 | — | — | — |
+| Turing | 19 | 36 | — | 1 | — |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
+`behaviourMotion.mjs` — 82 verified, 0 inert, 3 unverified, 0 open defects (the one found is fixed).
 
-That is **112 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 391, plus the whole custom-component surface, are not yet done and are
+That is **160 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 343, plus the whole custom-component surface, are not yet done and are
 not claimed.
 
 ---
@@ -124,6 +128,50 @@ matches its comment, and a second one pins that GM still names the kit.
 
 ---
 
+## D-3 — pressing a control scrolled the canvas out from under the pointer
+
+**Fixed.** `PanelPreviewSurface.svelte`, the generic pointer-down handler (one argument).
+
+This one is surface-wide rather than mine alone, and it is the reason it is worth writing up
+carefully: it silently displaced **every** absolute-positioning gesture in preview, on every control
+type, by an amount that depended on where the control happened to sit.
+
+**Symptom.** Dragging an Orbit satellite to a point due east of its own drawn hub committed an angle
+of **−12.9°** instead of 0°. Consistently, to fifteen decimal places, across three different ways of
+computing the target — which is what made it clear the target was not the variable.
+
+**Measured.** Tracing the control's own `getBoundingClientRect()` through the gesture:
+
+```
+pointerdown   rect.top 477   panel-surface scrollTop 0
+pointermove   rect.top 455   panel-surface scrollTop 22
+```
+
+The control moves **22px up between the press and the first move**. Suppressing the scroll and
+sweeping the drop point gives a clean, exact mapping with no offset at all:
+
+```
+dy = -24  →  +14.04°      dy =  0  →   0.00°
+dy = -10  →   +5.95°      dy = +10 →  −5.95°
+```
+
+**Cause.** The pointer-down handler called `event.currentTarget?.focus?.()`. Focusing an element the
+browser considers less than fully visible makes it scroll that element into view — here, on
+pointer-down, *while the pointer is already on it*. The control slides away under the finger and
+everything that positions absolutely from the pointer lands short by the scroll distance.
+
+**Fix.** `focus({ preventScroll: true })`, on the pointer path only. The five keyboard handlers keep
+the plain `focus()`: scrolling a control into view is the right thing when you arrived by Tab rather
+than by pointing at something already on screen.
+
+**Why the earlier checks missed it.** It is position-dependent. The Envelope in `behaviourCurves`
+asserts exact drop coordinates and passes — that control sat where no scroll was needed. A component
+whose check only asks "did anything change?" would never see it at all.
+
+Root independently observed the same canvas jump from the other side of the codebase.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
@@ -144,6 +192,12 @@ matches its comment, and a second one pins that GM still names the kit.
 - `DrumPads.rollRate` / `rollSync` — need a running transport to sync against. The free-running
   `rollHz` path *is* verified (20 Hz over 400 ms, with `rollVelocity` confirmed as an accent
   followed by quieter repeats, and `rollDelay` holding the first repeat back).
+- `Orbit.syncToTransport` / `cycleBars`, `Turing.syncToTransport` / `division` — same reason.
+- `Orbit.showTrails` — the trail only exists while the clock runs, so its shape is a moving target.
+
+**Environment, not product:** `browser-checks/screenDock.mjs` cannot run here — it launches
+`channel: 'msedge'`, which is Windows-only. Everything else in the existing browser suite passes
+with these changes, with no assertion failures.
 
 ---
 
@@ -176,14 +230,23 @@ product. They are listed because the previous pass's real failure was not notici
    otherwise would demand that a saved file remember a keypress.
 10. **`kit.click()` holds for 40 ms**, which outlived a 40 ms one-shot gate and read as "the gate did
     not hold".
+11. **Reading live state out of the document.** Twice: the Orbit's run clock injects `__phase` into
+    the *resolved* control rather than writing a phase into the document sixty times a second, and
+    the Turing's randomness mutates the *preview session* because preview is a rehearsal that leaves
+    the saved panel alone. Both read as "the clock is stopped". The fix was to measure the drawing
+    and the session — and, for the Turing, to add the assertion that actually matters: that all that
+    churning leaves the document untouched.
+12. **Parking a Timbre puck exactly on an anchor**, so the press grabbed the anchor — a different and
+    equally real gesture — and the puck never moved.
+13. **SVG coordinates plus the control's screen origin.** The svg is not necessarily flush with its
+    control element; adding the two offsets every target by that gap.
 
 ---
 
 ## Still to do in my half
 
-- The remaining 391 catalogue properties: Orbit, Looper, Timbre, Turing, Kinetic, Constellation,
-  Keyboard, StepSequencer, ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone,
-  Setlist, Transport, Panic.
+- The remaining 343 catalogue properties: Looper, Kinetic, Constellation, Keyboard, StepSequencer,
+  ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone, Setlist, Transport, Panic.
 - All 14 custom starters, and the authoring surface: public properties, value channels, hit zones,
   variants, generators, links, export/import.
 - Nothing here is a release sign-off, and none of it touches the native GUI or hardware gates.
