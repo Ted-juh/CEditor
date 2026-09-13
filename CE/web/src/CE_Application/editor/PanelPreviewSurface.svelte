@@ -4128,14 +4128,19 @@
     });
   }
   // Consume the live held-note state, the same reconcile the Zone Splitter does.
-  function pumpHarmInput(control) {
+  function pumpHarmInput(control, force = false) {
     ensureNoteInput();
     const id = getControlId(control);
     const seq = $midiNoteState.seq;
     const keep = harmKeyPress && harmKeyPress.id === id ? harmKeyPress.note : null;
-    // The mouse-held key has no sequence number of its own, so a press has to
-    // be reconciled even when the input store hasn't moved.
-    if (harmSeen[id] === seq && keep === null) return;
+    // The mouse-held key has no sequence number of its own, so a press has to be reconciled even
+    // when the input store hasn't moved — and so does the RELEASE, which is the half that was
+    // missing. Letting go sets `keep` back to null while `seq` is unchanged, so the guard below
+    // short-circuited and the reconcile that lets the chord go never ran: a key auditioned with the
+    // mouse sounded a chord that never stopped, with the keys left lit and the synth still holding
+    // it. `force` is how the release says "there is nothing new on the wire, and something still
+    // changed".
+    if (harmSeen[id] === seq && keep === null && !force) return;
     harmSeen[id] = seq;
     const entries = inputHeldEntries($midiNoteState.notes, harmInputChannel(control));
     const r = reconcileHarmony(harmHeld[id] ?? EMPTY_HELD, control, entries, keep);
@@ -4187,7 +4192,7 @@
     if (!harmKeyPress) return;
     const control = allControls.find((c) => getControlId(c) === harmKeyPress.id);
     harmKeyPress = null;
-    if (control) pumpHarmInput(control);
+    if (control) pumpHarmInput(control, true);
   }
 
   // --- Phrase Recorder: capture what you played, loop it -------------------------

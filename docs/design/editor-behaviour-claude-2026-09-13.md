@@ -564,6 +564,46 @@ really is a CHILD of the container, so a grouping that quietly failed could not 
 
 ---
 
+## D-12 — a key auditioned on the Harmoniser sounded a chord that never stopped
+
+**Fixed.** `pumpHarmInput` / `releaseHarmoniserPress` in `PanelPreviewSurface.svelte`.
+
+Clicking a key on the Harmoniser's keyboard is how you hear it with no keyboard plugged in, which is
+most of the editor's life. The chord sounds. Letting go does nothing at all:
+
+```
+press  → note-ons 52 55 59, three keys lit
+release→ note-offs: none
+         keys still lit: 3
+```
+
+The synth goes on holding the chord until something else moves the MIDI input store, or until Panic.
+
+**Cause, and it is one line with its own comment already half-explaining it.** `pumpHarmInput`
+reconciles against the held-note store, and guards on that store's sequence number so it does no
+work per frame:
+
+```js
+const keep = harmKeyPress && harmKeyPress.id === id ? harmKeyPress.note : null;
+// The mouse-held key has no sequence number of its own, so a press has to
+// be reconciled even when the input store hasn't moved.
+if (harmSeen[id] === seq && keep === null) return;
+```
+
+The comment is right about the press and the `keep === null` clause lets it through. The RELEASE is
+the symmetric case: letting go sets `keep` back to null while `seq` is unchanged, so the guard
+short-circuits and the reconcile that would let the chord go never runs. The press was thought
+about; the release was not.
+
+**Fix.** `pumpHarmInput(control, force)`, with the release passing `true` — "there is nothing new on
+the wire, and something still changed". Chosen over clearing the seen-sequence sentinel because it
+says what it means at the call site.
+
+**Regression.** `behaviourHarmony.mjs` asserts that every pitch the audition started is released on
+mouse-up, by note number, not that some note-off happened.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
