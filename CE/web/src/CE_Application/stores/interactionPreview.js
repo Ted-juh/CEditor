@@ -13,6 +13,7 @@ import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.j
 import { applyPanelValueRoutes } from '../utils/routeSessions.js';
 import { flatControls } from '../utils/containment.js';
 import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
+import { isSliderBehavior, getSliderActiveHandle } from '../utils/sliderBehavior.js';
 
 /**
  * Every control in the panel, containers included.
@@ -89,8 +90,8 @@ export function createInteractionPreviewSession(control = null) {
   if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
     next.checked = behavior?.defaultValue === true;
   }
-  if (String(behavior?.family ?? '') === 'range' && String(behavior?.role ?? '') === 'slider') {
-    next.activeHandle = String(behavior?.valueMode ?? 'single') === 'range' ? 'start' : 'current';
+  if (isSliderBehavior(behavior)) {
+    next.activeHandle = getSliderActiveHandle(behavior);
     next.valueInputRole = next.activeHandle;
   }
   // Two-value range spinner starts with the low (start) field active.

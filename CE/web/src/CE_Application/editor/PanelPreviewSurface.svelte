@@ -11,7 +11,7 @@
   import {
     collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
     pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
-    isStateSource, stateKeyOf, stateInfo, moveCursor,
+    isStateSource, stateKeyOf, stateInfo, moveCursor, regionStartOffset,
   } from '../utils/lcdZones.js';
   import { deviceParameterValues } from '../stores/deviceParameterValues.js';
   import { profileParameters, deviceRoleMappings, profileParameterPages } from '../stores/deviceProfileStores.js';

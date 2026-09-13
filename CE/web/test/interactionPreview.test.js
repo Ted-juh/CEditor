@@ -288,6 +288,11 @@ test('createInteractionPreviewSession seeds slider preview focus for the authore
   assert.equal(rangeSession.valueInputRole, 'start');
   assert.equal(bandSession.activeHandle, 'current');
   assert.equal(bandSession.valueInputRole, 'current');
+  for (const [activeHandlePolicy, expected] of [['startFirst', 'start'], ['currentFirst', 'current'], ['endFirst', 'end']]) {
+    const session = createInteractionPreviewSession(makeSliderControl('band_policy', { valueMode: 'band', activeHandlePolicy }));
+    assert.equal(session.activeHandle, expected);
+    assert.equal(session.valueInputRole, expected);
+  }
 });
 
 test('createInteractionPreviewSession seeds custom component value channels', () => {

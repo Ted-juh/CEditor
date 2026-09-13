@@ -713,6 +713,91 @@ try {
       const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const pointer=node(id).locator('.slider-svg > circle[fill="none"]').first(),start=await pointer.boundingBox();if(type==='Slider'){const b=await node(id).boundingBox();await page.mouse.click(b.x+b.width*.75,b.y+b.height/2);}else{await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2,start.y+start.height/2-50,{steps:8});await page.mouse.up();}await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),type==='Slider'?'0.25':'0.30',`${type} reversed drag decreases its value`);if(type==='Slider')assert.ok((await pointer.boundingBox()).x<start.x,'lower value still draws on the normal left-hand side');await node(id).hover();await page.mouse.wheel(0,-100);await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),type==='Slider'?'0.24':'0.29',`${type} wheel follows the reversed direction too`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),type==='Slider'?.24:.29);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
     }
   });
+  await check('Slider rotary and knob drag modes honour direction sensitivity and painted handle position',async()=>{
+    for(const config of [
+      {mode:'knob',sensitivity:.5,direction:'cw',reverse:false,want:.6},
+      {mode:'knob',sensitivity:2,direction:'cw',reverse:false,want:.9},
+      ...['cw','ccw'].flatMap(direction=>[false,true].map(reverse=>({mode:'rotary',sensitivity:1,direction,reverse,want:(direction==='cw')!==reverse?.75:.25}))),
+    ]){
+      const id=await fixture('Knob',{Transform:{width:240,height:240},Behavior:{min:0,max:1,step:.001,precision:3,defaultCurrentValue:.5,startAngle:0,sweepAngle:360,circularDiameter:120,showValueReadout:false,circularDragMode:config.mode,circularDragSensitivity:config.sensitivity,direction:config.direction,reverseMouseDirection:config.reverse},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{
+        await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+        const b=await node(id).boundingBox(),pointer=node(id).locator('.slider-svg > circle[fill="none"]').first(),p=await pointer.boundingBox();
+        const cx=b.x+b.width/2,cy=b.y+b.height/2,px=p.x+p.width/2,py=p.y+p.height/2,radius=Math.hypot(px-cx,py-cy);
+        await page.mouse.move(px,py);await page.mouse.down();
+        await page.mouse.move(config.mode==='knob'?px:cx-(py-cy),config.mode==='knob'?py-50:cy+(px-cx),{steps:12});await page.mouse.up();await settle();
+        assert.ok(Math.abs(Number(await node(id).getAttribute('aria-valuenow'))-config.want)<.001,JSON.stringify(config));
+        assert.ok(Math.abs(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value)-config.want)<.001,'emitted value agrees with the drag');
+        const after=await pointer.boundingBox(),angle=(config.direction==='cw'?1:-1)*config.want*Math.PI*2;
+        assert.ok(Math.hypot(after.x+after.width/2-(cx+Math.cos(angle)*radius),after.y+after.height/2-(cy+Math.sin(angle)*radius))<1,'handle paints at the corresponding authored angle');
+        assert.equal(await node(id).locator('.slider-readout').count(),0,'the disabled readout stays hidden');
+        await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
+      };
+      await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Screen text editing enforces charset and length and correctly commits cancels and reopens',async()=>{
+    for(const type of ['LcdDisplay','PixelDisplay'])for(const [charset,maxLength,initial,input,want] of [
+      ['digits',3,'12','A34','123'],['upper',5,'AB','cdeF','ABCDE'],['alnum',0,'x','Y9','xY9'],['ascii',0,'ABC','0123456789!?xyz','ABC0123456789!?xyz'],
+    ]){
+      const pixelBase={pixelsW:128,pixelsH:24,padding:0,showGhost:false,showGlass:false,animMode:'off'};
+      const section={editText:initial,editCharset:charset,editMaxLength:maxLength};
+      const cfg=type==='PixelDisplay'?{Pixel:{...pixelBase,...section,elements:[{id:'edit',kind:'edit',sourceId:'@edit',prefix:'[',suffix:']',x:2,y:2,w:124,h:8}]}}:{Display:{...section,cols:24,rows:1,cursorMode:'off',layouts:[{id:'home',zones:[{id:'edit',show:'edit',sourceId:'@edit',prefix:'[',suffix:']',row:1,colStart:1,colEnd:24}]}]}};
+      const id=await fixture(type,{Transform:{width:512,height:96},...cfg},[],type==='PixelDisplay'?[{type:'PixelDisplay',sections:{Core:{id:'edit_reference'},Transform:{x:50,y:230,width:512,height:96},Pixel:{...pixelBase,elements:[{id:'reference',kind:'static',text:`[${want}]`,x:2,y:2,w:124,h:8}]}}}]:[]);
+      const verify=async()=>{
+        await props.getByTitle('Enter Preview',{exact:true}).click();
+        const clickEnd=async()=>{const b=await node(id).boundingBox();await page.mouse.click(b.x+b.width-20,b.y+b.height/2);};
+        const verifyText=async()=>{if(type==='LcdDisplay')assert.equal((await node(id).locator('.lcd-char').allTextContents()).join('').trim(),`[${want}]`);else{const png=el=>el.locator('canvas').first().evaluate(c=>c.toDataURL());assert.ok((await png(node(id)))===(await png(node('edit_reference'))),`${charset}/${maxLength} must paint [${want}]`);}};
+        await clickEnd();await page.keyboard.type(input);await page.keyboard.press('Enter');await settle();await verifyText();
+        await clickEnd();await page.keyboard.press('Backspace');await page.keyboard.press('Escape');await settle();await verifyText();
+        await props.getByTitle('Exit Preview',{exact:true}).click();
+      };
+      await verify();await reopen(id);await verify();
+    }
+  });
+  await check('LCD aligned edit fields place the caret in the painted text and retain authored alignment after reopen',async()=>{
+    for(const align of ['left','center','right']){
+      const id=await fixture('LcdDisplay',{Transform:{width:512,height:96},Display:{cols:16,rows:1,editText:'AB',editCharset:'upper',editMaxLength:8,cursorMode:'off',layouts:[{id:'home',zones:[{id:'edit',show:'edit',sourceId:'@edit',prefix:'[',suffix:']',align,row:1,colStart:1,colEnd:16}]}]}});
+      const verify=async()=>{
+        await props.getByTitle('Enter Preview',{exact:true}).click();
+        const chars=node(id).locator('.lcd-char');const before=await chars.allTextContents();const bIndex=before.findIndex(c=>c==='B');assert.ok(bIndex>=0);
+        const box=await chars.nth(bIndex).locator('..').boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);await page.keyboard.type('X');await page.keyboard.press('Enter');await settle();
+        assert.equal((await chars.allTextContents()).join('').trim(),'[AXB]',`${align}: click on B inserts before B`);
+        await props.getByTitle('Exit Preview',{exact:true}).click();
+      };await verify();await reopen(id);await verify();
+    }
+  });
+  await check('LCD bound editing changes the source label and choice with visible output and Tab navigation',async()=>{
+    const rows=['Alpha','Disabled','Beta'].map((displayText,i)=>({id:String(i),internalValue:displayText,displayText,enabled:i!==1,selectedByDefault:i===0}));
+    const id=await fixture('LcdDisplay',{Transform:{width:512,height:160},Display:{cols:16,rows:2,editCharset:'upper',editMaxLength:8,cursorMode:'off',layouts:[{id:'home',zones:[{id:'name',show:'edit',sourceId:'edit_label',row:1,colStart:1,colEnd:16},{id:'choice',show:'edit',sourceId:'edit_choice',row:2,colStart:1,colEnd:16}]}]}},[],[
+      {type:'Label',sections:{Core:{id:'edit_label'},Transform:{x:50,y:240,width:220,height:60},Text:{content:'AB',editable:true}}},
+      {type:'Combobox',sections:{Core:{id:'edit_choice'},Transform:{x:320,y:240,width:220,height:60},Value:{rows},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'patchName',dryRun:true}]}}},
+    ]);
+    const verify=async()=>{
+      await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+      const b=await node(id).locator('.lcd-line').first().boundingBox();await page.mouse.click(b.x+b.width-15,b.y+b.height/2);await page.keyboard.type('X');await page.keyboard.press('Tab');await page.keyboard.press('ArrowRight');await settle();
+      const lines=await node(id).locator('.lcd-line').evaluateAll(es=>es.map(e=>[...e.querySelectorAll('.lcd-char')].map(c=>c.textContent).join('').trim()));assert.deepEqual(lines,['ABX','Beta']);
+      const label=page.locator('.canvas-viewport').last().locator('.canvas-control[data-control-id="edit_label"]').last();
+      assert.ok((await label.textContent()).includes('ABX'),'bound Label paints the edited string');assert.ok((await node('edit_choice').textContent()).includes('Beta'),'bound Combobox paints the selected option');
+      assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),'Beta','screen choice skips disabled row and sends the source output');
+      await page.keyboard.press('Shift+Tab');await page.keyboard.press('Backspace');await page.keyboard.press('Escape');await settle();assert.ok((await label.textContent()).includes('ABX'),'Escape restores the value at re-entry');
+      await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
+    };await verify();await reopen(id);await verify();
+  });
+  await check('Slider multiple handles respect active policy crossing and circular wrap in painted values and output',async()=>{
+    const cases=[
+      {policy:'startFirst',key:'ArrowRight',want:'21 | 50 | 80',out:21},
+      {policy:'currentFirst',key:'ArrowRight',want:'20 | 51 | 80',out:51},
+      {policy:'endFirst',key:'ArrowRight',want:'20 | 50 | 81',out:81},
+      {policy:'startFirst',key:'End',want:'50 | 50 | 80',out:50},
+      {policy:'startFirst',key:'End',cross:true,want:'100 | 50 | 80',out:100},
+      {policy:'startFirst',key:'End',geometry:'circular',wrap:true,want:'100 | 50 | 80',out:100},
+    ];
+    for(const c of cases){
+      const id=await fixture('Slider',{Behavior:{valueMode:'band',geometry:c.geometry??'linear',min:0,max:100,step:1,precision:0,defaultStartValue:20,defaultCurrentValue:50,defaultEndValue:80,activeHandlePolicy:c.policy,allowHandleCross:c.cross===true,allowWrapAround:c.wrap===true,bandSeparator:' | '},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.press(c.key);await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),c.want,JSON.stringify(c));assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),c.out);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();
