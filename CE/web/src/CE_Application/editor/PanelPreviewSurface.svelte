@@ -4452,6 +4452,30 @@
     if (closed !== live) setLiveTake(control, closed);
     commitTake(control);
   }
+  /**
+   * CAPTURE RUNS IN AN EFFECT, NOT IN THE RENDER — and this one stopped the Recorder recording.
+   *
+   * Both pumps end in `captureNote` -> `setLiveTake` -> `patchControlSession`, which writes a Svelte
+   * store. They used to be called from `applyRecorderValueSource`, which the template calls while
+   * working out what to draw, and Svelte 5 forbids writing state from there. So arming a Recorder
+   * and playing a note did not record it: the canvas boundary caught `state_unsafe_mutation` on the
+   * first captured note, every control vanished, and the take stayed empty — nothing in the
+   * document and nothing in the session. Recording is the whole of what this component does.
+   *
+   * Third site of the same fault, after the Transport's clock reconfiguration and the Setlist's
+   * recall, and found by looking for the shape rather than by tripping over it.
+   */
+  $effect(() => {
+    for (const raw of allControls) {
+      if (!isRecorderControl(raw)) continue;
+      const session = sessionFor(raw);
+      const overrides = session?.enabled === false ? {} : session;
+      const control = applySectionValues(raw, overrides?.sectionValues);
+      if (!control?._children?.Recorder) continue;
+      pumpRecorderInput(control);
+      pumpRecorderTap(control);
+    }
+  });
   function applyRecorderValueSource(control, resolved) {
     if (!isRecorderControl(control)) return resolved;
     const base = resolved?.control ?? control;
@@ -4459,8 +4483,6 @@
     if (!cfg) return resolved;
     ensureRecorderTicker();
     void orbitClock;
-    pumpRecorderInput(control);
-    pumpRecorderTap(control);
     const id = getControlId(control);
     const next = { ...cfg, __phase: recorderPhaseState[id] ?? 0 };
     const sess = sessionFor(control);
@@ -4661,7 +4683,14 @@
     if (!cfg) return resolved;
     if (cfg.running !== false) { ensurePhraseTicker(); void orbitClock; }
     const id = getControlId(control);
-    const index = phraseIndexState[id];
+    // A STOPPED SEQUENCE DRAWS NO COLUMN, decided here rather than left to the ticker to clear.
+    // The ticker does clear `phraseIndexState` when it notices the sequence has stopped — but it is
+    // a plain module map, not reactive, and the render that follows `running: false` happens BEFORE
+    // that frame. With the ticker then self-stopping there is no later render to pick the clear up,
+    // so the playing column stayed lit on a stopped sequencer, parked on whatever step it had
+    // reached, until something unrelated re-rendered the control. Reading `running` here makes the
+    // document the authority, which is what the renderer's own "-1 means draw nothing" expects.
+    const index = cfg.running === false ? undefined : phraseIndexState[id];
     const next = {
       ...cfg,
       __step: index === undefined ? -1 : phraseStepAt(index, phraseSteps(control), phraseDirection(control), cfg.seed ?? 0),

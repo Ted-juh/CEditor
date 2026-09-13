@@ -606,6 +606,95 @@ mouse-up, by note number, not that some note-off happened.
 
 ---
 
+## D-13 — a Recorder did not record, and took the canvas with it
+
+**Fixed.** The Recorder hunk of `PanelPreviewSurface.svelte`.
+
+The fourth site of D-9's fault, and the most expensive of them: this one stops the component doing
+the single thing it exists for. Found by reading for the shape — `applyRecorderValueSource` called
+`pumpRecorderInput` and `pumpRecorderTap` from the render path, and both end in `captureNote` →
+`setLiveTake` → `patchControlSession`, which writes a Svelte store.
+
+```
+Recorder.state = 'recording', a note arrives on the input
+  canvas: 0 controls · "The canvas stopped rendering / state_unsafe_mutation"
+  take in the document: 0 events
+  take in the session:  0 events
+```
+
+Nothing was captured, because the boundary caught the very first write. Arm a recorder, play a note,
+and the panel disappears.
+
+**Fix.** Both pumps into an `$effect`, as the Transport's reconfiguration and the Setlist's recall
+were. Afterwards the same note lands: canvas intact, one event in the live take. (The document take
+stays empty until the loop seam, which is `commitTake`'s job and correct — one undo step for the
+whole take, at the moment it stops being edited.)
+
+### The pattern, now that there are four of them
+
+| Site | What it wrote from the render | What it cost |
+| --- | --- | --- |
+| Transport | the shared clock | the canvas, on any tempo edit or tap |
+| Setlist | the recalled values and the tempo | the canvas, and the scene was not recalled |
+| Recorder | the live take | the canvas, and nothing was recorded |
+| (Harmoniser) | — | D-12 is a different fault; its pump writes no Svelte state |
+
+The value-source chain is a rendering function that several components had been using as a general
+"every frame, for every control" hook. That is what it is for when it INJECTS live state into what
+gets drawn, and it is where all four of these went wrong by writing instead.
+
+**The precise rule, because a looser one would be wrong.** Svelte's `state_unsafe_mutation` fires
+when a render writes state that the same render READS. All four sites wrote a store the surface
+itself reads while drawing — `panelPreviewSessions` through `sessionFor`, `transport` through
+`$transport.seq`, `panels` through `orderedControls`. So:
+
+> a function in `resolvedPreviewFor`'s chain must not write any store the surface reads during
+> render — in practice `panels`, `panelPreviewSessions` or `transport`.
+
+Several chain functions still write OTHER stores from the render and are not broken by it:
+`applyRouterValueSource` fans out through `commitDeviceParameter`, and the Zone Splitter's,
+Harmoniser's and Step Sequencer's chain calls all reach `sendNoteBytes` → `noteOutputEvents`. Those
+are exercised hard by the Zone Splitter (24 rows), Harmoniser (41) and Step Sequencer (38) passes
+with real notes flowing and no boundary trip, because the surface does not read those stores while
+drawing. Recorded as observed-working rather than as a second set of fixes: they are one reader
+away from the same failure — the Recorder's tap on `$noteOutputEvents` was exactly that reader —
+but changing them on suspicion would be four speculative edits to a shared file, and this pass
+reports what it measured.
+
+---
+
+## D-14 — a stopped Phrase Sequencer kept its playhead lit
+
+**Fixed.** `applyPhraseValueSource` in `PanelPreviewSurface.svelte`.
+
+The Step Sequencer states the contract in its own renderer: *"a stopped sequencer draws no playhead
+rather than one parked at step zero"*. The Phrase Sequencer's ticker says the same thing in a
+comment — `phraseIndexState[id] = undefined; // and the playing column goes dark` — and the column
+did not go dark.
+
+```
+never run                     column: 0
+running                       column: 1
+stopped, nothing sounding     column: 1
+stopped while a note is held  column: 1
+```
+
+**Cause, and it is an ordering problem rather than a missing line.** The ticker does clear
+`phraseIndexState`. But that is a plain module map, not reactive, and the render caused by
+`running: false` happens BEFORE the frame that clears it. The ticker then self-stops, so no later
+render picks the clear up, and the column stays on whatever step it had reached until something
+unrelated re-renders the control. Both branches fail, which is why the second line of the repro
+matters: even the case the ticker does handle is too late.
+
+**Fix.** The value source reads `running` and injects no index when the document says stopped, so
+the document is the authority and the renderer's own "-1 means draw nothing" does the rest. One
+line, and it makes the module map an optimisation rather than the source of truth.
+
+**Regression.** A row in `behaviourPhrase.mjs` that runs the sequence, stops it, and asserts the
+column count goes 0 → 1 → 0.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
