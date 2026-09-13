@@ -45,7 +45,8 @@ renderer ever reading it.
 | Drum Pads | 36 | 59 | — | 2 | **2** |
 | Keyboard | 18 | 23 | — | — | — |
 | Note Ribbon | 26 | 22 | — | 1 | — |
-| Chord Pad | 28 | 30 | 1 | 1 | — |
+| Chord Pad | 28 | 36 | 1 | — | — |
+| Arp | 34 | 30 | — | 2 | **1** |
 | Orbit | 15 | 30 | — | 2 | **1** (surface-wide) |
 | Timbre | 14 | 16 | — | — | — |
 | Turing | 19 | 36 | — | 1 | — |
@@ -53,7 +54,7 @@ renderer ever reading it.
 | Kinetic | 15 | 12 | — | 2 | — |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
-`behaviourNotes.mjs` — 134 verified, 1 inert, 4 unverified, 0 open defects (both found ones fixed).
+`behaviourNotes.mjs` — 176 verified, 1 inert, 4 unverified, 0 open defects (three found, all fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
@@ -63,8 +64,8 @@ The custom pass covers all **14 starters** (every declared part drawn with real 
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **266 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 237 are not yet done and are not claimed.
+That is **300 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 203 are not yet done and are not claimed.
 
 ---
 
@@ -305,6 +306,115 @@ into three confirmed mismatches.
 
 ---
 
+## D-7 — a Euclidean rhythm longer than the chord silenced the arpeggiator
+
+**Fixed.** `utils/arpLayout.js` and the Arp hunk of `PanelPreviewSurface.svelte`.
+
+The Arp's Euclidean mask decides which steps fire. `stepFires(control, i)` took one index, and every
+caller had already reduced it to the note sequence — `idx = global % seq.length` in the surface,
+`seq.map((notes, i) => …)` in the renderer. So the mask could only ever be read as far as the note
+set was long.
+
+**Measured.** A triad with `euclidSteps: 8, euclidPulses: 2`:
+
+```
+euclid(8, 2)  = [·, ·, ·, ●, ·, ·, ·, ●]   pulses on steps 3 and 7
+a triad reaches steps 0, 1, 2               → every reachable slot is a rest
+notes in 1.6s = 0
+```
+
+The arpeggiator went **completely silent**, while the properties panel drew the full eight-step
+pattern in its preview (`ArpEditor.svelte:67` calls the same `euclid()` with the configured length).
+The panel offers Steps up to 32, so on a three-note chord most of that range was unreachable and a
+good part of it silent.
+
+**Fix.** `stepFires(control, stepIndex, maskIndex)` takes both, because they count different things:
+`stepIndex` is the position in the note sequence, which is what a player mutes by clicking a cell,
+and `maskIndex` is the free-running step number, which is what a Euclidean rhythm is measured in —
+the whole idea being a rhythm of one length running against a note set of another. The synced path
+already had that number in hand; the free-running path reads its position out of a phase, so it now
+keeps a counter. The renderer asks a different question again — "will this cell ever fire?" — since
+with the two lengths cycling past each other every cell takes its turn, and dimming one would be
+drawing a rest that is not there.
+
+**Proven at the placement, not at the count.** The first version of this measurement counted notes,
+and root was right to reject it: 2-of-8 over 24 steps is "about six", a tolerance of ±2 accepts four
+through eight, and a tolerance that accepts zero accepts the very silence the fix was about. Worse,
+a count is satisfied by a completely wrong pattern at the right density — an evenly-spaced 3-in-8
+and a Euclidean 3-in-8 emit the same number of notes and do not sound remotely alike.
+
+So each fire is now placed on the step grid the rate defines, and the ONSETS are compared to the
+mask the product itself builds (`euclid()` is imported into the check), under every rotation, with
+an exact match required in both directions — every onset on a pulse, and every pulse in the covered
+span producing an onset:
+
+```
+euclid(8, 2)  pulses 3, 7      onsets exactly four steps apart, on a three-note chord
+euclid(8, 3)  pulses 2, 5, 7   onsets 3–3–2 — the tresillo, not 2.67 apart
+euclid(8, 6)  onset for onset against the fuller mask
+euclid(16, 1) two onsets, exactly sixteen steps apart, over a 5.2s window
+```
+
+3-of-8 is the row that separates placement from density, and 1-of-16 needed a window long enough to
+hold two onsets or "silent" and "correct" would have looked the same.
+
+### Two follow-ups from root's review of the first fix, both real
+
+**`stepEverFires` lit cells that never sound.** The renderer asks "will this cell ever fire?", and
+the first version answered "the lengths differ, so everyone gets a turn eventually". That is false
+whenever the lengths share a divisor: a four-note sequence against `euclid(8, 2)`, whose pulses are
+on 3 and 7, only ever fires cell 3 — both pulses are 3 modulo 4. Three rests were being drawn as
+hits. It now walks one full `lcm(len, mask.length)` cycle and answers by reachable residue.
+`test/arpLayout.test.js` pins the case root named, and checks it against the walk rather than
+against the arithmetic restated; reverting the helper fails it.
+
+**A one-slot sequence could not retrigger — see D-8.** That one turned out to be a separate bug,
+older than this fix, so it has its own entry.
+
+Root's call that the mask/sequence mismatch was a release bug rather than a design choice; the
+measurement and the fix followed it.
+
+---
+
+## D-8 — a block-chord arpeggiator sounded one chord and then fell silent
+
+**Fixed.** The free-running Arp tick in `PanelPreviewSurface.svelte`.
+
+Found while acting on root's review of D-7, which asked what happens when the sequence has one slot.
+It is worse than the review supposed: the arpeggiator does not merely fail to advance a counter, it
+stops playing.
+
+A free-running Arp has no step number. It reads a POSITION out of a phase — `stepIndexAt(phase,
+seq.length)` — and fired when that position changed. With one slot the position is 0 for ever:
+
+```
+pattern: 'chord'   → orderNotes returns [[all the notes]]   → seq.length === 1
+stepIndexAt(any phase, 1) === 0                              → the index never changes
+```
+
+**Measured**, rate 8, a triad, a 1.6-second window:
+
+```
+before   note-ons: 3     one chord, at t=0, and nothing after it for the rest of the session
+after    note-ons: 42    fourteen chords, 117–133ms apart (a step at rate 8 is 125ms)
+```
+
+`pattern: 'chord'` is the whole of the Chord (block) pattern — one of the seven the editor offers —
+and `source: 'input'` with a single key held reaches the same state. Counting notes cannot see it:
+one triad is three note-ons, which is not zero.
+
+**Fix.** The tick counts the times the phase has been round and derives a monotonic step number from
+it — `cycles * seq.length + idx` — which is both the retrigger gate and the number the Euclidean
+mask is measured in. Derived from the wrap count rather than incremented per fire, so a frame that
+arrives late leaves the rhythm where the clock says it should be rather than where the frames got
+to. It still does not fire the steps it slept through: only a synced Arp catches up, because only a
+synced Arp has a bar to catch up to.
+
+**Regression.** Three rows in `behaviourNotes.mjs` measure the MOMENTS notes left at rather than
+their number: fourteen separate fires, each 125ms ± 45 apart, each one the whole three-note chord.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
@@ -344,7 +454,9 @@ into three confirmed mismatches.
 
 **Unverified — nothing in this environment can observe it:**
 
-- `Envelope.phaseSourceId`, `Router.sourceControlId` — need a second control driving them live.
+- `Envelope.phaseSourceId`, `Router.sourceControlId`, `Arp.source`/`linkId`/`inputChannel` — need a
+  second control driving them live.
+- `Arp.latch` — only means anything for a source that releases; the Arp's own chord never does.
 
 **Closed since**, in `behaviourInbound.mjs`, by injecting bytes at `latestMidiInputMessage` (where a
 device delivers them) and running the panel's own transport: `Router.inputChannel` (omni, pinned,
@@ -441,7 +553,7 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The remaining 237 catalogue properties: Looper, StepSequencer, Arp, Phrase, Recorder, Harmoniser,
+- The remaining 203 catalogue properties: Looper, StepSequencer, Phrase, Recorder, Harmoniser,
   SplitZone, Setlist, Transport, Panic.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:

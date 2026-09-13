@@ -137,15 +137,58 @@ export function euclid(steps, pulses, rotation = 0) {
   const rot = ((Math.round(num(rotation, 0)) % n) + n) % n;
   return out.slice(rot).concat(out.slice(0, rot));
 }
-// Does step `i` fire? A hand-muted step never fires; otherwise the Euclidean
-// mask decides (when it's enabled).
-export function stepFires(control, i) {
+/**
+ * Does a step fire? A hand-muted step never does; otherwise the Euclidean mask decides.
+ *
+ * TWO INDICES, because they count different things. `stepIndex` is the position in the note
+ * sequence, which is what the player mutes by clicking a cell. `maskIndex` is the free-running step
+ * number, which is what a Euclidean rhythm is measured in — the whole idea is a rhythm of one
+ * length running against a note set of another, and the two drifting past each other.
+ *
+ * They used to be the same value, and the caller reduced it modulo the sequence before passing it.
+ * A rhythm could then only ever be read as far as the note set was long: euclid(8, 2) puts its
+ * pulses on steps 3 and 7, and a three-note chord reaches 0, 1 and 2 — so the arpeggiator fell
+ * silent while the properties panel drew the eight-step pattern in full. Anything above `Steps 3`
+ * on a triad was partly unreachable, and the panel offers up to 32.
+ */
+export function stepFires(control, stepIndex, maskIndex = stepIndex) {
   const cfg = arpConfig(control);
   const mutes = Array.isArray(cfg.mutes) ? cfg.mutes : [];
-  if (mutes.includes(Math.round(num(i, 0)))) return false;
+  if (mutes.includes(Math.round(num(stepIndex, 0)))) return false;
   if (cfg.euclidEnabled !== true) return true;
   const mask = euclid(cfg.euclidSteps ?? 8, cfg.euclidPulses ?? 5, cfg.euclidRotate ?? 0);
-  return mask.length ? mask[((Math.round(num(i, 0)) % mask.length) + mask.length) % mask.length] : true;
+  if (!mask.length) return true;
+  const at = Math.round(num(maskIndex, 0));
+  return mask[((at % mask.length) + mask.length) % mask.length];
+}
+
+/**
+ * Will this CELL ever fire? For the renderer, which draws one cell per note and has no step number.
+ *
+ * The two lengths cycle past each other, so a cell fires if ANY step that lands on it also lands on
+ * a pulse — which is a question about residues, not about the lengths merely differing. "They are
+ * different lengths, so everything gets a turn eventually" is false whenever they share a divisor:
+ * a four-note sequence against euclid(8, 2), whose pulses are on steps 3 and 7, only ever fires
+ * cell 3, because 3 % 4 and 7 % 4 are both 3. Lighting all four would draw three rests as hits.
+ *
+ * So it walks one full cycle of the two together — lcm(len, mask.length) steps — and answers
+ * honestly. Both lengths are small (the mask caps at 64), so the walk is cheap.
+ */
+export function stepEverFires(control, stepIndex, sequenceLength = 0) {
+  const cfg = arpConfig(control);
+  const mutes = Array.isArray(cfg.mutes) ? cfg.mutes : [];
+  if (mutes.includes(Math.round(num(stepIndex, 0)))) return false;
+  if (cfg.euclidEnabled !== true) return true;
+  const mask = euclid(cfg.euclidSteps ?? 8, cfg.euclidPulses ?? 5, cfg.euclidRotate ?? 0);
+  if (!mask.length) return true;
+  const len = Math.max(1, Math.round(num(sequenceLength, 0)));
+  const cell = ((Math.round(num(stepIndex, 0)) % len) + len) % len;
+  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+  const cycle = (len * mask.length) / gcd(len, mask.length);
+  for (let step = cell; step < cycle; step += len) {
+    if (mask[step % mask.length]) return true;
+  }
+  return false;
 }
 
 // The step index at a phase, for a sequence of `length` steps.
