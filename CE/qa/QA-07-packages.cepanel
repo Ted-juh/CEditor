@@ -6222,6 +6222,13 @@
               "name": "pianoKeys",
               "type": "piano-keys",
               "enabled": true,
+              "bounds": {
+                "x": 3,
+                "y": 33,
+                "width": 94,
+                "height": 52,
+                "unit": "percent"
+              },
               "targetBehavior": "pianoBar",
               "targetValueChannel": "note",
               "count": 36,

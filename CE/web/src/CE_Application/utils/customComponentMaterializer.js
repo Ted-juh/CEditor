@@ -1020,6 +1020,13 @@ function isBlackPianoKey(noteNumber) {
 }
 
 function materializePianoKeys(parts, generator, prefix, generatorName = '', hitZones = null) {
+  // Every other generator in this file opens with this line and maps its output through the rect.
+  // This one did not, and hardcoded the full height for both the drawn keys and — because
+  // generatedHitZones is on — their hit zones. A starter that puts anything else underneath the
+  // keyboard therefore had it buried: the Scrollable Piano Bar declares a scroll zone at y 86-98%
+  // and draws a thumb at 91%, and the app reported a piano key at every point inside that strip,
+  // so the scroll it advertises could never be dragged.
+  const bounds = generatorBounds(generator);
   const count = Math.max(1, Math.round(numberOr(generator?.count, 12)));
   const zIndex = numberOr(generator?.zIndex, 5);
   const targetBehavior = generator?.targetBehavior ?? '';
@@ -1053,10 +1060,10 @@ function materializePianoKeys(parts, generator, prefix, generatorName = '', hitZ
       kind: 'rectangle',
       zIndex: zIndex + (black ? 1 : 0),
       layout: {
-        x,
-        y: black ? 28 : 50,
-        width,
-        height: black ? 56 : 100,
+        x: mapGeneratorX(bounds, x),
+        y: mapGeneratorY(bounds, black ? 28 : 50),
+        width: mapGeneratorWidth(bounds, width),
+        height: mapGeneratorHeight(bounds, black ? 56 : 100),
         xUnit: 'percent',
         yUnit: 'percent',
         widthUnit: 'percent',
@@ -1086,13 +1093,13 @@ function materializePianoKeys(parts, generator, prefix, generatorName = '', hitZ
           isBlackKey: black,
           normalized: count > 1 ? index / (count - 1) : 0,
         },
-        bounds: {
+        bounds: mapGeneratorHitZoneBounds(bounds, {
           x: clamp(x - (width / 2), 0, 100),
           y: 0,
           width,
           height: black ? 58 : 100,
           unit: 'percent',
-        },
+        }),
       }, generatorName);
     }
   }

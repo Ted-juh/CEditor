@@ -1809,6 +1809,14 @@ function createScrollPianoBarStarterPatch() {
           name: 'pianoKeys',
           type: 'piano-keys',
           enabled: true,
+          // BOUNDED, like every other generator that shares its control with another hit zone.
+          // Without this the generated keys — and, because generatedHitZones is on, their hit
+          // zones — fill the whole component and bury the scrollArea zone below them: the starter
+          // advertises a scroll channel, declares a dragValue zone at y 86-98% for it, draws a
+          // scrollThumb at 91%, and the app reported a piano key at every single point inside that
+          // strip, so the scroll could never be dragged. The rect is the keyViewport part this
+          // starter already draws (y 33-91%), stopped above the scroll strip.
+          bounds: { x: 3, y: 33, width: 94, height: 52, unit: 'percent' },
           targetBehavior: 'pianoBar',
           targetValueChannel: 'note',
           count: 36,

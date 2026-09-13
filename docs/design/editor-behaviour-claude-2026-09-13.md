@@ -50,6 +50,11 @@ renderer ever reading it.
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
 `behaviourMotion.mjs` — 82 verified, 0 inert, 3 unverified, 0 open defects (the one found is fixed).
+`behaviourCustom.mjs` — 21 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
+
+The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
+hit zone located and moving the channel it names), plus bindings, links, published properties,
+generators, export/import and persistence — see D-4.
 
 That is **160 of my 503 catalogue properties** measured against their promised effect, rendered and
 after a reopen. The remaining 343, plus the whole custom-component surface, are not yet done and are
@@ -172,6 +177,47 @@ Root independently observed the same canvas jump from the other side of the code
 
 ---
 
+## D-4 — the Piano Bar's scroll strip could never be touched
+
+**Fixed.** `utils/customComponentMaterializer.js` (and a `bounds` on the starter).
+
+The Scrollable Piano Bar advertises "note, **scroll**, and velocity channels". It declares a
+`scrollArea` hit zone with a `dragValue` action at y 86–98%, a `pianoScroll` behaviour, a `scroll`
+value channel, and it draws a `scrollThumb` at y 91%. The scroll could not be dragged anywhere on
+the control.
+
+**Measured.** Asking the app what is under the pointer, across the whole component:
+
+```
+y=86%   piano_keyZ ×10
+y=89%   piano_keyZ ×10
+…
+y=98%   piano_keyZ ×10          scrollArea: reported nowhere
+```
+
+**Cause.** Every generator in the materializer opens with `const bounds = generatorBounds(generator)`
+and maps its output through that rect — `mapGeneratorX/Y/Width/Height` for the parts,
+`mapGeneratorHitZoneBounds` for the zones. `materializePianoKeys` did not. It hardcoded `y: 0,
+height: 100` for both the drawn keys and (because `generatedHitZones` is on) their hit zones, so the
+keybed filled the entire component and buried anything underneath it.
+
+The convention is visible in the data: of the nine generators the starters declare, the three that
+share their control with another zone — `meterLeds`, `stepBars`, `tabButtons` — all carry `bounds`.
+`pianoKeys` is the only **interactive** generator with `generatedHitZones: true` and none, in the one
+starter that also declares an interactive zone beneath it.
+
+**Fix.** Two parts, both following the existing convention: `materializePianoKeys` now reads
+`generator.bounds` and maps through it like its eight siblings, and the starter declares the rect of
+the `keyViewport` part it already draws, stopped above the scroll strip. `CE/qa/QA-07-packages.cepanel`
+regenerated through `tools/scripts/qa/make-qa-panels.mjs` — 7 inserted lines, confined to that one
+generator.
+
+**Regression.** `behaviourCustom.mjs` asserts that every hit zone every starter declares is findable
+and moves its own channel. Reverting the materializer fails with
+`Scrollable Piano Bar/scrollArea: the app reports it nowhere on the control`.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
@@ -240,6 +286,11 @@ product. They are listed because the previous pass's real failure was not notici
     equally real gesture — and the puck never moved.
 13. **SVG coordinates plus the control's screen origin.** The svg is not necessarily flush with its
     control element; adding the two offsets every target by that gap.
+14. **Looking for a part's colour on `.interactive-part`.** That wrapper is transparent; the paint is
+    on its `.interactive-simple-background` child. Reported a working binding as absent.
+15. **Three aims, one answer.** The Orbit drag returned −12.907408671265785° for three different
+    target calculations. Identical results from different inputs mean the input is not the variable —
+    that is what turned a hunt for an aiming error into D-3.
 
 ---
 
@@ -247,6 +298,8 @@ product. They are listed because the previous pass's real failure was not notici
 
 - The remaining 343 catalogue properties: Looper, Kinetic, Constellation, Keyboard, StepSequencer,
   ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone, Setlist, Transport, Panic.
-- All 14 custom starters, and the authoring surface: public properties, value channels, hit zones,
-  variants, generators, links, export/import.
+- Custom components: **done for this pass** — all 14 starters, bindings, links, published
+  properties, generators, export/import and persistence. Variants/states are the remaining gap
+  there: the Tab Group's rule-driven page swap is exercised only through its enum channel, not by
+  asserting which page becomes visible.
 - Nothing here is a release sign-off, and none of it touches the native GUI or hardware gates.
