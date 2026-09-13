@@ -16,7 +16,8 @@
   // section's context (shared filter + title-match + a visible-row counter);
   // outside a section it falls back to the raw store.
   const section = getContext('propertySection');
-  let filter = $derived(String($propertyFilter ?? '').trim().toLowerCase());
+  const filterStore = getContext('propertyFilterStore') ?? propertyFilter;
+  let filter = $derived(String($filterStore ?? '').trim().toLowerCase());
   let selfMatch = $derived(`${label} ${hint}`.toLowerCase().includes(filter));
   let visible = $derived(!filter || selfMatch || (section?.shared.titleMatches ?? false));
 

@@ -96,11 +96,11 @@ test('the context bar says something useful in its place', () => {
 test('the Effects tab does the editing rather than pointing at it', () => {
   assert.ok(!/coming soon/i.test(code.displayPanel), 'no "coming soon" placeholder ships');
   const tab = read(src('CE_Application', 'components', 'EffectsTab.svelte'));
-  // The four columns of docs/design/effects-tab-design.md. A tab reduced to a link back to the
-  // properties panel is the failure B10 found, and it would not mount these.
-  for (const piece of ['EffectStackList', 'EffectSpecimen', 'EffectSettings', 'EffectLooks']) {
+  // The canvas above supplies the preview; the compact dock still owns real effect editing.
+  for (const piece of ['EffectStackList', 'EffectSettings', 'EffectLooks']) {
     assert.match(tab, new RegExp(`<${piece}`), `the tab mounts ${piece}`);
   }
+  assert.doesNotMatch(tab, /<EffectSpecimen/, 'the separate preview stays removed');
   // And it writes, rather than deep-linking somewhere that writes.
   assert.match(tab, /updateControlProperty\(/, 'it writes properties itself');
   assert.match(tab, /applyControlPatch\(/, 'and applies reorder patches itself');

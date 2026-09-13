@@ -1,335 +1,188 @@
 <script>
-  /**
-   * The Effects tab.
-   *
-   * Four columns — the stack, the specimen, the selected effect, a shelf of looks — over three
-   * domains: Text effects, layer Effects and screen Lighting. See `docs/design/effects-tab-design.md`
-   * for the argument; the two things worth knowing before editing this file are in
-   * `utils/effectStack.js` (the stack is the renderer's own, not a second copy) and in
-   * `stores/editorTarget.js` (this tab does NOT follow the selection, deliberately).
-   *
-   * THE PROPERTIES PANEL IS UNTOUCHED. Every section this tab edits is still in the panel and
-   * still editable there — nothing has been relocated yet. That is on purpose: the tab has to be
-   * shown to work before anything is taken away, and until then the two are simply two ways into
-   * the same properties. Removing the panel's copies is a later, separate change, and the panel's
-   * search index depends on it (`allEffectFieldLabels` exists ready for that day).
-   */
-  import { onMount } from 'svelte';
+  import { setContext } from 'svelte';
+  import { writable } from 'svelte/store';
+  import Pin from 'lucide-svelte/icons/pin';
   import EffectStackList from './effects/EffectStackList.svelte';
-  import EffectSpecimen from './effects/EffectSpecimen.svelte';
   import EffectSettings from './effects/EffectSettings.svelte';
   import EffectLooks from './effects/EffectLooks.svelte';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { applyControlPatch, updateControlProperty } from '../stores/controls.js';
+  import { selectedControl, applyControlPatch, updateControlProperty } from '../stores/controls.js';
+  import { effectsDockSelection, effectsDockState } from '../stores/effectsDock.js';
+  import { stateEditScope, setStateEditScopeBase, setStateEditScopeState } from '../stores/stateEditScope.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { flatControls } from '../utils/containment.js';
-  import {
-    editorTarget,
-    activateEditorTarget,
-    armEditorTargetIfIdle,
-    setEditorTargetDomain,
-    clearEditorTarget,
-    targetOfKind,
-  } from '../stores/editorTarget.js';
-  import {
-    DOMAINS,
-    availableDomains,
-    buildDomain,
-    findOrderTies,
-    readSection,
-    reorderTextStack,
-    reorderComponentShadows,
-  } from '../utils/effectStack.js';
-  import { matchLook } from '../utils/effectLooks.js';
+  import { DOMAINS, availableDomains, buildDomain, findOrderTies, readSection, reorderTextStack, reorderComponentShadows } from '../utils/effectStack.js';
+  import { matchLook, looksFor } from '../utils/effectLooks.js';
+  import { EFFECT_SURFACES, resolvedSurfaceEffects, effectSurfacePath, effectSurfacePatch } from '../utils/surfaceEffects.js';
+  import '../properties/propertyTheme.css';
 
-  let selectedKey = $state('');
-  let soloed = $state([]);
-  let muted = $state([]);
-  let activeState = $state('base');
-
-  let mine = $derived(targetOfKind($editorTarget, 'effects'));
+  setContext('propertyFilterStore', writable(''));
+  setContext('propertySectionScope', () => 'effects-dock');
   let panelControls = $derived(flatControls($activePanel?.controls ?? []));
-
-  let control = $derived(
-    mine?.controlId
-      ? panelControls.find((entry) => entry._children?.Core?.id === mine.controlId) ?? null
-      : null
-  );
-
+  let rawControl = $derived($effectsDockState.followSelection ? $selectedControl
+    : panelControls.find((entry) => entry._children?.Core?.id === $effectsDockState.pinnedId) ?? null);
+  let control = $derived(resolveStateScopedControl(rawControl, $stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''));
+  let stateNames = $derived(Object.keys(rawControl?._children?.States?._children ?? {}));
   let domainsHere = $derived(availableDomains(control));
-  let domain = $derived(
-    domainsHere.includes(mine?.domain) ? mine.domain : (domainsHere[0] ?? 'text')
-  );
-
-  let built = $derived(buildDomain(control, domain));
+  let domain = $derived(domainsHere.includes($effectsDockState.domain) ? $effectsDockState.domain : (domainsHere[0] ?? 'text'));
+  let surfaces = $derived(EFFECT_SURFACES.filter((entry) => entry.id === 'component'
+    || (entry.id === 'background' && control?._children?.Background)
+    || (entry.id === 'border' && control?._children?.Background?._children?.Border)
+    || (!['background', 'border'].includes(entry.id) && control?._children?.Background?._children?.Fill)));
+  let surface = $derived(surfaces.some((entry) => entry.id === $effectsDockState.surface) ? $effectsDockState.surface : 'component');
+  let editingControl = $derived(domain === 'component' ? { ...control, _children: {
+    ...control?._children, Effects: resolvedSurfaceEffects(control, surface),
+  } } : control);
+  let selectionKey = $derived(domain === 'component' ? `${domain}:${surface}` : domain);
+  let built = $derived(buildDomain(editingControl, domain));
   let ties = $derived(domain === 'text' ? findOrderTies(built.rows) : []);
   let allRows = $derived([...built.rows, ...built.unordered]);
-  let selectedRow = $derived(allRows.find((row) => row.key === selectedKey) ?? allRows[0] ?? null);
-  let selectedValues = $derived(selectedRow ? readSection(control, selectedRow.root) : null);
+  let selectedRow = $derived(allRows.find((row) => row.key === $effectsDockSelection[selectionKey]) ?? allRows[0] ?? null);
+  let selectedValues = $derived(selectedRow ? readSection(editingControl, selectedRow.root) : null);
   let stackIndex = $derived(selectedRow ? built.rows.findIndex((row) => row.key === selectedRow.key) : -1);
-  let currentLook = $derived(control ? matchLook(control, domain) : '');
+  let looks = $derived(looksFor(domain));
+  let currentLook = $derived(control ? matchLook(editingControl, domain) : '');
+  let controlName = $derived(control?._children?.Core?.name || control?._children?.Core?.controlType || '');
 
-  let controlName = $derived(
-    control?._children?.Core?.name || control?._children?.Core?.controlType || ''
-  );
-
-  // Opening the tab arms it on whatever is selected right now, and that is the only moment it
-  // retargets — from then on it stays put and the header says what it is holding. See
-  // editorTarget.js for why that is the opposite of the Colors tab.
-    // Arm from the selection only when NOTHING is armed — not merely when nothing of this kind is.
-  // A target of another kind means another tab is being opened right now, and stealing it is how
-  // the properties panel's opener buttons looked broken. See stores/editorTarget.js.
-onMount(() => {
-    if (mine) return;
-    const first = [...($selectedComponentIds ?? [])][0];
-    if (first) armEditorTargetIfIdle('effects', first);
-  });
-
-  // A row that vanishes (domain switch, or a shadow deleted from the array) must not leave the
-  // settings column pointed at nothing.
-  $effect(() => {
-    if (selectedKey && !allRows.some((row) => row.key === selectedKey)) selectedKey = '';
-  });
-
-  function armFromSelection() {
-    const first = [...($selectedComponentIds ?? [])][0];
-    if (first) activateEditorTarget('effects', first, domain);
+  function togglePin() {
+    effectsDockState.update((state) => ({ ...state,
+      followSelection: !state.followSelection,
+      pinnedId: state.followSelection ? control?._children?.Core?.id ?? null : state.pinnedId,
+    }));
   }
-
+  function changeDomain(domain) {
+    effectsDockState.update((state) => ({ ...state, domain }));
+  }
+  function selectRow(key) {
+    effectsDockSelection.update((value) => ({ ...value, [selectionKey]: key }));
+  }
+  function applyPatch(patch) {
+    if (control) applyControlPatch(control._children.Core.id,
+      domain === 'component' ? effectSurfacePatch(control, surface, patch) : patch);
+  }
   function setField(row, key, value) {
     if (!control?._children?.Core?.id || !row?.root) return;
-    updateControlProperty(control._children.Core.id, `${row.root}.${key}`, value);
+    if (domain === 'component') applyPatch({ [`${row.root}.${key}`]: value });
+    else updateControlProperty(control._children.Core.id, `${row.root}.${key}`, value);
   }
-
   function toggleRow(row) {
-    if (!control?._children?.Core?.id || !row?.enabledPath || row.alwaysOn) return;
-    updateControlProperty(control._children.Core.id, row.enabledPath, !row.enabled);
+    if (control?._children?.Core?.id && row?.enabledPath && !row.alwaysOn)
+      applyPatch({ [row.enabledPath]: !row.enabled });
   }
-
   function reorder(key, toIndex) {
     const id = control?._children?.Core?.id;
     if (!id) return;
     const patch = domain === 'component'
-      ? reorderComponentShadows(control, built.rows.findIndex((row) => row.key === key), toIndex)
+      ? reorderComponentShadows(editingControl, built.rows.findIndex((row) => row.key === key), toIndex)
       : reorderTextStack(built.rows, key, toIndex);
-    if (Object.keys(patch).length) applyControlPatch(id, patch);
+    if (Object.keys(patch).length) {
+      applyPatch(patch);
+      if (domain === 'component') selectRow(`shadow:${Math.max(0, Math.min(built.rows.length - 1, toIndex))}`);
+    }
   }
-
-  function toggleIn(list, key) {
-    return list.includes(key) ? list.filter((entry) => entry !== key) : [...list, key];
-  }
-
   function applyLook(look) {
-    const id = control?._children?.Core?.id;
-    if (!id || !look) return;
-    applyControlPatch(id, look.patch);
+    if (control && look) applyPatch(look.patch);
   }
 </script>
 
-<div class="effects-tab">
+<section class="effects-tab property-theme" aria-label="Effects display panel">
+    <header class="target-bar">
+      <strong>{controlName || 'Effects'}</strong>{#if control}<span>/ Effects</span>{/if}
+      {#if control && !$selectedComponentIds?.has(control._children.Core.id)}<span class="stale">Not selected</span>{/if}
+      <div class="headtools">
+        <button type="button" class:pinned={!$effectsDockState.followSelection} aria-pressed={!$effectsDockState.followSelection}
+          disabled={!control && $effectsDockState.followSelection} onclick={togglePin}
+          title={$effectsDockState.followSelection ? 'Keep editing this control when the selection changes' : 'Follow the editor selection'}>
+          <Pin size={12} />{$effectsDockState.followSelection ? 'Follow selection' : 'Pinned'}
+        </button>
+      </div>
+    </header>
   {#if !control}
     <div class="empty">
-      <strong>Nothing armed.</strong>
-      <p>
-        Select a control on the canvas, then use the button below. This tab stays on the control you
-        open it with, so it will not change under you while you work.
-      </p>
-      <button type="button" class="arm" disabled={!($selectedComponentIds?.size)} onclick={armFromSelection}>
-        {($selectedComponentIds?.size) ? 'Edit the selected control’s effects' : 'Select a control first'}
-      </button>
+      {#if !$effectsDockState.followSelection}The pinned component is no longer available. Unpin to follow the editor selection.
+      {:else}Select a component to edit its effects here.{/if}
     </div>
+  {:else if !domainsHere.length}
+    <div class="empty">This component has no effects. Select a component with text, component, or screen effects.</div>
   {:else}
-    <div class="head">
-      <span class="who">
-        editing <b>{controlName}</b>
-        {#if !($selectedComponentIds?.has?.(control._children.Core.id))}
-          <i class="stale" title="This is not the control currently selected — the tab stays where you opened it">not selected</i>
-        {/if}
-      </span>
-
-      {#if domainsHere.length > 1}
-        <div class="domains" role="tablist" aria-label="Effect kind">
-          {#each DOMAINS.filter((entry) => domainsHere.includes(entry.id)) as entry (entry.id)}
-            <button
-              type="button"
-              role="tab"
-              class:on={entry.id === domain}
-              aria-selected={entry.id === domain}
-              onclick={() => setEditorTargetDomain(entry.id)}
-            >{entry.label}</button>
-          {/each}
+    <div class="toolbar">
+      <div class="domains" role="tablist" aria-label="Effect kind">
+        {#each DOMAINS.filter((entry) => domainsHere.includes(entry.id)) as entry (entry.id)}
+          <button type="button" role="tab" class:on={entry.id === domain} aria-selected={entry.id === domain}
+            onclick={() => changeDomain(entry.id)}>{entry.label}</button>
+        {/each}
+      </div>
+      {#if domain === 'component'}
+        <label>Apply to
+          <select aria-label="Effect target" value={surface}
+            onchange={(event) => effectsDockState.update((state) => ({ ...state, surface: event.target.value }))}>
+            {#each surfaces as entry}<option value={entry.id}>{entry.label}</option>{/each}
+          </select>
+        </label>
+      {/if}
+      <label>State
+        <select aria-label="Edit state" value={$stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''}
+          onchange={(event) => event.target.value ? setStateEditScopeState(event.target.value) : setStateEditScopeBase()}>
+          <option value="">Base</option>
+          {#if $stateEditScope.mode === 'state' && !stateNames.includes($stateEditScope.stateName)}
+            <option value={$stateEditScope.stateName}>{$stateEditScope.stateName}</option>
+          {/if}
+          {#each stateNames as name}<option value={name}>{name}</option>{/each}
+        </select>
+      </label>
+    </div>
+    <div class="cols" class:has-looks={looks.length > 0}>
+      <div class="stackcol">
+        <div class="colh"><span>{built.rows.length ? 'Stack' : 'Effects'}</span>{#if built.rows.length}<span>Front → back</span>{/if}</div>
+        <EffectStackList control={editingControl} {domain} rows={built.rows} unordered={built.unordered} {ties}
+          selectedKey={selectedRow?.key ?? ''} onselect={selectRow} ontoggle={toggleRow} onreorder={reorder} />
+      </div>
+      <div class="fxcol">
+        {#key `${control._children.Core.id}:${domain}:${surface}:${selectedRow?.key}`}
+          <EffectSettings row={selectedRow} values={selectedValues} controlId={control._children.Core.id}
+            colourRoot={domain === 'component' ? effectSurfacePath(surface, selectedRow?.root ?? '') : selectedRow?.root}
+            {stackIndex} stackSize={built.rows.length} onset={setField} ontoggle={toggleRow} onreorder={reorder} />
+        {/key}
+      </div>
+      {#if looks.length}
+        <div class="lookcol">
+          <div class="colh">Quick selection</div>
+          <EffectLooks {domain} current={currentLook} onapply={applyLook} />
         </div>
       {/if}
-
-      <div class="headtools">
-        <button type="button" class="retarget" disabled={!($selectedComponentIds?.size)} onclick={armFromSelection}
-                title="Point this tab at the control that is selected now">Use selection</button>
-        <button type="button" class="close" onclick={clearEditorTarget} title="Stop editing this control">Clear</button>
-      </div>
-    </div>
-
-    <div class="cols">
-      <div class="stackcol">
-        <div class="colh">Stack <s>front → back</s></div>
-        <EffectStackList
-          {control} {domain}
-          rows={built.rows}
-          unordered={built.unordered}
-          {ties}
-          selectedKey={selectedRow?.key ?? ''}
-          {soloed} {muted}
-          onselect={(key) => { selectedKey = key; }}
-          ontoggle={toggleRow}
-          onsolo={(key) => { soloed = toggleIn(soloed, key); }}
-          onmute={(key) => { muted = toggleIn(muted, key); }}
-          onreorder={reorder}
-        />
-      </div>
-
-      <div class="speccol">
-        <div class="colh">Specimen <s>live · this control</s></div>
-        <EffectSpecimen
-          {control} {domain}
-          rows={allRows}
-          {soloed} {muted}
-          {activeState}
-          onstate={(name) => { activeState = name; }}
-        />
-      </div>
-
-      <div class="fxcol">
-        <div class="colh">{selectedRow?.label ?? 'Effect'}</div>
-        <EffectSettings
-          row={selectedRow}
-          values={selectedValues}
-          {stackIndex}
-          stackSize={built.rows.length}
-          onset={setField}
-          ontoggle={toggleRow}
-        />
-      </div>
-
-      <div class="lookcol">
-        <div class="colh">Looks <s>your own text</s></div>
-        <EffectLooks {control} {domain} current={currentLook} onapply={applyLook} />
-      </div>
     </div>
   {/if}
-</div>
+</section>
 
 <style>
-  .effects-tab {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: auto;
-    background: #15181B;
-  }
-
-  .head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-bottom: 1px solid #2A2A2A;
-    flex: 0 0 auto;
-  }
-
-  .who {
-    font: 500 9.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #616C75;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .who b { color: #8FEDE3; font-weight: 600; }
-  .who .stale {
-    font-style: normal;
-    margin-left: 6px;
-    color: #E5A029;
-    border: 1px solid #4A3A1C;
-    background: #241d10;
-    border-radius: 2px;
-    padding: 2px 4px;
-  }
-
-  .domains { display: flex; gap: 2px; }
-  .domains button {
-    border: 1px solid transparent;
-    background: transparent;
-    color: #96A6B2;
-    font: 600 10px/1 'IBM Plex Sans', system-ui, sans-serif;
-    padding: 5px 9px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .domains button:hover { color: #DDE6EC; }
-  .domains button.on { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; }
-
+  .effects-tab { height: 100%; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: #1E1E1E; color: #DDD; font-size: 11px; container: effects-dock / inline-size; }
+  .target-bar, .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 8px; border-bottom: 1px solid #333; flex: 0 0 auto; }
+  .target-bar { background: #222; }
+  .target-bar strong { font-weight: 600; overflow-wrap: anywhere; }
+  .target-bar span, .toolbar label { color: #999; }
+  .target-bar .stale { color: #D7AF65; }
   .headtools { margin-left: auto; display: flex; gap: 4px; }
-  .headtools button {
-    border: 1px solid #333B42;
-    background: #12171A;
-    color: #9AA6AE;
-    font: 600 9px/1 'IBM Plex Sans', system-ui, sans-serif;
-    padding: 5px 8px;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .headtools button:hover:not(:disabled) { border-color: #4A555E; color: #E8EEF5; }
-  .headtools button:disabled { opacity: 0.4; cursor: default; }
-
-  .cols {
-    display: flex;
-    gap: 10px;
-    padding: 10px;
-    align-items: flex-start;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .stackcol { flex: 0 0 226px; min-width: 0; }
-  .speccol { flex: 1 1 0; min-width: 260px; }
-  .fxcol { flex: 0 0 268px; min-width: 0; }
-  .lookcol { flex: 0 0 150px; min-width: 0; }
-
-  .colh {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font: 600 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: #616C75;
-    margin-bottom: 7px;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .colh s { margin-left: auto; text-decoration: none; font-size: 8.5px; }
-
-  .empty {
-    padding: 22px;
-    max-width: 46ch;
-    color: #8A949C;
-  }
-  .empty strong { display: block; font: 600 13px/1.4 'IBM Plex Sans', system-ui, sans-serif; color: #E8EEF5; }
-  .empty p { margin: 8px 0 14px; font: 400 12px/1.6 'IBM Plex Sans', system-ui, sans-serif; }
-
-  .arm {
-    border: 1px solid #0E7C70;
-    background: #0B2320;
-    color: #8FEDE3;
-    font: 600 11px/1 'IBM Plex Sans', system-ui, sans-serif;
-    padding: 8px 12px;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .arm:disabled { opacity: 0.45; cursor: default; border-color: #333B42; background: #12171A; color: #69737B; }
-
-  /* The dock is the only place this renders, and it is landscape. Below the width the four
-     columns need, they wrap rather than squeeze the specimen out of existence. */
-  @media (max-width: 1040px) {
-    .cols { flex-wrap: wrap; }
-    .speccol { flex: 1 1 100%; order: -1; }
+  .headtools button { display: flex; align-items: center; gap: 5px; }
+  .headtools button.pinned { background: #094771; color: #FFF; }
+  button { min-height: 22px; padding: 2px 7px; border: 1px solid #333; border-radius: 3px; background: #1A1A1A; color: #AAA; font: inherit; cursor: pointer; }
+  button:hover { border-color: #5B9BD5; color: #FFF; }
+  button:disabled { opacity: .4; cursor: default; }
+  .domains { display: flex; gap: 3px; margin-right: auto; }
+  .domains button.on { background: #094771; border-color: #0B6EB5; color: #FFF; }
+  .toolbar label { display: flex; align-items: center; gap: 5px; }
+  select { height: 24px; max-width: 150px; padding: 0 6px; border: 1px solid #333; border-radius: 3px; background: #1A1A1A; color: #DDD; font: inherit; }
+  .cols { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0; flex: 1; }
+  .cols.has-looks { grid-template-columns: 220px minmax(0, 1fr) 150px; }
+  .stackcol { overflow: auto; min-width: 0; border-right: 1px solid #333; padding: 6px; }
+  .colh { display: flex; justify-content: space-between; gap: 4px; color: #888; font-size: 10px; padding: 0 2px 6px; }
+  .fxcol { min-width: 0; overflow: auto; padding: 2px 4px; }
+  .lookcol { min-width: 0; overflow: auto; padding: 6px; border-left: 1px solid #333; }
+  .empty { padding: 12px; color: #AAA; }
+  @container effects-dock (max-width: 700px) {
+    .cols, .cols.has-looks { grid-template-columns: 160px minmax(0, 1fr); overflow: auto; align-content: start; }
+    .stackcol { max-height: 230px; }
+    .fxcol { overflow: visible; }
+    .lookcol { grid-column: 1 / -1; border-left: 0; border-top: 1px solid #333; overflow: visible; }
+    .colh { font-size: 9px; }
   }
 </style>

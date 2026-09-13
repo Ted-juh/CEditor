@@ -5,7 +5,29 @@ import {
   stageSetlistContext,
   stageSurfaceModel,
   surfaceSlotForMidiActivity,
+  stageControllerContext,
 } from '../src/CE_Application/utils/stageViewModel.js';
+
+test('Stage distinguishes controller profiles, MIDI inputs and optional display integration', () => {
+  const layout = { displayName: 'My fader controller' };
+  const devices = { midiInputs: [{ name: 'USB MIDI', enabled: true }, { name: 'Other keyboard', enabled: false }] };
+  const generic = stageControllerContext(layout, devices, { state: 'searching' });
+  assert.equal(generic.profileName, 'My fader controller');
+  assert.equal(generic.midiLabel, 'MIDI · USB MIDI');
+  assert.equal(generic.midiEnabled, true);
+  assert.equal(generic.displayLabel, '');
+  const failedDisplay = stageControllerContext(layout, devices, { state: 'failed', device: 'CTRL49' });
+  assert.equal(failedDisplay.midiEnabled, true);
+  assert.equal(failedDisplay.displayWarning, true);
+  assert.equal(failedDisplay.displayLabel, 'Hardware display · Unavailable · CTRL49');
+  const profileOnly = stageControllerContext(layout, {}, { state: 'connected', device: 'CTRL49' });
+  assert.equal(profileOnly.midiEnabled, false, 'profile or display connection cannot claim MIDI is enabled');
+  assert.equal(profileOnly.midiLabel, 'MIDI · 0 inputs enabled');
+  const plugin = stageControllerContext(layout, {}, { state: 'searching' }, false);
+  assert.equal(plugin.midiLabel, 'MIDI · From host');
+  assert.equal(plugin.midiEnabled, false, 'host routing is not a claim of incoming MIDI activity');
+  assert.equal(stageControllerContext().profileName, '');
+});
 
 test('stage setlist context treats an unstarted list as ready for its first item', () => {
   const items = [{ itemId: 'a', name: 'First' }, { itemId: 'b', name: 'Second' }];
@@ -24,6 +46,29 @@ test('stage setlist context treats an unstarted list as ready for its first item
   assert.equal(last.previous?.name, 'First');
   assert.equal(last.next, null);
   assert.equal(last.canNext, false);
+});
+
+test('Stage next-song readiness follows the next rack ID and reports failures before loading completes', () => {
+  const items = [{ name: 'First', rackRecordId: 'rack-a' }, { name: 'Second', rackRecordId: 'rack-b' }];
+  const state = { setlist: { items, currentIndex: -1, preloads: [
+    { recordId: 'rack-a', state: 'loading', total: 3, ready: 2, failed: 0 },
+    { recordId: 'rack-b', state: 'ready', total: 0, ready: 0, failed: 0 },
+  ] } };
+  assert.equal(stageSetlistContext(state).nextReadiness.label, 'Loading rig… 2/3');
+  state.setlist.preloads[0].failed = 1;
+  state.setlist.preloads[0].error = 'Spire could not be loaded.';
+  assert.deepEqual(stageSetlistContext(state).nextReadiness,
+    { state: 'warning', label: 'Needs attention', detail: 'Spire could not be loaded.' });
+  state.setlist.currentIndex = 0;
+  assert.equal(stageSetlistContext(state).nextReadiness.label, 'Rig preloaded');
+  state.setlist.preloads = [];
+  assert.equal(stageSetlistContext(state).nextReadiness.label, 'Loads on selection');
+  items[1] = { name: 'Scene in current rack', sceneId: 'scene' };
+  assert.equal(stageSetlistContext(state).nextReadiness, null);
+  items[1].missing = true;
+  assert.equal(stageSetlistContext(state).nextReadiness.detail, 'The scene for this song is missing.');
+  state.setlist.currentIndex = 1;
+  assert.equal(stageSetlistContext(state).nextReadiness, null);
 });
 
 test('stage surface mirrors the selected CTRL49 control page as exactly eight slots', () => {

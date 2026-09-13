@@ -1,10 +1,6 @@
 /**
- * effectLooks.js — named looks for the Effects tab's fourth column.
- *
- * A preset gallery exists because most people want a look, not eleven parameters, and because the
- * eleven parameters are unreadable until you have seen what a few combinations of them do. The
- * thumbnails render the control's OWN text rather than the word "Sample", so what you click is
- * what you get.
+ * effectLooks.js — named looks for the Effects tab's quick selections.
+ * The buttons use fixed effect pictograms; the editor canvas shows the applied result.
  *
  * A look is a full patch, not a partial one: applying it switches OFF every effect it does not
  * use. A preset that only adds is a preset you cannot get out of — apply two and you have a mess

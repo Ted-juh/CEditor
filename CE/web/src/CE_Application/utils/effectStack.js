@@ -53,7 +53,7 @@ export const TEXT_EFFECTS = [
       num('reflectionDistance', 'Distance', { min: 0, max: 200, step: 1 }),
       num('reflectionIntensity', 'Intensity', { min: 0, max: 1, step: 0.05 }),
       num('reflectionBlur', 'Blur', { min: 0, max: 40, step: 0.5 }),
-      pick('reflectionFadeMode', 'Fade', ['none', 'linear', 'ease']),
+      pick('reflectionFadeMode', 'Fade', ['none', 'in', 'out']),
       num('reflectionFadeAmount', 'Fade amt', { min: 0, max: 100, step: 1 }),
     ],
   },
@@ -235,7 +235,7 @@ function section(control, path) {
 export function readSection(control, path) {
   let node = control;
   for (const part of path.split('.')) {
-    node = node?._children?.[part];
+    node = node?._children?.[part] ?? node?.[part];
     if (node == null) return null;
   }
   return node;
@@ -453,8 +453,8 @@ export function buildComponentRows(control) {
       key: group.key,
       label: group.label,
       stackable: false,
-      enabled: group.enabled ? node?.[group.enabled] === true : true,
       alwaysOn: !group.enabled,
+      enabled: group.enabled ? node?.[group.enabled] === true : true,
       enabledPath: group.enabled ? `${group.root}.${group.enabled}` : null,
       root: group.root,
       fields: group.fields,
@@ -491,7 +491,7 @@ export const LIGHTING_GROUPS = [
     key: 'backlight',
     label: 'Backlight',
     root: 'Display',
-    enabled: 'backlight',
+    enabled: 'backlightOn',
     fields: [
       num('brightness', 'Brightness', { min: 0, max: 100, step: 1 }),
       num('contrast', 'Contrast', { min: 0, max: 100, step: 1 }),
@@ -504,18 +504,23 @@ export const LIGHTING_GROUPS = [
     enabled: 'dotMatrix',
     fields: [
       num('dotPitch', 'Dot pitch', { min: 0, max: 20, step: 0.1 }),
-      pick('dotShape', 'Dot shape', ['round', 'square', 'rounded']),
+      pick('dotShape', 'Dot shape', ['round', 'square']),
     ],
   },
 ];
 
 export function buildLightingRows(control) {
-  const rows = LIGHTING_GROUPS.map((group) => {
+  const pixel = readSection(control, 'Display') == null && readSection(control, 'Pixel') != null;
+  const groups = LIGHTING_GROUPS.map((group) => !pixel ? group : ({ ...group, root: 'Pixel',
+    ...(group.key === 'dotmatrix' ? { enabled: null, fields: group.fields.filter((field) => field.key !== 'dotPitch') } : {}),
+  }));
+  const rows = groups.map((group) => {
     const node = readSection(control, group.root);
     return {
       key: group.key,
       label: group.label,
       stackable: false,
+      alwaysOn: !group.enabled,
       enabled: group.enabled ? node?.[group.enabled] === true : true,
       enabledPath: group.enabled ? `${group.root}.${group.enabled}` : null,
       root: group.root,
@@ -532,7 +537,7 @@ export function buildLightingRows(control) {
 
 export const DOMAINS = [
   { id: 'text', label: 'Text', build: buildTextStack },
-  { id: 'component', label: 'Layer', build: buildComponentRows },
+  { id: 'component', label: 'Component', build: buildComponentRows },
   { id: 'lighting', label: 'Screen', build: buildLightingRows },
 ];
 
@@ -543,7 +548,7 @@ export function availableDomains(control) {
   const has = [];
   if (readSection(control, 'Text') != null) has.push('text');
   if (readSection(control, COMPONENT_ROOT) != null) has.push('component');
-  if (readSection(control, 'Display') != null) has.push('lighting');
+  if (readSection(control, 'Display') != null || readSection(control, 'Pixel') != null) has.push('lighting');
   return has;
 }
 
@@ -606,7 +611,7 @@ function eachEffectFlag(control, domainId, apply) {
     return;
   }
   if (domainId === 'lighting') {
-    for (const group of LIGHTING_GROUPS) {
+    for (const { descriptor: group } of buildLightingRows(control).unordered) {
       if (!group.enabled) continue;
       const node = readSection(control, group.root);
       if (node) apply(node, group.enabled, group.key);

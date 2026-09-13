@@ -1,0 +1,13 @@
+/* Shared field geometry and colours for the properties panel and its display-dock editors. */
+.property-theme {
+  --pp-field-height: 26px;
+  --pp-field-font: 11px;
+  --pp-field-padding: 0 6px;
+  --pp-field-radius: 3px;
+  --pp-field-bg: #1A1A1A;
+  --pp-field-border: #333;
+  --pp-field-fg: #DDD;
+  --pp-field-fg-muted: #888;
+  --pp-field-focus: #5B9BD5;
+  --pp-field-disabled-fg: #555;
+}

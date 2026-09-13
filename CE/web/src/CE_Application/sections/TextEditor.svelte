@@ -35,6 +35,8 @@
   import { deepClone } from '../utils/deepClone.js';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import NumberCell from '../properties/NumberCell.svelte';
+  import TextDockEffects from '../components/typography/TextDockEffects.svelte';
+  import { curvePresetsFor, curvePresetPatch } from '../utils/typographyModel.js';
   import TextLineDecorationControls from './TextLineDecorationControls.svelte';
   import {
     DEFAULT_TEXT_FILL_GRADIENT,
@@ -51,10 +53,27 @@
 
   let {
     control = null,
+    dock = false,
+    dockGroup = $bindable('type'),
+    dockLine = $bindable('underline'),
+    dockEffect = $bindable('outline'),
+    allowMultiSelection = true,
     textPathPrefix = 'Text',
     textOverride = null,
     editorScope = 'component-text',
   } = $props();
+
+  const dockGroups = ['type', 'layout', 'fill', 'flow', 'lines', 'effects'];
+  let multiEditing = $derived(allowMultiSelection && $selectedComponentIds.size > 1);
+
+  function dockTabKeydown(event, index) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? dockGroups.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + dockGroups.length) % dockGroups.length;
+    dockGroup = dockGroups[next];
+    event.currentTarget.parentElement.children[next]?.focus();
+  }
 
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
@@ -126,6 +145,7 @@
     textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
   );
   let visibleTypographyFeatureOptions = $derived.by(() => {
+    if (dock) return TYPOGRAPHY_FEATURE_OPTIONS;
     if (!selectedFontFeatureSupportKnown) return [];
     return TYPOGRAPHY_FEATURE_OPTIONS.filter((option) =>
       option.tags.some((tag) => selectedFontSupportedFeatures.includes(tag))
@@ -146,7 +166,7 @@
   function set(path, value) {
     if (!core?.id) return;
     const scoped = scopeTextPath(path);
-    if ($selectedComponentIds.size > 1) {
+    if (multiEditing) {
       updateSelectedProperty(scoped, value);
     } else {
       updateControlProperty(core.id, scoped, value);
@@ -201,7 +221,7 @@
   }
 
   function openTextGradientEditor() {
-    if (!core?.id || $selectedComponentIds.size > 1) return;
+    if (!core?.id || multiEditing) return;
     openFillGradientEditor({
       controlId: core.id,
       targetPath: scopeTextPath('Text.Fill'),
@@ -212,7 +232,7 @@
   }
 
   function chooseTextFillAsset(kind) {
-    if (!core?.id || $selectedComponentIds.size > 1) return;
+    if (!core?.id || multiEditing) return;
     browseImage(textFillAssetRequestId(kind));
   }
 
@@ -721,15 +741,36 @@
   <OpenInDock tab="type" controlId={core?.id ?? ''} domain="flow" what="this text's flow" compact />
 {/snippet}
 {#snippet openTextEffects()}
-  <OpenInDock tab="effects" controlId={core?.id ?? ''} domain="text" what="these text effects" compact />
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="effects" what="these text effects" compact />
 {/snippet}
 
-{#if text}
-  <div class="text-editor-sections">
-    <PropertySection
+{#snippet spacingFields()}
+        <PropertyCell label="Word Spacing" span={1} compact hint="Adjust spacing added to each whitespace character in pixels.">
+          <NumberCell
+            label="Word"
+            value={font?.wordSpacing ?? 0}
+            step={0.5}
+            defaultValue={0}
+            onchange={(value) => set('Text.Font.wordSpacing', value)}
+          />
+        </PropertyCell>
+
+        <PropertyCell label="Letter Spacing" span={1} compact hint="Adjust spacing between characters in pixels">
+          <NumberCell
+            label="Letter"
+            value={font?.letterSpacing ?? 0}
+            step={0.5}
+            defaultValue={0}
+            onchange={(value) => set('Text.Font.letterSpacing', value)}
+          />
+        </PropertyCell>
+
+{/snippet}
+{#snippet textBasics()}
+<PropertySection
       title="Text"
       icon={Pencil}
-      collapsed={textSectionCollapsed}
+      collapsed={dock ? false : textSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('text'), value)}
     >
       <PropertyCell label="Text" span={4} hint="The text content displayed by this component">
@@ -745,20 +786,21 @@
           <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
         </div>
       </PropertyCell>
-      {#if String(core?.controlType ?? '') === 'Label'}
+      {#if !dock && String(core?.controlType ?? '') === 'Label'}
         <PropertyCell label="Editable" span={1} hint="Let the user edit this label's text at runtime. Required before an LCD 'edit' zone can rewrite it.">
           <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
         </PropertyCell>
       {/if}
     </PropertySection>
-
-    {#key fontEditorRenderKey}
+{/snippet}
+{#snippet fontBasics()}
+{#key fontEditorRenderKey}
       <PropertySection
         title="Font Settings"
         icon={Type}
-        collapsed={fontSectionCollapsed}
+        collapsed={dock ? false : fontSectionCollapsed}
         ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
-        tools={openType}
+        tools={dock ? undefined : openType}
       >
         <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
           <select
@@ -815,34 +857,52 @@
           </div>
         </PropertyCell>
 
-        <PropertyCell label="Word Spacing" span={1} compact hint="Adjust spacing added to each whitespace character in pixels.">
-          <NumberCell
-            label="Word"
-            value={font?.wordSpacing ?? 0}
-            step={0.5}
-            defaultValue={0}
-            onchange={(value) => set('Text.Font.wordSpacing', value)}
-          />
-        </PropertyCell>
-
-        <PropertyCell label="Letter Spacing" span={1} compact hint="Adjust spacing between characters in pixels">
-          <NumberCell
-            label="Letter"
-            value={font?.letterSpacing ?? 0}
-            step={0.5}
-            defaultValue={0}
-            onchange={(value) => set('Text.Font.letterSpacing', value)}
-          />
-        </PropertyCell>
+        {#if !dock}
+          {@render spacingFields()}
+        {:else}
+          <PropertyCell label="Colour" span={2} hint="Text fill colour; click the swatch to open the colour editor.">
+            <PropertyColor value={String(textFill?.colour ?? 'FFFFFFFF')} onchange={setFillColor} onswatchclick={handleFillColorSwatch} />
+          </PropertyCell>
+        {/if}
       </PropertySection>
     {/key}
+{/snippet}
 
-    <PropertySection
+{#if text}
+  <div class="text-editor-sections" class:dock-editor={dock}>
+    {#if dock}
+      <div class="dock-basics">
+        <div class="dock-content">{@render textBasics()}</div>
+        <div class="dock-font">{@render fontBasics()}</div>
+      </div>
+      <div class="dock-tabs" role="tablist" aria-label="Text property groups">
+        {#each dockGroups as group, index}
+          <button type="button" role="tab" id={'text-dock-tab-' + group} aria-controls="text-dock-fields" aria-selected={dockGroup === group} tabindex={dockGroup === group ? 0 : -1}
+            class:active={dockGroup === group} onclick={() => { dockGroup = group; }} onkeydown={(event) => dockTabKeydown(event, index)}>{group}</button>
+        {/each}
+      </div>
+    {:else}
+      {@render textBasics()}
+      {@render fontBasics()}
+    {/if}
+    <div class="text-fields" class:dock-fields={dock} id={dock ? 'text-dock-fields' : undefined} role={dock ? 'tabpanel' : undefined} aria-labelledby={dock ? 'text-dock-tab-' + dockGroup : undefined}>
+      {#if !dock || dockGroup === 'type'}
+        <div class="text-group" class:dock-group={dock}>
+          {#if dock}
+            <PropertySection title="Spacing & editing">
+              {@render spacingFields()}
+              {#if String(core?.controlType ?? '') === 'Label'}
+                <PropertyCell label="Editable" span={2} hint="Allow the label text to be edited at runtime."><PropertyToggle value={text?.editable === true} onchange={(value) => set('Text.editable', value)} /></PropertyCell>
+              {/if}
+              <PropertyCell label="Line Height" span={4} compact><NumberCell label="Line H" value={Math.max(0.5, Number(multilineProp('lineHeight', 1.2)))} min={0.5} step={0.1} onchange={(v) => setMultilineNumber('lineHeight', v, 0.1, 0.5)} /></PropertyCell>
+            </PropertySection>
+          {/if}
+          <PropertySection
       title="Typography"
       icon={CaseSensitive}
       collapsed={typographySectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('typography'), value)}
-      tools={openType}
+      tools={dock ? undefined : openType}
     >
       <PropertyCell label="Case" span={2} hint="Apply text case transforms including title, sentence, and small caps modes.">
         <select class="text-select" value={caseModeValue()} onchange={(event) => set('Text.Font.caseMode', event.target.value)}>
@@ -907,13 +967,15 @@
         {/each}
       {/if}
     </PropertySection>
-
-    <PropertySection
+        </div>
+      {/if}
+      {#if !dock || dockGroup === 'layout'}
+        <div class="text-group" class:dock-group={dock}><PropertySection
       title="Multiline"
       icon={TextAlignJustify}
       collapsed={multilineSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('multiline'), value)}
-      tools={openType}
+      tools={dock ? undefined : openType}
     >
       <PropertyCell
         label="Wrap"
@@ -1083,8 +1145,7 @@
         />
       </PropertyCell>
     </PropertySection>
-
-    <PropertySection
+<PropertySection
       title="Position"
       icon={Crosshair}
       collapsed={positionSectionCollapsed}
@@ -1099,6 +1160,18 @@
           />
         </div>
       </PropertyCell>
+
+      {#if dock}
+        <PropertyCell label="Orientation" span={2} hint="Set the text block orientation.">
+          <select class="text-select" value={position?.orientation ?? 'horizontal'} onchange={(event) => setFlowAngle(angleForOrientation(event.target.value))}>
+            <option value="horizontal">Horizontal</option>
+            <option value="rotate90">90°</option>
+            <option value="rotate180">180°</option>
+            <option value="rotate270">270°</option>
+            {#if position?.orientation && !['horizontal', 'rotate90', 'rotate180', 'rotate270'].includes(position.orientation)}<option value={position.orientation}>{position.orientation}</option>{/if}
+          </select>
+        </PropertyCell>
+      {/if}
 
       <PropertyCell label="Offset" span={2} hint="Horizontal uses left minus / right plus. Vertical uses up plus / down minus.">
         <div class="offset-panel">
@@ -1121,9 +1194,10 @@
           <button class="reset-btn" onclick={resetPosition}>Reset</button>
         </div>
       </PropertyCell>
-    </PropertySection>
-
-    <PropertySection
+    </PropertySection></div>
+      {/if}
+      {#if !dock || dockGroup === 'fill'}
+        <div class="text-group" class:dock-group={dock}><PropertySection
       title="Fill"
       icon={PaintBucket}
       collapsed={fillSectionCollapsed}
@@ -1283,14 +1357,15 @@
           </PropertyCell>
         </PropertySection>
       {/if}
-    {/if}
-
-    <PropertySection
+    {/if}</div>
+      {/if}
+      {#if !dock || dockGroup === 'flow'}
+        <div class="text-group" class:dock-wide={dock}><PropertySection
       title="Flow"
       icon={Spline}
       collapsed={orientationSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('orientation'), value)}
-      tools={openFlow}
+      tools={dock ? undefined : openFlow}
     >
       <PropertyCell label="Reading" span={4} hint="Choose the reading direction or mirror the text glyphs.">
         <div class="reading-row">
@@ -1310,6 +1385,11 @@
       </PropertyCell>
 
       <PropertyCell label="Mode" span={4} hint="How the text flows: as a block, on a line, stepped, or bent onto an arc or circle.">
+        {#if dock}
+          <select class="text-select" value={textFlowModeValue} onchange={(event) => setFlowMode(event.target.value)}>
+            {#each FLOW_MODE_OPTIONS as option}<option value={option.value}>{option.label}</option>{/each}
+          </select>
+        {:else}
         <div class="flow-mode-grid">
           {#each FLOW_MODE_OPTIONS as option}
             <button
@@ -1319,6 +1399,7 @@
             >{option.label}</button>
           {/each}
         </div>
+        {/if}
       </PropertyCell>
 
       <PropertyCell label="Distribution" span={1} hint="Natural uses measured advances, Fit stretches along the path, Justify expands spaces, Fixed uses a constant advance.">
@@ -1367,7 +1448,8 @@
             onchange={setFlowAngle}
           />
         </PropertyCell>
-      {:else if textFlowModeValue === 'stair'}
+      {/if}
+      {#if textFlowModeValue === 'stair'}
         <PropertyCell label="Step X" span={1} compact hint="Horizontal shift applied to each successive character in stair mode.">
           <NumberCell
             label="Step X"
@@ -1491,7 +1573,7 @@
           <NumberCell label="C2 Y" value={Number(position?.flowPathC2Y ?? 100)} step={1} defaultValue={100} onchange={(value) => set('Text.Position.flowPathC2Y', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'polyline' || textFlowModeValue === 'freehand'}
-        {#each [0, 1, 2, 3] as index}
+        {#each Array.from({ length: dock ? Math.max(4, position?.[textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints']?.length ?? 0) : 4 }, (_, index) => index) as index}
           <PropertyCell label={`P${index + 1} X`} span={1} compact hint="Path point X as a percentage of the text box.">
             <NumberCell label={`P${index + 1} X`} value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', index * 33)} step={1} defaultValue={index * 33} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', value)} />
           </PropertyCell>
@@ -1500,10 +1582,23 @@
           </PropertyCell>
         {/each}
       {/if}
-
-    </PropertySection>
-
-    <PropertySection
+      {#if dock && textFlowModeValue === 'line'}
+        <PropertyCell label="Step X" compact><NumberCell label="Step X" value={position?.flowStepX ?? 8} onchange={(v) => set('Text.Position.flowStepX', v)} /></PropertyCell>
+        <PropertyCell label="Step Y" compact><NumberCell label="Step Y" value={position?.flowStepY ?? 8} onchange={(v) => set('Text.Position.flowStepY', v)} /></PropertyCell>
+      {/if}
+      {#if dock && curvePresetsFor(textFlowModeValue).length}
+        <PropertyCell label="Path presets" span={4}>
+          <div class="style-row">
+            {#each curvePresetsFor(textFlowModeValue) as preset}
+              <button class="style-btn" onclick={() => { for (const [path, value] of Object.entries(curvePresetPatch(textFlowModeValue, preset))) set(path, value); }}>{preset.label}</button>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+    </PropertySection></div>
+      {/if}
+      {#if !dock}
+        <PropertySection
       title="Effects"
       icon={Sparkles}
       collapsed={effectsSectionCollapsed}
@@ -1529,13 +1624,15 @@
       <PropertyCell label="" span={4} compact
         hint="Thickness, distance, colour, dash, order and the rest — with a live specimen beside them.">
         <p class="effects-moved">
-          Switch an effect on here; its settings are in the <b>Effects</b> tab, with the stack in the
-          order the canvas draws it.
+          Switch an effect on here; its settings are in <b>Text → Effects</b> in the display dock.
         </p>
       </PropertyCell>
     </PropertySection>
-
-    <PropertySection
+      {:else if dockGroup === 'effects'}
+        <TextDockEffects bind:selected={dockEffect} values={textEffects} controlId={core?.id ?? ''} onset={(key, value) => set('Text.Effects.' + key, value)} />
+      {/if}
+      {#if !dock || dockGroup === 'lines'}
+        <div class="text-group" class:dock-wide={dock}><PropertySection
       title="Line"
       icon={Minus}
       collapsed={lineSectionCollapsed}
@@ -1555,7 +1652,17 @@
         </div>
       </PropertyCell>
 
-      {#if font?.underline === true}
+
+      {#if dock}
+        <PropertyCell label="Edit line" span={4} hint="Each decoration keeps its own settings, whether enabled or disabled.">
+          <div class="style-row">
+            {#each ['underline', 'strikethrough', 'overline'] as kind}
+              <button class="style-btn" class:active={dockLine === kind} aria-pressed={dockLine === kind} onclick={() => { dockLine = kind; }}>{kind}</button>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+      {#if dock ? dockLine === 'underline' : font?.underline === true}
         <TextLineDecorationControls
           title="Underline"
           yLabel="Underline Y"
@@ -1584,7 +1691,7 @@
         />
       {/if}
 
-      {#if font?.strikethrough === true}
+      {#if dock ? dockLine === 'strikethrough' : font?.strikethrough === true}
         <TextLineDecorationControls
           title="Strikethrough"
           yLabel="Strike Y"
@@ -1613,7 +1720,7 @@
         />
       {/if}
 
-      {#if font?.overline === true}
+      {#if dock ? dockLine === 'overline' : font?.overline === true}
         <TextLineDecorationControls
           title="Overline"
           yLabel="Overline Y"
@@ -1641,11 +1748,42 @@
           onChangeGap={(value) => setLineNumber('overlineGap', value)}
         />
       {/if}
-    </PropertySection>
+    </PropertySection></div>
+      {/if}
+    </div>
   </div>
 {/if}
 
 <style>
+
+  .text-fields, .text-group { display: contents; }
+  .dock-editor { height: 100%; min-height: 0; container: text-dock / inline-size; }
+  .dock-basics { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr); flex: 0 0 auto; }
+  .dock-content, .dock-font { min-width: 0; }
+  .dock-basics :global(.property-section-header) { display: none; }
+  .dock-basics :global(.property-grid) { padding-top: 8px; }
+  .dock-font :global(.property-grid) { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+  .dock-basics .text-input { height: 26px; padding: 4px 6px; }
+  .dock-basics .text-accept-btn { min-width: 28px; }
+  .dock-editor .effect-toggle-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dock-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 8px 0; border-bottom: 1px solid #333; flex: 0 0 auto; }
+  .dock-tabs button { padding: 5px 12px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0; background: #1A1A1A; color: #999; font: inherit; font-size: 11px; text-transform: capitalize; cursor: pointer; }
+  .dock-tabs button.active { background: #094771; border-bottom-color: #5B9BD5; color: #FFF; }
+  .dock-tabs button:hover { color: #FFF; }
+  .dock-fields { display: block; flex: 1; min-height: 0; overflow: auto; }
+  .dock-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); align-items: start; }
+  .dock-wide { display: block; }
+  .dock-wide :global(.property-grid) { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  @container text-dock (max-width: 700px) {
+    .dock-basics { grid-template-columns: 1fr; }
+    .dock-font :global(.property-grid) { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+    .dock-wide :global(.property-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .dock-editor .effect-toggle-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @container text-dock (max-width: 420px) {
+    .dock-font :global(.property-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
   .text-editor-sections {
     display: flex;
     flex-direction: column;

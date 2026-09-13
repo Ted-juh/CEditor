@@ -9,6 +9,7 @@
   // The screen fill + backlight + glass come from the CSS layers in
   // LcdDisplayRenderer; this canvas draws only the dots (transparent).
   import { FONT_W, FONT_H, FONT_ADVANCE, drawCharInto, drawTextInto } from '../utils/pixelFont.js';
+  import { decodeGifAnimation } from '../utils/gifAnimation.js';
 
   let {
     lines = [],
@@ -171,6 +172,14 @@
       const durations = frames.map(() => 1000 / Math.max(1, fps));
       return { frames, durations, total: frames.length * (1000 / Math.max(1, fps)) };
     }
+    const mime = src.startsWith('data:') ? src.slice(5, src.indexOf(';')) : 'image/gif';
+    // Decode GIFs independently of WebCodecs: its absence must never turn an
+    // imported animation into the old one-frame Image fallback.
+    if (mime === 'image/gif') {
+      try {
+        return decodeGifAnimation(await (await fetch(src)).arrayBuffer(), grab, MAX_ANIM_FRAMES);
+      } catch { return null; }
+    }
     if (typeof ImageDecoder === 'undefined') {
       const img = await new Promise((resolve) => {
         const image = new Image();
@@ -183,7 +192,6 @@
       return bmp ? { frames: [bmp], durations: [1000], total: 1000 } : null;
     }
     try {
-      const mime = src.startsWith('data:') ? src.slice(5, src.indexOf(';')) : 'image/gif';
       const buf = await (await fetch(src)).arrayBuffer();
       const decoder = new ImageDecoder({ data: buf, type: mime });
       await decoder.tracks.ready;
@@ -344,17 +352,18 @@
     const fps = Math.max(1, Number(animFps) || 12);
     const wantColour = animColour === true;
     void pixW; void pixH; void dither; void spriteCols;
+    const token = ++animDecodeToken;
     animCache = null;
     if (mode !== 'file' || !src) return;
-    const token = ++animDecodeToken;
 
     decodeAnimation(src, spriteFrames, fps, pixW, pixH, wantColour, spriteCols).then((cache) => {
-      if (token === animDecodeToken && cache) animCache = cache;
+      if (token === animDecodeToken && cache) animCache = { ...cache, startedAt: animTick };
     });
+    return () => { ++animDecodeToken; };
   });
 
   function animFrameBitmap() {
-    return pickFrame(animCache, animTick, animLoop);
+    return pickFrame(animCache, animTick - (animCache?.startedAt ?? 0), animLoop);
   }
 
   // --- Placeable animation elements (their own rect + source per element) ---
@@ -370,7 +379,7 @@
       elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache: null } };
       decodeAnimation(a.src, a.frames, a.fps, a.w, a.h, a.colourful === true, a.spriteCols ?? 0).then((cache) => {
         if (elAnimCaches[a.id]?.key === key) {
-          elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache } };
+          elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache, startedAt: animTick } };
         }
       });
     }
@@ -872,7 +881,7 @@
       if (a.mode === 'preset') {
         fb = presetInto(a.w, a.h, (animTick / 1000) * Math.max(0.05, Number(a.speed) || 1), a.preset);
       } else {
-        fb = pickFrame(elAnimCaches[a.id]?.cache, animTick, a.loop);
+        fb = pickFrame(elAnimCaches[a.id]?.cache, animTick - (elAnimCaches[a.id]?.startedAt ?? 0), a.loop);
       }
       if (!fb) continue;
       const rgba = fb.rgba ?? null;

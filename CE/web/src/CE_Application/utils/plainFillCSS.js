@@ -30,6 +30,7 @@ import { gradientToCSS } from './gradientCSS.js';
 import { buildLayerStyle } from './backgroundCSS.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { numberOr } from './primitives.js';
+import { hasBackgroundEffects } from './surfaceEffects.js';
 
 const LAYERS = ['solid', 'gradient', 'image', 'overlay'];
 const DEFAULT_ORDER = Object.freeze([...LAYERS]);
@@ -266,6 +267,7 @@ export function whyFillNotPlainCSS(background) {
  * to draw the layer as well.
  */
 export function plainFillCSS(background, width, height) {
+  if (hasBackgroundEffects(background)) return null;
   if (whyFillNotPlainCSS(background)) return null;
   if (!(width > 0 && height > 0)) return null;
 

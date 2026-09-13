@@ -1,3 +1,4 @@
+#include "VendorPreset.h"
 #include "SonicAnalysisJob.h"
 
 #include "SnapshotStore.h"
@@ -192,7 +193,7 @@ AnalysisEvent analysisEventFromLine (const juce::String& line)
 
 juce::String applyPresetStatePlain (juce::AudioProcessor& instrument, const AnalysisPreset& preset)
 {
-    if (preset.sourceType == "vstpreset")
+    if (isVendorPresetSource (preset.sourceType))
         return "Vendor preset loading is not available here.";
 
     if (preset.sourceType == "programList")

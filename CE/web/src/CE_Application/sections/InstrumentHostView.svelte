@@ -1,4 +1,8 @@
 <script>
+  import HostConfirmButton from './HostConfirmButton.svelte';
+  import HostPickupIndicator from './HostPickupIndicator.svelte';
+  import HostPartIssueIcons from './HostPartIssueIcons.svelte';
+  import { hostRackIssues } from '../stores/hostPartIssues.js';
   import '../styles/hostage-theme.css';
   import HostageLogo from '../components/HostageLogo.svelte';
   /**
@@ -16,7 +20,8 @@
   import { onDestroy, tick } from 'svelte';
   import {
     hostState,
-    hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostAudioDevices, initInstrumentHostBridge,
+    undoHostEdit, redoHostEdit,
+    hostMidiActivity, hostSurface, hostScanLog, hostLastError, hostSaveNotice, hostAudioDevices, initInstrumentHostBridge,
     filterInstruments, filterEffects, scanForInstruments, addScanPath, browseScanPath, removeScanPath, clearQuarantine,
     addRackPart, removeRackPart, moveRackPart, focusRackPart, loadInstrument, unloadInstrument,
     setPartMixer, setPartMidiRules, hostPanic, openEditor, closeEditor, floatEditor, closeEditorWindow,
@@ -33,12 +38,11 @@
     hostCanvasDrag,
     hostChordLearn, learnKeyChord, cancelKeyChordLearn, clearKeyChord,
     walkPartPreset,
-    setPresetAudition, auditionLibraryRecord,
-    startSoundComparison, stepSoundComparison, keepSoundComparison, cancelSoundComparison,
+    setPresetAudition,
     generateControlPages,
-    hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
+
     saveUserPreset, saveRackToLibrary, saveChainToLibrary,
-    setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
+
     addEffect, removeEffect, moveEffect, setEffectBypassed, openEffectEditor,
     reorderIndexForDrop, setPluginArtwork, clearPluginArtwork, customArtworkIds,
     hostParamDrag,
@@ -64,13 +68,20 @@
   import MidiChainPanel from './MidiChainPanel.svelte';
   import HostRackCanvas from './HostRackCanvas.svelte';
   import PluginTile from './PluginTile.svelte';
+  import HostPartIdentity from './HostPartIdentity.svelte';
+  import HostPartPicker from './HostPartPicker.svelte';
+  import { hostPartTitle as partTitle, hostPartLabel, hostEffectTargets,
+    hostTargetContext } from '../utils/hostTargetContext.js';
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import AppWindow from 'lucide-svelte/icons/app-window';
   import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
   import Unplug from 'lucide-svelte/icons/unplug';
   import Trash2 from 'lucide-svelte/icons/trash-2';
+  import KeyboardMusic from 'lucide-svelte/icons/keyboard-music';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
   import SoundBrowser from './SoundBrowser.svelte';
+  import HostLibraryPanel from './HostLibraryPanel.svelte';
   import HostSurfacePanel from './HostSurfacePanel.svelte';
   import ProductPanel from './ProductPanel.svelte';
   import ReliabilityPanel from './ReliabilityPanel.svelte';
@@ -99,8 +110,7 @@
   // Persisted with the Performance: the native side waits for the actual preset commit and
   // plays the configured phrase into that part alone. This view only edits the recipe.
   let audition = $derived($hostState.rack.presetAudition);
-  let libraryQuery = $state('');
-  let libraryType = $state('');
+  let soundBrowser = $state(null);
   let hostMode = $state('build');
   let buildHold = $state(false);
   let unlockRequested = $state(false);
@@ -120,7 +130,6 @@
   ];
   const hostUtilities = [
     { id: 'library', label: 'Library' },
-    { id: 'sounds', label: 'Sounds' },
     { id: 'devices', label: 'Audio & MIDI' },
     { id: 'project', label: 'Project' },
     { id: 'product', label: 'Product' },
@@ -197,8 +206,7 @@
     if (!utility) { preparedUtility = ''; return; }
     if (utility === preparedUtility) return;
     preparedUtility = utility;
-    if (utility === 'library') requestLibrary(libraryQuery, libraryType);
-    else if (utility === 'devices') requestAudioDevices();
+    if (utility === 'devices') requestAudioDevices();
     else if (utility === 'project') requestHostProject();
   });
 
@@ -213,7 +221,10 @@
   // down the rack column. The tab list is derived, not fixed: with no part focused only the
   // rack-wide chains apply, and the parameter view appears once something is inspectable.
   let dockOpen = $state(true);
-  let dockTab = $state('midi');
+  let dockTab = $state('sounds');
+  let dockExpanded = $state(false);
+  let soundCatalogueOpen = $state(false);
+  let soundsDockActive = $derived(dockOpen && dockTab === 'sounds');
   // What the patch being captured will be called. Typed while the capture is running, so it
   // is asked for at the moment the player knows the answer rather than afterwards.
   let patchName = $state('');
@@ -227,7 +238,7 @@
   let compareRecordId = $state('');
   const restoredDockHeights = restoreDockHeights();
   let dockHeights = $state(restoredDockHeights);
-  let dockHeight = $state(preferredDockHeight('midi'));
+  let dockHeight = $state(preferredDockHeight('sounds'));
   let buildContentHeight = $state(0);
   let dockContentElement = $state(null);
   let dockFitRequest = 0;
@@ -236,6 +247,7 @@
   let gripStartHeight = 0;
 
   function gripDown(event) {
+    dockExpanded = false;
     gripping = true;
     gripStartY = event.clientY;
     gripStartHeight = dockHeight;
@@ -263,10 +275,18 @@
     if (request !== dockFitRequest || tab !== dockTab || !dockOpen) return;
     const remembered = dockHeights[tab];
     const preferred = preferredDockHeight(tab, dockContentElement?.scrollHeight ?? 0, buildContentHeight);
-    dockHeight = clampDockHeight(remembered ?? preferred, buildContentHeight);
+    dockHeight = dockExpanded
+      ? Math.max(140, buildContentHeight - 180)
+      : clampDockHeight(remembered ?? preferred, buildContentHeight);
   }
 
   function resetDockHeight() { void fitDock(dockTab, true); }
+
+  function toggleDockExpanded() {
+    dockExpanded = !dockExpanded;
+    dockOpen = true;
+    void fitDock();
+  }
 
   $effect(() => storeDockHeights(dockHeights));
 
@@ -274,28 +294,49 @@
     // Clicking the tab you are on collapses the dock — the same gesture that opened it.
     if (dockOpen && dockTab === id) { dockOpen = false; return; }
     dockTab = id;
+    dockExpanded = false;
     dockOpen = true;
   }
 
 
-  function clickLibraryRow(record) {
-    if (record.type === 'rack' || !record.available) return;
-    // One click, loaded: into the focused part, or as the first part of an empty rack.
-    const action = focusedPart ? 'focused' : 'add';
-    if (audition.enabled && record.type === 'preset')
-      auditionLibraryRecord(record.recordId, action);
-    else
-      loadLibraryRecord(record.recordId, action);
-  }
-
-  function setLibraryFilter(query, type) {
-    libraryQuery = query;
-    libraryType = type;
-    requestLibrary(query, type);
+  async function showSounds(text = '') {
+    buildWorkspace = 'rack';
+    dockTab = 'sounds';
+    dockOpen = true;
+    await tick();
+    soundBrowser?.search(text);
   }
 
   function chooseUtility(id) {
     activeUtility = toggleHostUtility(activeUtility, id);
+  }
+
+  async function inspectPartIssue(partId, issue) {
+    focusRackPart(partId, { followEditor: false });
+    if (issue.target === 'health' || issue.target === 'devices') {
+      activeUtility = issue.target;
+      await tick();
+      document.querySelector('[data-testid="host-utility-drawer"] button')?.focus();
+    } else if (issue.target === 'mixer') {
+      activeUtility = '';
+      buildWorkspace = 'mixer';
+      await tick();
+      document.querySelector(`[data-part-id="${CSS.escape(partId)}"] .fader`)?.focus();
+    } else if (issue.target === 'part') {
+      activeUtility = '';
+      buildWorkspace = 'rack';
+      rackView = 'list';
+      await tick();
+      document.querySelector(`[data-rack-part-id="${CSS.escape(partId)}"] [data-testid="part-active"]`)?.focus();
+    } else {
+      activeUtility = '';
+      buildWorkspace = 'rack';
+      dockTab = issue.target;
+      dockOpen = true;
+      if (issue.target === 'routing') requestAudioDevices();
+      await tick();
+      document.querySelector(issue.target === 'zone' ? '.midi-zone select' : '.hw-config select')?.focus();
+    }
   }
 
   let instruments = $derived(filterInstruments($hostState.instruments, search));
@@ -332,11 +373,10 @@
   // Stage 5 every part answers — an empty or hardware part still has its mixer addresses.
   let paramTargetId = $state('');
   let lastFocusedPartId = $state('');
-  let allEffects = $derived([
-    ...$hostState.rack.masterEffects,
-    ...$hostState.rack.parts.flatMap((p) => p.effects),
-    ...$hostState.rack.returns.flatMap((r) => r.effects),
-  ]);
+  let effectTargets = $derived(hostEffectTargets($hostState.rack));
+  let allEffects = $derived(effectTargets.map(target => target.effect));
+  let paramContext = $derived(hostTargetContext($hostState.rack, paramTargetId));
+  let ownerEffects = $derived(effectTargets.filter(target => target.ownerId === paramContext?.ownerId));
   $effect(() => {
     const focusedTarget = focusedPart ? focusedPart.partId : '';
     const targetStillExists = paramTargetId
@@ -356,6 +396,9 @@
   let returnsStamp = $derived($hostState.rack.returns.map((r) => r.returnId).join(','));
   $effect(() => {
     returnsStamp;
+    // Controller uses the same parameter store for its instrument source. Reclaim the
+    // selected insert's registry when returning to Rack, and don't compete while away.
+    if (buildWorkspace !== 'rack') return;
     if (paramTargetId) requestParameters(paramTargetId);
     else hostParameters.set(emptyHostParameters());
   });
@@ -410,11 +453,6 @@
   let scales = $derived($hostState.performance.scales);
   let focusedPartId = $derived($hostState.rack.focusedPartId);
   let focusedPart = $derived(parts.find((p) => p.partId === focusedPartId) ?? null);
-  let soundComparison = $derived($hostState.rack.soundComparison);
-  let comparisonCandidates = $derived($hostLibrary.records.filter((record) =>
-    record.type === 'preset' && record.available && record.sourceType !== 'hardwarePatch'
-      && focusedPart?.hasInstrument && !focusedPart.hardware
-      && record.targetCeId === focusedPart.pluginCeId).slice(0, 20));
   let lastScanLine = $derived($hostScanLog.at(-1) ?? '');
   let audioLine = $derived(
     $hostState.audio.running
@@ -432,6 +470,7 @@
   // sends and extra outs all live there and any of them can appear at any moment — but the
   // parameter view only exists once something is inspectable, so it comes and goes.
   let dockTabs = $derived([
+    { id: 'sounds', label: 'Sounds' },
     ...(focusedPart
           ? [{ id: 'zone', label: 'Zone' }, { id: 'midi', label: 'MIDI' },
              { id: 'inserts', label: 'Inserts' }, { id: 'routing', label: 'Routing' }]
@@ -485,11 +524,8 @@
     return amount === 0 ? 'C' : `${pan < 0 ? 'L' : 'R'}${amount}`;
   }
 
-  function partTitle(part) {
-    if (part.hardware) return `${part.midiOutputName || 'External hardware'} (HW)`;
-    if (part.hasInstrument) return part.pluginName || 'Loaded instrument';
-    if (part.unresolved) return `${part.pluginName || part.pluginCeId} (missing)`;
-    return 'Empty part';
+  function soundTargetTitle(part) {
+    return hostPartLabel(part, parts.findIndex(candidate => candidate.partId === part.partId));
   }
 
   function submitScanPath() {
@@ -545,6 +581,20 @@
 
 </script>
 
+<svelte:window onkeydown={(event) => {
+  if (event.key === 'Escape') { clearTimeout(destructiveTimer); pendingDestructive = ''; }
+  if (hostMode !== 'build' || !(event.ctrlKey || event.metaKey) || event.altKey
+      || !event.target?.closest?.('[data-testid="instrument-host-workspace"]')
+      || event.target?.closest?.('input, textarea, [contenteditable="true"], .cm-editor')) return;
+  const key = event.key.toLowerCase();
+  if (key !== 'z' && key !== 'y') return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const redo = key === 'y' || event.shiftKey;
+  if (redo ? $hostState.editHistory.canRedo : $hostState.editHistory.canUndo)
+    (redo ? redoHostEdit : undoHostEdit)();
+}} />
+
 <div class="host-workspace" data-testid="instrument-host-workspace">
   <header class="host-header">
     <div class="host-brand">
@@ -572,6 +622,14 @@
 
     {#if hostMode === 'build'}
       <div class="host-command-area">
+        <div class="host-edit-actions" role="group" aria-label="Edit history">
+          <button type="button" data-testid="host-undo" disabled={!$hostState.editHistory.canUndo}
+            title={$hostState.editHistory.blockedReason || ($hostState.editHistory.undoLabel ? `Undo: ${$hostState.editHistory.undoLabel} (Ctrl+Z)` : 'No Build edits to undo')}
+            onclick={undoHostEdit}>Undo</button>
+          <button type="button" data-testid="host-redo" disabled={!$hostState.editHistory.canRedo}
+            title={$hostState.editHistory.blockedReason || ($hostState.editHistory.redoLabel ? `Redo: ${$hostState.editHistory.redoLabel} (Ctrl+Shift+Z)` : 'No Build edits to redo')}
+            onclick={redoHostEdit}>Redo</button>
+        </div>
       <!-- The transport is always visible: it is the one clock everything else follows,
            and a player needs to see whether it is running without opening a panel. -->
         <div class="host-transport-group">
@@ -654,7 +712,7 @@
   </nav>
 
   <div class="build-content" bind:clientHeight={buildContentHeight}>
-  {#if activeUtility}
+  {#if activeUtility && (activeUtility !== 'library' || buildWorkspace !== 'rack')}
   <aside class="utility-drawer" data-testid="host-utility-drawer"
          aria-label={`${hostUtilities.find((utility) => utility.id === activeUtility)?.label ?? 'Utility'} drawer`}>
     <div class="utility-drawer-head">
@@ -727,223 +785,15 @@
   {/if}
 
   {#if activeUtility === 'health'}
-    <ReliabilityPanel />
+    <ReliabilityPanel onInspectPart={inspectPartIssue} />
   {/if}
 
   {#if activeUtility === 'licence'}
     <LicencePanel />
   {/if}
 
-  {#if activeUtility === 'sounds'}
-    <!-- The browser acts on the focused part — save it, load into it, morph it — so it is
-         told which part that is. Mounted bare, every one of those buttons stayed disabled with
-         "focus a part first" while a part sat focused in the rack. -->
-    <SoundBrowser {focusedPart} {partTitle}
-                  auditionOn={audition.enabled}
-                  onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
-  {/if}
-
   {#if activeUtility === 'library'}
-    <div class="library-panel" data-testid="host-library-panel" aria-label="Library">
-      <div class="library-head">
-        <input type="search" placeholder="Search sounds, chains and racks…" value={libraryQuery}
-               oninput={(e) => setLibraryFilter(e.currentTarget.value, libraryType)} />
-        <span class="library-filters">
-          {#each [['', 'All'], ['preset', 'Presets'], ['chain', 'Chains'], ['rack', 'Racks']] as [value, label] (value)}
-            <button type="button" class="toggle" class:on={libraryType === value}
-                    onclick={() => setLibraryFilter(libraryQuery, value)}>{label}</button>
-          {/each}
-        </span>
-        <button type="button" class="toggle" class:on={audition.enabled}
-                class:playing={audition.playing} data-testid="host-audition"
-                title="When on, clicking a preset loads it and plays the configured phrase on that part"
-                onclick={() => setPresetAudition({ enabled: !audition.enabled })}>
-          {audition.playing ? '♪ Playing…' : '♪ Audition'}
-        </button>
-        <button type="button" onclick={() => scanForInstruments()} disabled={$hostState.scanning}
-                data-testid="host-scan">
-          {$hostState.scanning ? 'Scanning plug-ins…' : 'Scan plug-ins'}
-        </button>
-        <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
-        <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
-        <span class="library-counts">{$hostLibrary.counts.presets} presets · {$hostLibrary.counts.chains} chains · {$hostLibrary.counts.racks} racks</span>
-      </div>
-
-      {#if audition.enabled}
-        <div class="audition-config" data-testid="host-audition-config">
-          <strong>Audition phrase</strong>
-          <label>Phrase
-            <select value={audition.phrase}
-                    onchange={(e) => setPresetAudition({ phrase: e.currentTarget.value })}>
-              <option value="single">Single note</option>
-              <option value="chord">Major chord</option>
-              <option value="scale">Major scale</option>
-              <option value="riff">Short riff</option>
-            </select>
-          </label>
-          <label>Root
-            <span class="number-with-note">
-              <input type="number" min="0" max="127" value={audition.rootNote}
-                     onchange={(e) => setPresetAudition({ rootNote: Number(e.currentTarget.value) })} />
-              <small>{noteName(audition.rootNote)}</small>
-            </span>
-          </label>
-          <label>Velocity
-            <input type="number" min="1" max="127" value={audition.velocity}
-                   onchange={(e) => setPresetAudition({ velocity: Number(e.currentTarget.value) })} />
-          </label>
-          <label>Length
-            <span class="number-unit"><input type="number" min="40" max="4000" step="10"
-                     value={audition.noteLengthMs}
-                     onchange={(e) => setPresetAudition({ noteLengthMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
-          </label>
-          {#if audition.phrase === 'scale' || audition.phrase === 'riff'}
-            <label>Gap
-              <span class="number-unit"><input type="number" min="0" max="2000" step="10"
-                       value={audition.gapMs}
-                       onchange={(e) => setPresetAudition({ gapMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
-            </label>
-          {/if}
-          <span class="audition-help">Click a preset name to load and hear it.</span>
-        </div>
-      {/if}
-
-      {#if soundComparison.active}
-        <div class="sound-compare" data-testid="host-sound-comparison">
-          <span class="compare-slot">{soundComparison.index + 1}<small>/{soundComparison.count}</small></span>
-          <span class="compare-copy">
-            <small>Sound Comparison · original: {soundComparison.originalName}</small>
-            <strong>{soundComparison.name || 'Preset unavailable'}</strong>
-          </span>
-          <button type="button" class="ghost" title="Previous preset"
-                  onclick={() => stepSoundComparison(-1)}>‹ Previous</button>
-          <button type="button" class="ghost" title="Next preset"
-                  onclick={() => stepSoundComparison(1)}>Next ›</button>
-          <button type="button" class="compare-keep" onclick={() => keepSoundComparison()}>
-            Keep this sound
-          </button>
-          <button type="button" class="ghost" onclick={() => cancelSoundComparison()}>
-            Cancel · restore original
-          </button>
-        </div>
-      {/if}
-
-      <div class="library-capture">
-        <!-- A hardware part saves the patch it captured. The Library is where a sound lives
-             whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
-             in one list. -->
-        <button type="button"
-                disabled={!(focusedPart?.hasInstrument
-                            || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
-                title={focusedPart?.hasInstrument ? `Capture ${partTitle(focusedPart)}'s current state`
-                       : focusedPart?.hardware
-                         ? (focusedPart.hardwarePatchBytes > 0
-                              ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
-                              : 'Capture a patch from the synth first (Routing tab)')
-                         : 'Focus a part with an instrument first'}
-                onclick={() => saveUserPreset(focusedPart.partId)}
-                data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch of focused part' : 'Save preset of focused part'}</button>
-        <button type="button" disabled={!focusedPart?.hasInstrument}
-                title={focusedPart?.hasInstrument
-                       ? `Capture ${partTitle(focusedPart)} whole: the instrument and its state, the MIDI modules ahead of it and the inserts behind it`
-                       : 'Focus a part with an instrument first'}
-                onclick={() => saveChainToLibrary(focusedPart.partId)}
-                data-testid="host-save-chain">Save chain of focused part</button>
-        <button type="button" onclick={() => saveRackToLibrary()} data-testid="host-save-rack">
-          Save rack to library
-        </button>
-        <button type="button" data-testid="host-start-sound-comparison"
-                disabled={soundComparison.active || comparisonCandidates.length < 2}
-                title={comparisonCandidates.length >= 2
-                  ? `Compare ${comparisonCandidates.length} visible presets with the audition phrase`
-                  : 'Show at least two presets for the focused instrument'}
-                onclick={() => startSoundComparison(focusedPart.partId,
-                  comparisonCandidates.map((record) => record.recordId))}>
-          Compare visible ({comparisonCandidates.length})
-        </button>
-      </div>
-
-      {#if $hostLibrary.paths.length > 0}
-        <div class="library-paths">
-          {#each $hostLibrary.paths as path (path)}
-            <span class="scan-path"><span>{path}</span>
-            <button type="button" class="ghost danger" class:confirming={pendingDestructive === `library-path:${path}`}
-                    title={pendingDestructive === `library-path:${path}` ? 'Click again to confirm' : 'Remove this library folder'}
-                    onclick={() => guardedAction(`library-path:${path}`, () => removeLibraryPath(path))}>
-              {pendingDestructive === `library-path:${path}` ? 'Confirm' : '×'}
-            </button></span>
-          {/each}
-        </div>
-      {/if}
-
-      {#if $hostLibrary.records.length === 0}
-        <div class="empty-hint">
-          {$hostLibrary.counts.total === 0
-            ? 'Nothing in the library yet — scan presets, or capture the focused part.'
-            : 'Nothing matches the search.'}
-        </div>
-      {/if}
-
-      <div class="library-list">
-        {#each $hostLibrary.records as record (record.recordId)}
-          <div class="library-row" class:unavailable={!record.available}
-               class:comparing={soundComparison.active && soundComparison.recordId === record.recordId}>
-            <button type="button" class="ghost star" class:on={record.favourite}
-                    title={record.favourite ? 'Unfavourite' : 'Favourite'}
-                    onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>
-              {record.favourite ? '★' : '☆'}
-            </button>
-            {#if record.type !== 'rack'}
-              <PluginTile ceId={record.targetCeId} name={record.instrument || record.name}
-                          vendor={record.manufacturer} size={22} />
-            {/if}
-            <div class="library-id" class:clickable={record.type !== 'rack' && record.available}
-                 role="button" tabindex="-1" data-testid="library-row-body"
-                 title={record.type === 'rack' ? undefined
-                        : record.type === 'chain'
-                          ? 'Click: load the whole chain into the focused part'
-                          : audition.enabled && record.type === 'preset'
-                            ? 'Click: load into the focused part and audition'
-                                       : 'Click: load into the focused part'}
-                 onclick={() => clickLibraryRow(record)}
-                 onkeydown={(e) => e.key === 'Enter' && clickLibraryRow(record)}>
-              <span class="library-name">{record.name}</span>
-              <span class="library-detail">
-                {record.type === 'rack' ? 'Rack'
-                  : [record.type === 'chain' ? 'Chain'
-                       : record.sourceType === 'hardwarePatch' ? 'Hardware patch' : null,
-                     record.instrument, record.manufacturer]
-                      .filter(Boolean).join(' · ') || 'Preset'}
-                {#if record.sourceType === 'userState' || record.sourceType === 'rackCapture'
-                     || record.sourceType === 'chainCapture' || record.sourceType === 'hardwarePatch'} · yours{/if}
-                {#if record.tags.length > 0} · {record.tags.join(', ')}{/if}
-              </span>
-              {#if !record.available}
-                <span class="library-reason">{record.reason}</span>
-              {/if}
-            </div>
-            {#if record.type === 'rack'}
-              <button type="button" disabled={!record.available}
-                      onclick={() => loadLibraryRecord(record.recordId)}>Restore</button>
-            {:else}
-              <button type="button" disabled={!record.available || !focusedPart}
-                      title={focusedPart ? `Load into ${partTitle(focusedPart)}` : 'Focus a rack part first'}
-                      onclick={() => loadLibraryRecord(record.recordId, 'focused')}>Load</button>
-              <button type="button" disabled={!record.available} title="Add as a new part"
-                      onclick={() => loadLibraryRecord(record.recordId, 'add')}>+ Part</button>
-            {/if}
-            {#if !record.factory}
-              <button type="button" class="ghost danger" class:confirming={pendingDestructive === `library-record:${record.recordId}`}
-                      title={pendingDestructive === `library-record:${record.recordId}` ? 'Click again to confirm' : 'Remove this record'}
-                      onclick={() => guardedAction(`library-record:${record.recordId}`,
-                        () => removeLibraryRecord(record.recordId))}>
-                {pendingDestructive === `library-record:${record.recordId}` ? 'Confirm' : '×'}
-              </button>
-            {/if}
-          </div>
-        {/each}
-      </div>
-    </div>
+    <HostLibraryPanel onShowSounds={showSounds} />
   {/if}
 
   {#if activeUtility === 'project'}
@@ -990,6 +840,9 @@
       <button type="button" onclick={() => hostLastError.set('')}>×</button>
     </div>
   {/if}
+  {#if $hostSaveNotice}
+    <div class="host-save-notice" role="status" data-testid="host-save-notice">{$hostSaveNotice}</div>
+  {/if}
 
   <!-- Total recall's one question, asked once when a session opens holding patches set to
        "ask". Nothing has been transmitted at this point and nothing will be until somebody
@@ -1016,7 +869,7 @@
 
   {#if buildWorkspace === 'performance'}
     <main class="primary-workspace" data-testid="host-primary-performance">
-      <PerformancePanel />
+      <PerformancePanel onShowMixer={() => buildWorkspace = 'mixer'} />
     </main>
   {:else if buildWorkspace === 'mixer'}
     <main class="primary-workspace" data-testid="host-primary-mixer">
@@ -1031,10 +884,15 @@
       <HostSurfacePanel />
     </main>
   {:else}
-  <div class="host-columns">
+  <div class="rack-workspace">
+  <div class="host-columns" class:sounds-rack={soundsDockActive} class:catalogue-open={soundCatalogueOpen}>
     <section class="rack-column" aria-label="Instrument rack">
       <div class="column-head">
         <strong>Rack</strong>
+        {#if soundsDockActive}
+          <button type="button" class="toggle" class:on={soundCatalogueOpen} aria-expanded={soundCatalogueOpen}
+                  data-testid="sounds-show-plugins" onclick={() => (soundCatalogueOpen = !soundCatalogueOpen)}>Plug-ins</button>
+        {/if}
         <span class="view-switch">
           {#each [['list', 'List'], ['canvas', 'Canvas']] as [value, label] (value)}
             <button type="button" class="toggle" class:on={rackView === value}
@@ -1050,11 +908,13 @@
       {/if}
 
       {#if rackView === 'canvas'}
-        <HostRackCanvas />
+        <HostRackCanvas onInspectPart={inspectPartIssue} />
       {/if}
 
       {#each rackView === 'list' ? parts : [] as part, partIndex (part.partId)}
-        <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}>
+        <div class="part" class:focused={part.partId === focusedPartId} class:disabled={!part.enabled}
+             data-rack-part-id={part.partId}
+             data-testid={soundsDockActive ? 'sounds-rack-part' : undefined}>
           <!-- The plug-in's face fills the row's whole height on the left, beside everything
                rather than above it. A snapshot is a picture of a window, and a 24px square of
                one was a smudge; at the row's height it is recognisable from across the desk,
@@ -1069,7 +929,7 @@
           <div class="part-body">
           <div class="part-head">
             <button type="button" class="part-main" onclick={() => focusRackPart(part.partId)}>
-              <span class="part-name">{partTitle(part)}</span>
+              <span class="part-name"><HostPartIdentity {part} index={partIndex} thumbnail={false} /></span>
               <span class="part-vendor">{part.pluginVendor || (part.hardware ? part.midiOutputName : 'Ready for an instrument')}</span>
             </button>
             <span class="part-states" aria-label="Part state">
@@ -1078,6 +938,8 @@
               {#if part.mute}<span class="part-state muted">Muted</span>{/if}
               {#if part.solo}<span class="part-state soloed">Solo</span>{/if}
             </span>
+            <HostPartIssueIcons issues={$hostRackIssues[part.partId]}
+                                onInspect={(issue) => inspectPartIssue(part.partId, issue)} />
             <!-- The part's actions, in the open. These were a ••• menu: six things behind
                  one button, including the two you reach for most — the plug-in's own
                  interface, here or in its own window — and the one that must never be a
@@ -1168,6 +1030,7 @@
               {noteName(part.keyLow)}–{noteName(part.keyHigh)}
             </button>
             <button type="button" class="toggle" class:on={part.enabled} title="Part enabled (off panics its notes)"
+                    data-testid="part-active"
                     onclick={() => setPartMixer(part.partId, { enabled: !part.enabled })}>Active</button>
             <button type="button" class="toggle" class:on={part.mute} title="Mute (audio only; notes keep running)"
                     onclick={() => setPartMixer(part.partId, { mute: !part.mute })}>Mute</button>
@@ -1234,9 +1097,9 @@
               <PluginTile ceId={instrument.ceId} name={instrument.name} vendor={instrument.vendor} size={30} />
             </button>
             {#if $customArtworkIds.has(instrument.ceId)}
-              <button type="button" class="ghost tile-revert"
+              <HostConfirmButton identity={JSON.stringify([instrument.ceId])} type="button" class="ghost tile-revert"
                       title={`Use ${instrument.name}'s own picture again`}
-                      onclick={() => clearPluginArtwork(instrument.ceId)}>↺</button>
+                      onclick={() => clearPluginArtwork(instrument.ceId)}>↺</HostConfirmButton>
             {/if}
             <div class="instrument-id">
               <span class="instrument-name">{instrument.name}</span>
@@ -1286,9 +1149,9 @@
               <PluginTile ceId={effect.ceId} name={effect.name} vendor={effect.vendor} size={30} />
             </button>
             {#if $customArtworkIds.has(effect.ceId)}
-              <button type="button" class="ghost tile-revert"
+              <HostConfirmButton identity={JSON.stringify([effect.ceId])} type="button" class="ghost tile-revert"
                       title={`Use ${effect.name}'s own picture again`}
-                      onclick={() => clearPluginArtwork(effect.ceId)}>↺</button>
+                      onclick={() => clearPluginArtwork(effect.ceId)}>↺</HostConfirmButton>
             {/if}
             <div class="instrument-id">
               <span class="instrument-name">{effect.name}</span>
@@ -1331,6 +1194,7 @@
       <div class="pages" data-testid="host-pages">
         <div class="pages-head">
           <strong>Control pages</strong>
+          {#if selectedPage}<span class="pages-count">{selectedPage.slots.filter(s => s.assigned).length} / {selectedPage.slots.length} assigned</span>{/if}
           <span class="pages-actions">
             <button type="button" disabled={!focusedPart?.hasInstrument}
                     title={focusedPart?.hasInstrument
@@ -1353,6 +1217,7 @@
                        onchange={(e) => renameControlPage(page.pageId, e.currentTarget.value)} />
                 {#if page.generated}<span class="page-auto">auto</span>{/if}
                 <button type="button" class="ghost danger" class:confirming={pendingDestructive === `page:${page.pageId}`}
+                        aria-label={`Remove ${page.name}`}
                         title={pendingDestructive === `page:${page.pageId}` ? 'Click again to confirm' : 'Remove this page'}
                         onclick={() => guardedAction(`page:${page.pageId}`, () => removeControlPage(page.pageId))}>
                   {pendingDestructive === `page:${page.pageId}` ? 'Confirm' : '×'}
@@ -1361,71 +1226,87 @@
             {/each}
           </div>
           {#if selectedPage}
+            <div class="slot-columns" aria-hidden="true">
+              <span>Slot</span><span>Parameter / instrument</span><span class="slot-value-title">Value</span>
+              <span class="slot-midi-title">MIDI binding</span><span>Actions</span>
+            </div>
             <div class="slot-list">
-              {#each selectedPage.slots as slot (slot.slotId)}
-                <div class="slot-row" class:unresolved={slot.assigned && !slot.resolved}>
-                  <span class="slot-id">{slot.slotId}</span>
-                  {#if slot.assigned}
-                    <span class="slot-name" title={`${slot.parameterId} · ${slot.partId}`}>
-                      {slot.displayName}<span class="slot-part"> — {slot.partName || 'missing part'}</span>
-                    </span>
-                    {#if slot.resolved}
-                      <input type="range" min="0" max="1" step="0.001" aria-label={slot.displayName}
-                             oninput={(e) => setControlSlotValue(selectedPage.pageId, slot.slotId, Number(e.currentTarget.value))} />
-                    {:else}
-                      <span class="slot-warning">unresolved — the part no longer carries this plug-in</span>
-                    {/if}
-                    <button type="button" class="ghost danger" class:confirming={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}`}
-                            title={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to confirm' : 'Clear this slot'}
-                            onclick={() => guardedAction(`slot:${selectedPage.pageId}:${slot.slotId}`,
-                              () => clearControlSlot(selectedPage.pageId, slot.slotId))}>
-                      {pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Confirm' : '×'}
-                    </button>
-                  {:else}
-                    <span class="slot-empty">empty — assign from the parameter list (→)</span>
-                  {/if}
-                  <!-- MIDI learn: click, wiggle a control on the keyboard, and the slot follows
-                       it from then on. Works on an empty slot too — bind the knob first,
-                       assign the parameter after. -->
-                  {#if $hostMidiLearn.armed && $hostMidiLearn.pageId === selectedPage.pageId
-                        && $hostMidiLearn.slotId === slot.slotId}
-                    <button type="button" class="ghost midi-learn armed" data-testid="midi-learn-armed"
-                            title="Move a control on your MIDI keyboard — or click to cancel"
-                            onclick={() => cancelMidiLearn()}>listening…</button>
-                  {:else}
-                    {#if slot.midiCc >= 0}
-                      <span class="midi-cc"
-                            title={`This slot follows CC ${slot.midiCc}${slot.midiChannel ? ` on channel ${slot.midiChannel}` : ' on any channel'}`}>
-                        CC {slot.midiCc}{slot.midiChannel ? ` · ch ${slot.midiChannel}` : ''}
-                        <button type="button" class="ghost danger" class:confirming={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}`}
-                                title={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to confirm' : 'Remove the MIDI binding'}
-                                onclick={() => guardedAction(`midi-slot:${selectedPage.pageId}:${slot.slotId}`,
-                                  () => clearControlSlotMidi(selectedPage.pageId, slot.slotId))}>
-                          {pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}` ? 'Confirm' : '×'}
-                        </button>
+              {#each selectedPage.slots as slot, slotIndex (slot.slotId)}
+                {@const midiArmed = $hostMidiLearn.armed && $hostMidiLearn.pageId === selectedPage.pageId && $hostMidiLearn.slotId === slot.slotId}
+                {@const paramArmed = $hostParamLearn.armed && $hostParamLearn.pageId === selectedPage.pageId && $hostParamLearn.slotId === slot.slotId}
+                {@const context = hostTargetContext($hostState.rack, slot.partId)}
+                {@const owner = context ? `${context.ownerLabel}${context.effect ? ` › ${context.label}` : ''}` : slot.partName || 'Missing target'}
+                {@const artwork = context?.part ?? context?.effect}
+                <div class="slot-row" class:unresolved={slot.assigned && !slot.resolved}
+                     class:armed={midiArmed || paramArmed} data-testid="control-slot" data-slot-id={slot.slotId}>
+                  <span class="slot-id" title={slot.slotId}>{String(slotIndex + 1).padStart(2, '0')}</span>
+                  <div class="slot-assignment">
+                    <div class="slot-assignment-text">
+                      <span class="slot-name" class:slot-empty={!slot.assigned} title={slot.assigned ? `${slot.parameterId} · ${slot.partId}` : 'Assign from the parameter list or pick a plug-in control'}>
+                        {slot.assigned ? slot.displayName || slot.label || slot.parameterId : 'Unassigned'}
                       </span>
-                    {/if}
-                    <button type="button" class="ghost midi-learn"
-                            title="Bind a hardware control: click, then move a knob or fader on your MIDI keyboard"
-                            onclick={() => learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>learn</button>
-                    <!-- The answer to a plug-in with five hundred parameters: don't find it,
-                         point at it. Click, then move the control in the plug-in's OWN window
-                         and whatever moved lands here — no name to know, no list to scroll. -->
-                    {#if $hostParamLearn.armed && $hostParamLearn.slotId === slot.slotId}
-                      <button type="button" class="ghost midi-learn armed"
-                              data-testid="param-learn-armed"
-                              title="Move the control you want in the plug-in's own window — or click to cancel"
-                              onclick={() => cancelLearnControlSlotParameter()}>watching…</button>
-                    {:else}
-                      <button type="button" class="ghost midi-learn"
-                              data-testid="param-learn"
-                              title="Pick a parameter by moving it: click, then move the control in the plug-in's own window"
-                              onclick={() => learnControlSlotParameter(selectedPage.pageId, slot.slotId)}>grab</button>
-                    {/if}
-                  {/if}
+                      {#if slot.assigned}
+                        <span class="slot-owner" title={owner}>
+                          {#if artwork}
+                            <span class="slot-thumbnail" style={`--slot-color:${context.partIndex >= 0 ? partColor(context.partIndex) : 'var(--host-line-soft)'}`}>
+                              <PluginTile ceId={artwork.pluginCeId || artwork.deviceProfileId || ''}
+                                name={artwork.pluginName || slot.partName} vendor={artwork.pluginVendor || ''} fill />
+                            </span>
+                          {/if}
+                          <span>{owner}</span>
+                        </span>
+                        {#if !slot.resolved}<span class="slot-warning">Assignment unavailable</span>{/if}
+                      {/if}
+                      {#if midiArmed}<span class="slot-listening" role="status">Move a MIDI control…</span>{/if}
+                      {#if paramArmed}<span class="slot-listening" role="status">Move a plug-in control…</span>{/if}
+                    </div>
+                    <button type="button" class="slot-clear ghost danger" disabled={!slot.assigned}
+                      aria-label={`Clear slot ${slotIndex + 1}`} class:confirming={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}`}
+                      title={pendingDestructive === `slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to clear assignment' : 'Clear parameter assignment'}
+                      onclick={() => guardedAction(`slot:${selectedPage.pageId}:${slot.slotId}`, () => clearControlSlot(selectedPage.pageId, slot.slotId))}>
+                      ×
+                    </button>
+                  </div>
+                  <div class="slot-value">
+                    {#if slot.assigned && slot.resolved}
+                      <input type="range" min="0" max="1" step="0.001" value={slot.value}
+                        aria-label={`Value of ${slot.displayName || slot.parameterId}`} title={slot.valueText || 'Control position'}
+                        oninput={(e) => setControlSlotValue(selectedPage.pageId, slot.slotId, Number(e.currentTarget.value))} />
+                      <output>{Math.round(slot.value * 100)}% <HostPickupIndicator direction={slot.pickupDirection} /></output>
+                    {:else}<span class="slot-dash">—</span>{/if}
+                  </div>
+                  <div class="slot-midi">
+                    {#if slot.midiCc >= 0}
+                      <span><strong>CC {slot.midiCc}</strong>
+                        <span>{slot.midiChannel ? `Channel ${slot.midiChannel}` : 'Any channel'}</span></span>
+                      <button type="button" class="slot-clear ghost danger" aria-label={`Clear MIDI binding for slot ${slotIndex + 1}`}
+                        class:confirming={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}`}
+                        title={pendingDestructive === `midi-slot:${selectedPage.pageId}:${slot.slotId}` ? 'Click again to clear MIDI binding' : 'Clear MIDI binding'}
+                        onclick={() => guardedAction(`midi-slot:${selectedPage.pageId}:${slot.slotId}`, () => clearControlSlotMidi(selectedPage.pageId, slot.slotId))}>
+                        ×
+                      </button>
+                    {:else}<span>Unbound</span>{/if}
+                  </div>
+                  <div class="slot-actions">
+                    <button type="button" class:armed={midiArmed} aria-pressed={midiArmed}
+                      data-testid={midiArmed ? 'midi-learn-armed' : 'midi-learn'}
+                      aria-label={`${midiArmed ? 'Cancel MIDI' : 'Learn MIDI'} for slot ${slotIndex + 1}`}
+                      title={midiArmed ? 'Cancel MIDI learn' : 'Learn MIDI — move a hardware control'}
+                      onclick={() => midiArmed ? cancelMidiLearn() : learnControlSlotMidi(selectedPage.pageId, slot.slotId)}>
+                      <KeyboardMusic size={16} strokeWidth={1.75} aria-hidden="true" />
+                    </button>
+                    <button type="button" class:armed={paramArmed} aria-pressed={paramArmed}
+                      data-testid={paramArmed ? 'param-learn-armed' : 'param-learn'}
+                      aria-label={`${paramArmed ? 'Cancel pick' : 'Pick parameter'} for slot ${slotIndex + 1}`}
+                      title={paramArmed ? 'Cancel parameter pick' : 'Pick parameter — move a plug-in control'}
+                      onclick={() => paramArmed ? cancelLearnControlSlotParameter() : learnControlSlotParameter(selectedPage.pageId, slot.slotId)}>
+                      <Crosshair size={16} strokeWidth={1.75} aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               {/each}
             </div>
+            <div class="pages-footer">{selectedPage.name}</div>
           {/if}
         {:else}
           <div class="empty-hint">No pages yet — a page holds eight control slots for hardware and macros.</div>
@@ -1437,11 +1318,22 @@
     </section>
   </div>
 
+  {#if activeUtility === 'library'}
+    <aside class="rack-library" data-testid="host-library-sidebar" aria-label="Library">
+      <div class="utility-drawer-head"><strong>Library</strong>
+        <button type="button" class="ghost utility-close" aria-label="Close Library"
+          data-testid="host-library-close" onclick={() => activeUtility = ''}>×</button>
+      </div>
+      <div class="utility-drawer-body"><HostLibraryPanel onShowSounds={showSounds} /></div>
+    </aside>
+  {/if}
+  </div>
+
   <!-- The dock. Everything that edits ONE THING lives here rather than stacked down the
        rack column: the part's zone, its MIDI modules, its inserts, its routing, the
        parameter view, and the rack-wide chains. The column above is a list of parts you
        pick from; this is what you picked. Tabs, not scrolling, is the whole point. -->
-  <div class="host-dock" class:collapsed={!dockOpen} data-testid="host-dock"
+  <div class="host-dock" class:collapsed={!dockOpen} class:sounds-dock={dockTab === 'sounds'} data-testid="host-dock"
        style={dockOpen ? `height:${dockHeight}px` : null} aria-label="Editor dock">
     {#if dockOpen}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1458,13 +1350,82 @@
                 data-testid={`dock-tab-${tab.id}`}
                 onclick={() => selectDockTab(tab.id)}>{tab.label}</button>
       {/each}
-      <span class="dock-subject">{dockSubject}</span>
+      {#if !dockOpen || dockTab === 'rack'}
+        <span class="dock-subject">{dockSubject}</span>
+      {/if}
+      {#if dockTab === 'sounds'}
+        <button type="button" class="manage-library" data-testid="sounds-manage-library"
+          aria-expanded={activeUtility === 'library'} onclick={() => activeUtility = 'library'}>Manage library</button>
+      {/if}
+      <button type="button" class="ghost dock-expand" data-testid="dock-expand"
+              aria-label={dockExpanded ? 'Restore dock height' : 'Expand dock'} aria-pressed={dockExpanded}
+              onclick={toggleDockExpanded}>{dockExpanded ? '↙' : '↗'}</button>
       <button type="button" class="ghost dock-collapse" data-testid="dock-collapse"
               title={dockOpen ? 'Collapse the dock' : 'Open the dock'}
               onclick={() => (dockOpen = !dockOpen)}>{dockOpen ? '▾' : '▴'}</button>
     </div>
 
     {#if dockOpen}
+      {#if dockTab !== 'rack'}
+        <div class="dock-target-context" data-testid="dock-target-context">
+          {#if dockTab === 'params' && paramContext && !paramContext.part}
+            <span class="target-owner" data-testid="target-owner">{paramContext.ownerLabel}</span>
+            {#if focusedPart}<button type="button" class="ghost" onclick={() => paramTargetId = focusedPart.partId}>Back to part</button>{/if}
+          {:else}
+            <HostPartPicker {parts} partId={focusedPartId || ''}
+              label={dockTab === 'sounds' ? 'DESTINATION' : 'EDITING'}
+              ariaLabel={dockTab === 'sounds' ? 'Sounds target part' : 'Editing part'}
+              onchange={(id) => focusRackPart(id, { followEditor: false })} />
+          {/if}
+          {#if dockTab === 'sounds'}
+            <div class="sound-save-actions">
+      <!-- A hardware part saves the patch it captured. The library is where a sound lives
+           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
+           in one list. -->
+      <button type="button"
+              disabled={!(focusedPart?.hasInstrument
+                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
+              title={focusedPart?.hasInstrument ? `Save ${partTitle(focusedPart)}'s current instrument settings as a preset in the library`
+                     : focusedPart?.hardware
+                       ? (focusedPart.hardwarePatchBytes > 0
+                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
+                            : 'Capture a patch from the synth first (Routing tab)')
+                       : 'Focus a part with an instrument first'}
+              onclick={() => saveUserPreset(focusedPart.partId)}
+              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save patch' : 'Save preset'}</button>
+      <button type="button"  disabled={!focusedPart?.hasInstrument}
+              title={focusedPart?.hasInstrument
+                     ? `Save ${partTitle(focusedPart)} with its instrument settings, MIDI modules and insert effects to the library`
+                     : 'Focus a part with an instrument first'}
+              onclick={() => saveChainToLibrary(focusedPart.partId)}
+              data-testid="host-save-chain">Save chain</button>
+      <button type="button"  onclick={() => saveRackToLibrary()}
+              title="Save the complete Hostage rack and performance settings to the library"
+              data-testid="host-save-rack">Save rack</button>
+
+            </div>
+          {/if}
+          {#if dockTab === 'params' && paramContext}
+            <span class="target-separator" aria-hidden="true">›</span>
+            {#if paramContext.effect}
+              <PluginTile ceId={paramContext.effect.pluginCeId} name={paramContext.effect.pluginName}
+                vendor={paramContext.effect.pluginVendor} size={28} />
+            {/if}
+            <select class="parameter-target" aria-label="Parameter target" value={paramTargetId}
+              onchange={(event) => paramTargetId = event.currentTarget.value}>
+              {#if paramContext.part}<option value={paramContext.part.partId}>{paramContext.part.hardware ? 'Hardware / mixer' : paramContext.part.hasInstrument ? 'Instrument' : 'Part mixer'}</option>{/if}
+              {#each ownerEffects as target (target.effect.effectId)}
+                <option value={target.effect.effectId} disabled={!target.effect.hasProcessor}>{target.label}{!target.effect.hasProcessor ? ' (unavailable)' : ''}</option>
+              {/each}
+            </select>
+            <span class="target-context-path" data-testid="target-context-path">{paramContext.ownerLabel}{paramContext.effect ? ` › ${paramContext.label}` : ''}</span>
+            <button type="button" class="ghost target-open-editor" disabled={paramContext.effect ? !paramContext.effect.hasProcessor : !paramContext.part?.hasInstrument}
+              onclick={() => paramContext.effect ? toggleEffectEditor(paramTargetId) : toggleEditor(paramContext.part)}>{$hostState.editorOpenPartIds.includes(paramTargetId) ? 'Close editor' : 'Open editor'}</button>
+          {:else if dockTab === 'inserts'}
+            <span class="target-context-path">Insert chain</span>
+          {/if}
+        </div>
+      {/if}
       <div class="dock-body" data-testid="dock-body">
         <div class="dock-body-content" bind:this={dockContentElement}>
         <!-- Declared before anything renders it: the insert chain is drawn three times
@@ -1523,6 +1484,7 @@
                                             : floatEditor(effect.effectId))}>⧉</button>
                   <button type="button" class="toggle" disabled={!effect.hasProcessor}
                           class:on={paramTargetId === effect.effectId}
+                          aria-label={`Inspect insert ${index + 1} ${effect.pluginName} parameters`}
                           title="Inspect this effect's parameters"
                           onclick={() => { paramTargetId = effect.effectId; selectDockTab('params'); }}>P</button>
                   <button type="button" class="ghost danger" class:confirming={pendingDestructive === `effect:${effect.effectId}`}
@@ -1531,18 +1493,24 @@
                     {pendingDestructive === `effect:${effect.effectId}` ? 'Confirm' : '×'}
                   </button>
                   <span class="fx-name" title={effect.pluginVendor}>
-                    {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}
+                    <PluginTile ceId={effect.pluginCeId} name={effect.pluginName} vendor={effect.pluginVendor} size={24} />
+                    <span>{String(index + 1).padStart(2, '0')} · {effect.pluginName || 'Loading…'}{#if effect.unresolved} (missing){/if}</span>
                   </span>
                 </div>
               {/each}
             </div>
           {/snippet}
 
-        {#if !focusedPart && dockTab !== 'rack' && dockTab !== 'surface'}
+        {#if !focusedPart && dockTab !== 'rack' && dockTab !== 'surface' && dockTab !== 'sounds'}
           <div class="empty-hint">Focus a rack part to edit it.</div>
         {/if}
 
-        {#if dockTab === 'zone'}
+        {#if dockTab === 'sounds'}
+          <SoundBrowser bind:this={soundBrowser} {focusedPart} partTitle={soundTargetTitle}
+                        onManageLibrary={() => activeUtility = 'library'}
+                        auditionOn={audition.enabled}
+                        onToggleAudition={() => setPresetAudition({ enabled: !audition.enabled })} />
+        {:else if dockTab === 'zone'}
         {#if focusedPart}
           <div class="midi-zone">
             <strong>MIDI zone — {partTitle(focusedPart)}</strong>
@@ -1623,8 +1591,8 @@
           <div class="hw-config" data-testid="host-hardware">
             <div class="fx-head">
               <strong>External hardware — {partTitle(focusedPart)}</strong>
-              <button type="button" class="ghost" title="Back to a software part (identity and zones stay)"
-                      onclick={() => clearHardware(focusedPart.partId)}>Make software part</button>
+              <HostConfirmButton identity={JSON.stringify([focusedPart.partId])} type="button" class="ghost" title="Back to a software part (identity and zones stay)"
+                      onclick={() => clearHardware(focusedPart.partId)}>Make software part</HostConfirmButton>
             </div>
             {#if focusedPart.midiOutError}
               <div class="hw-error" role="alert">{focusedPart.midiOutError}</div>
@@ -1717,9 +1685,9 @@
                   <button type="button" disabled={focusedPart.hardwarePatchBytes === 0}
                           title="Send the captured patch to the synth now"
                           onclick={() => sendHardwarePatch(focusedPart.partId)}>Send patch</button>
-                  <button type="button" class="ghost" disabled={focusedPart.hardwarePatchBytes === 0}
+                  <HostConfirmButton identity={JSON.stringify([focusedPart.partId])} type="button" class="ghost" disabled={focusedPart.hardwarePatchBytes === 0}
                           title="Forget the captured patch (the part stays hardware)"
-                          onclick={() => clearHardwarePatch(focusedPart.partId)}>Forget</button>
+                          onclick={() => clearHardwarePatch(focusedPart.partId)}>Forget</HostConfirmButton>
                   <label class="hw-policy">On session open
                     <select value={focusedPart.hardwareRestore}
                             onchange={(e) => setHardwareRestorePolicy(focusedPart.partId, e.currentTarget.value)}>
@@ -1847,7 +1815,7 @@
         {#if paramTargetId && $hostParameters.partId === paramTargetId}
           <div class="param-view" data-testid="host-parameters">
             <div class="param-head">
-              <strong>Parameters — {paramTargetName}</strong>
+              <strong>Parameters</strong>
               <input type="search" placeholder="Search parameters…" bind:value={paramSearch} />
               <button type="button" class="toggle" class:on={paramAssignedOnly}
                       title="Only parameters already on a knob slot or macro"
@@ -2317,7 +2285,6 @@
   button.utility-close { padding: 2px 7px; font-size: 18px; line-height: 1; }
   .utility-drawer-body { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
   .utility-drawer .device-panel,
-  .utility-drawer .library-panel,
   .utility-drawer .project-panel {
     margin: 0;
     max-height: none;
@@ -2325,7 +2292,6 @@
   }
   .utility-drawer .device-panel { flex-direction: column; gap: 16px; }
   .utility-drawer .device-output { min-width: 0; width: 100%; }
-  .utility-drawer .library-panel { height: 100%; }
   .utility-drawer :global(.product-panel),
   .utility-drawer :global(.reliability-panel),
   .utility-drawer :global(.licence-panel) {
@@ -2421,68 +2387,6 @@
   }
   .project-build-log.failed { color: #e4b3b3; border-color: #7a4a4a; }
 
-  .library-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 8px 14px 0;
-    padding: 10px;
-    border: 1px solid #3b4652;
-    border-radius: 6px;
-    background: #171a1d;
-    max-height: 340px;
-  }
-  .library-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .library-head input { flex: 1; min-width: 180px; }
-  .library-filters { display: flex; gap: 4px; }
-  .library-head .playing { border-color: #ef8b35; color: #ffd3ab; }
-  .audition-config {
-    display: flex; align-items: end; gap: 10px; flex-wrap: wrap;
-    padding: 7px 9px;
-    border: 1px solid #3b4652;
-    background: #171c21;
-  }
-  .audition-config strong { align-self: center; color: #d7dde3; font-size: 12px; }
-  .audition-config label {
-    display: flex; flex-direction: column; gap: 3px;
-    color: #96a2ad; font-size: 10px; text-transform: uppercase;
-  }
-  .audition-config select { width: 112px; }
-  .audition-config input[type="number"] { width: 66px; }
-  .number-with-note, .number-unit { display: inline-flex; align-items: center; gap: 4px; }
-  .number-with-note small, .number-unit small { color: #b7c1ca; font-size: 11px; text-transform: none; }
-  .audition-help { align-self: center; color: #78848f; font-size: 11px; }
-  .sound-compare {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    padding: 8px 10px;
-    border: 1px solid #d66f24;
-    background: linear-gradient(90deg, #2a1c13, #171c21 42%);
-  }
-  .compare-slot {
-    display: inline-flex; align-items: baseline; justify-content: center;
-    min-width: 44px; color: #ff9a47; font-size: 22px; font-weight: 750;
-  }
-  .compare-slot small { color: #a87955; font-size: 11px; }
-  .compare-copy { display: flex; flex: 1 1 180px; min-width: 150px; flex-direction: column; }
-  .compare-copy small { color: #9f8877; font-size: 10px; }
-  .compare-copy strong { color: #f1f3f5; font-size: 13px; }
-  .compare-keep { border-color: #d66f24; color: #ffd7b7; }
-  .library-counts { color: #96a2ad; font-size: 12px; }
-  .library-capture { display: flex; gap: 8px; }
-  .library-paths { display: flex; flex-direction: column; gap: 4px; }
-  .library-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-  .library-row { display: flex; align-items: center; gap: 8px; min-height: 34px; }
-  .library-row.comparing { outline: 1px solid #d66f24; background: #241b15; }
-  .library-id { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .library-name { font-weight: 600; font-size: 12px; }
-  .library-id.clickable { cursor: pointer; }
-  .library-id.clickable:hover .library-name { color: #7fb4e0; }
-  .library-detail { color: #96a2ad; font-size: 12px; }
-  .library-reason { color: #e1aaaa; font-size: 12px; }
-  .library-row.unavailable .library-name { color: #8a939d; }
-  button.star { padding: 2px 4px; font-size: 14px; color: #7d8894; }
-  button.star.on { color: #d5a93a; }
-
   .host-error {
     display: flex;
     align-items: center;
@@ -2496,8 +2400,24 @@
     color: #e4b3b3;
   }
 
+  .host-save-notice { flex: none; margin: 8px 14px 0; padding: 6px 10px;
+    color: var(--host-text); background: var(--host-surface); border-left: 2px solid var(--host-accent);
+    font-size: 12px; overflow-wrap: anywhere; }
+
+  .rack-workspace { flex: 1; min-height: 0; min-width: 0; display: flex; overflow: hidden; }
+  .host-edit-actions { display: flex; align-items: center; gap: 4px; }
+  .rack-library { flex: 0 0 330px; width: 330px; min-width: 0; display: flex; flex-direction: column;
+    margin: 12px 14px 12px 0; border: 1px solid var(--host-line); border-radius: 4px; background: var(--host-surface); }
+  .manage-library { margin-left: auto; }
+  .sound-save-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-left: auto; }
+  @media (max-width: 780px) {
+    .rack-workspace { flex-direction: column; overflow: auto; }
+    .rack-workspace .host-columns { flex: none; min-height: 180px; }
+    .rack-library { flex: none; width: auto; max-height: 300px; margin: 0 14px 12px; }
+  }
   .host-columns {
     flex: 1;
+    min-width: 0;
     display: flex;
     gap: 12px;
     min-height: 0;
@@ -2551,6 +2471,16 @@
     white-space: nowrap;
   }
   .dock-collapse { padding: 2px 8px; }
+  .dock-target-context { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; padding: 7px 12px; background: var(--host-surface); border-bottom: 1px solid var(--host-line-soft); min-width: 0; }
+  .parameter-target { min-width: 0; max-width: 230px; }
+  .target-owner { font-size: 12px; font-weight: 600; }
+  .target-separator, .target-context-path { color: var(--host-text-soft); }
+  .target-context-path { font-size: 11px; overflow-wrap: anywhere; }
+  .target-open-editor { margin-left: auto; }
+  .dock-tabs { flex-wrap: wrap; }
+  .sounds-dock .dock-body { padding: 0; overflow: hidden; display: flex; }
+  .sounds-dock .dock-body-content { flex: 1; min-height: 0; gap: 0; }
+  .sounds-rack:not(.catalogue-open) .browser-column { display: none; }
   .dock-body {
     flex: 1;
     min-height: 0;
@@ -2930,7 +2860,8 @@
   .fx-row .ghost { flex: none; padding: 2px 6px; font-size: 11px; line-height: 18px; }
   /* Running is green, bypassed is red. Struck-through text said "deleted" — the one state
      this row can never be in — and it took reading the Byp button to find out otherwise. */
-  .fx-name { flex: 1; color: #8fc4a8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fx-name { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; color: #8fc4a8; overflow: hidden; white-space: nowrap; }
+  .fx-name > span { overflow: hidden; text-overflow: ellipsis; }
   .fx-row.bypassed .fx-name { color: #d68a8a; }
   .fx-row.unresolved .fx-name { color: #d6a3a3; font-style: italic; }
   .macro-row { display: flex; align-items: center; gap: 8px; }
@@ -2965,34 +2896,68 @@
   .macro-target.unresolved { color: #d6a3a3; border-color: #7a4a4a; }
 
   .pages {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border-top: 1px solid #2c343d;
-    padding-top: 8px;
+    --slot-action-size: 28px;
+    container: control-pages / inline-size;
+    min-width: 0; padding: 14px;
+    background: var(--host-surface); border: 1px solid var(--host-line-soft); border-radius: 6px;
   }
-  .pages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .pages-actions { display: flex; gap: 6px; }
-  .page-auto { color: #96a2ad; font-size: 11px; }
-  .page-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-  .page-tab { display: inline-flex; align-items: center; gap: 2px; border: 1px solid #3b4652; border-radius: 4px; padding: 0 2px; }
-  .page-tab.on { border-color: #5b9bd5; background: #24313d; }
-  .page-name { box-sizing: border-box; width: 104px; min-width: 0; background: none; color: inherit;
-               border: none; padding: 3px 6px; }
-  .slot-list { display: flex; flex-direction: column; gap: 4px; }
-  .slot-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-  .slot-id { flex: 0 0 20px; color: #7d8894; font-size: 11px; }
-  .slot-name { flex: 0 0 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .slot-part { color: #7d8894; font-size: 11px; }
-  .slot-row input[type='range'] { flex: 1; min-width: 60px; }
-  .slot-empty { color: #66707b; font-size: 11px; }
-  .slot-warning { flex: 1; color: #d6a3a3; font-size: 11px; }
-  .slot-row.unresolved .slot-name { color: #d6a3a3; }
-  .midi-learn { font-size: 10px; color: #9aa5b1; }
-  .midi-learn.armed { color: #d9a13c; border-color: #d9a13c; animation: midi-learn-pulse 1s ease-in-out infinite; }
+  .pages-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .pages-head > strong { font-size: 16px; font-weight: 600; }
+  .pages-count, .page-auto, .pages-footer { color: var(--host-text-soft); font-size: 11px; }
+  .pages-actions { display: flex; gap: 6px; margin-left: auto; }
+  .pages button { min-height: 30px; padding: 5px 8px; white-space: nowrap; font-size: 12px; }
+  .page-tabs { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 12px; }
+  .page-tab { display: inline-flex; align-items: center; border: 1px solid var(--host-line-soft); border-radius: 4px; overflow: hidden; background: var(--host-field); }
+  .page-tab.on { border-color: var(--host-accent); background: var(--host-accent-surface); }
+  .page-tab button { border: 0; border-left: 1px solid var(--host-line-soft); border-radius: 0; background: transparent; min-width: 30px; align-self: stretch; }
+  .page-auto { padding-right: 6px; }
+  .page-name { box-sizing: border-box; width: 114px; min-width: 0; min-height: 32px; background: none; color: inherit; border: none; padding: 6px 9px; }
+  .slot-columns, .slot-row { display: grid; grid-template-columns: 25px minmax(150px, 1fr) 102px 100px calc(var(--slot-action-size) * 2 + 6px); gap: 9px; align-items: center; }
+  .slot-columns { font-size: 10px; letter-spacing: .06em; color: var(--host-text-soft); padding: 8px 6px; border-block: 1px solid var(--host-line-soft); }
+  .slot-row { box-sizing: border-box; min-height: 58px; padding: 8px 6px; border-bottom: 1px solid var(--host-line-soft); font-size: 12px; }
+  .slot-row.armed { background: var(--host-accent-surface); }
+  .slot-id { color: var(--host-text-soft); font-variant-numeric: tabular-nums; font-size: 11px; }
+  .slot-assignment { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .slot-assignment-text { min-width: 0; flex: 1; }
+  .slot-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .slot-name.slot-empty { font-weight: 400; color: var(--host-text-soft); }
+  .slot-owner { display: flex; align-items: center; gap: 5px; min-width: 0; margin-top: 2px; color: var(--host-text-soft); font-size: 11px; }
+  .slot-owner > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-thumbnail { position: relative; flex: none; width: 25px; height: 18px; border-left: 2px solid var(--slot-color); border-radius: 2px; overflow: hidden; }
+  .pages .slot-clear { min-height: 25px; min-width: 25px; padding: 0 3px; background: transparent; flex: none; }
+  .slot-value { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .slot-value input { width: 100%; min-width: 0; margin: 0; height: 17px; accent-color: var(--host-accent); }
+  .slot-value output, .slot-dash { text-align: center; font-size: 11px; color: var(--host-text-soft); font-variant-numeric: tabular-nums; }
+  .slot-midi { display: flex; align-items: center; justify-content: space-between; gap: 3px; font-size: 11px; color: var(--host-text-soft); min-width: 0; }
+  .slot-midi strong { display: block; color: var(--host-text); font-size: 11px; font-weight: 500; }
+  .slot-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .host-workspace.host-workspace .pages .slot-actions button { display: inline-flex; align-items: center; justify-content: center; flex: none;
+    box-sizing: border-box; width: var(--slot-action-size); height: var(--slot-action-size);
+    min-width: var(--slot-action-size); min-height: var(--slot-action-size); padding: 0; }
+  .host-workspace.host-workspace .pages .slot-actions button.armed { color: var(--host-accent); border-color: var(--host-accent); background: var(--host-accent-surface); }
+  .slot-warning { display: block; color: var(--host-danger); font-size: 11px; }
+  .slot-listening { display: block; color: var(--host-accent); font-size: 11px; margin-top: 2px; }
+  .pages-footer { padding-top: 10px; }
+  @container control-pages (max-width: 620px) {
+    .slot-columns { grid-template-columns: 25px 1fr calc(var(--slot-action-size) * 2 + 6px); }
+    .slot-value-title, .slot-midi-title { display: none; }
+    .slot-row { grid-template-columns: 25px minmax(100px, 1fr) calc(var(--slot-action-size) * 2 + 6px); row-gap: 7px; }
+    .slot-assignment { grid-column: 2; }
+    .slot-actions { grid-column: 3; grid-row: 1 / span 2; }
+    .slot-value { grid-column: 2; grid-row: 2; max-width: 140px; }
+    .slot-midi { grid-column: 2 / 4; grid-row: 3; justify-content: flex-start; gap: 8px; }
+    .slot-midi strong { display: inline; margin-right: 6px; }
+    .slot-midi::before { content: 'MIDI'; font-size: 10px; letter-spacing: .04em; }
+  }
+  @container control-pages (max-width: 430px) {
+    .pages-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
+  }
+  @media (pointer: coarse) {
+    .pages { --slot-action-size: 44px; }
+    .pages button { min-height: 44px; }
+    .pages .slot-clear { min-width: 30px; }
+  }
   @keyframes midi-learn-pulse { 50% { opacity: 0.45; } }
-  .midi-cc { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: #7fb4e0;
-             background: #22303c; border-radius: 3px; padding: 1px 4px; white-space: nowrap; }
 
   /* A wide vendor editor takes at most half of CEditor, leaving Hostage about 1024px on a
      common 2048px desktop. The catalogue tolerates the smaller share; rack cards do not —

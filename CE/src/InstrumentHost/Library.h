@@ -127,7 +127,7 @@ struct LibraryRecord
 {
     juce::String recordId;        // stable, minted once
     juce::String type;            // "preset" | "rack" | "chain"
-    juce::String sourceType;      // "vstpreset" | "userState" | "rackCapture" | "chainCapture"
+    juce::String sourceType;      // vendor: "vstpreset" | "nksf" | "fxp" | "spire" | "h2p"; captures/programs below
     juce::String sourceLocator;   // file path for vendor sources; empty for captured state
     juce::String name;
     juce::String manufacturer;
@@ -296,7 +296,7 @@ public:
     bool removeSmartCollection (const juce::String& collectionId);
 
     void loadFrom (const juce::File& file);
-    void saveTo (const juce::File& file) const;
+    bool saveTo (const juce::File& file) const;
 
     juce::var toVar() const;
     static Library fromVar (const juce::var& stored);

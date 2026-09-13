@@ -166,10 +166,10 @@ test('the explicit path still takes the target from whoever holds it', () => {
   clearEditorTarget();
 });
 
-test('every tab arms from the selection through the idle path, not the explicit one', () => {
+test('tabs that arm on mount use the idle path, not the explicit one', () => {
   // The mount-time arm is the one that must not steal. Read out of the shipped tabs so a new tab
   // copying the old shape fails here rather than breaking the opener that points at it.
-  const tabs = ['EffectsTab', 'TypographyTab', 'AssetsTab', 'ScreenTab', 'ApiTab', 'AnimationTab', 'DesignerTab'];
+  const tabs = ['TypographyTab', 'AssetsTab', 'ApiTab', 'AnimationTab', 'DesignerTab'];
   for (const tab of tabs) {
     const source = src(`components/${tab}.svelte`);
     const mount = source.slice(source.indexOf('onMount(() => {'), source.indexOf('});', source.indexOf('onMount(() => {')));

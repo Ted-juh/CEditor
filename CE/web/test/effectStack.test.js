@@ -17,6 +17,7 @@ import {
   buildComponentRows,
   reorderComponentShadows,
   availableDomains,
+  readSection,
   visibleFields,
   allEffectFieldLabels,
   withEffectsOff,
@@ -26,6 +27,16 @@ import {
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+test('settings read sections and individual shadow entries, including zero values', () => {
+  const item = { enabled: false, blur: 0, offsetX: -12, colour: '80123456' };
+  const control = { _children: { Effects: { _children: { Shadows: { items: [item] } } } } };
+  const row = buildComponentRows(control).rows[0];
+  assert.equal(readSection(control, row.root), item);
+  assert.equal(readSection(control, `${row.root}.blur`), 0);
+  assert.equal(readSection(control, `${row.root}.enabled`), false);
+  assert.equal(readSection(control, 'Effects.Shadows.items.1'), null);
+});
 
 /** A control carrying the real shipped Text section, so the defaults under test are the defaults
  *  users actually have. */

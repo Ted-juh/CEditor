@@ -12,6 +12,9 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginScannerCoordinator.h"
 #include "InstrumentRackHost.h"
+#include "HostEditHistory.h"
+#include "MidiPickup.h"
+#include "SetlistSoundcheck.h"
 #include "ParameterModel.h"
 #include "Library.h"
 #include "SnapshotStore.h"
@@ -796,6 +799,8 @@ public:
         read now, not whatever the callback once saw. The owner pumps this from a UI-rate
         timer; tests call it directly. */
     void drainParameterEvents();
+    // The same UI-rate pump emits instrumentHostMeters { channels:[{id,left,right}] }.
+    // Peaks are linear, may exceed unity, and never enter the saved Performance state.
 
 private:
     struct ClassInfoForCommit
@@ -804,6 +809,10 @@ private:
     };
 
     void emitState();
+    juce::String historyModel() const;
+    juce::String historySnapshot();
+    juce::String historyBlockedReason();
+    void restoreEditHistory (bool redo);
     void emitError (const juce::String& message);
     /** Not const, and that is the licence block's doing: the licence store is built on first
         need because its public key lives in the Host Project, which is itself loaded lazily.
@@ -877,7 +886,13 @@ private:
         cannot. Void when the part has none. */
     juce::var morphProjection (const RackPart& part, float amount) const;
     void emitLibrary (const LibraryQuery& query);
+    juce::String saveCapturedLibraryRecord (LibraryRecord record);
     void scanVstPresets();
+    void scanCataloguePrograms (std::shared_ptr<juce::Array<PluginClassRecord>>, int index);
+    bool ingestProcessorPrograms (juce::AudioProcessor&, const PluginClassRecord&);
+    std::function<void (const juce::String&)> beginLibraryLoad (const LibraryRecord&, const juce::String& partId);
+    void loadEffectPresetRecord (const LibraryRecord&, const juce::String& partId,
+                                 bool addNew, std::function<void()> afterLoaded = {});
     /** Availability, computed live against the catalogue (caller holds no locks; this takes
         catalogLock itself): empty = loadable, else the actionable reason. */
     juce::String recordUnavailableReason (const LibraryRecord& record) const;
@@ -1221,6 +1236,25 @@ private:
     /** Fills a scene from the rig as it stands right now. */
     void captureSceneFromRack (perf::Scene& scene);
     void refreshSetlistPreloads();
+    struct SoundcheckEntry
+    {
+        juce::StringArray issues;
+        juce::String basis, measurementError;
+        juce::int64 checkedAt = 0, measuredAt = 0;
+        SoundcheckMeter::Reading level;
+    };
+    std::map<juce::String, SoundcheckEntry> soundcheckEntries;
+    juce::String soundcheckItemId;
+    uint64_t soundcheckToken = 0;
+    double soundcheckStartedMs = 0, soundcheckEmittedMs = 0;
+    SoundcheckMeter::Reading soundcheckReading;
+    void checkSetlistSoundcheck();
+    void startSoundcheck (const juce::String& itemId);
+    void finishSoundcheck();
+    void tickSoundcheck();
+    juce::String soundcheckCurrentItem() const;
+    juce::String soundcheckBlockedReason() const;
+    juce::var soundcheckPayload();
     void pumpSetlistPreloadQueue();
     void tickPendingSetlistRecall();
     void drainProcessorFailures();
@@ -1273,6 +1307,11 @@ private:
     juce::StringArray editorTargetIds; // instrument/effect editors stacked in the docked pane
     juce::StringArray floatingEditorIds;   // parts whose editors float in their own windows
     bool sessionRestored = false;
+    HostEditHistory editHistory;
+    bool restoringEditHistory = false;
+    int historyPendingLoads = 0;
+    bool historyRestorationPending = false;
+    juce::StringArray historyUnloadedParts;
     // Stage Lock is deliberately session-only: reopening the application must not strand the
     // owner in a performance view. The unlock clock is native so a WebView click cannot
     // bypass the hold gesture by sending `enabled: false` directly.
@@ -1634,7 +1673,11 @@ private:
     // on the controlling thread, where MIDI learn and the bound-slot writes actually happen.
     // A note rides the same queue with cc = -1: a pad that sends notes is a controller too,
     // and a key is a pad if you say so. Notes are never coalesced — each press counts.
-    struct PendingCc { int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false; };
+    struct PendingCc {
+        int channel = 0; int cc = 0; int value = 0; int note = -1; bool on = false;
+        int relativeDelta = 0, minimum = 0, maximum = 0;
+        int relativeMinimum = 0, relativeMaximum = 127;
+    };
     std::vector<PendingCc> pendingCcs;
 
     // MIDI-learn armed target — controlling thread only, like every other piece of service
@@ -1715,6 +1758,26 @@ private:
         anything outside a pair of delimiters is ignored rather than guessed at. */
     static std::vector<juce::MidiMessage> splitSysexBlob (const juce::MemoryBlock& blob);
     void drainControllerEvents();
+    struct PickupRuntime
+    {
+        ControlBinding binding;
+        int cc = -1, channel = 0;
+        MidiPickup pickup;
+        int reportedDirection = 0;
+        bool matches (const ControlSlot& slot) const
+        {
+            const auto& b = slot.binding;
+            return slot.midiPickup && ! slot.midiRelative && ! b.toggle && slot.midiNote < 0
+                && slot.midiCc >= 0 && b.rangeMin != b.rangeMax
+                && cc == slot.midiCc && channel == slot.midiChannel
+                && binding.partId == b.partId && binding.pluginCeId == b.pluginCeId
+                && binding.parameterId == b.parameterId && binding.rangeMin == b.rangeMin
+                && binding.rangeMax == b.rangeMax && binding.inverted == b.inverted;
+        }
+    };
+    std::map<std::pair<juce::String, juce::String>, PickupRuntime> midiPickups;
+    float controlBindingPosition (const ControlBinding& binding);
+    void refreshMidiPickups();
     void emitMidiLearn (bool armed, const juce::String& pageId, const juce::String& slotId,
                         int cc, int channel, int note = -1);
     bool audioRunning = false;
@@ -1724,6 +1787,11 @@ private:
     std::shared_ptr<std::atomic<bool>> alive { std::make_shared<std::atomic<bool>> (true) };
 
     std::thread scanThread;
+    std::thread libraryScanThread;
+    bool libraryScanBusy = false;
+    bool libraryScanFinished = false;
+    juce::Array<juce::var> libraryScanReport;
+    juce::uint64 libraryLoadSerial = 0;
     std::atomic<bool> scanBusy { false };
     std::atomic<bool> stopRequested { false };
 

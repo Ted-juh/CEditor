@@ -1052,11 +1052,32 @@ export function onInstrumentHostParamValues(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Stereo peak intervals, independent of rack/document snapshots. */
+export function onInstrumentHostMeters(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostMeters', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** The Stage 4 library ({ records, counts, paths, query, type }), answered by getLibrary and
     after every library mutation. */
 export function onInstrumentHostLibrary(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('instrumentHostLibrary', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Emitted only after a captured preset, chain or rack was written to the library file. */
+export function onInstrumentHostLibrarySaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLibrarySaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Result of loading a library preset, including asynchronous instrument construction. */
+export function onInstrumentHostLibraryLoad(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostLibraryLoad', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 

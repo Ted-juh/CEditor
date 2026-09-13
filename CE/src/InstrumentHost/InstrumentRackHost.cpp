@@ -235,7 +235,7 @@ InstrumentRackHost::InstrumentRackHost()
     // The Performance fader sits at the very end of the main pair, after the master chain:
     // it is the product's level, not another insert, so nothing on the master bus can be
     // driven by it and it cannot be bypassed by an effect that is.
-    masterGainNode = graph.addNode (std::make_unique<GainPanProcessor>());
+    masterGainNode = graph.addNode (std::make_unique<GainPanProcessor> (true, &soundcheckMeter));
 
     // The audition preview. It exists from the start and is silent until something is played
     // through it, so no rewiring is needed to begin previewing — which matters, because the
@@ -257,6 +257,26 @@ void InstrumentRackHost::setAuditionTarget (const juce::String& partId)
 }
 
 InstrumentRackHost::~InstrumentRackHost() = default;
+
+juce::Array<InstrumentRackHost::MeterReading> InstrumentRackHost::drainMeters()
+{
+    juce::Array<MeterReading> readings;
+    const auto append = [&readings] (const juce::String& id, GainPanProcessor* processor)
+    {
+        if (processor == nullptr) return;
+        const auto peak = processor->drainMeter();
+        readings.add ({ id, peak.left, peak.right });
+    };
+    for (const auto& part : model.parts)
+        if (auto* lp = findLive (part.partId)) append (part.partId, lp->gain);
+    for (const auto& [id, node] : busLevelNodes)
+        append (id, static_cast<GainPanProcessor*> (node->getProcessor()));
+    for (const auto& [id, node] : returnLevelNodes)
+        append (id, static_cast<GainPanProcessor*> (node->getProcessor()));
+    if (masterGainNode != nullptr)
+        append ("@master", static_cast<GainPanProcessor*> (masterGainNode->getProcessor()));
+    return readings;
+}
 
 void InstrumentRackHost::prepare (double sampleRate, int blockSize, int numInputChannels)
 {
@@ -1366,6 +1386,17 @@ bool InstrumentRackHost::setSlotMidiNote (const juce::String& pageId, const juce
     return true;
 }
 
+bool InstrumentRackHost::setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
+                                            bool pickup, bool relative)
+{
+    auto* page = model.findPage (pageId);
+    auto* slot = page != nullptr ? page->findSlot (slotId) : nullptr;
+    if (slot == nullptr) return false;
+    slot->midiPickup = pickup;
+    slot->midiRelative = relative;
+    return true;
+}
+
 bool InstrumentRackHost::setSlotLatched (const juce::String& pageId, const juce::String& slotId,
                                          bool latched)
 {
@@ -1753,7 +1784,7 @@ void InstrumentRackHost::createLiveNodes (const RackPart& part)
     lp.filter = filter.get();
     lp.filterNode = graph.addNode (std::move (filter));
 
-    auto gain = std::make_unique<GainPanProcessor>();
+    auto gain = std::make_unique<GainPanProcessor> (true);
     lp.gain = gain.get();
     lp.gainNode = graph.addNode (std::move (gain));
 
@@ -1852,7 +1883,7 @@ void InstrumentRackHost::syncAuxNodes()
     {
         auto& node = returnLevelNodes[chain.returnId];
         if (node == nullptr)
-            node = graph.addNode (std::make_unique<GainPanProcessor>());
+            node = graph.addNode (std::make_unique<GainPanProcessor> (true));
         static_cast<GainPanProcessor*> (node->getProcessor())
             ->setVolumePan (chain.level, 0.0f, true);
     }
@@ -1872,7 +1903,7 @@ void InstrumentRackHost::syncAuxNodes()
     {
         auto& node = busLevelNodes[bus.busId];
         if (node == nullptr)
-            node = graph.addNode (std::make_unique<GainPanProcessor>());
+            node = graph.addNode (std::make_unique<GainPanProcessor> (true));
         static_cast<GainPanProcessor*> (node->getProcessor())
             ->setVolumePan (bus.level, 0.0f, true);
     }

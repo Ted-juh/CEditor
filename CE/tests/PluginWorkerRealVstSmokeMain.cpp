@@ -8,6 +8,7 @@
 
 #include "InstrumentHost/IsolatedPluginProxy.h"
 #include "InstrumentHost/PluginScannerCoordinator.h"
+#include "InstrumentHost/VendorPreset.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <iostream>
@@ -143,17 +144,17 @@ int main (int argc, char* argv[])
     SmokeResult result;
     result.phase = "arguments";
 
-    if (argc != 4 && argc != 5)
+    if (argc < 4 || argc > 6)
     {
         result.detail = "usage: CEditorPluginWorkerRealVstSmoke <scanner.exe> <worker.exe> "
-                        "<plugin.vst3> [exact-class-name-or-id]";
+                        "<plugin.vst3> [exact-class-name-or-id] [preset-file]";
         return finish (result);
     }
 
     const juce::File scanner (juce::String::fromUTF8 (argv[1]));
     const juce::File worker (juce::String::fromUTF8 (argv[2]));
     const juce::File module (juce::String::fromUTF8 (argv[3]));
-    const auto selector = argc == 5 ? juce::String::fromUTF8 (argv[4]) : juce::String();
+    const auto selector = argc >= 5 ? juce::String::fromUTF8 (argv[4]) : juce::String();
     result.module = module.getFullPathName();
 
     if (! scanner.existsAsFile())
@@ -239,6 +240,46 @@ int main (int argc, char* argv[])
         result.phase = "prepare";
         processor->prepareToPlay (sampleRate, blockSize);
 
+        if (argc == 6)
+        {
+            result.phase = "vendor preset";
+            juce::MemoryBlock before;
+            processor->getStateInformation (before);
+            std::vector<float> beforeParameters;
+            for (auto* parameter : processor->getParameters()) beforeParameters.push_back (parameter->getValue());
+            if (! isolated->applyVstPreset (juce::File (juce::String::fromUTF8 (argv[5]))))
+                throw std::runtime_error ("worker refused the vendor preset");
+            juce::MemoryBlock after;
+            processor->getStateInformation (after);
+            if (after == before)
+                throw std::runtime_error ("preset returned success without changing the initial sound");
+            const auto preset = ceditor::host::readVendorPreset (juce::File (juce::String::fromUTF8 (argv[5])));
+            if (preset.sourceType == "h2p")
+            {
+                bool changed = false;
+                const auto& parameters = processor->getParameters();
+                for (int i = 0; i < parameters.size() && i < static_cast<int> (beforeParameters.size()); ++i)
+                    changed |= std::abs (parameters[i]->getValue() - beforeParameters[static_cast<size_t> (i)]) > 0.00001f;
+                if (! changed) throw std::runtime_error ("H2P changed its name but left the parameter cache unchanged");
+                const auto xml = juce::AudioProcessor::getXmlFromBinary (after.getData(), static_cast<int> (after.getSize()));
+                juce::MemoryBlock native;
+                const auto* component = xml != nullptr ? xml->getChildByName ("IComponent") : nullptr;
+                const auto filename = juce::File (juce::String::fromUTF8 (argv[5])).getFileName();
+                if (component == nullptr || ! native.fromBase64Encoding (component->getAllSubText())
+                    || ! juce::StringArray::fromLines (native.toString()).contains ("#pgm=" + filename))
+                    throw std::runtime_error ("H2P recall did not retain the real preset name");
+            }
+            if (preset.sourceType == "spire")
+                for (const auto& property : preset.parameters.getDynamicObject()->getProperties())
+                {
+                    bool matched = false;
+                    for (auto* parameter : processor->getParameters())
+                        if (parameter->getName (256) == property.name.toString())
+                            matched = std::abs (parameter->getValue() - static_cast<float> (property.value)) < 0.00001f;
+                    if (! matched) throw std::runtime_error ("Spire parameter differs from the preset file");
+                }
+        }
+
         result.phase = "audio and MIDI";
         const auto channels = juce::jmax (1, result.inputChannels, result.outputChannels);
         juce::AudioBuffer<float> audio (channels, blockSize);
@@ -261,10 +302,62 @@ int main (int argc, char* argv[])
         result.phase = "state";
         juce::MemoryBlock state;
         processor->getStateInformation (state);
+        const auto dumpPath = juce::SystemStats::getEnvironmentVariable ("HOSTAGE_SMOKE_STATE_DUMP", {});
+        if (dumpPath.isNotEmpty())
+        {
+            juce::File (dumpPath).replaceWithData (state.getData(), state.getSize());
+            juce::Array<juce::var> parameters;
+            for (const auto* parameter : processor->getParameters())
+            {
+                auto* value = new juce::DynamicObject();
+                value->setProperty ("name", parameter->getName (256));
+                value->setProperty ("value", parameter->getValue());
+                if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (parameter))
+                    value->setProperty ("id", hosted->getParameterID());
+                parameters.add (juce::var (value));
+            }
+            juce::File (dumpPath + ".parameters.json").replaceWithText (juce::JSON::toString (parameters));
+        }
         result.stateBytes = static_cast<int> (state.getSize());
         if (! state.isEmpty())
         {
+            std::vector<float> expected;
+            for (const auto* parameter : processor->getParameters()) expected.push_back (parameter->getValue());
+            if (argc == 6)
+            {
+                processor->releaseResources();
+                processor.reset();
+                processor = launchProxy (worker, workspace.getChildFile ("restore-worker"),
+                                         selected->descriptionXml, launchError);
+                if (processor == nullptr) throw std::runtime_error ("could not create state-restore worker");
+                isolated = dynamic_cast<ceditor::host::IsolatedPluginProxy*> (processor.get());
+                processor->prepareToPlay (sampleRate, blockSize);
+            }
             processor->setStateInformation (state.getData(), static_cast<int> (state.getSize()));
+            if (argc == 6)
+                for (int block = 0; block < 12; ++block)
+                {
+                    audio.clear(); midi.clear();
+                    processor->processBlock (audio, midi);
+                    juce::Thread::sleep (10);
+                }
+            if (dumpPath.isNotEmpty())
+            {
+                juce::MemoryBlock restored;
+                processor->getStateInformation (restored);
+                juce::File (dumpPath + ".restored").replaceWithData (restored.getData(), restored.getSize());
+            }
+            if (argc == 6)
+            {
+                const auto& parameters = processor->getParameters();
+                if (parameters.size() != static_cast<int> (expected.size()))
+                    throw std::runtime_error ("parameter inventory changed on state restore");
+                for (int i = 0; i < parameters.size(); ++i)
+                    if (std::abs (parameters[i]->getValue() - expected[static_cast<size_t> (i)]) > 0.00001f)
+                        throw std::runtime_error ("restored preset parameter differs: " + parameters[i]->getName (256).toStdString()
+                            + " expected " + std::to_string (expected[static_cast<size_t> (i)])
+                            + " got " + std::to_string (parameters[i]->getValue()));
+            }
             result.stateRestored = true;
         }
         if (! isolated->workerIsRunning())

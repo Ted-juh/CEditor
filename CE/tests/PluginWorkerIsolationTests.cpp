@@ -131,6 +131,18 @@ void testSupportedBlockSizeSoak (const juce::File& stub)
     processor->releaseResources();
 }
 
+void testProgramRefresh (const juce::File& stub)
+{
+    juce::String error;
+    auto processor = launch (stub, "NormalStub", error);
+    check (processor != nullptr, "program refresh worker starts");
+    if (processor == nullptr) return;
+    auto* isolated = dynamic_cast<ceditor::host::IsolatedPluginProxy*> (processor.get());
+    check (isolated != nullptr && isolated->refreshProgramList(), "refresh requests current program names from the worker");
+    check (processor->getNumPrograms() == 5002 && processor->getProgramName (5001) == "Refreshed 5001"
+           && processor->getCurrentProgram() == 5001, "refresh replaces the startup cache without truncating large banks");
+}
+
 void testNormalWorker (const juce::File& stub)
 {
     std::cout << "\nnormal isolated worker" << std::endl;
@@ -199,7 +211,9 @@ void testLargeParameterInventory (const juce::File& stub)
     check (processor->getParameters().size()
              == static_cast<int> (
                  ceditor::host::plugin_worker::maxParameterEventsPerBlock + 1),
-           "the proxy retains the complete parameter inventory");
+             "the proxy retains the complete parameter inventory");
+    check (processor->getNumPrograms() == 5001 && processor->getProgramName (5000) == "Program 5000",
+           "the initial worker metadata retains banks larger than 4096 programs");
 }
 
 void testDeadWorker (const juce::File& stub, const juce::String& mode, const char* label)
@@ -407,6 +421,7 @@ int main (int argc, char* argv[])
         return 64;
     const juce::File stub (juce::String::fromUTF8 (argv[1]));
     testNormalWorker (stub);
+    testProgramRefresh (stub);
     testLargeParameterInventory (stub);
     testSupportedBlockSizeSoak (stub);
     testDeadWorker (stub, "CrashStub", "crashed worker");

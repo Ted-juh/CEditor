@@ -3,7 +3,8 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
-  import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
+  import { lcdDesignLayoutIds, setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
+  import { pixelElementSelection, pixelSelectionKey, pixelElementId, selectPixelElement } from '../stores/pixelElementSelection.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -50,7 +51,7 @@
   const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'adsr', 'anim', 'bitmap'];
   const PAINT_MAX = 576; // cap the on-screen paint grid (24×24) to keep the DOM light
 
-  let { control = null } = $props();
+  let { control = null, dockGroup = '' } = $props();
 
   let core = $derived(getSection(control, 'Core'));
   let pixel = $derived(getSection(control, 'Pixel'));
@@ -99,7 +100,10 @@
     const file = event?.target?.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => set('animSrc', String(reader.result ?? ''));
+    reader.onload = () => {
+      if (file.type === 'image/gif') set('animFrames', 0);
+      set('animSrc', String(reader.result ?? ''));
+    };
     reader.readAsDataURL(file);
   }
 
@@ -125,6 +129,7 @@
       if (next[i]) {
         next[i].animSrc = String(reader.result ?? '');
         next[i].animMode = 'file';
+        if (file.type === 'image/gif') next[i].animFrames = 0;
         commitElements(next);
       }
     };
@@ -133,7 +138,7 @@
 
   // --- Layouts / pages (same engine as the LCD) ---
   let layouts = $derived(Array.isArray(pixel?.layouts) ? pixel.layouts : []);
-  let editLayoutId = $state('');
+  let editLayoutId = $derived($lcdDesignLayoutIds[core?.id] ?? '');
   let editLayout = $derived(layouts.find((l) => String(l?.id) === String(editLayoutId)) ?? layouts[0] ?? null);
   let pages = $derived(pixel?.pages ?? {});
   let pixelsW = $derived(Math.max(8, Math.round(Number(pixel?.pixelsW ?? 128))));
@@ -149,7 +154,6 @@
   function setPageProp(prop, value) { const p = clonePages(); p[prop] = value; commitPages(p); }
 
   function selectEditLayout(id) {
-    editLayoutId = id;
     setLcdDesignLayout(core?.id, id);
   }
   function addLayout() {
@@ -158,7 +162,6 @@
     // The first layout adopts the current flat elements so nothing is lost.
     next.push({ id, name: `Layout ${next.length + 1}`, elements: next.length === 0 ? $state.snapshot(flatElements) : [] });
     commitLayouts(next);
-    editLayoutId = id;
     setLcdDesignLayout(core?.id, id);
     if (next.length === 1) {
       const p = clonePages();
@@ -179,7 +182,6 @@
     for (const el of (Array.isArray(copy.elements) ? copy.elements : [])) el.id = genId('el_');
     next.splice(next.indexOf(src) + 1, 0, copy);
     commitLayouts(next);
-    editLayoutId = copy.id;
     setLcdDesignLayout(core?.id, copy.id);
   }
   function renameLayout(id, name) {
@@ -196,6 +198,14 @@
   function setSelectorRow(i, prop, value) {
     const p = clonePages();
     if (Array.isArray(p.selectorMap) && p.selectorMap[i]) { p.selectorMap[i][prop] = value; commitPages(p); }
+  }
+  function moveSelectorRow(i, delta) {
+    const p = clonePages();
+    const list = p.selectorMap ?? [];
+    const target = i + delta;
+    if (target < 0 || target >= list.length) return;
+    [list[i], list[target]] = [list[target], list[i]];
+    commitPages(p);
   }
   function removeSelectorRow(i) {
     const p = clonePages();
@@ -238,6 +248,11 @@
   // --- Elements (of the edited layout, or the flat list when no layouts) ---
   let flatElements = $derived(Array.isArray(pixel?.elements) ? pixel.elements : []);
   let elements = $derived(layouts.length ? (Array.isArray(editLayout?.elements) ? editLayout.elements : []) : flatElements);
+  let selectionLayout = $derived(layouts.length ? String(editLayout?.id ?? '') : '');
+  let selectedElementId = $derived($pixelElementSelection.get(pixelSelectionKey(core?.id, selectionLayout)));
+  function selectElement(i) {
+    if (elements[i]) selectPixelElement(core?.id, selectionLayout, pixelElementId(elements[i], i));
+  }
 
   function cloneElements() { return $state.snapshot(elements); }
   function commitElements(next) {
@@ -258,11 +273,14 @@
       frame: false, ticks: false, peakHold: false, smooth: false, visible: true,
     });
     commitElements(next);
+    selectPixelElement(core?.id, selectionLayout, pixelElementId(next[next.length - 1], next.length - 1));
   }
   function removeElement(i) {
     const next = cloneElements();
     next.splice(i, 1);
     commitElements(next);
+    const index = Math.min(i, next.length - 1);
+    selectPixelElement(core?.id, selectionLayout, index >= 0 ? pixelElementId(next[index], index) : null);
   }
   function duplicateElement(i) {
     const next = cloneElements();
@@ -275,6 +293,7 @@
     copy.y = Math.min(pixelsH - 1, (Number(copy.y) || 0) + 2);
     next.splice(i + 1, 0, copy);
     commitElements(next);
+    selectPixelElement(core?.id, selectionLayout, pixelElementId(copy, i + 1));
   }
   function setElement(i, prop, value) {
     const next = cloneElements();
@@ -345,12 +364,14 @@
 {/snippet}
 
 {#snippet openScreenTab()}
-  <OpenInDock tab="screen" controlId={core?.id ?? ''} what="this screen's pages and elements" compact />
+  <OpenInDock tab="screen" controlId={core?.id ?? ''} what="this screen" compact />
 {/snippet}
 
 {#if pixel}
-  <div class="lcd-inspector">
-  <PropertySection title="Screen" icon={Monitor} tools={openScreenTab}>
+  <div class="lcd-inspector" class:screen-dock-editor={!!dockGroup} class:appearance={dockGroup === 'appearance'}>
+  {#if !dockGroup || dockGroup === 'screen'}
+  <div class="screen-section" class:wide={false} data-screen-section="Screen">
+  <PropertySection title="Screen" icon={Monitor} tools={dockGroup ? undefined : openScreenTab}>
     <PropertyCell label="Pixels W" span={1} compact hint="Grid resolution: pixel columns. All element coordinates refer to this grid.">
       <NumberCell label="W" value={pixel.pixelsW ?? 128} defaultValue={128} step={1} min={8} max={1024} onchange={(value) => set('pixelsW', Math.round(value))} />
     </PropertyCell>
@@ -385,7 +406,11 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'pages'}
+  <div class="screen-section" class:wide={true} data-screen-section="Layouts">
   <PropertySection title="Layouts" icon={LayoutGrid}>
     {#snippet tools()}
       {#if layouts.length === 0}
@@ -425,9 +450,13 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+  </div>
+  {/if}
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages" icon={Files}>
+    {#if !dockGroup || dockGroup === 'pages'}
+  <div class="screen-section" class:wide={true} data-screen-section="Pages">
+  <PropertySection title="Pages" icon={Files}>
       {#snippet tools()}
         <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
         <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
@@ -480,6 +509,8 @@
                 <option value={String(l.id)}>{l.name ?? l.id}</option>
               {/each}
             </select>
+            <button class="val rule-move" type="button" title="Move rule up" disabled={i === 0} onclick={() => moveSelectorRow(i, -1)}>▲</button>
+            <button class="val rule-move" type="button" title="Move rule down" disabled={i === (pages.selectorMap ?? []).length - 1} onclick={() => moveSelectorRow(i, 1)}>▼</button>
             <button class="val erm" type="button" onclick={() => removeSelectorRow(i)} title="Remove">✕</button>
           </div>
         </PropertyCell>
@@ -511,38 +542,51 @@
         </PropertyCell>
       {/each}
     </PropertySection>
+  </div>
+  {/if}
   {/if}
 
+  {#if !dockGroup || dockGroup === 'content'}
+  <div class="screen-section" class:wide={true} data-screen-section="Elements">
   <PropertySection title="Elements" icon={Shapes}>
     {#snippet tools()}
       <button class="hdr-add" type="button" title="Add a pixel-addressed element. Text kinds draw at X/Y with font height H; widgets fill the X/Y/W/H rect." onclick={() => addElement()}>+ Element</button>
       <button class="hdr-add" type="button" title="Add a control that ★ Active may follow." onclick={() => addScope()}>+ Scope</button>
     {/snippet}
+    <div class="grid-units">
+      <strong>{pixelsW} × {pixelsH} dots</strong> · 1 unit = 1 dot in this screen's grid.
+      X/Y start at the top-left (0, 0); W/H count dot columns/rows.
+      <span>For text, H is the font height and W is the alignment/clip width (0 = automatic).
+      Select a row to outline its area in the Editor.</span>
+    </div>
     {#if elements.length > 0}
       <div class="el-head">
         <span class="el-num">#</span>
         <span class="esel">Kind</span>
-        <span class="en">X</span>
-        <span class="en">Y</span>
-        <span class="en">W</span>
-        <span class="en">H</span>
+        <span class="en">X<br />dots</span>
+        <span class="en">Y<br />dots</span>
+        <span class="en">W<br />dots</span>
+        <span class="en">H<br />dots</span>
         <span class="esel">Source</span>
         <span class="erm"></span>
         <span class="erm"></span>
       </div>
     {/if}
     {#each elements as el, i (el.id ?? i)}
-      <div class="el-row">
-        <span class="el-num" title="Element">#{i + 1}</span>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="el-row" class:element-selected={selectedElementId === pixelElementId(el, i)}
+        onpointerdown={() => selectElement(i)} onfocusin={() => selectElement(i)}>
+        <button type="button" class="el-num element-select" aria-label={`Select element ${i + 1}`}
+          aria-pressed={selectedElementId === pixelElementId(el, i)} onclick={() => selectElement(i)}>#{i + 1}</button>
         <select class="val esel" title="Element kind" value={el.kind ?? 'vbar'} onchange={(event) => setElement(i, 'kind', event.target.value)}>
           {#each ELEMENT_KINDS as kind}
             <option value={kind}>{kind}</option>
           {/each}
         </select>
-        <span class="en nc-wrap" title="X (px)"><NumberCell value={el.x ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'x', Math.round(value))} /></span>
-        <span class="en nc-wrap" title="Y (px)"><NumberCell value={el.y ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'y', Math.round(value))} /></span>
-        <span class="en nc-wrap" title="Width (px); for text: alignment/clip box (0 = none)"><NumberCell value={el.w ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'w', Math.round(value))} /></span>
-        <span class="en nc-wrap" title="Height (px); for text: font height"><NumberCell value={el.h ?? 8} defaultValue={8} step={1} onchange={(value) => setElement(i, 'h', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="X: dot columns from the left edge (0-based)"><NumberCell value={el.x ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'x', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Y: dot rows from the top edge (0-based)"><NumberCell value={el.y ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'y', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Width in dot columns; for text: alignment/clip width (0 = automatic)"><NumberCell value={el.w ?? 0} defaultValue={0} step={1} onchange={(value) => setElement(i, 'w', Math.round(value))} /></span>
+        <span class="en nc-wrap" title="Height in dot rows; for text: font height"><NumberCell value={el.h ?? 8} defaultValue={8} step={1} onchange={(value) => setElement(i, 'h', Math.round(value))} /></span>
         {#if el.kind === 'static'}
           <input class="val etext" type="text" placeholder="caption text" value={el.text ?? ''} oninput={(event) => setElement(i, 'text', event.target.value)} />
         {:else if el.kind === 'icon'}
@@ -789,7 +833,11 @@
       </PropertyCell>
     {/each}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'motion'}
+  <div class="screen-section" class:wide={false} data-screen-section="Animation">
   <PropertySection title="Animation" icon={Film}>
     <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the elements. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
       <select class="val" value={pixel.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
@@ -802,14 +850,14 @@
       <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
         <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
       </PropertyCell>
-      <PropertyCell label="Frames" span={1} compact hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
-        <NumberCell label="Frames" value={pixel.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+      <PropertyCell label="Frames" span={1} compact hint="GIF/APNG: leave at 0 to use the animation in the file. For a sprite sheet, enter the number of tiles; this is not a frame seek control.">
+        <NumberCell label="Sheet frames" value={pixel.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Cols" span={1} compact hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
         <NumberCell label="Cols" value={pixel.animSpriteCols ?? 0} defaultValue={0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate.">
-        <NumberCell label="FPS" value={pixel.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+        <NumberCell label="Sheet FPS" value={pixel.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
         <PropertyToggle value={pixel.animLoop !== false} onchange={() => toggle('animLoop', true)} />
@@ -842,7 +890,11 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'appearance'}
+  <div class="screen-section" class:wide={false} data-screen-section="Colour">
   <PropertySection title="Colour" icon={Palette}>
     <PropertyCell label="Screen colours" span={4} hint="Lit dots, unlit ghost dots, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
       <SwatchCluster swatches={[
@@ -857,8 +909,12 @@
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
-  <PropertySection title="Lighting" icon={Lamp} tools={openLightingTab}>
+  {#if !dockGroup || dockGroup === 'appearance'}
+  <div class="screen-section" class:wide={false} data-screen-section="Lighting">
+  <PropertySection title="Lighting" icon={Lamp} tools={dockGroup ? undefined : openLightingTab}>
     <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={pixel.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
@@ -926,7 +982,11 @@
       <NumberCell label="Pad" value={pixel.padding ?? 8} defaultValue={8} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'content'}
+  <div class="screen-section" class:wide={false} data-screen-section="On-screen text">
   <PropertySection title="On-screen text" icon={Pencil}>
     <PropertyCell label="Edit text" span={4} hint="The string shown by an 'edit' element bound to ✎ This screen's text.">
       <input class="val" type="text" value={pixel.editText ?? 'INIT'} oninput={(event) => set('editText', event.target.value)} />
@@ -943,7 +1003,11 @@
       <NumberCell label="Len" value={pixel.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'screen'}
+  <div class="screen-section" class:wide={false} data-screen-section="Custom font">
   <PropertySection title="Custom font" icon={Type}>
     <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells in a grid, left-to-right then top-to-bottom. Text elements set Font → Custom to use it.">
       <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
@@ -967,9 +1031,29 @@
     {/if}
   </PropertySection>
   </div>
+  {/if}
+  </div>
 {/if}
 
 <style>
+  .grid-units { grid-column: 1 / -1; color: #AAA; font-size: 11px; line-height: 1.5; padding: 2px 0 6px; }
+  .grid-units strong { color: #DDD; font-weight: 500; }
+  .grid-units span { display: block; }
+  .el-row.element-selected { background: #16394D; box-shadow: inset 2px 0 #5B9BD5; }
+  .element-select { padding: 0; height: 24px; border: 1px solid #444; border-radius: 3px; background: #222; color: #AAA; font: inherit; cursor: pointer; }
+  .element-select[aria-pressed="true"] { background: #094771; color: #FFF; border-color: #5B9BD5; }
+  .rule-move { flex: 0 0 26px; width: 26px; padding: 0; }
+  .screen-section { display: contents; }
+  .screen-dock-editor { container: screen-properties / inline-size; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 8px; align-items: start; padding: 8px; }
+  .screen-dock-editor.appearance { grid-template-columns: minmax(0, 1fr); }
+  @container screen-properties (min-width: 700px) {
+    .screen-dock-editor.appearance :global(.property-grid) { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  }
+  .screen-dock-editor .screen-section { display: block; min-width: 0; overflow-x: auto; }
+  .screen-dock-editor .screen-section.wide { grid-column: 1 / -1; }
+  .screen-dock-editor :global(.property-section) { margin: 0; }
+  .screen-dock-editor :global(.val) { min-height: var(--pp-field-height); font-size: var(--pp-field-font); border-radius: var(--pp-field-radius); }
+
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
 
   /* Visible keyboard focus for every inspector control + checkbox. */

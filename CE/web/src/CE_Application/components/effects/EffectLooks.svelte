@@ -1,17 +1,13 @@
 <script>
   /**
-   * The looks shelf — the fourth column.
-   *
-   * Each thumbnail is the look applied to the control you are actually editing, drawn by the real
-   * renderer, so it shows your own text in your own font rather than a stock word. Clicking one
+   * Quick selections use fixed effect pictograms. Clicking one
    * applies the whole patch, which switches off everything the look does not use — see the header
    * of `effectLooks.js` for why a preset that only adds is a preset you cannot get out of.
    */
-  import EffectPreview from './EffectPreview.svelte';
-  import { looksFor, previewLook } from '../../utils/effectLooks.js';
+  import EffectIcon from './EffectIcon.svelte';
+  import { looksFor } from '../../utils/effectLooks.js';
 
   let {
-    control = null,
     domain = 'text',
     current = '',
     onapply = () => {},
@@ -37,11 +33,10 @@
         role="radio"
         aria-checked={look.id === current}
         title={`Apply the ${look.label} look — replaces the whole stack`}
+        aria-label={look.label}
         onclick={() => onapply(look)}
       >
-        <span class="lookbox">
-          <EffectPreview control={previewLook(control, look)} boxWidth={132} boxHeight={40} padding={3} maxScale={0.9} />
-        </span>
+        <EffectIcon name={look.id} size={24} />
         <span class="lookl">{look.label}{#if look.id === current} ✓{/if}</span>
       </button>
     {/each}
@@ -54,39 +49,37 @@
 {/if}
 
 <style>
-  .looks { display: flex; flex-direction: column; gap: 6px; }
+  .looks { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
 
   .look {
-    border: 1px solid #2E3540;
+    border: 1px solid #333;
     border-radius: 3px;
-    background: #0C0F12;
-    padding: 0;
+    background: #1A1A1A;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 5px 8px;
+    color: #AABAC7;
     overflow: hidden;
     cursor: pointer;
     font: inherit;
   }
-  .look:hover { border-color: #45525C; }
-  .look.on { border-color: #0E7C70; box-shadow: 0 0 0 1px #0B2320; }
-
-  .lookbox {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 40px;
-    overflow: hidden;
-  }
+  .look:hover { border-color: #5B9BD5; }
+  .look.on { border-color: #0B6EB5; background: #094771; color: #FFF; }
 
   .lookl {
     display: block;
-    font: 500 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #616C75;
-    text-align: center;
-    padding: 0 0 5px;
+    font: inherit;
+    font-size: 10px;
+    color: #AAA;
+    text-align: left;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .look.on .lookl { color: #8FEDE3; }
+  .look.on .lookl { color: #FFF; }
 
   .none {
     margin: 0;

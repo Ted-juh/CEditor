@@ -1,4 +1,12 @@
 <script>
+  let { topInset = $bindable(34) } = $props();
+  let tabBarHeight = $state(34);
+  let rulerCorner = $state();
+  let rulerHeight = $state(0);
+
+  // Keep the shell's insert rail below the tabs and any visible horizontal ruler.
+  $effect(() => { topInset = tabBarHeight + (rulerCorner ? rulerHeight : 0); });
+
   import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
   import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
@@ -854,7 +862,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="editor-wrapper" onkeydown={handleEditorKeyDown} onkeyup={handleEditorKeyUp} tabindex="-1" class:panning={pan.isPanning || pan.spaceHeld}>
-  <div class="tab-bar-area">
+  <div class="tab-bar-area" bind:offsetHeight={tabBarHeight}>
     <TabBar />
   </div>
 
@@ -1101,7 +1109,7 @@
         {#if $showRulers}
           <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} markers={rulerSnapMarkersX} onGuideCreate={(o, p) => addGuide(o, p)} />
           <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} markers={rulerSnapMarkersY} onGuideCreate={(o, p) => addGuide(o, p)} />
-          <div class="ruler-corner"></div>
+          <div class="ruler-corner" bind:this={rulerCorner} bind:offsetHeight={rulerHeight}></div>
         {/if}
         {#if !$previewModeEnabled}
           <CanvasContextMenu bind:target={ctxMenu} panel={canvasPanel} />

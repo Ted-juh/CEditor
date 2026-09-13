@@ -1,4 +1,8 @@
 <script>
+  import HostConfirmButton from './HostConfirmButton.svelte';
+  import HostPartIssueIcons from './HostPartIssueIcons.svelte';
+  import { hostRackIssues } from '../stores/hostPartIssues.js';
+  let { onInspectPart = () => {} } = $props();
   /**
    * HostRackCanvas.svelte — the signal path as a picture you can rewire (rack-canvas plan,
    * stages 2 and 3).
@@ -23,6 +27,7 @@
     openEditor, closeEditor, floatEditor, closeEditorWindow, unloadInstrument, removeRackPart,
   } from '../stores/instrumentHost.js';
   import PluginTile from './PluginTile.svelte';
+  import { hostPartLabel } from '../utils/hostTargetContext.js';
   import AppWindow from 'lucide-svelte/icons/app-window';
   import PictureInPicture2 from 'lucide-svelte/icons/picture-in-picture-2';
   import Unplug from 'lucide-svelte/icons/unplug';
@@ -220,12 +225,17 @@
           {#if isPart && (node.hasInstrument || node.unresolved)}
             <PluginTile ceId={node.ceId} name={node.title} vendor={node.subtitle} size={20} />
           {/if}
-          <span class="node-title">{node.title}</span>
+          <span class="node-title">{isPart ? hostPartLabel($hostState.rack.parts.find(part => part.partId === node.id),
+            $hostState.rack.parts.findIndex(part => part.partId === node.id)) : node.title}</span>
         </span>
         <span class="node-meta">
           {#if node.midi > 0}<span class="badge midi" title={`${node.midi} MIDI modules`}>♪{node.midi}</span>{/if}
           {#if node.inserts > 0}<span class="badge fx" title={`${node.inserts} inserts`}>fx{node.inserts}</span>{/if}
           <span class="node-sub">{node.subtitle}</span>
+          {#if isPart}
+            <HostPartIssueIcons issues={$hostRackIssues[node.id]}
+                                onInspect={(issue) => onInspectPart(node.id, issue)} />
+          {/if}
         </span>
 
         <!-- On hover and on keyboard focus rather than always: at rest the picture is the
@@ -251,20 +261,20 @@
                     onclick={(e) => actOn(e, () => toggleFloat(node.id))}>
               <PictureInPicture2 size={13} strokeWidth={1.9} />
             </button>
-            <button type="button" class="node-action" disabled={!node.hasInstrument}
+            <HostConfirmButton identity={JSON.stringify([node.id])} type="button" class="node-action" disabled={!node.hasInstrument}
                     data-testid="canvas-unload"
                     aria-label={`Unload ${node.title}'s instrument, keep the part`}
                     title="Unload the instrument, keep the part"
                     onclick={(e) => actOn(e, () => unloadInstrument(node.id))}>
               <Unplug size={13} strokeWidth={1.9} />
-            </button>
-            <button type="button" class="node-action danger"
+            </HostConfirmButton>
+            <HostConfirmButton identity={JSON.stringify([node.id])} type="button" class="node-action danger"
                     data-testid="canvas-remove-part"
                     aria-label={`Remove ${node.title} from the rack`}
                     title="Remove this part"
                     onclick={(e) => actOn(e, () => removeRackPart(node.id))}>
               <Trash2 size={13} strokeWidth={1.9} />
-            </button>
+            </HostConfirmButton>
           </span>
         {/if}
       </div>
@@ -299,11 +309,11 @@
       {/if}
     </span>
     {#if placedCount > 0}
-      <button type="button" class="reset-layout" data-testid="canvas-reset-layout"
+      <HostConfirmButton identity={JSON.stringify([])} type="button" class="reset-layout" data-testid="canvas-reset-layout"
               title="Forget every hand-placed box and lay the canvas out again"
               onclick={() => clearCanvasPositions()}>
         Reset layout ({placedCount})
-      </button>
+      </HostConfirmButton>
     {/if}
   </div>
 </div>
@@ -416,7 +426,7 @@
      down whatever is hovered or focused. */
   .canvas.drag-in-flight .node:hover > .node-actions,
   .canvas.drag-in-flight .node:focus-within > .node-actions { opacity: 0; pointer-events: none; }
-  .node-action {
+  .node-actions :global(.node-action) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -429,10 +439,10 @@
     color: #8b97a3;
     cursor: pointer;
   }
-  .node-action:hover:not(:disabled) { background: #2c3742; color: #d6dbe0; }
-  .node-action.on { background: #24313d; color: #7fb4e0; }
-  .node-action.danger:hover:not(:disabled) { background: #3a2626; color: #e4b3b3; }
-  .node-action:disabled { opacity: 0.3; cursor: default; }
+  .node-actions :global(.node-action):hover:not(:disabled) { background: #2c3742; color: #d6dbe0; }
+  .node-actions :global(.node-action).on { background: #24313d; color: #7fb4e0; }
+  .node-actions :global(.node-action.danger):hover:not(:disabled) { background: #3a2626; color: #e4b3b3; }
+  .node-actions :global(.node-action):disabled { opacity: 0.3; cursor: default; }
 
   .canvas-key {
     position: sticky;
@@ -448,4 +458,5 @@
   .swatch { width: 14px; height: 0; border-top: 2px solid #5b9bd5; }
   .swatch.send { border-top-style: dashed; border-top-color: #6f8a70; }
   .canvas-note { margin-left: auto; }
+  .node-actions :global(.node-action.confirming) { width: auto; min-width: 62px; }
 </style>

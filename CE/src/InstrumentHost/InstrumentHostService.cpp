@@ -1,6 +1,7 @@
 #include "InstrumentHostService.h"
 
 #include "PatchDiff.h"
+#include "VendorPresetDiscovery.h"
 #include "SonicProbe.h"
 #include "SonicAnalysisJob.h"
 #include "SonicAnalysisWorker.h"
@@ -80,6 +81,7 @@ InstrumentHostService::~InstrumentHostService()
     stopPresetAudition();
     stopAudio();
     *alive = false;
+    if (libraryScanThread.joinable()) libraryScanThread.join();
     stopRequested.store (true);
     if (scanThread.joinable())
         scanThread.join();
@@ -98,7 +100,7 @@ namespace
     bool isStageSafeCommand (const juce::String& command)
     {
         static const juce::StringArray safeCommands {
-            "beginParameterGesture", "endParameterGesture", "getAudioDevices",
+            "beginParameterGesture", "endParameterGesture", "getAudioDevices", "finishSoundcheck",
             "getHostProject", "getLibrary", "getLicence", "getParameters",
             "getSurfaceLayout", "focusPart", "hostNote", "launchClip", "launchScene", "panic",
             "previewSupportBundle", "resetParameter", "setBusLevel",
@@ -128,6 +130,57 @@ namespace
             "cancelLearnControlSlotParameter", "cancelMidiLearn", "disarmCapture"
         };
         return safeCommands.contains (command);
+    }
+
+    juce::String editLabel (const juce::String& cmd)
+    {
+        static const juce::StringArray edits {
+            "addPart", "removePart", "movePart", "unloadInstrument", "setCanvasPosition",
+            "clearCanvasPositions", "setPartMidiRules", "setPartMixer", "addControlPage", "removeControlPage",
+            "renameControlPage", "assignControlSlot", "assignSurfaceControl", "generateControlPages", "clearControlSlot",
+            "setControlSlotOptions", "clearControlSlotMidi", "removeEffect", "moveEffect", "setEffectBypassed",
+            "addLayerGroup", "removeLayerGroup", "setLayerGroup", "addLayerMember", "removeLayerMember",
+            "setLayerMember", "addMacro", "removeMacro", "renameMacro", "addMacroTarget",
+            "removeMacroTarget", "setMacroTargetOptions", "addModulationRoute", "setModulationRoute", "removeModulationRoute",
+            "clearModulationRoutes", "addMidiLfo", "setMidiLfo", "removeMidiLfo", "addMidiLfoOutput",
+            "setMidiLfoOutput", "removeMidiLfoOutput", "addEnvelope", "setEnvelope", "removeEnvelope",
+            "addMseg", "setMseg", "removeMseg", "addRandomModulator", "setRandomModulator",
+            "removeRandomModulator", "addBus", "removeBus", "renameBus", "setBusLevel",
+            "setBusDestination", "setPartDestination", "addReturn", "removeReturn", "renameReturn",
+            "setReturnLevel", "setSendLevel", "setExtraOut", "removeExtraOut", "setPartMidiSource",
+            "addMidiSlot", "removeMidiSlot", "moveMidiSlot", "setMidiSlotBypassed", "setMidiSlotOptions",
+            "setPartArp", "setPartMidiFx", "addPattern", "removePattern", "renamePattern",
+            "setPatternOptions", "createPatternVariations", "addLane", "removeLane", "setLaneOptions",
+            "clearLane", "euclidFill", "setStep", "toggleStep", "setStepParameterLock",
+            "setStepCcLock", "removeStepLock", "clearStepLocks", "addClip", "removeClip",
+            "setClipOptions", "clearGestureLanes", "removeMidiLoop", "removePerformanceTake", "addScene",
+            "removeScene", "renameScene", "captureScene", "setSceneOptions", "setSceneClip",
+            "addSetlistItem", "removeSetlistItem", "moveSetlistItem", "setSetlistItem", "setSetlistOptions",
+            "addArrangementItem", "removeArrangementItem", "setArrangementItem", "moveArrangementItem", "setArrangementOptions",
+            "setPresetAudition"
+        };
+        if (! edits.contains (cmd)) return {};
+        juce::String label;
+        for (auto c : cmd)
+        {
+            if (c >= 'A' && c <= 'Z') label << ' ' << juce::String::charToString (c + ('a' - 'A'));
+            else label << juce::String::charToString (c);
+        }
+        return label.substring (0, 1).toUpperCase() + label.substring (1);
+    }
+
+    void stripHistoryRuntime (juce::var& value)
+    {
+        if (auto* obj = value.getDynamicObject())
+        {
+            obj->removeProperty ("stateBlob");
+            obj->removeProperty ("stateBlobHash");
+            obj->removeProperty ("editorOpen");
+            auto& properties = obj->getProperties();
+            for (int i = 0; i < properties.size(); ++i) stripHistoryRuntime (*properties.getVarPointerAt (i));
+        }
+        else if (auto* array = value.getArray())
+            for (auto& item : *array) stripHistoryRuntime (item);
     }
 
     /** Merges the arp fields a payload names into `arp`; absent fields keep their value.
@@ -436,6 +489,72 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         emitState();
         return;
     }
+
+    if (cmd == "undoHostEdit" || cmd == "redoHostEdit")
+    {
+        restoreEditHistory (cmd == "redoHostEdit");
+        return;
+    }
+
+    if (cmd == "checkSetlistSoundcheck" || cmd == "startSoundcheck" || cmd == "finishSoundcheck")
+    {
+        if (! requireFeature (licensing::Feature::scenesAndSetlists)) return;
+        if (cmd == "checkSetlistSoundcheck") checkSetlistSoundcheck();
+        else if (cmd == "startSoundcheck") startSoundcheck (payload.getProperty ("itemId", {}).toString());
+        else finishSoundcheck();
+        emitState();
+        return;
+    }
+
+    // Never snapshot note traffic, meters, transport ticks or live parameter gestures.
+    // Only stopped Build edits need document history; other mutations establish a boundary.
+    const auto candidateLabel = outermostCommand && ! restoringEditHistory ? editLabel (cmd) : juce::String();
+    const auto label = candidateLabel.isNotEmpty() && historyBlockedReason().isEmpty() ? candidateLabel : juce::String();
+    static const juce::StringArray historyBoundaries {
+        "loadInstrument", "addEffect", "loadLibraryRecord", "auditionLibraryRecord", "walkPartPreset",
+        "startSoundComparison", "stepSoundComparison", "keepSoundComparison", "cancelSoundComparison",
+        "applyVersion", "morphVersions", "setMorph", "clearMorph", "setMacroValue", "setMasterLevel",
+        "setControlSlotValue", "importScalaTuning", "resetMicrotuning", "setMicrotuning", "setPartMicrotuning",
+        "setHardwareConfig", "clearHardware", "clearHardwarePatch", "setHardwareRestorePolicy",
+        "learnControlSlotMidi", "learnControlSlotParameter", "learnSurfaceControl", "quickLearnParameter",
+        "captureRecentMidi", "freezeMidiClip", "finishMidiLoop", "finishGestureRecording", "finishPerformanceRecording"
+    };
+    if (outermostCommand && ! restoringEditHistory
+        && (historyBoundaries.contains (cmd) || (candidateLabel.isNotEmpty() && label.isEmpty())))
+        editHistory.clear();
+    const auto beforeModel = label.isNotEmpty() ? historyModel() : juce::String();
+    if (label.isNotEmpty() && editHistory.expectedModel.isNotEmpty()
+        && editHistory.expectedModel != beforeModel)
+        editHistory.clear();
+    juce::String group;
+    if (label.isNotEmpty() && cmd.startsWith ("set") && ! cmd.startsWith ("setStep") && cmd != "setSceneClip")
+    {
+        group = cmd;
+        if (const auto* object = payload.getDynamicObject())
+            for (const auto& property : object->getProperties())
+            {
+                const auto name = property.name.toString();
+                group += ":" + name;
+                if (name.endsWith ("Id") || name == "index" || name == "key") group += "=" + property.value.toString();
+            }
+    }
+    const auto editTime = juce::Time::getMillisecondCounterHiRes();
+    const bool mergingEdit = ! group.isEmpty() && editHistory.redo.empty() && ! editHistory.undo.empty()
+        && editHistory.undo.back().group == group && editTime - editHistory.undo.back().time < 600.0;
+    const auto beforeEdit = label.isNotEmpty() && ! mergingEdit ? historySnapshot() : juce::String();
+    const juce::ScopeGuard finishHistory { [&, this]
+    {
+        if (label.isEmpty() || restoringEditHistory) return;
+        const auto after = historyModel();
+        if (after == beforeModel) return; // refused commands and no-ops do not create steps
+        if (label.isNotEmpty() && historyPendingLoads == 0)
+        {
+            editHistory.record ({ beforeEdit, label, group, editTime });
+        }
+        else editHistory.clear(); // an untracked edit cannot leave a stale checkpoint behind
+        editHistory.expectedModel = after;
+        emitState();
+    } };
 
     if (cmd == "startPerformanceRecording")
     {
@@ -1725,7 +1844,11 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (fields->hasProperty ("label"))    binding.label    = payload["label"].toString().trim();
         }
 
+        const bool pickup = (bool) payload.getProperty ("midiPickup", slot->midiPickup);
+        const bool relative = (bool) payload.getProperty ("midiRelative", slot->midiRelative);
         rack.setSlotBinding (pageId, slotId, std::move (binding));
+        rack.setSlotMidiOptions (pageId, slotId, pickup, relative);
+        midiPickups.erase ({ pageId, slotId });
         savePerformance();
         emitState();
         return;
@@ -6320,8 +6443,6 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         ensureLibrary();
         scanVstPresets();
-        library.saveTo (libraryFile());
-        emitLibrary (libraryView);
         return;
     }
 
@@ -6426,8 +6547,9 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
         record.fingerprint = juce::String::toHexString (record.stateBlobBase64.hashCode64());
 
-        const auto recordId = library.addCapturedRecord (std::move (record));
-        library.saveTo (libraryFile());
+        const auto recordId = saveCapturedLibraryRecord (std::move (record));
+        if (recordId.isEmpty())
+            return;
 
         // Saving is also arriving: the part's preset cursor lands on what it just saved, so
         // prev/next walks on from here rather than from the top.
@@ -6479,8 +6601,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         record.rackManifestJson = juce::JSON::toString (one.toVar());
         record.fingerprint = juce::String::toHexString (record.rackManifestJson.hashCode64());
 
-        library.addCapturedRecord (std::move (record));
-        library.saveTo (libraryFile());
+        if (saveCapturedLibraryRecord (std::move (record)).isEmpty())
+            return;
         emitLibrary (libraryView);
         return;
     }
@@ -6518,8 +6640,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             record.parts.add (std::move (captured));
         }
 
-        library.addCapturedRecord (std::move (record));
-        library.saveTo (libraryFile());
+        if (saveCapturedLibraryRecord (std::move (record)).isEmpty())
+            return;
         emitLibrary (libraryView);
         return;
     }
@@ -6692,6 +6814,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
         // Resolve the target part per §18.6.7: focused, replace a named part, or add new.
         const auto action = payload.getProperty ("action", "focused").toString();
+        bool effectPreset = false;
+        {
+            const std::scoped_lock lock (catalogLock);
+            if (const auto* plugin = findClass (record->targetCeId))
+                effectPreset = record->type == "preset" && ! plugin->isInstrument;
+        }
+        if (effectPreset)
+        {
+            const auto target = payload.getProperty ("partId", rack.getPerformance().focusedPartId).toString();
+            loadEffectPresetRecord (*record, target, action == "add",
+                shouldAudition ? std::function<void()> ([this, target] { startPresetAudition (target); })
+                               : std::function<void()>());
+            return;
+        }
         juce::String partId;
         if (action == "add")
             partId = rack.addPart();
@@ -6812,7 +6948,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 candidates.add (&record);
 
         const auto rankOf = [] (const LibraryRecord& r)
-        { return r.sourceType == "programList" ? 0 : r.sourceType == "vstpreset" ? 1 : 2; };
+        { return r.sourceType == "programList" ? 0 : isVendorPresetSource (r.sourceType) ? 1 : 2; };
         const auto indexOf = [] (const LibraryRecord& r)
         { return r.sourceLocator.fromLastOccurrenceOf ("/", false, false).getIntValue(); };
         std::sort (candidates.begin(), candidates.end(),
@@ -7055,6 +7191,14 @@ bool InstrumentHostService::restoreLastKnownGood()
 
 void InstrumentHostService::applyPerformance (Performance&& performance)
 {
+    finishSoundcheck();
+    midiPickups.clear();
+    if (! restoringEditHistory)
+    {
+        editHistory.clear();
+        historyRestorationPending = false;
+        historyUnloadedParts.clear();
+    }
     // A document restore replaces the complete live environment. Runtime-only capture and
     // replay state must not survive it, otherwise a newly loaded rig could receive events
     // that were recorded against the previous one.
@@ -7106,7 +7250,8 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     gesturePoints.clear();
 
     for (const auto& unresolved : rack.loadModel (std::move (performance)))
-        requestInstrument (unresolved.partId, unresolved.ceId);
+        if (! restoringEditHistory || ! historyUnloadedParts.contains (unresolved.partId))
+            requestInstrument (unresolved.partId, unresolved.ceId);
 
     // The Stage 5 halves of the manifest load through their own transaction; a class that
     // fails to resolve leaves its slot unresolved-and-repairable, same as an instrument.
@@ -7149,7 +7294,7 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     for (const auto& partId : hardwarePartIds)
     {
         openHardwareMidi (partId);
-        rack.sendHardwareProgram (partId);   // no-op unless a bank/program is configured
+        if (! restoringEditHistory) rack.sendHardwareProgram (partId); // edit undo never transmits a hardware patch
     }
 
     // Total recall: a captured patch goes home, but never silently and never by default.
@@ -7161,7 +7306,7 @@ void InstrumentHostService::applyPerformance (Performance&& performance)
     for (const auto& partId : hardwarePartIds)
     {
         const auto* part = model.findPart (partId);
-        if (part == nullptr || part->hardwarePatchBase64.isEmpty())
+        if (restoringEditHistory || part == nullptr || part->hardwarePatchBase64.isEmpty())
             continue;
 
         if (part->hardwareRestore == "always")
@@ -7283,6 +7428,9 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
         return;
     }
 
+    if (! restoringEditHistory) editHistory.clear();
+    ++historyPendingLoads;
+    emitState();
     auto finishLoad =
         [this, aliveToken = alive, partId, generation, info,
          afterCommit = std::move (afterCommit), completion = std::move (completion)]
@@ -7291,6 +7439,15 @@ void InstrumentHostService::requestInstrument (const juce::String& partId, const
         {
             if (! aliveToken->load())
                 return;
+            --historyPendingLoads;
+            const auto historyLoad = restoringEditHistory || historyRestorationPending;
+            const juce::ScopeGuard finishHistoryLoad { [this, historyLoad]
+            {
+                if (! historyLoad) return;
+                editHistory.expectedModel = historyModel();
+                if (historyPendingLoads == 0) historyRestorationPending = false;
+                emitState();
+            } };
 
             // Survived construction: whatever happens next is not attributable to this load.
             if (completedInstantiation && activeMarker != nullptr)
@@ -7439,6 +7596,9 @@ void InstrumentHostService::requestEffect (
         return;
     }
 
+    if (! restoringEditHistory) editHistory.clear();
+    ++historyPendingLoads;
+    emitState();
     auto finishLoad = [this, aliveToken = alive, effectId, generation, info,
                        completion = std::move (completion)]
         (std::unique_ptr<juce::AudioProcessor> effect, const juce::String& error,
@@ -7446,6 +7606,15 @@ void InstrumentHostService::requestEffect (
         {
             if (! aliveToken->load())
                 return;
+            --historyPendingLoads;
+            const auto historyLoad = restoringEditHistory || historyRestorationPending;
+            const juce::ScopeGuard finishHistoryLoad { [this, historyLoad]
+            {
+                if (! historyLoad) return;
+                editHistory.expectedModel = historyModel();
+                if (historyPendingLoads == 0) historyRestorationPending = false;
+                emitState();
+            } };
 
             if (completedInstantiation && activeMarker != nullptr)
                 activeMarker->clear();
@@ -7475,6 +7644,7 @@ void InstrumentHostService::requestEffect (
             }
 
             attachParameters (effectId);
+            if (ingestProgramList (effectId)) emitLibrary (libraryView);
 
             if (editorWasHere)
                 showEditorForEffect (effectId);
@@ -7940,6 +8110,91 @@ juce::var InstrumentHostService::captureStateVar()
     }
 
     return state;
+}
+
+juce::String InstrumentHostService::historyModel() const
+{
+    auto model = rack.getPerformance().toVar();
+    model.getDynamicObject()->removeProperty ("focusedPartId");
+    stripHistoryRuntime (model);
+    juce::Array<juce::var> unloaded;
+    for (const auto& part : rack.getPerformance().parts)
+        if (part.pluginCeId.isNotEmpty() && ! rack.partHasInstrument (part.partId)) unloaded.add (part.partId);
+    model.getDynamicObject()->setProperty ("historyUnloadedParts", unloaded);
+    return juce::JSON::toString (model);
+}
+
+juce::String InstrumentHostService::historySnapshot()
+{
+    auto snapshot = rack.captureState().toVar();
+    juce::Array<juce::var> unloaded;
+    for (const auto& part : rack.getPerformance().parts)
+        if (part.pluginCeId.isNotEmpty() && ! rack.partHasInstrument (part.partId)) unloaded.add (part.partId);
+    snapshot.getDynamicObject()->setProperty ("historyUnloadedParts", unloaded);
+    return juce::JSON::toString (snapshot);
+}
+
+juce::String InstrumentHostService::historyBlockedReason()
+{
+    if (stageLocked) return "Leave Stage Lock to undo Build edits.";
+    if (historyPendingLoads > 0) return "Wait for plug-in loading to finish.";
+    if (rack.getEngine().getTransport().isPlaying() || performanceRecording || midiLoopRecording || gestureRecording
+        || arrangementPlaying || performanceReplay.state != PerformanceReplayRuntime::State::idle)
+        return "Stop playback and recording to undo Build edits.";
+    return {};
+}
+
+void InstrumentHostService::restoreEditHistory (bool redo)
+{
+    if (const auto reason = historyBlockedReason(); reason.isNotEmpty()) { emitError (reason); emitState(); return; }
+    if (editHistory.expectedModel.isNotEmpty() && editHistory.expectedModel != historyModel())
+        editHistory.clear();
+    auto& source = redo ? editHistory.redo : editHistory.undo;
+    auto& destination = redo ? editHistory.undo : editHistory.redo;
+    if (source.empty()) { emitState(); return; }
+    Performance restored;
+    const auto checkpoint = juce::JSON::parse (source.back().state);
+    if (! Performance::fromVar (checkpoint, restored))
+    { emitError ("The edit checkpoint could not be read; keeping the current rack."); return; }
+    const auto current = rack.captureState();
+    const auto label = source.back().label;
+    // Vendor-editor changes are not host edit commands. Keep the current state of surviving
+    // processors; only a deleted/unloaded processor needs its checkpoint's captured blob.
+    for (auto& part : restored.parts)
+        if (const auto* live = current.findPart (part.partId); live != nullptr)
+        {
+            part.editorOpen = live->editorOpen;
+            if (live->pluginCeId == part.pluginCeId && rack.partHasInstrument (part.partId))
+            {
+                part.stateBlobBase64 = live->stateBlobBase64;
+                part.stateBlobHash = SessionRecovery::hashState (part.stateBlobBase64);
+            }
+        }
+    auto preserveEffects = [&current] (juce::Array<EffectSlot>& slots)
+    {
+        for (auto& slot : slots)
+            if (const auto* live = current.findEffect (slot.effectId); live != nullptr && live->pluginCeId == slot.pluginCeId)
+            {
+                slot.stateBlobBase64 = live->stateBlobBase64;
+                slot.stateBlobHash = SessionRecovery::hashState (slot.stateBlobBase64);
+            }
+    };
+    for (auto& part : restored.parts) preserveEffects (part.effects);
+    preserveEffects (restored.masterEffects);
+    for (auto& chain : restored.returns) preserveEffects (chain.effects);
+    for (auto& bus : restored.buses) preserveEffects (bus.effects);
+    destination.push_back ({ historySnapshot(), label, {}, 0 });
+    source.pop_back();
+    editHistory.trim();
+    const juce::ScopedValueSetter<bool> restoring (restoringEditHistory, true);
+    historyUnloadedParts.clear();
+    if (const auto* unloaded = checkpoint.getProperty ("historyUnloadedParts", {}).getArray())
+        for (const auto& id : *unloaded) historyUnloadedParts.add (id.toString());
+    applyPerformance (std::move (restored));
+    historyRestorationPending = historyPendingLoads > 0;
+    editHistory.expectedModel = historyModel();
+    savePerformance();
+    emitState();
 }
 
 void InstrumentHostService::restoreFromVar (const juce::var& state)
@@ -9272,16 +9527,16 @@ juce::String InstrumentHostService::recordUnavailableReason (const LibraryRecord
         if (const auto why = module->unavailableReason(); why.isNotEmpty())
             return "Requires " + record.instrument + ", whose module is " + why + ".";
 
-    if (record.sourceType == "vstpreset" && ! juce::File (record.sourceLocator).existsAsFile())
+    if (isVendorPresetSource (record.sourceType) && ! juce::File (record.sourceLocator).existsAsFile())
         return "The preset file is gone: " + record.sourceLocator;
 
     return {};
 }
 
 juce::String InstrumentHostService::applyRecordState (juce::AudioProcessor& instrument,
-                                                      const LibraryRecord& record) const
+                                                      const LibraryRecord& record) const try
 {
-    if (record.sourceType == "vstpreset")
+    if (isVendorPresetSource (record.sourceType))
     {
         if (options.applyVstPreset == nullptr)
             return "Vendor preset loading is not available in this build.";
@@ -9306,6 +9561,14 @@ juce::String InstrumentHostService::applyRecordState (juce::AudioProcessor& inst
         return "The captured state for " + record.name + " is damaged.";
     instrument.setStateInformation (decoded.getData(), (int) decoded.getDataSize());
     return {};
+}
+catch (const std::exception& error)
+{
+    return "Could not load " + record.name + ": " + juce::String::fromUTF8 (error.what());
+}
+catch (...)
+{
+    return "The plug-in failed while loading " + record.name + ".";
 }
 
 juce::String InstrumentHostService::substitutionKey (const juce::String& pluginCeId,
@@ -9394,7 +9657,7 @@ InstrumentHostService::analysisBacklog (bool remeasureEverything) const
             const ModuleRecord* module = nullptr;
             const auto* classRecord = findClass (record.targetCeId, &module);
             if (classRecord == nullptr || module == nullptr
-                || module->unavailableReason().isNotEmpty())
+                || module->unavailableReason().isNotEmpty() || ! classRecord->isInstrument)
                 continue;   // nothing installed to play it with; not a failure, just not now
             task.descriptionXml = classRecord->descriptionXml;
         }
@@ -10132,6 +10395,27 @@ LibraryAvailability InstrumentHostService::libraryAvailability() const
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
 }
 
+juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord record)
+{
+    const auto name = record.name;
+    const auto recordId = library.addCapturedRecord (std::move (record));
+    if (! library.saveTo (libraryFile()))
+    {
+        // A failed capture must not remain in memory and appear saved on a later refresh.
+        library.removeRecord (recordId);
+        emitError ("Could not save \"" + name + "\" to the library. Could not write: "
+                   + libraryFile().getFullPathName());
+        return {};
+    }
+    if (options.emit != nullptr)
+    {
+        auto* result = new juce::DynamicObject();
+        result->setProperty ("name", name);
+        options.emit ("instrumentHostLibrarySaved", juce::var (result));
+    }
+    return recordId;
+}
+
 void InstrumentHostService::emitLibrary (const LibraryQuery& query)
 {
     if (options.emit == nullptr)
@@ -10150,6 +10434,11 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("type",         record->type);
         r->setProperty ("sourceType",   record->sourceType);
         r->setProperty ("targetCeId",   record->targetCeId);
+        {
+            const std::scoped_lock lock (catalogLock);
+            const auto* plugin = findClass (record->targetCeId);
+            r->setProperty ("isEffect", plugin != nullptr && ! plugin->isInstrument && record->type == "preset");
+        }
         r->setProperty ("name",         record->name);
         r->setProperty ("manufacturer", record->manufacturer);
         r->setProperty ("instrument",   record->instrument);
@@ -10349,6 +10638,9 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
     root->setProperty ("request", libraryQueryToVar (query));
     root->setProperty ("counts",  juce::var (counts));
     root->setProperty ("facets",  juce::var (facetVar));
+    root->setProperty ("scanning", libraryScanBusy);
+    root->setProperty ("scanReport", libraryScanReport);
+    root->setProperty ("updateFinished", libraryScanFinished);
     root->setProperty ("smartCollections", collectionVars);
     root->setProperty ("collections", staticVars);
     root->setProperty ("paths",   [this] { juce::Array<juce::var> a;
@@ -10359,79 +10651,121 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
 
 void InstrumentHostService::scanVstPresets()
 {
-    // Steinberg's convention plus whatever folders the user added. Enumeration reads only
-    // each file's header — indexing thousands of presets is file-system bound, not parse
-    // bound — and one unreadable file skips, never aborts the scan (baseline §18.6.5).
-    juce::Array<juce::File> roots {
-        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("VST3 Presets"),
-        juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory).getChildFile ("VST3 Presets"),
-    };
-    for (const auto& path : libraryPaths)
-        if (juce::File (path).isDirectory())
-            roots.add (juce::File (path));
-
-    juce::Array<LibraryRecord> scanned;
-    for (const auto& root : roots)
+    if (libraryScanBusy) return;
+    libraryScanBusy = true;
+    libraryScanFinished = false;
+    libraryScanReport.clear();
+    if (libraryScanThread.joinable()) libraryScanThread.join();
+    emitLibrary (libraryView);
+    PluginCatalog snapshot;
     {
-        if (! root.isDirectory())
-            continue;
-
-        for (const auto& entry : juce::RangedDirectoryIterator (root, true, "*.vstpreset",
-                                                                juce::File::findFiles))
-        {
-            const auto file = entry.getFile();
-            juce::MemoryBlock head;
-            {
-                juce::FileInputStream stream (file);
-                if (! stream.openedOk())
-                    continue;
-                stream.readIntoMemoryBlock (head, 4096);
-            }
-
-            const auto header = parseVstPresetHeader (head.getData(), head.getSize());
-            if (! header.valid)
-                continue;
-
-            LibraryRecord record;
-            record.type = "preset";
-            record.sourceType = "vstpreset";
-            record.factory = true;
-            record.sourceLocator = file.getFullPathName();
-            record.name = file.getFileNameWithoutExtension();
-            record.classIdHex = header.classIdHex;
-            // The Steinberg layout is <root>/<Vendor>/<Plugin>/<preset>.vstpreset; anything
-            // shallower keeps what path it has.
-            record.instrument = file.getParentDirectory() == root
-                                  ? juce::String()
-                                  : file.getParentDirectory().getFileName();
-            record.manufacturer = file.getParentDirectory().getParentDirectory() == root
-                                    || file.getParentDirectory() == root
-                                    ? juce::String()
-                                    : file.getParentDirectory().getParentDirectory().getFileName();
-            // Content identity follows the file, not the path: a renamed preset keeps its
-            // favourites through the fingerprint match in mergeVendorScan.
-            record.fingerprint = juce::String::toHexString (
-                head.toBase64Encoding().hashCode64() ^ (juce::int64) file.getSize());
-
-            // The class id is the preset's real identity, but the catalogue keys on JUCE's
-            // identifier — so the target resolves by the layout's plug-in name, and the
-            // format's own loader re-validates the class id at load time.
-            {
-                const std::scoped_lock lock (catalogLock);
-                for (const auto& instrumentClass : catalog.instrumentClasses())
-                    if (record.instrument.isNotEmpty()
-                        && instrumentClass.name.equalsIgnoreCase (record.instrument))
-                    {
-                        record.targetCeId = instrumentClass.ceId;
-                        break;
-                    }
-            }
-
-            scanned.add (std::move (record));
-        }
+        const std::scoped_lock lock (catalogLock);
+        snapshot = catalog;
     }
+    auto body = [this, token = alive, snapshot, paths = libraryPaths]() mutable
+    {
+        const auto cancelled = [token] { return ! token->load(); };
+        juce::Array<juce::File> vstRoots {
+            juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("VST3 Presets"),
+            juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory).getChildFile ("VST3 Presets"),
+            juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("VST3 Presets"),
+            juce::File::getSpecialLocation (juce::File::commonDocumentsDirectory).getChildFile ("VST3 Presets"),
+        };
+        for (const auto& path : paths)
+            if (juce::File::isAbsolutePath (path)) vstRoots.add (juce::File (path));
+        auto records = discoverVstPresetFiles (snapshot, vstRoots, cancelled);
+        records.addArray (discoverVendorPresets (snapshot, vendorPresetRoots (snapshot, paths), cancelled));
+        if (cancelled()) return;
+        auto finish = [this, token, snapshot, records = std::move (records)]() mutable
+        {
+            if (! token->load()) return;
+            for (const auto& source : { "vstpreset", "nksf", "fxp", "spire", "h2p" })
+            {
+                juce::Array<LibraryRecord> matches;
+                for (const auto& record : records)
+                    if (record.sourceType == source) matches.add (record);
+                library.mergeVendorScan (source, std::move (matches));
+            }
+            // Old versions indexed Zebra3's generic MIDI slots as named presets. Retire
+            // those even if program discovery cannot launch a worker on this scan.
+            juce::StringArray slots;
+            for (const auto& record : library.allRecords())
+                if (record.sourceType == "programList"
+                    && isZebra3ProgramSlot (record.instrument, record.manufacturer, record.name))
+                    slots.add (record.recordId);
+            for (const auto& id : slots) library.removeRecord (id);
+            library.saveTo (libraryFile());
+            scanCataloguePrograms (std::make_shared<juce::Array<PluginClassRecord>> (
+                presetCatalogueClasses (snapshot)), 0);
+        };
+        if (options.onControlThread != nullptr) options.onControlThread (std::move (finish));
+        else juce::MessageManager::callAsync (std::move (finish));
+    };
+    if (options.scanExecutor != nullptr) options.scanExecutor (std::move (body));
+    else libraryScanThread = std::thread (std::move (body));
+}
 
-    library.mergeVendorScan ("vstpreset", std::move (scanned));
+void InstrumentHostService::scanCataloguePrograms (
+    std::shared_ptr<juce::Array<PluginClassRecord>> classes, int index)
+{
+    if (index >= classes->size())
+    {
+        library.saveTo (libraryFile());
+        libraryScanBusy = false;
+        libraryScanFinished = true;
+        emitLibrary (libraryView);
+        return;
+    }
+    const auto plugin = classes->getReference (index);
+    juce::String refusal;
+    {
+        const std::scoped_lock lock (catalogLock);
+        const ModuleRecord* module = nullptr;
+        if (findClass (plugin.ceId, &module) == nullptr || module == nullptr)
+            refusal = "No longer in the catalogue";
+        else if (const auto reason = module->unavailableReason(); reason.isNotEmpty())
+            refusal = reason;
+        else refusal = safeModeRefusal (module->path);
+    }
+    auto finish = [this, token = alive, classes, index, plugin]
+        (std::unique_ptr<juce::AudioProcessor> processor, const juce::String& error)
+    {
+        if (! token->load()) return;
+        const bool instantiated = processor != nullptr;
+        int unnamedPrograms = 0;
+        if (processor != nullptr)
+            for (int i = 0; i < processor->getNumPrograms(); ++i)
+                if (isZebra3ProgramSlot (plugin.name, plugin.vendor, processor->getProgramName (i))) ++unnamedPrograms;
+        if (processor != nullptr) ingestProcessorPrograms (*processor, plugin);
+        processor.reset(); // Release this isolated instance before starting the next one.
+        int count = 0, files = 0, programs = 0, unavailable = 0;
+        for (const auto& record : library.allRecords())
+            if (record.targetCeId == plugin.ceId
+                && (isVendorPresetSource (record.sourceType) || record.sourceType == "programList"))
+            {
+                if (record.missing || recordUnavailableReason (record).isNotEmpty()) { ++unavailable; continue; }
+                ++count;
+                if (record.sourceType == "programList") ++programs; else ++files;
+            }
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("name", plugin.name);
+        row->setProperty ("kind", plugin.isInstrument ? "Instrument" : "Effect");
+        row->setProperty ("count", count);
+        row->setProperty ("files", files);
+        row->setProperty ("programs", programs);
+        row->setProperty ("unavailable", unavailable);
+        row->setProperty ("unnamedPrograms", unnamedPrograms);
+        row->setProperty ("reason", error.isNotEmpty() ? error : ! instantiated
+            ? juce::String ("Plug-in could not be opened for program discovery") : count == 0
+            ? juce::String ("No presets found in supported files or named program lists. Add a preset folder; other formats may require the plug-in's own browser.") : juce::String());
+        libraryScanReport.add (juce::var (row));
+        emitLibrary (libraryView);
+        scanCataloguePrograms (classes, index + 1);
+    };
+    if (refusal.isNotEmpty() || options.instantiate == nullptr)
+        finish (nullptr, refusal.isNotEmpty() ? refusal : "Program discovery is unavailable in this build");
+    else
+        options.instantiate (plugin.descriptionXml, options.sampleRate, options.blockSize, std::move (finish));
 }
 
 bool InstrumentHostService::ingestProgramList (const juce::String& partId)
@@ -10441,10 +10775,24 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
     // beside .vstpreset files and captured state, the moment it is live — no separate scan.
     // JUCE surfaces IUnitInfo program lists through the standard program API, and the API's
     // mandatory single program is not a list, so below two programs there is nothing to say.
-    const auto* part = rack.getPerformance().findPart (partId);
-    auto* instrument = rack.getInstrument (partId);
-    if (part == nullptr || instrument == nullptr || part->pluginCeId.isEmpty())
-        return false;
+    auto* instrument = targetProcessor (partId);
+    if (instrument == nullptr) return false;
+    PluginClassRecord plugin;
+    if (const auto* part = rack.getPerformance().findPart (partId))
+    { plugin.ceId = part->pluginCeId; plugin.name = part->pluginName; plugin.vendor = part->pluginVendor; }
+    else if (const auto* slot = rack.getPerformance().findEffect (partId))
+    { plugin.ceId = slot->pluginCeId; plugin.name = slot->pluginName; plugin.vendor = slot->pluginVendor; }
+    if (plugin.ceId.isEmpty()) return false;
+    return ingestProcessorPrograms (*instrument, plugin);
+}
+
+bool InstrumentHostService::ingestProcessorPrograms (juce::AudioProcessor& processor,
+                                                     const PluginClassRecord& plugin)
+{
+    auto* instrument = &processor;
+
+    if (auto* worker = dynamic_cast<PluginWorkerBoundary*> (instrument))
+        if (! worker->refreshProgramList()) return false;
 
     const auto count = instrument->getNumPrograms();
     if (count <= 1)
@@ -10455,15 +10803,16 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
     // records called Empty is a library nobody browses. Such slots are left out; a list
     // that is nothing but such slots — the bank not loaded yet, or never filled — says
     // nothing, and a list that is one name repeated says no more.
-    const auto placeholder = [] (const juce::String& name)
+    const auto placeholder = [&plugin] (const juce::String& name)
     {
         const auto lower = name.trim().toLowerCase();
         return lower.isEmpty() || lower == "empty" || lower == "(empty)" || lower == "<empty>"
-            || lower == "[empty]" || lower.containsOnly ("-_.…");
+            || lower == "[empty]" || lower.containsOnly ("-_.…")
+            || isZebra3ProgramSlot (plugin.name, plugin.vendor, name);
     };
 
     ensureLibrary();
-    const auto scope = "program://" + part->pluginCeId + "/";
+    const auto scope = "program://" + plugin.ceId + "/";
     juce::Array<LibraryRecord> scanned;
     juce::StringArray distinctNames;
     for (int i = 0; i < count; ++i)
@@ -10479,9 +10828,9 @@ bool InstrumentHostService::ingestProgramList (const juce::String& partId)
         record.factory = true;
         record.sourceLocator = scope + juce::String (i);
         record.name = reported;
-        record.instrument = part->pluginName;
-        record.manufacturer = part->pluginVendor;
-        record.targetCeId = part->pluginCeId;
+        record.instrument = plugin.name;
+        record.manufacturer = plugin.vendor;
+        record.targetCeId = plugin.ceId;
         // Index and name together: a reordered or renamed factory list reads as changed
         // content, and the scoped merge then keeps ids where the identity really held.
         record.fingerprint = juce::String::toHexString (
@@ -10725,7 +11074,7 @@ bool InstrumentHostService::applySoundComparisonIndex (int index)
         return false;
     }
 
-    if (record->sourceType == "vstpreset")
+    if (isVendorPresetSource (record->sourceType))
     {
         if (options.applyVstPreset == nullptr
             || ! options.applyVstPreset (*instrument, juce::File (record->sourceLocator)))
@@ -10793,10 +11142,84 @@ void InstrumentHostService::finishSoundComparison (bool keepSelection)
     emitState();
 }
 
+std::function<void (const juce::String&)> InstrumentHostService::beginLibraryLoad (
+    const LibraryRecord& record, const juce::String& partId)
+{
+    const auto serial = ++libraryLoadSerial;
+    auto report = [this, token = alive, serial, id = record.recordId, name = record.name, partId]
+        (const juce::String& phase, const juce::String& message)
+    {
+        if (! token->load() || serial != libraryLoadSerial || options.emit == nullptr) return;
+        auto* value = new juce::DynamicObject();
+        value->setProperty ("recordId", id);
+        value->setProperty ("name", name);
+        value->setProperty ("partId", partId);
+        value->setProperty ("phase", phase);
+        value->setProperty ("message", message);
+        options.emit ("instrumentHostLibraryLoad", juce::var (value));
+    };
+    report ("loading", "Loading " + record.name + "…");
+    return [report, name = record.name] (const juce::String& error)
+    { report (error.isEmpty() ? "loaded" : "failed", error.isEmpty() ? "Loaded " + name : error); };
+}
+
+void InstrumentHostService::loadEffectPresetRecord (const LibraryRecord& record,
+    const juce::String& partId, bool addNew, std::function<void()> afterLoaded)
+{
+    const auto report = beginLibraryLoad (record, partId);
+    const auto* part = rack.getPerformance().findPart (partId);
+    if (part == nullptr)
+    {
+        const juce::String error = "Focus a rack part to load this effect preset into its insert chain.";
+        report (error); emitError (error);
+        return;
+    }
+    if (soundComparison.active) finishSoundComparison (false);
+    stopPresetAudition();
+    juce::String effectId;
+    if (! addNew)
+        for (const auto& slot : part->effects)
+            if (slot.pluginCeId == record.targetCeId)
+            { effectId = slot.effectId; break; }
+    if (effectId.isEmpty()) effectId = rack.addEffectSlot (partId);
+    auto apply = [this, record, effectId, report, afterLoaded = std::move (afterLoaded)]
+    {
+        auto* processor = rack.getEffect (effectId);
+        if (processor == nullptr) { report ("The target insert is no longer available."); return; }
+        if (const auto error = applyRecordState (*processor, record); error.isNotEmpty())
+        { report (error); emitError (error); return; }
+        report ({});
+        if (afterLoaded != nullptr) afterLoaded();
+        savePerformance();
+        emitState();
+    };
+    if (rack.getEffect (effectId) != nullptr) apply();
+    else requestEffect (effectId, record.targetCeId,
+        [apply = std::move (apply), report] (bool loaded, const juce::String& error)
+        { if (loaded) apply(); else report (error.isNotEmpty() ? error : "The effect could not be loaded."); });
+}
+
 void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
                                                const juce::String& partId,
                                                std::function<void()> afterLoaded)
 {
+    bool effectPreset = false;
+    {
+        const std::scoped_lock lock (catalogLock);
+        if (const auto* plugin = findClass (record.targetCeId)) effectPreset = ! plugin->isInstrument;
+    }
+    if (effectPreset)
+    {
+        loadEffectPresetRecord (record, partId, false, std::move (afterLoaded));
+        return;
+    }
+    const auto report = beginLibraryLoad (record, partId);
+    afterLoaded = [report, callback = std::move (afterLoaded)]
+    { report ({}); if (callback != nullptr) callback(); };
+    const auto failed = [this, report] (const juce::String& error)
+    { report (error); emitError (error); };
+    const auto completion = [report] (bool loaded, const juce::String& error)
+    { if (! loaded) report (error.isNotEmpty() ? error : "The instrument could not be loaded."); };
     if (soundComparison.active)
         finishSoundComparison (false);
     // Any explicit preset change cancels the old phrase immediately. Its future notes live
@@ -10809,7 +11232,7 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
     {
         if (part == nullptr)
         {
-            emitError ("Unknown rack part.");
+            failed ("Unknown rack part.");
             return;
         }
 
@@ -10823,7 +11246,7 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         {
             if (rack.getInstrument (partId) != nullptr || part->pluginCeId.isNotEmpty())
             {
-                emitError (record.name + " is a hardware patch — load it onto a hardware part.");
+                failed (record.name + " is a hardware patch — load it onto a hardware part.");
                 return;
             }
             rack.setHardwareConfig (partId, {});
@@ -10845,16 +11268,11 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
                               && rack.getInstrument (partId) != nullptr
                               && part->pluginCeId == record.targetCeId;
 
-    const auto applyVendorPreset = [this, record] (juce::AudioProcessor& instrument) -> bool
+    const auto applyVendorPreset = [this, record, failed] (juce::AudioProcessor& instrument) -> bool
     {
-        if (options.applyVstPreset == nullptr)
+        if (const auto error = applyRecordState (instrument, record); error.isNotEmpty())
         {
-            emitError ("Vendor preset loading is not available in this build.");
-            return false;
-        }
-        if (! options.applyVstPreset (instrument, juce::File (record.sourceLocator)))
-        {
-            emitError ("The plug-in refused this preset: " + record.name);
+            failed (error);
             return false;
         }
         return true;
@@ -10867,7 +11285,7 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         auto* instrument = rack.getInstrument (partId);
         if (const auto refusal = applyRecordState (*instrument, record); refusal.isNotEmpty())
         {
-            emitError (refusal);
+            failed (refusal);
             return;
         }
 
@@ -10890,7 +11308,7 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
         const auto* classRecord = findClass (record.targetCeId, &module);
         if (classRecord == nullptr || module == nullptr)
         {
-            emitError ("Instrument not in the catalogue: " + record.targetCeId);
+            failed ("Instrument not in the catalogue: " + record.targetCeId);
             return;
         }
         info = { classRecord->ceId, module->path, classRecord->name, classRecord->vendor };
@@ -10898,39 +11316,38 @@ void InstrumentHostService::loadPresetRecord (const LibraryRecord& record,
 
     rack.primePartState (partId, info,
                          record.sourceType == "userState" ? record.stateBlobBase64 : juce::String());
-    rack.setPartLastPreset (partId, record.recordId, record.name);
+    if (! isVendorPresetSource (record.sourceType))
+        rack.setPartLastPreset (partId, record.recordId, record.name);
+    else
+        rack.setPartLastPreset (partId, {}, {});
 
-    if (record.sourceType == "vstpreset")
+    if (isVendorPresetSource (record.sourceType))
         requestInstrument (partId, record.targetCeId,
-                           [applyVendorPreset, afterLoaded = std::move (afterLoaded)]
+                           [this, partId, record, applyVendorPreset, afterLoaded = std::move (afterLoaded)]
                            (juce::AudioProcessor& instrument)
                            {
-                               if (applyVendorPreset (instrument) && afterLoaded != nullptr)
-                                   afterLoaded();
-                           });
+                               if (applyVendorPreset (instrument))
+                               {
+                                   rack.setPartLastPreset (partId, record.recordId, record.name);
+                                   if (afterLoaded != nullptr) afterLoaded();
+                               }
+                           }, completion);
     else if (record.sourceType == "programList")
         requestInstrument (partId, record.targetCeId,
-                           [this, index = record.sourceLocator.fromLastOccurrenceOf ("/", false, false)
-                                        .getIntValue(),
-                            name = record.name,
+                           [this, record, failed,
                             afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor& instrument)
                            {
-                               if (index >= 0 && index < instrument.getNumPrograms())
-                               {
-                                   instrument.setCurrentProgram (index);
-                                   if (afterLoaded != nullptr)
-                                       afterLoaded();
-                               }
-                               else
-                                   emitError ("The plug-in no longer has this program: " + name);
-                           });
+                               if (const auto error = applyRecordState (instrument, record); error.isNotEmpty())
+                                   failed (error);
+                               else if (afterLoaded != nullptr) afterLoaded();
+                           }, completion);
     else
         requestInstrument (partId, record.targetCeId,
                            [afterLoaded = std::move (afterLoaded)] (juce::AudioProcessor&)
                            {
                                if (afterLoaded != nullptr)
                                    afterLoaded();
-                           });
+                           }, completion);
 }
 
 void InstrumentHostService::loadChainRecord (const LibraryRecord& record, const juce::String& partId)
@@ -11048,6 +11465,156 @@ void InstrumentHostService::loadRackRecord (const LibraryRecord& record)
     applyPerformance (std::move (restored));
     savePerformance();
     emitState();
+}
+
+juce::String InstrumentHostService::soundcheckCurrentItem() const
+{
+    const auto& setlist = rack.getPerformance().setlist;
+    return juce::isPositiveAndBelow (setlist.currentIndex, setlist.items.size())
+        ? setlist.items.getReference (setlist.currentIndex).itemId : juce::String();
+}
+
+juce::String InstrumentHostService::soundcheckBlockedReason() const
+{
+    if (stageLocked) return "Return to Build to measure.";
+    if (soundcheckCurrentItem().isEmpty()) return "Select a song first.";
+    if (pendingSetlistRecall.active || historyPendingLoads > 0 || ! rackProcessorsReady())
+        return "Wait for the song's instruments and effects to load.";
+    if (! pendingScenes.empty() || sceneMorph.active) return "Wait for the scene change to finish.";
+    return {};
+}
+
+void InstrumentHostService::checkSetlistSoundcheck()
+{
+    ensureLibrary();
+    juce::StringArray outputs;
+    for (const auto& device : juce::MidiOutput::getAvailableDevices()) outputs.add (device.identifier);
+    auto rig = rack.getPerformance();
+    const auto items = rig.setlist.items; // following Current rig items inherit the preceding capture
+    bool basisValid = true;
+    juce::String basis = "Current rig at check time";
+    const auto now = juce::Time::currentTimeMillis();
+    const std::scoped_lock lock (catalogLock);
+    const auto pluginIssue = [this] (const juce::String& ceId) -> juce::String {
+        const ModuleRecord* module = nullptr;
+        if (findClass (ceId, &module) == nullptr || module == nullptr) return "not in the plug-in catalogue";
+        if (const auto why = module->unavailableReason(); why.isNotEmpty()) return why;
+        if (! juce::File (module->path).exists()) return "plug-in file is missing";
+        return safeModeRefusal (module->path);
+    };
+    for (const auto& item : items)
+    {
+        auto& result = soundcheckEntries[item.itemId];
+        result.issues.clear();
+        result.checkedAt = now;
+        if (item.rackRecordId.isNotEmpty())
+        {
+            const auto* record = library.find (item.rackRecordId);
+            basisValid = record != nullptr && record->type == "rack";
+            if (! basisValid) result.issues.add ("Rack capture is missing from the Library.");
+            else
+            {
+                basis = record->name;
+                Performance parsed;
+                basisValid = Performance::fromVar (juce::JSON::parse (record->rackManifestJson), parsed);
+                if (basisValid) rig = std::move (parsed);
+                else result.issues.add ("Rack capture could not be read.");
+            }
+        }
+        else if (! basisValid) result.issues.add ("The preceding rig could not be checked; select a rig for this song.");
+        result.basis = basis;
+        if (basisValid) result.issues.addArray (soundcheckReferences (rig, item, pluginIssue, outputs));
+    }
+}
+
+void InstrumentHostService::startSoundcheck (const juce::String& itemId)
+{
+    if (itemId.isEmpty() || itemId != soundcheckCurrentItem()) { emitError ("Select this song before measuring."); return; }
+    if (const auto why = soundcheckBlockedReason(); why.isNotEmpty()) { emitError (why); return; }
+    if (soundcheckItemId.isNotEmpty()) { emitError ("Stop the current measurement first."); return; }
+    soundcheckItemId = itemId;
+    soundcheckReading = {};
+    soundcheckStartedMs = juce::Time::getMillisecondCounterHiRes();
+    soundcheckEmittedMs = soundcheckStartedMs;
+    soundcheckEntries[itemId].measurementError.clear();
+    rack.soundcheckMeter.start (++soundcheckToken);
+}
+
+void InstrumentHostService::finishSoundcheck()
+{
+    if (soundcheckItemId.isEmpty()) return;
+    rack.soundcheckMeter.stop();
+    SoundcheckMeter::Reading latest;
+    if (rack.soundcheckMeter.read (latest) && latest.token == soundcheckToken) soundcheckReading = latest;
+    auto& result = soundcheckEntries[soundcheckItemId];
+    if (soundcheckReading.samples == 0 || soundcheckReading.invalid)
+    {
+        result.measurementError = soundcheckReading.invalid ? "Invalid audio received; measurement discarded."
+            : "No audio buffers received; start the audio device or host playback and measure again.";
+        // A failed attempt does not destroy a previous usable measurement.
+    }
+    else
+    {
+        result.level = soundcheckReading;
+        result.measuredAt = juce::Time::currentTimeMillis();
+        result.measurementError.clear();
+    }
+    soundcheckItemId.clear();
+}
+
+void InstrumentHostService::tickSoundcheck()
+{
+    if (soundcheckItemId.isEmpty()) return;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (soundcheckItemId != soundcheckCurrentItem() || now - soundcheckStartedMs >= 120000.0)
+    {
+        finishSoundcheck();
+        emitState();
+        return;
+    }
+    if (now - soundcheckEmittedMs < 200.0) return;
+    soundcheckEmittedMs = now;
+    SoundcheckMeter::Reading latest;
+    if (rack.soundcheckMeter.read (latest) && latest.token == soundcheckToken) soundcheckReading = latest;
+    emitState();
+}
+
+juce::var InstrumentHostService::soundcheckPayload()
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("activeItemId", soundcheckItemId);
+    root->setProperty ("currentItemId", soundcheckCurrentItem());
+    root->setProperty ("blockedReason", soundcheckBlockedReason());
+    juce::Array<juce::var> entries;
+    juce::StringArray retained;
+    for (const auto& item : rack.getPerformance().setlist.items)
+    {
+        retained.add (item.itemId);
+        const auto found = soundcheckEntries.find (item.itemId);
+        if (found == soundcheckEntries.end()) continue;
+        const auto& result = found->second;
+        auto* row = new juce::DynamicObject();
+        row->setProperty ("itemId", item.itemId);
+        row->setProperty ("checkedAt", (double) result.checkedAt);
+        row->setProperty ("basis", result.basis);
+        juce::Array<juce::var> issues;
+        for (const auto& issue : result.issues) issues.add (issue);
+        row->setProperty ("issues", issues);
+        const bool measuring = item.itemId == soundcheckItemId;
+        const auto& level = measuring ? soundcheckReading : result.level;
+        const bool measured = level.samples > 0 && ! level.invalid;
+        row->setProperty ("measured", measured);
+        row->setProperty ("measuredAt", (double) result.measuredAt);
+        row->setProperty ("peak", measured ? (double) level.peak : 0.0);
+        row->setProperty ("rms", measured ? std::sqrt (level.energy / (double) level.samples) : 0.0);
+        row->setProperty ("seconds", level.seconds);
+        row->setProperty ("error", result.measurementError);
+        entries.add (juce::var (row));
+    }
+    for (auto it = soundcheckEntries.begin(); it != soundcheckEntries.end();)
+        if (! retained.contains (it->first)) it = soundcheckEntries.erase (it); else ++it;
+    root->setProperty ("entries", entries);
+    return juce::var (root);
 }
 
 void InstrumentHostService::refreshSetlistPreloads()
@@ -11549,7 +12116,7 @@ juce::String InstrumentHostService::slotDisplayName (const ControlBinding& bindi
 float InstrumentHostService::slotPositionFor (const ControlBinding& binding, float parameterValue)
 {
     const auto span = binding.rangeMax - binding.rangeMin;
-    const auto positioned = span > 0.0f
+    const auto positioned = span != 0.0f
                               ? juce::jlimit (0.0f, 1.0f, (parameterValue - binding.rangeMin) / span)
                               : 0.0f;
     return binding.inverted ? 1.0f - positioned : positioned;
@@ -13513,6 +14080,7 @@ bool InstrumentHostService::goToSetlistItem (int index)
     if (! juce::isPositiveAndBelow (index, currentSetlist.items.size()))
         return false;
 
+    finishSoundcheck();
     const auto item = currentSetlist.items.getReference (index);
     const auto previous = currentSetlist.currentIndex;
     pendingSetlistRecall = {};
@@ -13913,16 +14481,26 @@ void InstrumentHostService::noteMidiActivity (const juce::String& deviceName,
 
     // Controller changes additionally feed MIDI learn and the learned-slot writes, which
     // happen on the controlling thread — this only queues. Coalesced per (channel, cc):
-    // a knob sweep between drains is one entry carrying its latest value, and the arrival
-    // order of DISTINCT controllers is kept, because learn binds the first one heard.
+    // a knob sweep between drains is one entry carrying its latest position and extrema.
+    // Relative steps also compose their offset and clamped limits, so fast back-and-forth
+    // turns are retained even at an endpoint. Distinct controller order stays intact for learn.
     if (message.isController())
     {
-        const PendingCc event { message.getChannel(), message.getControllerNumber(),
+        PendingCc event { message.getChannel(), message.getControllerNumber(),
                                 message.getControllerValue() };
+        event.relativeDelta = MidiPickup::relativeStep (event.value);
+        event.relativeMinimum = juce::jlimit (0, 127, event.relativeDelta);
+        event.relativeMaximum = juce::jlimit (0, 127, 127 + event.relativeDelta);
+        event.minimum = event.maximum = event.value;
         for (auto& queued : pendingCcs)
-            if (queued.channel == event.channel && queued.cc == event.cc)
+            if (queued.note < 0 && queued.channel == event.channel && queued.cc == event.cc)
             {
                 queued.value = event.value;
+                queued.minimum = std::min (queued.minimum, event.value);
+                queued.maximum = std::max (queued.maximum, event.value);
+                queued.relativeDelta = juce::jlimit (-65536, 65536, queued.relativeDelta + event.relativeDelta);
+                queued.relativeMinimum = juce::jlimit (0, 127, queued.relativeMinimum + event.relativeDelta);
+                queued.relativeMaximum = juce::jlimit (0, 127, queued.relativeMaximum + event.relativeDelta);
                 return;
             }
         if (pendingCcs.size() < 64)
@@ -14142,8 +14720,46 @@ void InstrumentHostService::refreshSlotNoteListening()
     slotNotesWanted.store (wanted);
 }
 
+float InstrumentHostService::controlBindingPosition (const ControlBinding& binding)
+{
+    // writeMappedBinding changes the base of a modulated parameter. Pickup must follow
+    // that same base, rather than continually chasing the LFO's current contribution.
+    for (const auto& route : rack.getPerformance().modulationRoutes)
+        if (route.targetId == binding.partId && route.parameterId == binding.parameterId
+            && (isVirtualParameterId (binding.parameterId) || route.targetCeId == binding.pluginCeId))
+            return slotPositionFor (binding, route.baseValue);
+    if (isVirtualParameterId (binding.parameterId))
+        return slotPositionFor (binding, virtualParameterValue (binding.partId, binding.parameterId));
+    if (auto* parameter = resolveParameter (binding.partId, binding.parameterId))
+        return slotPositionFor (binding, parameter->getValue());
+    return 0.0f;
+}
+
+void InstrumentHostService::refreshMidiPickups()
+{
+    bool changed = false;
+    for (auto it = midiPickups.begin(); it != midiPickups.end();)
+    {
+        const auto* page = rack.getPerformance().findPage (it->first.first);
+        const auto* slot = page != nullptr ? page->findSlot (it->first.second) : nullptr;
+        auto& runtime = it->second;
+        if (slot == nullptr || ! runtime.matches (*slot) || ! bindingResolves (slot->binding))
+        {
+            changed = changed || runtime.reportedDirection != 0;
+            it = midiPickups.erase (it);
+            continue;
+        }
+        const int direction = runtime.pickup.direction (controlBindingPosition (slot->binding));
+        changed = changed || direction != runtime.reportedDirection;
+        runtime.reportedDirection = direction;
+        ++it;
+    }
+    if (changed) emitState();
+}
+
 void InstrumentHostService::drainControllerEvents()
 {
+    refreshMidiPickups();
     // Recomputed here, at the rate everything else is drained, so every path that binds or
     // unbinds a note — learn, clear, a page removed, a session restored — is covered by one
     // line rather than remembered at each of them.
@@ -14208,6 +14824,7 @@ void InstrumentHostService::drainControllerEvents()
                                       : rack.setSlotMidi (pageId, slotId, first.cc, first.channel);
             if (bound)
             {
+                midiPickups.erase ({ pageId, slotId });
                 savePerformance();
                 emitState();
                 emitMidiLearn (false, pageId, slotId, first.cc, first.channel, first.note);
@@ -14248,9 +14865,9 @@ void InstrumentHostService::drainControllerEvents()
         }
     }
 
-    // Every event lands on every slot bound to it — absolute position, the controller value
-    // scaling the slot's mapped range exactly as the on-screen knob does. The freshly
-    // learned slot is caught here too, so the knob takes effect the moment it binds.
+    // Every event lands on its bound slot. Absolute CCs scale the mapped range, optionally
+    // waiting for pickup; configured relative CCs accumulate steps. Learning uses the same
+    // path, so an opted-in absolute control cannot jump the parameter while being learned.
     //
     // A pad is a press, not a position. Momentary (the default): down is the top of the
     // range, up is the bottom — hold for a filter sweep, let go and it closes. Toggle: each
@@ -14287,8 +14904,25 @@ void InstrumentHostService::drainControllerEvents()
                 {
                     normalised = event.on ? 1.0f : 0.0f;
                 }
+                else if (slot.midiRelative)
+                {
+                    if (event.relativeDelta == 0 && event.relativeMinimum == 0 && event.relativeMaximum == 127) continue;
+                    normalised = juce::jlimit ((float) event.relativeMinimum / 127.0f,
+                        (float) event.relativeMaximum / 127.0f,
+                        controlBindingPosition (slot.binding) + (float) event.relativeDelta / 127.0f);
+                }
+                else if (slot.midiPickup && slot.binding.rangeMin != slot.binding.rangeMax)
+                {
+                    auto it = midiPickups.try_emplace (std::make_pair (page.pageId, slot.slotId),
+                        PickupRuntime { slot.binding, slot.midiCc, slot.midiChannel }).first;
+                    if (! it->second.pickup.accept (normalised, controlBindingPosition (slot.binding),
+                            (float) event.minimum / 127.0f, (float) event.maximum / 127.0f))
+                        continue;
+                }
 
                 writeMappedBinding (slot.binding, normalised);
+                if (auto it = midiPickups.find ({ page.pageId, slot.slotId }); it != midiPickups.end())
+                    it->second.pickup.written (controlBindingPosition (slot.binding));
                 auto* action = new juce::DynamicObject();
                 action->setProperty ("cmd", "setControlSlotValue");
                 action->setProperty ("pageId", page.pageId);
@@ -14573,6 +15207,26 @@ void InstrumentHostService::drainParameterEvents()
     tickRandomModulators();
     tickMidiHealth();
 
+    // A dedicated small packet, not a document/state push. Draining even when the browser
+    // is hidden prevents old audio from flashing on reopening. The graph only accumulates
+    // atomic peaks; all JSON allocation and event delivery happens here, at UI rate.
+    const auto meterReadings = rack.drainMeters();
+    if (options.emit != nullptr)
+    {
+        juce::Array<juce::var> channels;
+        for (const auto& reading : meterReadings)
+        {
+            auto* channel = new juce::DynamicObject();
+            channel->setProperty ("id", reading.id);
+            channel->setProperty ("left", reading.left);
+            channel->setProperty ("right", reading.right);
+            channels.add (juce::var (channel));
+        }
+        auto* packet = new juce::DynamicObject();
+        packet->setProperty ("channels", juce::var (channels));
+        options.emit ("instrumentHostMeters", juce::var (packet));
+    }
+
     // The MIDI activity readout: at most one event per drain, carrying the latest message —
     // a UI light needs "something arrived, this is what", not a message log.
     {
@@ -14788,6 +15442,8 @@ void InstrumentHostService::drainParameterEvents()
     // Cleared at the END of the drain: a write made during this cycle is answered by a change
     // event in this cycle, and clearing earlier would let it through as a touch.
     parametersWrittenByUs.clear();
+    refreshMidiPickups();
+    tickSoundcheck();
 }
 
 void InstrumentHostService::setEditorPaneHooks (EditorPaneHooks hooks)
@@ -15234,6 +15890,13 @@ juce::var InstrumentHostService::buildStatePayload()
             s->setProperty ("midiCc",      slot.midiCc);
             s->setProperty ("midiChannel", slot.midiChannel);
             s->setProperty ("midiNote",    slot.midiNote);
+            s->setProperty ("midiPickup",  slot.midiPickup);
+            s->setProperty ("midiRelative", slot.midiRelative);
+            int pickupDirection = 0;
+            if (auto it = midiPickups.find ({ page.pageId, slot.slotId });
+                it != midiPickups.end() && it->second.matches (slot) && resolved && slotIndex < liveSlots.size())
+                pickupDirection = it->second.pickup.direction (controlBindingPosition (b));
+            s->setProperty ("pickupDirection", pickupDirection);
             s->setProperty ("kind",        slot.kind);
             s->setProperty ("index",       slot.index);
             s->setProperty ("toggle",      b.toggle);
@@ -15612,10 +16275,19 @@ juce::var InstrumentHostService::buildStatePayload()
         return paths;
     }());
     root->setProperty ("performance", performancePayload());
+    root->setProperty ("soundcheck", soundcheckPayload());
     root->setProperty ("product", productPayload());
     root->setProperty ("reliability", reliabilityPayload());
     root->setProperty ("licence", licencePayload());
     root->setProperty ("stageLocked", stageLocked);
+    auto* history = new juce::DynamicObject();
+    const auto blockedHistory = historyBlockedReason();
+    history->setProperty ("blockedReason", blockedHistory);
+    history->setProperty ("canUndo", blockedHistory.isEmpty() && ! editHistory.undo.empty());
+    history->setProperty ("canRedo", blockedHistory.isEmpty() && ! editHistory.redo.empty());
+    history->setProperty ("undoLabel", editHistory.undo.empty() ? juce::String() : editHistory.undo.back().label);
+    history->setProperty ("redoLabel", editHistory.redo.empty() ? juce::String() : editHistory.redo.back().label);
+    root->setProperty ("editHistory", juce::var (history));
     root->setProperty ("scanning", scanBusy.load());
     juce::Array<juce::var> dockedEditors;
     for (const auto& targetId : editorTargetIds)

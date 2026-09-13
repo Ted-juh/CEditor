@@ -1,18 +1,8 @@
 <script>
-  /**
-   * The stack — the column that replaces eleven `*Order` number fields.
-   *
-   * Rows are front first. Dragging one writes new order numbers through `reorderTextStack`; the
-   * row thumbnails show what each layer contributes on its own, which is the only way to tell
-   * which of nine live effects is producing what you are looking at.
-   *
-   * Drag is pointer-based rather than HTML5 drag-and-drop: the dock is a small target, HTML5 drag
-   * images look wrong over a dark panel, and pointer capture gives the same drop-line feedback the
-   * layer tree already uses.
-   */
+  // Front-first rows share the renderer order; pointer and keyboard moves write it back.
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
-  import EffectPreview from './EffectPreview.svelte';
-  import { withOnlyEffect } from '../../utils/effectStack.js';
+  import EffectIcon from './EffectIcon.svelte';
+  import { readSection } from '../../utils/effectStack.js';
 
   let {
     control = null,
@@ -21,12 +11,8 @@
     unordered = [],
     ties = [],
     selectedKey = '',
-    soloed = [],
-    muted = [],
     onselect = () => {},
     ontoggle = () => {},
-    onsolo = () => {},
-    onmute = () => {},
     onreorder = () => {},
   } = $props();
 
@@ -37,9 +23,11 @@
   let stackable = $derived(rows.filter((row) => row.stackable));
   let tiedKeys = $derived(new Set(ties.flat().map((row) => row.key)));
 
-  function previewFor(row) {
-    return withOnlyEffect(control, domain, row.key);
+  function iconFor(row) {
+    return domain === 'component' && row.key.startsWith('shadow:')
+      ? readSection(control, row.root)?.type ?? 'shadow' : row.key;
   }
+
 
   function beginDrag(row, event) {
     if (!row.stackable || stackable.length < 2) return;
@@ -96,7 +84,6 @@
     <div
       class="srow"
       class:sel={row.key === selectedKey}
-      class:fillrow={row.key === 'fill'}
       class:off={!row.enabled}
       class:dragging={dragKey === row.key}
       class:tied={tiedKeys.has(row.key)}
@@ -135,27 +122,9 @@
         onclick={(event) => { event.stopPropagation(); ontoggle(row); }}
       ></button>
 
+      <EffectIcon name={iconFor(row)} size={20} />
       <span class="snm">
         {row.label}{#if row.note}<i>— {row.note}</i>{/if}
-      </span>
-
-      <span class="sm">
-        <button
-          type="button"
-          class:on={soloed.includes(row.key)}
-          title={`Solo ${row.label} on the specimen`}
-          onclick={(event) => { event.stopPropagation(); onsolo(row.key); }}
-        >S</button>
-        <button
-          type="button"
-          class:mu={muted.includes(row.key)}
-          title={`Mute ${row.label} on the specimen`}
-          onclick={(event) => { event.stopPropagation(); onmute(row.key); }}
-        >M</button>
-      </span>
-
-      <span class="thumb" title={`${row.label} on its own`}>
-        <EffectPreview control={previewFor(row)} boxWidth={44} boxHeight={22} fit="cover" zoom={1.25} maxScale={1.2} label={`${row.label} alone`} />
       </span>
     </div>
   {/each}
@@ -195,10 +164,8 @@
             aria-label={`${row.label} ${row.enabled ? 'on' : 'off'}`}
             onclick={(event) => { event.stopPropagation(); ontoggle(row); }}
           ></button>
+          <EffectIcon name={iconFor(row)} size={20} />
           <span class="snm">{row.label}</span>
-          <span class="thumb">
-            <EffectPreview control={previewFor(row)} boxWidth={44} boxHeight={22} fit="cover" zoom={1.25} maxScale={1.2} label={`${row.label} alone`} />
-          </span>
         </div>
       {/each}
     </div>
@@ -218,9 +185,11 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 5px;
+    padding: 5px;
+    min-height: 26px;
+    box-sizing: border-box;
     border-bottom: 1px solid #242424;
-    font-size: 10px;
+    font-size: 11px;
     position: relative;
     cursor: pointer;
     outline: none;
@@ -228,11 +197,10 @@
   .srow:last-child { border-bottom: 0; }
   .srow:hover { background: #252525; }
   .srow:focus-visible { box-shadow: inset 0 0 0 1px #5B9BD5; }
-  .srow.sel { background: #173449; box-shadow: inset 2px 0 0 #5B9BD5; }
-  .srow.fillrow { background: #191F17; box-shadow: inset 2px 0 0 #6E8A4E; }
-  .srow.fillrow.sel { background: #1E2A22; box-shadow: inset 2px 0 0 #5B9BD5; }
-  .srow.off { opacity: 0.5; }
-  .srow.dragging { background: #0B2320; box-shadow: inset 2px 0 0 #14B8A6; }
+  .srow.sel { background: #094771; box-shadow: inset 2px 0 0 #5B9BD5; }
+  .srow.off .snm { color: #888; }
+  .srow.off.sel .snm { color: #FFF; }
+  .srow.dragging { background: #094771; box-shadow: inset 2px 0 0 #5B9BD5; }
   .srow.tied .snm::after {
     content: '⚠';
     color: #E5A029;
@@ -246,7 +214,7 @@
     right: 0;
     top: -1px;
     height: 2px;
-    background: #14B8A6;
+    background: #5B9BD5;
     border-radius: 1px;
     pointer-events: none;
   }
@@ -272,7 +240,7 @@
     background: #2A2F33;
     cursor: pointer;
   }
-  .dot.on { background: #14B8A6; border-color: #0E7C70; }
+  .dot.on { background: #5B9BD5; border-color: #0B6EB5; }
   .dot.locked { cursor: default; background: #6E8A4E; border-color: #55703C; }
 
   .snm {
@@ -285,33 +253,8 @@
   }
   .snm i { font-style: normal; opacity: 0.55; margin-left: 4px; }
   .srow.sel .snm { color: #EAF5FF; }
-  .srow.fillrow .snm { color: #C7D9A8; }
-
-  .sm { display: flex; gap: 2px; flex: 0 0 auto; }
-  .sm button {
-    width: 14px;
-    height: 14px;
-    padding: 0;
-    border: 1px solid #333B42;
-    border-radius: 2px;
-    background: #12171A;
-    font: 600 7.5px/12px 'IBM Plex Mono', ui-monospace, monospace;
-    color: #69737B;
-    cursor: pointer;
-  }
-  .sm button:hover { border-color: #4A555E; color: #9AA6AE; }
-  .sm button.on { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; }
-  .sm button.mu { border-color: #5C3A3A; background: #241616; color: #D98C8C; }
-
-  .thumb {
-    flex: 0 0 44px;
-    height: 22px;
-    border: 1px solid #2E3540;
-    border-radius: 2px;
-    background: #0C0F12;
-    overflow: hidden;
-    display: flex;
-  }
+  .srow :global(.effect-icon) { color: #AABAC7; }
+  .srow.sel :global(.effect-icon) { color: #FFF; }
 
   .tiebar {
     display: flex;
@@ -320,7 +263,8 @@
     padding: 5px 6px;
     background: #241d10;
     border-top: 1px solid #4A3A1C;
-    font: 400 8.5px/1.35 'IBM Plex Mono', ui-monospace, monospace;
+    font: inherit;
+    font-size: 10px;
     color: #E5A029;
   }
 
@@ -328,9 +272,8 @@
   .ungrouped-head {
     display: block;
     padding: 5px 6px 3px;
-    font: 600 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font: inherit;
+    font-size: 10px;
     color: #616C75;
   }
 </style>

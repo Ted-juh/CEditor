@@ -20,7 +20,11 @@ import { resolvedActivePanelId, selectedComponentIds } from './panels.js';
  *   { kind: 'effects' | 'typography' | 'assets' | 'screen' | 'api', type: 'control', controlId: 'ctrl_1', domain: string|null }
  *   null — nothing armed; the tab shows its empty state.
  *
- * WHY IT DOES NOT FOLLOW THE SELECTION. Decided for the Effects tab and inherited here. The Colors
+ * Text, Effects and Screen follow selection through their own dock state by default, with optional
+ * pinning. They consume this store for explicit openers; ordinary tab clicks do not arm a target.
+ * The pin-by-default behaviour described below remains the legacy contract for other tabs.
+ *
+ * WHY IT DOES NOT FOLLOW THE SELECTION. Originally decided for Effects and inherited here. The Colors
  * tab clears its target on a selection change because a stale write-route silently repaints an
  * object the user moved on from. These tabs hold the same kind of route, so they take the rule with
  * one difference: they do not RETARGET when the selection changes, they keep editing what they were
@@ -43,13 +47,13 @@ export const editorTarget = writable(null);
  */
 export const EDITOR_TARGET_KINDS = {
   effects: { tab: 'effects', domains: ['text', 'component', 'lighting'] },
-  typography: { tab: 'type', domains: ['type', 'flow'] },
+  typography: { tab: 'type', domains: ['type', 'layout', 'fill', 'flow', 'lines', 'effects'] },
   // Assets has no halves — one library, one stage — so it has no domains. Which asset is selected
   // is the tab's own state and deliberately not carried here: `domains` is a fixed list validated
   // on the way in, and an asset name is neither fixed nor known to this file.
   assets: { tab: 'assets', domains: null },
-  // Screen has no halves either. Which page and which zone are selected are the tab's own state:
-  // both belong to the control's data, not to a fixed list this file could validate against.
+  // Screen keeps its property group in screenDockState and shares its chosen layout with the
+  // canvas through lcdDesignLayoutIds. Explicit openers only need to identify the control.
   screen: { tab: 'screen', domains: null },
   // The API tab has no halves either: which row is selected is the tab's own state.
   api: { tab: 'api', domains: null },

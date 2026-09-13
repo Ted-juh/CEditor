@@ -22,7 +22,10 @@ import {
   onInstrumentHostBuildProgress,
   onInstrumentHostParameters,
   onInstrumentHostParamValues,
+  onInstrumentHostMeters,
   onInstrumentHostLibrary,
+  onInstrumentHostLibraryLoad,
+  onInstrumentHostLibrarySaved,
   onInstrumentHostSupportBundle,
   onInstrumentHostLicenceReceipt,
   onInstrumentHostMidiActivity,
@@ -49,6 +52,7 @@ import {
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
 import { stageCommandAllowed } from '../utils/stageLock.js';
+import { receiveHostMeters, resetHostMeters } from './hostMeters.js';
 import {
   RESPONSE_CURVES, normalizeResponseCurvePoints,
 } from '../utils/responseCurve.js';
@@ -69,11 +73,34 @@ export const MEASURED_AXES = ['brightness', 'attack', 'tail', 'width', 'cost'];
 export const hostState = writable(emptyHostState());
 export const hostScanLog = writable([]);
 export const hostLastError = writable('');
+export const hostSaveNotice = writable('');
+let saveNoticeTimer;
+function clearSaveNotice() {
+  clearTimeout(saveNoticeTimer);
+  hostSaveNotice.set('');
+}
+function showLibrarySaved(payload) {
+  clearSaveNotice();
+  const name = String(payload?.name ?? '').trim();
+  if (!name) return;
+  hostSaveNotice.set(`Saved “${name}” to library.`);
+  saveNoticeTimer = setTimeout(clearSaveNotice, 5000);
+  saveNoticeTimer?.unref?.();
+}
 export const hostAudioDevices = writable(emptyAudioDevices());
 export const hostProject = writable(emptyHostProject());
 export const hostBuild = writable(emptyHostBuild());
 export const hostParameters = writable(emptyHostParameters());
 export const hostLibrary = writable(emptyHostLibrary());
+export const hostLibraryLoad = writable(normalizeLibraryLoad());
+
+export function normalizeLibraryLoad(payload = {}) {
+  return {
+    recordId: String(payload?.recordId ?? ''), name: String(payload?.name ?? ''),
+    partId: String(payload?.partId ?? ''), message: String(payload?.message ?? ''),
+    phase: ['loading', 'loaded', 'failed'].includes(payload?.phase) ? payload.phase : 'idle',
+  };
+}
 /** What the auditioner is doing, if anything. `running` is what the browser gates its
  *  Listen button on; `total` of 0 with running false is the idle state. */
 export const hostAnalysis = writable({ done: 0, total: 0, what: '', running: false });
@@ -611,6 +638,9 @@ export function cycleLibraryFacet(query, facet, value, straightToExclude = false
 
 export function emptyHostLibrary() {
   return {
+    scanning: false,
+    updateFinished: false,
+    scanReport: [],
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
               measured: 0, measurable: 0, refused: 0, snapshots: 0, snapshotBytes: 0 },
@@ -628,11 +658,21 @@ export function emptyHostLibrary() {
 export function normalizeHostLibrary(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   return {
+    scanning: p.scanning === true,
+    updateFinished: p.updateFinished === true,
+    scanReport: (Array.isArray(p.scanReport) ? p.scanReport : []).map((r) => ({
+      name: String(r?.name ?? ''), kind: String(r?.kind ?? ''),
+      count: Number(r?.count ?? 0), reason: String(r?.reason ?? ''),
+      files: Math.max(0, Number(r?.files) || 0), programs: Math.max(0, Number(r?.programs) || 0),
+      unavailable: Math.max(0, Number(r?.unavailable) || 0),
+      unnamedPrograms: Math.max(0, Number(r?.unnamedPrograms) || 0),
+    })),
     records: (Array.isArray(p.records) ? p.records : []).map((r) => ({
       recordId: String(r?.recordId ?? ''),
       type: String(r?.type ?? ''),
       sourceType: String(r?.sourceType ?? ''),
       targetCeId: String(r?.targetCeId ?? ''),
+      isEffect: r?.isEffect === true,
       name: String(r?.name ?? ''),
       manufacturer: String(r?.manufacturer ?? ''),
       instrument: String(r?.instrument ?? ''),
@@ -1123,6 +1163,32 @@ export function applyParamValues(registry, payload) {
   };
 }
 
+/** Keep page controls current even when their target is not the open parameter registry.
+ * Slot values are control positions: undo the binding's range and inversion, as native does. */
+export function applyControlSlotValues(state, payload) {
+  const changes = new Map((Array.isArray(payload?.changes) ? payload.changes : [])
+    .filter(change => Number.isFinite(change?.value)).map(change => [String(change.id), change]));
+  if (!changes.size) return state;
+  let changed = false;
+  const pages = state.rack.pages.map(page => {
+    let pageChanged = false;
+    const slots = page.slots.map(slot => {
+      const change = slot.assigned && slot.resolved && slot.partId === payload.partId
+        ? changes.get(slot.parameterId) : null;
+      if (!change) return slot;
+      const span = slot.rangeMax - slot.rangeMin;
+      const positioned = span !== 0 ? Math.max(0, Math.min(1, (change.value - slot.rangeMin) / span)) : 0;
+      const value = slot.inverted ? 1 - positioned : positioned;
+      const valueText = String(change.text ?? '');
+      if (value === slot.value && valueText === slot.valueText) return slot;
+      changed = pageChanged = true;
+      return { ...slot, value, valueText };
+    });
+    return pageChanged ? { ...page, slots } : page;
+  });
+  return changed ? { ...state, rack: { ...state.rack, pages } } : state;
+}
+
 /** How well `query` matches `text`, or -1 for no match at all.
 
     Subsequence rather than substring, because the names in a five-hundred-parameter plug-in
@@ -1259,6 +1325,7 @@ export function emptyHostState() {
     scanPaths: [],
     scanning: false,
     stageLocked: false,
+    editHistory: { canUndo: false, canRedo: false, undoLabel: '', redoLabel: '', blockedReason: '' },
     editorOpenPartId: '',
     editorOpenPartIds: [],
     floatingEditorPartIds: [],
@@ -1275,6 +1342,7 @@ export function emptyHostState() {
                                recordId: '', name: '', originalRecordId: '',
                                originalName: 'Original sound', recordIds: [] } },
     performance: emptyPerformance(),
+    soundcheck: normalizeSoundcheck(),
     product: emptyProduct(),
     reliability: emptyReliability(),
     licence: emptyLicence(),
@@ -1600,6 +1668,27 @@ export function normalizeProduct(payload) {
 
 /** The Stage 6 half of the state: one transport, the patterns and clips over it, the scenes
  *  that recall whole rigs, the compact arranger that chains them, and the setlist that walks them. */
+export function normalizeSoundcheck(payload = {}) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const nonnegative = value => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+  return {
+    activeItemId: String(p.activeItemId ?? ''), currentItemId: String(p.currentItemId ?? ''),
+    blockedReason: String(p.blockedReason ?? 'Select a song first.'),
+    entries: (Array.isArray(p.entries) ? p.entries : []).map(row => ({
+      itemId: String(row?.itemId ?? ''), checkedAt: nonnegative(row?.checkedAt), basis: String(row?.basis ?? ''),
+      issues: (Array.isArray(row?.issues) ? row.issues : []).map(String),
+      measured: row?.measured === true && typeof row?.peak === 'number' && Number.isFinite(row.peak) && row.peak >= 0
+        && typeof row?.rms === 'number' && Number.isFinite(row.rms) && row.rms >= 0,
+      measuredAt: nonnegative(row?.measuredAt), peak: nonnegative(row?.peak), rms: nonnegative(row?.rms),
+      seconds: nonnegative(row?.seconds), error: String(row?.error ?? ''),
+    })).filter(row => row.itemId),
+  };
+}
+
+export const checkSetlistSoundcheck = () => send({ cmd: 'checkSetlistSoundcheck' });
+export const startSoundcheck = itemId => send({ cmd: 'startSoundcheck', itemId });
+export const finishSoundcheck = () => send({ cmd: 'finishSoundcheck' });
+
 export function emptyPerformance() {
   return {
     transport: {
@@ -2875,6 +2964,13 @@ export function normalizeHostState(payload) {
     scanPaths: (Array.isArray(p.scanPaths) ? p.scanPaths : []).map(String),
     scanning: p.scanning === true,
     stageLocked: p.stageLocked === true,
+    editHistory: {
+      canUndo: p.editHistory?.canUndo === true,
+      canRedo: p.editHistory?.canRedo === true,
+      undoLabel: String(p.editHistory?.undoLabel ?? ''),
+      redoLabel: String(p.editHistory?.redoLabel ?? ''),
+      blockedReason: String(p.editHistory?.blockedReason ?? ''),
+    },
     // Singular is retained for compatibility with an older native host. New UI uses the set.
     editorOpenPartId: editorOpenPartIds.at(-1) ?? '',
     editorOpenPartIds,
@@ -2892,6 +2988,7 @@ export function normalizeHostState(payload) {
     performance: normalizePerformance(p.performance),
     product: normalizeProduct(p.product),
     reliability: normalizeReliability(p.reliability),
+    soundcheck: normalizeSoundcheck(p.soundcheck),
     licence: normalizeLicence(p.licence),
     rack: {
       performanceId: String(rack.performanceId ?? ''),
@@ -3155,6 +3252,11 @@ export function normalizeHostState(payload) {
           midiCc: Number.isInteger(slot?.midiCc) ? Math.max(-1, Math.min(127, slot.midiCc)) : -1,
           midiChannel: Number.isInteger(slot?.midiChannel) ? Math.max(0, Math.min(16, slot.midiChannel)) : 0,
           midiNote: Number.isInteger(slot?.midiNote) ? Math.max(-1, Math.min(127, slot.midiNote)) : -1,
+          midiPickup: slot?.midiPickup === true,
+          midiRelative: slot?.midiRelative === true,
+          pickupDirection: slot?.midiPickup === true && slot?.midiRelative !== true && slot?.toggle !== true
+            && slot?.midiCc >= 0 && !(slot?.midiNote >= 0) && [-1, 1].includes(slot?.pickupDirection)
+            ? slot.pickupDirection : 0,
           toggle: slot?.toggle === true,
           latched: slot?.latched === true,
           value: Math.max(0, Math.min(1, Number(slot?.value ?? 0) || 0)),
@@ -4861,8 +4963,9 @@ export function applyMockCommand(state, payload) {
         resolved: true,
       });
     } else {
-      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label'])
+      for (const key of ['rangeMin', 'rangeMax', 'inverted', 'bipolar', 'toggle', 'label', 'midiPickup', 'midiRelative'])
         if (payload[key] !== undefined) slot[key] = payload[key];
+      slot.pickupDirection = 0;
       if (payload.label !== undefined && payload.label) slot.displayName = String(payload.label);
     }
     return next;
@@ -6088,7 +6191,11 @@ export function initInstrumentHostBridge() {
   onInstrumentHostProject((payload) => hostProject.set(normalizeHostProject(payload)));
   onInstrumentHostBuildProgress((payload) => hostBuild.update((b) => applyBuildProgress(b, payload)));
   onInstrumentHostParameters((payload) => hostParameters.set(normalizeHostParameters(payload)));
-  onInstrumentHostParamValues((payload) => hostParameters.update((r) => applyParamValues(r, payload)));
+  onInstrumentHostParamValues((payload) => {
+    hostParameters.update((r) => applyParamValues(r, payload));
+    hostState.update((state) => applyControlSlotValues(state, payload));
+  });
+  onInstrumentHostMeters(receiveHostMeters);
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
@@ -6285,14 +6392,23 @@ export function initInstrumentHostBridge() {
       patchName: String(p?.patchName ?? ''),
     })).filter((p) => p.partId),
   ));
-  onInstrumentHostState((payload) => hostState.set(normalizeHostState(payload)));
+  onInstrumentHostState((payload) => {
+    const next = normalizeHostState(payload);
+    if (next.rack.performanceId !== get(hostState).rack.performanceId) resetHostMeters();
+    hostState.set(next);
+  });
   onInstrumentHostScanProgress((payload) => {
     hostScanLog.update((lines) => [...lines.slice(-49), String(payload?.line ?? '')]);
     // done means the catalogue changed on the scan thread; the fresh snapshot has to come
     // through the normal command path (see InstrumentHostService.cpp, runScanNow).
     if (payload?.done === true) send({ cmd: 'getState' });
   });
-  onInstrumentHostError((payload) => hostLastError.set(String(payload?.message ?? '')));
+  onInstrumentHostError((payload) => {
+    clearSaveNotice();
+    hostLastError.set(String(payload?.message ?? ''));
+  });
+  onInstrumentHostLibrarySaved(showLibrarySaved);
+  onInstrumentHostLibraryLoad((payload) => hostLibraryLoad.set(normalizeLibraryLoad(payload)));
   send({ cmd: 'getState' });
 }
 
@@ -6368,6 +6484,10 @@ function mockGenericLayout(own) {
 }
 
 function send(payload) {
+  if (['saveUserPreset', 'saveChainToLibrary', 'saveRackToLibrary'].includes(payload?.cmd)) {
+    clearSaveNotice();
+    hostLastError.set('');
+  }
   if (!isJuceAvailable()) {
     if (payload?.cmd === 'beginStageUnlock') {
       if (get(hostState).stageLocked && mockStageUnlockStartedAt <= 0)
@@ -6891,6 +7011,14 @@ function send(payload) {
       // A hardware part saves the patch it captured; with nothing captured there is nothing
       // to save, and the native side refuses aloud — so does this.
       const hardwarePatch = kind === 'preset' && part?.hardware === true;
+      if (kind !== 'rack' && !part) {
+        hostLastError.set('Unknown rack part.');
+        return;
+      }
+      if (kind !== 'rack' && !hardwarePatch && !part.hasInstrument) {
+        hostLastError.set('That part has no instrument to capture.');
+        return;
+      }
       if (hardwarePatch && !(part.hardwarePatchBytes > 0)) {
         hostLastError.set('Capture a patch from the synth first — there is nothing to save yet.');
         return;
@@ -6923,6 +7051,7 @@ function send(payload) {
       if (kind === 'preset' && part)
         hostState.update((st) => withPart(st, part.partId,
           () => ({ presetRecordId: recordId, presetName: payload.name || fallbackName })));
+      showLibrarySaved({ name: payload.name || fallbackName });
       return;
     }
     if (payload?.cmd === 'setLibraryUserMetadata') {
@@ -7120,6 +7249,8 @@ export const setStageLock = (enabled) => send({ cmd: 'setStageLock', enabled: en
 export const beginStageUnlock = () => send({ cmd: 'beginStageUnlock' });
 export const cancelStageUnlock = () => send({ cmd: 'cancelStageUnlock' });
 export const scanForInstruments = () => send({ cmd: 'scan' });
+export const undoHostEdit = () => send({ cmd: 'undoHostEdit' });
+export const redoHostEdit = () => send({ cmd: 'redoHostEdit' });
 export const addScanPath = (path) => send({ cmd: 'addScanPath', path });
 export const browseScanPath = () => send({ cmd: 'browseScanPath' });
 export const removeScanPath = (path) => send({ cmd: 'removeScanPath', path });
@@ -7322,8 +7453,16 @@ export const learnSurfaceControl = (pageId, kind, index) => {
 export const clearControlSlot = (pageId, slotId) => send({ cmd: 'clearControlSlot', pageId, slotId });
 export const setControlSlotOptions = (pageId, slotId, fields) =>
   send({ cmd: 'setControlSlotOptions', pageId, slotId, ...fields });
-export const setControlSlotValue = (pageId, slotId, value) =>
-  send({ cmd: 'setControlSlotValue', pageId, slotId, value });
+export const setControlSlotValue = (pageId, slotId, value) => {
+  const slot = get(hostState).rack.pages.find(page => page.pageId === pageId)?.slots.find(slot => slot.slotId === slotId);
+  if (!slot?.assigned || !slot.resolved || !Number.isFinite(value)) return;
+  const position = Math.max(0, Math.min(1, value));
+  const mapped = slot.rangeMin + (slot.inverted ? 1 - position : position) * (slot.rangeMax - slot.rangeMin);
+  // Reflect a drag immediately; native deltas reconcile quantized values and hardware moves.
+  hostState.update(state => applyControlSlotValues(state, { partId: slot.partId,
+    changes: [{ id: slot.parameterId, value: mapped }] }));
+  send({ cmd: 'setControlSlotValue', pageId, slotId, value: position });
+};
 export const learnControlSlotMidi = (pageId, slotId) => {
   if (!isJuceAvailable()) {
     // The mock binds instantly (no hardware to wait for), so arming never sticks.

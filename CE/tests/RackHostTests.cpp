@@ -14,6 +14,7 @@
 #include "InstrumentHost/PluginWorkerBoundary.h"
 #include "StubSynthProcessor.h"
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -873,6 +874,128 @@ void testLayerVoiceAllocationAndCrossfade()
     }
 }
 
+void testStereoMeters()
+{
+    std::cout << "\nstereo output meters" << std::endl;
+    ceditor::host::StereoPeakMeter meter;
+    juce::AudioBuffer<float> audio (2, 64);
+    audio.clear();
+    audio.setSample (0, 2, -1.25f);
+    audio.setSample (1, 4, 0.3f);
+    meter.capture (audio);
+    check (near (audio.getSample (0, 2), -1.25f), "meter capture leaves audio untouched");
+    audio.clear();
+    meter.capture (audio);
+    const auto peak = meter.drain();
+    check (near (peak.left, 1.25f) && near (peak.right, 0.3f),
+           "stereo peaks retain a one-sample overload across quieter blocks");
+    const auto empty = meter.drain();
+    check (near (empty.left, 0) && near (empty.right, 0), "draining starts a fresh interval");
+
+    Rig rig;
+    const auto part = rig.host.addPart();
+    rig.load (part, 0.8f);
+    const auto bus = rig.host.addBus ("Synths");
+    const auto send = rig.host.addReturn ("Space");
+    rig.host.setPartDestination (part, bus);
+    rig.host.setVolume (part, 0.5f);
+    rig.host.setPan (part, 0.5f);
+    rig.host.setSendLevel (part, send, 0.5f);
+    rig.host.setBusLevel (bus, 0.5f);
+    rig.host.setReturnLevel (send, 0.5f);
+    rig.host.setMasterLevel (0.5f);
+    for (const auto& chain : { part, bus, send, juce::String ("master") })
+    {
+        const auto id = rig.host.addEffectSlot (chain);
+        check (rig.host.commitEffectLoad (id, rig.host.beginEffectLoad (id),
+                   std::make_unique<ceditor::test::StubEffectProcessor> (0.5f),
+                   { "stub.effect", "stub", "Half", "Test" }), "meter fixture installs its insert");
+    }
+    rig.noteOn (1, 60);
+    for (int i = 0; i < 64; ++i) rig.process(); // settle ramps and graph latency compensation
+    rig.host.drainMeters();
+    rig.process();
+    const auto readings = rig.host.drainMeters();
+    auto expect = [&] (const juce::String& id, float left, float right)
+    {
+        for (const auto& reading : readings)
+            if (reading.id == id)
+            {
+                check (near (reading.left, left) && near (reading.right, right),
+                       "post-insert/fader meter matches stereo audio for " + id);
+                return;
+            }
+        check (false, "missing meter " + id);
+    };
+    expect (part, 0.1f, 0.2f);
+    expect (bus, 0.025f, 0.05f);
+    expect (send, 0.0125f, 0.025f);
+    expect ("@master", 0.009375f, 0.01875f);
+    check (near (rig.level (0), 0.009375f) && near (rig.level (1), 0.01875f),
+           "metering does not change the final mix");
+    rig.host.setMute (part, true);
+    for (int i = 0; i < 64; ++i) rig.process();
+    rig.host.drainMeters();
+    rig.process();
+    for (const auto& reading : rig.host.drainMeters())
+        check (near (reading.left, 0) && near (reading.right, 0), "mute reaches downstream output meters");
+    rig.host.removePart (part);
+    rig.host.removeBus (bus);
+    rig.host.removeReturn (send);
+    const auto remaining = rig.host.drainMeters();
+    check (remaining.size() == 1 && remaining[0].id == "@master", "removed channels leave no dangling meter entries");
+}
+
+void testSoundcheckMeter()
+{
+    std::cout << "\nSoundcheck peak and RMS" << std::endl;
+    ceditor::host::SoundcheckMeter meter;
+    ceditor::host::SoundcheckMeter::Reading reading;
+    juce::AudioBuffer<float> audio (2, 4);
+    audio.clear();
+    meter.capture (audio, 48000);
+    check (meter.read (reading) && reading.samples == 0, "inactive measurement has no samples");
+    meter.start (1);
+    meter.capture (audio, 48000);
+    check (meter.read (reading) && reading.token == 1 && reading.samples == 8 && reading.energy == 0,
+           "processed silence is a real zero-level measurement");
+    for (int channel = 0; channel < 2; ++channel)
+        for (int sample = 0; sample < 4; ++sample) audio.setSample (channel, sample, -0.5f);
+    meter.capture (audio, 48000);
+    check (meter.read (reading) && reading.samples == 16 && near (reading.peak, 0.5f)
+           && near ((float) std::sqrt (reading.energy / reading.samples), std::sqrt (0.125f)),
+           "RMS includes the silent passage instead of averaging block peaks");
+    check (near (audio.getSample (0, 0), -0.5f), "soundcheck leaves the audio unchanged");
+    meter.stop();
+    meter.capture (audio, 48000);
+    meter.read (reading);
+    check (reading.samples == 16, "stopped measurement no longer accumulates");
+    meter.start (2);
+    meter.capture (audio, 48000);
+    audio.setSize (2, 12); audio.clear();
+    meter.capture (audio, 48000);
+    meter.read (reading);
+    check (reading.token == 2 && reading.samples == 32 && near ((float) reading.energy, 2)
+           && near ((float) std::sqrt (reading.energy / reading.samples), 0.25f),
+           "new passage resets and unequal block sizes are weighted by samples");
+    meter.start (3);
+    audio.setSample (0, 0, std::numeric_limits<float>::quiet_NaN());
+    meter.capture (audio, 48000); meter.read (reading);
+    check (reading.invalid, "nonfinite audio invalidates the passage");
+
+    Rig rig;
+    const auto part = rig.host.addPart();
+    rig.load (part, 0.8f);
+    rig.host.setMasterLevel (0.5f);
+    rig.noteOn (1, 60); rig.settle();
+    rig.host.soundcheckMeter.start (1); rig.process(); rig.host.soundcheckMeter.stop();
+    rig.host.soundcheckMeter.read (reading);
+    check (reading.samples == 128 && near (reading.peak, 0.4f)
+           && near ((float) std::sqrt (reading.energy / reading.samples), 0.4f),
+           "real graph soundcheck measures the main output after the master fader");
+    check (near ((float) reading.seconds, 64.0f / 48000.0f, 0.000001f), "duration counts frames, not stereo samples");
+}
+
 int main()
 {
     std::cout << "RackHost tests" << std::endl;
@@ -889,6 +1012,8 @@ int main()
     testConfigurationMidiDelivery();
     testProcessorFailureContainment();
     testLayerVoiceAllocationAndCrossfade();
+    testStereoMeters();
+    testSoundcheckMeter();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

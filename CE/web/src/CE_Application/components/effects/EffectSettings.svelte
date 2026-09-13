@@ -1,257 +1,80 @@
 <script>
-  /**
-   * The selected effect's fields — the third column.
-   *
-   * NO SLIDERS, which is a house rule for this tab and not a compromise. Every number here is a
-   * `NumberCell`: its label is a horizontal drag handle, its steppers give exact increments
-   * (Shift = ×10) and the value is always typeable. Its own comment calls this "three ways in, no
-   * modes". A slider would trade the precision for a rough gesture and eat the width the dock is
-   * being used for. Angles are number fields with an orientation glyph beside them, not dials.
-   *
-   * There is no Order field. The stack is the order — that is the whole point of the column to the
-   * left of this one — so the footer says where the row sits instead of offering a number to type.
-   */
+  import PropertySection from '../../properties/PropertySection.svelte';
+  import PropertyCell from '../../properties/PropertyCell.svelte';
+  import PropertyColor from '../../properties/PropertyColor.svelte';
+  import PropertyToggle from '../../properties/PropertyToggle.svelte';
   import NumberCell from '../../properties/NumberCell.svelte';
-  import Segmented from '../../properties/Segmented.svelte';
-  import EffectColourPopover from './EffectColourPopover.svelte';
-  import { visibleFields } from '../../utils/effectStack.js';
+  import OpenInDock from '../../properties/OpenInDock.svelte';
+  import { activateColorTarget } from '../../stores/colorTarget.js';
 
-  let {
-    row = null,
-    values = null,
-    stackIndex = -1,
-    stackSize = 0,
-    onset = () => {},
-    ontoggle = () => {},
-  } = $props();
-
-  let openColour = $state('');
-
-  let fields = $derived(row ? visibleFields(row, values ?? {}) : []);
-
-  const titleCase = (value) => String(value)
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (ch) => ch.toUpperCase());
-
-  function segOptions(options) {
-    return options.map((option) => ({ value: option, label: titleCase(option) }));
-  }
-
-  function swatch(value) {
-    const hex = String(value ?? '000000').replace(/^#/, '');
-    return hex.length >= 8 ? `#${hex.slice(2)}` : `#${hex.padStart(6, '0').slice(-6)}`;
-  }
-
-  function swatchAlpha(value) {
-    const hex = String(value ?? '').replace(/^#/, '');
-    return hex.length >= 8 ? parseInt(hex.slice(0, 2), 16) / 255 : 1;
+  let { row = null, values = null, controlId = '', colourRoot = null, stackIndex = -1, stackSize = 0,
+    onset = () => {}, ontoggle = () => {}, onreorder = () => {} } = $props();
+  const titleCase = (value) => String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+  function colourChanged(key, value) {
+    let hex = String(value).replace(/^#/, '');
+    if (/^[0-9a-f]{6}$/i.test(hex)) hex = `FF${hex}`;
+    if (/^[0-9a-f]{8}$/i.test(hex)) onset(row, key, hex.toUpperCase());
   }
 </script>
 
-{#if !row}
-  <div class="empty">Pick an effect on the left.</div>
-{:else}
-  <div class="fxbox">
-    <div class="fxtitle">
-      <button
-        type="button"
-        class="dot"
-        class:on={row.enabled}
-        disabled={row.alwaysOn}
-        aria-label={`${row.label} ${row.enabled ? 'on' : 'off'}`}
-        title={row.alwaysOn ? `${row.label} is always drawn` : `Toggle ${row.label}`}
-        onclick={() => ontoggle(row)}
-      ></button>
-      <b>{row.label}</b>
-      <s>{row.alwaysOn ? 'always on' : row.enabled ? 'on' : 'off'}</s>
-    </div>
-
-    {#if !fields.length}
-      <p class="note">
-        {row.key === 'fill'
-          ? 'The fill is the letterform itself. Its colour and gradient live in the Text section; it is listed here so you can move it in the stack.'
-          : 'This effect has no settings of its own.'}
-      </p>
-    {/if}
-
-    {#each fields as field (field.key)}
-      <div class="r">
-        <label for={`fx-${row.key}-${field.key}`}>{field.label}</label>
-
-        {#if field.kind === 'number'}
-          <div class="cell" class:angle={field.angle}>
-            {#if field.angle}
-              <span class="glyph" aria-hidden="true" style={`--a:${Number(values?.[field.key] ?? 0)}deg`}>
-                <svg width="12" height="12" viewBox="0 0 12 12">
-                  <circle cx="6" cy="6" r="4.5" fill="none" stroke="#3B4650" stroke-width="1" />
-                  <line x1="6" y1="6" x2="6" y2="1.5" stroke="#8FA4B0" stroke-width="1.5"
-                        transform={`rotate(${Number(values?.[field.key] ?? 0)} 6 6)`} />
-                </svg>
-              </span>
-            {/if}
-            <NumberCell
-              value={Number(values?.[field.key] ?? 0)}
-              min={field.min}
-              max={field.max}
-              step={field.step ?? 1}
-              label={field.label}
-              onchange={(next) => onset(row, field.key, next)}
-            />
-          </div>
-
-        {:else if field.kind === 'choice'}
-          <Segmented
-            options={segOptions(field.options)}
-            value={values?.[field.key]}
-            ariaLabel={field.label}
-            onchange={(next) => onset(row, field.key, next)}
-          />
-
-        {:else if field.kind === 'toggle'}
-          <Segmented
-            options={[{ value: false, label: 'Off' }, { value: true, label: 'On' }]}
-            value={values?.[field.key] === true}
-            ariaLabel={field.label}
-            onchange={(next) => onset(row, field.key, next)}
-          />
-
-        {:else if field.kind === 'colour'}
-          <div class="colourwrap">
-            <button
-              type="button"
-              id={`fx-${row.key}-${field.key}`}
-              class="chip"
-              title={`${field.label} — edit here, without leaving the specimen`}
-              onclick={() => { openColour = openColour === field.key ? '' : field.key; }}
-            >
-              <i class="sw" style={`background:${swatch(values?.[field.key])};opacity:${swatchAlpha(values?.[field.key])}`}></i>
-              <em>{String(values?.[field.key] ?? '').replace(/^#/, '').toUpperCase() || '—'}</em>
-            </button>
-            {#if openColour === field.key}
-              <EffectColourPopover
-                colour={values?.[field.key] ?? 'FF000000'}
-                label={`${row.label} ${field.label}`}
-                oninput={(hex) => onset(row, field.key, hex)}
-                oncommit={() => { openColour = ''; }}
-                oncancel={(hex) => { onset(row, field.key, hex); openColour = ''; }}
-              />
-            {/if}
-          </div>
+<div class="effect-settings">
+  {#if !row}
+    <p class="note">Pick an effect on the left.</p>
+  {:else}
+    <PropertySection title={row.label} collapseKey={row.key}>
+      {#snippet tools()}
+        {#if row.stackable && stackSize > 1}
+          <span class="position">{stackIndex + 1} / {stackSize}</span>
+          <button type="button" title="Move effect forward" aria-label="Move effect forward" disabled={stackIndex <= 0} onclick={() => onreorder(row.key, stackIndex - 1)}>↑</button>
+          <button type="button" title="Move effect backward" aria-label="Move effect backward" disabled={stackIndex >= stackSize - 1} onclick={() => onreorder(row.key, stackIndex + 1)}>↓</button>
         {/if}
-      </div>
-    {/each}
-
-    {#if row.stackable && stackIndex >= 0 && stackSize > 0}
-      <div class="orderline">
-        Order is the stack — drag the row. This one is
-        <b>{stackIndex + 1} of {stackSize}</b>{#if row.key !== 'fill'}, {stackIndex < (stackSize - 1) ? 'in front of' : 'behind'} the rest{/if}.
-      </div>
-    {/if}
-  </div>
-{/if}
+      {/snippet}
+      {#if !row.alwaysOn}
+        <PropertyCell label="Enabled"><PropertyToggle value={row.enabled} ariaLabel={`${row.label} enabled`} onchange={() => ontoggle(row)} /></PropertyCell>
+      {/if}
+      {#if row.orderPath}
+        <PropertyCell label="Draw order" compact hint="Lower orders draw behind higher orders.">
+          <NumberCell label="Order" value={row.order} step={1} onchange={(v) => onset(row, row.orderPath.split('.').at(-1), v)} />
+        </PropertyCell>
+      {/if}
+      {#each row.fields as field (field.key)}
+        <PropertyCell label={field.label} span={field.kind === 'colour' || field.kind === 'choice' ? 2 : 1}
+          compact={field.kind === 'number'} disabled={field.when ? !field.when(values ?? {}) : false}
+          hint={`${row.label}: ${field.label}.`}>
+          {#if field.kind === 'number'}
+            <NumberCell label={field.label} value={Number(values?.[field.key] ?? 0)} min={field.min} max={field.max}
+              step={field.step ?? 1} disabled={field.when ? !field.when(values ?? {}) : false} onchange={(v) => onset(row, field.key, v)} />
+          {:else if field.kind === 'choice'}
+            <select aria-label={`${row.label} ${field.label}`} value={values?.[field.key] ?? field.options[0]}
+              disabled={field.when ? !field.when(values ?? {}) : false} onchange={(event) => onset(row, field.key, event.target.value)}>
+              {#if values?.[field.key] != null && !field.options.includes(values[field.key])}<option value={values[field.key]}>{titleCase(values[field.key])}</option>{/if}
+              {#each field.options as option}<option value={option}>{titleCase(option)}</option>{/each}
+            </select>
+          {:else if field.kind === 'toggle'}
+            <PropertyToggle value={values?.[field.key] === true} ariaLabel={`${row.label} ${field.label}`}
+              disabled={field.when ? !field.when(values ?? {}) : false} onchange={(v) => onset(row, field.key, v)} />
+          {:else if field.kind === 'colour'}
+            <PropertyColor value={String(values?.[field.key] ?? 'FFFFFFFF')} onchange={(v) => colourChanged(field.key, v)}
+              onswatchclick={() => activateColorTarget({ type: 'control', controlId, path: `${colourRoot ?? row.root}.${field.key}` }, String(values?.[field.key] ?? 'FFFFFFFF'))} />
+          {/if}
+        </PropertyCell>
+      {/each}
+      {#if row.key === 'fill'}
+        <PropertyCell label="Colour and fill" span={3}><OpenInDock tab="type" domain="fill" {controlId} what="text fill" /></PropertyCell>
+      {/if}
+    </PropertySection>
+  {/if}
+</div>
 
 <style>
-  .empty {
-    padding: 16px 10px;
-    font: 400 11px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #616C75;
-  }
-
-  .fxbox {
-    background: #1E1E1E;
-    border: 1px solid #333;
-    border-radius: 4px;
-    padding: 8px;
-  }
-
-  .fxtitle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding-bottom: 7px;
-    margin-bottom: 7px;
-    border-bottom: 1px solid #2A2A2A;
-  }
-  .fxtitle b { font: 600 12px/1 'IBM Plex Sans', system-ui, sans-serif; color: #EAF5FF; }
-  .fxtitle s {
-    margin-left: auto;
-    text-decoration: none;
-    font: 500 8.5px/1 'IBM Plex Mono', ui-monospace, monospace;
-    color: #616C75;
-  }
-
-  .dot {
-    flex: 0 0 9px;
-    width: 9px;
-    height: 9px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid #3A434A;
-    background: #2A2F33;
-    cursor: pointer;
-  }
-  .dot.on { background: #14B8A6; border-color: #0E7C70; }
-  .dot:disabled { cursor: default; }
-
-  .note {
-    margin: 0 0 4px;
-    font: 400 10px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #616C75;
-  }
-
-  .r {
-    display: grid;
-    grid-template-columns: 62px minmax(0, 1fr);
-    gap: 7px;
-    align-items: center;
-    margin-top: 6px;
-  }
-  .r > label {
-    font: 400 9.5px/1.15 'IBM Plex Sans', system-ui, sans-serif;
-    color: #616C75;
-    text-align: right;
-  }
-
-  .cell { min-width: 0; display: flex; }
-  .cell.angle { gap: 5px; align-items: center; }
-  .cell.angle :global(.number-cell) { flex: 1; min-width: 0; }
-  .glyph { flex: 0 0 12px; display: flex; align-items: center; }
-
-  .colourwrap { position: relative; min-width: 0; }
-
-  .chip {
-    display: flex;
-    width: 100%;
-    height: 24px;
-    align-items: stretch;
-    border: 1px solid #333;
-    border-radius: 3px;
-    background: #1A1A1A;
-    padding: 0;
-    cursor: pointer;
-    overflow: hidden;
-  }
-  .chip:hover { border-color: #4A555E; }
-  .chip .sw { flex: 0 0 24px; border-right: 1px solid #333; }
-  .chip em {
-    flex: 1;
-    min-width: 0;
-    font: 500 10px/22px 'IBM Plex Mono', ui-monospace, monospace;
-    color: #DDD;
-    padding: 0 6px;
-    font-style: normal;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .orderline {
-    margin-top: 9px;
-    padding-top: 8px;
-    border-top: 1px solid #2A2A2A;
-    font: 400 9px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #616C75;
-  }
-  .orderline b { color: #14B8A6; font-weight: 600; }
+  .effect-settings { container: effect-settings / inline-size; min-width: 0; }
+  .effect-settings :global(.property-grid) { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .position { color: #888; font-size: 10px; margin-right: 4px; }
+  button { width: 22px; height: 20px; padding: 0; border: 1px solid #333; border-radius: 3px; background: #1A1A1A; color: #AAA; cursor: pointer; }
+  button:hover { border-color: #5B9BD5; color: #FFF; }
+  button:disabled { opacity: .4; cursor: default; }
+  select { width: 100%; height: var(--pp-field-height); padding: var(--pp-field-padding); background: var(--pp-field-bg); border: 1px solid var(--pp-field-border); border-radius: var(--pp-field-radius); color: var(--pp-field-fg); font: inherit; font-size: var(--pp-field-font); }
+  .note { padding: 8px; color: #999; }
+  @container effect-settings (max-width: 700px) { .effect-settings :global(.property-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @container effect-settings (max-width: 300px) { .effect-settings :global(.property-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); } .effect-settings :global(.span-3) { grid-column: span 2; } }
 </style>

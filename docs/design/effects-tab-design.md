@@ -1,5 +1,9 @@
 # The Effects tab
 
+Shape targeting, 2026-09-11: “Layer” is now labelled “Component”. Its Apply to selector addresses the whole component, background plus border, each of the four fill layers, or the border alone. Each target retains independent effects and uses the same preset/settings UI. Shadows and glow use rendered alpha through SVG filters, so rounded, chamfered, notched and transparent artwork contours replace the former rectangular CSS box shadow. Scoped background effects render outside the text clip. Optional target nodes materialise on first edit and survive state overrides and panel serialisation.
+
+Update, 2026-09-11: the dock now shares the Text dock's compact properties-panel styling. Only the separate specimen preview is removed. Quick selections and stack rows use semantic SVG effect icons instead of miniature component previews, beside the responsive settings grid. Effects follows the editor selection automatically; pinning is optional, like Text. All existing effect fields remain available, with drag, keyboard and button ordering plus numeric text draw order. Colours use the shared colour dock. The default height is 300px; user-resized heights are retained. The original four-column design below records the earlier iteration.
+
 Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
 
 Candidate 1 from [`display-panel-candidates.md`](display-panel-candidates.md). Drawn in

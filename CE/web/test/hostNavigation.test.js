@@ -53,14 +53,14 @@ test('every tab the host draws is a utility the navigation will accept', () => {
   assert.ok(block, 'the host view must declare its utility tabs as one list');
   const drawn = [...block.matchAll(/id: '([^']+)'/g)].map((match) => match[1]);
 
-  assert.ok(drawn.length >= 7, 'the audit must see the whole tab strip');
+  assert.ok(drawn.length >= 6, 'the audit must see the whole utility strip');
   assert.deepEqual(drawn.filter((id) => !HOST_UTILITIES.includes(id)), [],
     'a drawn tab with no entry in HOST_UTILITIES opens an empty drawer');
   assert.deepEqual(HOST_UTILITIES.filter((id) => !drawn.includes(id)), [],
     'a utility nothing draws is unreachable');
 });
 
-test('the Sounds drawer is told which part is focused', () => {
+test('the Sounds dock is told which part is focused', () => {
   // SoundBrowser takes the focused part as a prop and every per-part action in it — save
   // this sound, load into the part, morph the part between two neighbours — is disabled with
   // "focus a part first" until it is handed one. Mounted bare, the drawer drew all of those
@@ -75,4 +75,8 @@ test('the Sounds drawer is told which part is focused', () => {
     assert.match(attributes, /\{focusedPart\}|focusedPart=/, 'the browser is handed the focused part');
     assert.match(attributes, /\{partTitle\}|partTitle=/, 'and the part naming rule');
   }
+});
+
+test('a remembered Sounds drawer migrates to the bottom dock', () => {
+  assert.equal(normaliseHostNavigation({ utility: 'sounds' }).utility, '');
 });

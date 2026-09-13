@@ -9,6 +9,12 @@
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
+    "test:text-dock": "node browser-checks/textDock.mjs",
+    "test:effects-dock": "node browser-checks/effectsTab.mjs",
+    "test:shape-effects": "node browser-checks/shapeEffects.mjs",
+    "test:screen-dock": "node browser-checks/screenTab.mjs",
+    "test:screen-animation": "node browser-checks/screenAnimation.mjs",
+    "test:pixel-selection": "node browser-checks/pixelSelection.mjs",
     "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "docs:help": "node scripts/generate-help-bundle.mjs",
@@ -24,6 +30,7 @@
   },
   "dependencies": {
     "acorn": "^8.17.0",
+    "gifuct-js": "^2.1.2",
     "luaparse": "^0.3.1",
     "lucide-svelte": "^1.0.1",
     "wasmoon": "^1.16.0"

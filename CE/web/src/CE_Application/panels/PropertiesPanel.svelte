@@ -1,4 +1,5 @@
 <script>
+  import '../properties/propertyTheme.css';
   import Paintbrush from 'lucide-svelte/icons/paintbrush';
   import Type from 'lucide-svelte/icons/type';
   import Image from 'lucide-svelte/icons/image';
@@ -470,7 +471,7 @@
   }
 </script>
 
-<div class="properties-panel" style="width: {clampedWidth}px;">
+<div class="properties-panel property-theme" style="width: {clampedWidth}px;">
   {#if $activePanel}
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <PropertiesToolbar
@@ -657,19 +658,6 @@
      26px is PropertyToggle's height and it wins because it is the tallest thing already in the
      grid; matching it is what makes a toggle and a text field on the same row line up.
      -------------------------------------------------------------------------------------- */
-  .properties-panel {
-    --pp-field-height: 26px;
-    --pp-field-font: 11px;
-    --pp-field-padding: 0 6px;
-    --pp-field-radius: 3px;
-    --pp-field-bg: #1A1A1A;
-    --pp-field-border: #333;
-    --pp-field-fg: #DDD;
-    --pp-field-fg-muted: #888;
-    --pp-field-focus: #5B9BD5;
-    --pp-field-disabled-fg: #555;
-  }
-
   .properties-panel {
     display: flex;
     flex-direction: column;

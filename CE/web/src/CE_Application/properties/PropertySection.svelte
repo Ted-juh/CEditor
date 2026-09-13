@@ -66,7 +66,8 @@
     selfManaged ? ($sectionCollapse[storeKey] ?? defaultCollapsed) : collapsed === true
   );
 
-  let filter = $derived(String($propertyFilter ?? '').trim().toLowerCase());
+  const filterStore = getContext('propertyFilterStore') ?? propertyFilter;
+  let filter = $derived(String($filterStore ?? '').trim().toLowerCase());
   let filterActive = $derived(filter !== '');
   let titleMatches = $derived(filterActive && title.toLowerCase().includes(filter));
 

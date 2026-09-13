@@ -66,7 +66,7 @@
   const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
-    type: () => import('../components/TypographyTab.svelte').then((module) => ({ default: module.default })),
+    type: () => import('../components/TextDock.svelte').then((module) => ({ default: module.default })),
     assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
     screen: () => import('../components/ScreenTab.svelte').then((module) => ({ default: module.default })),
     api: () => import('../components/ApiTab.svelte').then((module) => ({ default: module.default })),
@@ -691,7 +691,7 @@
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
     { id: 'effects',  label: 'Effects',  icon: Sparkles },
-    { id: 'type',     label: 'Type',     icon: TypeIcon },
+    { id: 'type',     label: 'Text',     icon: TypeIcon },
     { id: 'assets',   label: 'Assets',   icon: Boxes },
     { id: 'screen',   label: 'Screen',   icon: MonitorIcon },
     { id: 'api',      label: 'API',      icon: Braces },

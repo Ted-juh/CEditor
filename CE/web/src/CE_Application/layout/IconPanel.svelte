@@ -513,7 +513,7 @@
     height: 100%;
     background: #252525;
     border-right: 1px solid #1A1A1A;
-    padding: 34px 0 6px 0;
+    padding: 6px 0;
     gap: 2px;
     overflow-y: auto;
   }

@@ -1,6 +1,29 @@
 # The Screen tab
 
-Status: **built**, 2026-09-10. The properties panel is untouched — see [What was built](#what-was-built).
+Status: **updated**, 2026-09-11. The Screen dock now reuses the complete DisplayEditor and
+PixelDisplayEditor in compact groups: Screen, Appearance, Content, Pages and Motion. All existing
+property editors remain accessible in the sidebar. No duplicate screen preview is rendered in the dock.
+
+Screen follows the selected component by default, with optional pinning. A shared layout selector
+keeps the dock, sidebar and main Editor on the same layout, including after visiting Colors or another
+tab. Page rules can be moved up/down. Appearance uses the shared property theme and adapts its grid
+to dock width; the first-run dock height is 300px. Existing user-resized heights remain respected.
+
+Effects → Screen also supports Pixel displays and uses the renderer's `backlightOn` field. Pixel
+displays expose dot shape without an inapplicable dot-matrix enable or pitch control.
+
+Validation: `npm run test:screen-dock` exercises production UI property coverage for all three LCD
+modes and Pixel, editing, history, follow/pin, layouts, rules and responsive sizing.
+`test/screenLighting.test.js` verifies effect mappings against actual section defaults.
+
+The original design and measurements below describe the earlier page-composition implementation.
+
+2026-09-12: Pixel Content names its coordinate units in dots and displays the current grid size.
+An editor-only element selection is shared between the table and main canvas, scoped by component
+and layout. Selecting a row or focusing a field shows the element's outline, dimensions and resize
+handle. Canvas clicks select the matching row. Add/duplicate select the new element; stable IDs keep
+selection attached through reordering. Preview/export do not render these guides.
+`npm run test:pixel-selection` verifies dimensions, two-way selection, movement and lifecycle.
 
 Candidate 4 from [`display-panel-candidates.md`](display-panel-candidates.md), after
 [Effects](effects-tab-design.md), [Typography](typography-tab-design.md) and

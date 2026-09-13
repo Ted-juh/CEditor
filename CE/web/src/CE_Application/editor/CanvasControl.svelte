@@ -64,7 +64,9 @@
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
-  import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
+  import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
@@ -1448,7 +1450,7 @@
   let handleStyle = $derived((id) => resizeHandleStyle(id, 1 / (scale || 1)));
 
   // --- Effects CSS (applied to .canvas-control and .control-content) ---
-  let shadowCSS = $derived(buildShadowCSS(effects));
+  let separateBackground = $derived(hasBackgroundEffects(background));
   let blendCSS  = $derived(buildBlendCSS(effects));
   let filterCSS = $derived(buildFilterCSS(effects));
 
@@ -3161,7 +3163,7 @@
   class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   class:mouse-transparent={mouseBlocksPointer}
   class:mouse-focus-outline={mouseFocusOutline}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; --inv-scale:{1 / (scale || 1)}; {layerTint ? `--layer-tint:${layerTint};` : ''} {canvasTransformCSS} {rootTransitionCSS} {blendCSS} {mouseCursorCSS} {mouseClipCSS} {mouseRaiseCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
   ondblclick={editorInteractionEnabled ? handleDoubleClick : undefined}
   ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
@@ -3187,8 +3189,14 @@
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
   aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
+  <EffectSurface {effects} width={displayW} height={displayH} shadowsOnly target="component">
+  {#if separateBackground}
+    <div class="control-background" style={filterCSS}>
+      <BackgroundRenderer {background} width={displayW} height={displayH} />
+    </div>
+  {/if}
   <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {absorbedFillCSS ?? ''}">
-    {#if background}
+    {#if background && !separateBackground}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
     {/if}
 
@@ -3927,6 +3935,7 @@
       {@render blockLineDecorations('front')}
     {/if}
   </div>
+  </EffectSurface>
 
   {#if showCustomHitZones && customHitZoneEntries.length}
     <div class="custom-hit-zone-label-tray" aria-hidden="true">
@@ -4169,6 +4178,7 @@
     overflow: hidden;
     pointer-events: none;
   }
+  .control-background { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 
   .interaction-debug-badge {
     position: absolute;

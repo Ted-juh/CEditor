@@ -1,5 +1,11 @@
 <script>
   import { onMount } from 'svelte';
+
+  let menuBarHeight = $state(28);
+  let contextBarElement = $state();
+  let contextBarHeight = $state(0);
+  let canvasTopInset = $state(34);
+  const iconPanelTop = $derived(menuBarHeight + (contextBarElement ? contextBarHeight : 0) + canvasTopInset);
   import { dragScrub } from './CE_Application/scrub/dragScrubAction';
   import MenuBar from './CE_Application/layout/MenuBar.svelte';
   import IconPanel from './CE_Application/layout/IconPanel.svelte';
@@ -377,11 +383,11 @@
     class:workspace-swap-b={workspaceSwapClass === 'b'}
     style="--icon-width: {workspaceChrome.iconWidth + 'px'}; --props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
   >
-    <div class="menubar-area">
+    <div class="menubar-area" bind:offsetHeight={menuBarHeight}>
       <MenuBar />
     </div>
 
-    <div class="icon-panel-area">
+    <div class="icon-panel-area" style:padding-top={`${iconPanelTop}px`}>
       <IconPanel
         showDisplayPanel={$showDisplayPanel}
         showPropertiesPanel={$showPropertiesPanel}
@@ -399,13 +405,13 @@
       <div class="editor-top-row">
         <div class="editor-canvas-col">
           {#if !isSettingsTab && !chromeWorkspaceActive}
-            <div class="context-bar-area">
+            <div class="context-bar-area" bind:this={contextBarElement} bind:offsetHeight={contextBarHeight}>
               <ContextBar />
             </div>
           {/if}
           <div class="editor-canvas-area">
             <ErrorBoundary label="The canvas">
-              <EditorCanvas />
+              <EditorCanvas bind:topInset={canvasTopInset} />
             </ErrorBoundary>
           </div>
         </div>
@@ -480,7 +486,7 @@
   }
 
   .menubar-area    { grid-area: menu; position: relative; z-index: 1000; }
-  .icon-panel-area { grid-area: icon; }
+  .icon-panel-area { grid-area: icon; min-height: 0; background: #252525; }
   .center-area     { grid-area: center; display: flex; flex-direction: column; overflow: hidden; }
   .properties-area { grid-area: props; overflow: hidden; }
   .statusbar-area  { grid-area: status; }

@@ -72,7 +72,7 @@ check('Hollow is still here, because it is the one thing the Effects tab does no
 
 const opener = await ev(() => window.__m.opener('Effects'));
 check('and the header carries the way into the tab that took the rest', () => {
-  assert.equal(opener, 'effects:ctrl_m:text');
+  assert.equal(opener, 'type:ctrl_m:effects');
 });
 
 const note = await ev(() => window.__m.note('Effects'));

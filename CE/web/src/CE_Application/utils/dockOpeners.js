@@ -35,7 +35,7 @@
  */
 export const DOCK_OPENERS = {
   effects: { tab: 'effects', label: 'Effects', kind: 'effects', domains: ['text', 'component', 'lighting'] },
-  type: { tab: 'type', label: 'Type', kind: 'typography', domains: ['type', 'flow'] },
+  type: { tab: 'type', label: 'Text', kind: 'typography', domains: ['type', 'layout', 'fill', 'flow', 'lines', 'effects'] },
   assets: { tab: 'assets', label: 'Assets', kind: 'assets', domains: [] },
   screen: { tab: 'screen', label: 'Screen', kind: 'screen', domains: [] },
   api: { tab: 'api', label: 'API', kind: 'api', domains: [] },
