@@ -56,6 +56,7 @@ renderer ever reading it.
 | Transport | 19 | 48 | — | 1 | **1** |
 | Panic | 12 | 22 | — | — | — |
 | Step Sequencer | 19 | 38 | — | 2 | — |
+| Looper | 17 | 33 | 1 | — | — |
 | (nested components) | — | 6 | — | — | **1** |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
@@ -65,17 +66,16 @@ renderer ever reading it.
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
 `behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
 `behaviourClock.mjs` — 76 verified, 0 inert, 1 unverified, 0 open defects (three found, all fixed).
-`behaviourSteps.mjs` — 38 verified over the Step Sequencer, 2 unverified, 0 open defects. The Looper
-half of that file is written but not yet green, so nothing is claimed for it here.
+`behaviourSteps.mjs` — 71 verified, 1 inert, 2 unverified, 0 open defects.
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **366 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 137 — Looper, Phrase, Recorder, Harmoniser and Setlist — are not yet
-done and are not claimed. (The Setlist's *recall* is measured, because D-10 is about it; its
-twenty-three properties are not.)
+That is **383 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 120 — Phrase, Recorder, Harmoniser and Setlist — are not yet done and
+are not claimed. (The Setlist's *recall* is measured, because D-10 is about it; its twenty-three
+properties are not.)
 
 ---
 
@@ -593,6 +593,13 @@ really is a CHILD of the container, so a grouping that quietly failed could not 
   marking it reserved and unimplemented. **Not investigated further on instruction; this is the
   recommendation, not a completed change.**
 
+- `Looper.quantizeLoop`. Declared in `sectionDefaults` and published to scripts as the `quantize`
+  verb, and read by **nothing** in `src/` — not `LooperRenderer`, not `looperLayout`, not the Looper
+  editor, which does not offer it. Worse than the unreachable inert rows rather than better: this one
+  has a caller. A script author toggles `quantize`, the call succeeds, and the loop length does not
+  snap to anything. Same smallest-honest-fix shape as `Constellation.showField` — either implement
+  the snap or stop the verb table promising it.
+
 - `Envelope.xLabel`, `Envelope.yLabel`. No reader in `CE/src`, `CE/web/src`, `tools/` or the script
   API; `EnvelopeRenderer` draws no `<text>` at all. Written only by
   `tools/scripts/an1x-panel/make-an1x-panel.mjs`. Not reachable from the properties panel either, so
@@ -702,8 +709,7 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The remaining 137 catalogue properties: Looper (written, not yet green), Phrase, Recorder,
-  Harmoniser, Setlist.
+- The remaining 120 catalogue properties: Phrase, Recorder, Harmoniser, Setlist.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:
   each rule is asserted by which page is actually on screen (a hidden part is not rendered at all,
