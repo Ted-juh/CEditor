@@ -514,10 +514,33 @@ export function createCustomComponentThumbnail(control, options = {}) {
   };
 }
 
+/**
+ * Keys `instantiateCustomComponentPackageControl` STAMPS onto an instance, which therefore describe
+ * the import rather than the component. Excluded from the fingerprint for the same reason `Core.id`
+ * is: two copies of one component are the same component.
+ *
+ * Without this the hash could never match. The stored `sourcePackage.fingerprint` is computed on the
+ * author's control at export; the live one is computed on the instance, which by then carries all of
+ * these. `CustomPackageLibrary.svelte` compares the two, so every packaged component read as "edited
+ * since package load" from the moment it was inserted — and a real edit was indistinguishable from
+ * that permanent false baseline. `packageImportedAt` is a timestamp, so the hash was not even stable
+ * between two inserts of the same package.
+ *
+ * `designWidth`/`designHeight` are in the list because they are not authored either: instantiate
+ * derives them from `Transform.width`/`height`, which the hash already covers.
+ */
+const INSTANCE_PROVENANCE_KEYS = [
+  'packageName', 'packageVersion', 'packageId', 'packageFingerprint', 'packageImportedAt',
+  'sourcePackage', 'designWidth', 'designHeight',
+];
+
 export function fingerprintCustomComponent(control) {
   const clone = deepClone(control ?? {});
   if (clone?._children?.Core) {
     delete clone._children.Core.id;
+  }
+  if (clone?._children?.Designer) {
+    for (const key of INSTANCE_PROVENANCE_KEYS) delete clone._children.Designer[key];
   }
   return hashString(stableStringify(clone));
 }

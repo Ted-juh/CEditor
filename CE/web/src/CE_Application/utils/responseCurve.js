@@ -5,14 +5,26 @@
 export const RESPONSE_CURVE_POINT_COUNT = 9;
 export const RESPONSE_CURVES = ['linear', 'soft', 'hard', 's curve', 'custom'];
 
-const clamp = (value, low, high) => Math.min(high, Math.max(low, Number(value)));
+// NaN-safe on purpose. Both scalar entry points already guard with Number.isFinite, but the nine
+// custom POINTS did not: `?? identity` substitutes for null/undefined and lets NaN through, and a
+// bare Math.min/Math.max propagates it. One NaN point then reached applyResponseCurve7, whose
+// 7-bit result is a velocity or CC byte — so a single bad point produced a NaN MIDI value and a
+// broken line in the designer. Clamping to `low` is the same answer the scalar guards already give.
+const clamp = (value, low, high) => {
+  const number = Number(value);
+  if (! Number.isFinite(number)) return low;
+  return Math.min(high, Math.max(low, number));
+};
 
 export function normalizeResponseCurvePoints(points) {
   const source = Array.isArray(points) && points.length === RESPONSE_CURVE_POINT_COUNT
     ? points : null;
   return Array.from({ length: RESPONSE_CURVE_POINT_COUNT }, (_, index) => {
     const identity = Math.round(index * 127 / (RESPONSE_CURVE_POINT_COUNT - 1));
-    return Math.round(clamp(source?.[index] ?? identity, 0, 127));
+    // A point that is not a finite number reads as "no point here", exactly like a missing one, so
+    // the curve stays on the identity line there rather than dropping to the floor.
+    const raw = Number(source?.[index]);
+    return Math.round(clamp(Number.isFinite(raw) ? raw : identity, 0, 127));
   });
 }
 
