@@ -22,7 +22,10 @@ test('the selected-control inspector exposes assignment and mapping options', ()
   assert.match(source, /Invert control direction/);
   assert.match(source, /Pad mode/);
   assert.match(source, /Clear MIDI binding/);
-  assert.match(source, /Confirm clear/);
+  assert.match(source, /<HostConfirmButton[^>]*title="Clear MIDI binding"/);
+  const confirm = fs.readFileSync(new URL('../src/CE_Application/sections/HostConfirmButton.svelte', import.meta.url), 'utf8');
+  assert.match(confirm, /if \(armed\) \{ cancel\(\); onclick\?\.\(event\); return; \}/);
+  assert.match(confirm, /aria-label=\{armed \? `Confirm:/);
 });
 
 test('the controller editor foregrounds pages, useful regions and explicit states', () => {

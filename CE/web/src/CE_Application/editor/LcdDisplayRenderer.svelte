@@ -15,6 +15,7 @@
 
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
+  import { buildGlyphMap } from '../utils/lcdUserGlyphs.js';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { composeLayout, findLayout, resolveActiveLayoutId, infoFraction, WIDGET_ZONE_KINDS, regionStartOffset } from '../utils/lcdZones.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
@@ -341,7 +342,7 @@
     const max = live?.max ?? numberOr(behavior?.max, 127);
     const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
     return {
-      present: true,
+      present: live?.present !== false,
       name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
       value: numberOr(live?.value, fallbackValue),
       min,
@@ -365,7 +366,7 @@
       const zones = isGraphic
         ? (layout?.zones ?? []).filter((z) => !WIDGET_ZONE_KINDS.has(String(z?.show ?? '')))
         : (layout?.zones ?? []);
-      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed);
+      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed, display?.__state ?? {});
     }
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const out = [];
@@ -443,6 +444,34 @@
       'mask-repeat:repeat',
     ].join('; ');
   });
+
+  // --- Pressed soft key (inverse video) ---
+  // The preview injects display.__press = { row, c0, c1 } (0-based) for ~140ms when a pressable
+  // zone is clicked. It arrives as a REGION rather than a zone id on purpose: a press that changes
+  // the page leaves its own zone behind on the old layout, so there would be nothing to look up.
+  //
+  // Character panels only, and that is a real limit rather than an oversight. On a SEGMENT panel
+  // "inverse" has no meaning — a starburst glyph has lit segments and unlit ones, and lighting all
+  // of them spells nothing. On a GRAPHIC panel the cells are drawn into a canvas bitmap, so
+  // inverting a region means flipping bits after the stamp rather than styling a span; worth
+  // doing, but it is canvas work and does not belong in this commit.
+  let pressedRegion = $derived.by(() => {
+    const press = display?.__press;
+    if (!press || isSegment || isGraphic) return null;
+    const row = Math.round(numberOr(press.row, -1));
+    if (row < 0 || row >= rows) return null;
+    const c0 = clamp(Math.round(numberOr(press.c0, 0)), 0, cols - 1);
+    const c1 = clamp(Math.round(numberOr(press.c1, 0)), c0, cols - 1);
+    return { row, c0, c1 };
+  });
+
+  function isPressedCell(r, c) {
+    return pressedRegion !== null && r === pressedRegion.row && c >= pressedRegion.c0 && c <= pressedRegion.c1;
+  }
+
+  // User glyphs (CGRAM), as character -> SVG path. Rebuilt only when the definitions change; the
+  // cell loop below does a Map lookup per cell rather than parsing anything.
+  let userGlyphs = $derived(buildGlyphMap(display?.glyphs));
 
   let backlightOn = $derived(display?.backlightOn !== false);
   let showGhost = $derived(display?.showGhost !== false);
@@ -523,6 +552,7 @@
         <div class="lcd-line" style={lineStyle}>
           {#each line as ch, c (c)}
             {@const isCursor = cursorVisible && r === cursorRow && c === cursorCol}
+            {@const isPressed = isPressedCell(r, c)}
             <span class="lcd-cell" style={cellStyle}>
               {#if isSegment}
                 {@const glyph = getSegmentGlyph(segmentType, ch)}
@@ -549,11 +579,22 @@
                 {#if showGhost}
                   <span class="lcd-ghost" style={ghostStyle}>█</span>
                 {/if}
-                {#if isCursor && effectiveCursorMode === 'block'}
+                {#if isPressed || (isCursor && effectiveCursorMode === 'block')}
                   <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
                 {/if}
                 {#if blinkOn}
-                  <span class="lcd-char" style={isCursor && effectiveCursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
+                  {@const userPath = userGlyphs.get(ch)}
+                  {#if userPath}
+                    <!-- A user-defined glyph: drawn from its own 5x8 bitmap rather than from the
+                         font, which is the whole point — no font has a bar with a foot on it. -->
+                    <svg class="lcd-glyph" viewBox="0 0 5 8" preserveAspectRatio="xMidYMid meet"
+                         style={`fill:${isPressed || (isCursor && effectiveCursorMode === 'block') ? screenCss : litCss}; opacity:${(0.35 + brightness * 0.65).toFixed(3)};`}
+                         aria-hidden="true">
+                      <path d={userPath} />
+                    </svg>
+                  {:else}
+                    <span class="lcd-char" style={isPressed || (isCursor && effectiveCursorMode === 'block') ? charInvertStyle : charStyle}>{ch}</span>
+                  {/if}
                 {/if}
               {/if}
               {#if isCursor && effectiveCursorMode === 'underline'}
@@ -639,6 +680,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /* A user glyph fills the same box a character would, so a screen mixing glyphs and text keeps
+     one baseline. Sized to the cell rather than to the font: CGRAM is 5x8 dots, not a typeface. */
+  .lcd-glyph {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    padding: 6% 12%;
+    box-sizing: border-box;
   }
 
   .lcd-ghost {

@@ -2,6 +2,7 @@
 // identity-mismatch override and dump parse/collection entry points. Falls back to the local
 // engine when the JUCE bridge is unavailable or a draft source is being edited.
 import { get } from 'svelte/store';
+import { recordDeviceParameterValue } from './deviceParameterValues.js';
 import {
   compileParameterMessage,
   getDeviceDiagnostics,
@@ -196,6 +197,10 @@ export function commitDeviceParameter({
   }
 
   payload.profileId = resolved.profileId;
+
+  // The outbound half of the device's live state. Recorded only once the send actually resolves,
+  // so a parameter the profile could not compile is not reported as though it had been set.
+  recordDeviceParameterValue(deviceRole, parameterId, value);
 
   if (interactionPhase === 'continuous') {
     queueContinuousParameterSend(payload);

@@ -20,10 +20,12 @@ test('dense host workspaces retain readable rows and values', () => {
   const performance = read('PerformancePanel.svelte');
   const controller = read('HostSurfacePanel.svelte');
 
-  assert.match(mixer, /min-width: 98px/);
+  const stripRule = mixer.match(/\.strip\s*\{([^}]+)\}/)?.[1] ?? '';
+  assert.ok(Number(stripRule.match(/min-width:\s*(\d+)px/)?.[1]) >= 98,
+    'mixer strips must remain at least 98px wide');
   assert.match(mixer, /\.db \{ font-size: 12px/);
   assert.match(performance, /\.step \{[\s\S]{0,80}height: 28px/);
-  assert.match(controller, /\.param-chip \{[\s\S]{0,100}min-height: 30px/);
+  assert.match(controller, /\.param-chip \{[^}]*min-height: 30px/);
 });
 
 test('the reliability panel explains the real plug-in process boundary', () => {

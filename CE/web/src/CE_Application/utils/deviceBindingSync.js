@@ -1,4 +1,5 @@
 import { get } from 'svelte/store';
+import { recordDeviceParameterValue } from '../stores/deviceParameterValues.js';
 import { panels, resolvedActivePanelId } from '../stores/panels.js';
 import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/interactionPreview.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
@@ -91,6 +92,10 @@ export function syncDeviceParameterToPanelPreview(deviceRole, parameterId, value
   const parameter = String(parameterId ?? '');
   const skipControlId = String(options?.skipControlId ?? '');
   if (!parameter) return 0;
+
+  // The device told us what this parameter is. Record it before fanning it out to bound controls:
+  // a display zone naming '@param:...' reads it from here, and has no control to read it from.
+  recordDeviceParameterValue(role, parameter, value);
 
   const activePanelId = get(resolvedActivePanelId);
   const panel = get(panels).find((entry) => entry.id === activePanelId) ?? null;

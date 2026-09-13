@@ -116,7 +116,7 @@
     const max = live?.max ?? numberOr(behavior?.max, 127);
     const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
     return {
-      present: true,
+      present: live?.present !== false,
       name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
       value: numberOr(live?.value, fallbackValue),
       min,

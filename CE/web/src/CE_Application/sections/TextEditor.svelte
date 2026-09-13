@@ -889,7 +889,7 @@
       {#if !dock || dockGroup === 'type'}
         <div class="text-group" class:dock-group={dock}>
           {#if dock}
-            <PropertySection title="Spacing & editing">
+      <PropertySection title="Spacing & editing" icon={Pencil}>
               {@render spacingFields()}
               {#if String(core?.controlType ?? '') === 'Label'}
                 <PropertyCell label="Editable" span={2} hint="Allow the label text to be edited at runtime."><PropertyToggle value={text?.editable === true} onchange={(value) => set('Text.editable', value)} /></PropertyCell>

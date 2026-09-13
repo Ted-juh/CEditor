@@ -14,6 +14,7 @@
     "test:shape-effects": "node browser-checks/shapeEffects.mjs",
     "test:screen-dock": "node browser-checks/screenTab.mjs",
     "test:screen-animation": "node browser-checks/screenAnimation.mjs",
+    "test:screen-runtime": "node browser-checks/screenRuntime.mjs",
     "test:pixel-selection": "node browser-checks/pixelSelection.mjs",
     "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",

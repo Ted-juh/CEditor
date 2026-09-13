@@ -15,7 +15,7 @@ try{
   const id=c.addControl('PixelDisplay')._children.Core.id;
   c.applyControlPatch(id,{'Core.name':'Pixel selection example','Transform.x':50,'Transform.y':40,'Transform.width':400,'Transform.height':240,
    'Pixel.pixelsW':128,'Pixel.pixelsH':64,'Pixel.padding':8,'Pixel.showGrid':true,'Pixel.snapGrid':1,
-   'Pixel.elements':[{id:'title',kind:'static',text:'CUTOFF',x:4,y:4,w:80,h:8},{id:'bar',kind:'hbar',x:4,y:24,w:20,h:12},
+   'Pixel.elements':[{id:'title',kind:'static',text:'CUTOFF',x:4,y:4,w:80,h:8},{id:'bar',name:'meter',kind:'hbar',x:4,y:24,w:20,h:12,extension:{keep:true}},
      {id:'auto',kind:'static',text:'AUTO',x:4,y:44,w:0,h:8}]});
   p.selectComponent(id);(await import('/src/CE_Application/stores/panelVisibility.js')).showDisplayPanel.set(true);
   (await import('/src/CE_Application/stores/displayTab.js')).displayTabRequest.set({tab:'screen'});return id;
@@ -40,6 +40,12 @@ try{
  await dock.getByRole('button',{name:'Select element 2',exact:true}).click();const b=await bar.boundingBox();
  await page.mouse.move(b.x+10,b.y+10);await page.mouse.down();await page.mouse.move(b.x+40,b.y+10,{steps:5});await page.mouse.up();await settle();
  assert.equal(await rows.nth(1).locator('[title^="X: dot columns"] input').inputValue(),'14');
+ const moved=await page.evaluate(async id=>{
+   const {get}=await import('/node_modules/svelte/src/store/index-client.js');
+   const {panels}=await import('/src/CE_Application/stores/panels.js');
+   return get(panels).flatMap(p=>p.controls).find(c=>c._children.Core.id===id)._children.Pixel.elements.find(e=>e.id==='bar');
+ },id);
+ assert.equal(moved.name,'meter');assert.deepEqual(moved.extension,{keep:true});
  await rows.nth(1).locator('button[title="More element settings"]').click();
  await dock.locator('.el-extra button[title="Move up (paints earlier)"]').click();await settle();
  assert.match(await rows.first().getAttribute('class'),/element-selected/);assert.match(await bar.getAttribute('class'),/selected/);

@@ -53,6 +53,23 @@ try {
   assert.deepEqual(actual,expected,`${type??'pixel'}: all sidebar sections and fields available`);
  }
  console.log('ok LCD character, segment, graphic and Pixel property coverage');
+ // Integration: main's programmable glyphs remain editable in the compact dock,
+ // and their renderer updates in the actual component above the dock.
+ await select(lcd);await patch(lcd,{'Display.panelType':'character','Display.line1':'A'});await group('Content');
+ const glyphs=dock.locator('[data-screen-section="Glyphs"]');
+ assert.equal(await glyphs.locator('.gl-slot').count(),8);
+ await glyphs.getByRole('button',{name:'Clear all',exact:true}).click();
+ await glyphs.getByRole('button',{name:'pixel 1,1',exact:true}).click();
+ await glyphs.locator('.gl-claim-in').fill('A');await glyphs.locator('.gl-claim-in').press('Tab');await settle();
+ assert.equal((await read(lcd,'Display.glyphs'))[0].for,'A');
+ const renderedGlyph=page.locator(`[data-control-id="${lcd}"] .lcd-glyph path`).first();
+ assert.equal(await renderedGlyph.getAttribute('d'),'M0 0h1v1h-1z');
+ await glyphs.locator('button[title="Nudge right"]').click();await settle();
+ assert.equal(await renderedGlyph.getAttribute('d'),'M1 0h1v1h-1z');
+ await glyphs.getByRole('button',{name:'Bar set',exact:true}).click();await settle();
+ assert.equal((await read(lcd,'Display.glyphs')).filter(g=>g.for).length,8);
+ await group('Pages');assert.equal(await dock.locator('[data-screen-section="Glyphs"]').count(),0);
+ console.log('ok merged glyph authoring, character claims and live component rendering');
  await select(lcd);await group('Appearance');
  await page.evaluate(async()=>(await import('/src/CE_Application/stores/propertyFilter.js')).propertyFilter.set('nothing-matches-this'));
  assert.equal(await cell('Brightness').isVisible(),true);
@@ -78,6 +95,22 @@ try {
   assert.ok(((await read(id,`${section}.layouts`))[0][section==='Display'?'zones':'elements']??[]).length>0);
  }
  console.log('ok create layouts, reorder rules and add zones/elements');
+ // Script-authored layout/zone fields are not represented by every inspector
+ // input. Editing and duplicating through Content must round-trip them intact.
+ const savedLayouts=await read(lcd,'Display.layouts');
+ savedLayouts[0].cursorMax=5;savedLayouts[0].timeoutMs=2500;savedLayouts[0].timeoutTo='home';
+ savedLayouts[0].zones[0].press={cursor:1};savedLayouts[0].zones[0].visibleWhen={cursor:2};
+ savedLayouts[0].zones[0].sourceId='@state:cursor';
+ await patch(lcd,{'Display.layouts':savedLayouts});await select(lcd);await group('Content');
+ const zone=dock.locator('.zone-cell').first();
+ await zone.locator('[title="Row"] input').fill('2');await zone.locator('[title="Row"] input').press('Enter');
+ await zone.locator('button[title^="More zone settings"]').click();
+ await dock.locator('button[title="Duplicate zone"]').click();await settle();
+ const roundTrip=(await read(lcd,'Display.layouts'))[0];
+ assert.equal(roundTrip.cursorMax,5);assert.equal(roundTrip.timeoutMs,2500);assert.equal(roundTrip.timeoutTo,'home');
+ for(const z of roundTrip.zones){assert.deepEqual(z.press,{cursor:1});assert.deepEqual(z.visibleWhen,{cursor:2});assert.equal(z.sourceId,'@state:cursor');}
+ console.log('ok Screen edits preserve script-authored layout and zone fields');
+ await select(pixel);
  await group('Pages');await dock.locator('button[title="Add layout"]').click();await settle();
  const activeLayout=await dock.getByLabel('Active screen layout').inputValue();
  await group('Content');

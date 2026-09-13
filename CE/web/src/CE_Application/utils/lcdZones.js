@@ -24,6 +24,16 @@ export function infoFraction(info) {
 }
 
 const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
+
+/**
+ * Every character `barString` can emit, full block first and then the seven partials.
+ *
+ * Exported so the glyph editor can offer exactly these to claim, rather than re-spelling them:
+ * eight characters, which is exactly the eight CGRAM slots a hardware panel has, and that is not a
+ * coincidence — a claiming set for these is what a bargraph glyph set IS.
+ */
+export const BAR_CHARS = `█${BAR_EIGHTHS.slice(1)}`;
+
 export function barString(frac, width) {
   const w = Math.max(1, Math.round(width));
   const eighths = Math.round(clamp(frac, 0, 1) * w * 8);
@@ -67,6 +77,177 @@ export const ACTIVE_SOURCE_ID = '@active';
 // The reserved source for the display's own editable text buffer (Display.editText).
 // A zone with show:'edit' bound to this shows/edits the preset-name field.
 export const EDIT_SOURCE_ID = '@edit';
+
+// A zone may name the DISPLAY'S OWN STATE — today that is one thing, the menu cursor.
+//
+// `pages.selectorMap` and `overlays` answer from the panel's values, and `press`/`timeoutMs` move
+// between pages. None of them can hold "which item is selected", because a layout is a list of
+// zones and not a record. A menu could be entered and left but never scrolled.
+//
+//   '@state:cursor'   the selection index on this display, 0-based
+export const STATE_SOURCE_PREFIX = '@state:';
+
+export function isStateSource(id) {
+  return String(id ?? '').startsWith(STATE_SOURCE_PREFIX);
+}
+
+/** The state key a '@state:...' source names, or '' when it is not one. */
+export function stateKeyOf(id) {
+  return isStateSource(id) ? String(id).slice(STATE_SOURCE_PREFIX.length).trim() : '';
+}
+
+/**
+ * Move a selection index, wrapping at both ends.
+ *
+ * WRAPPING RATHER THAN CLAMPING. A three-item menu where holding the down key sticks on the last
+ * row reads as broken, and every hardware menu short enough to fit one of these screens wraps.
+ * Clamping would need a flag; nobody has asked for one, and a flag nobody asked for is a setting
+ * everyone has to read past.
+ */
+export function moveCursor(current, delta, max) {
+  const n = Math.max(0, Math.round(numberOr(max, 0)));
+  if (n === 0) return 0;                       // a page with no list: nowhere to move
+  const span = n + 1;
+  const at = Math.round(numberOr(current, 0)) + Math.round(numberOr(delta, 0));
+  return ((at % span) + span) % span;
+}
+
+/** Zone info for a state value, so `value`, `pct` and `bar` render it like anything else. */
+export function stateInfo(value, max) {
+  const n = Math.max(0, Math.round(numberOr(max, 0)));
+  return {
+    present: true,
+    name: '',
+    value: clamp(Math.round(numberOr(value, 0)), 0, n),
+    min: 0,
+    max: n,
+    text: '',
+    on: false,
+  };
+}
+
+/**
+ * Is a zone shown, given the display's state?
+ *
+ * `visibleWhen: { cursor: 1 }` is how a menu draws its selection marker: one arrow zone per row,
+ * each shown only on its own index. Authoring N zones for N rows is honest for a screen four rows
+ * tall, and it needs no new drawing — the zone engine already paints or skips a zone.
+ */
+export function zoneVisibleWith(zone, state = {}) {
+  if (!zone || zone.visible === false) return false;
+  const when = zone.visibleWhen;
+  if (!when || typeof when !== 'object') return true;
+  for (const [key, want] of Object.entries(when)) {
+    if (Math.round(numberOr(state?.[key], 0)) !== Math.round(numberOr(want, 0))) return false;
+  }
+  return true;
+}
+
+// A zone may name a DEVICE PARAMETER instead of a panel control.
+//
+// Until this existed, a zone's sourceId was always a control id, so showing a device parameter
+// meant creating a control, binding it, and pointing the zone at the control. A screen reporting
+// eight parameters needed eight controls that existed only to be read.
+//
+//   '@param:filter.cutoff'         the default device role
+//   '@param:synth:filter.cutoff'   a named role, for a panel driving more than one device
+//
+// The role is the part BEFORE the first colon when there are two segments, because a parameter id
+// is dotted (`filter.cutoff`) and a role is not. A parameter id containing a colon would parse
+// wrongly; none does, and the alternative was a second prefix nobody would remember.
+export const PARAM_SOURCE_PREFIX = '@param:';
+
+export function isParamSource(id) {
+  return String(id ?? '').startsWith(PARAM_SOURCE_PREFIX);
+}
+
+/** { role, parameterId } for a '@param:...' source, or null. An empty id is not a source. */
+export function parseParamSource(id, defaultRole = '') {
+  const s = String(id ?? '');
+  if (!isParamSource(s)) return null;
+  const rest = s.slice(PARAM_SOURCE_PREFIX.length);
+  const colon = rest.indexOf(':');
+  const role = colon >= 0 ? rest.slice(0, colon).trim() : String(defaultRole ?? '');
+  const parameterId = (colon >= 0 ? rest.slice(colon + 1) : rest).trim();
+  if (!parameterId) return null;
+  return { role, parameterId };
+}
+
+/**
+ * A zone `info` built from a profile's parameter definition plus its current value.
+ *
+ * The same shape `lcdSourceInfo` produces for a control, so every `show` kind works against a
+ * parameter without knowing the difference. `address` answers the parameter's own id, which is
+ * what the kind already showed when it reached through a control's binding to find one.
+ *
+ * A BOOLEAN parameter has no `range` — it carries falseValue/trueValue instead — so it is reported
+ * as 0..1 with `on` set. Reporting its raw 0/127 would make `pct` say 100% for "on", which is true
+ * of the wire and useless on a screen.
+ */
+export function parameterInfo(parameter, value) {
+  if (!parameter) return null;
+  const isBool = String(parameter?.type ?? '') === 'boolean';
+  const fallback = parameter?.default;
+  const raw = value === undefined || value === null ? fallback : value;
+
+  if (isBool) {
+    const on = raw === true || numberOr(raw, 0) >= numberOr(parameter?.trueValue, 1) / 2;
+    return {
+      present: true,
+      name: String(parameter?.name ?? parameter?.id ?? ''),
+      value: on ? 1 : 0,
+      min: 0,
+      max: 1,
+      text: on ? 'On' : 'Off',
+      on,
+      address: String(parameter?.id ?? ''),
+    };
+  }
+
+  // A CHOICE PARAMETER IS NOT A NUMBER, and falling through to the numeric branch below silently
+  // turned one into the wrong number. A profile's choice stores its value as an id — "square", not
+  // 2 — so `numberOr(raw, min)` answered `min` for every setting the parameter had, and the text
+  // was the unit rather than the label. An `@param:osc.wave` zone therefore read 0 and drew no
+  // name, whichever waveform was selected.
+  //
+  // Shaped to match what a control-backed choice zone already produces (lcdSourceInfo): `text` is
+  // the human label so a screen shows "Bright" rather than "option_2", and `selector` is the id so
+  // a page can switch on it. The value is the POSITION in the list, which is what makes `pct` and
+  // `bar` mean something for a parameter that has no numeric range of its own.
+  const choices = Array.isArray(parameter?.choices) ? parameter.choices : [];
+  if (choices.length) {
+    const key = String(raw ?? '');
+    // By id first, then by wire value: a profile records the id, but a value arriving from the
+    // device is the wire byte, and both have to land on the same choice.
+    const at = choices.findIndex((c) => String(c?.id ?? '') === key
+      || String(c?.value ?? '') === key);
+    const chosen = at >= 0 ? choices[at] : null;
+    return {
+      present: at >= 0,
+      name: String(parameter?.name ?? parameter?.id ?? ''),
+      value: Math.max(0, at),
+      min: 0,
+      max: choices.length - 1,
+      text: String(chosen?.label ?? chosen?.id ?? ''),
+      on: false,
+      selector: String(chosen?.id ?? ''),
+      address: String(parameter?.id ?? ''),
+    };
+  }
+
+  const min = numberOr(parameter?.range?.min, 0);
+  const max = numberOr(parameter?.range?.max, 127);
+  return {
+    present: true,
+    name: String(parameter?.name ?? parameter?.id ?? ''),
+    value: numberOr(raw, min),
+    min,
+    max,
+    text: String(parameter?.display?.unit ?? ''),
+    on: false,
+    address: String(parameter?.id ?? ''),
+  };
+}
 
 export function isActiveSource(id) {
   return String(id ?? '') === ACTIVE_SOURCE_ID || String(id ?? '').startsWith(`${ACTIVE_SOURCE_ID}#`);
@@ -179,18 +360,20 @@ export function zoneScrollWindow(content, width, elapsedChars) {
   return out;
 }
 
-// Compose `rows` strings of `cols` chars from a layout's zones. Later (higher
+// Compose `rows` strings of `cols` chars from a layout's zones. `state` gates zones that declare
+// `visibleWhen` — see zoneVisibleWith, and note that pressTargetAt filters through the same
+// predicate, so a zone that is not drawn cannot be pressed either. Later (higher
 // priority) zones paint over earlier ones. getInfo(sourceId) -> info | null.
 // `elapsedChars` drives per-zone marquee: a zone with scroll:true whose content
 // overflows its region scrolls within it instead of truncating.
-export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0) {
+export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}) {
   const nRows = Math.max(0, Math.round(rows));
   const nCols = Math.max(0, Math.round(cols));
   const grid = [];
   for (let r = 0; r < nRows; r += 1) grid.push(new Array(nCols).fill(' '));
 
   const ordered = (Array.isArray(zones) ? zones : [])
-    .filter((z) => z && z.visible !== false)
+    .filter((z) => zoneVisibleWith(z, state))
     .slice()
     .sort((a, b) => numberOr(a?.priority, 0) - numberOr(b?.priority, 0));
 
@@ -263,6 +446,128 @@ export function resolveActiveLayoutId(pages, layouts, state = {}) {
 
 export function findLayout(layouts, id) {
   return (Array.isArray(layouts) ? layouts : []).find((l) => String(l?.id ?? '') === String(id)) ?? null;
+}
+
+/**
+ * A layout's auto-return, or null when it stays put.
+ *
+ * THE ONE EDGE A VALUE CANNOT EXPRESS. `pages.selectorMap` maps a control's value to a layout and
+ * `overlays` show one on a trigger, so both are pure functions of the current values: ask twice
+ * with the same values and you get the same answer. "Five seconds after you last touched it" is not
+ * a value at all, which is why a device's Edit page could be entered here but never left.
+ *
+ * DECLARED ON THE PAGE, NOT ON THE KEY THAT OPENED IT. "This page does not stay" is a property of
+ * the page — four soft keys and a selector can all lead to the same Edit screen, and every one of
+ * them wants the same behaviour on arrival. Putting `after` on the press would mean repeating it
+ * per key and getting it wrong on the fifth.
+ *
+ *   { id: 'edit', timeoutMs: 5000, timeoutTo: 'home', zones: [...] }
+ *
+ * `timeoutTo` empty means "stop overriding" — back to whatever the selector or the default says,
+ * which is the common case and one fewer id to keep in step.
+ */
+export function layoutTimeout(layout) {
+  const ms = numberOr(layout?.timeoutMs, 0);
+  // Sub-100ms would be a page nobody could read; 0 and negatives mean "no timeout" rather than
+  // "immediately", which is the reading that cannot strand a user on a screen they never saw.
+  if (!(ms >= 100)) return null;
+  return { ms: Math.round(ms), to: String(layout?.timeoutTo ?? '') };
+}
+
+// --- Pressable zones (soft keys) -------------------------------------------
+//
+// A zone may carry a `press` action, which makes it a HIT TARGET: the region it
+// already occupies becomes a soft key, the way F1..F6 sit under a hardware
+// screen. The action is one of:
+//
+//   { layout: 'id' }        switch the active layout — screen navigation
+//   { set: 'name', to: n }  write a value to another control
+//
+// WHY THIS IS AN EXCEPTION AND NOT A NEW MODEL. A display has no Mouse,
+// Behavior or HitZones section; it is an output, and `displayMode.js` makes a
+// read-only control transparent to the pointer precisely so a meter laid over
+// a knob passes the click through. Pressable zones do not overturn that — the
+// display stays display-only, and only a zone that DECLARES an action takes a
+// press. The precedent is already here: an `edit` zone has been clickable
+// since the edit field was added, resolved through this same cell geometry.
+
+/**
+ * True when a zone declares a press action a user could actually trigger.
+ *
+ * EVERY ACTION HAS TO BE LISTED HERE. A zone whose action this does not recognise is not a hit
+ * target at all, so `pressTargetAt` returns null and the press does nothing — silently, and
+ * identically to a zone with no action. `{ cursor: ±1 }` shipped broken for exactly that reason:
+ * the unit tests exercised the cursor arithmetic and the visibility gate separately and both
+ * passed, while pressing the key in the real editor moved nothing.
+ */
+export function isPressableZone(zone) {
+  if (!zone || zone.visible === false) return false;
+  const press = zone.press;
+  if (!press || typeof press !== 'object') return false;
+  if (String(press.layout ?? '') !== '') return true;
+  if (String(press.set ?? '') !== '') return true;
+  // 0 is not a move, so it is not an action — the same reading `moveCursor` takes.
+  return Number.isFinite(Number(press.cursor)) && Number(press.cursor) !== 0;
+}
+
+/** Does a zone's region cover this 0-based character cell? */
+export function zoneCoversCell(zone, cell, cols) {
+  if (!zone || !cell) return false;
+  const row = Math.round(numberOr(zone?.row, 1)) - 1;
+  if (cell.row !== row) return false;
+  const nCols = Math.max(1, Math.round(numberOr(cols, 16)));
+  const c0 = clamp(Math.round(numberOr(zone?.colStart, 1)) - 1, 0, nCols - 1);
+  const c1 = clamp(Math.round(numberOr(zone?.colEnd, nCols)) - 1, c0, nCols - 1);
+  return cell.col >= c0 && cell.col <= c1;
+}
+
+/**
+ * The pressable zone a click at `cell` (0-based row/col) lands on, or null.
+ *
+ * ORDERED LIKE THE PAINT, AND THAT IS THE WHOLE SUBTLETY. Zones overlap on
+ * purpose — composeLayout sorts by priority ascending and lets a later zone
+ * paint over an earlier one — so the zone a user can SEE at a cell is the last
+ * one to paint there. A press has to resolve to the same zone the eye picked,
+ * so this walks the identical ordering backwards and returns the first hit.
+ * Resolving it forwards would hand the press to a zone hidden underneath.
+ */
+export function pressTargetAt(zones, cell, cols, state = {}, getInfo = null) {
+  const nCols = Math.max(0, Math.round(numberOr(cols, 0)));
+  const ordered = (Array.isArray(zones) ? zones : [])
+    .filter((z) => zoneVisibleWith(z, state))
+    .slice()
+    .sort((a, b) => numberOr(a?.priority, 0) - numberOr(b?.priority, 0));
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    const zone = ordered[i];
+    if (!zoneCoversCell(zone, cell, cols)) continue;
+    if (isPressableZone(zone)) return zone;
+    // A zone that covers the cell but takes no press BLOCKS the ones beneath it,
+    // for the same reason it hides them visually: the user pressed what they
+    // could see, and what they could see does nothing.
+    //
+    // …UNLESS IT PAINTED NOTHING, which is the case that argument does not cover.
+    // composeLayout skips a zone whose resolved content is empty — an idle
+    // '@active#kind' zone, or any source that is absent — and leaves whatever is
+    // underneath on screen. Blocking on it anyway made the two disagree: the eye
+    // saw the soft key below and the press hit a zone that was never drawn. So the
+    // same emptiness test decides both, from the same resolved content.
+    if (getInfo && nCols > 0 && zoneContentEmpty(zone, nCols, getInfo)) continue;
+    return null;
+  }
+  return null;
+}
+
+/** Did this zone resolve to nothing — the exact condition composeLayout skips on? */
+function zoneContentEmpty(zone, nCols, getInfo) {
+  const c0 = clamp(Math.round(numberOr(zone?.colStart, 1)) - 1, 0, nCols - 1);
+  const c1 = clamp(Math.round(numberOr(zone?.colEnd, nCols)) - 1, c0, nCols - 1);
+  const info = getInfo(String(zone?.sourceId ?? ''));
+  return resolveZoneContent(zone, info, c1 - c0 + 1) === '';
+}
+
+/** Every pressable zone of a layout, for a surface that wants to mark them. */
+export function pressableZones(zones) {
+  return (Array.isArray(zones) ? zones : []).filter(isPressableZone);
 }
 
 // Every sourceId referenced by a layout's zones (for the preview to gather live

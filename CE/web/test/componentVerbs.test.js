@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  moduleIdFor, verbSignature, verbArgs, itemCurrent,
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent,
 } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
@@ -249,6 +249,25 @@ test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a
   // patch touching the field it declares. A verb that silently does nothing for every input is the
   // failure mode a spec-driven surface is most prone to, and it is invisible one verb at a time.
+  // A name-addressed verb needs an element to land on, and a pixel display's scene is EMPTY by
+  // default — that is what makes a blank screen blank, and it is the whole reason `elem` exists
+  // rather than `item`. So the probe display is given one named element, in the flat list and in a
+  // layout, which is also the two places a name resolves across. This is not the assertion being
+  // relaxed: the verb still has to produce a patch, and it still has to touch `elements`.
+  const PROBE_ELEMENT = {
+    id: 'el_probe', name: 'probe', kind: 'static', text: '', label: '',
+    x: 0, y: 0, w: 0, h: 0, visible: true, blink: false,
+  };
+  const probeCfg = (verb) => {
+    const cfg = cfgFor(verb.section);
+    if (verb.k !== 'elem') return cfg;
+    return {
+      ...cfg,
+      elements: [{ ...PROBE_ELEMENT }],
+      layouts: [{ id: 'lay_probe', name: 'Probe', elements: [{ ...PROBE_ELEMENT, id: 'el_probe2' }] }],
+    };
+  };
+
   const sample = (verb) => {
     switch (verb.k) {
       case 'bool': return [];                                  // bare call toggles
@@ -271,6 +290,15 @@ test('every verb either changes something or explains why it cannot', () => {
         const pick = lo + step;
         return [1, pick === current ? lo + step * 2 : pick];
       }
+      case 'elem': {
+        // Addressed by NAME, and the element the probe carries answers to "probe".
+        if (verb.kind === 'bool') return ['probe', !(PROBE_ELEMENT[verb.item] === true)];
+        if (verb.kind === 'str') return ['probe', 'spec-probe'];
+        const lo = Number.isFinite(verb.min) ? verb.min : 0;
+        const hi = Number.isFinite(verb.max) ? verb.max : 1;
+        const pick = lo + (verb.kind === 'int' ? 1 : (hi - lo) / 3);
+        return ['probe', pick === PROBE_ELEMENT[verb.item] ? pick + 1 : pick];
+      }
       case 'cell': return verb.clear ? [] : (verb.grid ? [1, 1, 0.375] : [1, 0.375]);
       // An index set is addressed 1-based and toggles with no second argument.
       case 'indexset': return [1];
@@ -291,7 +319,7 @@ test('every verb either changes something or explains why it cannot', () => {
     // reducer — they are driven end to end against a real control in scriptComponents.test.js,
     // which carries the same catch-all for them.
     if (REDUCERLESS_KINDS.includes(verb.k)) continue;
-    const cfg = cfgFor(verb.section);
+    const cfg = probeCfg(verb);
     const patch = componentScriptPatch(verb, cfg, sample(verb));
     const keys = Object.keys(patch);
     if (!keys.length) { dead.push(`${verb.id}: no patch`); continue; }
@@ -473,4 +501,95 @@ test('a target with no control behind it is a different message from the wrong k
   }
   const traced = get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
   assert.match(traced, /"Cutof" — this panel has no control by that name/, `got:\n${traced}`);
+});
+
+/* ------------------------------------------------ the scene, addressed by name (proposal 2) */
+
+/** A pixel display with a named element in the flat scene and the same name on a layout. */
+const pixelCfg = () => ({
+  ...SECTION_DEFAULTS.Pixel,
+  elements: [
+    { id: 'el_0', name: 'title', kind: 'static', text: 'INIT', visible: true, x: 2, y: 2 },
+    { id: 'el_1', name: '', kind: 'vbar', visible: true, x: 40, y: 0 },
+  ],
+  layouts: [{ id: 'lay_0', name: 'Page 1',
+    elements: [{ id: 'el_2', name: 'title', kind: 'static', text: 'INIT', visible: true, x: 2, y: 2 }] }],
+});
+
+test('a pixel element is written by name, everywhere that name appears', () => {
+  const cfg = pixelCfg();
+  const patch = componentScriptPatch(byId('pixelText'), cfg, ['title', 'SATURN VB']);
+  assert.equal(patch.elements[0].text, 'SATURN VB');
+  assert.equal(patch.layouts[0].elements[0].text, 'SATURN VB', 'the same title on the page too');
+  assert.equal(patch.elements[1].kind, 'vbar', 'and nothing else moved');
+});
+
+test('an unnamed element is still reachable by its id', () => {
+  // Not the addressing anybody should write, but a name is optional and `read` hands ids back, so
+  // an id from the document has to resolve or the answer would be unusable.
+  const patch = componentScriptPatch(byId('pixelX'), pixelCfg(), ['el_1', 12]);
+  assert.equal(patch.elements[1].x, 12);
+  assert.equal(patch.elements[0].x, 2);
+});
+
+test('a name the display does not have is REFUSED, not silently ignored', () => {
+  // This is the whole difference from the index-addressed attempt. "There is no element called
+  // tempo" is something the console can print and a script can branch on; an index past the end of
+  // an empty array said nothing, and looked exactly like success.
+  const cfg = pixelCfg();
+  assert.deepEqual(componentScriptPatch(byId('pixelText'), cfg, ['tempo', 'X']), {});
+  assert.equal(componentRequestLegal(byId('pixelText'), cfg, ['tempo', 'X']), false);
+  // …while a name it does have, already holding that value, is "already that way" — a success.
+  assert.deepEqual(componentScriptPatch(byId('pixelText'), cfg, ['title', 'INIT']), {});
+  assert.equal(componentRequestLegal(byId('pixelText'), cfg, ['title', 'INIT']), true);
+});
+
+test('a bare show toggles from the FIRST match, so two pages do not drift apart', () => {
+  // Each element flipping from its own state is the bug: one `show(scr, "title")` with the flat
+  // copy visible and the page copy hidden would leave them swapped rather than agreeing.
+  const cfg = pixelCfg();
+  cfg.layouts[0].elements[0].visible = false;
+  const patch = componentScriptPatch(byId('pixelShow'), cfg, ['title']);
+  assert.equal(patch.elements[0].visible, false, 'the first match was visible, so it hides');
+  assert.deepEqual(Object.keys(patch), ['elements'],
+    'and the page copy, already hidden, is not rewritten — they converge rather than swap');
+});
+
+test('a pixel display with no elements refuses every scene verb, which is the honest answer', () => {
+  const blank = { ...SECTION_DEFAULTS.Pixel };
+  for (const id of ['pixelText', 'pixelShow', 'pixelX', 'pixelW']) {
+    assert.deepEqual(componentScriptPatch(byId(id), blank, ['title', 1]), {}, id);
+    assert.equal(componentRequestLegal(byId(id), blank, ['title', 1]), false, id);
+  }
+});
+
+test('every published argument agrees with the signature it is published beside', () => {
+  // The two were derived separately and disagreed: the signature line showed `[, enabled]` and the
+  // descriptor beside it marked the argument required, for every toggling verb in the surface.
+  for (const verb of COMPONENT_VERBS) {
+    const sig = verbSignature(verb);
+    const optional = verbArgOptional(verb);
+    verbArgs(verb).forEach((name, i) => {
+      const inBrackets = new RegExp(`\\[,\\s*${name}\\b`).test(sig);
+      assert.equal(optional[i], inBrackets,
+        `${verb.id}: "${name}" is ${optional[i] ? 'optional' : 'required'} but the signature says `
+        + `otherwise — ${sig}`);
+    });
+    // …and the descriptor the editor publishes carries the same answer.
+    const params = (MEMBER_BY_ID[verb.id]?.params ?? []).filter((x) => x.name !== 'target');
+    params.forEach((param, i) => assert.equal(param.required, !optional[i],
+      `${verb.id}: the published "${param.name}" disagrees with ${sig}`));
+  }
+});
+
+test('an addressed verb types its index or name separately from its value', () => {
+  // drumPadsLabel published `index` as a STRING, because the label is a string and both arguments
+  // were typed from the verb's one kind. The signature beside it was right, which is how it
+  // survived — nothing compares the two, until the test above.
+  const params = (id) => Object.fromEntries((MEMBER_BY_ID[id].params ?? []).map((p) => [p.name, p.type]));
+  assert.equal(params('drumPadsLabel').index, 'number');
+  assert.equal(params('drumPadsLabel').label, 'string');
+  assert.equal(params('pixelText').name, 'string');
+  assert.equal(params('pixelX').name, 'string');
+  assert.equal(params('pixelX').x, 'number');
 });

@@ -602,6 +602,20 @@ export const SECTION_DEFAULTS = {
     showGhost: true,               // faint unlit cells behind the text
     showScanlines: false,          // horizontal scanline overlay
     showGrid: false,               // faint pixel/cell grid lines
+    // CGRAM — eight user-definable 5x8 glyphs, exactly as a real HD44780 has. ALWAYS EIGHT SLOTS,
+    // initially blank, because that is what the hardware is: an empty slot draws nothing and is not
+    // a glyph. (It also means an index-addressed script verb always has a slot to write to, which
+    // Pixel.elements — an array that starts empty — does not. See
+    // docs/design/display-component-futures.md, proposal 2.)
+    //   bits  eight rows of 5, '#'/'.' separated by '|'; '1'/'0' and no separators also parse
+    //   for   an ordinary character this glyph stands in for wherever it appears, e.g. '█', which
+    //         is how `bar` becomes a segmented bargraph with a baseline without the zone engine
+    //         knowing glyphs exist. A claim on \x00..\x07 is refused: it would displace a slot.
+    // Addressed in zone text as \x00..\x07, the way the hardware addresses CGRAM.
+    glyphs: [
+      { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' },
+      { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' }, { bits: '', for: '' },
+    ],
     dotMatrix: false,              // render glyphs as a dot grid (dot-matrix look)
     dotShape: 'round',             // round | square
     dotPitch: 0,                   // dot cell size px (0 = auto from cell size)
@@ -638,8 +652,29 @@ export const SECTION_DEFAULTS = {
     fields: [],
     // Zones / layouts / pages. When layouts is non-empty the display composes its
     // rows from the active layout's zones instead of the lines/tokens above.
-    // layout: { id, name, zones:[ { id,name,row,colStart,colEnd,show,sourceId,
-    //   text,label,precision,prefix,suffix,radix,align,priority,visible } ] }.
+    // layout: { id, name, timeoutMs, timeoutTo, zones:[ { id,name,row,colStart,colEnd,show,
+    //   sourceId,text,label,precision,prefix,suffix,radix,align,priority,visible,press } ] }.
+    //
+    // `timeoutMs`/`timeoutTo` are a layout's AUTO-RETURN, and the one page transition a value
+    // cannot express: selectorMap and overlays are pure functions of the current values, and
+    // "five seconds after you last touched it" is not a value. Declared on the page rather than on
+    // the key that opened it, because "this page does not stay" is true however you arrived.
+    // An empty `timeoutTo` means stop overriding — back to the selector or the default.
+    // Only a layout reached by a PRESS runs the timer; timing out of a selector-chosen layout
+    // would fight the selector, which would choose it again on the next frame.
+    //
+    // `press` makes a zone a SOFT KEY — the region it already occupies becomes a hit target, the
+    // way F1..F6 sit under a hardware screen. One of:
+    //   { layout: 'id' }        navigate to another layout
+    //   { set: 'name', to: n }  write a value to another control, addressed by name
+    //   { cursor: 1 | -1 }      move the selection on this display, wrapping at both ends
+    //
+    // `visibleWhen: { cursor: N }` shows a zone only at one selection index — which is how a menu
+    // draws its marker: one arrow zone per row. A zone hidden this way is not pressable either.
+    // `cursorMax` on the LAYOUT is how many items that page has (0 = no list, the default), because
+    // a two-item menu and a six-item one are different pages.
+    // A zone without one is inert, and the display stays display-only otherwise: only a zone that
+    // DECLARES an action takes a press. See docs/design/display-component-futures.md, proposal 4.
     layouts: [],
     // pages: which layout is active. selector maps a control's value to a layout;
     // overlays transiently show a layout on a trigger for a duration / until change.
@@ -651,6 +686,14 @@ export const SECTION_DEFAULTS = {
     },
     // Which controls count as "@active" (Core.ids). Empty = any control.
     activeScope: [],
+    // A zone's sourceId is normally a control's Core.id. Three reserved forms are not:
+    //   '@active' / '@active#kind'   whichever control was last touched
+    //   '@edit'                      this display's own editText buffer
+    //   '@state:<key>'               this display's own state; today the only key is 'cursor'
+    //   '@param:<id>'                a DEVICE PARAMETER, with no control in between — optionally
+    //                                '@param:<role>:<id>' for a panel driving more than one device.
+    //                                Its value comes from stores/deviceParameterValues.js, and its
+    //                                name and range from the role's profile.
     // Editable text field (e.g. a preset name). A zone with show:'edit' bound to
     // the reserved "@edit" source displays this buffer; in preview the screen is
     // focusable and edits it live (keyboard type/caret, or a knob/wheel cycling
@@ -714,12 +757,21 @@ export const SECTION_DEFAULTS = {
     // font:'custom' to use it. { src(dataURL), glyphW, glyphH, cols, first(charCode) }.
     customFont: null,
     // The scene: pixel-addressed elements. Each:
-    // { id, kind (static|name|value|pct|midiValue|note|text|state|
+    // { id, name, kind (static|name|value|pct|midiValue|note|text|state|
     //   hbar|vbar|hslider|vslider|needle), x, y, w, h, sourceId, align,
     //   precision, prefix, suffix, label, radix, frame, ticks, peakHold,
     //   smooth, visible }
     // Text kinds draw at (x, y) with font height h (w > 0 clips/aligns);
     // widget kinds fill the (x, y, w, h) rect.
+    //
+    // `name` is the SCRIPT HANDLE and nothing else — never drawn, unlike
+    // `label`. A script addresses an element by it (ce.components.pixel.text,
+    // .show, .x …), because the two keys that already existed cannot be used:
+    // the index is the paint order, which the inspector's arrows rewrite, and
+    // `id` is an `el_…` the UI never shows. The same name on two layouts is
+    // one element on two pages — duplicating a layout keeps names and mints
+    // new ids — and a verb writes every element carrying it.
+    // See utils/pixelElements.js and design/display-component-futures.md #2.
     elements: [],
     // Layouts/pages (same engine as the LCD): when layouts is non-empty the
     // active layout's elements replace the flat list above.

@@ -7,7 +7,14 @@
   import {
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
   } from '../utils/returnToRest.js';
-  import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
+  import {
+    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
+    pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
+    isStateSource, stateKeyOf, stateInfo, moveCursor,
+  } from '../utils/lcdZones.js';
+  import { deviceParameterValues } from '../stores/deviceParameterValues.js';
+  import { profileParameters, deviceRoleMappings, profileParameterPages } from '../stores/deviceProfileStores.js';
+  import { refreshProfileParameters } from '../stores/deviceProfileSession.js';
   import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
@@ -504,6 +511,54 @@
     return range && range.value !== undefined ? range : null;
   }
 
+  /**
+   * Live info for a '@param:...' zone source: the profile's parameter definition, plus whatever
+   * the device's live state says it is set to.
+   *
+   * Read through the stores rather than through a bound control, which is the whole point — a zone
+   * naming a parameter needs no proxy control, and works whether or not one happens to exist.
+   * Missing profile, missing mapping or an unknown id all answer null, so the zone paints nothing
+   * and whatever sits under it survives; an invented value would be worse than a blank.
+   */
+  function lcdParamInfo(sourceId) {
+    const parsed = parseParamSource(sourceId, DEFAULT_DEVICE_ROLE);
+    if (!parsed) return null;
+    const profileId = String($deviceRoleMappings?.[parsed.role]?.profileId ?? '');
+    if (!profileId) return null;
+    const parameters = $profileParameters?.[profileId];
+    if (!Array.isArray(parameters)) return null;
+    const parameter = parameters.find((entry) => String(entry?.id ?? '') === parsed.parameterId);
+    if (!parameter) return null;
+    return parameterInfo(parameter, $deviceParameterValues?.[parsed.role]?.[parsed.parameterId]);
+  }
+
+  /**
+   * What one source id currently reads as — the single resolver for every kind of zone source.
+   *
+   * "@active"/"@active#kind" resolve to the most recently touched control (restricted to this
+   * display's activeScope and to the kind filter); '@state:' reads the display's own record; a
+   * '@param:' source resolves through the profile and the device's live state; anything else is
+   * still a control id, resolved as it always was.
+   *
+   * It is a function rather than three inline branches because TWO callers need it and they must
+   * not disagree: the live map composition paints from, and the hit test that decides whether a
+   * zone painted anything at all. When only composition knew how to resolve a source, a zone that
+   * drew nothing still swallowed presses aimed at the soft key showing through underneath it.
+   */
+  function lcdLiveInfoFor(control, display, id) {
+    if (isParamSource(id)) return lcdParamInfo(id);
+    if (isStateSource(id)) {
+      const activeLayoutId = control?._children?.Core?.controlType === 'PixelDisplay'
+        ? resolvePixelActiveLayoutId(control) : resolveLcdActiveLayoutId(control);
+      const layout = findLayout(display?.layouts, activeLayoutId);
+      const key = stateKeyOf(id);
+      return key ? stateInfo(lcdStateFor(control)[key], layout?.cursorMax) : null;
+    }
+    const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
+    const src = resolvedId ? controlById(resolvedId) : null;
+    return src ? lcdSourceInfo(src) : null;
+  }
+
   // Rich live info about a source control for the zones engine: value/range, its
   // name, an On/Off or choice text, and a selector key for page switching.
   function lcdSourceInfo(src) {
@@ -558,6 +613,24 @@
   // both free-text with a caret — or a Combobox/Radio/Cyclic, which becomes a
   // choice cycler (no caret; wheel/arrows change the selected option).
   let lcdEdit = $state({ id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false });
+  // The soft key currently flashing, as a REGION rather than a zone id: { id, row, c0, c1 },
+  // 0-based. See lcdFlashPress for why it is a region, and why it is timed.
+  let lcdPress = $state({ id: '', row: -1, c0: 0, c1: 0 });
+  let lcdPressTimer = 0;
+
+  // Per-display state the layouts can read and the soft keys can move: { [controlId]: { cursor } }.
+  // Transient like everything else here — a menu's selection is where you are, not what the panel
+  // is, so it belongs beside lcdEdit rather than in the document.
+  let lcdDisplayState = $state({});
+
+  // Auto-return timers, one per display: { [controlId]: timer }. Plain object rather than $state —
+  // nothing renders from it, and making it reactive would re-derive every display on every tick.
+  const lcdLayoutTimers = {};
+
+  // Which layout a soft key has navigated each display to: { [controlId]: layoutId }.
+  // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
+  // panel document, so it must not reach the store and must not survive leaving preview.
+  let lcdPressedLayout = $state({});
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
@@ -755,6 +828,185 @@
   }
   const LCD_EDIT_IDLE = { id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false };
 
+  /** The pressable zone under a pointer position on an LcdDisplay, or null. */
+  function lcdPressTargetFor(control, local) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') return null;
+    const display = lcdDisplayOf(control);
+    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return null;
+    const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
+    if (!layout) return null;
+    const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
+    return pressTargetAt(layout.zones ?? [], lcdCellFromPoint(control, local), cols,
+      lcdStateFor(control), (id) => lcdLiveInfoFor(control, display, id));
+  }
+
+  /**
+   * Perform a soft key's action. Returns true when the press was consumed.
+   *
+   * Two actions, and both are deliberately things a performer does mid-song rather than things an
+   * author does once: navigate to another page, or move a control. Anything structural belongs in
+   * the inspector, which is the same line componentVerbs.js draws for script verbs.
+   */
+  /**
+   * Light a soft key for long enough to be seen.
+   *
+   * A FLASH, NOT A HELD STATE, and that is a decision rather than a shortcut. Holding the
+   * highlight until pointer-up reads better in principle and gets STUCK in practice: press a key,
+   * drag off the display, release, and the pointer-up never arrives at this control — leaving a
+   * key lit with nothing to turn it off. A soft key fires on press and is momentary, so the
+   * feedback is momentary too, on its own timer, and cannot outlive itself.
+   *
+   * 140ms because a click can be shorter than a frame at 60Hz: tying the flash to the real press
+   * duration would make a fast click produce no visible feedback at all.
+   *
+   * A REGION, NOT A ZONE ID, and that one is not a preference either. A `{ layout }` press changes
+   * the page, so by the time anything paints, the zone that was pressed belongs to the layout the
+   * screen has just LEFT — looking it up by id in the now-active layout finds nothing and the key
+   * never lights. (Measured: zero inverted cells.) Freezing the row and column span at press time
+   * lights the place the finger was, over whatever page arrives, which is what a hardware soft key
+   * does: the feedback is positional, and soft-key rows sit in the same place across pages.
+   */
+  function lcdFlashPress(control, zone) {
+    if (lcdPressTimer) clearTimeout(lcdPressTimer);
+    const cols = Math.max(1, Math.round(numberOr(lcdDisplayOf(control)?.cols, 16)));
+    const row = Math.max(0, Math.round(numberOr(zone?.row, 1)) - 1);
+    const c0 = Math.max(0, Math.min(cols - 1, Math.round(numberOr(zone?.colStart, 1)) - 1));
+    const c1 = Math.max(c0, Math.min(cols - 1, Math.round(numberOr(zone?.colEnd, cols)) - 1));
+    lcdPress = { id: getControlId(control), row, c0, c1 };
+    lcdPressTimer = setTimeout(() => {
+      lcdPress = { id: '', row: -1, c0: 0, c1: 0 };
+      lcdPressTimer = 0;
+    }, 140);
+  }
+
+  /**
+   * Start (or restart) a navigated layout's auto-return.
+   *
+   * Only a layout reached BY PRESS gets a timer. Timing out of a layout the selector chose would
+   * fight the selector, which would just choose it again on the next frame — a screen that flickers
+   * rather than one that returns.
+   *
+   * It does not chain: the layout you land on does not start a timer of its own. Two pages whose
+   * timeouts point at each other would otherwise ping-pong forever on an idle panel, and a menu
+   * that returns you once is the behaviour anyone actually wants.
+   */
+  function lcdScheduleLayoutTimeout(control, layoutId) {
+    const controlId = getControlId(control);
+    if (lcdLayoutTimers[controlId]) clearTimeout(lcdLayoutTimers[controlId]);
+    delete lcdLayoutTimers[controlId];
+
+    const display = lcdDisplayOf(control);
+    const spec = layoutTimeout(findLayout(display?.layouts, layoutId));
+    if (!spec) return;
+
+    lcdLayoutTimers[controlId] = setTimeout(() => {
+      delete lcdLayoutTimers[controlId];
+      const back = spec.to && (display?.layouts ?? []).some((l) => String(l?.id ?? '') === spec.to)
+        ? spec.to : '';
+      if (back) {
+        lcdPressedLayout = { ...lcdPressedLayout, [controlId]: back };
+      } else {
+        // Stop overriding entirely, so the selector or the page default answers again.
+        const { [controlId]: _gone, ...rest } = lcdPressedLayout;
+        lcdPressedLayout = rest;
+      }
+    }, spec.ms);
+  }
+
+  /**
+   * The display's state as the ACTIVE LAYOUT sees it.
+   *
+   * The cursor belongs to the display and the bound belongs to the layout, so a page change can
+   * leave the selection past the new page's last item — and a marker zone that exists for no index
+   * the page has draws nothing at all, which reads as a menu with no selection rather than as a
+   * number out of range. Folding it here rather than on arrival covers the selector and the
+   * timeout too, which change the layout without any press to hang a clamp on.
+   */
+  function lcdStateFor(control) {
+    const held = lcdDisplayState[getControlId(control)];
+    if (!held) return {};
+    const display = lcdDisplayOf(control);
+    const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+    const max = Math.max(0, Math.round(numberOr(layout?.cursorMax, 0)));
+    const cursor = Math.round(numberOr(held.cursor, 0));
+    return cursor > max ? { ...held, cursor: max } : held;
+  }
+
+  /**
+   * Auto-return counts from the LAST INTERACTION, not from arrival.
+   *
+   * The timer used to start only on the press that navigated, so moving the cursor near the
+   * deadline could be answered by the page leaving under your finger a moment later. The state
+   * diagram this was built from says "5s idle", and idle means idle — every press that the page
+   * consumed is activity.
+   *
+   * Only a layout REACHED BY A PRESS restarts, which is the same rule that decides whether the
+   * timer runs at all: restarting on a selector-chosen layout would start a timer the selector
+   * would immediately fight.
+   */
+  function lcdRestartLayoutTimeout(control) {
+    const controlId = getControlId(control);
+    if (!lcdPressedLayout[controlId] || !lcdLayoutTimers[controlId]) return;
+    lcdScheduleLayoutTimeout(control, lcdPressedLayout[controlId]);
+  }
+
+  function lcdPerformPress(control, zone) {
+    const controlId = getControlId(control);
+    const press = zone?.press ?? {};
+
+    const layoutId = String(press.layout ?? '');
+    if (layoutId) {
+      const display = lcdDisplayOf(control);
+      // An unknown layout id is a no-op rather than a blank screen: the same ruling the enum verbs
+      // make, and for the same reason — a typo that changes nothing is debuggable.
+      if (!(display?.layouts ?? []).some((l) => String(l?.id ?? '') === layoutId)) return false;
+      lcdPressedLayout = { ...lcdPressedLayout, [controlId]: layoutId };
+      lcdScheduleLayoutTimeout(control, layoutId);
+      lcdFlashPress(control, zone);
+      return true;
+    }
+
+    // Move the selection. The range is the ACTIVE LAYOUT's, because how many items a page has is a
+    // property of that page — a two-item menu and a six-item one are different layouts.
+    if (press.cursor !== undefined && press.cursor !== null) {
+      const display = lcdDisplayOf(control);
+      const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+      const max = numberOr(layout?.cursorMax, 0);
+      if (max <= 0) return false;
+      const now = numberOr(lcdStateFor(control).cursor, 0);
+      const next = moveCursor(now, press.cursor, max);
+      lcdDisplayState = {
+        ...lcdDisplayState,
+        [controlId]: { ...(lcdDisplayState[controlId] ?? {}), cursor: next },
+      };
+      lcdRestartLayoutTimeout(control);
+      lcdFlashPress(control, zone);
+      return true;
+    }
+
+    const setName = String(press.set ?? '');
+    if (setName) {
+      // Addressed the way a script addresses a control — by NAME, falling back to an id — because
+      // a panel author typing into the inspector has the name in front of them and not the id.
+      const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === setName)
+        ?? controlById(setName);
+      if (!target) return false;
+      const behavior = getBehavior(target);
+      if (!isRangeBehavior(behavior)) return false;
+      const value = snapRangeValue(behavior, numberOr(press.to, getRangeMin(behavior)));
+      // THROUGH patchControlSession, NOT updatePanelPreviewSession. The two differ by one line —
+      // `emitDeviceBindingsForPatch` — and that line is the difference between moving a number on
+      // screen and sending the parameter to the instrument. Writing the session directly made the
+      // soft key look like it worked while the device never heard it, which is the worst shape a
+      // bug can take on a control surface.
+      patchControlSession(getControlId(target), { valueOverrideEnabled: true, valueOverride: value });
+      lcdRestartLayoutTimeout(control);
+      lcdFlashPress(control, zone);
+      return true;
+    }
+    return false;
+  }
+
   // Text edit target read/write: '@edit' -> the display's own editText
   // (Display.editText or Pixel.editText), else a Label's content.
   function lcdEditText(control, sourceId) {
@@ -837,7 +1089,15 @@
     // persisted) acts as the resting default while previewing from the editor.
     const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
     const hasDesign = designId && display.layouts.some((l) => String(l?.id ?? '') === designId);
-    const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    let effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    // A soft key beats the selector and the design default, because navigating by hand is the most
+    // recent thing the user said. It does NOT beat an overlay: an overlay is a transient
+    // interruption (a "saved" flash) and should be seen over whatever page you had navigated to.
+    const pressed = String(lcdPressedLayout[getControlId(control)] ?? '');
+    if (pressed && display.layouts.some((l) => String(l?.id ?? '') === pressed)) {
+      effPages = { ...effPages, defaultLayoutId: pressed };
+      return resolveActiveLayoutId(effPages, display.layouts, { activeOverlayLayoutId });
+    }
     return resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId });
   }
 
@@ -892,6 +1152,56 @@
   // A reactive clock bumped by timers so timed overlays auto-dismiss while idle.
   let overlayClock = $state(0);
   const lcdPrevValue = {};
+  /* --- Parameter metadata for '@param:' zones ------------------------------------------------
+   *
+   * A '@param:' zone resolves through `profileParameters`, and NOTHING WAS FILLING THAT STORE for
+   * a panel the user just opened. The only thing that asks is the Device tab's browser, on mount —
+   * so a panel whose screen reports eight parameters showed eight blanks until you happened to
+   * visit a tab that has nothing to do with it. Worse quietly: that request is paginated at 160, so
+   * on the profiles this feature is most for — the GAIA's 793 parameters, the AN1x's 1,296 —
+   * anything past the first page stayed blank even after visiting it.
+   *
+   * So the preview asks for what its own zones name. `askedParameterPages` makes it exactly once
+   * per (profile, offset): the effect re-runs whenever the store it reads changes, and a request
+   * that did not guard itself would answer its own reply forever.
+   */
+  const askedParameterPages = new Set();
+
+  /** Every profile id the visible displays' '@param:' zones actually need. */
+  function paramProfilesNeeded() {
+    const wanted = new Map();
+    for (const control of orderedControls) {
+      const type = String(control?._children?.Core?.controlType ?? '');
+      const section = type === 'LcdDisplay' ? control?._children?.Display
+        : type === 'PixelDisplay' ? control?._children?.Pixel : null;
+      if (!section) continue;
+      for (const id of (type === 'PixelDisplay' ? pixelSourceIds(section) : collectSourceIds(section))) {
+        if (!isParamSource(id)) continue;
+        const parsed = parseParamSource(id, DEFAULT_DEVICE_ROLE);
+        const profileId = String($deviceRoleMappings?.[parsed?.role]?.profileId ?? '');
+        if (parsed && profileId) wanted.set(profileId, parsed.role);
+      }
+    }
+    return wanted;
+  }
+
+  $effect(() => {
+    for (const [profileId, role] of paramProfilesNeeded()) {
+      const page = $profileParameterPages?.[profileId];
+      const loaded = Array.isArray($profileParameters?.[profileId])
+        ? $profileParameters[profileId].length : 0;
+      // Nothing yet, or a page boundary with more behind it. `hasMore` is the browser's own
+      // paging flag, so this walks the list the same way and stops where it stops.
+      const complete = page && page.hasMore === false;
+      if (loaded && complete) continue;
+      const offset = loaded;
+      const key = `${profileId}:${offset}`;
+      if (askedParameterPages.has(key)) continue;
+      askedParameterPages.add(key);
+      refreshProfileParameters(profileId, role, { offset });
+    }
+  });
+
   let overlayTimers = [];
 
   // Schedule a re-render at each distinct timer-overlay duration so an overlay
@@ -939,6 +1249,12 @@
   });
 
   onDestroy(() => overlayTimers.forEach((t) => clearTimeout(t)));
+  // The soft-key timers, on the same terms as the overlay ones above: a pending auto-return or
+  // press flash would otherwise fire into a component that no longer exists.
+  onDestroy(() => {
+    for (const t of Object.values(lcdLayoutTimers)) clearTimeout(t);
+    if (lcdPressTimer) clearTimeout(lcdPressTimer);
+  });
   // Leaving preview drops the echoed notes. A keyboard unplugged mid-note never
   // sends its note-off, and a pad stuck lit forever looks like a bug.
   // Leaving preview silences the rig. A note the panel was holding has no other
@@ -985,13 +1301,7 @@
     const live = {};
     if (hasLayouts) {
       for (const id of collectSourceIds(display)) {
-        // "@active"/"@active#kind" resolve to the most recently touched control
-        // (restricted to this display's activeScope, and to the kind filter);
-        // a fixed id resolves to that control. Keyed by the raw id so each
-        // filtered "@active#kind" zone reads its own live value.
-        const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
-        const src = resolvedId ? controlById(resolvedId) : null;
-        const info = src ? lcdSourceInfo(src) : null;
+        const info = lcdLiveInfoFor(control, display, id);
         if (info) live[id] = info;
       }
     }
@@ -1044,6 +1354,11 @@
         // Live edit marker: text edits carry the caret; a choice edit highlights
         // the armed zone (the renderer parks the block on its first cell).
         const controlId = getControlId(control);
+        // The display's own state, for zones that declare `visibleWhen` and for '@state:' sources.
+        cd.__state = lcdStateFor(control);
+        // Which soft key is lit right now, for the renderer to draw in inverse.
+        cd.__press = (lcdPress.id === controlId && lcdPress.row >= 0)
+          ? { row: lcdPress.row, c0: lcdPress.c0, c1: lcdPress.c1 } : null;
         cd.__edit = (lcdEdit.active && lcdEdit.id === controlId)
           ? { active: true, caret: lcdEdit.caret, zoneId: lcdEdit.zoneId, kind: lcdEdit.kind } : null;
       }
@@ -4654,9 +4969,7 @@
 
     const live = {};
     for (const id of pixelSourceIds(pixel)) {
-      const resolvedId = isActiveSource(id) ? lcdResolveActive(id, pixel) : id;
-      const src = resolvedId ? controlById(resolvedId) : null;
-      const info = src ? lcdSourceInfo(src) : null;
+      const info = lcdLiveInfoFor(control, pixel, id);
       if (info) live[id] = info;
     }
 
@@ -6540,10 +6853,24 @@
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
       lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId;
     }
+    // A SOFT KEY IS RESOLVED FIRST, and the order is the decision. A press and an edit are both
+    // clicks on the same screen, and a zone that declares an action is the more specific intent:
+    // an edit field is armed by clicking "somewhere on the display", while a soft key is a click on
+    // one named region. Resolving edits first would make a soft key beside an edit field
+    // unreachable, because the edit path falls back to its FIRST target when the click misses.
+    //
+    // It sets a flag rather than returning: the bookkeeping below (closing an open combobox,
+    // pointing the inspector at this control) is owed for every pointer-down on a control,
+    // including one that a soft key consumed.
+    const pressedZone = lcdPressTargetFor(control, pointerDownLocal);
+    const consumedByPress = pressedZone ? lcdPerformPress(control, pressedZone) : false;
+    // A press ends any edit in progress, the way a hardware soft key leaves the field.
+    if (consumedByPress && lcdEdit.active) lcdEdit = { ...LCD_EDIT_IDLE };
+
     // Clicking an LCD with an editable zone focuses it; clicking anything else
     // ends any active edit. Text targets place the caret at the end; a choice
     // target just arms the cycler (wheel/arrows change the option).
-    const editTargets = screenEditTargets(control);
+    const editTargets = consumedByPress ? [] : screenEditTargets(control);
     if (editTargets.length) {
       // Pick the edit field under the click (falling back to the first one);
       // clicking inside a text field places the caret at the clicked character.
@@ -6562,7 +6889,7 @@
           : 0;
       }
       lcdArmEdit(control, target, caret);
-    } else if (lcdEdit.active) {
+    } else if (!consumedByPress && lcdEdit.active) {
       lcdEdit = { ...LCD_EDIT_IDLE };
     }
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {

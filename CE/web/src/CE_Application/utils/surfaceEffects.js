@@ -1,4 +1,5 @@
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { deepClone } from './deepClone.js';
 
 export const EFFECT_SURFACES = [
   { id: 'component', label: 'Whole component', root: 'Effects' },
@@ -34,7 +35,7 @@ export function effectSurfacePatch(control, surface, patch) {
   if (!readSurfaceEffects(control, surface)) {
     for (const [section, fields] of Object.entries(SECTION_DEFAULTS.Effects._children)) {
       for (const [key, value] of Object.entries(fields)) {
-        if (!key.startsWith('_')) result[`${root}.${section}.${key}`] = structuredClone(value);
+        if (!key.startsWith('_')) result[`${root}.${section}.${key}`] = deepClone(value);
       }
     }
   }

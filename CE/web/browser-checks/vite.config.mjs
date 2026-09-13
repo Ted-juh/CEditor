@@ -1,10 +1,11 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 
-const page = (name) => new URL(`./${name}.html`, import.meta.url).pathname;
+const page = (name) => fileURLToPath(new URL(`./${name}.html`, import.meta.url));
 
 export default defineConfig({
-  root: new URL('.', import.meta.url).pathname,
+  root: fileURLToPath(new URL('.', import.meta.url)),
   base: './',
   plugins: [svelte()],
   // The app's entry reads a build stamp the main config injects. These harnesses do not care what
