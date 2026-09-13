@@ -9,8 +9,24 @@
     timbreConfig, timbreTargets, timbreAnchors, timbrePuck, anchorWeights,
     timbreGeometry, timbreToPx, timbreAddressableCount,
   } from '../utils/timbreLayout.js';
+  import { safeSvgId } from '../utils/primitives.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, width = 0, height = 0, idSeed = '' } = $props();
+
+  /**
+   * The heat gradients need ids that are unique in the DOCUMENT, not in this component.
+   *
+   * SVG ids are document-global and `url(#…)` resolves to the FIRST match, so two Timbres on one
+   * panel both defining `tsHeat-0` meant the second one painted with the first one's gradient —
+   * wrong centre, wrong radius, wrong colours, and worse the bigger the size difference. Measured
+   * with two instances: ids came back ["tsHeat-0","tsHeat-1","tsHeat-0","tsHeat-1"], the first
+   * defined at cx=78,cy=282,r=204 and the second at cx=38,cy=122,r=84.
+   *
+   * The control's own id is already unique per control, so it is the seed. `idSeed` is accepted as
+   * an override for the case the control id cannot cover — the same control rendered twice, in the
+   * canvas and in a dock preview at once — so a caller that knows its render namespace can pass it.
+   */
+  let gradientSeed = $derived(safeSvgId(idSeed || control?._children?.Core?.id || 'timbre'));
 
   const PAD = 10;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -63,7 +79,7 @@
 <svg class="timbre" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <defs>
     {#each anchorPx as ap (ap.i)}
-      <radialGradient id={`tsHeat-${ap.i}`} gradientUnits="userSpaceOnUse" cx={ap.q.px} cy={ap.q.py} r={Math.max(20, Math.min(geom.w, geom.h) * 0.6)}>
+      <radialGradient id={`tsHeat-${gradientSeed}-${ap.i}`} gradientUnits="userSpaceOnUse" cx={ap.q.px} cy={ap.q.py} r={Math.max(20, Math.min(geom.w, geom.h) * 0.6)}>
         <stop offset="0" stop-color={ap.colour} stop-opacity="0.34" />
         <stop offset="1" stop-color={ap.colour} stop-opacity="0" />
       </radialGradient>
@@ -73,7 +89,7 @@
   <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke="rgba(36,36,48,1)" />
   {#if cfg.showField !== false}
     {#each anchorPx as ap (ap.i)}
-      <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={`url(#tsHeat-${ap.i})`} />
+      <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={`url(#tsHeat-${gradientSeed}-${ap.i})`} />
     {/each}
   {/if}
 

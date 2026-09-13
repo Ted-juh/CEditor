@@ -46,19 +46,20 @@ renderer ever reading it.
 | Orbit | 15 | 30 | — | 2 | **1** (surface-wide) |
 | Timbre | 14 | 16 | — | — | — |
 | Turing | 19 | 36 | — | 1 | — |
+| Constellation | 19 | 21 | 1 | 1 | — |
+| Kinetic | 15 | 12 | — | 2 | — |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
-`behaviourMotion.mjs` — 82 verified, 0 inert, 3 unverified, 0 open defects (the one found is fixed).
+`behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
 `behaviourCustom.mjs` — 30 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **160 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 343, plus the whole custom-component surface, are not yet done and are
-not claimed.
+That is **194 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 309 are not yet done and are not claimed.
 
 ---
 
@@ -218,9 +219,51 @@ and moves its own channel. Reverting the materializer fails with
 
 ---
 
+## D-5 — two Timbres on one panel shared their heat gradients
+
+**Fixed.** `editor/TimbreRenderer.svelte`.
+
+SVG ids are **document**-global and `url(#…)` resolves to the first match. `TimbreRenderer` named its
+heat gradients `tsHeat-0`, `tsHeat-1`, … after the anchor index alone, so a panel holding two Timbres
+defined every id twice and the second painted with the first one's gradient.
+
+**Measured**, with a 360×360 Timbre and a 160×160 one:
+
+```
+radialGradient ids  ["tsHeat-0","tsHeat-1","tsHeat-0","tsHeat-1"]
+first  definition   cx=78  cy=282  r=204
+second definition   cx=38  cy=122  r=84      ← never used by anything
+```
+
+Wrong centre, wrong radius and wrong colours, and worse the more the two instances differ.
+
+**Fix.** The gradient ids carry the control's own id, which is already unique per control. An
+optional `idSeed` prop is accepted for the case a control id cannot cover — the same control rendered
+in the canvas and a dock preview at once — so a caller that knows its render namespace can pass one
+without this file changing again.
+
+**Swept, not just fixed.** The same mistake is available to any renderer that names a gradient, clip
+path, mask, filter or pattern by index, and it is invisible to every check that looks at one instance
+at a time. `behaviourMotion.mjs` now puts **two differently sized instances of all 23 types in my
+half** on one panel and asserts no svg id is ever defined twice. Timbre was the only one; reverting
+its fix fails with `Timbre: tsHeat-0, tsHeat-1, tsHeat-2, tsHeat-3`.
+
+Root found the same class independently in the Macro (a second, differently sized Macro referencing
+the first instance's label geometry) and asked me to check the Timbre — this is that check, widened
+so the next one does not need asking.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
+
+- `Constellation.showField`. The only `showField` reader in `src/` is `TimbreRenderer`, where it
+  gates a per-anchor heat overlay drawn over the base field rect. The Constellation draws the base
+  rect and has no overlay at all, so there is nothing for the flag to turn off. It is **not** in the
+  properties panel, but it **is** published as a scripting verb (`constellationShowField`) in all
+  seven engines, so a script can call it and get nothing. Recorded rather than fixed: giving the
+  Constellation a heat field is building a visual feature, which is the owner's call, not a QA fix.
 
 - `Envelope.xLabel`, `Envelope.yLabel`. No reader in `CE/src`, `CE/web/src`, `tools/` or the script
   API; `EnvelopeRenderer` draws no `<text>` at all. Written only by
@@ -239,7 +282,12 @@ and moves its own channel. Reverting the materializer fails with
   `rollHz` path *is* verified (20 Hz over 400 ms, with `rollVelocity` confirmed as an accent
   followed by quieter repeats, and `rollDelay` holding the first repeat back).
 - `Orbit.syncToTransport` / `cycleBars`, `Turing.syncToTransport` / `division` — same reason.
-- `Orbit.showTrails` — the trail only exists while the clock runs, so its shape is a moving target.
+- `Orbit.showTrails`, `Kinetic.showTrail` — the trail only exists while the clock runs, so its shape
+  is a moving target.
+- `Constellation.syncToTransport` / `wanderBars` — need a running transport.
+- `Kinetic.friction` / `restitution` / `gravity` / `keepAlive` — the integrator keeps its live state
+  in a module-level map this check cannot read. The ball's motion, its stopping, and the fling are
+  verified on screen; the individual physics coefficients are not.
 
 **Environment, not product:** `browser-checks/screenDock.mjs` cannot run here — it launches
 `channel: 'msedge'`, which is Windows-only. Everything else in the existing browser suite passes
@@ -291,12 +339,20 @@ product. They are listed because the previous pass's real failure was not notici
 15. **Three aims, one answer.** The Orbit drag returned −12.907408671265785° for three different
     target calculations. Identical results from different inputs mean the input is not the variable —
     that is what turned a hunt for an aiming error into D-3.
+16. **Assuming screen coordinates on a flipped axis.** The Constellation probe committed
+    (0.903, 0.093) from a drag to the bottom-right, which is exactly right: y=1 is the TOP on every
+    field component here. The expectation was upside down, not the component.
+17. **Reading live state out of the document, twice more.** A Kinetic fling writes the physics state
+    the ticker integrates, not `Kinetic.initial` — preview is a rehearsal, so the document keeps the
+    author's start point. Asserting the document reported a working fling as dead. The assertion
+    that came out of it is better than the one intended: the ball moves on screen AND the authored
+    start point is untouched.
 
 ---
 
 ## Still to do in my half
 
-- The remaining 343 catalogue properties: Looper, Kinetic, Constellation, Keyboard, StepSequencer,
+- The remaining 309 catalogue properties: Looper, Keyboard, StepSequencer,
   ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone, Setlist, Transport, Panic.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:
