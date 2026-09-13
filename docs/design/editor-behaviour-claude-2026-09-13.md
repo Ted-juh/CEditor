@@ -53,6 +53,8 @@ renderer ever reading it.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
 `behaviourCustom.mjs` — 30 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
+`behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
+`behaviourCustomExport.mjs` — 11 verified, 0 inert, 0 unverified, 0 open defects (the one found is fixed).
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
@@ -254,6 +256,43 @@ so the next one does not need asking.
 
 ---
 
+## D-6 — an exported filmstrip did not look like the component it was baked from
+
+**Fixed.** `utils/customComponentFilmstripBaker.js`.
+
+Three implementations decide how an image fills a part. The live one is
+`plainFillCSS.imageLayerStyle` → `backgroundCSS.buildLayerStyle` → `fitToCSS`, and plainFillCSS
+translates a Fill's `imageFit` into the panel background's own vocabulary *precisely so the two
+agree* — its header says "two functions meant to agree do not stay agreeing". The baker is the
+third, and it had drifted in three places.
+
+**Measured in pixels**, with an 80×20 image of four equal colour columns in a 100×100 frame, sampling
+the baked PNG at the same four points for every mode:
+
+| `imageFit` | live CSS | baked, before | baked, after |
+| --- | --- | --- | --- |
+| `stretch` | `100% 100%` | `R Y G R` ✓ | `R Y G R` |
+| `fill` | `cover` | **`R Y G R`** — a stretch | `G B G G` |
+| `fit` | `contain` | cover | `R Y transparent R` |
+| `original` | `auto` | cover | `R Y transparent transparent` |
+| `tile` | `repeat` | cover | repeats, pattern returns one tile along |
+
+`fill` baked **byte-identical to `stretch`**: an exported filmstrip showed red and yellow where the
+live component showed green and blue. `tile` and `original` had no branch at all and fell through to
+cover — and `tile` is the live **default for an overlay layer**, so that one was wrong without
+anybody choosing it (the baker defaulted an overlay to `cover`).
+
+**Fix.** `fill` falls into the existing cover branch; `original` draws at natural size, centred;
+`tile` is drawn as a canvas pattern at the same `tileScale × 25%` of the frame width CSS uses, with
+the height following the aspect ratio; the overlay default becomes `tile`, matching the live path.
+
+Reverting only the `fill` line fails with `expected ["G","B","G","G"], measured ["R","Y","G","R"]`.
+
+Found from root's reading of the two files; the pixel comparison is what turned it from a suspicion
+into three confirmed mismatches.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
@@ -276,8 +315,13 @@ so the next one does not need asking.
 **Unverified — nothing in this environment can observe it:**
 
 - `Envelope.phaseSourceId`, `Router.sourceControlId` — need a second control driving them live.
-- `Router.inputChannel`, `Router.polyMode` — need inbound MIDI, including polyphonic aftertouch.
-- `DrumPads.echo` / `echoChannel` / `echoColour` — need an inbound MIDI route.
+
+**Closed since**, in `behaviourInbound.mjs`, by injecting bytes at `latestMidiInputMessage` (where a
+device delivers them) and running the panel's own transport: `Router.inputChannel` (omni, pinned,
+and tracking the value), `Router.polyMode` (highest and last), `DrumPads.echo` / `echoChannel` /
+`echoColour`, `DrumPads.rollSync` / `rollRate`, `Turing.syncToTransport` / `division`,
+`Orbit.syncToTransport` / `cycleBars`, and that a synced clock parks dead still when the transport
+stops. Physical hardware remains separately unverified — but it was never what these needed.
 - `DrumPads.rollRate` / `rollSync` — need a running transport to sync against. The free-running
   `rollHz` path *is* verified (20 Hz over 400 ms, with `rollVelocity` confirmed as an accent
   followed by quieter repeats, and `rollDelay` holding the first repeat back).

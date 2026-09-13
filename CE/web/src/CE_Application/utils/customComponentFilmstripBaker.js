@@ -223,9 +223,34 @@ function drawShapeFill(ctx, part, frame, fillStyle, opacity = 1, blend = 'normal
   ctx.restore();
 }
 
+/**
+ * Where an image lands inside a part, in the SAME vocabulary the live renderer uses.
+ *
+ * The live path is `plainFillCSS.imageLayerStyle` → `backgroundCSS.buildLayerStyle` → `fitToCSS`,
+ * and plainFillCSS translates a Fill's `imageFit` into the panel background's own words precisely
+ * so the two agree — its header says as much: "two functions meant to agree do not stay agreeing".
+ * This is the third implementation and it had drifted:
+ *
+ *   'fill'      live `background-size: cover`, baked as a STRETCH. Measured with an 80×20 image in
+ *               a 100×100 frame, the bake put red and yellow where the live component showed green
+ *               and blue — the exported filmstrip was not the component on screen.
+ *   'tile'      live `background-repeat: repeat` at 25% per tile, baked as cover. It is also the
+ *               live DEFAULT for an overlay layer, so this one was wrong without anybody choosing
+ *               it.
+ *   'original'  live `background-size: auto`, baked as cover.
+ *
+ * 'tile' is not a single rect, so it is drawn by the caller; everything else resolves here.
+ */
 function imageFitRect(image, frame, fit = 'fill') {
   const mode = String(fit ?? 'fill');
-  if (mode === 'stretch' || mode === 'fill') return { sx: 0, sy: 0, sw: image.width, sh: image.height, dx: 0, dy: 0, dw: frame.width, dh: frame.height };
+  if (mode === 'stretch') return { sx: 0, sy: 0, sw: image.width, sh: image.height, dx: 0, dy: 0, dw: frame.width, dh: frame.height };
+  if (mode === 'original') {
+    return {
+      sx: 0, sy: 0, sw: image.width, sh: image.height,
+      dx: (frame.width - image.width) / 2, dy: (frame.height - image.height) / 2,
+      dw: image.width, dh: image.height,
+    };
+  }
   const imageRatio = image.width / Math.max(1, image.height);
   const frameRatio = frame.width / Math.max(1, frame.height);
   const contain = mode === 'contain' || mode === 'fit';
@@ -251,7 +276,10 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
   if (!image) return;
 
   const prefix = isImage ? 'image' : 'overlay';
-  const rect = imageFitRect(image, frame, fill?.[`${prefix}Fit`] ?? (isImage ? 'fill' : 'cover'));
+  // The same default the live path uses (plainFillCSS: `at('Fit', isImage ? 'fill' : 'tile')`).
+  // This said 'cover' for an overlay, so an untouched overlay baked differently from the one drawn.
+  const mode = String(fill?.[`${prefix}Fit`] ?? (isImage ? 'fill' : 'tile'));
+  const rect = imageFitRect(image, frame, mode);
   ctx.save();
   const path = partPath(ctx, part, frame, part?._children?.Background ?? null);
   if (path) ctx.clip(path);
@@ -270,7 +298,31 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
   ctx.rotate((numberOr(fill?.[`${prefix}Rotation`], 0) * Math.PI) / 180);
   ctx.scale(fill?.[`${prefix}FlipH`] === true ? -1 : 1, fill?.[`${prefix}FlipV`] === true ? -1 : 1);
   ctx.translate(-frame.width / 2, -frame.height / 2);
-  ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, rect.dx + numberOr(fill?.[`${prefix}OffsetX`], 0), rect.dy + numberOr(fill?.[`${prefix}OffsetY`], 0), rect.dw, rect.dh);
+  const offsetX = numberOr(fill?.[`${prefix}OffsetX`], 0);
+  const offsetY = numberOr(fill?.[`${prefix}OffsetY`], 0);
+  if (mode === 'tile') {
+    // CSS says `background-size: <tileScale × 25>%` with `background-repeat: repeat`: one value, so
+    // the width is that share of the frame and the height follows the aspect ratio. A canvas
+    // pattern over the whole frame is the same picture.
+    const scale = Math.max(0.01, numberOr(fill?.[`${prefix}TileScale`], 1));
+    const tileW = Math.max(1, frame.width * scale * 0.25);
+    const tileH = Math.max(1, tileW / Math.max(0.0001, image.width / Math.max(1, image.height)));
+    const tile = document.createElement('canvas');
+    tile.width = Math.max(1, Math.round(tileW));
+    tile.height = Math.max(1, Math.round(tileH));
+    const tileCtx = tile.getContext('2d');
+    if (tileCtx) {
+      tileCtx.drawImage(image, 0, 0, tile.width, tile.height);
+      const pattern = ctx.createPattern(tile, 'repeat');
+      if (pattern) {
+        ctx.fillStyle = pattern;
+        ctx.translate(offsetX, offsetY);
+        ctx.fillRect(-offsetX, -offsetY, frame.width, frame.height);
+      }
+    }
+  } else {
+    ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, rect.dx + offsetX, rect.dy + offsetY, rect.dw, rect.dh);
+  }
   ctx.restore();
 }
 
