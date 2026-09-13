@@ -34,6 +34,7 @@ export function counterClockwiseDelta(fromDegrees, toDegrees) {
 
 export function resolveSliderNormalizedFromPoint(behavior = null, rect = null, clientX = 0, clientY = 0) {
   if (!rect) return 0;
+  const reverse = (value) => behavior?.reverseMouseDirection === true ? 1 - value : value;
 
   if (getSliderGeometry(behavior) === 'circular') {
     const center = resolveCircularCenter(rect.width, rect.height, {
@@ -48,7 +49,7 @@ export function resolveSliderNormalizedFromPoint(behavior = null, rect = null, c
     const delta = direction === 'ccw'
       ? counterClockwiseDelta(startAngle, angle)
       : clockwiseDelta(startAngle, angle);
-    return clamp(delta / Math.max(1, sweepAngle), 0, 1);
+    return reverse(clamp(delta / Math.max(1, sweepAngle), 0, 1));
   }
 
   const localX = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
@@ -57,10 +58,10 @@ export function resolveSliderNormalizedFromPoint(behavior = null, rect = null, c
   const direction = getSliderDirection(behavior);
 
   if (orientation === 'vertical') {
-    return direction === 'ttb' ? localY : 1 - localY;
+    return reverse(direction === 'ttb' ? localY : 1 - localY);
   }
 
-  return direction === 'rtl' ? 1 - localX : localX;
+  return reverse(direction === 'rtl' ? 1 - localX : localX);
 }
 
 export function sliderValueToAngle(behavior = null, value = 0) {

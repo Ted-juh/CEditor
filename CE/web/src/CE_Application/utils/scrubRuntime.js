@@ -80,16 +80,18 @@ export function getCircularSliderDragMode(behavior) {
 
 export function createCircularSliderScrub(behavior, startNormalized = 0, mouse = null) {
   const sensitivityScale = Math.max(0.01, numberOr(behavior?.circularDragSensitivity, 1));
+  const reversed = isMouseDirectionReversed(behavior);
   const base = getCircularSliderDragMode(behavior) === 'rotary'
     ? {
         ...presets.rotary,
         // The core's rotary axis is counter-clockwise-positive (mathematical
         // angles); a cw dial needs the mirror so clockwise motion increases.
-        invertX: getSliderDirection(behavior) !== 'ccw',
+        invertX: (getSliderDirection(behavior) !== 'ccw') !== reversed,
         sensitivity: (1 / 400) * sensitivityScale,
       }
     : {
         ...presets.knob,
+        invertY: reversed,
         sensitivity: (1 / 250) * sensitivityScale,
       };
   return new DragScrub(withMouse({
@@ -115,7 +117,8 @@ function linearTrackScrub(vertical, inverted, mouse) {
 export function createSliderTrackScrub(behavior, mouse = null) {
   const vertical = getSliderOrientation(behavior) === 'vertical';
   const direction = getSliderDirection(behavior);
-  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl', mouse);
+  const inverted = vertical ? direction === 'ttb' : direction === 'rtl';
+  return linearTrackScrub(vertical, inverted !== isMouseDirectionReversed(behavior), mouse);
 }
 
 // Range-family slider role: same mapping, orientation read from the range block.

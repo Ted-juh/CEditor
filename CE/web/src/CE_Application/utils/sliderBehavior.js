@@ -42,9 +42,16 @@ export function getSliderMax(behavior = null) {
 }
 
 export function getSliderStep(behavior = null) {
+  if (behavior?.snapToTicks === true) {
+    const span = getSliderMax(behavior) - getSliderMin(behavior);
+    const major = Math.max(2, Math.round(numberOr(behavior.majorTickCount, 11)));
+    const minor = Math.max(0, Math.round(numberOr(behavior.minorTickCount, 0)));
+    if (span > 0) return span / ((major - 1) * (minor + 1));
+  }
   const valueType = String(behavior?.valueType ?? 'float').trim().toLowerCase();
   const fallback = valueType === 'int' ? 1 : 0.01;
-  return Math.max(numberOr(behavior?.step, fallback), fallback);
+  const step = numberOr(behavior?.step, fallback);
+  return step > 0 ? step : fallback;
 }
 
 export function getSliderOrientation(behavior = null) {
@@ -211,7 +218,7 @@ function snapToReachableValue(rawValue, min, max, step) {
 export function snapSliderValue(behavior = null, rawValue = 0) {
   const min = getSliderMin(behavior);
   const max = getSliderMax(behavior);
-  const step = behavior?.snapToStep === false ? 0 : getSliderStep(behavior);
+  const step = behavior?.snapToStep === false && behavior?.snapToTicks !== true ? 0 : getSliderStep(behavior);
   let next = snapToReachableValue(rawValue, min, max, step);
 
   if (String(behavior?.valueType ?? 'float').trim().toLowerCase() === 'int') {

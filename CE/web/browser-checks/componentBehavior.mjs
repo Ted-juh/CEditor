@@ -671,6 +671,48 @@ try {
     const id=await fixture('PixelDisplay',{Transform:{width:320,height:160},Pixel:{...cfg,editText:'AAAAA',elements:[{id:'edit',kind:'edit',sourceId:'@edit',font:'custom',x:2,y:2,w:50,h:8}]}},[],[{type:'PixelDisplay',sections:{Core:{id:'caret_reference'},Transform:{x:450,y:50,width:320,height:160},Pixel:{...cfg,elements:[{id:'expected',kind:'static',text:'AABAAA',font:'custom',x:2,y:2,w:50,h:8}]}}}]);
     const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await page.waitForTimeout(250);const b=await node(id).boundingBox();await page.mouse.click(b.x+90,b.y+30);await page.keyboard.type('B');await page.keyboard.press('Enter');await settle();const image=el=>el.locator('canvas').first().evaluate(c=>c.toDataURL());assert.ok((await image(node(id)))===(await image(node('caret_reference'))),'clicking after the second custom glyph must insert B after two As');await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
   });
+  await check('Slider settings: all eight presets draw their handles and retain functional output after reopening',async()=>{
+    for(const geometry of ['Linear','Circular'])for(const preset of ['Single','Bipolar','Range','Band']){
+      const id=await fixture('Slider',{Behavior:{min:0,max:100,step:1,precision:0,rangeSeparator:' - ',bandSeparator:' | '},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});await tab('Slider');await cell(geometry).getByRole('button',{name:preset,exact:true}).click();await settle();
+      const index=['Single','Bipolar','Range','Band'].indexOf(preset),dimensions=geometry==='Linear'?[[220,48],[240,56],[240,56],[260,64]][index]:[[180,180],[200,200],[200,200],[220,220]][index];
+      const verify=async()=>{const box=await node(id).boundingBox();assert.ok(Math.abs(box.width-dimensions[0])<1&&Math.abs(box.height-dimensions[1])<1,`${geometry}/${preset} dimensions`);assert.equal(await node(id).locator('.slider-svg > circle[fill="none"]').count(),[1,1,2,3][index]);assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),['50','0.00','25 - 75','25 | 50 | 75'][index]);await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.press('End');await settle();const expected=[100,1,75,75][index];assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),expected,`${geometry}/${preset} emits its reachable endpoint`);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Slider settings: Snap to ticks aligns pointer keyboard and output with displayed stops',async()=>{
+    for (const config of [
+      {majorTickCount:5,minorTickCount:0,snapToTicks:true},
+      {majorTickCount:3,minorTickCount:1,snapToTicks:true,snapToStep:false},
+      {majorTickCount:5,minorTickCount:0,snapToTicks:false},
+    ]) {
+      const id=await fixture('Slider',{Behavior:{min:0,max:100,step:1,precision:0,defaultCurrentValue:50,showCenterMarker:false,...config},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{
+        const ticks=await node(id).locator('.slider-svg > line').evaluateAll(es=>es.map(e=>Number(e.getAttribute('x1'))).sort((a,b)=>a-b));
+        assert.equal(ticks.length,5,'major and minor counts must produce five visible stops');
+        await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+        const box=await node(id).boundingBox();await page.mouse.click(box.x+box.width*.37,box.y+box.height/2);await settle();
+        const wanted=config.snapToTicks?25:37;
+        assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),String(wanted),'37% pointer position snaps only when the option is enabled');
+        assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),wanted);
+        if(config.snapToTicks)assert.ok(Math.abs(Number(await node(id).locator('.slider-svg > circle[fill="none"]').first().getAttribute('cx'))-ticks[1])<.1,'the handle sits on the drawn quarter tick');
+        await page.keyboard.press('ArrowRight');await settle();
+        assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),config.snapToTicks?'50':'38','keyboard advances by the enabled stop spacing');
+        await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
+      };
+      await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Slider settings: fractional steps below one hundredth remain usable and emit the shown value',async()=>{
+    for(const type of ['Slider','Knob']){
+      const id=await fixture(type,{Behavior:{min:0,max:1,step:.001,precision:3,defaultCurrentValue:.5},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.press('ArrowRight');await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),'0.501',`${type} honours step 0.001`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),.501);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Slider settings: reversed mouse changes drag and wheel direction without mirroring the artwork',async()=>{
+    for(const type of ['Slider','Knob']){
+      const id=await fixture(type,{Behavior:{min:0,max:1,step:.01,precision:2,defaultCurrentValue:.5,reverseMouseDirection:true,wheelEnabled:true,circularDragMode:'knob',circularDragSensitivity:1},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const pointer=node(id).locator('.slider-svg > circle[fill="none"]').first(),start=await pointer.boundingBox();if(type==='Slider'){const b=await node(id).boundingBox();await page.mouse.click(b.x+b.width*.75,b.y+b.height/2);}else{await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down();await page.mouse.move(start.x+start.width/2,start.y+start.height/2-50,{steps:8});await page.mouse.up();}await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),type==='Slider'?'0.25':'0.30',`${type} reversed drag decreases its value`);if(type==='Slider')assert.ok((await pointer.boundingBox()).x<start.x,'lower value still draws on the normal left-hand side');await node(id).hover();await page.mouse.wheel(0,-100);await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),type==='Slider'?'0.24':'0.29',`${type} wheel follows the reversed direction too`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),type==='Slider'?.24:.29);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();

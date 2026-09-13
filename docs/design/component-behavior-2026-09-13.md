@@ -74,6 +74,9 @@ separate gate, not implied by this document round trip.
 | B54 | Static screen text Prefix / Suffix | The editor offers both settings but a static Caption paints without its requested brackets. | Apply configured prefix/suffix in the shared screen text resolver. Nine formatted element kinds paint the exact expected strings before/after reopening. |
 | B55 | PixelDisplay custom-font wrapping | Five 3x4 glyphs at height 8 and width 24 lose a glyph and use the wrong row spacing. | Wrapping uses the selected font's advance, actual scaled height and final character spacing. A manually specified five-glyph dot mask matches the painted canvas before/after reopen. |
 | B56 | PixelDisplay custom-font cursor | Clicking after two visible custom glyphs inserts after three because hit testing uses the built-in font's advance. | Share text metrics between wrapping, selection width and caret hit testing/rendering. Actual typing paints AABAAA at the clicked boundary before/after reopen; leaving rehearsal restores authored text. |
+| B57 | Slider Snap to ticks | Pointer at 37% sends 37 despite quarter ticks and snapping enabled. | Use tick-derived increments for snapping, keyboard and wheel. Pointer sends/draws 25, then Right advances to 50; fresh reopen passes. |
+| B58 | Slider / Knob fractional step | Configured step 0.001 remains stuck at 0.500 on Right because the effective step is silently floored at 0.01. | Honour a positive authored step; use a fallback only for invalid/nonpositive values. Both controls draw and emit 0.501 after Right, including after reopen. |
+| B59 | Slider / Knob Reverse Mouse | Reversed slider click still increases to 0.75; the drag constructors ignore the setting. | Apply reverse to absolute pointer mapping and linear/relative circular drags, without changing the drawn track direction. Slider decreases to 0.25, Knob's 50px upward drag to 0.30; wheel decreases both again and fresh reopen passes. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -131,6 +134,14 @@ Checkpoint after B49–B56: **all 68 root behavioral scenarios pass together, no
 errors; all 4,817 Node tests pass with no skips; the production frontend build passes.**
 The font/formatting additions are included in this combined run. Remaining slider settings
 and the other gaps below are still being investigated.
+
+Slider follow-up: all eight presets pass actual dimensions, handle counts, readout,
+keyboard output and fresh reopen. B57–B59 focused checks pass, including major/minor
+tick spacing, snapping on/off and with step snapping disabled, handle-to-tick geometry,
+0.001 increments on Slider/Knob, and reversed drag/wheel plus captured output.
+All **4,817 Node tests** and the production frontend build pass after these changes.
+The root harness now contains 72 scenarios; the four additions have focused passes
+and have not yet been run as one combined 72-scenario set.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

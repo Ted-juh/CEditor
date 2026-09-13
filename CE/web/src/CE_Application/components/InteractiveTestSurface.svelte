@@ -40,6 +40,7 @@
   import {
     formatSliderNumericValue,
     getSliderActiveHandle,
+    getSliderStep,
     getSliderDisplayValue,
     getSliderLegalRangeForHandle,
     getSliderResolvedValues,
@@ -1108,11 +1109,11 @@
           break;
         case 'ArrowLeft':
         case 'ArrowDown':
-          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01));
+          nextValue = snapSliderValue(behavior, nextValue - getSliderStep(behavior));
           break;
         case 'ArrowRight':
         case 'ArrowUp':
-          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01));
+          nextValue = snapSliderValue(behavior, nextValue + getSliderStep(behavior));
           break;
         default:
           return;
@@ -1262,7 +1263,7 @@
     const direction = resolveMouseDirection(behavior, event.deltaY < 0 ? 1 : -1);
     if (isSliderControl()) {
       const role = currentSliderActiveHandle();
-      setSliderRoleValue(role, currentSliderRoleValue(role) + (direction * numberOr(behavior?.step, 0.01)), {
+      setSliderRoleValue(role, currentSliderRoleValue(role) + (direction * getSliderStep(behavior)), {
         hover: true,
         focused: true,
       });

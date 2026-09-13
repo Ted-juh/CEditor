@@ -256,6 +256,7 @@
   import {
     formatSliderReadout,
     getSliderActiveHandle,
+    getSliderStep,
     getSliderLegalRangeForHandle,
     getSliderResolvedValues,
     getSliderValueMode,
@@ -6483,17 +6484,17 @@
           break;
         case 'ArrowLeft':
         case 'ArrowDown':
-          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01));
+          nextValue = snapSliderValue(behavior, nextValue - getSliderStep(behavior));
           break;
         case 'ArrowRight':
         case 'ArrowUp':
-          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01));
+          nextValue = snapSliderValue(behavior, nextValue + getSliderStep(behavior));
           break;
         case 'PageDown':
-          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01) * 10);
+          nextValue = snapSliderValue(behavior, nextValue - getSliderStep(behavior) * 10);
           break;
         case 'PageUp':
-          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01) * 10);
+          nextValue = snapSliderValue(behavior, nextValue + getSliderStep(behavior) * 10);
           break;
         default:
           return;
@@ -6718,7 +6719,7 @@
     }
     if (isSliderControl(control)) {
       const role = currentSliderActiveHandle(control);
-      setSliderRoleValue(control, role, currentSliderRoleValue(control, role) + (direction * numberOr(behavior?.step, 0.01)), {
+      setSliderRoleValue(control, role, currentSliderRoleValue(control, role) + (direction * getSliderStep(behavior)), {
         hover: true,
         focused: true,
       });
