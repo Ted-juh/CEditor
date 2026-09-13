@@ -80,6 +80,8 @@ separate gate, not implied by this document round trip.
 | B60 | LCD editable field caret | Clicking inside a field throws `regionStartOffset is not defined`, so typing never begins. | Import the shared alignment helper. Real entry covers four charsets, finite/unlimited length, Enter/Escape, left/centre/right caret positions, bound Label/Combobox, disabled-choice skipping, Tab navigation, output and fresh reopen. Pixel entry receives the same charset/commit/cancel/reopen checks. |
 | B61 | Slider activeHandlePolicy | A band configured startFirst moves current on its first arrow key because session initialization hard-codes current. | Seed the session with the existing policy resolver. All three initial roles, crossing disabled/enabled, circular wrapping, exact readout and outbound value pass after fresh reopen. |
 | B62 | Pixel Reset appearance | Reset leaves a strong glow and gamma 3 behind, so its painted canvas differs from the default look. | Reset both appearance settings. Actual canvas matches a default reference with identical content; quarter-brightness alpha confirms gamma resets too. Both survive fresh reopen. |
+| B63 | Dependent choice output | Changing the bank resets the child visually to B1 while its last emitted value stays Shared. | Emit changed dependent values after the initiating user action. Eighteen parent/child/reset combinations pass with ordered output and fresh reopen. Inbound MIDI updates both controls without echo. |
+| B64 | Multi-level dependent choices | With program before bank in canvas order, a family change updates the bank but leaves the program stale. | Resolve dependencies before children and send in that same order. A reversed three-level chain updates every displayed choice and emits family, bank, program in order after reopen. Cyclic malformed dependencies terminate. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -159,6 +161,12 @@ and bounce scrolling with gap and finite-repeat settling; cursor style/cell and 
 blinking; round/square dot pixels, glow extent and ghost colour/opacity; complete Pixel
 appearance reset with preserved bitmap content. The prior 77 passed together; these four
 have focused passes, without claiming a new combined 81-scenario run.
+
+Three dependency scenarios bring the harness to 84. All pass together as a focused
+batch, including 18 combinations of Combobox/Radio/Cyclic parents, Combobox/Listbox/Radio
+children and reset/retain behavior, inbound no-echo, and a reversed three-level chain.
+All **4,819 Node tests pass with zero skips** after B63/B64. Integration validation
+with Claude's corrected arpeggiator follows.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

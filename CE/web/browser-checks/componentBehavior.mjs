@@ -840,6 +840,42 @@ try {
     const alpha=()=>node(id).locator('canvas').first().evaluate(c=>c.getContext('2d').getImageData(40,40,1,1).data[3]);assert.ok(Math.abs(await alpha()-83)<=1,'reset gamma yields the default quarter-brightness response');await reopen(id);assert.ok(Math.abs(await alpha()-83)<=1);
   });
 
+  await check('Dependent selectors keep visible choices selected state and child output in sync after parent changes',async()=>{
+    for(const parentType of ['Combobox','RadioButtonGroup','CyclicButton'])for(const type of ['Combobox','Listbox','RadioButtonGroup'])for(const reset of [true,false]){
+      const rows=[['A1','A'],['A2','A'],['B1','B'],['B2','B'],['Shared','']].map(([value,parentValue],i)=>({id:value,internalValue:value,displayText:value,parentValue,enabled:true,selectedByDefault:i===0}));
+      const id=await fixture(type,{Behavior:{defaultValue:'A1'},Value:{rows,dependsOn:'bank_parent',dependsResetOnChange:reset},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'childChoice',dryRun:true}]}},[],[{type:parentType,sections:{Core:{id:'bank_parent'},Transform:{x:50,y:300,width:260,height:48},Behavior:{defaultValue:'A'},Value:{rows:['A','B'].map((v,i)=>({id:v,internalValue:v,displayText:v,enabled:true,selectedByDefault:i===0}))},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'bankChoice',dryRun:true}]}}}]);
+      const clickChoice=async(controlId,controlType,label)=>{
+        if(controlType==='Combobox'){await node(controlId).click();await page.locator('.panel-combobox-menu').getByRole('option',{name:label,exact:true}).click();}
+        else if(controlType==='CyclicButton')await node(controlId).click();
+        else{const target=node(controlId).locator(controlType==='Listbox'?'.lb-label':'.radio-group-label').getByText(label,{exact:true});const b=await target.boundingBox();await page.mouse.click(b.x+b.width/2,b.y+b.height/2);}
+        await settle();
+      };
+      const verify=async()=>{
+        await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await clickChoice(id,type,'Shared');
+        const sent=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='childChoice'));
+        const before=await sent();assert.equal(before.at(-1)?.payload.value,'Shared');const sendCount=await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length);await clickChoice('bank_parent',parentType,'B');
+        const want=reset?'B1':'Shared';
+        if(type==='Combobox'){assert.ok((await node(id).textContent()).includes(want));await node(id).click();assert.deepEqual(await page.locator('.panel-combobox-menu').getByRole('option').allTextContents(),['B1','B2','Shared']);await page.keyboard.press('Escape');}
+        else{const labelClass=type==='Listbox'?'.lb-label':'.radio-group-label';assert.deepEqual(await node(id).locator(labelClass).allTextContents(),['B1','B2','Shared']);assert.deepEqual(await node(id).locator(type==='Listbox'?'.listbox-row.selected .lb-label':'.radio-group-item.selected .radio-group-label').allTextContents(),[want]);}
+        const after=await sent();assert.equal(after.at(-1)?.payload.value,want,`${type}/reset=${reset}: output agrees with visible selection`);assert.equal(after.length,before.length+(reset?1:0),'automatic reset emits once; retaining a valid value emits nothing');
+        const ordered=await page.evaluate(n=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').slice(n).map(e=>[e.payload.parameterId,e.payload.value]),sendCount);assert.deepEqual(ordered,reset?[['bankChoice','B'],['childChoice','B1']]:[['bankChoice','B']],'parent output precedes dependent output');
+        await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
+      };await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Inbound bank changes update dependent choices without echoing values back to the device',async()=>{
+    const id=await fixture('Combobox',{Behavior:{defaultValue:'A1'},Value:{dependsOn:'inbound_bank',rows:[{id:'A1',internalValue:'A1',displayText:'Alpha preset',parentValue:'0',enabled:true},{id:'B1',internalValue:'B1',displayText:'Beta preset',parentValue:'127',enabled:true}]},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'childChoice',dryRun:true}]}},[],[{type:'Combobox',sections:{Core:{id:'inbound_bank'},Transform:{x:50,y:300,width:260,height:48},Behavior:{defaultValue:'0'},Value:{rows:[{id:'0',internalValue:'0',displayText:'Bank A',enabled:true},{id:'127',internalValue:'127',displayText:'Bank B',enabled:true}]},DeviceBindings:{enabled:true,bindings:[{kind:'midiControl',message:'cc',port:'selectedChoice',channel:1,controller:16,deviceRole:'mainSynth',feedback:{receiveUpdates:true},dryRun:true}]}}}]);
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await page.evaluate(async()=>{const {latestMidiInputMessage}=await import('/src/CE_Application/stores/deviceProfileStores.js');latestMidiInputMessage.set({hex:'B0107F',messageType:'midi',at:Date.now()});});await settle();assert.ok((await node('inbound_bank').textContent()).includes('Bank B'));assert.ok((await node(id).textContent()).includes('Beta preset'));assert.equal(await page.evaluate(()=>window.__behaviorMidi.length),0,'inbound feedback must update both controls without outbound echo');await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
+  await check('Nested dependent selectors send bank before program even when canvas order puts the program first',async()=>{
+    const rows=(prefix,parents)=>['A','B'].map((s,i)=>({id:prefix+s,internalValue:prefix+s,displayText:prefix+s,enabled:true,selectedByDefault:i===0,...(parents?{parentValue:parents+s}:{})}));
+    const binding=parameterId=>({enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId,dryRun:true}]});
+    const id=await fixture('Combobox',{Behavior:{defaultValue:'ProgramA'},Value:{dependsOn:'chain_bank',rows:rows('Program','Bank')},DeviceBindings:binding('program')},[],[
+      {type:'Combobox',sections:{Core:{id:'chain_bank'},Transform:{x:50,y:250,width:260,height:48},Behavior:{defaultValue:'BankA'},Value:{dependsOn:'chain_family',rows:rows('Bank','Family')},DeviceBindings:binding('bank')}},
+      {type:'Combobox',sections:{Core:{id:'chain_family'},Transform:{x:50,y:400,width:260,height:48},Behavior:{defaultValue:'FamilyA'},Value:{rows:rows('Family')},DeviceBindings:binding('family')}},
+    ]);
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node('chain_family').click();await page.locator('.panel-combobox-menu').getByRole('option',{name:'FamilyB',exact:true}).click();await settle();assert.ok((await node('chain_bank').textContent()).includes('BankB'));assert.ok((await node(id).textContent()).includes('ProgramB'));const sent=await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').map(e=>[e.payload.parameterId,e.payload.value]));assert.deepEqual(sent,[['family','FamilyB'],['bank','BankB'],['program','ProgramB']]);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();

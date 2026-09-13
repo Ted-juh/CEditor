@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dependsOnId, dependsResetOnChange, visibleChoiceRows, dependentControl, firstDependentValue,
+  dependsOnId, dependsResetOnChange, visibleChoiceRows, dependentControl, firstDependentValue, sortDependentControls,
 } from '../src/CE_Application/utils/dependentChoices.js';
 
 function child(rows, { dependsOn = 'parent1', reset } = {}) {
@@ -20,6 +20,14 @@ const ROWS = [
   { id: 'c', internalValue: 'saw', displayText: 'Saw', parentValue: 'synth' },
   { id: 'd', internalValue: 'init', displayText: 'INIT', parentValue: '' }, // global
 ];
+
+test('dependency ordering terminates on malformed cycles and retains each control once', () => {
+  const a = { _children: { Core: { id: 'a' }, Value: { dependsOn: 'b' } } };
+  const b = { _children: { Core: { id: 'b' }, Value: { dependsOn: 'a' } } };
+  const ordered = sortDependentControls([a, b]);
+  assert.equal(ordered.length, 2);
+  assert.deepEqual(new Set(ordered), new Set([a, b]));
+});
 
 test('dependsOnId + dependsResetOnChange read the Value section', () => {
   assert.equal(dependsOnId(child(ROWS)), 'parent1');

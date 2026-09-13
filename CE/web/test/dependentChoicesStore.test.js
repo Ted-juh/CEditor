@@ -24,6 +24,21 @@ const PRESETS = [
   { id: 'p4', internalValue: 'pad', displayText: 'Pad', parentValue: 'synth' },
 ];
 
+test('a reversed three-level chain settles every dependent selection in one update', () => {
+  const controls = [
+    selector('preset', PRESETS, { dependsOn: 'bank' }),
+    selector('bank', BANKS.map((row, i) => ({ ...row, parentValue: i === 0 ? 'acoustic' : 'electronic' })), { dependsOn: 'family' }),
+    selector('family', [{ id: 'acoustic', internalValue: 'acoustic', selectedByDefault: true }, { id: 'electronic', internalValue: 'electronic' }]),
+  ];
+  const initial = applyPanelDependentChoices(controls, {});
+  assert.equal(initial.bank.valueOverride, 'drums');
+  assert.equal(initial.preset.valueOverride, 'kick');
+  const next = applyPanelDependentChoices(controls, { ...initial, family: { valueOverrideEnabled: true, valueOverride: 'electronic' } });
+  assert.equal(next.bank.valueOverride, 'synth');
+  assert.equal(next.preset.valueOverride, 'saw');
+  assert.equal(next.preset.dependsParentValue, 'synth');
+});
+
 test('child seeds to the first row of the parent default on first resolve', () => {
   const controls = [selector('bank', BANKS), selector('preset', PRESETS, { dependsOn: 'bank' })];
   const next = applyPanelDependentChoices(controls, {});

@@ -50,7 +50,7 @@
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { applySectionValues } from '../utils/sectionValueOverrides.js';
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
-  import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
+  import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
@@ -6013,52 +6013,79 @@
     else updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: value });
   }
 
+  // A user changing a bank can also reset a dependent program selector. The
+  // store updates both displays; send that secondary value after the parent.
+  // Keep this on user action paths so inbound device updates do not echo back.
+  function emitDependentChoiceChanges(previousSessions) {
+    const nextSessions = get(panelPreviewSessions);
+    if (previousSessions === nextSessions) return;
+    const changed = [];
+    for (const child of controlsById.values()) {
+      if (!dependsOnId(child)) continue;
+      const id = getControlId(child);
+      const previous = previousSessions?.[id];
+      const next = nextSessions?.[id];
+      if (!previous || !next || previous.dependsParentValue === next.dependsParentValue) continue;
+      if (next.valueOverrideEnabled !== true || String(previous.valueOverride) === String(next.valueOverride)) continue;
+      changed.push(child);
+    }
+    for (const child of sortDependentControls(changed)) {
+      emitDeviceBindingsForPatch(child, { valueOverride: nextSessions[getControlId(child)].valueOverride });
+    }
+  }
+
   function commitSelectActionAndEmit(control, options = {}) {
-    const controlId = getControlId(control);
-    if (!controlId) return;
+    const previousSessions = get(panelPreviewSessions);
+    try {
+      const controlId = getControlId(control);
+      if (!controlId) return;
 
-    const requestedValue = Object.prototype.hasOwnProperty.call(options, 'value')
-      ? options.value
-      : undefined;
+      const requestedValue = Object.prototype.hasOwnProperty.call(options, 'value')
+        ? options.value
+        : undefined;
 
-    const appliedPatch = commitPanelPreviewSelectAction(controlId, options);
+      const appliedPatch = commitPanelPreviewSelectAction(controlId, options);
 
-    if (appliedPatch?.valueOverrideEnabled === true) {
-      emitDeviceBindingsForPatch(control, {
-        valueOverride: appliedPatch.valueOverride,
-      });
-      return;
-    }
+      if (appliedPatch?.valueOverrideEnabled === true) {
+        emitDeviceBindingsForPatch(control, {
+          valueOverride: appliedPatch.valueOverride,
+        });
+        return;
+      }
 
-    if (Object.prototype.hasOwnProperty.call(appliedPatch ?? {}, 'checked')) {
-      emitDeviceBindingsForPatch(control, {
-        checked: appliedPatch.checked === true,
-      });
-      return;
-    }
+      if (Object.prototype.hasOwnProperty.call(appliedPatch ?? {}, 'checked')) {
+        emitDeviceBindingsForPatch(control, {
+          checked: appliedPatch.checked === true,
+        });
+        return;
+      }
 
-    if (requestedValue !== undefined && requestedValue !== '') {
-      // Player fallback: commitPanelPreviewSelectAction resolves the control via the editor's
-      // active-panel store, which is empty in the standalone/plugin player — so it returns null
-      // and the session is never updated (the send still fires below, which is why SysEx worked
-      // but the on-screen selection didn't move). Update the session directly here (we have the
-      // control), so radio/combobox selection reflects the click — matching the slider's behaviour.
-      updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: requestedValue });
-      emitDeviceBindingsForPatch(control, {
-        valueOverride: requestedValue,
-      });
-      return;
-    }
+      if (requestedValue !== undefined && requestedValue !== '') {
+        // Player fallback: commitPanelPreviewSelectAction resolves the control via the editor's
+        // active-panel store, which is empty in the standalone/plugin player — so it returns null
+        // and the session is never updated (the send still fires below, which is why SysEx worked
+        // but the on-screen selection didn't move). Update the session directly here (we have the
+        // control), so radio/combobox selection reflects the click — matching the slider's behaviour.
+        updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: requestedValue });
+        emitDeviceBindingsForPatch(control, {
+          valueOverride: requestedValue,
+        });
+        return;
+      }
 
-    const currentSession = sessionFor(control);
-    if (currentSession?.valueOverrideEnabled === true) {
-      emitDeviceBindingsForPatch(control, {
-        valueOverride: currentSession.valueOverride,
-      });
+      const currentSession = sessionFor(control);
+      if (currentSession?.valueOverrideEnabled === true) {
+        emitDeviceBindingsForPatch(control, {
+          valueOverride: currentSession.valueOverride,
+        });
+      }
+    } finally {
+      emitDependentChoiceChanges(previousSessions);
     }
   }
 
   function patchControlSession(controlId, patch = {}) {
+    const previousSessions = get(panelPreviewSessions);
     const control = controlById(controlId);
     const previous = control ? sessionFor(control) : null;
     const behavior = getBehavior(control);
@@ -6085,6 +6112,7 @@
       if (output.hover === false) output.cancelled = true;
       emitDeviceBindingsForPatch(control, output);
     }
+    emitDependentChoiceChanges(previousSessions);
   }
 
   function customSessionValues(control) {

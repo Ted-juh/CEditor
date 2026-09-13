@@ -12,6 +12,23 @@ export function dependsOnId(control) {
   return String(control?._children?.Value?.dependsOn ?? '').trim();
 }
 
+// Resolve parents before their children, independently of canvas/z order.
+// Mark before descending so malformed cyclic dependencies cannot recurse forever.
+export function sortDependentControls(controls) {
+  const list = Array.isArray(controls) ? controls : [];
+  const byId = new Map(list.map(control => [String(control?._children?.Core?.id ?? ''), control]));
+  const visited = new Set();
+  const ordered = [];
+  function visit(control) {
+    if (!control || visited.has(control)) return;
+    visited.add(control);
+    visit(byId.get(dependsOnId(control)));
+    ordered.push(control);
+  }
+  for (const control of list) visit(control);
+  return ordered;
+}
+
 // Whether a parent-change should reset the child's selection (default true).
 export function dependsResetOnChange(control) {
   return control?._children?.Value?.dependsResetOnChange !== false;

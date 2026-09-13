@@ -4,7 +4,7 @@ import { panels, resolvedActivePanelId, selectedComponentId } from './panels.js'
 import { setDebugDock } from './debugDock.js';
 import { beginPreviewRehearsal, endPreviewRehearsal } from './previewRehearsal.js';
 import { resolveInteractiveControl, serializeInteractionRuntime, resolveInteractionContext } from '../utils/interactionRuntime.js';
-import { dependsOnId, dependsResetOnChange, visibleChoiceRows, firstDependentValue } from '../utils/dependentChoices.js';
+import { dependsOnId, dependsResetOnChange, visibleChoiceRows, firstDependentValue, sortDependentControls } from '../utils/dependentChoices.js';
 import { getNextEnumValue } from '../utils/enumBehavior.js';
 import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../utils/selectGroupUtils.js';
 import { normalizeCustomChannelValue, seedCustomValues } from '../utils/customComponentInteraction.js';
@@ -126,7 +126,7 @@ function getControlId(control) {
 // dependsResetOnChange, in which case a still-visible pick is kept). This runs
 // alongside applyPanelCustomLinkRoutes on every panel-preview session update.
 export function applyPanelDependentChoices(controls = [], sessions = {}) {
-  const controlList = Array.isArray(controls) ? controls : [];
+  const controlList = sortDependentControls(controls);
   const byId = new Map(controlList.map((control) => [getControlId(control), control]));
   let nextSessions = sessions ?? {};
   let changed = false;
