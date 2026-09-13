@@ -2976,7 +2976,7 @@
       selected.add(String(runtimeValue));
     }
 
-    if (selected.size > 0) {
+    if (selected.size > 0 || previewSession?.valueOverrideEnabled === true) {
       if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
         return new Set([selected.values().next().value]);
       }
@@ -3275,7 +3275,7 @@
     {/if}
 
     {#if isMacro}
-      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} />
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} idPrefix={svgIdSeed} />
     {/if}
 
     {#if isOrbit}

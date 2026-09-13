@@ -12,6 +12,7 @@ import { syncCustomArpeggiatorValues } from '../utils/customComponentArpeggiator
 import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.js';
 import { applyPanelValueRoutes } from '../utils/routeSessions.js';
 import { flatControls } from '../utils/containment.js';
+import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
 
 /**
  * Every control in the panel, containers included.
@@ -415,11 +416,26 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       ?? null;
     if (!nextRow) return null;
 
+    const nextValue = nextRow?.internalValue ?? nextRow?.id ?? '';
+    const currentValues = currentSession.valueOverrideEnabled === true
+      ? (Array.isArray(currentSession.valueOverride) ? currentSession.valueOverride : [currentSession.valueOverride])
+      : [...resolveRadioSelectedKeys(valueRows, behavior)];
+    const selected = new Set(currentValues.filter(v => v !== '' && v != null).map(String));
+    const key = String(nextValue);
+    const multi = behavior.selectionMode === 'multi';
+    let value = nextValue;
+    if (multi) {
+      if (selected.has(key)) {
+        if (behavior.allowDeselect === true) selected.delete(key);
+      } else selected.add(key);
+      value = valueRows.filter(row => selected.has(String(row.internalValue ?? row.id))).map(row => row.internalValue ?? row.id);
+    } else if (behavior.allowDeselect === true && selected.has(key)) value = '';
+
     const patch = {
       checked: false,
       mixed: false,
       valueOverrideEnabled: true,
-      valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+      valueOverride: value,
     };
     updatePanelPreviewSession(controlId, patch);
     return patch;
@@ -490,8 +506,10 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
     return patch;
   }
 
+  const wasChecked = currentPreviewBoolValue(control, currentSession);
+  if (wasChecked && behavior?.allowUncheck === false) return {};
   const patch = {
-    checked: !currentPreviewBoolValue(control, currentSession),
+    checked: !wasChecked,
     mixed: false,
     valueOverrideEnabled: false,
   };

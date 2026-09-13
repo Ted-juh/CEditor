@@ -51,6 +51,31 @@ separate gate, not implied by this document round trip.
 
 ## Current behavioral checks
 
+### Follow-up after checkpoint 55ab7e10 (in progress)
+
+| ID | Setting / path | Observed defect | Correction / evidence |
+| --- | --- | --- | --- |
+| B31 | Toggle Allow Off / default on | An on toggle could switch off with Allow Off disabled. Default-on state styling could stay on after an allowed off action. | Selection action respects allowUncheck and runtime styling respects an explicit false session state. Real click/reopen check passes. |
+| B32 | Radio Group multi / deselect | Second choice replaces the first; clearing the last selection visually restores the default; runtime converts arrays back to a scalar. | Preserve typed selection arrays and explicit empty state through selection, renderer and runtime context. Visible rows and frontend boundary output pass before/after reopen. |
+| B33 | Scroll Area negative child positions | Child at y=-80 cannot be reached by scrolling up. | Scroll bounds and thumb mapping include negative positions while retaining authored origin. Real child-visibility check and wheel/clamp/thumb regression. |
+| B34 | Scroll Area Content summary | Two real children reported as zero. | Count children in the model's Children map. |
+| B35 | Number inline draft / Escape | Draft already changes the committed value; Escape leaves 12 instead of restoring 20. | Buffer typing until Enter/blur, avoid duplicate commit on later blur. Bounds, step, output, cancellation and reopen check passes. |
+| B36 | Slider / Knob / Range accessibility value | Slider shows 2.5 but exposes 0.5 to assistive technology. | Resolve the active slider/spinner handle and formatted family readout. Default, keyboard-adjusted, emitted and reopened Slider/Knob values agree. |
+| B37 | Multiple Macro instances / label clipping | A second, differently sized Macro resolves its label clip to the first Macro's geometry. | Namespace the face/label SVG references per control and rendering surface. Both controls resolve their own clips before/after reopen. |
+
+Range spinner low/high direct entry was also exercised: cross prevention, maximum clamping,
+both displayed values and fresh-document reopen pass. No fix required for those cases.
+
+Macro's four curves, negative depth and mapped output range agree with visible lane proportions
+and captured frontend binding payloads. Repeating after a fresh reopen passes; leaving rehearsal
+correctly restores the authored 0.25 value. Lanes/values visibility and editable guard also pass.
+The initial Macro persistence expectation incorrectly assumed that rehearsal edits were authored;
+the test was corrected after checking the explicit previewRehearsal contract, without changing it.
+
+Validation at this follow-up: all 38 then-current behavior scenarios pass together; the two added
+Macro scenarios pass separately. All 4,814 Node tests and the production frontend build passed
+before the Macro SVG namespace change. Combined validation follows integration with Claude.
+
 - Meter value/min/max actually control fill extent and clamp outside bounds; orientations,
   thickness, LED count/lit count, scale ticks, caption position and persisted rendering.
 - Numpad digits, offset, out-of-range refusal (red readout), Clear, auto-commit at length,

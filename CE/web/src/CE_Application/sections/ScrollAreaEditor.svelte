@@ -7,6 +7,7 @@
   // nothing — both of which look like the scroll area is broken rather than like the number is.
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { contentExtent } from '../utils/scrollAreaLayout.js';
+  import { getChildControls } from '../utils/containment.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -19,6 +20,7 @@
   let core = $derived(getSection(control, 'Core'));
   let a = $derived(getSection(control, 'ScrollArea'));
   let extent = $derived(contentExtent(control));
+  let childCount = $derived(getChildControls(control).length);
 
   function set(prop, value) {
     if (!core?.id) return;
@@ -46,7 +48,7 @@
 
     <PropertyCell label="Content" span={4} hint="Measured from the children, not set here — an author-set extent goes stale the moment a control moves." compact>
       <span class="extent">{Math.round(extent.width)} × {Math.round(extent.height)} px across
-        {(control?.children?.length ?? 0)} child{(control?.children?.length ?? 0) === 1 ? '' : 'ren'}</span>
+        {childCount} child{childCount === 1 ? '' : 'ren'}</span>
     </PropertyCell>
   </PropertySection>
 

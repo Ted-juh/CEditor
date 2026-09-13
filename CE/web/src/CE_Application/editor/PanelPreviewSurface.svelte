@@ -211,7 +211,7 @@
   import { EMPTY_NRPN_STATE, applyNrpnEvents } from '../utils/nrpn.js';
   import { expressionEventsFromHex } from '../utils/midiNoteInput.js';
   import { tabGeometry, tabAtPoint, tabPages } from '../utils/tabContainerLayout.js';
-  import { scrollByWheel, scrollGeometry, thumbRect, maxScroll, clampScroll } from '../utils/scrollAreaLayout.js';
+  import { scrollByWheel, scrollGeometry, thumbRect, minScroll, maxScroll, clampScroll } from '../utils/scrollAreaLayout.js';
   import { latestMidiInputMessage } from '../stores/deviceProfileStores.js';
   import {
     createTimedButtonPreviewController,
@@ -254,6 +254,7 @@
     scrubSample,
   } from '../utils/scrubRuntime.js';
   import {
+    formatSliderReadout,
     getSliderActiveHandle,
     getSliderLegalRangeForHandle,
     getSliderResolvedValues,
@@ -439,9 +440,10 @@
     const thumb = thumbRect(axis, offset, t.width, t.height, control);
     const length = axis === 'y' ? thumb.h : thumb.w;
     const track = axis === 'y' ? geom.viewport.h : geom.viewport.w;
-    const ratio = maxScroll(t.width, t.height, control)[axis] / Math.max(1, track - length);
+    const minimum = minScroll(t.width, t.height, control)[axis];
+    const ratio = (maxScroll(t.width, t.height, control)[axis] - minimum) / Math.max(1, track - length);
     if (point[axis] < thumb[axis] || point[axis] > thumb[axis] + length) {
-      offset = setScrollOffset(control, { ...offset, [axis]: (point[axis] - length / 2) * ratio });
+      offset = setScrollOffset(control, { ...offset, [axis]: minimum + (point[axis] - length / 2) * ratio });
     }
     scrollDrag = { id: getControlId(control), axis, pointer: point[axis], offset, ratio };
   }
@@ -6251,6 +6253,7 @@
   function commitRangeFieldInput(control) {
     const controlId = getControlId(control);
     const session = sessionFor(control);
+    if (session?.valueInputActive !== true) return;
     const rawValue = session?.valueInputActive === true
       ? String(session?.valueInputBuffer ?? '')
       : resolveRangeDisplayValue(getBehavior(control), session);
@@ -6269,14 +6272,9 @@
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
     const rawValue = String(event?.currentTarget?.value ?? '');
-    const parsed = parseRangeInputValue(getBehavior(control), rawValue);
     patchControlSession(getControlId(control), {
       valueInputActive: true,
       valueInputBuffer: rawValue,
-      ...(parsed === null ? {} : {
-        valueOverrideEnabled: true,
-        valueOverride: parsed,
-      }),
     });
   }
 
@@ -7843,10 +7841,14 @@
       previewAriaDisabled: isDisabled(control),
       previewAriaChecked: previewAriaCheckedFor(control),
       previewAriaExpanded: isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined,
-      previewAriaValueNow: isRangeControl(control) ? currentRangeValue(control) : undefined,
+      previewAriaValueNow: isSliderControl(control) ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
+        : isTwoValueSpinner(control) ? (spinnerActiveHandle(control) === 'end' ? getRangeEndValue(behavior, session) : getRangeStartValue(behavior, session))
+        : isRangeControl(control) ? currentRangeValue(control) : undefined,
       previewAriaValueMin: isRangeControl(control) ? getRangeMin(behavior) : undefined,
       previewAriaValueMax: isRangeControl(control) ? getRangeMax(behavior) : undefined,
-      previewAriaValueText: isRangeControl(control) ? resolveRangeDisplayValue(behavior, session) : undefined,
+      previewAriaValueText: isSliderControl(control) ? formatSliderReadout(behavior, session)
+        : isTwoValueSpinner(control) ? `${spinnerFieldValue(control, 'lowField')} – ${spinnerFieldValue(control, 'highField')}`
+        : isRangeControl(control) ? resolveRangeDisplayValue(behavior, session) : undefined,
       previewValueField: previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
         value: resolveRangeDisplayValue(behavior, session),
         disabled: isDisabled(control),

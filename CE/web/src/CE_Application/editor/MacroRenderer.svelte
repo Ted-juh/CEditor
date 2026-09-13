@@ -10,7 +10,8 @@
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
   import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
-  let { control = null, width = 0, height = 0, dragging = false } = $props();
+  let { control = null, width = 0, height = 0, dragging = false, idPrefix = '' } = $props();
+  let svgId = $derived(`macro-${idPrefix || String(control?._children?.Core?.id ?? 'x')}`);
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
     const s = String(hex ?? '').replace(/^#/, '').trim();
@@ -80,7 +81,7 @@
 
 <svg class="macro" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <defs>
-    <radialGradient id="macroFace" cx="50%" cy="36%" r="72%">
+    <radialGradient id={`${svgId}-face`} cx="50%" cy="36%" r="72%">
       <stop offset="0" stop-color="rgba(255,255,255,0.14)" />
       <stop offset="1" stop-color="rgba(0,0,0,0.22)" />
     </radialGradient>
@@ -93,7 +94,7 @@
     <path d={arcPath(arcR, 135, angle)} fill="none" stroke={arcCss} stroke-width="5" stroke-linecap="round" />
   {/if}
   <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={knobCss} stroke="rgba(0,0,0,0.6)" stroke-width="1" />
-  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill="url(#macroFace)" />
+  <circle cx={geom.knobCX} cy={geom.knobCY} r={geom.knobR} fill={`url(#${svgId}-face)`} />
   <line x1={geom.knobCX} y1={geom.knobCY} x2={pointer[0]} y2={pointer[1]} stroke={dragging ? 'rgba(255,255,255,1)' : 'rgba(240,240,245,0.92)'} stroke-width="3" stroke-linecap="round" />
 
   <!-- Knob readout / label -->
@@ -107,12 +108,12 @@
   <!-- Lanes -->
   <defs>
     {#each laneRows as row (row.i)}
-      <clipPath id={`lbl-${row.i}`}><rect x={geom.lanesX0} y={row.y} width={row.labelW} height={row.rowH} /></clipPath>
+      <clipPath id={`${svgId}-label-${row.i}`}><rect x={geom.lanesX0} y={row.y} width={row.labelW} height={row.rowH} /></clipPath>
     {/each}
   </defs>
   {#each laneRows as row (row.i)}
     {@const cy = row.y + row.rowH / 2}
-    <text x={geom.lanesX0} y={cy} font-size={labelSize} clip-path={`url(#lbl-${row.i})`}
+    <text x={geom.lanesX0} y={cy} font-size={labelSize} clip-path={`url(#${svgId}-label-${row.i})`}
           fill={row.s.enabled ? 'rgba(220,220,228,1)' : 'rgba(150,150,160,0.5)'} dominant-baseline="middle" style="letter-spacing:.01em">{row.s.label}</text>
     <rect x={row.trackX} y={cy - 4} width={row.trackW} height="8" rx="4" fill={trackCss} />
     <!-- value-scale divisions (vertical; same generator as the sliders' ticks) -->

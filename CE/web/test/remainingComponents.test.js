@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 
 import { INSERT_CATEGORIES } from '../src/CE_Application/models/insertCatalog.js';
 import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
+import { getChildControls } from '../src/CE_Application/utils/containment.js';
 import {
   METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
 } from '../src/CE_Application/models/componentFamilies.js';
@@ -507,6 +508,11 @@ test('the extent is measured from the children, never set by the author', () => 
 test('a child dragged above the top is reachable rather than stranded', () => {
   const area = withChildren(control('ScrollArea', 'ScrollArea'), [{ x: 0, y: -50, width: 100, height: 40 }]);
   assert.equal(contentExtent(area).minY, -50);
+  const top = scrollByWheel({ x: 0, y: 0 }, { y: -999 }, 200, 100, area);
+  assert.equal(top.y, -24);
+  assert.equal(clampScroll({ y: -999 }, 200, 100, area).y, -50);
+  assert.equal(thumbRect('y', { y: -50 }, 200, 100, area).y, 0);
+  assert.equal(isChildVisible(getChildControls(area)[0], { y: -50 }, 200, 100), true);
 });
 
 test('content that fits does not scroll', () => {

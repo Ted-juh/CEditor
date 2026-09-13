@@ -123,6 +123,19 @@ function makeSliderControl(id, behaviorOverrides = {}) {
   };
 }
 
+test('radio multi selection retains typed values and an explicitly empty selection', () => {
+  const control = makeRadioGroupControl('multi');
+  control._children.Behavior.selectionMode = 'multi';
+  control._children.Value.rows = [1, 2].map(value => ({ id: String(value), internalValue: value, displayText: `Choice ${value}`, enabled: true, selectedByDefault: value === 1 }));
+  const selected = resolveInteractionContext(control, { valueOverrideEnabled: true, valueOverride: [1, 2] });
+  assert.deepEqual(selected.valueRaw, [1, 2]);
+  assert.equal(selected.selectionActive, true);
+  assert.equal(selected.valueDisplay, 'Choice 1, Choice 2');
+  const empty = resolveInteractionContext(control, { valueOverrideEnabled: true, valueOverride: [] });
+  assert.deepEqual(empty.valueRaw, []);
+  assert.equal(empty.selectionActive, false);
+});
+
 test('resolveInteractionContext keeps built-in radio groups out of the root checked state', () => {
   const control = makeRadioGroupControl('radio_runtime');
   const signals = resolveInteractionContext(control, {

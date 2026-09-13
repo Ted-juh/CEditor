@@ -65,14 +65,14 @@ export function contentExtent(control) {
 /** Geometry: the viewport, minus whichever scrollbars are actually needed. */
 export function scrollGeometry(width, height, control) {
   const config = scrollConfig(control);
-  const bar = Math.max(0, num(config.scrollbarSize, 10));
   const extent = contentExtent(control);
   const w = Math.max(1, num(width, 0));
   const h = Math.max(1, num(height, 0));
+  const bar = Math.min(Math.max(0, num(config.scrollbarSize, 10)), Math.max(0, Math.min(w, h) - 1));
 
   const mode = String(config.direction ?? 'vertical');
-  const wantsX = (mode === 'horizontal' || mode === 'both') && extent.width > w;
-  const wantsY = (mode === 'vertical' || mode === 'both') && extent.height > h;
+  const wantsX = (mode === 'horizontal' || mode === 'both') && (extent.minX < 0 || extent.maxX > w);
+  const wantsY = (mode === 'vertical' || mode === 'both') && (extent.minY < 0 || extent.maxY > h);
 
   // A scrollbar takes space, which can make the OTHER axis overflow when it did not before. Checked
   // once rather than iterated: one pass is enough for two axes, and a loop here would be a loop
@@ -81,7 +81,7 @@ export function scrollGeometry(width, height, control) {
   const showX = wantsX || ((mode === 'horizontal' || mode === 'both') && showY && extent.width > w - bar);
 
   return {
-    viewport: { x: 0, y: 0, w: w - (showX ? 0 : 0) - (showY ? bar : 0), h: h - (showX ? bar : 0) },
+    viewport: { x: 0, y: 0, w: w - (showY ? bar : 0), h: h - (showX ? bar : 0) },
     showX,
     showY,
     bar,
@@ -93,17 +93,24 @@ export function scrollGeometry(width, height, control) {
 export function maxScroll(width, height, control) {
   const geom = scrollGeometry(width, height, control);
   return {
-    x: Math.max(0, geom.extent.width - geom.viewport.w),
-    y: Math.max(0, geom.extent.height - geom.viewport.h),
+    x: geom.showX ? Math.max(0, geom.extent.maxX - geom.viewport.w) : 0,
+    y: geom.showY ? Math.max(0, geom.extent.maxY - geom.viewport.h) : 0,
   };
+}
+
+/** Negative child positions remain reachable without moving the authored origin. */
+export function minScroll(width, height, control) {
+  const geom = scrollGeometry(width, height, control);
+  return { x: geom.showX ? geom.extent.minX : 0, y: geom.showY ? geom.extent.minY : 0 };
 }
 
 /** Clamp a scroll position into range. */
 export function clampScroll(offset, width, height, control) {
   const max = maxScroll(width, height, control);
+  const min = minScroll(width, height, control);
   return {
-    x: clamp(num(offset?.x, 0), 0, max.x),
-    y: clamp(num(offset?.y, 0), 0, max.y),
+    x: clamp(num(offset?.x, 0), min.x, max.x),
+    y: clamp(num(offset?.y, 0), min.y, max.y),
   };
 }
 
@@ -141,12 +148,13 @@ export function thumbRect(axis, offset, width, height, control, { minLength = 24
   const geom = scrollGeometry(width, height, control);
   const vertical = axis === 'y';
   const track = vertical ? geom.viewport.h : geom.viewport.w;
-  const content = vertical ? geom.extent.height : geom.extent.width;
-  if (content <= track) return null;
-
-  const length = Math.max(minLength, (track * track) / content);
-  const max = Math.max(1, content - track);
-  const position = (clamp(num(vertical ? offset?.y : offset?.x, 0), 0, max) / max) * (track - length);
+  if (vertical ? !geom.showY : !geom.showX) return null;
+  const min = minScroll(width, height, control)[axis];
+  const max = maxScroll(width, height, control)[axis];
+  const range = max - min;
+  const content = range + track;
+  const length = Math.min(track, Math.max(minLength, (track * track) / content));
+  const position = ((clamp(num(offset?.[axis], 0), min, max) - min) / Math.max(1, range)) * (track - length);
 
   return vertical
     ? { x: geom.viewport.w, y: position, w: geom.bar, h: length }

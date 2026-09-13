@@ -1,4 +1,5 @@
 import { deepClone } from './deepClone.js';
+import { resolveRadioSelectedKeys } from './radioSegmentStyle.js';
 import { setNestedValue } from '../stores/controlTreeUtils.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
 import {
@@ -625,7 +626,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
   }
 
   if (buttonType === 'toggle') {
-    const checked = previewSession?.checked === true || behavior?.defaultValue === true;
+    const checked = typeof previewSession?.checked === 'boolean' ? previewSession.checked : behavior?.defaultValue === true;
     const toggleRow = checked
       ? (valueRows[1] ?? valueRows.find((row) => row?.internalValue === true) ?? null)
       : (valueRows[0] ?? valueRows.find((row) => row?.internalValue === false) ?? null);
@@ -653,10 +654,17 @@ export function resolveInteractionContext(control, previewSession = {}) {
   }
 
   if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox' || buttonType === 'listbox') {
-    const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
-      ?? findDefaultRow(valueRows);
-    const selectionActive = resolvedRow != null;
-    valueRaw = resolvedRow?.internalValue ?? resolvedRow?.id ?? defaultValue ?? '';
+    const multi = buttonType === 'radio' && behavior?.selectionMode === 'multi';
+    const emptyRadio = buttonType === 'radio' && previewSession?.valueOverrideEnabled === true
+      && (valueRaw === '' || (Array.isArray(valueRaw) && valueRaw.length === 0));
+    const selectedKeys = multi ? (previewSession?.valueOverrideEnabled === true
+      ? (Array.isArray(valueRaw) ? valueRaw : [valueRaw])
+      : [...resolveRadioSelectedKeys(valueRows, behavior)]) : null;
+    const selectedRows = multi ? valueRows.filter(row => selectedKeys.map(String).includes(String(row.internalValue ?? row.id))) : [];
+    const resolvedRow = emptyRadio ? null : multi ? selectedRows[0]
+      : findRowByInternalValue(valueRows, valueRaw) ?? findDefaultRow(valueRows);
+    const selectionActive = multi ? selectedRows.length > 0 : resolvedRow != null;
+    valueRaw = multi ? selectedRows.map(row => row.internalValue ?? row.id) : emptyRadio ? '' : resolvedRow?.internalValue ?? resolvedRow?.id ?? defaultValue ?? '';
     const rowIndex = Math.max(0, valueRows.findIndex((row) => row?.id === resolvedRow?.id));
     const normalizedRow = valueRows.length > 1 ? rowIndex / (valueRows.length - 1) : (resolvedRow ? 1 : 0);
     return {
@@ -664,7 +672,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
       role: String(behavior?.role ?? core?.controlType ?? 'button'),
       valueType,
       valueRaw,
-      valueDisplay: String(resolvedRow?.displayText ?? valueRaw ?? ''),
+      valueDisplay: multi ? selectedRows.map(row => row.displayText ?? row.internalValue ?? row.id).join(', ') : String(resolvedRow?.displayText ?? valueRaw ?? ''),
       valueEnum: String(valueRaw ?? ''),
       valueNormalized: clamp(normalizedRow, 0, 1),
       hover: previewSession?.hover === true,
