@@ -415,6 +415,53 @@ their number: fourteen separate fires, each 125ms ± 45 apart, each one the whol
 
 ---
 
+## D-9 — changing a Transport setting in preview killed the whole canvas
+
+**Fixed.** The Transport hunk of `PanelPreviewSurface.svelte`.
+
+Found in the first minute of the clock pass, by doing the most ordinary thing there is: setting
+`Transport.bpm` on a panel that was in preview.
+
+```
+preview on, one Transport on the panel
+set Transport.bpm  →  every control gone from the DOM, and they do not come back
+                       leaving preview does not bring them back either
+```
+
+The canvas `ErrorBoundary` had caught this and was showing its fallback:
+
+```
+The canvas stopped rendering
+state_unsafe_mutation
+Updating state inside `$derived(...)`, `$inspect(...)` or a template expression is forbidden.
+  at publish                     (stores/transport.js:117)
+  at setTransportBpm             (stores/transport.js:247)
+  at applyTransportValueSource   (PanelPreviewSurface.svelte)
+  at resolvedPreviewFor          (PanelPreviewSurface.svelte)
+  at previewPropsFor             (PanelPreviewSurface.svelte)
+```
+
+`applyTransportValueSource` pushed the control's settings into the shared clock — `setTransportBpm`,
+`setTransportSwing`, `setTransportLoop` and the rest, all of which end in `transport.set(...)` — from
+inside the function the template calls to work out what to draw. Svelte 5 forbids writing state
+there, so the boundary tripped and the region died.
+
+**Why it matters more than an editor inconvenience.** The Transport writes its own `bpm` back:
+`handleTransportPointerDown` does exactly that on a tap-tempo press. So **tapping a tempo destroys
+the surface you tapped it on**, with no editor involved, and `showTap` is on by default. In the
+Player there is no "Try again" button to press — the panel is simply gone.
+
+**Fix.** The reconfiguration moved into an `$effect`, with the same signature guard, so it still
+happens once per change rather than per frame. `applyTransportValueSource` now only reads. The
+effect runs exactly when the old call could: the editor swaps in `PanelSurface` outside preview, and
+the Player always mounts this one.
+
+**Regression.** The whole of `behaviourClock.mjs` is one, since every Transport row sets a property
+in preview and then measures; before the fix the suite cannot reach its second check. Tap tempo has
+its own row, and asserts the tempo against the gaps between the taps as they were actually timed.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**

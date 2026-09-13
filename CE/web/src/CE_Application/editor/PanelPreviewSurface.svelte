@@ -4865,22 +4865,38 @@
     const t = control?._children?.Transform ?? {};
     return tpGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 8);
   }
-  // Push the control's settings into the shared clock. Done from the value
-  // source so edits take effect live, and once per change rather than per frame.
-  function applyTransportValueSource(control, resolved) {
-    if (!isTransportControl(control)) return resolved;
-    const base = resolved?.control ?? control;
-    const cfg = base?._children?.Transport;
-    if (!cfg) return resolved;
-    // Which device the clock goes to is part of the signature: renaming a device or opening a panel
-    // that names a different one has to re-address the transport, not keep clocking the old one.
-    const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
-    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
-      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
-    if (transportConfigured !== signature) {
+  /**
+   * Push the control's settings into the shared clock.
+   *
+   * FROM AN EFFECT, NOT FROM THE RENDER, and the distinction is not stylistic. This used to run
+   * inside `applyTransportValueSource`, which the template calls while computing what to draw —
+   * and `setTransportBpm` and the rest all end in `transport.set(...)`. Svelte 5 forbids writing
+   * state from inside a derived or a template expression, so the second time any Transport setting
+   * changed while the panel was in preview the canvas boundary caught `state_unsafe_mutation` and
+   * the WHOLE CANVAS stopped rendering until somebody pressed "Try again" — the panel gone, the
+   * Player with no way back at all. Tap tempo reached it on its own: it writes `Transport.bpm`,
+   * which changes the signature, so tapping a tempo destroyed the surface you tapped it on.
+   *
+   * The effect runs whenever this surface is mounted, which is exactly when the old call could
+   * happen (the editor swaps in PanelSurface outside preview; the Player always has this one), and
+   * it still reconfigures once per CHANGE rather than per frame — the signature guard is the same
+   * one, moved.
+   */
+  $effect(() => {
+    for (const control of (orderedControls ?? [])) {
+      if (!isTransportControl(control)) continue;
+      const cfg = control?._children?.Transport;
+      if (!cfg) continue;
+      // Which device the clock goes to is part of the signature: renaming a device or opening a
+      // panel that names a different one has to re-address the transport, not keep clocking the old
+      // one.
+      const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
+      const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
+        + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
+      if (transportConfigured === signature) continue;
       transportConfigured = signature;
-      setTransportSource(tpSource(base));
-      if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
+      setTransportSource(tpSource(control));
+      if (!transportIsFollowing(tpSource(control))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
       setTransportClockDevice(clockTarget);
       // Swing lives on the clock so every synced follower shuffles together.
@@ -4888,15 +4904,22 @@
       // The meter has to reach the store, not just the readout: the components
       // that loop in BARS ask the store how long a bar is.
       setTransportSignature(numberOr(cfg.beatsPerBar, 4));
-      const region = loopRegion(base, numberOr(cfg.beatsPerBar, 4));
+      const region = loopRegion(control, numberOr(cfg.beatsPerBar, 4));
       setTransportLoop(region.enabled, region.startBeats, region.lengthBeats);
       // Run-on-load is a decision only a MASTER clock gets to make. Following a
       // DAW or an incoming clock, pressing play is the other end's job, and
       // starting ourselves would show a running transport parked at bar 1.
-      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(base))) {
-        startTransportWithCountIn(countInBars(base), 0);
+      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(control))) {
+        startTransportWithCountIn(countInBars(control), 0);
       }
     }
+  });
+  // Read-only: the live clock state the renderer draws from. Nothing here writes.
+  function applyTransportValueSource(control, resolved) {
+    if (!isTransportControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Transport;
+    if (!cfg) return resolved;
     void $transport.seq;                       // re-render on every publish
     return {
       ...resolved,
