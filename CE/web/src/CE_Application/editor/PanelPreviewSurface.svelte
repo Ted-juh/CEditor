@@ -305,6 +305,20 @@
     sortControlsForRender(panel?.controls ?? [], orderedLayerNames)
       .filter((control) => !hiddenLayers.has(normalizeLayerName(control?._children?.Core?.layer)))
   );
+  /**
+   * EVERY control on the panel — containers and their children alike.
+   *
+   * `orderedControls` is the top-level list, and a component inside a Group or a Tab page is not in
+   * it. That was invisible for as long as everything ran off the render, because the value-source
+   * chain reaches children through `childPreviewPropsFor`; the moment anything sweeps the panel
+   * itself — a run ticker, a panic, a scene recall — the top-level list is the wrong one. A nested
+   * arpeggiator drew its lane, lit its playhead and played NOTHING: its ticker started from the
+   * child render, then looked for arps in a list it was not in and self-stopped.
+   *
+   * Derived rather than flattened at each call site, because the tickers ask on every frame.
+   */
+  let allControls = $derived(flatControls(orderedControls ?? []));
+
   // What to PAINT — same decision the editor surface makes, from the same module, except that here
   // a scenery layer compiles whether or not it is locked: there is nothing to edit in preview, so
   // the lock has no meaning and holding the DOM elements open would buy nothing. `orderedControls`
@@ -2027,7 +2041,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Orbit';
   }
   function orbitControls() {
-    return (orderedControls ?? []).filter((c) => isOrbitControl(c));
+    return allControls.filter((c) => isOrbitControl(c));
   }
   function orbitPhaseFor(control) {
     const id = getControlId(control);
@@ -2174,7 +2188,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Looper';
   }
   function looperControls() {
-    return (orderedControls ?? []).filter((c) => isLooperControl(c));
+    return allControls.filter((c) => isLooperControl(c));
   }
   function looperPhaseFor(control) {
     const id = getControlId(control);
@@ -2488,7 +2502,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Turing';
   }
   function turingControls() {
-    return (orderedControls ?? []).filter((c) => isTuringControl(c));
+    return allControls.filter((c) => isTuringControl(c));
   }
   function turingPhaseFor(control) {
     const id = getControlId(control);
@@ -2625,7 +2639,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Kinetic';
   }
   function kineticControls() {
-    return (orderedControls ?? []).filter((c) => isKineticControl(c));
+    return allControls.filter((c) => isKineticControl(c));
   }
   function kineticStateFor(control) {
     return kineticStateMap[getControlId(control)] ?? kineticInitial(control);
@@ -2749,7 +2763,7 @@
   function isConstControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Constellation';
   }
-  function constControls() { return (orderedControls ?? []).filter((c) => isConstControl(c)); }
+  function constControls() { return allControls.filter((c) => isConstControl(c)); }
   function constGeomFor(control) {
     const t = control?._children?.Transform ?? {};
     return constellationGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 10);
@@ -3132,7 +3146,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Arp';
   }
   function arpControls() {
-    return (orderedControls ?? []).filter((c) => isArpControl(c));
+    return allControls.filter((c) => isArpControl(c));
   }
   // A Chord Pad that feeds a running Arp goes SILENT itself — the Arp plays its
   // notes. Otherwise you'd hear the block chord under the arpeggio.
@@ -3370,7 +3384,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'StepSequencer';
   }
   function stepSequencerControls() {
-    return (orderedControls ?? []).filter((c) => isStepSequencerControl(c));
+    return allControls.filter((c) => isStepSequencerControl(c));
   }
   function seqAllOff(control) {
     const id = getControlId(control);
@@ -3980,7 +3994,7 @@
     const dot = String(path).indexOf('.');
     if (dot <= 0) return null;
     const name = String(path).slice(0, dot);
-    const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === name);
+    const target = allControls.find((c) => String(c?._children?.Core?.name ?? '') === name);
     return target ? { target, rest: String(path).slice(dot + 1) } : null;
   }
   function writeSceneValues(values) {
@@ -4049,12 +4063,37 @@
       else setlistStep(control, 1);
     }
   }
+  /**
+   * THE PEDAL AND THE RECALL RUN IN AN EFFECT, NOT IN THE RENDER.
+   *
+   * Both of these write Svelte state — `pumpSetlistFoot` moves `Setlist.index` through
+   * `updateControlProperty`, and a recall writes every stored value the scene carries and the
+   * transport tempo besides. They used to be called from `applySetlistValueSource`, which the
+   * template calls while working out what to draw, and Svelte 5 forbids writing state from there.
+   *
+   * So recalling a scene that carried any stored values did not recall it: the canvas boundary
+   * caught `state_unsafe_mutation` on the first `updateControlProperty`, every control vanished,
+   * and the values never arrived. Recalling stored values is the whole of what a setlist is for,
+   * and on stage the Player has no "Try again" button. Same shape as the Transport's clock
+   * reconfiguration, same fix.
+   */
+  $effect(() => {
+    // Flattened for the same reason the Transport's is: a setlist inside a container reached the
+    // pumps through `childPreviewPropsFor`, and a top-level-only list would quietly stop pedalling.
+    // The section-valued control is what the chain handed these, so that is what they get.
+    for (const raw of allControls) {
+      if (!isSetlistControl(raw)) continue;
+      const session = sessionFor(raw);
+      const overrides = session?.enabled === false ? {} : session;
+      const control = applySectionValues(raw, overrides?.sectionValues);
+      if (!control?._children?.Setlist) continue;
+      pumpSetlistFoot(control);
+      pumpSetlistIndex(control);
+    }
+  });
+  // Read-only: the setlist draws itself from the document, so there is nothing to inject. Kept in
+  // the chain so the shape of `resolvedPreviewFor` does not change for one component.
   function applySetlistValueSource(control, resolved) {
-    if (!isSetlistControl(control)) return resolved;
-    const base = resolved?.control ?? control;
-    if (!base?._children?.Setlist) return resolved;
-    pumpSetlistFoot(control);
-    pumpSetlistIndex(control);
     return resolved;
   }
   // Click a row to jump to it. On stage you use the pedal; in the editor you
@@ -4206,7 +4245,7 @@
   }
   function releaseHarmoniserPress() {
     if (!harmKeyPress) return;
-    const control = (orderedControls ?? []).find((c) => getControlId(c) === harmKeyPress.id);
+    const control = allControls.find((c) => getControlId(c) === harmKeyPress.id);
     harmKeyPress = null;
     if (control) pumpHarmInput(control);
   }
@@ -4239,7 +4278,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Recorder';
   }
   function recorderControls() {
-    return (orderedControls ?? []).filter((c) => isRecorderControl(c));
+    return allControls.filter((c) => isRecorderControl(c));
   }
   function liveTakeFor(control) {
     const id = getControlId(control);
@@ -4522,7 +4561,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'Phrase';
   }
   function phraseControls() {
-    return (orderedControls ?? []).filter((c) => isPhraseControl(c));
+    return allControls.filter((c) => isPhraseControl(c));
   }
   function phraseGeomFor(control) {
     const t = control?._children?.Transform ?? {};
@@ -4738,7 +4777,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'SplitZone';
   }
   function splitControls() {
-    return (orderedControls ?? []).filter((c) => isSplitZoneControl(c));
+    return allControls.filter((c) => isSplitZoneControl(c));
   }
   function splitGeomFor(control) {
     const t = control?._children?.Transform ?? {};
@@ -4925,22 +4964,50 @@
     const t = control?._children?.Transform ?? {};
     return tpGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 8);
   }
-  // Push the control's settings into the shared clock. Done from the value
-  // source so edits take effect live, and once per change rather than per frame.
-  function applyTransportValueSource(control, resolved) {
-    if (!isTransportControl(control)) return resolved;
-    const base = resolved?.control ?? control;
-    const cfg = base?._children?.Transport;
-    if (!cfg) return resolved;
-    // Which device the clock goes to is part of the signature: renaming a device or opening a panel
-    // that names a different one has to re-address the transport, not keep clocking the old one.
-    const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
-    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
-      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
-    if (transportConfigured !== signature) {
+  /**
+   * Push the control's settings into the shared clock.
+   *
+   * FROM AN EFFECT, NOT FROM THE RENDER, and the distinction is not stylistic. This used to run
+   * inside `applyTransportValueSource`, which the template calls while computing what to draw —
+   * and `setTransportBpm` and the rest all end in `transport.set(...)`. Svelte 5 forbids writing
+   * state from inside a derived or a template expression, so the second time any Transport setting
+   * changed while the panel was in preview the canvas boundary caught `state_unsafe_mutation` and
+   * the WHOLE CANVAS stopped rendering until somebody pressed "Try again" — the panel gone, the
+   * Player with no way back at all. Tap tempo reached it on its own: it writes `Transport.bpm`,
+   * which changes the signature, so tapping a tempo destroyed the surface you tapped it on.
+   *
+   * The effect runs whenever this surface is mounted, which is exactly when the old call could
+   * happen (the editor swaps in PanelSurface outside preview; the Player always has this one), and
+   * it still reconfigures once per CHANGE rather than per frame — the signature guard is the same
+   * one, moved.
+   */
+  $effect(() => {
+    // FLATTENED, and resolved the way the render path resolved it. `orderedControls` is the
+    // top-level canvas list; the value-source chain also ran through `childPreviewPropsFor`, so a
+    // Transport inside a Group or a Tab container configured the clock and would silently stop
+    // doing so here. And the chain handed `applyTransportValueSource` the RESOLVED control, which
+    // carries a host-automated `Transport.bpm` (sectionValues) and anything a States rule wrote —
+    // reading the raw document control would drop both. `resolveInteractiveControl` is pure, so
+    // repeating the first two steps of `resolvedPreviewFor` here costs nothing and keeps the two
+    // paths saying the same thing.
+    for (const raw of allControls) {
+      if (!isTransportControl(raw)) continue;
+      const session = sessionFor(raw);
+      const overrides = session?.enabled === false ? {} : session;
+      const valued = applySectionValues(raw, overrides?.sectionValues);
+      const control = resolveInteractiveControl(valued, overrides)?.control ?? valued;
+      const cfg = control?._children?.Transport;
+      if (!cfg) continue;
+      // Which device the clock goes to is part of the signature: renaming a device or opening a
+      // panel that names a different one has to re-address the transport, not keep clocking the old
+      // one.
+      const clockTarget = resolveClockDevice(cfg.clockDevice, countRolesInPanels([panel]).keys());
+      const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
+        + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}|${clockTarget}`;
+      if (transportConfigured === signature) continue;
       transportConfigured = signature;
-      setTransportSource(tpSource(base));
-      if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
+      setTransportSource(tpSource(control));
+      if (!transportIsFollowing(tpSource(control))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
       setTransportClockDevice(clockTarget);
       // Swing lives on the clock so every synced follower shuffles together.
@@ -4948,15 +5015,22 @@
       // The meter has to reach the store, not just the readout: the components
       // that loop in BARS ask the store how long a bar is.
       setTransportSignature(numberOr(cfg.beatsPerBar, 4));
-      const region = loopRegion(base, numberOr(cfg.beatsPerBar, 4));
+      const region = loopRegion(control, numberOr(cfg.beatsPerBar, 4));
       setTransportLoop(region.enabled, region.startBeats, region.lengthBeats);
       // Run-on-load is a decision only a MASTER clock gets to make. Following a
       // DAW or an incoming clock, pressing play is the other end's job, and
       // starting ourselves would show a running transport parked at bar 1.
-      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(base))) {
-        startTransportWithCountIn(countInBars(base), 0);
+      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(control))) {
+        startTransportWithCountIn(countInBars(control), 0);
       }
     }
+  });
+  // Read-only: the live clock state the renderer draws from. Nothing here writes.
+  function applyTransportValueSource(control, resolved) {
+    if (!isTransportControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Transport;
+    if (!cfg) return resolved;
     void $transport.seq;                       // re-render on every publish
     return {
       ...resolved,
@@ -5014,7 +5088,7 @@
   }
   // Stop every note-playing control on this panel, whatever it happens to hold.
   function silenceLocalNoteControls() {
-    for (const c of (orderedControls ?? [])) {
+    for (const c of allControls) {
       if (isChordPadControl(c)) chordAllOff(c);
       else if (isKeyboardControl(c)) releaseKeyboardNotes(getControlId(c));
       else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
@@ -5079,7 +5153,7 @@
     sentAnyNote = false;
     if (!flashButtons) return;
     // Light any Panic buttons on the panel, so Esc visibly does the same thing.
-    for (const c of (orderedControls ?? [])) {
+    for (const c of allControls) {
       if (!isPanicControl(c)) continue;
       const id = getControlId(c);
       patchControlSession(id, { panicFlash: true });

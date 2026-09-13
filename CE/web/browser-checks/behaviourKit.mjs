@@ -297,6 +297,72 @@ class Kit {
   notes() { return this.page.evaluate(() => window.__notes.slice()); }
   forget() { return this.page.evaluate(() => { window.__notes.length = 0; }); }
 
+  /**
+   * THE OUTBOUND MIDI BOUNDARY, which is a wider door than the note funnel.
+   *
+   * `notes()` taps `sendNoteBytes`, and `noteOutputFromBytes` publishes note-on and note-off and
+   * nothing else — so a Panic button's CC 120/123/121, a Transport's clock, a Setlist's program
+   * change and a Zone Splitter's controller forwarding all pass through that funnel INVISIBLY. The
+   * door they do all go through is `triggerRawMidiAction`, which hands bytes to the JUCE backend.
+   * In a browser there is no backend and the call returns early, so one is stood in here and keeps
+   * what it is handed. The same stub `browser-checks/midi.entry.js` has always used.
+   *
+   * Two conditions have to hold or the door never opens, and both are the product's rules rather
+   * than the harness's: JUCE has to look available, and the panel has to name EXACTLY ONE device
+   * role — `resolveClockDevice` refuses to guess between two, and sends nothing at all if it
+   * cannot tell. So a plain Slider carrying one binding is inserted to name the role, which is
+   * also the honest setup: a panel that names no device has nowhere to send.
+   *
+   * Returns the helper control's id so a check can move it out of the way if it needs to.
+   */
+  async wire(role = 'mainSynth') {
+    const helper = await this.make('Slider', { 'Transform.x': 2, 'Transform.y': 2,
+      'Transform.width': 10, 'Transform.height': 10,
+      'DeviceBindings.bindings': [{ id: 'wire0', deviceRole: role, parameterId: '', portId: '' }] });
+    await this.page.evaluate(() => {
+      window.__midiOut = [];
+      window.__JUCE__ = {
+        backend: {
+          emitEvent(name, payload) { if (name === 'triggerRawMidiAction') window.__midiOut.push(payload); },
+          addEventListener() { return 0; },
+          removeEventListener() {},
+        },
+      };
+    });
+    await this.settle(200);
+    return helper;
+  }
+
+  /**
+   * Everything the panel has put on the wire, decoded.
+   *
+   * THE SEPARATORS COME OUT FIRST. The two senders spell a message differently — the transport's own
+   * `hex()` joins with nothing ("F21F00") while `bytesToHex` puts spaces between the bytes
+   * ("B0 78 00") — and a reader that walks two characters at a time across the second one gets
+   * [176, 7, 8, 0], because `parseInt(" 7", 16)` is 7. That reads a panic's CC 120 as CC 7 and looks
+   * like the product sending the wrong controller. `raw` keeps whatever was actually handed over.
+   */
+  sent() {
+    return this.page.evaluate(() => (window.__midiOut ?? []).map((m) => {
+      const raw = String(m?.message ?? '');
+      const hex = raw.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+      const b = [];
+      for (let i = 0; i + 1 < hex.length; i += 2) b.push(parseInt(hex.slice(i, i + 2), 16));
+      const status = b[0] & 0xF0;
+      return { hex, raw, actionId: String(m?.actionId ?? ''), role: String(m?.deviceRole ?? ''),
+        status, channel: (b[0] & 0x0F) + 1, data1: b[1], data2: b[2], bytes: b };
+    }));
+  }
+
+  forgetSent() { return this.page.evaluate(() => { if (window.__midiOut) window.__midiOut.length = 0; }); }
+
+  /** Take the backend away again. `reopen()` reloads the page, which removes it anyway; this is for
+   *  checks that carry on afterwards and should not be running against a half-real bridge. */
+  async unwire() {
+    await this.page.evaluate(() => { delete window.__JUCE__; window.__midiOut = []; });
+    await this.settle(120);
+  }
+
   box(id) {
     return this.page.evaluate((id) => {
       const el = document.querySelector(`[data-control-id="${id}"]`);

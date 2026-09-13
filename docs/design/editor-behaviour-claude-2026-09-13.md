@@ -52,20 +52,30 @@ renderer ever reading it.
 | Turing | 19 | 36 | — | 1 | — |
 | Constellation | 19 | 21 | 1 | 1 | — |
 | Kinetic | 15 | 12 | — | 2 | — |
+| Zone Splitter | 16 | 24 | — | 1 | — |
+| Transport | 19 | 48 | — | 1 | **1** |
+| Panic | 12 | 22 | — | — | — |
+| Step Sequencer | 19 | 38 | — | 2 | — |
+| (nested components) | — | 6 | — | — | **1** |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
-`behaviourNotes.mjs` — 176 verified, 1 inert, 4 unverified, 0 open defects (three found, all fixed).
+`behaviourNotes.mjs` — 204 verified, 1 inert, 5 unverified, 0 open defects (four found, all fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
 `behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
+`behaviourClock.mjs` — 76 verified, 0 inert, 1 unverified, 0 open defects (three found, all fixed).
+`behaviourSteps.mjs` — 38 verified over the Step Sequencer, 2 unverified, 0 open defects. The Looper
+half of that file is written but not yet green, so nothing is claimed for it here.
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **300 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 203 are not yet done and are not claimed.
+That is **366 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 137 — Looper, Phrase, Recorder, Harmoniser and Setlist — are not yet
+done and are not claimed. (The Setlist's *recall* is measured, because D-10 is about it; its
+twenty-three properties are not.)
 
 ---
 
@@ -415,6 +425,145 @@ their number: fourteen separate fires, each 125ms ± 45 apart, each one the whol
 
 ---
 
+## D-9 — changing a Transport setting in preview killed the whole canvas
+
+**Fixed.** The Transport hunk of `PanelPreviewSurface.svelte`.
+
+Found in the first minute of the clock pass, by doing the most ordinary thing there is: setting
+`Transport.bpm` on a panel that was in preview.
+
+```
+preview on, one Transport on the panel
+set Transport.bpm  →  every control gone from the DOM, and they do not come back
+                       leaving preview does not bring them back either
+```
+
+The canvas `ErrorBoundary` had caught this and was showing its fallback:
+
+```
+The canvas stopped rendering
+state_unsafe_mutation
+Updating state inside `$derived(...)`, `$inspect(...)` or a template expression is forbidden.
+  at publish                     (stores/transport.js:117)
+  at setTransportBpm             (stores/transport.js:247)
+  at applyTransportValueSource   (PanelPreviewSurface.svelte)
+  at resolvedPreviewFor          (PanelPreviewSurface.svelte)
+  at previewPropsFor             (PanelPreviewSurface.svelte)
+```
+
+`applyTransportValueSource` pushed the control's settings into the shared clock — `setTransportBpm`,
+`setTransportSwing`, `setTransportLoop` and the rest, all of which end in `transport.set(...)` — from
+inside the function the template calls to work out what to draw. Svelte 5 forbids writing state
+there, so the boundary tripped and the region died.
+
+**Why it matters more than an editor inconvenience.** The Transport writes its own `bpm` back:
+`handleTransportPointerDown` does exactly that on a tap-tempo press. So **tapping a tempo destroys
+the surface you tapped it on**, with no editor involved, and `showTap` is on by default. In the
+Player there is no "Try again" button to press — the panel is simply gone.
+
+**Fix.** The reconfiguration moved into an `$effect`, with the same signature guard, so it still
+happens once per change rather than per frame. `applyTransportValueSource` now only reads. The
+effect runs exactly when the old call could: the editor swaps in `PanelSurface` outside preview, and
+the Player always mounts this one.
+
+**Regression.** The whole of `behaviourClock.mjs` is one, since every Transport row sets a property
+in preview and then measures; before the fix the suite cannot reach its second check. Tap tempo has
+its own row, and asserts the tempo against the gaps between the taps as they were actually timed.
+
+---
+
+## D-10 — recalling a Setlist scene killed the canvas, and did not recall the scene
+
+**Fixed.** The Setlist hunk of `PanelPreviewSurface.svelte`.
+
+The same defect as D-9 at a second site, found by reading for the shape rather than by tripping over
+it. `applySetlistValueSource` called `pumpSetlistFoot` and `pumpSetlistIndex` from the render path,
+and both of them write state: the pedal moves `Setlist.index` through `updateControlProperty`, and a
+recall writes every stored value the scene carries plus the transport tempo.
+
+```
+three scenes; the third stores { 'Cutoff.Value.value': 0.8 }
+set Setlist.index = 2   → canvas: 0 controls · "The canvas stopped rendering / state_unsafe_mutation"
+                        → Cutoff.Value.value: unchanged
+```
+
+So the scene was not recalled — the boundary caught the very first `updateControlProperty` and the
+rest of the plan never ran. Recalling stored values is the whole of what a setlist is for, and it
+happens on stage, in the Player, where there is no "Try again" button. A scene carrying only a tempo
+survived (the transport publish is throttled and lands outside the render), which is why this needed
+looking for rather than waiting for.
+
+**Fix.** Both pumps moved into an `$effect`, as D-9's reconfiguration was. `applySetlistValueSource`
+never injected anything — it returned `resolved` untouched — so it stays in the chain as a
+pass-through and the thirty-deep chain expression is not disturbed.
+
+### What root's review of D-9 caught, and it applies to both
+
+**`orderedControls` is the top-level list.** The value-source chain also ran through
+`childPreviewPropsFor`, so a Transport inside a Group or a Tab page configured the clock. An effect
+sweeping only the top level would have been a silent regression for every panel that keeps its
+transport in a container. Both effects now walk `flatControls(orderedControls)`, and the regression
+is a real one: the fixture is grouped through the editor's own `groupSelectionIntoContainer`, then
+asserted to be a CHILD of the container before anything else is measured.
+
+**The chain handed the value source the RESOLVED control.** Reading the raw document control drops
+two things: a host parameter automating `Transport.bpm`, which arrives as the session's
+`sectionValues` overlay and never touches the document, and anything a States rule wrote. The
+Transport effect now repeats the first two steps of `resolvedPreviewFor` — `applySectionValues`,
+then `resolveInteractiveControl`, which is pure — so both paths say the same thing. Proven by
+overlaying an automated tempo of 177 on a stored 144: the clock takes 177, the document stays 144,
+the face reads 177, and releasing the automation returns the clock to 144.
+
+---
+
+## D-11 — a component inside a Group renders perfectly and does nothing
+
+**Fixed** for my families; two sites left for root, named below.
+
+Found by following root's review of D-9 rather than by tripping over it. Root's point was that
+`orderedControls` is the top-level list and the value-source chain also reaches children through
+`childPreviewPropsFor`. That is true of far more than the Transport: **every sweep of the panel in
+the preview surface used the top-level list**, and the components that run on a clock sweep the
+panel to find themselves.
+
+**Measured**, one Arp, grouped through the editor's own `groupSelectionIntoContainer`:
+
+```
+top level   → 11 note-ons in 1.2s
+nested      → 0 note-ons in 1.2s      (drawn, playhead lit, no error, no sound)
+```
+
+The ticker starts from the child render, then looks for arpeggiators in a list the arp is not in,
+finds none, and self-stops. Nothing says so: the lane is drawn, the playhead lights, the console is
+clean.
+
+**The same line appeared fourteen times.** Fixed in my families:
+
+| Site | What was broken |
+| --- | --- |
+| `arpControls` `stepSequencerControls` `looperControls` `orbitControls` `turingControls` `kineticControls` `constControls` `recorderControls` `phraseControls` `splitZoneControls` | a nested one never runs |
+| `silenceLocalNoteControls` | **Panic does not silence a nested note control** — a stuck note the panic button cannot clear is the exact failure it exists to prevent |
+| the Esc-panic flash sweep | a nested Panic button does not light |
+| `sceneTargetFor` | a Setlist scene cannot recall a value onto a nested control |
+| `releaseHarmoniserPress` | a key auditioned on a nested Harmoniser never releases |
+
+**Left for root**, both in areas they own, both the same one-word change:
+
+- `PanelPreviewSurface.svelte:1006` — a button's `set` target addressed by name. The fallback is
+  `controlById`, which is keyed by id, so a name naming a nested control finds nothing.
+- `PanelPreviewSurface.svelte:1394` — the meter peak-hold ticker. A nested meter with `peakHold`
+  never holds a peak.
+
+**Fix.** One `$derived` — `allControls = flatControls(orderedControls ?? [])` — used at every one of
+those sites. Derived rather than flattened per call because the tickers ask on every frame.
+
+**Regression.** A `Nested` section in `behaviourClock.mjs`: an Arp, a Step Sequencer and a Looper
+each measured on the canvas and then again after being grouped through the editor's own action, plus
+a Panic releasing a chord held by a pad inside a Group. Each one first asserts that the fixture
+really is a CHILD of the container, so a grouping that quietly failed could not pass the rest.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
@@ -553,8 +702,8 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The remaining 203 catalogue properties: Looper, StepSequencer, Phrase, Recorder, Harmoniser,
-  SplitZone, Setlist, Transport, Panic.
+- The remaining 137 catalogue properties: Looper (written, not yet green), Phrase, Recorder,
+  Harmoniser, Setlist.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:
   each rule is asserted by which page is actually on screen (a hidden part is not rendered at all,
