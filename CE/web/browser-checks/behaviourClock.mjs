@@ -402,6 +402,227 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
+  // TRANSPORT, NESTED AND AUTOMATED. Two ways the clock reaches its settings that a check on a
+  // bare top-level control cannot see, both raised in review of the effect that replaced the
+  // render-path write.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const T = 'Transport';
+    const clockState = () => kit.page.evaluate(async () => {
+      const { transport } = await import('/src/CE_Application/stores/transport.js');
+      const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+      const t = get(transport);
+      return { bpm: t.bpm, beatsPerBar: t.beatsPerBar, swing: t.swing, loopEnabled: t.loopEnabled, source: t.source };
+    });
+    const inner = await kit.make(T, { 'Transform.x': 60, 'Transform.y': 140,
+      'Transform.width': 340, 'Transform.height': 60, 'Transport.bpm': 144,
+      'Transport.beatsPerBar': 5, 'Transport.swing': 0.375, 'Transport.loopEnabled': true,
+      'Transport.loopStartBar': 3, 'Transport.loopLengthBars': 2, 'Transport.source': 'internal' });
+    // Group it, through the editor's own action rather than by hand-building a tree.
+    const containerId = await kit.page.evaluate(async (id) => {
+      const { groupSelectionIntoContainer } = await import('/src/CE_Application/stores/controls.js');
+      const { selectComponent } = await import('/src/CE_Application/stores/panels.js');
+      selectComponent(id);
+      return groupSelectionIntoContainer(12)?._children?.Core?.id ?? '';
+    }, inner);
+    await kit.settle(300);
+    const nesting = await kit.page.evaluate(async ({ inner, containerId }) => {
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const top = (live?.controls ?? []).map((c) => c._children.Core.id);
+      const container = (live?.controls ?? []).find((c) => c._children.Core.id === containerId);
+      const kids = Object.keys(container?._children?.Children?._children ?? {});
+      return { topLevel: top.includes(inner), childOfTheContainer: kids.includes(inner) };
+    }, { inner, containerId });
+    led.check(T, 'nested (the fixture really is nested)', 'the transport is a CHILD of the container, not a sibling of it',
+      { topLevel: false, childOfTheContainer: true }, nesting);
+
+    await kit.preview(true);
+    await kit.settle(500);
+    led.check(T, 'nested (the clock is configured from inside a container)',
+      'a transport in a Group configures the shared clock exactly as a top-level one does',
+      { bpm: 144, beatsPerBar: 5, swing: 0.375, loopEnabled: true },
+      (({ bpm, beatsPerBar, swing, loopEnabled }) => ({ bpm, beatsPerBar, swing, loopEnabled }))(await clockState()));
+    await kit.set(inner, { 'Transport.bpm': 96 });
+    await kit.settle(400);
+    led.check(T, 'nested (an edit still reaches the clock)', 'changing the tempo of a nested transport re-tempos the clock',
+      96, (await clockState()).bpm);
+    led.check(T, 'nested (and the canvas survives the edit)', 'and the surface is still rendering afterwards',
+      true, (await kit.box(inner)) !== null);
+    await kit.set(inner, { 'Transport.source': 'external' });
+    await kit.settle(400);
+    led.check(T, 'nested (source)', 'and switching a nested transport to follow an external clock switches the shared one',
+      'external', (await clockState()).source);
+    await kit.set(inner, { 'Transport.source': 'internal', 'Transport.bpm': 144 });
+    await kit.settle(300);
+
+    // --- sectionValues: a host parameter automating the tempo -------------------------------------
+    // The chain handed the value source the RESOLVED control, so a DAW automating `Transport.bpm`
+    // reached the clock through the session's `sectionValues` overlay without the document ever
+    // changing. Reading the raw document control would drop that silently — the parameter would
+    // appear in the host, move, and do nothing.
+    {
+      await kit.page.evaluate(async (id) => {
+        const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+        updatePanelPreviewSession(id, { sectionValues: { Transport: { bpm: 177 } } });
+      }, inner);
+      await kit.settle(500);
+      led.check(T, 'sectionValues (host automation of the tempo)',
+        'an automated bpm overlaid on the session reaches the clock, with the document untouched',
+        { clock: 177, document: 144 },
+        { clock: (await clockState()).bpm, document: Number(await kit.read(inner, 'Transport.bpm')) });
+      led.check(T, 'sectionValues (and the face shows it)', 'and the readout is the automated tempo, not the stored one',
+        true, (await kit.texts(inner)).includes('177.0'));
+      await kit.page.evaluate(async (id) => {
+        const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+        updatePanelPreviewSession(id, { sectionValues: undefined });
+      }, inner);
+      await kit.settle(400);
+      led.check(T, 'sectionValues (released)', 'and letting the automation go returns the clock to the stored tempo',
+        144, (await clockState()).bpm);
+    }
+    await kit.page.evaluate(async () => {
+      const { stopTransport } = await import('/src/CE_Application/stores/transport.js');
+      stopTransport();
+    });
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
+  // NESTED COMPONENTS — the same fault as the Transport's, across the families that sweep the
+  // panel for themselves. A component inside a Group renders perfectly and does nothing, which is
+  // the hardest kind of broken to notice: the lane is drawn, the playhead lights, no error appears.
+  // =============================================================================================
+  {
+    /** Put a control inside a Container through the editor's own grouping action. */
+    const nest = async (id) => {
+      await kit.preview(false);
+      const containerId = await kit.page.evaluate(async (cid) => {
+        const { groupSelectionIntoContainer } = await import('/src/CE_Application/stores/controls.js');
+        const { selectComponent } = await import('/src/CE_Application/stores/panels.js');
+        selectComponent(cid);
+        return groupSelectionIntoContainer(12)?._children?.Core?.id ?? '';
+      }, id);
+      await kit.settle(300);
+      const nested = await kit.page.evaluate(async ({ id, containerId }) => {
+        const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+        const get = (st) => { let v; st.subscribe((x) => { v = x; })(); return v; };
+        const live = get(panels).find((p) => p.id === get(activePanelId));
+        const container = (live?.controls ?? []).find((c) => c._children.Core.id === containerId);
+        return Object.keys(container?._children?.Children?._children ?? {}).includes(id);
+      }, { id, containerId });
+      await kit.preview(true);
+      await kit.settle(300);
+      return nested;
+    };
+
+    // --- a nested Arp still plays -------------------------------------------------------------
+    await kit.fresh();
+    {
+      const aid = await kit.make('Arp', { 'Transform.x': 60, 'Transform.y': 140,
+        'Transform.width': 420, 'Transform.height': 200, 'Arp.running': false, 'Arp.rate': 8,
+        'Arp.pattern': 'up', 'Arp.channel': 1, 'Arp.velocity': 90 });
+      await kit.preview(true);
+      const run = async () => {
+        await kit.forget();
+        await kit.set(aid, { 'Arp.running': true });
+        await kit.settle(1200);
+        await kit.set(aid, { 'Arp.running': false });
+        await kit.settle(200);
+        return (await kit.notes()).filter((e) => e.kind === 'on').length;
+      };
+      const flat = await run();
+      const isNested = await nest(aid);
+      const inside = await run();
+      led.check('Nested', 'Arp (the fixture really is nested)', 'the arp is a child of the container',
+        true, isNested);
+      led.check('Nested', 'Arp (it still plays)',
+        'an arpeggiator inside a Group plays the same number of notes as one on the canvas — it used to draw its lane, light its playhead and emit nothing',
+        true, flat >= 6 && Math.abs(inside - flat) <= 3);
+      led.check('Nested', 'Arp (it is still on screen)', 'and is still drawn where it was',
+        true, (await kit.box(aid)) !== null);
+    }
+    await kit.preview(false);
+
+    // --- a nested Step Sequencer still plays --------------------------------------------------------
+    await kit.fresh();
+    {
+      const sid = await kit.make('StepSequencer', { 'Transform.x': 60, 'Transform.y': 140,
+        'Transform.width': 520, 'Transform.height': 170, 'StepSequencer.steps': 4,
+        // 1/16 at 240bpm is a step every 62.5ms, so a 1.2s window holds nineteen steps and the
+        // two lit cells fire nine or ten times. At 1/4 the same window held under three fires,
+        // which is too few to tell "nested and silent" from "nested and sampled awkwardly".
+        'StepSequencer.bpm': 240, 'StepSequencer.division': '1/16', 'StepSequencer.running': false,
+        'StepSequencer.pattern': { 't0:0': { on: true, velocity: 100 }, 't1:2': { on: true, velocity: 100 } } });
+      await kit.preview(true);
+      const run = async () => {
+        await kit.forget();
+        await kit.set(sid, { 'StepSequencer.running': true });
+        await kit.settle(1200);
+        await kit.set(sid, { 'StepSequencer.running': false });
+        await kit.settle(200);
+        return (await kit.notes()).filter((e) => e.kind === 'on').length;
+      };
+      const flat = await run();
+      const isNested = await nest(sid);
+      const inside = await run();
+      led.check('Nested', 'StepSequencer (it still plays)',
+        'a sequencer inside a Group walks its grid and sounds its cells',
+        true, isNested && flat >= 6 && Math.abs(inside - flat) <= 3);
+    }
+    await kit.preview(false);
+
+    // --- a nested Looper still runs its clock ----------------------------------------------------------
+    await kit.fresh();
+    {
+      const lid = await kit.make('Looper', { 'Transform.x': 60, 'Transform.y': 140,
+        'Transform.width': 420, 'Transform.height': 180, 'Looper.running': true,
+        'Looper.loopSeconds': 2, 'Looper.showPlayhead': true, 'Looper.phase': 0,
+        'Looper.lanes': [{ id: 'g0', label: 'A', points: [{ t: 0, v: 0 }, { t: 1, v: 1 }], rest: 0, enabled: true }] });
+      await kit.preview(true);
+      const isNested = await nest(lid);
+      const headX = async () => (await kit.geo(lid)).find((n) => n.tag === 'line' && n['stroke-width'] === 1.5)?.x1 ?? null;
+      const a = await headX();
+      await kit.settle(700);
+      const b = await headX();
+      led.check('Nested', 'Looper (its clock still runs)',
+        'a looper inside a Group sweeps its playhead rather than freezing at the phase it was saved with',
+        true, isNested && a !== null && b !== null && Math.abs(b - a) > 30);
+      await kit.set(lid, { 'Looper.running': false });
+    }
+    await kit.preview(false);
+
+    // --- Panic still silences a nested note control --------------------------------------------------------
+    await kit.fresh();
+    {
+      const cid = await kit.make('ChordPad', { 'Transform.x': 60, 'Transform.y': 300,
+        'Transform.width': 300, 'Transform.height': 160, 'ChordPad.layout': 'grid',
+        'ChordPad.channel': 3, 'ChordPad.latch': true });
+      const pid = await kit.make('Panic', { 'Transform.x': 60, 'Transform.y': 140,
+        'Transform.width': 180, 'Transform.height': 56, 'Panic.clearLocal': true, 'Panic.editable': true });
+      const isNested = await nest(cid);
+      const padBox = await kit.box(cid);
+      await kit.click({ x: padBox.x + padBox.w * 0.2, y: padBox.y + padBox.h * 0.6 });
+      await kit.settle(240);
+      const held = (await kit.session(cid))?.chordNotes ?? [];
+      await kit.forget();
+      const panicBox = await kit.box(pid);
+      await kit.click({ x: panicBox.x + panicBox.w / 2, y: panicBox.y + panicBox.h / 2 });
+      await kit.settle(260);
+      const offs = (await kit.notes()).filter((e) => e.kind === 'off');
+      led.check('Nested', 'Panic (it silences a nested note control)',
+        'a chord held by a pad inside a Group is released by the panic button — a panic that misses a control is the failure this button exists to prevent',
+        { nested: true, wasHolding: true, released: true, stillHeld: 0 },
+        { nested: isNested, wasHolding: held.length >= 3,
+          released: held.length > 0 && held.every((n) => offs.some((e) => e.note === n)),
+          stillHeld: ((await kit.session(cid))?.chordNotes ?? []).length });
+    }
+    await kit.preview(false);
+  }
+
+  // =============================================================================================
   // PANIC — the button whose whole result is silence. Measured as the bytes it sends and the notes
   // it stops, not as the document property that was written.
   // =============================================================================================
