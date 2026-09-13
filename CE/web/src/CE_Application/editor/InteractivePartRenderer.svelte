@@ -564,6 +564,7 @@
         inputmode={editableInput.inputMode ?? 'decimal'}
         value={editableInput.value ?? ''}
         disabled={editableInput.disabled === true}
+        readonly={editableInput.readOnly === true}
         aria-label={editableInput.ariaLabel ?? 'Value'}
         tabindex={editableInput.tabIndex ?? -1}
         style={inputStyle}

@@ -90,6 +90,15 @@ async function captureMidi() {
     window.__JUCE__={backend:{addEventListener:()=>0,removeEventListener:()=>{},emitEvent:(name,payload)=>window.__behaviorMidi.push({name,payload})}};
   });
 }
+async function paintedPixels(id, points) {
+  const png = await node(id).screenshot();
+  return page.evaluate(async ({data,points})=>{
+    const img=new Image();img.src=`data:image/png;base64,${data}`;await img.decode();
+    const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;
+    const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);
+    return points.map(([x,y])=>Array.from(ctx.getImageData(x,y,1,1).data));
+  },{data:png.toString('base64'),points});
+}
 try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, {waitUntil:'networkidle',timeout:60000});
   await page.waitForSelector('.app');
@@ -512,6 +521,69 @@ try {
   await check('Multiple Macro instances use their own label clips at different sizes',async()=>{
     const id=await fixture('Macro',{},[],[{type:'Macro',sections:{Core:{id:'other_macro'},Transform:{x:400,y:60,width:400,height:240}}}]);
     const verify=async()=>{for(const controlId of [id,'other_macro']){const refs=await node(controlId).locator('svg.macro text[clip-path]').evaluateAll(es=>es.map(e=>{const id=e.getAttribute('clip-path').slice(5,-1),target=document.getElementById(id);return {own:target?.closest('svg')===e.closest('svg'),text:e.textContent};}));assert.ok(refs.length>0&&refs.every(r=>r.own),`Macro ${controlId} must clip labels against its own geometry`);}};await verify();await reopen(id);await verify();
+  });
+  await check('PixelDisplay grid dimensions bar width brightness gamma and live source paint the expected dots',async()=>{
+    const id=await fixture('PixelDisplay',{Pixel:{pixelsW:30,pixelsH:16,padding:0,showGhost:false,showGlass:false,showScanlines:false,backlightOn:false,brightness:100,gamma:1,glow:0,dotShape:'square',litColour:'FFFFFFFF',layouts:[],elements:[{id:'bar',kind:'hbar',sourceId:'pixel_source',x:4,y:4,w:12,h:6}]}},[],[{type:'Number',sections:{Core:{id:'pixel_source'},Transform:{x:450,y:50,width:140,height:50},Behavior:{min:0,max:1,step:0.25,valueType:'float',defaultValue:0.5}}}]);
+    const pixel=async(x,y)=>node(id).locator('canvas.lcd-graphic').evaluate((c,{x,y})=>Array.from(c.getContext('2d').getImageData(Math.floor((x+0.5)*c.width/30),Math.floor((y+0.5)*c.height/16),1,1).data),{x,y});
+    const verify=async()=>{assert.deepEqual(await pixel(9,6),[255,255,255,255],'half of a 12-dot bar lights six columns');assert.equal((await pixel(10,6))[3],0,'seventh column remains unlit');assert.equal((await pixel(3,6))[3],0,'X=4 starts at grid column four');await props.getByTitle('Enter Preview',{exact:true}).click();await node('pixel_source').focus();await page.keyboard.press('ArrowUp');await settle();assert.equal((await pixel(12,6))[3],255,'0.75 lights nine columns');assert.equal((await pixel(13,6))[3],0);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();await tab('Pixels');let input=cell('Brightness').locator('input.scrub-value');await input.fill('25');await input.press('Enter');await settle();assert.ok(Math.abs((await pixel(5,6))[3]-83)<=1,'25% brightness changes actual dot alpha');input=cell('Gamma').locator('input.scrub-value');await input.fill('2');await input.press('Enter');await settle();assert.ok(Math.abs((await pixel(5,6))[3]-140)<=1,'gamma 2 lifts the quarter-bright dot to half response');await reopen(id);assert.ok(Math.abs((await pixel(5,6))[3]-140)<=1,'lighting survives reopen');
+  });
+  await check('LCD tokens dimensions and seven-segment glyphs render their configured content after reopen',async()=>{
+    const id=await fixture('LcdDisplay',{Display:{cols:24,rows:2,layouts:[],lines:['V {value}','{pct}% {bar:8}'],value:5,valueMin:0,valueMax:20,valuePrecision:1,valuePrefix:'+',valueSuffix:'dB',showGhost:false}});
+    const lines=()=>node(id).locator('.lcd-line').evaluateAll(es=>es.map(e=>Array.from(e.querySelectorAll('.lcd-char')).map(c=>c.textContent).join('')));
+    const verify=async()=>{assert.equal(await node(id).locator('.lcd-cell').count(),48);const text=await lines();assert.ok(text[0].startsWith('V +5.0dB'));assert.ok(text[1].startsWith('25% ██'));};await verify();await reopen(id);await verify();await tab('Display');await number('Cols',12);await number('Rows',1);assert.equal(await node(id).locator('.lcd-cell').count(),12);assert.equal((await lines())[0].trim(),'V +5.0dB');
+    const segmentId=await fixture('LcdDisplay',{Display:{panelType:'segment',segmentType:'7',cols:2,rows:1,layouts:[],lines:['18'],showGhost:false}});const segments=()=>node(segmentId).locator('svg.lcd-seg > polygon');assert.equal(await segments().count(),9,'1 lights two segments; 8 lights all seven');await reopen(segmentId);assert.equal(await segments().count(),9);
+  });
+  await check('Number and Range Keyboard off also blocks typing into their inline value fields',async()=>{
+    for(const type of ['Number','Range']){
+      const id=await fixture(type,{Behavior:{keyboardEnabled:false,min:0,max:100,defaultValue:40,defaultStartValue:20,defaultEndValue:80}});await props.getByTitle('Enter Preview',{exact:true}).click();const inputs=node(id).locator('input');const before=await inputs.evaluateAll(es=>es.map(e=>e.value));await inputs.first().focus();await page.keyboard.press('Control+a');await page.keyboard.type('33');await page.keyboard.press('Enter');await settle();assert.deepEqual(await inputs.evaluateAll(es=>es.map(e=>e.value)),before,`${type} keyboard off must cover the actual field, not only the outer wrapper`);
+    }
+  });
+  await check('Image contain fit flips and opacity change actual painted pixels and survive reopening',async()=>{
+    const imageSrc='data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><path fill="red" d="M0 0h50v25H0z"/><path fill="lime" d="M50 0h50v25H50z"/><path fill="blue" d="M0 25h50v25H0z"/><path fill="yellow" d="M50 25h50v25H50z"/></svg>').toString('base64');
+    const id=await fixture('Image',{Background:{_children:{Fill:{solidEnabled:true,colour:'FF101010',imageEnabled:true,imageSrc,imageFit:'contain',imageOpacity:100},Border:{enabled:false},Corners:{radius:0}}}});
+    let pixels=await paintedPixels(id,[[75,40],[225,40],[75,120],[225,120],[75,2]]);assert.deepEqual(pixels.slice(0,4).map(p=>p.slice(0,3)),[[255,0,0],[0,255,0],[0,0,255],[255,255,0]]);assert.deepEqual(pixels[4].slice(0,3),[16,16,16],'contain fits the whole image with a 5px letterbox');await tab('Background');await toggle('Flip H');assert.deepEqual((await paintedPixels(id,[[75,40]]))[0].slice(0,3),[0,255,0]);await toggle('Flip V');assert.deepEqual((await paintedPixels(id,[[75,40]]))[0].slice(0,3),[255,255,0]);await number('Opac',50);const verify=async()=>{const p=(await paintedPixels(id,[[75,40]]))[0];assert.ok(Math.abs(p[0]-136)<=1&&Math.abs(p[1]-136)<=1&&Math.abs(p[2]-8)<=1,'50% image opacity composites over the authored solid');};await verify();await reopen(id);await verify();
+  });
+  await check('Image rotation covers every corner throughout all four quadrants',async()=>{
+    const imageSrc='data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><path fill="red" d="M0 0h100v100H0z"/></svg>').toString('base64');
+    const id=await fixture('Image',{Background:{_children:{Fill:{solidEnabled:true,colour:'FF101010',imageEnabled:true,imageSrc,imageFit:'fill',imageRotation:135},Border:{enabled:false},Corners:{radius:0}}}});
+    const verify=async angle=>{const pixels=await paintedPixels(id,[[20,20],[280,20],[20,140],[280,140]]);assert.ok(pixels.every(p=>p[0]>250&&p[1]<5&&p[2]<5),`rotation ${angle} must cover the corners: ${JSON.stringify(pixels)}`);};await verify(135);await tab('Background');for(const angle of [45,225,315,-135]){await number('Angle',angle);await verify(angle);}await reopen(id);await verify(-135);
+  });
+  await check('Slider return to rest moves the visible handle and emits its final value on release',async()=>{
+    const id=await fixture('Slider',{Behavior:{returnMode:'center',returnTime:0,defaultCurrentValue:0.25},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).click({position:{x:275,y:80}});await settle();assert.equal(Number(await node(id).locator('.slider-readout').textContent()),0.5,'release returns the handle to centre');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),0.5,'final output matches the resting handle');await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
+  await check('Numeric wrapper typing commits only on Enter and Escape keeps the previous output',async()=>{
+    for(const type of ['Number','Slider','Knob']){
+      const id=await fixture(type,{Behavior:{min:0,max:100,step:1,precision:0,defaultValue:40,defaultCurrentValue:40},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.type('23');await settle();assert.equal(Number(await node(id).getAttribute('aria-valuenow')),40,`${type} draft must not change the committed handle`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),0,'uncommitted typing must not reach the device');await page.keyboard.press('Escape');assert.equal(Number(await node(id).getAttribute('aria-valuenow')),40);await page.keyboard.type('26');await page.keyboard.press('Enter');await settle();assert.equal(Number(await node(id).getAttribute('aria-valuenow')),26);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),26);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Slider timed returns follow their curve and a new grab interrupts the spring',async()=>{
+    for(const curve of ['linear','exp','ease']){
+      const id=await fixture('Slider',{Behavior:{returnMode:'min',returnTime:800,returnCurve:curve,defaultCurrentValue:0.25,step:0.001,precision:3},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const b=await node(id).boundingBox();await page.mouse.move(b.x+275,b.y+80);await page.mouse.down();const from=Number(await node(id).getAttribute('aria-valuenow'));await page.mouse.up();const started=Date.now();await page.waitForTimeout(240);const actual=Number(await node(id).getAttribute('aria-valuenow'));const t=Math.min(1,(Date.now()-started)/800);const shaped=curve==='exp'?1-(1-t)**3:curve==='ease'?(t<.5?2*t*t:1-(-2*t+2)**2/2):t;assert.ok(Math.abs(actual-from*(1-shaped))<.1,`${curve} follows its timed trajectory: ${actual}`);await page.mouse.down();const grabbed=Number(await node(id).getAttribute('aria-valuenow'));await page.waitForTimeout(850);assert.equal(Number(await node(id).getAttribute('aria-valuenow')),grabbed,'a new grab cancels the earlier spring');await page.mouse.up();await page.waitForTimeout(950);assert.equal(Number(await node(id).getAttribute('aria-valuenow')),0);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),0);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Slider and Knob typed display values map back to the correct wire value',async()=>{
+    for(const type of ['Slider','Knob']){
+      const id=await fixture(type,{Behavior:{min:61,max:67,step:1,precision:0,displayMin:-3,displayMax:3,defaultCurrentValue:64},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'octave',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.equal(Number(await node(id).locator('.slider-readout').textContent()),0);await node(id).focus();await page.keyboard.type('-2');await page.keyboard.press('Enter');await settle();assert.equal(Number(await node(id).locator('.slider-readout').textContent()),-2,'typed display value must survive commit');assert.equal(Number(await node(id).getAttribute('aria-valuenow')),62);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),62);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('ProgressBar shows its reading and changing progress changes the actual fill after reopen',async()=>{
+    const id=await fixture('ProgressBar',{Meter:{value:35,valueMin:0,valueMax:100,valuePrecision:0,valueSuffix:'%'}});
+    const verify=async expected=>{assert.equal(await node(id).locator('.meter-readout').textContent(),`${expected}%`);const track=await node(id).locator('.meter-track').boundingBox();const fill=await node(id).locator('.meter-clip').boundingBox();assert.ok(Math.abs(fill.width/track.width-expected/100)<.01);};await verify(35);await tab('Meter');await number('Val',75);await verify(75);await reopen(id);await verify(75);
+  });
+  await check('CyclicButton skips disabled choices obeys wrap and sends the displayed choice',async()=>{
+    for(const wrapBehavior of [false,true]){
+      const rows=[{id:'a',internalValue:10,displayText:'Alpha',enabled:true},{id:'b',internalValue:20,displayText:'Blocked',enabled:false},{id:'c',internalValue:30,displayText:'Gamma',enabled:true}];
+      const id=await fixture('CyclicButton',{Behavior:{defaultValue:10,wrapBehavior},Value:{rows},Text:{content:'{valueDisplay}'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'choice',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).click();await settle();assert.match(await node(id).textContent(),/Gamma/);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),30);await node(id).click();await settle();assert.match(await node(id).textContent(),wrapBehavior?/Alpha/:/Gamma/);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),wrapBehavior?10:30);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Leaving Preview cancels an unfinished numeric return and stops its output',async()=>{
+    const id=await fixture('Slider',{Behavior:{returnMode:'min',returnTime:2500,returnCurve:'linear'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+    await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).click({position:{x:275,y:80}});await page.waitForTimeout(150);await props.getByTitle('Exit Preview',{exact:true}).click();await settle();const count=await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length);await page.waitForTimeout(400);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),count,'closing rehearsal must stop its return output');
   });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));

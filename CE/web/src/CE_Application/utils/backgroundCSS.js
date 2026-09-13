@@ -44,8 +44,8 @@ export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, 
   const transforms = [];
   if (rotation) {
     const rad = Math.abs(rotation * Math.PI / 180);
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
     const w = panelW || 1;
     const h = panelH || 1;
     const newW = w * cos + h * sin;
@@ -61,11 +61,13 @@ export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, 
 
   switch (fit) {
     case 'fill':
+    case 'cover':
       parts.push('background-size: cover;');
       parts.push(`background-position: ${pos};`);
       parts.push('background-repeat: no-repeat;');
       break;
     case 'fit':
+    case 'contain':
       parts.push('background-size: contain;');
       parts.push(`background-position: ${pos};`);
       parts.push('background-repeat: no-repeat;');

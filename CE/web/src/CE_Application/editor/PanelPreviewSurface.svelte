@@ -260,6 +260,7 @@
     getSliderResolvedValues,
     getSliderValueMode,
     isSliderBehavior,
+    parseSliderInputValue,
     snapSliderValue,
   } from '../utils/sliderBehavior.js';
   import {
@@ -5570,6 +5571,7 @@
     const behavior = getBehavior(control);
     const base = {
       disabled: isDisabled(control),
+      readOnly: behavior?.keyboardEnabled === false,
       inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
       tabIndex: -1,
     };
@@ -5580,6 +5582,7 @@
   }
 
   function beginSpinnerFieldEdit(control, role) {
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const behavior = getBehavior(control);
     const session = sessionFor(control);
@@ -5595,8 +5598,10 @@
   }
 
   function commitSpinnerField(control, role) {
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const session = sessionFor(control);
+    if (session?.valueInputActive !== true) return;
     const buffer = String(session?.valueInputBuffer ?? '');
     const parsed = parseRangeInputValue(getBehavior(control), buffer);
     patchControlSession(getControlId(control), {
@@ -5620,6 +5625,7 @@
 
   function handleSpinnerFieldInput(control, role, event) {
     event.stopPropagation();
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
@@ -5632,6 +5638,7 @@
 
   function handleSpinnerFieldKeyDown(control, role, event) {
     event.stopPropagation();
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
 
     if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
@@ -6247,6 +6254,7 @@
   }
 
   function beginRangeFieldEdit(control) {
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const controlId = getControlId(control);
     patchControlSession(controlId, {
       focused: true,
@@ -6257,6 +6265,7 @@
   }
 
   function commitRangeFieldInput(control) {
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const controlId = getControlId(control);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -6277,6 +6286,7 @@
 
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
+    if (getBehavior(control)?.keyboardEnabled === false) return;
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
       valueInputActive: true,
@@ -6286,6 +6296,7 @@
 
   function handleRangeFieldKeyDown(control, event) {
     event.stopPropagation();
+    if (getBehavior(control)?.keyboardEnabled === false) return;
 
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
@@ -6348,7 +6359,12 @@
     const id = getControlId(control);
     cancelReturn(id);                      // a new release restarts the glide rather than racing it
 
-    const from = currentRangeValue(control);
+    const sliderRole = isSliderControl(control) ? currentSliderActiveHandle(control) : null;
+    const spinnerRole = isTwoValueSpinner(control) ? spinnerActiveHandle(control) : null;
+    const from = sliderRole ? currentSliderRoleValue(control, sliderRole)
+      : spinnerRole === 'end' ? getRangeEndValue(behavior, sessionFor(control))
+      : spinnerRole === 'start' ? getRangeStartValue(behavior, sessionFor(control))
+      : currentRangeValue(control);
     const token = { cancelled: false };
     activeReturns.set(id, token);
 
@@ -6360,8 +6376,11 @@
 
       const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       const step = returnStep(from, rest, now - startedAt, behavior);
-      setRangeValue(control, step.value);
-      emitControlPortFanout(control, step.done ? 'commit' : 'continuous');
+      // These setters update the visible handle and emit its matching binding value.
+      if (sliderRole) setSliderRoleValue(control, sliderRole, step.value);
+      else if (spinnerRole) setSpinnerHandleValue(control, spinnerRole,
+        clampRangeHandleValue(behavior, sessionFor(control), spinnerRole, step.value));
+      else setRangeValue(control, step.value);
       if (step.done) {
         activeReturns.delete(id);
         raiseComponent(control, 'onSettled', { value: step.value });
@@ -6529,7 +6548,13 @@
     }
 
     if (key === 'Enter') {
-      const parsed = parseRangeInputValue(getBehavior(control), currentBuffer);
+      const parsed = isSliderControl(control)
+        ? parseSliderInputValue(getBehavior(control), currentBuffer)
+        : parseRangeInputValue(getBehavior(control), currentBuffer);
+      if (parsed !== null && isSliderControl(control)) {
+        setSliderRoleValue(control, currentSliderActiveHandle(control), parsed);
+        return true;
+      }
       patchControlSession(controlId, {
         valueInputActive: false,
         valueInputBuffer: '',
@@ -6552,14 +6577,9 @@
       return false;
     }
 
-    const parsed = parseRangeInputValue(getBehavior(control), nextBuffer);
     patchControlSession(controlId, {
       valueInputActive: true,
       valueInputBuffer: nextBuffer,
-      ...(parsed === null ? {} : {
-        valueOverrideEnabled: true,
-        valueOverride: parsed,
-      }),
     });
     return true;
   }
@@ -6755,6 +6775,7 @@
 
   onDestroy(() => {
     removeWindowListeners();
+    for (const id of activeReturns.keys()) cancelReturn(id);
     stopListboxMomentum();
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
@@ -6771,6 +6792,9 @@
     // changes: a plain nested button held for a second was fine, while one whose own handler kept
     // writing (a roll firing notes on a timer) tore its own listeners off mid-gesture.
     const activeControlIds = [...controlsById.keys()];
+    for (const id of activeReturns.keys()) {
+      if (!controlsById.has(id)) cancelReturn(id);
+    }
     for (const id of Object.keys(pianoHeld)) {
       if (!controlsById.has(id)) releaseKeyboardNotes(id);
     }
@@ -7399,14 +7423,6 @@
       releaseRibbon(activeControl);
     }
 
-    // The generic spring-back, for the controls without one of their own. After the three
-    // specialised releases above, so a joystick or ribbon that already glided is not glided twice.
-    if (activeControl
-      && !joyDrag && !xfadeDrag && !ribbonDrag
-      && String(getBehavior(activeControl)?.returnMode ?? RETURN_MODE.none) !== RETURN_MODE.none) {
-      startValueReturn(activeControl);
-    }
-
     // Release a macro knob: commit the position, drop the session override.
     if (macroDrag && activeControl) {
       const value = macroWorkingValue(activeControl);
@@ -7570,6 +7586,8 @@
     if (!cancelled && listboxDrag?.id === activeId) startListboxMomentum(activeControl, listboxDrag);
     listboxDrag = null;
     removeWindowListeners();
+    // Clear the released pointer first: the return cancels itself while a hand is on the control.
+    if (activeControl) startValueReturn(activeControl);
   }
 
   function handleFocus(control) {
@@ -7869,6 +7887,7 @@
       previewValueField: previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
         value: resolveRangeDisplayValue(behavior, session),
         disabled: isDisabled(control),
+        readOnly: behavior?.keyboardEnabled === false,
         inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
         ariaLabel: `${coreName} value`,
         tabIndex: -1,

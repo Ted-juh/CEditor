@@ -592,7 +592,7 @@ export const COMPONENT_TYPES = {
       Transform: { width: 160, height: 120 },
       Background: {
         _children: {
-          Fill: { solidEnabled: false, imageEnabled: true, imageFit: 'contain', colour: '00000000' },
+          Fill: { solidEnabled: false, imageEnabled: true, imageFit: 'fit', colour: '00000000' },
           Border: { enabled: false },
         },
       },
@@ -1357,7 +1357,7 @@ export const COMPONENT_TYPES = {
         valueMin: 0,
         valueMax: 1,
         value: 0.35,
-        showReadout: true,
+        showValue: true,
       },
       Background: {
         _children: {

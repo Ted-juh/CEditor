@@ -10,7 +10,7 @@
   ];
 </script>
 
-<select class="val" {value} onchange={(e) => onchange?.(e.target.value)}>
+<select class="val" value={value === 'contain' ? 'fit' : value === 'cover' ? 'fill' : value} onchange={(e) => onchange?.(e.target.value)}>
   {#each FIT_MODES as [v, label] (v)}
     <option value={v}>{label}</option>
   {/each}
