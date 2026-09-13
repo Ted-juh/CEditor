@@ -64,6 +64,8 @@ separate gate, not implied by this document round trip.
 | B44 | ProgressBar default readout | The default requests showReadout, which the Meter renderer never reads; no number appears. | Use showValue. Displayed 35%/75% agrees with the visible clipped fill, and 75% survives reopen. |
 | B45 | Leaving Preview during numeric return | Outbound calls continue after leaving rehearsal (21 becomes 44 in 400ms). | Cancel active return tokens on surface destruction and component removal. Real Preview-close check confirms output stops. |
 | B46 | Number / Range Display mode | Inline field bypasses the outer read-only guard: typing and ArrowUp replace 40 with 34. | Native read-only attribute plus field-handler Display guards. Both component types reject actual edits and emit nothing, before/after fresh reopen. |
+| B47 | Range Home / End on one endpoint | Home on high produces low=20, high=0, crossing the endpoints. | Clamp in the shared spinner setter before rendering and emission. Home/End visible pair and outgoing value agree, including reopen. |
+| B48 | Partial saved Effects.Filters settings | A document with only invert=100 still paints the original RGB 128,64,32; omitted neutral filters produce undefined% and invalidate the whole CSS filter. | Omitted/null neutral fields no longer emit invalid CSS. Invert, half brightness and grayscale produce expected pixels on component/background surfaces after reopening. This was a partial-document case, not a failure of a fully populated default Filters section. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -92,6 +94,17 @@ CanvasControl now supplies its render namespace to Timbre's gradient IDs. Review
 persistence loophole in Claude's shared reopen helper (sessions survived), a weak page-exclusivity
 assertion, and live CSS rather than live pixels in export comparisons. Claude is strengthening
 these and rerunning them; the affected evidence is provisional until those stronger checks pass.
+
+Further focused checks pass: Container/Group content fitting, per-side padding and minimums;
+actual overflowing child pixels with clipping on/off; editor drag-resize limits and 90-degree
+rotation; padded bottom-right anchors after parent resize; Label font size, letter spacing,
+case and baseline geometry; three-handle Slider neighbour bounds/entry/output; rounded background
+glow pixels. Every case includes a fresh reopen. The Label test was corrected to measure the
+text Range instead of its full-width wrapper. No product changes were needed for these cases.
+
+Combined checkpoint after B47/B48: **62 root browser scenarios pass, no browser errors;
+4,814 Node tests pass, no skips.** This includes complete and partial filter settings on both
+surfaces. Claude's strengthened reopen/export follow-up is the next integration gate.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 
@@ -151,14 +164,18 @@ native/hardware gates. This list is an active work record, not a completion repo
 
 | Root-owned family | Behavioral coverage in this pass | Remaining work |
 | --- | --- | --- |
-| Meter / ProgressBar | Meter geometry, levels, ranges, arc/segments, colours, readout, linked peak timing | ProgressBar explicit checks, all remaining combinations and source/zone events |
+| Meter / ProgressBar | Meter geometry, levels, ranges, arc/segments, colours, readout, linked peak timing; ProgressBar actual fill/readout | Remaining combinations and source/zone events |
 | TextInput | Display/editable/focus settings, commit/cancel, output, reopen | Remaining formatting and placeholder properties |
 | Shape | All 14 kinds, fill/stroke, corner/rotation/line settings | Shared appearance/effects combinations |
-| TabContainer / ScrollArea | Page click/visibility, four strip edges, wheel/drag/axis/delta and clipping | Nested layout, negative content bounds, bindings and remaining settings |
+| TabContainer / ScrollArea | Page click/visibility, four strip edges, wheel/drag/axis/delta, negative content bounds and clipping | Nested layout, bindings and remaining settings |
 | Numpad | Entry, bounds, offset, digits, clear, auto-commit, editable guard and MIDI | Remaining readout/key appearance combinations |
 | Momentary / Timed / OneShot | Press edge, repeating keyboard, cancellation, one-shot lockout, script confirmation | Remaining modes/settings and output combinations |
 | Combobox / Listbox | Search/filter, confirmation, highlighting, momentum, native typing | Remaining selection, row style, data-source and navigation settings |
 | Crossfader / VectorJoystick | Gains/axes/corners/output, major display settings, rest target/axis and final send | Timed curve variants, trails and remaining colours/layout combinations |
 | Ribbon / PitchWheel / ModWheel | Value/touch/return output, snapped bipolar behavior, wheel indicator/glow/text | Remaining presets, time/curve/appearance and vertical gesture combinations |
-| Number / Slider / Knob / Range | Keyboard disable and navigation switches | All other numeric interaction, layout, formatting and multi-handle settings |
-| Background / Label / Image / Container / Group / LcdDisplay / PixelDisplay / Macro / ToggleButton / RadioButtonGroup / CyclicButton | Not yet covered by this new pass beyond fixtures or earlier separate tests | Property-by-property functional investigation still open |
+| Number / Slider / Knob / Range | Keyboard/Display guards, entry/cancel, bounds, default/readout/output, remapping, band neighbours, snap/timed returns and cancellation | Remaining presets, layout, curves/directions, formatting, active-handle policies and appearance settings |
+| Container / Group / Transform | Fitting/minimums/padding, actual overflow clipping, anchors, drag-resize limits and rotation | Flow layout, nested combinations, remaining transform/mouse/grid settings |
+| Label / Background / Image / Effects | Text size/spacing/case/baseline geometry, contain fit/flips/opacity/rotation pixels, rounded glow, component/background filter pixels | Remaining text paths/typography/fills/effects, image alignment/tiling, borders and state combinations |
+| LcdDisplay / PixelDisplay | Token values, rows/columns, seven-segment glyphs, grid elements/source/brightness/gamma, existing GIF/runtime/selection suites | Remaining screen properties, element kinds, paging, interaction and appearance combinations |
+| Macro | Four curves, depth/output range, visibility/editability, multiple-instance SVG references | Remaining lanes, labels, target/routing and style settings |
+| ToggleButton / RadioButtonGroup / CyclicButton | Default/Allow Off, multiple selection/deselection, cycle disabled rows/wrap, rendered selection and emitted values | Remaining selection-group, row styling/layout and navigation settings |

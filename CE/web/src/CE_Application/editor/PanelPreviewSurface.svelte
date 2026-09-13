@@ -5673,11 +5673,12 @@
   // pair ordered) and marks it active.
   function setSpinnerHandleValue(control, handle, nextValue, extraPatch = {}) {
     const role = handle === 'end' ? 'end' : 'start';
+    const clamped = clampRangeHandleValue(getBehavior(control), sessionFor(control), role, nextValue);
     patchControlSession(getControlId(control), {
       activeHandle: role,
       valueInputRole: role,
       [`${role}ValueOverrideEnabled`]: true,
-      [`${role}ValueOverride`]: nextValue,
+      [`${role}ValueOverride`]: clamped,
       valueInputActive: false,
       valueInputBuffer: '',
       ...extraPatch,

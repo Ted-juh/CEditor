@@ -29,10 +29,12 @@ export function buildFilterCSS(effects) {
   if (!f) return '';
   const parts = [];
   if (f.blur > 0) parts.push(`blur(${f.blur}px)`);
-  if (f.brightness !== 100) parts.push(`brightness(${f.brightness}%)`);
-  if (f.contrast !== 100) parts.push(`contrast(${f.contrast}%)`);
-  if (f.saturation !== 100) parts.push(`saturate(${f.saturation}%)`);
-  if (f.hueRotate !== 0) parts.push(`hue-rotate(${f.hueRotate}deg)`);
+  // Older/partial documents may omit neutral filters. One `undefined%` invalidates
+  // the entire CSS filter list, including the effects that are explicitly configured.
+  if (f.brightness != null && f.brightness !== 100) parts.push(`brightness(${f.brightness}%)`);
+  if (f.contrast != null && f.contrast !== 100) parts.push(`contrast(${f.contrast}%)`);
+  if (f.saturation != null && f.saturation !== 100) parts.push(`saturate(${f.saturation}%)`);
+  if (f.hueRotate != null && f.hueRotate !== 0) parts.push(`hue-rotate(${f.hueRotate}deg)`);
   if (f.grayscale > 0) parts.push(`grayscale(${f.grayscale}%)`);
   if (f.sepia > 0) parts.push(`sepia(${f.sepia}%)`);
   if (f.invert > 0) parts.push(`invert(${f.invert}%)`);

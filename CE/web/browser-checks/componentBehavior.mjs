@@ -90,8 +90,9 @@ async function captureMidi() {
     window.__JUCE__={backend:{addEventListener:()=>0,removeEventListener:()=>{},emitEvent:(name,payload)=>window.__behaviorMidi.push({name,payload})}};
   });
 }
-async function paintedPixels(id, points) {
-  const png = await node(id).screenshot();
+async function paintedPixels(id, points, padding = 0) {
+  const bounds = padding ? await node(id).boundingBox() : null;
+  const png = bounds ? await page.screenshot({clip:{x:bounds.x-padding,y:bounds.y-padding,width:bounds.width+padding*2,height:bounds.height+padding*2}}) : await node(id).screenshot();
   return page.evaluate(async ({data,points})=>{
     const img=new Image();img.src=`data:image/png;base64,${data}`;await img.decode();
     const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;
@@ -589,6 +590,49 @@ try {
     for(const type of ['Number','Range']){
       const id=await fixture(type,{Behavior:{valueFlow:'display',min:0,max:100,defaultValue:40,defaultStartValue:20,defaultEndValue:80},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
       const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const input=node(id).locator('input').first();const before=await input.inputValue();await input.focus();await page.keyboard.press('Control+A');await page.keyboard.type('33');await page.keyboard.press('Enter');await page.keyboard.press('ArrowUp');await settle();assert.equal(await input.inputValue(),before,`${type} Display is read-only through its real inline field`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),0);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Container and Group fit contents padding and minimum size match their actual child geometry',async()=>{
+    for(const type of ['Container','Group']){
+      const id=await fixture(type,{Children:{fitWidth:'contents',fitHeight:'contents',padding:10,minWidth:0,minHeight:0}},[{sections:{Transform:{x:20,y:30,width:100,height:40},Text:{content:'FITTED CHILD'}}}]);
+      const verify=async(w,h,left,top)=>{const parent=await node(id).boundingBox();const child=await node(id).locator('.canvas-control').first().boundingBox();assert.ok(Math.abs(parent.width-w)<1&&Math.abs(parent.height-h)<1,`${type} expected ${w}x${h}, got ${parent.width}x${parent.height}`);assert.ok(Math.abs(child.x-parent.x-left)<1&&Math.abs(child.y-parent.y-top)<1,'padding positions the actual child inside the fitted box');};await verify(140,90,30,40);await tab('Children');await toggle('Per side');const edit=async(label,v)=>{const f=cell(label).getByRole('textbox');await f.fill(String(v));await f.press('Enter');await settle();};await edit('Left',25);await edit('Top',15);await verify(155,95,45,45);await edit('Min W',240);await edit('Min H',180);await verify(240,180,45,45);await reopen(id);await verify(240,180,45,45);
+    }
+  });
+  await check('Range Home and End never send a value beyond the other handle',async()=>{
+    const id=await fixture('Range',{Behavior:{min:0,max:100,step:1,defaultStartValue:20,defaultEndValue:80},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const inputs=node(id).locator('input');await inputs.last().focus();await inputs.last().press('Home');await settle();assert.deepEqual(await inputs.evaluateAll(es=>es.map(e=>e.value)),['20','20'],'high Home clamps to low');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),20,'outbound must equal the clamped visible high handle');await inputs.first().focus();await inputs.first().press('End');await settle();assert.deepEqual(await inputs.evaluateAll(es=>es.map(e=>e.value)),['20','20']);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),20);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
+  await check('Container and Group clipping actually hides overflowing child pixels and can be turned off',async()=>{
+    for(const type of ['Container','Group']){
+      const id=await fixture(type,{Transform:{width:150,height:100},Children:{padding:0,clip:false}},[{sections:{Transform:{x:120,y:30,width:60,height:40},Text:{content:''},Background:{_children:{Fill:{solidEnabled:true,colour:'FFFF0000'},Border:{enabled:false},Corners:{radius:0}}}}}]);
+      const isRed=async()=>{const p=(await paintedPixels(id,[[200,80]],40))[0];return p[0]>245&&p[1]<10&&p[2]<10;};assert.equal(await isRed(),true,'child beyond x=150 is visible with clipping off');await tab('Children');await toggle('Clip');assert.equal(await isRed(),false,'clipping hides the same outside pixel');await reopen(id);assert.equal(await isRed(),false);await tab('Children');await toggle('Clip');assert.equal(await isRed(),true);
+    }
+  });
+  await check('Label font size letter spacing case and baseline move the actual rendered text after reopen',async()=>{
+    const id=await fixture('Label',{Text:{content:'abcd',_children:{Font:{family:'Arial',size:20,letterSpacing:0},Position:{justification:'centred'},Fill:{colour:'FFFFFFFF'}}}});
+    const glyph=()=>node(id).locator('.text-glyphs');const width=()=>glyph().evaluate(el=>{const r=document.createRange();r.selectNodeContents(el);return r.getBoundingClientRect().width;});const initial=await width();await tab('Text');await number('Size',40);const larger=await width();assert.ok(Math.abs(larger/initial-2)<.05,`doubling font size doubles this four-letter word: ${initial} to ${larger}`);await number('Letter',5);assert.ok(Math.abs((await width())-larger-20)<1,'letter spacing adds 5px per glyph');await choose('Case','uppercase');assert.equal((await glyph().textContent()).trim(),'ABCD');const top=(await glyph().boundingBox()).y;await number('Base',10);assert.ok(Math.abs((await glyph().boundingBox()).y-top+10)<1,'positive baseline raises glyphs by 10px');const before=await glyph().boundingBox();await reopen(id);assert.equal((await glyph().textContent()).trim(),'ABCD');const after=await glyph().boundingBox();assert.ok(Math.abs(after.width-before.width)<1&&Math.abs(after.y-before.y)<1,'fresh reopen preserves actual text geometry');
+  });
+  await check('Editor resize honours minimum and maximum dimensions and rotation survives reopening',async()=>{
+    const id=await fixture('Label',{Transform:{width:200,height:100,minWidth:120,minHeight:60,maxWidth:260,maxHeight:140},Text:{content:'RESIZE'}});
+    const resize=async(dx,dy)=>{const boxes=await node(id).locator('.resize-handle').evaluateAll(es=>es.map(e=>{const b=e.getBoundingClientRect();return{x:b.x+b.width/2,y:b.y+b.height/2};}));const br=boxes.sort((a,b)=>b.x+b.y-a.x-a.y)[0];assert.ok(br,'selected component exposes resize handles');await page.mouse.move(br.x,br.y);await page.mouse.down();await page.mouse.move(br.x+dx,br.y+dy,{steps:8});await page.mouse.up();await settle();};
+    await resize(-150,-70);let b=await node(id).boundingBox();assert.ok(Math.abs(b.width-120)<1&&Math.abs(b.height-60)<1,`minimum is 120x60, got ${b.width}x${b.height}`);await resize(250,180);b=await node(id).boundingBox();assert.ok(Math.abs(b.width-260)<1&&Math.abs(b.height-140)<1);await tab('Transform');await number('Rot',90);b=await node(id).boundingBox();assert.ok(Math.abs(b.width-140)<1&&Math.abs(b.height-260)<1,'90 degree rotation swaps visible bounds');await reopen(id);b=await node(id).boundingBox();assert.ok(Math.abs(b.width-140)<1&&Math.abs(b.height-260)<1);
+  });
+  await check('Nested bottom-right anchors follow the padded parent when it is resized',async()=>{
+    const id=await fixture('Container',{Transform:{width:200,height:120},Children:{padding:10}},[{sections:{Transform:{anchor:'bottomRight',x:15,y:12,width:40,height:30},Text:{content:'ANCHOR'}}}]);
+    const verify=async()=>{const p=await node(id).boundingBox();const c=await node(id).locator('.canvas-control').first().boundingBox();assert.ok(Math.abs(p.x+p.width-c.x-c.width-25)<1,'right inset includes 10 padding + 15 anchor');assert.ok(Math.abs(p.y+p.height-c.y-c.height-22)<1,'bottom inset includes 10 padding + 12 anchor');};await verify();await tab('Transform');await number('W',300);await number('H',200);await verify();await reopen(id);await verify();
+  });
+  await check('Slider band handles enforce neighbours for keyboard entry and show the value they send',async()=>{
+    const id=await fixture('Slider',{Behavior:{valueMode:'band',min:0,max:100,step:1,precision:0,defaultStartValue:20,defaultCurrentValue:50,defaultEndValue:80,showHandleLabels:true,allowHandleCross:false},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const handles=node(id).locator('.slider-svg > circle[fill="none"]');assert.equal(await handles.count(),3);const pick=async index=>{const b=await handles.nth(index).boundingBox();await page.mouse.click(b.x+b.width/2,b.y+b.height/2);};await pick(0);await page.keyboard.press('End');await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),'50 | 50 | 80');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),50);await pick(2);await page.keyboard.press('Home');await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),'50 | 50 | 50');await page.keyboard.type('5');await page.keyboard.press('Enter');await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),'50 | 50 | 50','typing into end cannot cross current');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),50);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
+  await check('Background glow follows a rounded silhouette instead of the rectangular component bounds',async()=>{
+    const id=await fixture('Label',{Transform:{width:160,height:160},Text:{content:''},Background:{_children:{Fill:{solidEnabled:true,colour:'FF804010'},Border:{enabled:false},Corners:{radius:80},Effects:{_children:{Shadows:{items:[{enabled:true,type:'outer-glow',colour:'FF00FF00',blur:8,spread:0}]}}}}}});
+    const verify=async()=>{const [edge,corner]=await paintedPixels(id,[[110,25],[30,30]],30);assert.ok(edge[1]-edge[0]>20&&edge[1]-edge[2]>20,`green glow should extend above the curved edge: ${edge}`);assert.ok(corner[1]-Math.max(corner[0],corner[2])<10,`far square corner must not get rectangular glow: ${corner}`);};await verify();await reopen(id);await verify();
+  });
+  await check('Whole-component and background filters paint correctly with complete or partial saved settings',async()=>{
+    for(const complete of [false,true])for(const surface of ['component','background'])for(const [filter,value,want]of [['invert',100,[127,191,223]],['brightness',50,[64,32,16]],['grayscale',100,[75,75,75]]]){
+      const effects={_children:{Filters:{...(complete?{blur:0,brightness:100,contrast:100,saturation:100,hueRotate:0,grayscale:0,sepia:0,invert:0}:{}),[filter]:value}}};const bg={_children:{Fill:{solidEnabled:true,colour:'FF804020'},Border:{enabled:false},Corners:{radius:0},...(surface==='background'?{Effects:effects}:{})}};
+      const id=await fixture('Label',{Text:{content:''},Background:bg,...(surface==='component'?{Effects:effects}:{})});const verify=async()=>{const p=(await paintedPixels(id,[[150,80]]))[0];assert.ok(want.every((v,i)=>Math.abs(p[i]-v)<=2),`${surface}/${filter} expected ${want}, got ${p}`);};await verify();await reopen(id);await verify();
     }
   });
 } finally {
