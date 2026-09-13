@@ -3838,7 +3838,13 @@
         drumHit(control, hit.pad, hit.strikeY, { velocity: base, roll: true });
         return true;
       default:
-        drumHit(control, hit.pad, hit.strikeY);
+        // `base` and not a recomputation. drumHit only receives strikeY, so when it works the
+        // velocity out itself it calls strikeVelocity(control, strikeY) with no strikeX — which
+        // defaults to 0.5, making dx always zero. Under velocityFrom 'centre' that collapsed the
+        // documented Chebyshev falloff to the vertical axis alone: a strike on the left rim came
+        // out as loud as one dead centre, which is the exact case the rule was written for. Every
+        // corner branch above already passes `base`; only the plain hit threw it away.
+        drumHit(control, hit.pad, hit.strikeY, { velocity: base });
         return true;
     }
   }
@@ -7035,7 +7041,18 @@
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget?.setPointerCapture?.(event.pointerId);
-    event.currentTarget?.focus?.();
+    // preventScroll, and it is not cosmetic. Focusing an element the browser considers less than
+    // fully visible makes it scroll that element into view — here, on pointer-DOWN, which moves the
+    // control out from under the finger in the middle of the gesture that just started. Everything
+    // that positions absolutely from the pointer then lands short by however far it scrolled: an
+    // Orbit satellite dropped due east of its hub committed an angle thirteen degrees below east,
+    // because the surface had scrolled 22px between the press and the release. Measured; with the
+    // scroll suppressed the same drag commits 0.00°, and the error tracks the scroll exactly.
+    //
+    // Only the POINTER path takes this. The keyboard handlers below focus deliberately, and
+    // scrolling a control into view is the right thing when you arrived by Tab rather than by
+    // pointing at something already on screen.
+    event.currentTarget?.focus?.({ preventScroll: true });
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);

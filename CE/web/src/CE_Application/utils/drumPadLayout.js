@@ -98,6 +98,20 @@ export function drumMap(control) {
 export function drumGateMs(control) { return clampInt(drumConfig(control).gateMs ?? 60, 5, 2000); }
 
 // A readable name for a note: its GM percussion name when there is one.
+/**
+ * A pad's PITCH name, never its drum name.
+ *
+ * `drumNoteLabel` answers "what is this drum called", and prefers the General MIDI name whenever
+ * one exists — which is every note from 35 to 81, i.e. the whole range a drum grid uses. That is
+ * right for the GM map and wrong for the chromatic one, whose entire promise (and the properties
+ * panel's own hint) is "labelled by pitch": selecting Chromatic on a default 36-based grid showed
+ * Kick, Stick, Snare… exactly as GM did, and the option looked broken because it was.
+ */
+export function drumPitchLabel(note) {
+  const m = clampInt(note, 0, 127);
+  return `${NOTE_SHARP[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
+}
+
 export function drumNoteLabel(note, short = true) {
   const m = clampInt(note, 0, 127);
   const gm = GM_DRUMS[m];
@@ -137,7 +151,7 @@ export function resolveDrumPads(config) {
     const ov = overrides[i] ?? {};
     const note = clampInt(ov.note ?? (map === 'custom' ? base + i : base + i), 0, 127);
     const label = String(ov.label ?? '').trim()
-      || (map === 'chromatic' ? drumNoteLabel(note, true) : (GM_DRUMS[note] ? GM_DRUMS[note][1] : drumNoteLabel(note, true)));
+      || (map === 'chromatic' ? drumPitchLabel(note) : (GM_DRUMS[note] ? GM_DRUMS[note][1] : drumNoteLabel(note, true)));
     const choke = clampInt(ov.choke ?? (map === 'gm' ? (GM_CHOKE[note] ?? 0) : 0), 0, 8);
     out.push({
       index: i,
