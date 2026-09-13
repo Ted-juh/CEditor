@@ -71,15 +71,66 @@ Each proposed change must be checked against the current code and a user workflo
   and emitted CC 20, 21 and 22 from Lua, JavaScript and TypeScript with no plugin window open.
   This proves the native host path, not compatibility with every third-party DAW.
 
-## Remaining release gates
+## Continued release review
 
-1. Installer installation/upgrade and a third-party DAW acceptance pass remain required. The
-   staged runtime and in-app export passed; the older Program Files installation was not replaced.
+### Second corrective batch
+
+- The player now queues incoming host MIDI away from the audio thread and delivers it through
+  the existing device service. Note-on/off triggers Lua, JavaScript and TypeScript with no editor
+  window. A host briefly creating and destroying an editor can no longer leave its device-event
+  callback disconnected. This uses a bounded single-producer/single-consumer byte queue, with
+  overflow reported in the existing player log. It does not run scripts in the audio callback.
+- Binding status identifies the next missing step; Last received retains a useful controller
+  readout across clock/keep-alive messages. MIDI learn opens the existing drag-to-bind chips.
+- The status bar reveals MIDI output and opens Ports. Ports enumerates real endpoints, updates
+  backend role mappings, and selects the panel's named device. Multiple devices require an
+  explicit choice. Changing a port preserves that device's profile and recorded values.
+- Raw Send and MIDI-CI use the selected device. Send reports the correlated backend result or
+  explains an outgoing filter's refusal. It no longer declares success before sending.
+- Help includes a create → bind → preview → save/share → export walkthrough. Ports fields and
+  buttons follow the properties-panel colors and dimensions.
+- Native acceptance found Ports, Routes and Snapshots missing from the dock's renderer despite
+  having loaders and tab buttons. The dock now renders these loaded tools; the workflow test
+  mounts the real dock and checks all three, instead of testing Ports in isolation.
+- Windows Release build and 34 native tests pass, including queue overflow, wraparound, large
+  SysEx and concurrent producer/consumer tests. A real VST3 worker test now processes 64 blocks;
+  a fixture emitted CC 30/31/32 for incoming notes and CC 40/41/42 for note-off across Lua/JS/TS.
+  The old player emitted none of these. This checks actual script output, not just host survival.
+- A rendered workflow regression checks default and custom device roles, preservation of profile
+  values, dropdown-to-backend mapping, binding guidance, last CC, navigation and send outcomes.
+- The complete browser suite passes in Windows Edge, including Text, Effects, Screen, inbound
+  player MIDI, learn chips and dock navigation. The generated help bundle is current.
+- REAPER 7.73 acceptance uses its own configuration and Dummy Audio: both exported VST3s scan
+  with distinct names, load embedded SVG artwork, and expose Cutoff. Setting A to 0.87 through
+  REAPER's parameter UI updates its panel; B remains 0.50. After saving the project, closing
+  REAPER completely and reopening it, A restores 0.87 and B restores 0.50 with correct identities.
+- Native first-use acceptance created a blank panel, inserted a knob, bound a profile parameter,
+  exercised binding guidance, opened Ports and MIDI, saved and reopened the panel. A loopMIDI
+  port sent and received CC 74 value 96, with the backend result and last-received readout agreeing.
+- That walkthrough found the toolbar's Bind action claimed metadata adoption while leaving a
+  knob at 0..1. It now calls the same adoption helper as drag-to-bind and starts with Dry Run off.
+  The rendered regression clicks the real toolbar and verifies range 0..127, integer type and
+  default 64. Raw MIDI's direct-value range is explained in the walkthrough.
+- Port assignment uses the existing Generic MIDI CC profile for an unmapped device; named
+  device profiles remain unchanged. The installer now includes device profiles and the backend
+  resolves them beside the executable before falling back to a developer checkout.
+- The copied native test loaded profiles entirely from an installed-layout directory and mapped
+  a new Generic MIDI CC device. The staged exporter produced a 21.9 MB VST3 carrying its profiles;
+  its manifest regenerated and the real native host verified all six note-triggered script CCs.
+- A repeated native run exposed JUCE's Windows pipe cancellation race: a timeout could discard
+  a completed read and release a still-live OVERLAPPED. The local JUCE patch drains cancellation
+  and retains successful completion. The unchanged 4 MB polling test passes five consecutive
+  times, and the full Windows native suite passes 34/34 after the fix.
+
+### Acceptance still required
+
+1. Installer installation/upgrade remains required. The staged runtime, in-app export and
+   REAPER scan/UI/parameter/session-restore pass are verified. DAW-to-hardware MIDI is separate.
 2. Broaden export-format/runtime acceptance beyond the verified VST3 path. Extra script runtimes
    are currently bundled only for VST3 by the compiling exporter; template export cannot add
    them. Unsupported combinations now explain their refusal instead of producing false success.
-3. Review first-use navigation, component diagnostics and the create/bind/preview workflow.
-   Preserve all properties; improve grouping, labels and the route to existing controls.
+3. Native first-use and virtual MIDI loopback pass. Physical instrument behavior remains separate
+   from the verified loopback and rendered workflow checks.
 4. Confirm hardware MIDI and session restore against an actual instrument. Automated message
    checks do not demonstrate the physical synth's behavior.
 5. Hostage's existing 36-feature completion audit and current native suites were reviewed. A

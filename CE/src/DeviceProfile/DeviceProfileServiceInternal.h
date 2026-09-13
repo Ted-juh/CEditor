@@ -20,6 +20,11 @@ inline double nowMs()
 
 inline juce::File sourceRoot()
 {
+    // Installed apps must prefer their own profiles, even on the build machine.
+    const auto executable = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    for (const auto& candidate : { executable, executable.getParentDirectory() })
+        if (candidate.getChildFile ("CE/profiles/test").isDirectory())
+            return candidate;
    #if defined (CEDITOR_SOURCE_ROOT)
     return juce::File (CEDITOR_SOURCE_ROOT);
    #else

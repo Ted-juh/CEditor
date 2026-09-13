@@ -69,6 +69,16 @@ test('the fallback to the compile-time defines is still there', () => {
   );
 });
 
+test('Windows pipe cancellation drains pending I/O and preserves deadline completion', () => {
+  const source = readFileSync(join(repoRoot, 'JUCE/include/JUCE-8.0.7/modules/juce_core/native/juce_Files_windows.cpp'), 'utf8');
+  const wait = source.slice(source.indexOf('bool waitForIO ('));
+  const body = wait.slice(0, wait.indexOf('JUCE_DECLARE_NON_COPYABLE'));
+  assert.equal((body.match(/GetOverlappedResult \(pipeH, &over.over, &transferred, TRUE\)/g) ?? []).length, 2,
+    `Timeout and shutdown must drain cancelled I/O before releasing OVERLAPPED. ${REAPPLY}`);
+  assert.match(body, /return GetOverlappedResult.*!= FALSE/);
+  assert.ok(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8').includes('Windows named-pipe cancellation'));
+});
+
 test('JUCE/VENDORED.md records the patch', () => {
   // The test above proves the code is there; this proves someone can find out why. A patch nobody
   // can explain is one the next person deletes.

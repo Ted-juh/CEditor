@@ -375,12 +375,12 @@ export function compileRawMidiAction(payload) {
 }
 
 export function triggerRawMidiAction(payload) {
-  if (!isJuceAvailable()) return;
+  if (!isJuceAvailable()) return { status: 'MIDI sending requires the desktop app.' };
   // ce.midi.interceptOut sits here: this is the one door every outbound message goes through,
   // a control's own binding as much as a script's sendCC. Filtering only the scripting side would
   // leave the case that actually floods a synth — a fast drag — with no answer.
   const filtered = filterOutboundMidi(payload ?? {});
-  if (filtered === null || filtered === undefined) return;      // a filter dropped it
+  if (filtered === null || filtered === undefined) return { status: 'Not sent: dropped by an outgoing MIDI filter.' };
   window.__JUCE__.backend.emitEvent('triggerRawMidiAction', filtered);
 }
 

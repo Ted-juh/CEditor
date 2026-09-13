@@ -8,7 +8,11 @@
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import Plug from 'lucide-svelte/icons/plug';
   import Link2 from 'lucide-svelte/icons/link-2';
-  import { MIDI_CONTROL_KIND, MIDI_CONTROL_MESSAGES, midiControlBindingFrom, midiControlLabel } from '../utils/midiControlBindings.js';
+  import { MIDI_CONTROL_KIND, MIDI_CONTROL_MESSAGES, midiControlBindingFrom, midiControlLabel, isMidiControlBinding, canSendMidiControl } from '../utils/midiControlBindings.js';
+  import { deviceRoleMappings, midiDestinations, latestMidiInputMessage } from '../stores/deviceProfiles.js';
+  import { previewModeEnabled } from '../stores/interactionPreview.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
+  import { parseMidiHex } from '../utils/midiNoteInput.js';
 
   let { control = null } = $props();
 
@@ -21,6 +25,47 @@
   let selectedIndex = $state(0);
 
   let selectedBinding = $derived(bindings[selectedIndex] ?? null);
+  let bindingRole = $derived(selectedBinding?.deviceRole || DEFAULT_DEVICE_ROLE);
+  let roleMapping = $derived($deviceRoleMappings?.[bindingRole]);
+  let bindingStatus = $derived.by(() => {
+    if (deviceBindings?.enabled === false) return 'Bindings are disabled. Enable them above.';
+    if (!selectedBinding) return 'Add a binding, or drag a parameter from Device or a learned control from MIDI onto this component.';
+    if (!ports.some((port) => port.id === selectedBinding.port)) return 'Choose a value port exposed by this component.';
+    if (!roleMapping?.profileId) return `No profile is mapped to ${bindingRole}. Configure it in Settings → MIDI.`;
+    if (selectedBinding.kind === MIDI_CONTROL_KIND) {
+      if (!isMidiControlBinding(selectedBinding)) return 'Choose a valid MIDI message and controller number.';
+      if (!canSendMidiControl(selectedBinding)) return 'This message is input only. Move the hardware control to update it.';
+    } else {
+      if (!selectedBinding.parameterId?.trim()) return 'Choose a parameter from Device, or enter its profile ID below.';
+    }
+    if (selectedBinding.dryRun !== false) return 'Dry Run is on. Turn it off below to send MIDI.';
+    const destination = roleMapping?.midiDestination;
+    if (!destination || destination.type === 'previewOnly') return 'Output is Preview Only. Choose a MIDI output in Ports or Settings → MIDI.';
+    if (destination.type === 'none') return 'MIDI output is disabled. Choose an output in Ports or Settings → MIDI.';
+    if (!$midiDestinations.some((port) => port.id === destination.id)) return 'The selected MIDI output is unavailable. Reconnect it or choose another port.';
+    if (!$previewModeEnabled) return 'Edit mode. Turn on Preview in the left rail to operate this control.';
+    return `Ready to send to ${destination.name || destination.id}. Check MIDI for outgoing messages.`;
+  });
+
+  let lastReceived = $state('');
+  $effect(() => {
+    // A keep-alive/clock must not immediately replace the controller the user just moved.
+    lastReceived = '';
+    const role = bindingRole;
+    return latestMidiInputMessage.subscribe((message) => {
+      if (message?.deviceRole && message.deviceRole !== role) return;
+      const [status, first, second] = parseMidiHex(message?.hex);
+      if (!(status >= 0x80 && status < 0xf0)) return;
+      const channel = (status & 15) + 1;
+      const kind = status & 0xf0;
+      lastReceived = kind === 0xb0 ? `CC ${first} · ch ${channel} · value ${second}`
+        : kind === 0x90 || kind === 0x80 ? `Note ${first} · ch ${channel} · velocity ${second}`
+        : `Ch ${channel} · ${message.hex}`;
+    });
+  });
+  let inputStatus = $derived(roleMapping?.midiInput?.type !== 'hardwareInput'
+    ? 'No MIDI input selected. Choose an input in Ports or Settings → MIDI.'
+    : lastReceived || 'Waiting for MIDI. Move a control on the instrument.');
 
   $effect(() => {
     if (selectedIndex >= bindings.length) selectedIndex = Math.max(0, bindings.length - 1);
@@ -149,10 +194,10 @@
   <div class="placeholder">Device binding editing is single-selection only right now.</div>
 {:else}
   <PropertySection title="Device Bindings" icon={Plug}>
-    <PropertyCell label="Enabled" span={1} hint="Enable semantic device parameter bindings for this component.">
+    <PropertyCell label="Enabled" span={1} hint="Enable MIDI and device parameter bindings for this component.">
       <PropertyToggle value={deviceBindings?.enabled !== false} onchange={() => setEnabled(!(deviceBindings?.enabled !== false))} />
     </PropertyCell>
-    <PropertyCell label="Add" span={1} hint="Add a semantic parameter binding.">
+    <PropertyCell label="Add" span={1} hint="Add a binding, then choose a device parameter or MIDI message.">
       <button class="action-btn" onclick={addBinding}>Add</button>
     </PropertyCell>
     <PropertyCell label="Remove" span={1} hint="Remove the selected semantic parameter binding.">
@@ -160,6 +205,16 @@
     </PropertyCell>
     <PropertyCell label="Ports" span={1} hint="Value ports exposed by this component type.">
       <div class="port-list">{ports.map((port) => port.id).join(', ') || 'None'}</div>
+    </PropertyCell>
+    <PropertyCell label="Binding status" span={4} hint="The next step needed to operate this binding.">
+      <div class="binding-status" role="status">{bindingStatus}</div>
+    </PropertyCell>
+    <PropertyCell label="Last received" span={4} hint="The last MIDI control received for this device role; clock and keep-alive messages are ignored.">
+      <div class="binding-status">{inputStatus}</div>
+      <div class="binding-links">
+        <button onclick={() => displayTabRequest.set({ tab: 'ports' })}>Configure ports</button>
+        <button onclick={() => displayTabRequest.set({ tab: 'midi' })}>MIDI learn</button>
+      </div>
     </PropertyCell>
   </PropertySection>
 
@@ -180,7 +235,7 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Role" span={2} hint="Logical device role used by the panel.">
-        <input class="val" value={selectedBinding?.deviceRole ?? 'mainSynth'} onchange={(e) => setBindingProp('deviceRole', e.target.value)} />
+        <input class="val" value={selectedBinding?.deviceRole || DEFAULT_DEVICE_ROLE} onchange={(e) => setBindingProp('deviceRole', e.target.value)} />
       </PropertyCell>
       <PropertyCell label="Kind" span={2} hint="A profile parameter is compiled by the device engine; a MIDI control is sent as raw bytes and matched on arrival.">
         <select class="val" value={selectedBinding?.kind ?? 'deviceParameter'} onchange={(e) => setBindingKind(e.target.value)}>
@@ -252,11 +307,15 @@
       </PropertyCell>
     </PropertySection>
   {:else}
-    <div class="placeholder">No semantic device bindings yet.</div>
+    <div class="placeholder">No device bindings yet.</div>
   {/if}
 {/if}
 
 <style>
+  .binding-status { color: #BBB; font-size: 11px; line-height: 1.45; white-space: normal; }
+  .binding-links { display: flex; gap: 12px; margin-top: 3px; }
+  .binding-links button { background: none; border: 0; padding: 0; color: var(--pp-accent, #71B8F1); font: inherit; font-size: 11px; cursor: pointer; }
+  .binding-links button:hover { text-decoration: underline; }
   .placeholder {
     padding: 16px;
     color: #777;

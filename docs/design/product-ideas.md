@@ -1,6 +1,6 @@
 # Product ideas — everything that isn't MIDI
 
-> Status: **idea record, 2026-09-11.** Nothing here is built. Companion to
+> Status: **idea record, 2026-09-11; implementation review updated 2026-09-13.** Companion to
 > [`midi-frontier.md`](midi-frontier.md), which covers the MIDI side. This one covers everything
 > else: the editor, the exported plugin, the rig, sound design, sharing, and getting new people in
 > the door.

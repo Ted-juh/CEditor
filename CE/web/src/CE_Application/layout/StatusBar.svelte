@@ -21,6 +21,16 @@
   import { requestFitToWindow, requestZoomStep } from '../stores/editorCommands.js';
   import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
   import { flatControls } from '../utils/containment.js';
+  import { midiDestinations, deviceRoleMappings, midiInputs } from '../stores/deviceProfiles.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+  import { countRolesInControls } from '../utils/deviceRoles.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
+
+  let deviceRoles = $derived([...countRolesInControls($activePanel?.controls).keys()]);
+  let deviceRole = $derived(deviceRoles.length === 1 ? deviceRoles[0] : deviceRoles.length ? '' : DEFAULT_DEVICE_ROLE);
+  let midiMapping = $derived($deviceRoleMappings[deviceRole]);
+  let midiOutput = $derived($midiDestinations.find((port) => port.id === (midiMapping?.midiDestination?.id ?? 'previewOnly')));
+  let midiInput = $derived($midiInputs.find((port) => port.id === midiMapping?.midiInput?.id));
 
   let panel = $derived($activePanel);
   // Zoom/view controls only make sense with a panel canvas on screen.
@@ -73,6 +83,13 @@
 
 <div class="status-bar">
   <span class={['status-item', `status-${$scriptStatus.kind}`]}>{$scriptStatus.message || 'Ready'}</span>
+  {#if canvasActive}
+    <button class="status-item midi-status" class:status-warn={!midiOutput || midiOutput.type !== 'hardwareOutput'}
+      title={deviceRole ? `${deviceRole} MIDI output: ${midiOutput?.name ?? 'Unavailable'}. Input: ${midiInput?.name ?? 'None'}. Click to configure ports.` : `Panel devices: ${deviceRoles.join(', ')}. Click to configure ports.`}
+      onclick={() => displayTabRequest.set({ tab: 'ports' })}>
+      MIDI out: {deviceRole ? midiOutput?.name ?? 'Unavailable' : `${deviceRoles.length} devices`}
+    </button>
+  {/if}
   <span class="spacer"></span>
   {#if selectionInfo}
     <span class="status-item">{selectionInfo.label}</span>
@@ -131,6 +148,21 @@
   .status-item {
     white-space: nowrap;
   }
+
+  .midi-status {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+    min-width: 100px;
+    text-align: left;
+  }
+  .midi-status:hover { text-decoration: underline; }
 
   .status-item.dim {
     opacity: 0.7;

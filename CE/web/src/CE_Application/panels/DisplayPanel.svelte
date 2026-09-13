@@ -922,6 +922,12 @@
           </div>
         </div>
       </div>
+    {:else if activeTabComponent?.default}
+      <!-- Tools requiring props keep an explicit branch above this default renderer. -->
+      {@const ToolTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <ToolTab />
+      </div>
     {:else if activeTabError}
       <div class="tab-pane">
         <div class="placeholder">Failed To Load: {activeTabError}</div>

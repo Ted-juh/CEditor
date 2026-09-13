@@ -45,6 +45,7 @@ static inline juce::File ceditorPlayerPanelFile()
 #endif
 
 #if CEDITOR_VALUE_LAYER
+ #include "HostMidiInputQueue.h"
  #include "PanelParameters.h"
  #include "ProgramBank.h"
  #include "RestorePolicy.h"
@@ -127,6 +128,12 @@ public:
     // thread (script sendCC/NRPN/Sysex) into the host's MIDI buffer here.
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
     {
+       #if CEDITOR_VALUE_LAYER
+        // Capture input before the outgoing collector appends script output, using
+        // metadata directly so even SysEx does not allocate a MidiMessage on the audio thread.
+        for (const auto message : midi)
+            hostMidiInput.push (message.data, message.numBytes);
+       #endif
         scriptMidiCollector.removeNextBlockOfMessages (midi, buffer.getNumSamples());
         captureHostPosition();
     }
@@ -523,8 +530,14 @@ private:
             if (windowOpen && ! scriptWindowWasOpen)      { scriptRuntime->onPanelReady (! scriptReadyFired); scriptReadyFired = true; }
             else if (! windowOpen && scriptWindowWasOpen) { scriptRuntime->onPanelClose(); installScriptDeviceCallback(); } // PlayerHost nulled it on close — reclaim
             scriptWindowWasOpen = windowOpen;
+            // A host can construct and destroy an editor to query it between timer ticks.
+            // PlayerHost then clears the callback without an observable open/close edge.
+            if (! windowOpen && ! deviceService.hasEventCallback()) installScriptDeviceCallback();
         }
        #endif
+        // The service's existing callback routes to the WebView while open and to the native
+        // script runtime while closed. Use that same path for DAW input and device input.
+        serviceHostMidiInput();
         // BEFORE the window-open early return, deliberately: a project reopened with the editor
         // showing still has a synth sitting on the wrong patch, and the restore is exactly as due
         // then as it is with the window closed. It is also the only state in which the question can
@@ -577,6 +590,26 @@ private:
                 scriptRuntime->dispatchEvent ("onValueChanged", desc.path.upToFirstOccurrenceOf (".", false, false), juce::var (v));
             }
        #endif
+    }
+
+    ce::HostMidiInputQueue hostMidiInput;
+    juce::MemoryBlock hostMidiMessage;
+
+    void serviceHostMidiInput()
+    {
+        // Bound work per timer tick when a host floods the bus; overflow is observable in
+        // the existing player log instead of blocking its audio callback.
+        for (int count = 0; count < 1024 && hostMidiInput.pop (hostMidiMessage); ++count)
+        {
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("deviceRole", "mainSynth");
+            payload->setProperty ("origin", "hostInput");
+            payload->setProperty ("hex", juce::String::toHexString (
+                hostMidiMessage.getData(), static_cast<int> (hostMidiMessage.getSize()), 1));
+            deviceService.ingestIncomingMidiMessage (juce::var (payload));
+        }
+        if (const auto dropped = hostMidiInput.takeDroppedCount(); dropped != 0)
+            scriptLogLine ("Host MIDI input queue full: " + juce::String (dropped) + " messages dropped");
     }
 
     // --- Total Recall S2: pushing a restored patch back at the hardware --------------------------

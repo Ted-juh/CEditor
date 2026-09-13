@@ -823,6 +823,12 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
 ce_configure_test(CEditorPanelValueTests)
 
+add_executable(CEditorHostMidiInputTests "${CE_ROOT}/tests/HostMidiInputQueueTests.cpp")
+target_include_directories(CEditorHostMidiInputTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorHostMidiInputTests PRIVATE juce::juce_core)
+add_test(NAME HostMidiInputQueue COMMAND CEditorHostMidiInputTests)
+ce_configure_test(CEditorHostMidiInputTests)
+
 # The exported plugin's automation list. Also the only thing that COMPILES PanelParameters.h — it is
 # reachable otherwise only through PluginProcessor.h, which needs WebView2 and cannot build off
 # Windows, so a typo in it would surface nowhere but a Windows plugin build.
@@ -1819,6 +1825,10 @@ endif()
 
 # Installing means installing the APP, which only exists when it was built.
 if (TARGET CEditor)
+    install(DIRECTORY "${CE_ROOT}/profiles/"
+        DESTINATION "CE/profiles" COMPONENT CEditor
+        FILES_MATCHING PATTERN "*.json"
+    )
     install(TARGETS CEditor
         RUNTIME DESTINATION "." COMPONENT CEditor
         RESOURCE DESTINATION "." COMPONENT CEditor

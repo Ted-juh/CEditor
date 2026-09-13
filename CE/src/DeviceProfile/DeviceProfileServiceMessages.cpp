@@ -222,7 +222,8 @@ juce::var DeviceProfileService::ingestIncomingMidiMessage (const juce::var& payl
         ? static_cast<double> (obj->getProperty ("timestampSeconds"))
         : juce::Time::getMillisecondCounterHiRes() / 1000.0;
 
-    auto result = ingestIncomingMidiBytes (deviceRole, bytes, messageType, timestampSeconds);
+    auto result = ingestIncomingMidiBytes (deviceRole, bytes, messageType, timestampSeconds,
+                                          varToStringOr (obj->getProperty ("origin"), "hardwareInput"));
     if (auto* resultObject = result.getDynamicObject())
         resultObject->setProperty ("requestId", requestId);
     return result;
@@ -438,7 +439,8 @@ void DeviceProfileService::processSysexAssemblyTimeouts()
 juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& deviceRole,
                                                          const juce::Array<int>& bytes,
                                                          const juce::String& messageType,
-                                                         double timestampSeconds)
+                                                         double timestampSeconds,
+                                                         const juce::String& origin)
 {
     auto role = deviceRole.isNotEmpty() ? deviceRole : juce::String ("mainSynth");
     auto hex = DeviceProfileEngine::bytesToHex (bytes);
@@ -460,13 +462,13 @@ juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& dev
 
     if (! isSysexLike)
     {
-        processIncomingMidiMessage (role, hex, type, timestampSeconds);
+        processIncomingMidiMessage (role, hex, type, timestampSeconds, origin);
         return juce::var (response);
     }
 
     if (startsSysex && endsSysex)
     {
-        processIncomingMidiMessage (role, hex, "sysex", timestampSeconds);
+        processIncomingMidiMessage (role, hex, "sysex", timestampSeconds, origin);
         return juce::var (response);
     }
 
@@ -520,14 +522,15 @@ juce::var DeviceProfileService::ingestIncomingMidiBytes (const juce::String& dev
     response->setProperty ("chunks", chunks);
     response->setProperty ("assembledBytes", assembledBytes.size());
     response->setProperty ("hex", assembledHex);
-    processIncomingMidiMessage (role, assembledHex, "sysex", timestampSeconds);
+    processIncomingMidiMessage (role, assembledHex, "sysex", timestampSeconds, origin);
     return juce::var (response);
 }
 
 void DeviceProfileService::processIncomingMidiMessage (const juce::String& deviceRole,
                                                        const juce::String& hex,
                                                        const juce::String& messageType,
-                                                       double timestampSeconds)
+                                                       double timestampSeconds,
+                                                       const juce::String& origin)
 {
     auto role = deviceRole.isNotEmpty() ? deviceRole : juce::String ("mainSynth");
     auto mapping = roleMappings.find (role);
@@ -540,7 +543,7 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
     incoming->setProperty ("messageType", messageType);
     incoming->setProperty ("hex", hex);
     incoming->setProperty ("timestampSeconds", timestampSeconds);
-    incoming->setProperty ("origin", "hardwareInput");
+    incoming->setProperty ("origin", origin);
     auto incomingVar = juce::var (incoming);
     emitDeviceEvent ("midiInputMessage", incomingVar);
 

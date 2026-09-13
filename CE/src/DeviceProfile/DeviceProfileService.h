@@ -74,6 +74,7 @@ public:
     void clearMonitorEvents();
     juce::var getDiagnostics() const;
     void setEventCallback (EventCallback callback);
+    bool hasEventCallback() const { return static_cast<bool> (eventCallback); }
 
 private:
     struct LoadedProfile
@@ -314,11 +315,13 @@ private:
     juce::var ingestIncomingMidiBytes (const juce::String& deviceRole,
                                        const juce::Array<int>& bytes,
                                        const juce::String& messageType,
-                                       double timestampSeconds);
+                                       double timestampSeconds,
+                                       const juce::String& origin = "hardwareInput");
     void processIncomingMidiMessage (const juce::String& deviceRole,
                                      const juce::String& hex,
                                      const juce::String& messageType,
-                                     double timestampSeconds);
+                                     double timestampSeconds,
+                                     const juce::String& origin);
     void emitDeviceEvent (const juce::String& eventName, const juce::var& payload);
     void sendRawMidiToRole (const juce::String& deviceRole, const juce::MidiMessage& message);
     void pollMidiCiDiscovery();

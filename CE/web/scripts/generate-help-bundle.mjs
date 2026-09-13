@@ -45,6 +45,13 @@ export const OUT = resolve(HERE, '../src/CE_Application/generated/helpDocs.js');
  */
 export const HELP_DOCUMENTS = [
   {
+    id: 'editor-getting-started',
+    file: 'docs/editor-getting-started.md',
+    section: 'Start here',
+    title: 'Your first working panel',
+    blurb: 'Create, bind, preview, save and export a panel; find out why a control is not responding.',
+  },
+  {
     id: 'release-notes',
     file: 'RELEASE-NOTES.md',
     section: 'Start here',
@@ -83,10 +90,9 @@ export const HELP_DOCUMENTS = [
 
 /** The gap the list above leaves, said out loud in the viewer rather than left to be noticed. */
 export const HELP_GAPS = [
-  'There is no current editor manual. The 2026-08-10 snapshot in the repository describes an '
-  + 'editor two refactors ago and is not shipped for that reason. Until one exists, Help → '
-  + 'Keyboard Shortcuts and the hint text on every property are what the editor documents about '
-  + 'itself.',
+  'Your first working panel covers the basic editor workflow. A complete current editor manual '
+  + 'is still missing; the historical 2026-08-10 snapshot is not shipped. Help → Keyboard Shortcuts '
+  + 'and the hint text on properties cover additional controls.',
 ];
 
 const firstParagraph = (text) => {

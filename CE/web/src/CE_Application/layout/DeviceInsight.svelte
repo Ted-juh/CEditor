@@ -21,6 +21,7 @@
   } from '../stores/deviceProfiles.js';
   import { getBindableComponentPorts, getPreferredPort, getBindingCompatibility } from '../models/componentPorts.js';
   import { resolveDeviceAddress } from '../utils/deviceAddress.js';
+  import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
@@ -95,7 +96,7 @@
       parameterId: String(param.id ?? ''),
       parameterType: String(param.type ?? ''),
       adoptMetadata: true,
-      dryRun: true,
+      dryRun: false,
       feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
     };
     const next = [...bindings, binding];
@@ -104,6 +105,7 @@
     } else {
       updateControlProperty(core.id, 'DeviceBindings', { _type: 'DeviceBindings', enabled: true, debug: false, bindings: next });
     }
+    adoptParameterMetadata(core.id, core.controlType, param);
     pickerOpen = false;
   }
 

@@ -202,6 +202,13 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     }
     writeFileSync(path.join(panelDir, 'panel.cepanel'), JSON.stringify(panelDoc, null, 2));
 
+    // The native MIDI service needs its codecs on a machine without CEditor's checkout.
+    // Contents is the parent of the VST3 module directory on Windows/Linux.
+    const profiles = path.join(REPO, 'CE/profiles/test');
+    if (format.id === 'vst3' && existsSync(profiles)) {
+      cpSync(profiles, path.join(dest, 'Contents/CE/profiles/test'), { recursive: true });
+    }
+
     if (format.id === 'vst3') fixVst3Manifest(dest, helperExe, log);
 
     const size = format.bundle ? dirSize(dest) : statSync(dest).size;

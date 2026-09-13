@@ -19,7 +19,9 @@ namespace
 {
 constexpr double sampleRate = 48'000.0;
 constexpr int blockSize = 256;
-constexpr int blocksToProcess = 12;
+// Cover several message-thread timer ticks as well as the audio handoff. Scripted MIDI
+// responses are asynchronous and need time to return through the next worker block.
+constexpr int blocksToProcess = 64;
 
 struct SmokeResult
 {

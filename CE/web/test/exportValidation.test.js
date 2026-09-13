@@ -67,6 +67,7 @@ test('template validation protects a previous export, then a supported panel exp
 
     const result = await exportFromTemplate(options);
     assert.equal(result.written.length, 1);
+    assert.equal(JSON.parse(readFileSync(path.join(result.written[0], 'Contents/CE/profiles/test/generic-cc-dpd.ceditor-device.json'), 'utf8')).id, 'generic-cc-dpd');
     const resources = path.join(result.written[0], 'Contents', 'Resources');
     if (process.platform === 'win32') {
       assert.equal(readFileSync(path.join(result.written[0], 'Contents/x86_64-win/Validation.vst3'), 'utf8'), 'test DLL placeholder');

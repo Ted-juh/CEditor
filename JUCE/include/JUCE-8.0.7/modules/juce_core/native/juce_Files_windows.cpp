@@ -1265,6 +1265,8 @@ private:
         if (shouldStop)
         {
             CancelIo (pipeH);
+            DWORD transferred = 0;
+            GetOverlappedResult (pipeH, &over.over, &transferred, TRUE);
             return false;
         }
 
@@ -1277,7 +1279,10 @@ private:
             return true;
 
         CancelIo (pipeH);
-        return false;
+        // CEditor: cancellation can race successful completion. Drain the operation before its
+        // stack OVERLAPPED/buffer can be reused, and retain bytes that completed at the deadline.
+        DWORD transferred = 0;
+        return GetOverlappedResult (pipeH, &over.over, &transferred, TRUE) != FALSE;
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Pimpl)

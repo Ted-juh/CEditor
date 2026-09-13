@@ -23,6 +23,16 @@ New panels select VST3 only; saved format choices are retained.
 
 ## What you get
 
+- **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
+  Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
+  and reports the actual send result. Changing ports preserves its profile and parameter values.
+  Ports, Routes and Snapshots now render their tools instead of remaining on “Loading…”.
+  The toolbar's Bind action now adopts the parameter's range and value type, so a new knob
+  controls the full MIDI range. Unmapped devices explain where to assign a profile.
+- **Incoming DAW MIDI for panel scripts**, with the plugin window open or closed. Host note-on
+  and note-off have been exercised through Lua, JavaScript and TypeScript in a real VST3 host.
+  The host bus currently enters as `mainSynth`; processing is asynchronous control scripting,
+  and individual DAWs/plugin formats determine which MIDI and SysEx messages they deliver.
 - **Panel designer** — 50 component types, seven scripting languages, a device-profile designer.
 - **A whole editor from a device profile** — File → New Panel from Device Profile builds one bound
   control per parameter, grouped, with the real range, choices and label read off the profile. The

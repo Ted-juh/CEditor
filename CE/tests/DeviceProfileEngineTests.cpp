@@ -2123,8 +2123,34 @@ int runMidiCiTests()
 }
 }
 
-int main()
+int main (int argc, char** argv)
 {
+    // Run a copied test binary beside an installed profile tree to prove checkout independence.
+    if (argc == 2 && juce::String (argv[1]) == "--installed-profiles")
+    {
+        ceditor::device::DeviceProfileService service;
+        const auto list = service.listProfiles();
+        const auto installRoot = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        bool genericFound = false;
+        if (auto* entries = list.getArray())
+            for (const auto& entry : *entries)
+            {
+                const juce::File source (entry.getProperty ("filePath", "").toString());
+                if (! source.isAChildOf (installRoot))
+                {
+                    std::cerr << "[FAIL] profile escaped installed tree: " << source.getFullPathName() << '\n';
+                    return 1;
+                }
+                genericFound |= entry.getProperty ("id", "").toString() == "generic-cc-dpd";
+            }
+        auto* mapping = new juce::DynamicObject();
+        mapping->setProperty ("role", "freshDevice");
+        mapping->setProperty ("profileId", "generic-cc-dpd");
+        if (! genericFound || ! (bool) service.setDeviceRoleMapping (juce::var (mapping)).getProperty ("ok", false))
+            return 1;
+        std::cout << "[PASS] installed profiles resolve locally and map a new MIDI device\n";
+        return 0;
+    }
     const auto root = profileRoot();
     const juce::Array<juce::File> profiles {
         root.getChildFile ("test-cc-synth.ceditor-device.json"),

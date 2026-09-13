@@ -36,7 +36,7 @@ test('it uses the real stores and actions rather than its own copies', () => {
   // The failure this guards is a diagnostics panel that shows its own idea of the port list while
   // the app sends on another — which would make it worse than nothing, because you would trust it.
   for (const symbol of [
-    'selectedMidiDestinationId', 'selectedMidiInputId',   // the same selection the Device tab drives
+    'deviceRoleMappings', 'mapDeviceRole',                // the mapping used by actual binding resolution
     'latestDeviceIdentityReply',                          // the store that existed with nothing rendering it
     'requestMidiCiDiscovery',
     'triggerRawMidiAction',                               // the filtered outbound path, not a raw emit
@@ -66,9 +66,9 @@ test('hex input is validated before anything is sent', () => {
 });
 
 test('the send button is disabled until the bytes parse', () => {
-  assert.match(SOURCE, /disabled=\{!rawCheck\?\.ok\}/,
+  assert.match(SOURCE, /disabled=\{!rawCheck\?\.ok(?: \|\| [^}]+)?\}/,
     'Send must be disabled while the hex is invalid — finding out from the synth tells you nothing');
-  assert.match(SOURCE, /disabled=\{!dumpCheck\?\.ok\}/, 'Decode likewise');
+  assert.match(SOURCE, /disabled=\{!dumpCheck\?\.ok(?: \|\| [^}]+)?\}/, 'Decode likewise');
 });
 
 test('it is registered as a tab, lazily, and is a legal tab id', () => {

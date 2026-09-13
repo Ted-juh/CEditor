@@ -47,6 +47,21 @@ outer bundle, as required by the loader.
 that file; the whole rationale is in `CE/src/Export/Vst3SidecarIdentity.h`, and the guard test names
 this document when it fails.
 
+### 3. Windows named-pipe cancellation
+
+**File:** `include/JUCE-8.0.7/modules/juce_core/native/juce_Files_windows.cpp`, `NamedPipe::Pimpl::waitForIO`.
+
+Cancellation must finish before the stack OVERLAPPED and transfer buffer are released. A timeout
+can race a successful transfer; returning failure immediately discards bytes already removed from
+the pipe. After `CancelIo`, the patch calls `GetOverlappedResult(..., TRUE)` and retains successful
+completion. The shutdown path also drains its operation before returning failure. Cancellation and
+the pending I/O run on the same thread; close keeps the handle alive until the read lock is released.
+
+**Pinned by:** the native `PluginWorkerProtocol` large-frame polling test and
+`CE/web/test/vendoredJucePatches.test.js`. The original 4 MB test failed repeatedly before this patch
+and passed five consecutive runs after it. Reapply this fix on JUCE upgrades unless upstream has
+equivalent cancellation draining and completion accounting.
+
 ### 2. Linux webview bridge: messages framed in bytes
 
 **File:** `include/JUCE-8.0.7/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp`,
