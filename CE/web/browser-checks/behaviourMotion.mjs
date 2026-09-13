@@ -161,10 +161,12 @@ try {
       led.check(O, 'showValues (false)', 'and stops printing it', 0, (await kit.texts(id)).length);
       await kit.set(id, { 'Orbit.showSpokes': true, 'Orbit.showRings': true });
     }
-    led.unverified(O, 'showTrails', 'comet trail behind each satellite',
-      'the trail is only populated while the clock runs, so its shape is a moving target; the flag is exercised by the mount pass');
-    led.unverified(O, 'syncToTransport / cycleBars', 'time the global cycle off the panel transport',
-      'needs a running transport to compare against; the free-running rate path is verified above');
+    led.closed(O, 'showTrails', 'comet trail behind each satellite',
+      "behaviourLinks.mjs, counted by colour. This trail is not a recording at all — the renderer derives "
+      + 'each dot from the CURRENT phase by winding the satellite back along its own path, so a stopped '
+      + 'orbit draws the whole comet and there is no moving target to chase');
+    led.closed(O, 'syncToTransport / cycleBars', 'time the global cycle off the panel transport',
+      "behaviourInbound.mjs, over the panel's own running transport; the free-running rate path is verified above");
 
     // --- the four colours -----------------------------------------------------------------------------
     await kit.set(id, { 'Orbit.fieldColour': 'FF0D0D12', 'Orbit.ringColour': 'FF2A6BA8',
@@ -546,8 +548,8 @@ try {
     }
     await kit.preview(false);
 
-    led.unverified(U, 'syncToTransport / division', 'clock the sequence off the panel transport',
-      'needs a running transport to compare against; the free-running rate path is verified above');
+    led.closed(U, 'syncToTransport / division', 'clock the sequence off the panel transport',
+      "behaviourInbound.mjs, over the panel's own running transport; the free-running rate path is verified above");
 
     // --- save and reopen ------------------------------------------------------------------------------------------------
     {
@@ -683,8 +685,9 @@ try {
       await kit.set(id, { 'Constellation.running': false, 'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5 });
       await kit.preview(false);
     }
-    led.unverified(K, 'syncToTransport / wanderBars', 'run the wander off the panel transport',
-      'needs a running transport; the free-running wanderRate path is verified above');
+    led.closed(K, 'syncToTransport / wanderBars', 'run the wander off the panel transport',
+      'behaviourLinks.mjs: held still while the clock is stopped, wandering when it runs, and frozen where it '
+      + 'was when it stops again, with a one-bar wander covering about four times a four-bar one');
 
     // --- editable, with outbound matching what is displayed ------------------------------------------------
     await kit.preview(true);
@@ -792,8 +795,10 @@ try {
       const slippery = await speedAfter(0, 600);
       const draggy = await speedAfter(2, 600);
       if (slippery === null || draggy === null) {
-        led.unverified(N, 'friction / restitution / gravity / keepAlive', 'air drag, bounce energy, downward pull and the re-kick',
-          'the integrator keeps its live state somewhere this check cannot read; the ball motion itself is verified above');
+        led.closed(N, 'friction / restitution / gravity / keepAlive', 'air drag, bounce energy, downward pull and the re-kick',
+          'behaviourLinks.mjs, from visible motion over time rather than from the integrator\'s state: the '
+          + 'distance fallen on screen, the travel in the second half of a window against the first, the '
+          + 'speed kept after a wall, and whether the ball is still moving once the drag has had its way');
       } else {
         led.check(N, 'friction', 'air drag leaves the ball slower than the same throw with none',
           true, draggy < slippery);
@@ -817,8 +822,9 @@ try {
         true, (await kit.geo(id)).length < wallsOn);
       await kit.set(id, { 'Kinetic.showWalls': true });
     }
-    led.unverified(N, 'showTrail', 'a comet trail behind the ball',
-      'the trail only exists while the physics run, so its shape is a moving target');
+    led.closed(N, 'showTrail', 'a comet trail behind the ball',
+      'behaviourLinks.mjs. A moving target is still a countable one: the trail is painted a colour nothing '
+      + 'else in the drawing wears, and the dots wearing it are counted while the ball runs');
 
     // --- editable: fling it ------------------------------------------------------------------------------------
     await kit.preview(true);

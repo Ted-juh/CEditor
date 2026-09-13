@@ -504,9 +504,21 @@ export class Ledger {
     this.rows.push({ type, property, promise, expected: '—', measured: note, status: 'inert' });
   }
 
-  /** Honest gap: nothing in this environment can observe it. */
+  /** Honest gap: this pass has not observed it, and the row says why. */
   unverified(type, property, promise, why) {
     this.rows.push({ type, property, promise, expected: '—', measured: why, status: 'unverified' });
+  }
+
+  /**
+   * A property this suite does not measure because ANOTHER suite does.
+   *
+   * Distinct from `unverified`, and the distinction was worth adding a status for: a row saying
+   * "nothing here can observe it" next to a row in the next file that observes it is not a gap, it
+   * is a stale statement, and a reader has no way to tell the two apart. `where` names the suite
+   * holding the evidence, so the claim can be followed rather than taken.
+   */
+  closed(type, property, promise, where) {
+    this.rows.push({ type, property, promise, expected: '—', measured: where, status: 'closed elsewhere' });
   }
 
   /** A reproducible defect. */
@@ -541,7 +553,9 @@ export class Ledger {
     const v = this.count('verified');
     const i = this.count('inert');
     const u = this.count('unverified');
-    console.log(`\n${this.title}: ${v} verified, ${i} inert, ${u} unverified, ${this.failures.length} defects, of ${this.rows.length} rows`);
+    const c = this.count('closed elsewhere');
+    const closed = c ? `, ${c} closed elsewhere` : '';
+    console.log(`\n${this.title}: ${v} verified, ${i} inert, ${u} unverified${closed}, ${this.failures.length} defects, of ${this.rows.length} rows`);
     for (const f of this.failures) console.log(`   ${f}`);
   }
 }

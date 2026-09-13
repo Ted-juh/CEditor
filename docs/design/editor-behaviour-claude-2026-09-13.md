@@ -63,9 +63,11 @@ renderer ever reading it.
 | Recorder | 34 | 40 | — | 4 | — |
 | (nested components) | — | 6 | — | — | **1** |
 
-`behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
-`behaviourNotes.mjs` — 204 verified, 1 inert, 5 unverified, 0 open defects (four found, all fixed).
-`behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
+`behaviourCurves.mjs` — 146 verified, 2 inert, 0 unverified, 4 closed elsewhere, 0 open defects.
+`behaviourNotes.mjs` — 204 verified, 1 inert, 1 unverified, 4 closed elsewhere, 0 open defects (four
+found, all fixed).
+`behaviourMotion.mjs` — 113 verified, 1 inert, 0 unverified, 6 closed elsewhere, 0 open defects (the two
+found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
 `behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
@@ -76,6 +78,13 @@ renderer ever reading it.
 `behaviourRecorder.mjs` — 40 verified, 0 inert, 4 unverified, 0 open defects.
 `behaviourLinks.mjs` — 33 verified, 0 inert, 0 unverified, 0 open defects. The suite that exists to
 close the rows the old ledger called unobservable; see the section on those below.
+
+**"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
+another one does used to say "nothing here can observe it", which sat one file away from the suite
+that observed it — and a reader had no way to tell a real gap from a stale sentence. `Ledger.closed`
+now records the row with the suite holding the evidence named in it, so the claim can be followed
+rather than taken. Fourteen rows moved from `unverified` to `closed elsewhere` on that basis; none
+moved to `verified`, because a row is only verified in the file that ran the assertion.
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
@@ -795,9 +804,12 @@ stops.
   in the same direction give the same answer, and no row built on one could have said more than
   "it moved".
 
-**Still unverified, with the real reason in each case.** Each suite's own ledger carries its rows
-and its wording; what follows is the shape of what is left, so that nobody has to read twelve
-ledgers to find out whether a thing was skipped or could not be done.
+**Still unverified, with the real reason in each case.** Each suite's own ledger carries its rows and
+its wording, and the fourteen rows closed above now say so in their own files, as
+`closed elsewhere` naming the suite that holds the evidence — a stale "nothing here can observe it"
+sitting one file away from the file that observed it was the whole problem. What follows is the
+shape of what is genuinely left, so that nobody has to read twelve ledgers to find out whether a
+thing was skipped or could not be done.
 
 - **Physical hardware.** Every inbound row above injects at `latestMidiInputMessage`, the store a
   MIDI device delivers into. That is the right seam for the panel's behaviour and is not a claim

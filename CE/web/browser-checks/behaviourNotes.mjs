@@ -392,8 +392,8 @@ try {
       [1, true], [early, later > early]);
   }
   await kit.set(id, { 'DrumPads.pads': [], 'DrumPads.rollDelay': 0, 'DrumPads.rollSync': true });
-  led.unverified(D, 'rollRate / rollSync (musical)', 'a synced roll follows the panel transport tempo',
-    'needs a running transport to compare against; the free-running rollHz path is verified above');
+  led.closed(D, 'rollRate / rollSync (musical)', 'a synced roll follows the panel transport tempo',
+    'behaviourInbound.mjs, over the panel\'s own running transport; the free-running rollHz path is verified above');
 
   // --- showNotes / showLabels / showHeader ------------------------------------------------------------------------------------
   await kit.set(id, { 'DrumPads.rows': 2, 'DrumPads.cols': 2, 'DrumPads.map': 'gm',
@@ -430,8 +430,8 @@ try {
   }
 
   // --- echo: lighting the pads from INBOUND midi -------------------------------------------------------------------------------------
-  led.unverified(D, 'echo / echoChannel / echoColour', 'incoming MIDI lights the pads so the grid doubles as a monitor',
-    'needs an inbound MIDI route; no device in this environment');
+  led.closed(D, 'echo / echoChannel / echoColour', 'incoming MIDI lights the pads so the grid doubles as a monitor',
+    'behaviourInbound.mjs, by injecting bytes at latestMidiInputMessage — the store a device delivers into');
 
   // --- save and reopen, then PLAY it again ---------------------------------------------------------------------------------------------
   {
@@ -1347,10 +1347,12 @@ try {
     }
 
     // --- latch ------------------------------------------------------------------------------------------------------------
-    led.unverified(A, 'latch', 'keep arpeggiating after the source releases',
-      "only meaningful for source 'link' or 'input', where a source releases; the arp's own chord never does");
-    led.unverified(A, 'source / linkId / inputChannel', 'follow a Chord Pad or the MIDI input instead of its own chord',
-      'the link pair needs a second control driving it live; the inbound path is measured for the Router and Drum Pads in behaviourInbound.mjs');
+    led.closed(A, 'latch', 'keep arpeggiating after the source releases',
+      "behaviourLinks.mjs. It is only meaningful for a source that releases, and the arp's own chord never "
+      + 'does — so the answer was to give it one that does, not to call it unobservable');
+    led.closed(A, 'source / linkId / inputChannel', 'follow a Chord Pad or the MIDI input instead of its own chord',
+      'behaviourLinks.mjs: a latching Chord Pad really holding a chord on one channel while the arp walks '
+      + 'exactly those notes on another, then the same over injected keys with the channel pinned and omni');
 
     // --- showNotes / showHeader --------------------------------------------------------------------------------------------
     {
