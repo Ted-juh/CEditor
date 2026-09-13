@@ -620,3 +620,127 @@ outside their interactive regions, not bugs. They are not reported as findings a
 gesture shaped for it before anything can be claimed.
 
 Running total: **12 false positives, 5 confirmed defects** (4 fixed, 1 awaiting ownership).
+
+---
+
+## Round 8 — the six gestures shaped for their own components, and three packages
+
+The previous round closed with six types unproven and an explicit refusal to call them defects. All
+six now have a gesture aimed at the region the component itself decides, plus three multi-part
+starter packages. Eight of the nine are green; the ninth is a defect and is committed failing.
+
+Everything below is in `CE/web/browser-checks/musicModulationRuntime.mjs`, run against the real app
+through Chromium — not a harness mount, and not a model write.
+
+| Gesture | Interaction region, and how it was found | Result |
+| --- | --- | --- |
+| Envelope breakpoint | the node's own rendered circle (index 1, an interior node) | drag commits `Envelope.points` |
+| Orbit satellite | the satellite's own circle, with `running: false` first | drag commits `Orbit.nodes` |
+| Drum pad strike | the pad's own rect, **index 1** | note-on 36 ch10, note-off on release, `drumHits` empties |
+| Ribbon Keyboard touch | a zone rect from the strip | note-on, note-off on release, rail cleared |
+| Step Sequencer cell | `cellRect(sequencerGeometry(…))` over the designer stage | lights on the click, out on the next |
+| Dual Slider Switch | `sliderAZone` + `switchModeZone`, located by hover | `valueA` 0.25→0.28, `mode` A→B |
+| Triple Value Slider | `mainZone`, located by hover | middle 0.5→0.61, min and max untouched |
+| Tab Group | a **generated** tab zone, located by hover | `tab` one→two |
+| Keyboard key | `keyboardNoteAt` over the key's own rect | **FAILS — C-7** |
+
+### How the multi-part packages were aimed
+
+Their hit zones are declared in percent, some are circles or rings, and the Tab Group's do not exist
+in the authored document at all — a generator makes one per tab at run time. So nothing here reads
+bounds. The preview surface writes `hoveredCustomHitZone` as the pointer moves, so the check hovers
+an 11×11 grid and lets the app name the zone under each point. That locates authored and generated
+zones by the same mechanism, and it is the app's own hit test doing the locating.
+
+### Note emitters: the document is the wrong evidence
+
+A Drum Pad, a Ribbon Keyboard and a Keyboard never write the panel, so "did something change?" is
+satisfied by nothing at all. Each is asserted on four things instead: a note-on on
+`noteOutputEvents`, a held mark in the preview session, a matching note-off on release with the held
+set empty again, and the control's serialised document **unchanged**.
+
+`noteOutputEvents` is one funnel for the whole panel. A running ChordPad on channel 1 at velocity 96
+was sounding during this work and would have been counted as the Keyboard playing. Every emitter is
+therefore filtered to notes its own model could have produced — the pad map, the ribbon's zones, and
+for the Keyboard `keyboardPress`'s exact note, velocity **and** channel.
+
+### C-6 — a properties-panel "open in dock" button opens nothing
+
+`OpenInDock` is the only advertised way into the Designer tab from the properties panel. It calls
+`activateEditorTarget(…)` and `displayTabRequest.set({ tab })`. `App.svelte:261-265` holds an
+`$effect` whose entire purpose is to open the dock when that request appears:
+
+```js
+$effect(() => {
+  if ($colorTarget || $gradientTarget || $displayTabRequest) showDisplayPanel.set(true);
+});
+```
+
+It does not fire in time. `DisplayPanel.svelte:188-193` consumes and clears the request first, so the
+parent's effect never observes a truthy value. Measured on a fresh profile:
+
+```
+before          { show: false, req: null,  areaH: 0   }
+after request   { show: false, req: null,  areaH: 0   }   <- displayTabRequest.set({tab:'designer'})
+after set(true) { show: true,  req: null,  areaH: 430 }   <- showDisplayPanel.set(true)
+```
+
+The dock ships **closed** (`panelVisibility.js:31`, `DEFAULTS = { tree: true, display: false,
+properties: true }`), so this is the default state, not an edge case. The editor target does arm, so
+the tab is correct the moment the dock is opened by hand from the icon rail — which is what the
+Step Sequencer gesture now does, and why it needs to.
+
+Scope: every `OpenInDock` button (designer, effects, assets, screen, api, library, animation), plus
+`CanvasContextMenu`'s Align and `DeviceBindingsEditor`'s "Configure ports" / "MIDI learn".
+
+Not fixed here — reported to root, who reads it as a test-only concern. Recording the disagreement
+rather than arguing it: the fact this rests on is that App.svelte contains an effect written to open
+the dock on a tab request, and that effect never runs. Whether the button *should* open the dock is
+the owner's call; whether the code that says it does works is not a matter of opinion.
+
+### C-7 — the Keyboard is a picture (confirmed, committed failing)
+
+`keyboardLayout.js` exports the whole interaction: `keyboardNoteAt`, `keyboardPress`,
+`keyboardHold`, `keyboardGlide`. **Nothing in `src/` imports any of the four.** The preview surface's
+pointer-down dispatcher has a branch for twenty-six control types and none for the Keyboard, and
+`KeyboardRenderer` draws held keys from `previewSession.keyboardHeld` — a session key nothing
+anywhere writes.
+
+Measured, not inferred. Pressing the first white key at the position the component's own
+`keyboardNoteAt` calls note 48:
+
+```
+session.pressed       true      <- the press reaches the control
+notes sounded         []        <- nothing plays
+session.keyboardHeld  undefined <- the renderer is never told
+```
+
+It is the same shape the Designer tab's own header records for the Step Sequencer: the layout module
+had the hit test and the writers all along and nothing imported them.
+
+The regression asserts the **correct** behaviour — note 48, channel 1, velocity 100, note-off on
+release, `keyboardHeld` carrying the note and then empty — so wiring the surface turns it green with
+nothing to remember to invert. Root owns that wiring.
+
+### False positive 13 — `rect[rx="6"]` is also the header
+
+The first drum-pad gesture reported "pressed, but nothing is held". The pad bodies carry `rx="6"`;
+so does the header strip, and the header is first in document order. Index 0 was never a pad. The
+note-on that made it look like a partial failure came from elsewhere on the panel entirely.
+
+Two lessons, both already on this page in another form: the note tap is panel-wide and needs
+filtering to the control under test, and a selector is an assumption about markup until it is
+checked against the renderer that writes it.
+
+Running total: **13 false positives, 7 confirmed defects** — C-1 through C-5 fixed, C-6 reported and
+disputed, C-7 confirmed and owned by root.
+
+### Still untested, stated plainly
+
+- The Keyboard's `latch`, `scaleLock` (`refuse` / `quantize`) and `glide` paths. There is no runtime
+  to exercise them against until C-7 is wired; the unit tests in `test/remainingComponents.test.js`
+  cover the functions, nothing covers them through a pointer.
+- The eleven starter packages other than the three above. Mount and draw are covered for all
+  fourteen; only these three have had a value or button gesture.
+- Everything behind `#if JUCE_WINDOWS`, and the native GUI acceptance gate, which is blocked on the
+  window-automation failure and is not mine.
