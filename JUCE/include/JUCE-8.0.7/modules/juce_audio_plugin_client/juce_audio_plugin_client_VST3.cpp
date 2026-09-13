@@ -4335,6 +4335,19 @@ private:
 
     static Span<const ClassEntry> getClassEntries()
     {
+        const char* productName = JucePlugin_Name;
+        const char* vendorName = JucePlugin_Manufacturer;
+        const char* productVersion = JucePlugin_VersionString;
+       #if CEDITOR_SIDECAR_IDENTITY
+        // A template must show the panel's identity in the host's plugin browser too.
+        const auto& sidecar = ceditor::vst3SidecarIdentity();
+        if (sidecar.valid)
+        {
+            productName = sidecar.identity.productName.toRawUTF8();
+            vendorName = sidecar.identity.vendorName.toRawUTF8();
+            productVersion = sidecar.identity.version.toRawUTF8();
+        }
+       #endif
       #ifndef JucePlugin_Vst3ComponentFlags
        #if JucePlugin_IsSynth
         #define JucePlugin_Vst3ComponentFlags Vst::kSimpleModeSupported
@@ -4354,41 +4367,41 @@ private:
         static const PClassInfo2 compatibilityClass { JucePluginCompatibility::iid,
                                                       PClassInfo::kManyInstances,
                                                       kPluginCompatibilityClass,
-                                                      JucePlugin_Name,
+                                                      productName,
                                                       0,
                                                       "",
-                                                      JucePlugin_Manufacturer,
-                                                      JucePlugin_VersionString,
+                                                      vendorName,
+                                                      productVersion,
                                                       kVstVersionString };
 
         static const PClassInfo2 componentClass { JuceVST3Component::iid,
                                                   PClassInfo::kManyInstances,
                                                   kVstAudioEffectClass,
-                                                  JucePlugin_Name,
+                                                  productName,
                                                   JucePlugin_Vst3ComponentFlags,
                                                   JucePlugin_Vst3Category,
-                                                  JucePlugin_Manufacturer,
-                                                  JucePlugin_VersionString,
+                                                  vendorName,
+                                                  productVersion,
                                                   kVstVersionString };
 
         static const PClassInfo2 controllerClass { JuceVST3EditController::iid,
                                                    PClassInfo::kManyInstances,
                                                    kVstComponentControllerClass,
-                                                   JucePlugin_Name,
+                                                   productName,
                                                    JucePlugin_Vst3ComponentFlags,
                                                    JucePlugin_Vst3Category,
-                                                   JucePlugin_Manufacturer,
-                                                   JucePlugin_VersionString,
+                                                   vendorName,
+                                                   productVersion,
                                                    kVstVersionString };
        #if JucePlugin_Enable_ARA
         static const PClassInfo2 araFactoryClass { JuceARAFactory::iid,
                                                    PClassInfo::kManyInstances,
                                                    kARAMainFactoryClass,
-                                                   JucePlugin_Name,
+                                                   productName,
                                                    JucePlugin_Vst3ComponentFlags,
                                                    JucePlugin_Vst3Category,
-                                                   JucePlugin_Manufacturer,
-                                                   JucePlugin_VersionString,
+                                                   vendorName,
+                                                   productVersion,
                                                    kVstVersionString };
        #endif
 

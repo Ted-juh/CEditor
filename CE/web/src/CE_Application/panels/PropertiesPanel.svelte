@@ -366,7 +366,8 @@
   $effect(() => {
     const req = $propertiesTabRequest;
     if (!req?.tabId) return;
-    if (contextMode === 'component' && componentTabs.some((tab) => tab.id === req.tabId)) {
+    const tabs = contextMode === 'component' ? componentTabs : panelTabs;
+    if (tabs.some((tab) => tab.id === req.tabId)) {
       if (viewMode !== 'single') viewMode = 'single';
       setActiveSingleTab(req.tabId);
     }

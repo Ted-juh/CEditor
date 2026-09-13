@@ -55,6 +55,9 @@ function usableAsset(value) {
  * already defines for a file that cannot be read.
  */
 function readAssetViaCache(filePath) {
+  // A reopened package already contains its bytes. Sharing it again must not ask the native
+  // filesystem to open a data URL as though it were a Windows path.
+  if (usableAsset(filePath)) return Promise.resolve(filePath);
   return new Promise((resolve) => {
     const cached = usableAsset(get(fileCache)[filePath]);
     if (cached) { resolve(cached); return; }
@@ -91,7 +94,9 @@ export async function packagePanelForSharing(panel, metadata = {}) {
 
   // Warm the cache first so the common case is one pass with no waiting: a panel that has been on
   // screen already has its images here.
-  for (const path of panelAssetPaths(panel)) loadFile(path);
+  for (const path of panelAssetPaths(panel)) {
+    if (!usableAsset(path)) loadFile(path);
+  }
 
   const envelope = await createPanelPackage(panel, {
     readAsset: readAssetViaCache,

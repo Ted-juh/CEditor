@@ -244,7 +244,15 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "CEditor Player VST"; }
+    const juce::String getName() const override
+    {
+       #if CEDITOR_SIDECAR_IDENTITY
+        static const auto sidecar = ceditor::exporter::readIdentityBesideModule (
+            juce::File::getSpecialLocation (juce::File::currentExecutableFile));
+        if (sidecar.valid) return sidecar.identity.productName;
+       #endif
+        return JucePlugin_Name;
+    }
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return false; }

@@ -6,7 +6,7 @@ top-to-bottom; if a gate fails, capture the noted output before moving on. Two t
 - **Track A — from a source checkout** (your `C:\dev\projects\ceditor`): verifies the new in-app
   features *and* a real test-panel compile, because the build environment is present.
 - **Track B — from the installer**: verifies build-installer → install → launch → toolchain management.
-  (A GUI-only install can manage toolchains but a full VST3 export still needs the build env — see
+  (Compiler-free VST3 export uses the installed template; extra runtimes need a build environment — see
   `docs/scripting-language-options-and-shippable-export.md` §3a.)
 
 ---
@@ -143,10 +143,17 @@ and the bundled `tools\node\node.exe` runs.)
 
 **Proves:** the installed app manages toolchains.
 
-> **Export from the installed app:** a full VST3 export needs the C++ build environment (source + CMake +
-> compiler) because each panel needs a unique compile-time FUID. A GUI-only install therefore cannot do a
-> full VST3 export by itself — run exports from the source checkout (Track A) until the standalone/CLAP
-> compiler-free path lands. The installer's job here is the editor + toolchain management.
+### Gate B4 — Export away from the source checkout
+
+Launch the staged/installed app as a standard user, with no source checkout required. Create a
+panel using Lua or JavaScript, select VST3 only and export. Verify the output under
+Documents → CEditor → Exports, then scan/load it in a host and exercise its controls and scripts.
+Export a second panel and verify distinct plugin identities. Confirm the shipped Node and
+`tools/scripts/shared` identity helpers are used, and the app loads `web/dist` without localhost.
+
+CLAP/LV2 templates and C++/C#/Java/Python template runtimes are currently unsupported. Selecting
+them must explain the refusal and preserve a previous export. Test those supported combinations
+with the compiling exporter in Track A. A standalone per-panel export is not implemented.
 
 ---
 

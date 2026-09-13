@@ -63,6 +63,12 @@ export function loadFile(filePath) {
   const cache = get(fileCache);
   if (cache[filePath]) return; // Already loaded
 
+  // Shared panels store images inline. Native file IO cannot open a data URL as a path.
+  if (typeof filePath === 'string' && filePath.startsWith('data:')) {
+    fileCache.update(c => ({ ...c, [filePath]: filePath }));
+    return;
+  }
+
   if (!isJuceAvailable()) {
     // In browser dev mode, try using the path directly (won't work for local files)
     fileCache.update(c => ({ ...c, [filePath]: filePath }));

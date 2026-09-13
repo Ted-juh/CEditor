@@ -36,6 +36,8 @@ struct SmokeResult
     int processedBlocks = 0;
     int stateBytes = 0;
     bool stateRestored = false;
+    int parameterCount = 0;
+    juce::Array<juce::var> outputCc;
 };
 
 int finish (const SmokeResult& result)
@@ -56,6 +58,8 @@ int finish (const SmokeResult& result)
     object->setProperty ("processedBlocks", result.processedBlocks);
     object->setProperty ("stateBytes", result.stateBytes);
     object->setProperty ("stateRestored", result.stateRestored);
+    object->setProperty ("parameterCount", result.parameterCount);
+    object->setProperty ("outputCc", result.outputCc);
 
     std::cout << (result.passed ? "PASS  " : "FAIL  ") << result.detail << std::endl;
     // The final, single-line record is intentionally easy for a release script to capture.
@@ -293,6 +297,12 @@ int main (int argc, char* argv[])
             if (result.acceptsMidi && block == blocksToProcess / 2)
                 midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
             processor->processBlock (audio, midi);
+            for (const auto metadata : midi)
+            {
+                const auto message = metadata.getMessage();
+                if (message.isController())
+                    result.outputCc.addIfNotAlreadyThere (message.getControllerNumber());
+            }
             ++result.processedBlocks;
             juce::Thread::sleep (10); // allow the fixed one-block pipeline to publish its reply
         }
@@ -300,6 +310,7 @@ int main (int argc, char* argv[])
             throw std::runtime_error ("worker stopped during representative block processing");
 
         result.phase = "state";
+        result.parameterCount = processor->getParameters().size();
         juce::MemoryBlock state;
         processor->getStateInformation (state);
         const auto dumpPath = juce::SystemStats::getEnvironmentVariable ("HOSTAGE_SMOKE_STATE_DUMP", {});

@@ -38,7 +38,12 @@ matters, because a host keys plugins by FUID and a saved session must keep findi
 across the change. `CE/tests/PanelIdentitySidecarTests.cpp` asserts that equality against
 `convertJucePluginId` itself, for every VST3 interface type.
 
-**If you upgrade JUCE:** re-apply it. `getInterfaceId` is a short static function near the top of
+The guarded `JucePluginFactory::getClassEntries` also reads the sidecar's product name, vendor
+and version. Otherwise distinct panels have different IDs but all appear as the generic template
+in a host's plugin browser. The Windows exporter renames the internal VST3 binary to match its
+outer bundle, as required by the loader.
+
+**If you upgrade JUCE:** re-apply both identity and metadata hooks. `getInterfaceId` is near the top of
 that file; the whole rationale is in `CE/src/Export/Vst3SidecarIdentity.h`, and the guard test names
 this document when it fails.
 
@@ -66,4 +71,3 @@ running the app on Linux with a 3,600-preset Surge XT library (2026-09-08, commi
 
 **If you upgrade JUCE:** check whether upstream fixed it (look for `getNumBytesAsUTF8` in
 `sendCommand`); if not, re-apply both halves. The guard test names this document when it fails.
-

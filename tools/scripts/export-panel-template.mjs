@@ -9,20 +9,26 @@
 //
 // A template player (cmake -DCEDITOR_TEMPLATE_PLAYER=ON) takes its identity AND its panel from the
 // single .cepanel sitting beside it, so exporting is a copy: take a prebuilt binary, put the panel
-// inside it, done. No compiler, no CMake, no source tree. The ids it reports are byte-identical to
-// the ones the relinking path produced -- see CE/src/Export/PanelIdentitySidecar.h, and
+// inside it, done. No compiler, no CMake, no source tree. Only VST3 currently adopts this identity;
+// its ids match the relinking path -- see CE/src/Export/PanelIdentitySidecar.h, and
 // CE/tests/PanelIdentitySidecarTests.cpp which asserts it against JUCE's own convertJucePluginId.
 //
 // The compiling exporter is untouched and stays the default. This is the path for a machine that
 // has no build environment, which after this is most of them.
 
-import { existsSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, renameSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { validateTemplateScripting } from './exportValidation.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
+
+function identityHelper(name) {
+  const installed = path.join(HERE, 'shared', name);
+  return existsSync(installed) ? installed : path.join(REPO, 'CE/web/src/CE_Application/utils', name);
+}
 
 /** The formats a template can produce, and where the panel goes inside each. */
 export const TEMPLATE_FORMATS = [
@@ -36,9 +42,8 @@ export const TEMPLATE_FORMATS = [
   },
   {
     id: 'clap',
-    // A .clap is a single file, so the panel sits beside it rather than inside it. CLAP has no
-    // fixed-id contract at all -- its id is a freeform string -- so this format never needed the
-    // compiler in the first place.
+    // Retained as a known format for explicit refusal. Its wrapper still uses a build-time ID,
+    // and a shared sidecar directory cannot safely hold independent panel exports.
     ext: '.clap',
     bundle: false,
     panelDir: (root) => path.dirname(root),
@@ -60,8 +65,8 @@ export const TEMPLATE_FORMATS = [
  */
 async function identityFor(panelDoc, guid, panelFile) {
   const [{ deriveIdentity }, { identityInputsFromPanel }] = await Promise.all([
-    import(pathToFileURL(path.join(REPO, 'CE/web/src/CE_Application/utils/exportIdentity.js')).href),
-    import(pathToFileURL(path.join(REPO, 'CE/web/src/CE_Application/utils/panelIdentityInputs.js')).href),
+    import(pathToFileURL(identityHelper('exportIdentity.js')).href),
+    import(pathToFileURL(identityHelper('panelIdentityInputs.js')).href),
   ]);
 
   const inputs = identityInputsFromPanel(panelDoc, path.basename(panelFile));
@@ -117,6 +122,22 @@ export function findTemplate(templatesDir, format) {
 
 export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir, formats, log = console.log }) {
   const panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  formats ??= TEMPLATE_FORMATS.filter((format) =>
+    format.id === 'vst3' || (format.id === 'clap'
+      ? panelDoc.exportSettings?.exportClap !== false
+      : panelDoc.exportSettings?.exportLv2 !== false));
+  const unsupported = formats.filter((format) => format.id !== 'vst3');
+  if (unsupported.length) {
+    throw new Error(`Compiler-free export currently supports VST3 only. Disable ${unsupported.map((format) => format.id.toUpperCase()).join(' and ')} in Panel Properties → Export, or use the compiling exporter. Their template identities are not yet safe for separate panels.`);
+  }
+  validateTemplateScripting(panelDoc);
+  if (panelDoc.controls?.length && !Array.isArray(panelDoc.exportParameters)) {
+    throw new Error('This panel has not been prepared for plugin export. Open it in CEditor and use Build → Export Plugin to prepare its automation parameters and embedded assets.');
+  }
+  const scripts = [...(panelDoc.scripts ?? []), ...(panelDoc.controls ?? []).flatMap((control) => control?._children?.Scripts?.scripts ?? [])];
+  if (scripts.some((script) => script.enabled !== false && script.language === 'typescript' && script.source?.trim() && !script.compiledJs?.trim())) {
+    throw new Error('TypeScript needs compiled JavaScript before template export. Open this panel in CEditor and use Build → Export Plugin.');
+  }
   const { identity, productName } = await identityFor(panelDoc, guid, panelFile);
 
   // The plugin file name is the product name, sanitized the way a file name has to be. The IDENTITY
@@ -128,9 +149,14 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
   log(`  identity: pluginCode=${identity.pluginCode} auSubtype=${identity.auSubtype}`);
   log(`  clapId:   ${identity.clapId}`);
 
+  // Refuse an incomplete format set before replacing any previous export.
+  const missingFormats = formats.filter((format) => !findTemplate(templatesDir, format));
+  if (missingFormats.length) {
+    throw new Error(`Missing player templates for ${missingFormats.map((format) => format.id).join(', ')} in ${templatesDir}. Install those templates or disable those export formats.`);
+  }
   mkdirSync(outDir, { recursive: true });
   const helperExe = ['juce_vst3_helper.exe', 'juce_vst3_helper']
-    .map((n) => path.join(REPO, 'JUCE/bin/JUCE-8.0.7', n))
+    .flatMap((n) => [path.join(REPO, 'tools/bin', n), path.join(REPO, 'JUCE/bin/JUCE-8.0.7', n)])
     .find((p) => existsSync(p));
 
   const written = [];
@@ -144,6 +170,19 @@ export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir
     const dest = path.join(outDir, safeName + format.ext);
     rmSync(dest, { recursive: true, force: true });
     cpSync(template, dest, { recursive: format.bundle });
+
+    // The Windows VST3 loader derives the DLL name from its enclosing bundle name.
+    // Renaming only the outer directory makes an otherwise valid template unloadable.
+    if (format.id === 'vst3' && process.platform === 'win32') {
+      const contents = path.join(dest, 'Contents');
+      for (const architecture of readdirSync(contents).filter((name) => name.endsWith('-win'))) {
+        const binDir = path.join(contents, architecture);
+        const binaries = readdirSync(binDir).filter((name) => name.toLowerCase().endsWith('.vst3'));
+        if (binaries.length !== 1) throw new Error(`Expected one VST3 binary in ${binDir}. Reinstall the player template.`);
+        const target = path.join(binDir, `${safeName}.vst3`);
+        if (path.join(binDir, binaries[0]) !== target) renameSync(path.join(binDir, binaries[0]), target);
+      }
+    }
 
     const panelDir = format.panelDir(dest);
     mkdirSync(panelDir, { recursive: true });
@@ -199,7 +238,6 @@ async function main() {
     guid,
     templatesDir: path.resolve(flag('templates', path.join(REPO, 'templates'))),
     outDir: path.resolve(flag('out', path.join(REPO, 'export-out'))),
-    formats: TEMPLATE_FORMATS,
   });
 }
 

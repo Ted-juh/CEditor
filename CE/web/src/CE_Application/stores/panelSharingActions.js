@@ -24,6 +24,12 @@ import { addPanel, activePanel } from './panels.js';
 import { cerror, cinfo, cwarn } from './console.js';
 import { deserializePanel, serializePanel } from './panelModel.js';
 import { openSharedPanel, packagePanelForSharing, panelPackageFile } from './panelSharing.js';
+import { notify } from './scriptUi.js';
+
+function sharingError(message) {
+  cerror('[share]', message);
+  notify(message, { kind: 'error', duration: 0 });
+}
 
 /** How long to wait for the backend to hand back the chosen package before giving up. */
 const READ_TIMEOUT_MS = 15000;
@@ -81,21 +87,31 @@ function readPackageText(filePath) {
  * the one person who can still find them.
  */
 export async function sharePanelToFile(metadata = {}) {
+  try {
+    return await prepareSharedPanel(metadata);
+  } catch (error) {
+    sharingError(`Could not share the panel. ${error.message}`);
+    return { ok: false, issues: [error.message] };
+  }
+}
+
+async function prepareSharedPanel(metadata) {
   const panel = get(activePanel);
-  if (!panel) { cwarn('[share] No active panel to share.'); return { ok: false }; }
+  if (!panel) { notify('Open a panel before sharing it.', { kind: 'warn' }); return { ok: false }; }
 
   const name = String(panel.name ?? '').trim() || 'Panel';
   cinfo(`[share] Packaging "${name}" — embedding images may take a moment…`);
 
   const result = await packagePanelForSharing(documentToShare(panel), { name, ...metadata });
   if (!result.ok) {
-    cerror('[share] Could not package the panel:', (result.issues ?? []).join(' '));
+    sharingError(`Could not package the panel. ${(result.issues ?? []).join(' ')}`);
     return result;
   }
 
   if (result.missing.length) {
     cwarn(`[share] ${result.missing.length} file(s) could not be read and are NOT in the package: `
       + result.missing.join(', '));
+    notify(`Shared panel is missing ${result.missing.length} file(s). Check the Console for file names before sending it.`, { kind: 'warn', duration: 0 });
   }
 
   const file = panelPackageFile(result.envelope);
@@ -124,18 +140,21 @@ export async function openPackageText(text, fallbackName = '') {
   try {
     envelope = JSON.parse(text);
   } catch (error) {
-    cerror('[share] That file is not a panel package — it is not valid JSON.', error.message);
+    sharingError('Cannot open this shared panel: the file is not valid JSON. Choose a .cepanelpkg file.');
     return null;
   }
 
   const opened = await openSharedPanel(envelope);
   if (!opened.ok) {
-    cerror('[share] Cannot open that package:', opened.issues.join(' '));
+    sharingError(`Cannot open this shared panel. ${opened.issues.join(' ')}`);
     return null;
   }
   for (const warning of opened.warnings ?? []) cwarn('[share]', warning);
   if (opened.unresolved.length) {
     cwarn(`[share] ${opened.unresolved.length} asset(s) were referenced but not in the package.`);
+  }
+  if (opened.warnings?.length || opened.unresolved.length) {
+    notify('This shared panel has missing or unused assets. Check the Console for details.', { kind: 'warn', duration: 0 });
   }
 
   const name = String(envelope?.metadata?.name ?? '').trim() || fallbackName || 'Shared Panel';
@@ -144,6 +163,7 @@ export async function openPackageText(text, fallbackName = '') {
 
   addPanel(panel);
   cinfo(`[share] Opened "${name}" from a package. Save it to keep it.`);
+  notify(`Opened "${name}". Use Save to keep an editable copy.`, { duration: 6000 });
   return panel;
 }
 
@@ -154,10 +174,11 @@ export function ensurePanelSharingListeners() {
 
   onPanelPackageSaved((payload) => {
     if (payload?.ok === false) {
-      cerror('[share] Could not write', payload?.filePath ?? 'the package', '— check the folder is writable.');
+      sharingError('Could not save the shared panel. Choose a writable folder and try again.');
       return;
     }
     cinfo('[share] ✓ Saved →', payload?.filePath ?? '(unknown path)');
+    notify('Shared panel saved.', { duration: 5000 });
   });
 
   onPanelPackageOpened(async (payload) => {
@@ -168,6 +189,7 @@ export function ensurePanelSharingListeners() {
       await openPackageText(text, String(payload?.name ?? ''));
     } catch (error) {
       cerror('[share] Could not read', filePath, '—', error.message);
+      sharingError('Could not open the shared panel. Check that the file is readable and try again.');
     }
   });
 

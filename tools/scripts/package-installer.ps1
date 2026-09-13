@@ -88,15 +88,13 @@ function Find-VcRedist {
 }
 
 function Reset-Directory([string]$Path) {
+    $resolved = [System.IO.Path]::GetFullPath($Path)
+    $packageRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-RepoRoot) "build\package")) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolved.StartsWith($packageRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clear a directory outside build\package: $resolved"
+    }
     if (Test-Path $Path) {
-        try {
-            Remove-Item -LiteralPath $Path -Recurse -Force
-        }
-        catch {
-            Write-Warning "Could not fully clear $Path. Reusing the existing directory."
-            New-Item -ItemType Directory -Path $Path -Force | Out-Null
-            return
-        }
+        Remove-Item -LiteralPath $resolved -Recurse -Force
     }
 
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
@@ -147,7 +145,7 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
         # CE_VST_GENERIC_PLAYER: the installer ships the player without a panel baked in — the
         # export pipeline bakes one per panel later. Saying so turns the no-panel warning into a
         # status line, so a packaging run that warns is a run worth reading.
-        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration && cmake --install `"$buildDir`" --config $Configuration --prefix `"$StageDir`""
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration && cmake --install `"$buildDir`" --config $Configuration --component CEditor --prefix `"$StageDir`""
         cmd /c $cmd
 
         if ($LASTEXITCODE -ne 0) {
@@ -203,8 +201,8 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # payoff is that an install without Visual Studio can export at all, which it previously could
     # not by design.
     #
-    # ONE binary per format serves every panel, which is also what makes signing tractable: sign
-    # these three once here rather than every artefact a user ever exports.
+    # One VST3 binary serves every panel. CLAP/LV2 still require per-panel compilation because
+    # their wrappers do not yet adopt a sidecar identity.
     $vcvars = Find-VcVars64
     $buildDir = Join-Path $RepoRoot "build\package\template"
     $templatesDir = Join-Path $StageDir "templates"
@@ -214,7 +212,7 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
 
     Push-Location $RepoRoot
     try {
-        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3 CEditorPlayerVST_CLAP CEditorPlayerVST_LV2"
+        $cmd = "`"$vcvars`" && cmake -S . -B `"$buildDir`" -G `"Ninja Multi-Config`" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON -DCEDITOR_TEMPLATE_PLAYER=ON -DCE_VST_GENERIC_PLAYER=ON && cmake --build `"$buildDir`" --config $Configuration --target CEditorPlayerVST_VST3"
         cmd /c $cmd
 
         if ($LASTEXITCODE -ne 0) {
@@ -228,20 +226,17 @@ function Build-And-Stage-Templates([string]$RepoRoot, [string]$StageDir, [string
     # Copy the artefacts out by extension rather than by name: JUCE names them from
     # CE_VST_PRODUCT_NAME, and the exporter finds a template by extension anyway.
     $artefacts = Join-Path $buildDir "CEditorPlayerVST_artefacts\$Configuration"
-    $found = 0
-    foreach ($ext in @("vst3", "clap", "lv2")) {
-        Get-ChildItem -Path $artefacts -Filter "*.$ext" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName -Destination (Join-Path $templatesDir $_.Name) -Recurse -Force
-            Write-Host "Staged template: $($_.Name)"
-            $found++
+    # Only VST3 has the runtime identity hook required for copying a template safely.
+    foreach ($ext in @("vst3")) {
+        $formatDir = Join-Path $artefacts $ext.ToUpperInvariant()
+        $bundles = @(Get-ChildItem -LiteralPath $formatDir -Filter "*.$ext")
+        if ($bundles.Count -ne 1) {
+            throw "Expected one $ext template in $formatDir; found $($bundles.Count)."
         }
-    }
-
-    if ($found -eq 0) {
-        # Not fatal -- an installer with no templates is still a working panel designer, and says so
-        # when someone presses Export. But it is the difference between the two installs, so it is a
-        # warning rather than a silent omission.
-        Write-Warning "No player templates were produced; this installer will NOT be able to export without a source checkout."
+        $bundles | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $templatesDir $_.Name) -Recurse -Force
+            Write-Host "Staged template: $($_.Name)"
+        }
     }
 }
 
@@ -258,6 +253,19 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     New-Item -ItemType Directory -Path $scriptsDst -Force | Out-Null
     Copy-Item (Join-Path $toolsSrc "scripts\*") -Destination $scriptsDst -Recurse -Force
 
+    # Keep one source of identity rules, but ship their runtime copies with the exporter.
+    # An installed app has web/dist, not the frontend source checkout.
+    $sharedDst = Join-Path $scriptsDst "shared"
+    New-Item -ItemType Directory -Path $sharedDst -Force | Out-Null
+    foreach ($helper in @("exportIdentity.js", "panelIdentityInputs.js")) {
+        Copy-Item -LiteralPath (Join-Path $RepoRoot "CE\web\src\CE_Application\utils\$helper") -Destination $sharedDst -Force
+    }
+    '{"type":"module"}' | Set-Content -LiteralPath (Join-Path $sharedDst "package.json") -Encoding UTF8
+
+    $binDst = Join-Path $toolsDst "bin"
+    New-Item -ItemType Directory -Path $binDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $RepoRoot "JUCE\bin\JUCE-8.0.7\juce_vst3_helper.exe") -Destination $binDst -Force
+
     # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
     # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).
     $tcDst = Join-Path $toolsDst "toolchains"
@@ -272,11 +280,11 @@ function Stage-NodeRuntime([string]$StageDir) {
     # installer's provision.cmd both prefer it, so toolchain provisioning + management work on a clean
     # machine with NO system Node. Windows node.exe is self-contained (depends only on system DLLs), so a
     # single-file copy of the build machine's node is sufficient and pins the bundled Node to the build's.
-    $node = (Get-Command node -ErrorAction SilentlyContinue).Source
-    if (-not $node) {
-        Write-Warning "node.exe was not found on PATH; the installer will NOT bundle Node. Toolchain management on a clean machine will then require the user to install Node.js."
-        return
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCommand) {
+        throw "node.exe is required to package an installer with working export and toolchain management."
     }
+    $node = $nodeCommand.Source
 
     $nodeDst = Join-Path $StageDir "tools\node"
     New-Item -ItemType Directory -Path $nodeDst -Force | Out-Null

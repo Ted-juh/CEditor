@@ -66,6 +66,26 @@ test('a panel with no assets collects nothing', () => {
   assert.deepEqual(collectPanelAssetRefs({}), []);
 });
 
+test('panel textures, text fills, overlays and nested part images travel with the panel', async () => {
+  const panel = {
+    bgTexture: 'texture.png',
+    controls: [{ _children: {
+      Text: { _children: { Fill: { imageSrc: 'text.png', textureSrc: 'grain.png' } } },
+      Parts: { _children: { face: { _children: { Background: { _children: { Fill: {
+        imageSrc: 'face.png', overlaySrc: 'shine.png',
+      } } } } } } },
+    } }],
+  };
+  const paths = panelAssetPaths(panel);
+  assert.deepEqual(paths.sort(), ['face.png', 'grain.png', 'shine.png', 'text.png', 'texture.png']);
+  const envelope = await createPanelPackage(panel, { readAsset: async (path) => `bytes:${path}` });
+  assert.equal(Object.keys(envelope.assets).length, 5);
+  const opened = await openPanelPackage(envelope, { writeAsset: async (id, data) => `inline:${data}` });
+  assert.equal(opened.ok, true);
+  assert.deepEqual(panelAssetPaths(opened.panel).sort(), paths.map((path) => `inline:bytes:${path}`).sort());
+  assert.equal(panel.bgTexture, 'texture.png', 'sharing leaves the source document untouched');
+});
+
 test('package then open: the panel arrives with working references', async () => {
   // THE CONTRACT. Everything else in this file is a way this can be subtly wrong.
   const pkg = await createPanelPackage(panelWithAssets(), { readAsset, now: '2026-08-23T00:00:00Z' });
@@ -156,6 +176,28 @@ test('something that is not a panel package is rejected by format, first', async
     const v = validatePanelPackage(junk);
     assert.equal(v.ok, false);
     assert.match(v.issues[0], /Not a panel package/);
+  }
+});
+
+test('malformed package fields return a refusal before any asset is opened', async () => {
+  const base = { format: PANEL_PACKAGE_FORMAT, formatVersion: 1, panel: { controls: [] }, assets: {} };
+  for (const fields of [
+    { panel: { controls: {} } },
+    { panel: { controls: [null] } },
+    { panel: [] },
+    { assets: 'broken' },
+    { missing: 'image.png' },
+    { missing: [null] },
+    { panel: { controls: [], bgImage: 'asset:bad' }, assets: { bad: { data: null } } },
+    { panel: { controls: [], bgImage: 'asset:toString' } },
+  ]) {
+    const packageData = { ...base, ...fields };
+    assert.equal(validatePanelPackage(packageData).ok, false);
+    const opened = await openPanelPackage(packageData, {
+      writeAsset: () => assert.fail('invalid packages must not write assets'),
+    });
+    assert.equal(opened.ok, false);
+    assert.equal(opened.panel, null);
   }
 });
 

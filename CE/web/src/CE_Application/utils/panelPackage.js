@@ -9,13 +9,9 @@
 // `docs/known-issues.md` recorded it, and `beta-readiness-review` §3.5 lists it under "no way in, no
 // way out". This is the way out.
 //
-// THREE PLACES a panel points outside itself, and they were found by reading the model rather than
-// by guessing (a fourth appearing later is why `collectPanelAssetRefs` is one function and every
-// caller goes through it):
-//
-//   panel.bgImage                                  the panel's own backdrop
-//   <control>.Background._children.Fill.imageSrc   any control with an image fill
-//   <control>.Text.path                            a font, where one is given by path
+// Asset fields include the panel's backdrop/texture, control and part image/overlay/texture
+// sources, and Text.path fonts. References carry their exact location so repeated part assets
+// and controls without an id are rewritten correctly.
 //
 // THE SHAPE IS DELIBERATELY THE CUSTOM-COMPONENT ONE. Same `format`/`formatVersion`/`compatibility`
 // envelope, same idea of an asset map keyed by a content hash. Not for tidiness: it means the
@@ -34,6 +30,7 @@ export const PANEL_PACKAGE_VERSION = 1;
 /** Where an asset reference lives, so it can be read AND rewritten through one description. */
 const REF_KIND = {
   panelBackground: 'panelBackground',
+  panelTexture: 'panelTexture',
   controlImage: 'controlImage',
   controlFont: 'controlFont',
 };
@@ -67,18 +64,29 @@ export function assetIdFor(bytes, hint = '') {
  */
 export function collectPanelAssetRefs(panel) {
   const refs = [];
+  const add = (kind, value, location, controlId = null) => {
+    const path = text(value);
+    if (path) refs.push({ kind, path, controlId, location });
+  };
+  add(REF_KIND.panelBackground, panel?.bgImage, ['bgImage']);
+  add(REF_KIND.panelTexture, panel?.bgTexture, ['bgTexture']);
 
-  const bg = text(panel?.bgImage);
-  if (bg) refs.push({ kind: REF_KIND.panelBackground, path: bg, controlId: null });
-
-  for (const control of panel?.controls ?? []) {
+  for (const [index, control] of (panel?.controls ?? []).entries()) {
     const id = control?._children?.Core?.id ?? null;
-
-    const imageSrc = text(control?._children?.Background?._children?.Fill?.imageSrc);
-    if (imageSrc) refs.push({ kind: REF_KIND.controlImage, path: imageSrc, controlId: id });
-
-    const fontPath = text(control?._children?.Text?.path);
-    if (fontPath) refs.push({ kind: REF_KIND.controlFont, path: fontPath, controlId: id });
+    const walk = (value, location) => {
+      if (!value || typeof value !== 'object') return;
+      for (const [key, child] of Object.entries(value)) {
+        const childLocation = [...location, key];
+        if (typeof child === 'string' && /^(imageSrc|textureSrc|overlaySrc)$/.test(key)) {
+          add(REF_KIND.controlImage, child, childLocation, id);
+        } else if (key === 'path' && location.at(-1) === 'Text' && typeof child === 'string') {
+          add(REF_KIND.controlFont, child, childLocation, id);
+        } else if (child && typeof child === 'object') {
+          walk(child, childLocation);
+        }
+      }
+    };
+    walk(control?._children, ['controls', index, '_children']);
   }
 
   return refs;
@@ -91,18 +99,12 @@ export function panelAssetPaths(panel) {
 
 /** Rewrite one reference in place. Paired with the collector above so the two cannot disagree. */
 function applyRef(panel, ref, value) {
-  if (ref.kind === REF_KIND.panelBackground) {
-    panel.bgImage = value;
-    return;
+  let target = panel;
+  for (const key of ref.location.slice(0, -1)) {
+    if (!target || !Object.hasOwn(target, key)) return;
+    target = target[key];
   }
-  const control = (panel.controls ?? []).find((c) => c?._children?.Core?.id === ref.controlId);
-  if (!control) return;
-  if (ref.kind === REF_KIND.controlImage) {
-    const fill = control._children?.Background?._children?.Fill;
-    if (fill) fill.imageSrc = value;
-  } else if (ref.kind === REF_KIND.controlFont) {
-    if (control._children?.Text) control._children.Text.path = value;
-  }
+  if (target) target[ref.location.at(-1)] = value;
 }
 
 /**
@@ -179,8 +181,21 @@ export function validatePanelPackage(envelope) {
     issues.push(`Package format ${version} is newer than this build understands (${PANEL_PACKAGE_VERSION}).`);
   }
 
-  if (!envelope.panel || typeof envelope.panel !== 'object') issues.push('Package carries no panel.');
+  if (!envelope.panel || typeof envelope.panel !== 'object' || Array.isArray(envelope.panel)) issues.push('Package carries no panel.');
   else if (!Array.isArray(envelope.panel.controls)) issues.push('Package panel has no controls array.');
+  else if (envelope.panel.controls.some((control) => !control || typeof control !== 'object' || Array.isArray(control))) {
+    issues.push('Package contains an invalid control.');
+  }
+
+  if (envelope.assets != null && (typeof envelope.assets !== 'object' || Array.isArray(envelope.assets))) {
+    issues.push('Package assets must be an object.');
+  }
+  if (envelope.missing != null && (!Array.isArray(envelope.missing) || envelope.missing.some((path) => typeof path !== 'string'))) {
+    issues.push('Package missing files must be a list of paths.');
+  }
+  // Stop before walking references: malformed documents must return a refusal, not throw while
+  // trying to iterate the very field whose shape we have just rejected.
+  if (issues.length) return { ok: false, issues, warnings };
 
   // Dangling references are the failure this format exists to prevent, so they are checked rather
   // than discovered when the panel renders blank.
@@ -188,7 +203,10 @@ export function validatePanelPackage(envelope) {
   for (const ref of collectPanelAssetRefs(envelope.panel ?? {})) {
     if (!ref.path.startsWith('asset:')) continue;
     const id = ref.path.slice('asset:'.length);
-    if (!assets[id]) issues.push(`Panel references asset "${id}", which is not in the package.`);
+    if (!Object.hasOwn(assets, id)) issues.push(`Panel references asset "${id}", which is not in the package.`);
+    else if (typeof assets[id]?.data !== 'string' || !assets[id].data) {
+      issues.push(`Asset "${id}" has no usable data.`);
+    }
   }
 
   const referenced = new Set(collectPanelAssetRefs(envelope.panel ?? {})

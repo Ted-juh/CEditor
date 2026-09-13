@@ -380,7 +380,7 @@ private:
 
 // Resolve the root that holds the export pipeline (tools/scripts/export-panel-vst3.mjs). A dev build
 // runs from a source checkout (CEDITOR_SOURCE_ROOT / cwd); an installed build has tools/ staged beside
-// the executable. Try, in order: the compile-time source root, the executable's dir (and its parent),
+// the executable. Try, in order: the executable's dir (and its parent), the compile-time source root,
 // then the current working dir — returning the first that actually contains the exporter, so the same
 // binary works in both layouts. Falls back to the compile-time root / cwd if none match.
 static juce::File ceditorSourceRoot()
@@ -392,12 +392,12 @@ static juce::File ceditorSourceRoot()
     };
 
     juce::Array<juce::File> candidates;
-   #if defined (CEDITOR_SOURCE_ROOT)
-    candidates.add (juce::File (CEDITOR_SOURCE_ROOT));
-   #endif
     const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
     candidates.add (exeDir);
     candidates.add (exeDir.getParentDirectory());
+   #if defined (CEDITOR_SOURCE_ROOT)
+    candidates.add (juce::File (CEDITOR_SOURCE_ROOT));
+   #endif
     candidates.add (juce::File::getCurrentWorkingDirectory());
 
     for (const auto& c : candidates)
@@ -1587,8 +1587,14 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
                 }
 
-                const auto exportPath = sourceRoot.getChildFile ("export-out")
-                                                  .getChildFile (productName + ".vst3").getFullPathName();
+                // Installed files may live in Program Files. Export into the user's documents,
+                // never require administrator rights to write a plugin beside the executable.
+                const auto exportDir = hasBuildEnv ? sourceRoot.getChildFile ("export-out")
+                    : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                        .getChildFile ("CEditor").getChildFile ("Exports");
+                auto safeProductName = productName.replaceCharacters ("\\/:*?\"<>|", "_________").trim();
+                if (safeProductName.isEmpty()) safeProductName = "CEditor Panel";
+                const auto exportPath = exportDir.getChildFile (safeProductName + ".vst3").getFullPathName();
 
                 // The two exporters take the same first two arguments deliberately. The third differs:
                 // the compiling one accepts a product-name override on the command line, the template
@@ -1600,7 +1606,8 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 if (hasBuildEnv)
                     command.add (productName);
                 else
-                    command.addArray ({ "--templates", templatesDir.getFullPathName() });
+                    command.addArray ({ "--templates", templatesDir.getFullPathName(),
+                                        "--out", exportDir.getFullPathName() });
 
                 buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });

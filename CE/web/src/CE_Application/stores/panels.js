@@ -16,8 +16,10 @@ import {
   onBuildComplete,
 } from '../bridge/bridge.js';
 import { clog, cinfo, cwarn, cerror } from './console.js';
+import { notify } from './scriptUi.js';
+import { preparePanelForExport } from './panelExportPreparation.js';
 import {
-  appendRunLine, beginRun, claimIdentity, finishRun, identityFor, newCopyPatch,
+  appendRunLine, beginRun, claimIdentity, finishRun, identityFor, newCopyPatch, exportIdentityPrompt,
 } from './exportRuns.js';
 import {
   reopenLastSession,
@@ -291,9 +293,13 @@ function restoreUnsavedSessionFromSnapshot() {
   const restoredPanels = snapshot
     .filter((panel) => panel && typeof panel === 'object')
     .map((panelData) => {
+      const fresh = createPanel();
       const restored = {
-        ...createPanel(),
+        ...fresh,
         ...panelData,
+        // Session IDs key tabs and must come from this run's allocator. Keeping a saved ID can
+        // collide with the next opened panel; panelGuid remains the persistent document identity.
+        id: fresh.id,
         modified: panelData.modified !== false,
       };
 
@@ -1087,7 +1093,7 @@ function ensureBuildListeners() {
  * the first time so re-exports keep the same plugin identity.
  */
 export function buildActivePanelVst3({ identityChoice = null } = {}) {
-  const panel = get(activePanel);
+  let panel = get(activePanel);
   if (!panel) { cwarn('[vst3] No active panel to build.'); return false; }
   if (buildInFlight) { cwarn('[vst3] A build is already running.'); return false; }
 
@@ -1099,15 +1105,18 @@ export function buildActivePanelVst3({ identityChoice = null } = {}) {
   // returned only for that case, so the ordinary re-export still runs without a question.
   const decision = identityFor(panel);
   if (decision.action === 'ask' && identityChoice === null) {
+    exportIdentityPrompt.set({ panelId: panel.id, decision });
     cwarn(`[vst3] ${decision.reason}. Choose Update or New copy on the Export tab.`);
     return { needsChoice: true, decision };
   }
 
+  exportIdentityPrompt.set(null);
   let guid = panel.panelGuid;
   if (identityChoice === 'new') {
     const patch = newCopyPatch(panel, makeGuid);
     guid = patch.panelGuid;
     updatePanel(panel.id, patch);
+    panel = { ...panel, ...patch };
     cinfo(`[vst3] New independent plugin identity — exporting as "${patch.exportSettings.pluginName}".`);
   } else if (!guid) {
     guid = makeGuid();
@@ -1136,9 +1145,18 @@ export function buildActivePanelVst3({ identityChoice = null } = {}) {
     guid,
     format: 'VST3',
   });
-  cinfo(`[vst3] Building "${productName}" — runs npm + cmake, may take a minute…`);
+  cinfo(`[vst3] Preparing "${productName}" for export…`);
   // Serialize with the GUID merged in so the temp .cepanel carries it too (harmless if unused).
-  bridgeBuildVst3(String(panel.id), serializePanelForExport({ ...panel, panelGuid: guid }), guid, productName);
+  preparePanelForExport(serializePanelForExport({ ...panel, panelGuid: guid }))
+    .then((document) => bridgeBuildVst3(String(panel.id), document, guid, productName))
+    .catch((error) => {
+      buildInFlight = false;
+      const message = error?.message ?? String(error);
+      appendRunLine(message);
+      finishRun({ ok: false, message });
+      cerror('[vst3]', message);
+      notify(message, { kind: 'error', duration: 0 });
+    });
   return true;
 }
 
@@ -1270,6 +1288,7 @@ export function initPanelBridge() {
         if (filePath) pendingOpenPanelFiles.delete(filePath);
         finishPendingPanelTimers(filePath, label, payloadSizeBytes, 'failed');
         console.error('[panels] Failed to load deferred panel data:', error);
+        notify(`Could not read "${label}". Check that the file is accessible, then try opening it again.`, { kind: 'error', duration: 0 });
         return;
       }
     }
@@ -1292,6 +1311,7 @@ export function initPanelBridge() {
       if (filePath) pendingOpenPanelFiles.delete(filePath);
       deserializeTimer('failed');
       console.error(`[panels] "${label}" could not be opened — the file is corrupted or is not a .cepanel document.`);
+      notify(`Cannot open "${label}": the file is corrupted or is not a valid .cepanel document.`, { kind: 'error', duration: 0 });
       return;
     }
     restorePanelDeviceSession(panel, label);

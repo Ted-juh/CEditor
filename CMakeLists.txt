@@ -1820,19 +1820,19 @@ endif()
 # Installing means installing the APP, which only exists when it was built.
 if (TARGET CEditor)
     install(TARGETS CEditor
-        RUNTIME DESTINATION "."
-        RESOURCE DESTINATION "."
+        RUNTIME DESTINATION "." COMPONENT CEditor
+        RESOURCE DESTINATION "." COMPONENT CEditor
     )
     if (TARGET CEditorPluginScanner)
-        install(TARGETS CEditorPluginScanner RUNTIME DESTINATION ".")
+        install(TARGETS CEditorPluginScanner RUNTIME DESTINATION "." COMPONENT CEditor)
     endif()
     if (TARGET CEditorPluginWorker)
-        install(TARGETS CEditorPluginWorker RUNTIME DESTINATION ".")
+        install(TARGETS CEditorPluginWorker RUNTIME DESTINATION "." COMPONENT CEditor)
     endif()
 
     if (EXISTS "${CE_ROOT}/web/dist")
         install(DIRECTORY "${CE_ROOT}/web/dist/"
-            DESTINATION "web/dist"
+            DESTINATION "web/dist" COMPONENT CEditor
         )
     else()
         message(WARNING "CE/web/dist was not found. Run `npm run build` in CE/web before `cmake --install`.")

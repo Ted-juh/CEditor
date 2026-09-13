@@ -39,6 +39,9 @@ export const MAX_HISTORY = 40;
 /** The run in flight, or null. */
 export const activeRun = writable(null);
 
+/** Identity decision awaiting input, shared by menu and Properties export commands. */
+export const exportIdentityPrompt = writable(null);
+
 /** Finished exports, newest first. */
 export const exportHistory = writable(readStoredJson(HISTORY_KEY, []) ?? []);
 

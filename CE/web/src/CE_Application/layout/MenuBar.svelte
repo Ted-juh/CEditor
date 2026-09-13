@@ -35,6 +35,8 @@
   import { runUpdateCheck } from '../stores/updateChannel.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
+  import { clearSelection } from '../stores/panels.js';
+  import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
 
@@ -255,7 +257,12 @@
       // not list them, because it cannot see the panel's settings from here and a menu item naming
       // a format the user switched off would be a lie in the one place it is hardest to check.
       // The Export tab's build note spells out exactly what this run will produce.
-      { label: 'Export Plugin', enabled: hasPanel, action: () => buildActivePanelVst3() },
+      { label: 'Export Plugin', enabled: hasPanel, action: () => {
+        clearSelection();
+        showPropertiesPanel.set(true);
+        requestPropertiesTab('export');
+        buildActivePanelVst3();
+      } },
     ],
     // The three dock toggles had exactly one home — the icon rail — because they were `$state`
     // locals inside App.svelte and nothing else could see them. They live in a store now

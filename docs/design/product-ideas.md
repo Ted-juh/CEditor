@@ -11,6 +11,10 @@
 
 ## How to read this
 
+For implementation checks and release priorities, see the
+[13 September release review](release-readiness-2026-09-13.md). This idea record is not a list
+of missing features: several ideas build on capabilities that already exist.
+
 Every idea says four things: what it is, why anyone would care, what already exists in the tree that
 it stands on, and what is awkward about it. The awkward part is not decoration — several of these
 sound better than they are until you look at the hard bit.

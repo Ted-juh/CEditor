@@ -17,6 +17,7 @@ import { createPanel } from '../src/CE_Application/stores/panelModel.js';
 import { openPackageText, sharePanelToFile } from '../src/CE_Application/stores/panelSharingActions.js';
 import { packagePanelForSharing, panelPackageFile } from '../src/CE_Application/stores/panelSharing.js';
 import { get } from 'svelte/store';
+import { scriptNotifications } from '../src/CE_Application/stores/scriptUi.js';
 
 function panelOnScreen({ filePath = null, bg = '' } = {}) {
   const panel = createPanel('Shareable');
@@ -29,6 +30,7 @@ function panelOnScreen({ filePath = null, bg = '' } = {}) {
 test.beforeEach(() => {
   panels.set([]);
   fileCache.set({});
+  scriptNotifications.set([]);
 });
 
 test("sharing an unsaved panel with no backend says so rather than failing silently", async () => {
@@ -97,6 +99,39 @@ test('a file that is not JSON is refused without opening a tab', async () => {
   const opened = await openPackageText('this is not a package');
   assert.equal(opened, null);
   assert.equal(get(panels).length, 0);
+  assert.match(get(scriptNotifications).at(-1).message, /not valid JSON/);
+  assert.equal(get(scriptNotifications).at(-1).kind, 'error');
+});
+
+test('a malformed shared panel leaves the existing panel intact and explains the refusal', async () => {
+  const existing = panelOnScreen();
+  addPanel(existing);
+  const opened = await openPackageText(JSON.stringify({
+    format: 'ceditor-panel', formatVersion: 1, panel: { controls: {} }, assets: {},
+  }));
+  assert.equal(opened, null);
+  assert.equal(get(activePanel).id, existing.id);
+  assert.equal(get(panels).length, 1);
+  assert.match(get(scriptNotifications).at(-1).message, /controls array/);
+});
+
+test('sharing a reopened panel uses its embedded bytes without another filesystem read', async () => {
+  const image = 'data:image/png;base64,Ymc=';
+  addPanel(panelOnScreen({ bg: image }));
+  const result = await sharePanelToFile();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.missing, []);
+  assert.equal(result.assetCount, 1);
+  assert.deepEqual(get(fileCache), {}, 'inline bytes should never enter the file request cache');
+  const opened = await openPackageText(JSON.stringify(result.envelope));
+  assert.equal(opened.bgImage, image);
+});
+
+test('missing shared files produce a visible warning, not just a console entry', async () => {
+  addPanel(panelOnScreen({ bg: 'C:/not-here/missing.png' }));
+  const result = await sharePanelToFile();
+  assert.deepEqual(result.missing, ['C:/not-here/missing.png']);
+  assert.ok(get(scriptNotifications).some((n) => n.kind === 'warn' && /missing 1 file/.test(n.message)));
 });
 
 test('a package from a newer build is refused without opening a tab', async () => {

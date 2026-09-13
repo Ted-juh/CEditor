@@ -22,3 +22,9 @@ test('deserializePanel round-trips a valid panel document', () => {
   assert.equal(panel.name, 'Round Trip');
   assert.equal(panel.modified, false);
 });
+
+test('malformed component lists are refused without throwing during open', () => {
+  for (const controls of [{}, 'components', [null], [42], [[]]]) {
+    assert.equal(deserializePanel(JSON.stringify({ controls }), 'broken.cepanel', null), null);
+  }
+});

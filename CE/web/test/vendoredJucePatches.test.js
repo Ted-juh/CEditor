@@ -49,11 +49,14 @@ test('the patch stays behind its guard, so a stock build is unaffected', () => {
   const guarded = source.split('#if CEDITOR_SIDECAR_IDENTITY').slice(1)
     .map((section) => section.split('#endif')[0]);
 
-  assert.equal(guarded.length, 2, 'expected exactly two guarded hunks: the include and the call');
+  assert.equal(guarded.length, 3, 'expected guarded include, interface IDs and class metadata');
   const callSites = source.split('ceditor::vst3SidecarPluginCodes').length - 1;
   const guardedCallSites = guarded.join('\n').split('ceditor::vst3SidecarPluginCodes').length - 1;
   assert.equal(callSites, guardedCallSites,
     'a call to the sidecar identity sits outside #if CEDITOR_SIDECAR_IDENTITY — a stock build would change behaviour');
+  assert.equal(source.split('ceditor::vst3SidecarIdentity()').length - 1,
+    guarded.join('\n').split('ceditor::vst3SidecarIdentity()').length - 1,
+    'class metadata must use sidecar identity only in template builds');
 });
 
 test('the fallback to the compile-time defines is still there', () => {
@@ -99,4 +102,3 @@ test('JUCE/VENDORED.md records the Linux bridge patch too', () => {
   assert.ok(text.includes('juce_WebBrowserComponent_linux.cpp') && text.includes('getNumBytesAsUTF8'),
     'VENDORED.md must name the Linux bridge file and the byte-count fix');
 });
-

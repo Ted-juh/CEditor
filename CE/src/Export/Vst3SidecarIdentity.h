@@ -30,6 +30,13 @@
 namespace ceditor
 {
 
+inline const exporter::SidecarIdentity& vst3SidecarIdentity()
+{
+    static const auto identity = exporter::readIdentityBesideModule (
+        juce::File::getSpecialLocation (juce::File::currentExecutableFile));
+    return identity;
+}
+
 /** manufacturerCode, pluginCode — packed, in the order convertJucePluginId takes them. */
 using Vst3PluginCodes = std::pair<juce::uint32, juce::uint32>;
 
@@ -43,8 +50,7 @@ inline std::optional<Vst3PluginCodes> vst3SidecarPluginCodes()
 {
     static const std::optional<Vst3PluginCodes> codes = []() -> std::optional<Vst3PluginCodes>
     {
-        const auto module = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
-        const auto identity = exporter::readIdentityBesideModule (module);
+        const auto& identity = vst3SidecarIdentity();
         if (! identity.valid)
             return std::nullopt;
 

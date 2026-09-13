@@ -197,14 +197,27 @@ accepts a path, so an opened package puts the embedded bytes straight back into 
 a folder the next person also needs. The only native support the format required is two file
 dialogs (`savePanelPackageAs`, `openPanelPackage`).
 
-Three places a panel points outside itself, listed because a fourth would be a package that works
-until it doesn't: `panel.bgImage`, each control's `Background.Fill.imageSrc`, and `Text.path`. They
-live in one collector for that reason.
+The collector includes `panel.bgImage`, `panel.bgTexture`, nested control/part image, overlay and
+texture sources, and `Text.path` font references. Arbitrary files read by scripts are not collected.
 
 Two things are stripped on the way out, and both are the kind of leak nobody notices until it is
 in somebody else's hands: `filePath`, which is the author's name and folder layout, and
 `deviceSession`, which names MIDI hardware the recipient does not have.
 
-**Not yet driven on Windows.** Thirty-two tests cover the format, the asset binding and the
-commands, but no package has been through a real FileChooser. Sharing is the one feature in this
-build whose end-to-end path has only been exercised in Node.
+**Windows walkthrough verified on 13 September 2026.** Native Share/Open Shared dialogs, an embedded
+SVG background, saving an editable copy and reopening after restart passed. Inline artwork no
+longer triggers a filesystem read. Invalid package shapes show a visible error, preserve the
+current panel and do not open an extra tab. Tests also cover nested artwork and missing assets;
+the walkthrough is not evidence for every asset format or a second computer.
+
+## Compiler-free plugin export
+
+The installed exporter supports VST3. CLAP and LV2 templates are refused because their wrappers
+still report a build-time identity; copying them per panel would create plugin collisions. Those
+formats remain available through the source-checkout compiling exporter. New panels select VST3
+only, and existing saved format choices are retained.
+
+The installed template includes Lua/JavaScript support (TypeScript is prepared by the existing
+export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compiling exporter currently
+bundles these extra runtimes only for VST3. A requested unsupported combination fails explicitly
+before replacing an export. A failed required handler build also fails the export.

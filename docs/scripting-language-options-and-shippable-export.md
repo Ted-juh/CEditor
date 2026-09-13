@@ -254,12 +254,11 @@ same `provision.mjs`. Either way, only **C#** (~230 MB) and **Java** (~195 MB) a
 | 1 | **On-demand provisioning** | ✅ `tools/toolchains/languages.mjs` (lang→toolchain map, status, preflight, ensure/remove) + the exporter installs only the toolchains a panel's languages need, when missing (`autoProvisionToolchains` opt-out). Node-side verified (status/preflight + freshness checks run). |
 | 1/3 | **Skip the panel-independent Vite build** | ✅ exporter rebuilds `dist` only when web sources changed (`webBundleFresh`); `forceWebBuild`/`CE_FORCE_WEB=1` overrides. Verified fresh↔stale flips. |
 | 2 | **In-app Scripting Toolchains panel** | ✅ Settings → Scripting Toolchains (Installed / Install / Remove per language). C++ bridge (`toolchainStatus`/`provisionToolchains`/`removeToolchains` via a `ToolchainJob` mirroring `VstBuildJob`) + `bridge.js` wrappers + `ToolchainsSettings.svelte`. Web bundle builds clean; C++ compiles with the app. |
-| 3 | **Template player** | ● Done (§3a). The sidecar-FUID route works and produces byte-identical ids; `CEDITOR_TEMPLATE_PLAYER=ON` + `export-panel-template.mjs`. Unvalidated in a real host — that needs Windows and a DAW. |
-| 4 | **Installer language options + staging** | ✅ `CEditor.iss` `[Types]`/`[Components]` (Python/C++/C#/Java) with per-component `provision.cmd` `[Run]`; `package-installer.ps1` stages `tools/` (scripts only, binaries on demand); the app resolves the exporter from the install dir (`ceditorSourceRoot()` checks the exe dir). Inno/PowerShell not runnable in CI — needs a Windows packaging run to validate. |
+| 3 | **Template player** | VST3 verified on Windows on 13 September 2026: distinct names/IDs, automation, state restore and window-closed Lua/JS/TS MIDI output in CEditor's isolated native host. CLAP/LV2 templates are refused because their wrappers still use build-time identities. Third-party DAW acceptance remains open. |
+| 4 | **Installer staging** | Local Windows packaging/staged startup and actual in-app export passed. Scripting is enabled in both builds; Node, identity helpers and the VST3 manifest helper are staged. The installed pipeline is preferred over a checkout and exports into the user's Documents. Actual installer upgrade acceptance remains open. |
 
-**Caveat carried by 3 + 4:** a GUI-only install can *manage toolchains* (Settings panel) and the
-installer can *provision* them, but a full **VST3 export still needs the C++ build environment** (source
-+ CMake + a compiler) on a source checkout; an install with a prebuilt template exports with no
-compiler at all (§3a). Historically a compiler-free path was thought to exist
-only for **standalone/CLAP** (future 3a work). This is a JUCE/VST3 ecosystem constraint, not a CEditor
-limitation.
+**Current runtime boundary:** installed VST3 templates include Lua/JavaScript; TypeScript is prepared
+by the editor before export. C++/C#/Java handlers and CPython require the compiling exporter and
+are currently bundled only for VST3. Provisioning a language toolchain does not by itself add it
+to a template. Unsupported combinations fail before replacing output. A standalone per-panel
+export is still future work.

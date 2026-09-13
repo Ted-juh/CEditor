@@ -39,7 +39,7 @@
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
-  import { activeRun, buildRunning, clearHistory, clearRun, exportHistory, identityFor }
+  import { activeRun, buildRunning, clearHistory, clearRun, exportHistory, exportIdentityPrompt }
     from '../stores/exportRuns.js';
   import { canRevealFiles, revealFile } from '../bridge/revealFile.js';
   import { LICENCE_NOTICE, SIGNING_NOTICE } from '../utils/legalNotices.js';
@@ -209,11 +209,11 @@
   // The identity fork, asked only when it is a real question. `identityFor` returns 'ask' solely
   // for a GUID that belongs to a DIFFERENT panel — the copied-.cepanel case — so a normal
   // re-export never sees this and never learns to click through it.
-  let identityAsk = $state(null);
+  let identityAsk = $derived($exportIdentityPrompt?.panelId === panel?.id
+    ? $exportIdentityPrompt.decision : null);
 
   function runExport(choice = null) {
-    const result = buildActivePanelVst3(choice === null ? {} : { identityChoice: choice });
-    identityAsk = result && result.needsChoice ? result.decision : null;
+    buildActivePanelVst3(choice === null ? {} : { identityChoice: choice });
   }
 
   function setExportSetting(key, value) {
@@ -753,6 +753,77 @@
       </PropertyCell>
     </PropertySection>
   {:else if tabId === 'export'}
+    <PropertySection title="Build" icon={Hammer}>
+      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. The log below is this run only; the Console panel keeps the interleaved copy.">
+        <div class="export-row">
+          <button class="export-action" disabled={$buildRunning} onclick={() => runExport()}>
+            {$buildRunning ? 'Building…' : 'Export Plugin'}
+          </button>
+          <span class="export-build-note">{effectivePluginName}{exportFormatSuffix}{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
+        </div>
+      </PropertyCell>
+
+      <!-- The identity fork (export plan D1). Shown only when it is a real question: a normal
+           re-export of a panel's own plugin must not ask, or it becomes a dialog people click
+           through without reading. -->
+      {#if identityAsk}
+        <PropertyCell label="Plugin identity" span={4} hint="This panel's plugin GUID already belongs to another panel — almost always the file this one was copied from. Updating replaces that plugin everywhere it is loaded; a new copy gets its own identity and can sit beside it in a DAW.">
+          <div class="identity-fork">
+            <p class="identity-why">{identityAsk.reason}.</p>
+            <div class="export-row">
+              <button class="export-action" onclick={() => runExport('update')}>Update that plugin</button>
+              <button class="export-action primary" onclick={() => runExport('new')}>Export as a new plugin</button>
+            </div>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $activeRun}
+        <PropertyCell label={$activeRun.status === 'running' ? 'Build log' : ($activeRun.status === 'ok' ? 'Built' : 'Failed')} span={4} hint="The head and tail of this run. The middle is dropped when a build is long — a configure error is in the first lines and a compile error in the last, so both ends are kept and the gap is counted rather than hidden.">
+          <div class="build-log" class:ok={$activeRun.status === 'ok'} class:failed={$activeRun.status === 'failed'}>
+            {#if $activeRun.status === 'ok'}
+              <div class="build-result">
+                <b>{$activeRun.productName}</b> → <code>{$activeRun.path || 'export-out/'}</code>
+                {#if canRevealFiles() && $activeRun.path}
+                  <button class="link" onclick={() => revealFile($activeRun.path)}>Reveal in folder</button>
+                {/if}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {:else if $activeRun.status === 'failed'}
+              <div class="build-result bad">
+                {$activeRun.message || 'Build failed'}
+                <button class="link" onclick={() => clearRun()}>Dismiss</button>
+              </div>
+            {/if}
+            <pre class="log-lines">{$activeRun.head.join('\n')}{$activeRun.elided ? `\n… ${$activeRun.elided} lines not shown …\n` : '\n'}{$activeRun.tail.join('\n')}</pre>
+          </div>
+        </PropertyCell>
+      {/if}
+
+      {#if $exportHistory.length}
+        <PropertyCell label="History" span={4} hint="What this project has exported and where it went. Failed runs are kept too — the one you want to look at again is usually the one that did not work.">
+          <ul class="export-history">
+            {#each $exportHistory.slice(0, 12) as run (run.guid + run.at)}
+              <li class:bad={!run.ok}>
+                <span class="hist-mark">{run.ok ? '✓' : '✗'}</span>
+                <span class="hist-name">{run.productName || run.panelName}</span>
+                <span class="hist-fmt">{run.format}</span>
+                {#if run.ok && run.path}
+                  <code class="hist-path" title={run.path}>{run.path}</code>
+                  {#if canRevealFiles()}
+                    <button class="link" onclick={() => revealFile(run.path)}>Reveal</button>
+                  {/if}
+                {:else}
+                  <span class="hist-path bad" title={run.message}>{run.message || 'failed'}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          <button class="link" onclick={() => clearHistory()}>Clear history</button>
+        </PropertyCell>
+      {/if}
+    </PropertySection>
+
     <PropertySection title="Plugin" icon={Package}>
       <PropertyCell label="Plugin Name" span={2} hint="Host-visible plugin name and .vst3 filename. Blank = use the panel name.">
         <input class="val" type="text"
@@ -783,7 +854,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Identity" icon={KeyRound}>
+    <PropertySection title="Identity" icon={KeyRound} defaultCollapsed>
       <PropertyCell label="Plugin GUID" span={4} hint="Stable per-panel id behind the plugin FUID. Change it and hosts treat a rebuild as a different plugin.">
         <div class="export-row">
           <input class="val val-mono" type="text" readonly value={panel.panelGuid ?? '(none)'} />
@@ -801,7 +872,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Scripting Modules" icon={Puzzle}>
+    <PropertySection title="Scripting Modules" icon={Puzzle} defaultCollapsed>
       <PropertyCell label="Modules" span={4}
                     hint="Which parts of the scripting API this panel's scripts can reach. Auto follows the scripts — it is the right answer almost always. Manual pins an explicit list; anything left off logs a notice naming the module instead of acting. ce.core (set/get/log/on/run) is always on.">
         <div class="export-row">
@@ -971,18 +1042,21 @@
         <PropertyToggle value={true} />
       </PropertyCell>
       <PropertyCell label="CLAP" span={2}
-                    hint="Also build a .clap next to the .vst3 (Bitwig, Reaper, FL Studio). Same player, same panel — just a second door.">
+                    hint="Also build a .clap next to the .vst3. Requires export from a source checkout with a C++ build environment.">
         <PropertyToggle value={exportClap}
                         onchange={() => setExportSetting('exportClap', !exportClap)} />
       </PropertyCell>
       <PropertyCell label="LV2" span={2}
-                    hint="Also build an .lv2 bundle. Rare on Windows hosts; mainly future-proofing for Linux DAWs.">
+                    hint="Also build an .lv2 bundle. Requires export from a source checkout with a C++ build environment.">
         <PropertyToggle value={exportLv2}
                         onchange={() => setExportSetting('exportLv2', !exportLv2)} />
       </PropertyCell>
       <PropertyCell label="AU / AAX" span={2}
                     hint="AU needs a macOS build — its identity is already derived per panel, so it activates the day a Mac port exists. AAX needs Avid's SDK and PACE signing. VST2 licensing closed in 2018 — permanently out.">
         <span class="export-build-note">gated</span>
+      </PropertyCell>
+      <PropertyCell span={4}>
+        <span class="export-build-note">The installed app exports VST3 with Lua, JavaScript and TypeScript. Additional formats and native script runtimes require the compiling exporter.</span>
       </PropertyCell>
     </PropertySection>
 
@@ -995,7 +1069,7 @@
          banks, captured patches and recall sitting in the editor where the plugin never saw them.
          The bank is baked at export because a plugin should not scan an instrument's memory on
          every project load; the note below says which it is. -->
-    <PropertySection title="Programs" icon={ListMusic}>
+    <PropertySection title="Programs" icon={ListMusic} defaultCollapsed={!requiredProfileId}>
       {#if !requiredProfileId}
         <PropertyCell label="Bank" span={4}
                       hint="Programs come from a preset librarian bank for the device profile this panel requires. Bind a control to a profile parameter first.">
@@ -1047,76 +1121,7 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection title="Build" icon={Hammer}>
-      <PropertyCell label="Output" span={4} hint="Builds every enabled format (see Formats above) from this panel into export-out/. The log below is this run only; the Console panel keeps the interleaved copy.">
-        <div class="export-row">
-          <button class="export-action" disabled={$buildRunning} onclick={() => runExport()}>
-            {$buildRunning ? 'Building…' : 'Export Plugin'}
-          </button>
-          <span class="export-build-note">→ export-out/{effectivePluginName}{exportFormatSuffix}{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
-        </div>
-      </PropertyCell>
 
-      <!-- The identity fork (export plan D1). Shown only when it is a real question: a normal
-           re-export of a panel's own plugin must not ask, or it becomes a dialog people click
-           through without reading. -->
-      {#if identityAsk}
-        <PropertyCell label="Plugin identity" span={4} hint="This panel's plugin GUID already belongs to another panel — almost always the file this one was copied from. Updating replaces that plugin everywhere it is loaded; a new copy gets its own identity and can sit beside it in a DAW.">
-          <div class="identity-fork">
-            <p class="identity-why">{identityAsk.reason}.</p>
-            <div class="export-row">
-              <button class="export-action" onclick={() => runExport('update')}>Update that plugin</button>
-              <button class="export-action primary" onclick={() => runExport('new')}>Export as a new plugin</button>
-            </div>
-          </div>
-        </PropertyCell>
-      {/if}
-
-      {#if $activeRun}
-        <PropertyCell label={$activeRun.status === 'running' ? 'Build log' : ($activeRun.status === 'ok' ? 'Built' : 'Failed')} span={4} hint="The head and tail of this run. The middle is dropped when a build is long — a configure error is in the first lines and a compile error in the last, so both ends are kept and the gap is counted rather than hidden.">
-          <div class="build-log" class:ok={$activeRun.status === 'ok'} class:failed={$activeRun.status === 'failed'}>
-            {#if $activeRun.status === 'ok'}
-              <div class="build-result">
-                <b>{$activeRun.productName}</b> → <code>{$activeRun.path || 'export-out/'}</code>
-                {#if canRevealFiles() && $activeRun.path}
-                  <button class="link" onclick={() => revealFile($activeRun.path)}>Reveal in folder</button>
-                {/if}
-                <button class="link" onclick={() => clearRun()}>Dismiss</button>
-              </div>
-            {:else if $activeRun.status === 'failed'}
-              <div class="build-result bad">
-                {$activeRun.message || 'Build failed'}
-                <button class="link" onclick={() => clearRun()}>Dismiss</button>
-              </div>
-            {/if}
-            <pre class="log-lines">{$activeRun.head.join('\n')}{$activeRun.elided ? `\n… ${$activeRun.elided} lines not shown …\n` : '\n'}{$activeRun.tail.join('\n')}</pre>
-          </div>
-        </PropertyCell>
-      {/if}
-
-      {#if $exportHistory.length}
-        <PropertyCell label="History" span={4} hint="What this project has exported and where it went. Failed runs are kept too — the one you want to look at again is usually the one that did not work.">
-          <ul class="export-history">
-            {#each $exportHistory.slice(0, 12) as run (run.guid + run.at)}
-              <li class:bad={!run.ok}>
-                <span class="hist-mark">{run.ok ? '✓' : '✗'}</span>
-                <span class="hist-name">{run.productName || run.panelName}</span>
-                <span class="hist-fmt">{run.format}</span>
-                {#if run.ok && run.path}
-                  <code class="hist-path" title={run.path}>{run.path}</code>
-                  {#if canRevealFiles()}
-                    <button class="link" onclick={() => revealFile(run.path)}>Reveal</button>
-                  {/if}
-                {:else}
-                  <span class="hist-path bad" title={run.message}>{run.message || 'failed'}</span>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-          <button class="link" onclick={() => clearHistory()}>Clear history</button>
-        </PropertyCell>
-      {/if}
-    </PropertySection>
 
   {:else}
     <div class="placeholder">Panel: {tabId}</div>
@@ -1215,8 +1220,8 @@
   }
   .export-regen:hover { background: #333; border-color: #666; }
   .export-build-note {
-    font-size: 10px; color: #777; font-family: 'Consolas', monospace;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    font-size: 11px; color: #999; line-height: 1.4;
+    white-space: normal; overflow-wrap: anywhere; min-width: 0;
   }
 
   /* Segmented Auto/On/Off toggle (no combobox for <5 options) */

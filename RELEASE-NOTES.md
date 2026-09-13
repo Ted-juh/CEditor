@@ -6,19 +6,19 @@ follows your DAW — and export the result as a plugin.
 
 ## Three things to know before you install
 
-**Windows only.** The app links WebView2 and `dwmapi` unconditionally. The macOS and Linux branches
-exist in the build files and are unverified; there is no build for either.
+**Windows release candidate.** The local Windows Release build is the verification target.
+The macOS and Linux build paths remain unverified; neither has a release artifact.
 
 **Unsigned.** No Authenticode certificate yet, so Windows SmartScreen will warn you about the
 installer, and about every plugin you export. It is not a sign anything is wrong — it is a sign
 nothing has been signed. Choose *More info → Run anyway*. A certificate is planned before 1.0;
 the app tells you the same thing in **About** and on the **Export** tab.
 
-**One install, and it can export.** There is no cut-down beta build. This installer is the whole
-program, and it exports plugins without needing Visual Studio, CMake or a source checkout — it
-ships prebuilt player templates and copies one per panel. If you *do* have a source checkout, the
-older compiling exporter runs there instead and produces identical plugin identities, so you can
-move between the two freely.
+**VST3 export without a compiler.** The installer includes a player template, Node and the export
+scripts. It exports VST3 panels using Lua, JavaScript and TypeScript without Visual Studio or a
+source checkout, into Documents → CEditor → Exports. CLAP/LV2 and extra native script runtimes
+require the compiling exporter. Unsupported combinations are refused with an explanation.
+New panels select VST3 only; saved format choices are retained.
 
 ## What you get
 
@@ -26,7 +26,8 @@ move between the two freely.
 - **A whole editor from a device profile** — File → New Panel from Device Profile builds one bound
   control per parameter, grouped, with the real range, choices and label read off the profile. The
   GAIA profile's 793 parameters become 1624 controls in a second.
-- **Export** to VST3, CLAP, LV2 and standalone.
+- **Plugin export** to VST3; the source-checkout exporter also builds CLAP and LV2. A standalone
+  player is a development build target, not a packaged per-panel export option.
 - **Total Recall** — a reopened project puts the whole saved patch back on the synth, not just on
   the screen: the session stores a full device dump beside the automation values, and a restore
   sends the dump first and the values after. The exported plugin asks once, with the device's name
@@ -58,13 +59,11 @@ move between the two freely.
   a manual for the editor itself: the one in the repository describes an editor two refactors ago,
   so shipping it would be worse than the gap. Help → Keyboard Shortcuts and the hint on every
   property are what the editor documents about itself today.
-- **Panel sharing is new and has never run on Windows.** A bare `.cepanel` references images by
-  absolute path, so sending one to someone else loses its pictures — the file looks perfect on the
-  machine that made it, which is why this went unnoticed. **File → Share Panel...** writes a
-  `.cepanelpkg` with every image embedded, and **File → Open Shared Panel...** reads one back. It is
-  covered by thirty-two tests, but no package has yet been through a real save dialog, so this is
-  the one feature here whose end-to-end path has only been exercised in test. Please try it and say
-  what happened.
+- **Share panels with File → Share Panel...** The `.cepanelpkg` includes the backdrop, panel
+  textures, nested component/part artwork and referenced text fonts. Open Shared Panel and Save
+  create an editable copy. A Windows walkthrough verified the native dialogs, embedded SVG
+  background, reopen, Save and restart; malformed packages now show an error and preserve the
+  current panel. Missing files are reported. Arbitrary files read by scripts are not packaged.
 - **AU is absent** (it needs the macOS port) and **AAX and VST2** are not planned — AAX needs Avid's
   SDK and PACE signing, and VST2 licensing closed in 2018.
 

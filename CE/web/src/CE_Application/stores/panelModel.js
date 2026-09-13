@@ -45,15 +45,14 @@ export function createPanel(name = null) {
       // Compile-at-export C++/C#/Java handlers into native modules (no language runtime shipped).
       // 'auto' = compile the native-handler languages the panel actually uses, when their toolchain is
       // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
-      // warning for any that's missing; 'on' = force; 'off' = keep those handlers editor-preview-only.
+      // failing if a required handler cannot build; 'on' = force; 'off' = omit native handlers.
       compileNativeHandlers: 'auto',
-      // Every JUCE format reachable without a third-party gate ships by default. Both readers
-      // (the Export tab and export-panel-vst3.mjs) test `!== false`, so a panel saved before these
-      // keys existed exports all three too — the default is the behaviour, not just the value.
+      // New panels select VST3 only, which the installed compiler-free exporter supports.
+      // Existing explicit format selections remain part of their documents.
       // AAX needs Avid's SDK + PACE signing, VST2 licensing closed in 2018, and AU/AUv3 need a
       // macOS build, so none of those are settings here.
-      exportClap: true,
-      exportLv2: true,
+      exportClap: false,
+      exportLv2: false,
       // Total Recall: may the exported plugin push a restored session's values back at the synth
       // when a project reopens? 'ask' (the default) asks once and remembers; 'always' sends without
       // asking; 'never' leaves the hardware alone. Ask is the conservative default because a plugin
@@ -377,6 +376,11 @@ export function deserializePanel(json, filePath, name) {
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file does not contain a panel document`);
+    return null;
+  }
+  if (data.controls != null && (!Array.isArray(data.controls)
+    || data.controls.some((control) => !control || typeof control !== 'object' || Array.isArray(control)))) {
+    console.error('[panels] Cannot open panel — controls must be an array of component objects');
     return null;
   }
   const id = nextId++;
