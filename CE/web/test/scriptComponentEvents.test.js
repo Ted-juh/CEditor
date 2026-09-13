@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import {
-  setRuntimeHost, setLiveEnabled, dispatchInteraction, scriptApiForTesting,
+  setRuntimeHost, setLiveEnabled, dispatchInteraction, scriptApiForTesting, runPreviewSessionsForTesting,
 } from '../src/CE_Application/scripting/panelRuntime.js';
 import {
   COMPONENT_EVENTS, ALL_EVENTS, EVENT_BY_ID, ALL_HANDLER_NAMES,
@@ -104,6 +104,55 @@ test('an explicit on(target, event, fn) listener receives a component event', as
     assert.equal(seen.length, 1);
     assert.deepEqual(seen[0], { target: 'MyArp', index: 3, of: 8, notes: [60, 64] });
   });
+});
+
+test('a burst of transient component events is delivered once in arrival order', async () => {
+  await withArp(async (arp, id) => {
+    const seen = [];
+    const api = scriptApiForTesting('', 'queued-events');
+    for (const event of ['onHit', 'onSettled', 'onRelease']) api.on('*', event, (p) => seen.push([event, p.value]));
+    await Promise.all([
+      dispatchInteraction(id, 'onHit', { value: 80 }),
+      dispatchInteraction(id, 'onSettled', { value: 50 }),
+      dispatchInteraction(id, 'onRelease', { value: 50 }),
+    ]);
+    assert.deepEqual(seen, [['onHit', 80], ['onSettled', 50], ['onRelease', 50]]);
+  });
+});
+
+test('queued UI events cannot spill into another panel', async () => {
+  await withArp(async (arp, id) => {
+    const first = dispatchInteraction(id, 'onStep', { index: 1 });
+    const queued = dispatchInteraction(id, 'onSettled', { value: 50 });
+    setRuntimeHost({ panel: { id: 'different-panel', controls: [] }, scripts: [] });
+    const seen = [];
+    scriptApiForTesting('', 'new-panel-events').on('*', 'onSettled', (p) => seen.push(p));
+    await Promise.all([first, queued]);
+    assert.deepEqual(seen, []);
+  });
+});
+
+test('a return completion follows the pending final value change', async () => {
+  const { panelPreviewSessions } = await import('../src/CE_Application/stores/interactionPreview.js');
+  try {
+    await withArp(async (arp, id) => {
+      panelPreviewSessions.set({ [id]: { valueOverrideEnabled: true, valueOverride: 80 } });
+      await runPreviewSessionsForTesting();
+      const seen = [];
+      const api = scriptApiForTesting('', 'settled-order');
+      api.on('*', 'onValueChanged', (value) => seen.push(['value', value]));
+      api.on('*', 'onSettled', (event) => seen.push(['settled', event.value]));
+      const earlier = dispatchInteraction(id, 'onPointerUp', {});
+      panelPreviewSessions.set({ [id]: { valueOverrideEnabled: true, valueOverride: 50 } });
+      runPreviewSessionsForTesting();
+      const settled = dispatchInteraction(id, 'onSettled', { value: 50 });
+      await Promise.all([earlier, settled]);
+      await new Promise(setImmediate);
+      api.off('*', 'onValueChanged');
+      api.off('*', 'onSettled');
+      assert.deepEqual(seen, [['value', 50], ['settled', 50]]);
+    });
+  } finally { panelPreviewSessions.set({}); }
 });
 
 test('on("*", …) receives it too, which is why every payload carries its target', async () => {

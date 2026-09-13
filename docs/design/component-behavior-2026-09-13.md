@@ -66,6 +66,14 @@ separate gate, not implied by this document round trip.
 | B46 | Number / Range Display mode | Inline field bypasses the outer read-only guard: typing and ArrowUp replace 40 with 34. | Native read-only attribute plus field-handler Display guards. Both component types reject actual edits and emit nothing, before/after fresh reopen. |
 | B47 | Range Home / End on one endpoint | Home on high produces low=20, high=0, crossing the endpoints. | Clamp in the shared spinner setter before rendering and emission. Home/End visible pair and outgoing value agree, including reopen. |
 | B48 | Partial saved Effects.Filters settings | A document with only invert=100 still paints the original RGB 128,64,32; omitted neutral filters produce undefined% and invalidate the whole CSS filter. | Omitted/null neutral fields no longer emit invalid CSS. Invert, half brightness and grayscale produce expected pixels on component/background surfaces after reopening. This was a partial-document case, not a failure of a fully populated default Filters section. |
+| B49 | Numeric onSettled / transient script events | A real return to a neighbour-clamped value raises no onSettled listener call. dispatchInteraction discards it while the preceding session event is being dispatched. | Queue transient UI events until that batch completes, preserving order and discarding queued events for a different panel. Drain pending value changes before onSettled. Real onSettled/reopen test plus burst-order, value-before-settled and panel-isolation regressions pass. |
+| B50 | Numeric onSettled payload | Generic return reports the requested target (0) even when its active band endpoint must stop at 50. | Read the actual settled handle for the script payload. Visible band and event now both report 50. |
+| B51 | Integrated custom image rotation | After the live image coverage fix, the export's interior probes pass but 135-degree corner probes show white where live shows image colours. | Share rotationCoverScale between CSS and filmstrip drawing. All four corners agree. Added numeric RGB validation of 40% opacity because nearest-colour classification alone called every faded sample white. |
+| B52 | PixelDisplay text Scroll | Overflowing text remains stationary unless another element starts the display clock. | Scroll-enabled text participates in the motion clock. Canvas changes after 850 ms, before and after a fresh reopen. |
+| B53 | PixelDisplay element Blink | Text/bitmap blink, but a bar widget remains painted throughout every phase. Animation elements also lack the blink gate. | Apply the same phase gate to widgets and animation elements while keeping the animation clock stable. Actual canvas alternates between painted and empty for text, bitmap, hbar, vbar, hslider, vslider, needle, wave, scope, ADSR and animation, including after reopening. |
+| B54 | Static screen text Prefix / Suffix | The editor offers both settings but a static Caption paints without its requested brackets. | Apply configured prefix/suffix in the shared screen text resolver. Nine formatted element kinds paint the exact expected strings before/after reopening. |
+| B55 | PixelDisplay custom-font wrapping | Five 3x4 glyphs at height 8 and width 24 lose a glyph and use the wrong row spacing. | Wrapping uses the selected font's advance, actual scaled height and final character spacing. A manually specified five-glyph dot mask matches the painted canvas before/after reopen. |
+| B56 | PixelDisplay custom-font cursor | Clicking after two visible custom glyphs inserts after three because hit testing uses the built-in font's advance. | Share text metrics between wrapping, selection width and caret hit testing/rendering. Actual typing paints AABAAA at the clicked boundary before/after reopen; leaving rehearsal restores authored text. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -105,6 +113,24 @@ text Range instead of its full-width wrapper. No product changes were needed for
 Combined checkpoint after B47/B48: **62 root browser scenarios pass, no browser errors;
 4,814 Node tests pass, no skips.** This includes complete and partial filter settings on both
 surfaces. Claude's strengthened reopen/export follow-up is the next integration gate.
+
+Integration through Claude 11bf7395: custom export **51**, custom **32**, curves **146**,
+notes **134**, motion **113**, inbound/transport **19** behavioral assertions pass locally.
+These are assertion counts, not unique property counts. Inert and unverified rows remain in
+Claude's ledger and are not included as passes. The export checks now reopen all 24 image
+configurations, keep the component selected so editor hint tint is excluded, probe corners
+away from exact colour seams, and measure 40% opacity numerically.
+
+The script event correction passes all **4,817 Node tests** (no skips). The subsequent
+PixelDisplay marquee and 11-kind blink checks pass before/after fresh reopen. A local
+Windows Release build embedding those fixes succeeds, and all **34 native tests pass**.
+That build is not evidence of native GUI interaction or hardware testing. Screen formatting
+and custom-font behavioral checks are continuing; this remains an active bug hunt.
+
+Checkpoint after B49–B56: **all 68 root behavioral scenarios pass together, no browser
+errors; all 4,817 Node tests pass with no skips; the production frontend build passes.**
+The font/formatting additions are included in this combined run. Remaining slider settings
+and the other gaps below are still being investigated.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

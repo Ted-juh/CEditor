@@ -270,7 +270,7 @@ export function resolveZoneContent(zone, info, width) {
 
   switch (show) {
     case 'static':
-      return String(zone?.text ?? '');
+      return `${prefix}${String(zone?.text ?? '')}${suffix}`;
     case 'name':
       return `${prefix}${String(zone?.label || info?.name || zone?.text || '')}${suffix}`;
     case 'value': {

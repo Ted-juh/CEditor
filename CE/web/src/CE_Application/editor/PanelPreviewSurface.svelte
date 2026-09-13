@@ -16,7 +16,7 @@
   import { deviceParameterValues } from '../stores/deviceParameterValues.js';
   import { profileParameters, deviceRoleMappings, profileParameterPages } from '../stores/deviceProfileStores.js';
   import { refreshProfileParameters } from '../stores/deviceProfileSession.js';
-  import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
+  import { pixelTextMetrics } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
@@ -774,10 +774,8 @@
   // rendered width, and the caret is offset past the prefix.
   function pixelTextLayout(control, element, sourceId) {
     const elX = Math.round(numberOr(element?.x, 0));
-    const elH = Math.max(3, Math.round(numberOr(element?.h, 8)));
     const boxW = Math.max(0, Math.round(numberOr(element?.w, 0)));
-    const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
-    const advance = FONT_ADVANCE * s;
+    const { scale: s, advance, height: rowH } = pixelTextMetrics(element, pixelDisplayOf(control)?.customFont);
     const prefixLen = String(element?.prefix ?? '').length;
     const suffixLen = String(element?.suffix ?? '').length;
     const len = lcdEditText(control, sourceId).length;
@@ -789,7 +787,7 @@
       if (align === 'center') startX = elX + Math.round((boxW - textW) / 2);
       else if (align === 'right') startX = elX + boxW - textW;
     }
-    return { startX, advance, len, prefixLen, renderedLen, elY: Math.round(numberOr(element?.y, 0)), rowH: FONT_H * s };
+    return { startX, advance, len, prefixLen, renderedLen, textW, elY: Math.round(numberOr(element?.y, 0)), rowH };
   }
   // Element bounds (grid px) → is a control-local click inside it?
   function pixelElementContainsPoint(control, element, pt) {
@@ -806,7 +804,7 @@
     const gx = (pt.x - padding) / sx;
     const gy = (pt.y - padding) / sy;
     const lay = pixelTextLayout(control, element, String(element?.sourceId ?? ''));
-    const w = Math.max(1, Math.round(numberOr(element?.w, Math.max(1, lay.renderedLen) * FONT_ADVANCE)));
+    const w = Math.max(1, Math.round(numberOr(element?.w, 0)) || lay.textW);
     const x0 = Math.round(numberOr(element?.x, 0));
     return gx >= x0 - 1 && gx <= x0 + w + 1 && gy >= lay.elY - 1 && gy <= lay.elY + lay.rowH + 1;
   }
@@ -6362,10 +6360,11 @@
 
     const sliderRole = isSliderControl(control) ? currentSliderActiveHandle(control) : null;
     const spinnerRole = isTwoValueSpinner(control) ? spinnerActiveHandle(control) : null;
-    const from = sliderRole ? currentSliderRoleValue(control, sliderRole)
+    const readValue = () => sliderRole ? currentSliderRoleValue(control, sliderRole)
       : spinnerRole === 'end' ? getRangeEndValue(behavior, sessionFor(control))
       : spinnerRole === 'start' ? getRangeStartValue(behavior, sessionFor(control))
       : currentRangeValue(control);
+    const from = readValue();
     const token = { cancelled: false };
     activeReturns.set(id, token);
 
@@ -6384,7 +6383,7 @@
       else setRangeValue(control, step.value);
       if (step.done) {
         activeReturns.delete(id);
-        raiseComponent(control, 'onSettled', { value: step.value });
+        raiseComponent(control, 'onSettled', { value: readValue() });
         return;
       }
       requestAnimationFrame(tick);

@@ -7544,6 +7544,7 @@ const live = {
   readyFired: new Set(),   // panelIds that already saw onPanelReady (firstTime tracking)
   prevPreviewOn: false,
   dispatching: false,
+  interactions: [],        // transient UI events arriving while an earlier batch runs
   unsubs: [],
 };
 
@@ -7632,6 +7633,22 @@ function scriptMatchesControl(script, controlName) {
 // inside these handlers is silent by default. The depth has to be held across the AWAIT — an RAII
 // wrapper around the call would pop it the moment dispatchEvents returned its promise, i.e. before
 // a single handler had run, and every write would go out loud.
+function drainInteractionEvents() {
+  if (live.dispatching || !live.interactions.length) return;
+  const pending = live.interactions.splice(0);
+  const panelId = String(livePanel()?.id ?? live.activePanelId);
+  const current = [];
+  for (const entry of pending) {
+    if (live.enabledGlobal && entry.panelId === panelId) current.push(entry);
+    else entry.resolve();
+  }
+  if (current.length) {
+    dispatchEvents(current.map((entry) => entry.event)).then(
+      () => { for (const entry of current) entry.resolve(); },
+      (error) => { for (const entry of current) entry.reject(error); });
+  }
+}
+
 async function dispatchEvents(events, { inbound = false } = {}) {
   if (!events.length) return;
   const scripts = activeScripts();
@@ -7662,9 +7679,13 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       // against the state it actually changed from. Each pass advances the baseline, so a burst
       // drains rather than looping.
       live.sessionsDirty = false;
-      Promise.resolve().then(() => onPreviewSessionsChanged(get(panelPreviewSessions)));
+      Promise.resolve().then(() => {
+        onPreviewSessionsChanged(get(panelPreviewSessions));
+        drainInteractionEvents();
+      });
     } else {
       seedSessionSnapshot();   // absorb the preview-overlay writes our scripts just made
+      drainInteractionEvents();
     }
   }
 }
@@ -8134,8 +8155,14 @@ export function setLiveScripts(scripts, panelId = null) {
  * (so they can't be detected from a panelPreviewSessions diff). Works in the editor and the player.
  */
 export function dispatchInteraction(controlId, eventName, payload) {
-  if (!live.enabledGlobal || live.dispatching) return undefined;
+  if (!live.enabledGlobal) return undefined;
+  const event = { event: eventName, controlName: controlNameById(controlId), payload };
+  if (live.dispatching) {
+    return new Promise((resolve, reject) => {
+      live.interactions.push({ event, panelId: String(livePanel()?.id ?? live.activePanelId), resolve, reject });
+    });
+  }
   // The promise is returned rather than dropped. Callers in the UI ignore it — an interaction is
   // fire-and-forget — but returning it is what lets anything else wait for the handlers to finish.
-  return dispatchEvents([{ event: eventName, controlName: controlNameById(controlId), payload }]);
+  return dispatchEvents([event]);
 }

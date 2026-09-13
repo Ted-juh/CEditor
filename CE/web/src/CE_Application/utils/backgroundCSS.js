@@ -29,6 +29,13 @@ export function hexToRgba(hex) {
  * size, position, repeat, plus any rotation/flip/offset transform.
  * `panelW`/`panelH` are needed so rotation can compute a cover scale.
  */
+export function rotationCoverScale(rotation, width, height) {
+  const rad = Math.abs(rotation * Math.PI / 180);
+  const cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+  const w = width || 1, h = height || 1;
+  return Math.max((w * cos + h * sin) / w, (w * sin + h * cos) / h);
+}
+
 export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, rotation, panelW, panelH) {
   const parts = [];
 
@@ -43,14 +50,7 @@ export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, 
   // When rotated, scale the layer up so the rotated content still covers the panel fully.
   const transforms = [];
   if (rotation) {
-    const rad = Math.abs(rotation * Math.PI / 180);
-    const cos = Math.abs(Math.cos(rad));
-    const sin = Math.abs(Math.sin(rad));
-    const w = panelW || 1;
-    const h = panelH || 1;
-    const newW = w * cos + h * sin;
-    const newH = w * sin + h * cos;
-    const coverScale = Math.max(newW / w, newH / h);
+    const coverScale = rotationCoverScale(rotation, panelW, panelH);
     transforms.push(`rotate(${rotation}deg)`);
     if (coverScale > 1) transforms.push(`scale(${coverScale.toFixed(4)})`);
   }

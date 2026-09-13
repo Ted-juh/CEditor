@@ -7,7 +7,7 @@
   import { onDestroy, untrack } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
-  import { FONT_H, FONT_ADVANCE, ICON_GLYPHS } from '../utils/pixelFont.js';
+  import { pixelTextMetrics, ICON_GLYPHS } from '../utils/pixelFont.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { pixelElementSelection, pixelSelectionKey, pixelElementId, selectPixelElement } from '../stores/pixelElementSelection.js';
   import { updateControlProperty } from '../stores/controls.js';
@@ -195,14 +195,14 @@
       const boxW = Math.max(0, Math.round(numberOr(el?.w, 0)));
       const elH = Math.max(3, Math.round(numberOr(el?.h, 8)));
       const colour = el?.colour ? cssColour(el.colour) : '';
-      const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+      const metrics = pixelTextMetrics(el, pixel?.customFont);
       const align = String(el?.align ?? 'left');
 
       // Word-wrap into stacked lines (honours explicit \n too). Takes precedence
       // over marquee; each wrapped line is its own text entry.
       if (el?.wrap === true && boxW > 0) {
-        const charsPerLine = Math.max(1, Math.floor(boxW / (FONT_ADVANCE * s)));
-        const lineH = FONT_H * s + 1;
+        const charsPerLine = Math.max(1, Math.floor((boxW + metrics.scale) / metrics.advance));
+        const lineH = metrics.height + 1;
         wrapText(content, charsPerLine).forEach((ln, li) => {
           const ly = elY + li * lineH;
           if (ly < pixH) out.push({ x: elX, y: ly, w: boxW, h: elH, align, content: ln, colour, font: String(el?.font ?? '') });
@@ -214,7 +214,7 @@
       // rather than clipping. Reads the rAF clock only when scroll is on, so
       // static text elements don't recompute every frame.
       if (el?.scroll === true && boxW > 0) {
-        const fit = Math.floor(boxW / (FONT_ADVANCE * s));
+        const fit = Math.floor((boxW + metrics.scale) / metrics.advance);
         if (fit > 0 && content.length > fit) {
           const elapsed = Math.floor((frameTime / 1000) * 3); // ~3 chars/sec
           content = zoneScrollWindow(content, fit, elapsed);
@@ -249,6 +249,7 @@
     for (const el of elements) {
       const kind = String(el?.kind ?? '');
       if (el?.visible === false || !PIXEL_WIDGET_KINDS.has(kind)) continue;
+      if (el?.blink === true && !blinkPhase) continue;
       const info = controlInfo(String(el?.sourceId ?? ''));
       const cutInfo = kind === 'wave' ? controlInfo(String(el?.cutoffSourceId ?? '')) : null;
       const resInfo = kind === 'wave' ? controlInfo(String(el?.resoSourceId ?? '')) : null;
@@ -331,11 +332,8 @@
         const content = kind === 'icon' ? ICON_GLYPHS[String(el?.icon ?? 'play')] ?? ''
           : kind === 'clock' ? formatClock(el?.clockFormat)
           : resolveZoneContent({ ...el, show: kind }, controlInfo(String(el?.sourceId ?? '')), 16);
-        const custom = el?.font === 'custom' && pixel?.customFont?.src;
-        const glyphH = custom ? numberOr(pixel.customFont.glyphH, 8) : FONT_H + 1;
-        const advance = custom ? numberOr(pixel.customFont.glyphW, 6) + 1 : FONT_ADVANCE;
-        const fontScale = Math.max(1, Math.floor(h / glyphH));
-        w = Math.max(1, String(content).length * advance * fontScale - fontScale);
+        const metrics = pixelTextMetrics(el, pixel?.customFont);
+        w = Math.max(1, String(content).length * metrics.advance - metrics.scale);
       }
       out.push({
         i,
@@ -444,6 +442,7 @@
     const out = [];
     for (const el of elements) {
       if (el?.visible === false || String(el?.kind ?? '') !== 'anim') continue;
+      if (el?.blink === true && !blinkPhase) continue;
       out.push({
         id: String(el?.id ?? ''),
         x: Math.round(numberOr(el?.x, 0)),
@@ -495,15 +494,17 @@
   // rAF clock for animations and widget ballistics.
   let frameTime = $state(0);
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
-  let animActive = $derived(animMode !== 'off' || animElements.length > 0);
+  // Visibility during a blink must not stop/restart the clock driving it.
+  let animActive = $derived(animMode !== 'off' || elements.some((e) => e?.kind === 'anim' && e?.visible !== false));
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
   let editActive = $derived(pixel?.__edit?.active === true);
   let clockActive = $derived(elements.some((e) => String(e?.kind ?? '') === 'clock' && e?.visible !== false));
   let blinkActive = $derived(elements.some((e) => e?.blink === true && e?.visible !== false));
+  let scrollActive = $derived(elements.some((e) => e?.scroll === true && e?.wrap !== true && e?.visible !== false));
   // Blink phase (~530ms, matches the LCD cursor): elements flagged blink are
   // dropped from the frame on the "off" half.
   let blinkPhase = $derived(Math.floor(frameTime / 530) % 2 === 0);
-  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive || blinkActive);
+  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive || blinkActive || scrollActive);
 
   // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
   // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring
@@ -516,10 +517,8 @@
     if (!el) return null;
     const elX = Math.round(numberOr(el.x, 0));
     const elY = Math.round(numberOr(el.y, 0));
-    const elH = Math.max(3, Math.round(numberOr(el.h, 8)));
     const boxW = Math.max(0, Math.round(numberOr(el.w, 0)));
-    const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
-    const advance = FONT_ADVANCE * s;
+    const { scale: s, advance, height: glyphHeight } = pixelTextMetrics(el, pixel?.customFont);
     const info = controlInfo(String(el.sourceId ?? ''));
     // The rendered string is prefix + editText + suffix; the caret index is into
     // editText, so it sits past the prefix. Alignment uses the full rendered
@@ -538,7 +537,7 @@
     }
     const caret = String(es.kind ?? 'text') === 'choice'
       ? 0 : Math.max(0, Math.min(rawLen, Math.round(numberOr(es.caret, 0))));
-    return { x: startX + (prefixLen + caret) * advance, y: elY, w: Math.max(1, s), h: FONT_H * s, on: editBlink };
+    return { x: startX + (prefixLen + caret) * advance, y: elY, w: s, h: glyphHeight, on: editBlink };
   });
 
   function prefersReducedMotion() {

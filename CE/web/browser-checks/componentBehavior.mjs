@@ -635,6 +635,42 @@ try {
       const id=await fixture('Label',{Text:{content:''},Background:bg,...(surface==='component'?{Effects:effects}:{})});const verify=async()=>{const p=(await paintedPixels(id,[[150,80]]))[0];assert.ok(want.every((v,i)=>Math.abs(p[i]-v)<=2),`${surface}/${filter} expected ${want}, got ${p}`);};await verify();await reopen(id);await verify();
     }
   });
+  await check('Numeric return onSettled scripts receive the clamped value shown by the active handle',async()=>{
+    const id=await fixture('Slider',{Behavior:{valueMode:'band',min:0,max:100,step:1,precision:0,defaultStartValue:20,defaultCurrentValue:50,defaultEndValue:80,returnMode:'min',returnTime:0}});
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await page.evaluate(async()=>{window.__settled=[];(await import('/src/CE_Application/scripting/panelRuntime.js')).scriptApiForTesting('','behavior-settled-consumer').on('*','onSettled',v=>window.__settled.push(v));});const end=await node(id).locator('.slider-svg > circle[fill="none"]').last().boundingBox();await page.mouse.click(end.x+end.width/2,end.y+end.height/2);await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),'20 | 50 | 50');const events=await page.evaluate(()=>window.__settled);assert.equal(events.length,1);assert.equal(events[0].value,50,'script event must describe the actual resting handle rather than the out-of-bounds requested target');await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
+  await check('PixelDisplay marquee moves overflowing text without requiring another animation',async()=>{
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    const id=await fixture('PixelDisplay',{Transform:{width:320,height:160},Pixel:{pixelsW:64,pixelsH:32,padding:0,showGhost:false,showGlass:false,animMode:'off',elements:[{id:'scroll',kind:'static',text:'ABCDEFGH',x:2,y:2,w:18,h:8,scroll:true}]}});
+    const verify=async()=>{const canvas=node(id).locator('canvas').first();const initial=await canvas.evaluate(c=>c.toDataURL());await page.waitForTimeout(850);const later=await canvas.evaluate(c=>c.toDataURL());assert.notEqual(later,initial,'overflowing text must move when Scroll is enabled on an otherwise static display');};await verify();await reopen(id);await verify();
+  });
+  await check('PixelDisplay Blink hides and restores text bitmap widgets and animation elements',async()=>{
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    for(const kind of ['static','bitmap','hbar','vbar','hslider','vslider','needle','wave','scope','adsr','anim']){
+      const id=await fixture('PixelDisplay',{Transform:{width:320,height:160},Pixel:{pixelsW:64,pixelsH:32,padding:0,showGhost:false,showGlass:false,animMode:'off',elements:[{id:'blink',kind,text:'HELLO',bits:'1'.repeat(128),x:2,y:2,w:16,h:8,blink:true,frame:true,animMode:'preset',animPreset:'wave'}]}});
+      const verify=async()=>{const counts=await node(id).locator('canvas').first().evaluate(async c=>{const counts=[];for(let t=0;t<14;t++){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let count=0;for(let i=3;i<d.length;i+=4)if(d[i])count++;counts.push(count);await new Promise(r=>setTimeout(r,100));}return counts;});assert.ok(Math.max(...counts)>0,`${kind} must paint during its on phase`);assert.equal(Math.min(...counts),0,`${kind} must disappear during its off phase: ${counts}`);};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('PixelDisplay source formatting paints the exact requested text after reopening',async()=>{
+    const cfg={pixelsW:128,pixelsH:16,padding:0,showGhost:false,showGlass:false,animMode:'off'};
+    for(const [kind,extra,want] of [['name',{},'[Cutoff]'],['value',{precision:2},'[64.00]'],['pct',{},'[50]'],['midiValue',{radix:'hex'},'[40]'],['note',{},'[E4]'],['text',{},'[Tune]'],['state',{},'[On]'],['edit',{sourceId:'@edit'},'[Preset]'],['static',{text:'Caption'},'[Caption]']]){
+      const el={id:'formatted',kind,sourceId:'format_source',prefix:'[',suffix:']',x:2,y:2,w:120,h:8,...extra};
+      const id=await fixture('PixelDisplay',{Transform:{width:512,height:64},Pixel:{...cfg,editText:'Preset',elements:[el]}},[],[{type:'Number',sections:{Core:{id:'format_source',name:'Cutoff'},Transform:{x:50,y:300,width:100,height:50},Behavior:{min:0,max:127,defaultValue:64},Text:{content:'Tune'}}},{type:'PixelDisplay',sections:{Core:{id:'format_reference'},Transform:{x:50,y:200,width:512,height:64},Pixel:{...cfg,elements:[{id:'reference',kind:'static',text:want,x:2,y:2,w:120,h:8}]}}}]);
+      const verify=async()=>{const image=el=>el.locator('canvas').first().evaluate(c=>c.toDataURL());assert.ok((await image(node(id)))===(await image(node('format_reference'))),`${kind} must paint exactly ${want}`);};await verify();await reopen(id);await verify();
+    }
+  });
+  await check('PixelDisplay custom-font wrapping preserves every glyph using the chosen font dimensions',async()=>{
+    const src=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=3;c.height=4;const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,3,4);return c.toDataURL();});
+    const id=await fixture('PixelDisplay',{Transform:{width:320,height:160},Pixel:{pixelsW:64,pixelsH:32,padding:0,showGhost:false,showGlass:false,animMode:'off',customFont:{src,glyphW:3,glyphH:4,cols:1,first:65},elements:[{id:'custom',kind:'static',text:'AAAAA',font:'custom',x:2,y:2,w:24,h:8,wrap:true}]}});
+    const expected=[];for(const [count,y]of [[3,2],[2,11]])for(let glyph=0;glyph<count;glyph++)for(let yy=y;yy<y+8;yy++)for(let x=2+glyph*8;x<8+glyph*8;x++)expected.push(`${x},${yy}`);expected.sort();
+    const verify=async()=>{await page.waitForTimeout(250);const lit=await node(id).locator('canvas').first().evaluate(c=>{const ctx=c.getContext('2d'),out=[];for(let y=0;y<32;y++)for(let x=0;x<64;x++)if(ctx.getImageData(Math.floor((x+.5)*c.width/64),Math.floor((y+.5)*c.height/32),1,1).data[3])out.push(`${x},${y}`);return out.sort();});assert.deepEqual(lit,expected,'five 3x4 glyphs at scale 2 must wrap three then two, with a one-dot line gap');};await verify();await reopen(id);await verify();
+  });
+  await check('PixelDisplay custom-font clicks insert at the glyph boundary shown on screen',async()=>{
+    const src=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=6;c.height=4;const ctx=c.getContext('2d');ctx.fillStyle='black';ctx.fillRect(0,0,6,4);ctx.fillStyle='white';ctx.fillRect(0,0,3,4);ctx.fillRect(3,0,1,4);return c.toDataURL();});
+    const cfg={pixelsW:64,pixelsH:32,padding:0,showGhost:false,showGlass:false,animMode:'off',customFont:{src,glyphW:3,glyphH:4,cols:2,first:65}};
+    const id=await fixture('PixelDisplay',{Transform:{width:320,height:160},Pixel:{...cfg,editText:'AAAAA',elements:[{id:'edit',kind:'edit',sourceId:'@edit',font:'custom',x:2,y:2,w:50,h:8}]}},[],[{type:'PixelDisplay',sections:{Core:{id:'caret_reference'},Transform:{x:450,y:50,width:320,height:160},Pixel:{...cfg,elements:[{id:'expected',kind:'static',text:'AABAAA',font:'custom',x:2,y:2,w:50,h:8}]}}}]);
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await page.waitForTimeout(250);const b=await node(id).boundingBox();await page.mouse.click(b.x+90,b.y+30);await page.keyboard.type('B');await page.keyboard.press('Enter');await settle();const image=el=>el.locator('canvas').first().evaluate(c=>c.toDataURL());assert.ok((await image(node(id)))===(await image(node('caret_reference'))),'clicking after the second custom glyph must insert B after two As');await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();

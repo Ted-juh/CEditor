@@ -4,6 +4,7 @@ import { normalizeCorner } from './cornerNormalization.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { buildBorderSegments, getDoubleGap } from './borderSegments.js';
 import { numberOr, clamp } from './primitives.js';
+import { rotationCoverScale } from './backgroundCSS.js';
 
 import { deepClone } from './deepClone.js';
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
@@ -312,7 +313,13 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
   if (numberOr(fill?.[`${prefix}Contrast`], 100) !== 100) filterParts.push(`contrast(${numberOr(fill?.[`${prefix}Contrast`], 100)}%)`);
   ctx.filter = filterParts.length ? filterParts.join(' ') : 'none';
   ctx.translate(frame.width / 2, frame.height / 2);
-  ctx.rotate((numberOr(fill?.[`${prefix}Rotation`], 0) * Math.PI) / 180);
+  const rotation = numberOr(fill?.[`${prefix}Rotation`], 0);
+  ctx.rotate((rotation * Math.PI) / 180);
+  const coverScale = rotationCoverScale(rotation, frame.width, frame.height);
+  if (coverScale > 1) {
+    const scale = Number(coverScale.toFixed(4));
+    ctx.scale(scale, scale);
+  }
   ctx.scale(fill?.[`${prefix}FlipH`] === true ? -1 : 1, fill?.[`${prefix}FlipV`] === true ? -1 : 1);
   ctx.translate(-frame.width / 2, -frame.height / 2);
   const offsetX = numberOr(fill?.[`${prefix}OffsetX`], 0);

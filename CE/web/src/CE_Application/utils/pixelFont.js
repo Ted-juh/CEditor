@@ -7,6 +7,18 @@ export const FONT_W = 5;
 export const FONT_H = 7;
 export const FONT_ADVANCE = 6; // 5px glyph + 1px gap
 
+// Match the canvas's integer-scaled glyphs when wrapping, selecting or editing
+// a pixel text element. Custom sheets have their own cell dimensions.
+export function pixelTextMetrics(element, customFont = null) {
+  const number = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+  const custom = element?.font === 'custom' && customFont?.src;
+  const glyphW = custom ? Math.max(2, Math.round(number(customFont.glyphW, 6))) : FONT_W;
+  const glyphH = custom ? Math.max(2, Math.round(number(customFont.glyphH, 8))) : FONT_H;
+  const cellH = custom ? glyphH : FONT_H + 1;
+  const scale = Math.max(1, Math.floor(Math.max(3, Math.round(number(element?.h, 8))) / cellH));
+  return { scale, advance: (glyphW + 1) * scale, height: glyphH * scale };
+}
+
 // Glyphs as 7 rows of 5 chars ('#' = lit). Lowercase falls back to uppercase.
 const GLYPHS = {
   ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],

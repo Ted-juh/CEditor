@@ -157,6 +157,16 @@ try {
     const live = (await kit.livePixels(id, P)).map(nameOf);
     const baked = (await bakedSamples(P)).map(nameOf);
     led.check('imageFit', label, promise, live, baked);
+    await kit.reopen(id);
+    // Unselected custom controls deliberately carry a faint blue design hint.
+    // Select the reopened component, as it was when inserted, so comparison
+    // measures its artwork rather than that editor-only decoration.
+    await kit.page.evaluate(async id => (await import('/src/CE_Application/stores/panels.js')).selectedComponentIds.set(new Set([id])), id);
+    await kit.settle();
+    const reopenedLive = (await kit.livePixels(id, P)).map(nameOf);
+    const reopenedBaked = (await bakedSamples(P)).map(nameOf);
+    led.check('imageFit', `${label} after fresh reopen`, 'saved settings retain both their live appearance and their export',
+      { live, baked }, { live: reopenedLive, baked: reopenedBaked });
     return { live, baked };
   };
 
@@ -210,6 +220,20 @@ try {
   ]) {
     await setFill(patch);
     await compare(`'fill' with ${label}`, 'the bake applies the same transform the live layer does');
+    if (label.startsWith('rotation')) {
+      // Stay off the colour boundary at 135 degrees: CSS screenshot rounding and
+      // canvas sampling may choose opposite sides of that one-pixel seam.
+      const corners = [[0.08,0.12],[0.92,0.12],[0.08,0.88],[0.92,0.88]];
+      led.check('imageRotation', `${label} corner coverage`, 'all four corners paint the same image region',
+        (await kit.livePixels(id, corners)).map(nameOf), (await bakedSamples(corners)).map(nameOf));
+    }
+    if (label === 'opacity 40') {
+      const samples = [[0.125,0.5],[0.875,0.5]];
+      const live = await kit.livePixels(id, samples), baked = await bakedSamples(samples);
+      const expected = [[153,255,153],[153,153,255]];
+      led.check('imageOpacity', '40 percent composites numerically', '40% green/blue over white retains the expected RGB, rather than merely classifying as white',
+        expected, {live,baked}, (want,actual)=>[actual.live,actual.baked].every(values=>values.every((p,i)=>want[i].every((v,c)=>Math.abs(p[c]-v)<=2))));
+    }
   }
   await setFill({ imageOpacity: 100 });
 
