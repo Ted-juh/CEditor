@@ -507,56 +507,67 @@ try {
         await kit.settle(240);
         return Number(await kit.read(sid, 'Setlist.index'));
       };
-      await kit.set(sid, { 'Setlist.index': 0, 'Setlist.footEnabled': true, 'Setlist.footCc': 64,
+      /** Park the index somewhere a step is VISIBLE from. Without this the checks inherit
+       *  whatever the last one left, and at the end of a three-scene list with wrap off a
+       *  successful step and a step that never happened are the same number. */
+      const park = async (index) => {
+        await kit.set(sid, { 'Setlist.index': index });
+        await kit.settle(280);
+      };
+      await kit.set(sid, { 'Setlist.footEnabled': true, 'Setlist.footCc': 64,
         'Setlist.footThreshold': 64, 'Setlist.footAction': 'next', 'Setlist.footChannel': 0 });
-      await kit.settle(240);
+      await park(0);
       led.check(S, 'footEnabled + footCc + footAction (next)', 'pressing the pedal steps one scene on',
         1, await pedal(64, 127));
       // A momentary pedal sends 127 and then 0. Acting on both would step twice per press.
-      led.check(S, 'the footswitch is a rising EDGE', 'letting go of the pedal steps nothing — a momentary pedal sends 127 then 0, and acting on both would double every press',
+      led.check(S, 'the footswitch is a rising EDGE', 'letting go of the pedal steps nothing \u2014 a momentary pedal sends 127 then 0, and acting on both would double every press',
         1, await pedal(64, 0));
       led.check(S, 'footswitch (a second press)', 'and the next press steps again', 2, await pedal(64, 127));
       await pedal(64, 0);
 
       await kit.set(sid, { 'Setlist.footThreshold': 100 });
-      await kit.settle(200);
-      led.check(S, 'footThreshold', 'a press under the threshold is not a press', 2, await pedal(64, 80));
-      led.check(S, 'footThreshold (over it)', 'and over it, it is', 0, await pedal(64, 110));
+      await park(0);
+      led.check(S, 'footThreshold', 'a press under the threshold is not a press', 0, await pedal(64, 80));
       await pedal(64, 0);
+      led.check(S, 'footThreshold (over it)', 'and over it, it is', 1, await pedal(64, 110));
+      await pedal(64, 0);
+
       await kit.set(sid, { 'Setlist.footThreshold': 64, 'Setlist.footCc': 80 });
-      await kit.settle(200);
+      await park(0);
       led.check(S, 'footCc', 'another controller number is not this pedal', 0, await pedal(64, 127));
       await pedal(64, 0);
       led.check(S, 'footCc (the declared one)', 'and the declared one is', 1, await pedal(80, 127));
       await pedal(80, 0);
 
       await kit.set(sid, { 'Setlist.footCc': 64, 'Setlist.footChannel': 5 });
-      await kit.settle(200);
-      led.check(S, 'footChannel (pinned)', 'a pedal on another channel is ignored', 1, await pedal(64, 127, 2));
+      await park(0);
+      led.check(S, 'footChannel (pinned)', 'a pedal on another channel is ignored', 0, await pedal(64, 127, 2));
       await pedal(64, 0, 2);
-      led.check(S, 'footChannel (matching)', 'and the watched one is taken', 2, await pedal(64, 127, 5));
+      led.check(S, 'footChannel (matching)', 'and the watched one is taken', 1, await pedal(64, 127, 5));
       await pedal(64, 0, 5);
       await kit.set(sid, { 'Setlist.footChannel': 0 });
 
-      await kit.set(sid, { 'Setlist.index': 2, 'Setlist.footAction': 'prev' });
-      await kit.settle(240);
+      await kit.set(sid, { 'Setlist.footAction': 'prev' });
+      await park(2);
       led.check(S, "footAction 'prev'", 'the same pedal can step backwards instead', 1, await pedal(64, 127));
       await pedal(64, 0);
       await kit.set(sid, { 'Setlist.footAction': 'goto', 'Setlist.footGoto': 0 });
-      await kit.settle(240);
+      await park(2);
       led.check(S, "footAction 'goto'", 'or jump to one named scene', 0, await pedal(64, 127));
       await pedal(64, 0);
 
       await kit.set(sid, { 'Setlist.footAction': 'next', 'Setlist.footBackCc': 81 });
-      await kit.settle(240);
-      led.check(S, 'footBackCc', 'a second pedal steps back, and the two do not cancel one another',
-        { forward: 1, back: 0 },
-        { forward: await pedal(64, 127), back: (await pedal(64, 0), await pedal(81, 127)) });
+      await park(0);
+      const forward = await pedal(64, 127);
+      await pedal(64, 0);
+      const back = await pedal(81, 127);
       await pedal(81, 0);
+      led.check(S, 'footBackCc', 'a second pedal steps back, and the two hold their own state rather than cancelling one another',
+        { forward: 1, back: 0 }, { forward, back });
       await kit.set(sid, { 'Setlist.footBackCc': null });
 
-      await kit.set(sid, { 'Setlist.footEnabled': false, 'Setlist.index': 0 });
-      await kit.settle(240);
+      await kit.set(sid, { 'Setlist.footEnabled': false });
+      await park(0);
       led.check(S, 'footEnabled (false)', 'a disabled pedal does nothing at all', 0, await pedal(64, 127));
       await kit.set(sid, { 'Setlist.footEnabled': true });
       await pedal(64, 0);
@@ -667,7 +678,14 @@ try {
 
     // --- save and reopen ------------------------------------------------------------------------------------------------
     {
-      await kit.set(sid, { 'Setlist.index': 0, 'Setlist.channel': 4 });
+      // The colour rows replaced the scene list with three plain scenes, so the programs went with
+      // it. Put a real one back before saving, or "a reopened setlist still recalls" would be
+      // asserting that a scene with nothing to send sends nothing.
+      await kit.set(sid, { 'Setlist.index': 0, 'Setlist.channel': 4, 'Setlist.sendProgram': true,
+        'Setlist.scenes': [
+          scene({ id: 's1', name: 'Opener' }),
+          scene({ id: 's2', name: 'Ballad', program: 12 }),
+          scene({ id: 's3', name: 'Closer', program: 40 })] });
       await kit.settle(300);
       const before = await kit.geo(sid);
       const again = await kit.reopen(sid);
