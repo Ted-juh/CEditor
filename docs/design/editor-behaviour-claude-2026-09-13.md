@@ -38,20 +38,20 @@ renderer ever reading it.
 
 | Type | Properties | Verified rows | Inert | Unverified | Defects found |
 | --- | --- | --- | --- | --- | --- |
-| Envelope | 29 | 51 | 2 | 1 | — |
+| Envelope | 29 | 53 | 2 | — | — |
 | Mod Matrix | 17 | 34 | — | — | — |
 | Constraint | 10 | 26 | — | — | — |
-| Router | 20 | 35 | — | 3 | — |
-| Drum Pads | 36 | 59 | — | 2 | **2** |
+| Router | 20 | 37 | — | — | — |
+| Drum Pads | 36 | 59 | — | — | **2** |
 | Keyboard | 18 | 23 | — | — | — |
 | Note Ribbon | 26 | 22 | — | 1 | — |
 | Chord Pad | 28 | 36 | 1 | — | — |
-| Arp | 34 | 30 | — | 2 | **1** |
-| Orbit | 15 | 30 | — | 2 | **1** (surface-wide) |
+| Arp | 34 | 44 | — | — | **1** |
+| Orbit | 15 | 33 | — | — | **1** (surface-wide) |
 | Timbre | 14 | 16 | — | — | — |
-| Turing | 19 | 36 | — | 1 | — |
-| Constellation | 19 | 21 | 1 | 1 | — |
-| Kinetic | 15 | 12 | — | 2 | — |
+| Turing | 19 | 36 | — | — | — |
+| Constellation | 19 | 25 | 1 | — | — |
+| Kinetic | 15 | 20 | — | — | — |
 | Zone Splitter | 16 | 24 | — | 1 | — |
 | Transport | 19 | 48 | — | 1 | **1** |
 | Panic | 12 | 22 | — | — | — |
@@ -74,6 +74,8 @@ renderer ever reading it.
 `behaviourHarmony.mjs` — 77 verified, 0 inert, 7 unverified, 0 open defects (the one found is fixed).
 `behaviourPhrase.mjs` — 48 verified, 0 inert, 2 unverified, 0 open defects (the one found is fixed).
 `behaviourRecorder.mjs` — 40 verified, 0 inert, 4 unverified, 0 open defects.
+`behaviourLinks.mjs` — 33 verified, 0 inert, 0 unverified, 0 open defects. The suite that exists to
+close the rows the old ledger called unobservable; see the section on those below.
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
@@ -743,28 +745,89 @@ column count goes 0 → 1 → 0.
   drive the Envelope Designer's stage readout via `designerModel.envelopeStages`, and `timeMax` is
   scriptable. Verified.)
 
-**Unverified — nothing in this environment can observe it:**
+**Unverified — what is left, and what it would actually take**
 
-- `Envelope.phaseSourceId`, `Router.sourceControlId`, `Arp.source`/`linkId`/`inputChannel` — need a
-  second control driving them live.
-- `Arp.latch` — only means anything for a source that releases; the Arp's own chord never does.
+This heading used to read *"nothing in this environment can observe it"*, and under it sat twenty
+properties across eight components. **Every one of them is now measured**, and the sentence was
+wrong about every one of them — not because the environment changed, but because "a second control
+driving it live" and "a running transport" were both things this harness could always have arranged
+and had not. Two of the bullets under it were already stale when they were written: the transport
+rows they listed had been closed in `behaviourInbound.mjs` and were sitting in the same section
+twice, once as a gap and once as a closure. The list is rewritten rather than annotated, and the
+duplicates are gone, so nobody inherits either.
 
-**Closed since**, in `behaviourInbound.mjs`, by injecting bytes at `latestMidiInputMessage` (where a
-device delivers them) and running the panel's own transport: `Router.inputChannel` (omni, pinned,
+**Closed in `behaviourInbound.mjs`**, by injecting bytes at `latestMidiInputMessage` — the store a
+device delivers into — and running the panel's own transport: `Router.inputChannel` (omni, pinned,
 and tracking the value), `Router.polyMode` (highest and last), `DrumPads.echo` / `echoChannel` /
 `echoColour`, `DrumPads.rollSync` / `rollRate`, `Turing.syncToTransport` / `division`,
 `Orbit.syncToTransport` / `cycleBars`, and that a synced clock parks dead still when the transport
-stops. Physical hardware remains separately unverified — but it was never what these needed.
-- `DrumPads.rollRate` / `rollSync` — need a running transport to sync against. The free-running
-  `rollHz` path *is* verified (20 Hz over 400 ms, with `rollVelocity` confirmed as an accent
-  followed by quieter repeats, and `rollDelay` holding the first repeat back).
-- `Orbit.syncToTransport` / `cycleBars`, `Turing.syncToTransport` / `division` — same reason.
-- `Orbit.showTrails`, `Kinetic.showTrail` — the trail only exists while the clock runs, so its shape
-  is a moving target.
-- `Constellation.syncToTransport` / `wanderBars` — need a running transport.
-- `Kinetic.friction` / `restitution` / `gravity` / `keepAlive` — the integrator keeps its live state
-  in a module-level map this check cannot read. The ball's motion, its stopping, and the fling are
-  verified on screen; the individual physics coefficients are not.
+stops.
+
+**Closed in `behaviourLinks.mjs`**, which exists for exactly this:
+
+- `Arp.source` / `linkId` / `latch` / `inputChannel` — a latching Chord Pad really holding a chord
+  on one channel, the arpeggiator walking those notes on another, the pad falling silent while it
+  feeds the arp, and the arp stopping the moment the pad lets go — or not stopping, with `latch` on.
+  Then the same again over `source: 'input'` with keys injected and released at the MIDI input, and
+  with `inputChannel` pinned and omni. `latch` was called unobservable because "the Arp's own chord
+  never releases"; the answer was to give it a source that does. Every latch row first proves the
+  source really let go, so a passing latch is not a stuck fixture.
+- `Constellation.syncToTransport` / `wanderBars` — the probe held dead still while the shared clock
+  is stopped, wandering the moment it runs, frozen *where it was* when it stops again, and a one-bar
+  wander covering about four times the ground a four-bar one does in the same three seconds.
+- `Kinetic.gravity` / `friction` / `restitution` / `keepAlive` — from visible motion over time, not
+  from the physics map: the distance fallen on screen, the travel in the second half of a window
+  against the first, the speed kept after a wall, and whether the ball is still moving once the drag
+  has had its way.
+- `Kinetic.showTrail`, `Orbit.showTrails` — both comets counted. The old note said a trail "only
+  exists while the clock runs, so its shape is a moving target". Half right: the Kinetic's trail is
+  a recording (a map of where the ball has been) and is measured while it runs, but the Orbit's is
+  *derived from the current phase* by winding each satellite back along its own path, so a stopped
+  orbit draws the whole comet and it can be counted at leisure.
+- `Envelope.phaseSourceId`, `Router.sourceControlId` — a real on-panel slider, dragged with the
+  pointer, driving both: the envelope's playhead landing a tenth, a half and nine tenths of the way
+  across its own plot (measured from the span of its drawn grid lines, since it draws no field rect
+  to read), and the router's live input bar filling to the same fractions of its well. Each has its
+  negative beside it — an envelope naming nothing parks on the authored phase and ignores the
+  slider; a router whose source is not `'link'` drops it and sits on its test input.
+  A **slider rather than a knob**, and for a reason worth keeping: a knob's preview gesture is
+  angular — the value is the pointer's bearing around its centre — so a 60px drag and a 220px drag
+  in the same direction give the same answer, and no row built on one could have said more than
+  "it moved".
+
+**Still unverified, with the real reason in each case.** Each suite's own ledger carries its rows
+and its wording; what follows is the shape of what is left, so that nobody has to read twelve
+ledgers to find out whether a thing was skipped or could not be done.
+
+- **Physical hardware.** Every inbound row above injects at `latestMidiInputMessage`, the store a
+  MIDI device delivers into. That is the right seam for the panel's behaviour and is not a claim
+  about drivers, ports or timing on a real machine. Nothing in this pass has touched a device.
+- **Outbound controller traffic**, where the note funnel cannot see it: `Harmoniser.forwardBend` and
+  `forwardPressure`, `Setlist.scenes[].sysex`. These are the **cheapest remaining close** and no
+  longer need anything new — `behaviourKit.wire()` / `sent()` read the bytes at
+  `triggerRawMidiAction`, and the Setlist's program, bank and CC rows already go through them. They
+  are listed as unverified because this pass did not write them, not because it could not.
+- **Inspector-only actions**, which the rendered control does not perform at all: the Sequencer grid
+  (`StepSequencer.editable` — cells are edited in the designer dock, root's half),
+  `Setlist.capturePaths`, `Recorder.slot` / `slots`, and `Recorder.grid` /
+  `quantizeStrength` / `quantizeLength` / `snapToScale`, all four of which are arguments to
+  `quantizeTake` and reach it only from the Quantise button on the inspector.
+- **`followPanelKey`** on the Harmoniser, the Phrase and the Recorder. The old reason — "it needs a
+  second control driving it" — is **wrong**, and is corrected here rather than repeated: the panel
+  key is not written by a control at all, it is the `setPanelKey` store action, which broadcasts the
+  key into every section that opted in. Driving it and measuring which components re-harmonise is
+  ordinary work this pass has not done.
+- **Live values injected for the renderer and never written to the document**:
+  `StepSequencer.position`. The drawn playhead *is* measured — it moves a whole cell a second later
+  and is absent when the sequencer is stopped — but the property as written has no document-side
+  reading, so there is nothing for a save/reopen row to compare.
+- **Chains that swap through the preview session**: `Phrase.patterns` / `chain` / `chainOn` /
+  `chainLoop` and the Recorder's copy of the same engine. The swap is driven by the lap counter and
+  lands in the session rather than the document, which is correct — preview is a rehearsal — and
+  leaves the swap itself without a document-side reading.
+- **`Transport.runOnLoad`** — it fires once, on the transition into preview with the flag already
+  set, and the surface is already in preview by the time a check can set the flag. Reachable with a
+  panel authored with the flag on before preview opens; not reachable by setting it afterwards.
 
 **Harness, corrected after review:** `behaviourKit.reopen` used to add the deserialised panel into
 the *same* runtime. Control ids survive a reopen and the preview sessions are keyed by id, so the
@@ -834,7 +897,21 @@ product. They are listed because the previous pass's real failure was not notici
 16. **Assuming screen coordinates on a flipped axis.** The Constellation probe committed
     (0.903, 0.093) from a drag to the bottom-right, which is exactly right: y=1 is the TOP on every
     field component here. The expectation was upside down, not the component.
-17. **Reading live state out of the document, twice more.** A Kinetic fling writes the physics state
+17. **Pressing a control that the editor's own chrome was sitting on — for the second time.** The
+    Recorder pass had already lost a Chord Pad this way and written it up; a slider authored at
+    y=420 lost the same argument, because roughly 760px of viewport is where the chrome starts and
+    a control's box can be on screen while its centre is not reachable. The slider does not move,
+    so neither do the things bound to it, and the row reads as a dead link rather than as a missed
+    target. The tell was the shape of the failure: the middle reading passed and both ends failed,
+    which is what a playhead that never left the authored phase looks like — a link that was never
+    driven, not a link that was driven wrongly. Recording it a second time because writing a trap
+    down once evidently is not enough: the fixture is moved up AND a comment at the fixture says
+    why it sits where it does, which is the part that was missing the first time.
+18. **Running a suite that had been pasted into itself.** `behaviourLinks.mjs` carried the
+    Constellation and Kinetic blocks twice, and the failing row was the *second* copy of one I had
+    already fixed in the first — so a fix looked like it had not taken, twice. Worth the entry
+    because the symptom (an edit that apparently does nothing) sends you looking at the product.
+19. **Reading live state out of the document, twice more.** A Kinetic fling writes the physics state
     the ticker integrates, not `Kinetic.initial` — preview is a rehearsal, so the document keeps the
     author's start point. Asserting the document reported a working fling as dead. The assertion
     that came out of it is better than the one intended: the ball moves on screen AND the authored
@@ -844,12 +921,18 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The catalogue is complete. What remains is the older unverified rows root asked to close rather
-  than leave standing.
-- Then the older unverified rows root asked to close rather than leave standing: `source`/`linkId`/
-  `latch` with a real second control and an injected note release, a transport-driven Constellation,
-  and the trail and physics coefficients read from visible motion over time. The ledger statements
-  that say this environment cannot observe those are stale and go with them.
+- The catalogue is **complete**, and so is the list of older unverified rows root asked to close:
+  `source`/`linkId`/`latch` over both a real second control and an injected note release, a
+  transport-driven Constellation, and the trail and the physics coefficients read from visible
+  motion over time — all in `behaviourLinks.mjs`, with `Envelope.phaseSourceId`,
+  `Router.sourceControlId` and `Orbit.showTrails` closed alongside them because they were the same
+  claim. The ledger statements saying this environment could not observe them are gone rather than
+  annotated, and the duplicate gaps that `behaviourInbound.mjs` had already closed are gone with
+  them.
+- The cheapest thing left is the outbound-controller group — `Harmoniser.forwardBend` /
+  `forwardPressure` and `Setlist.scenes[].sysex` — which needs no new machinery at all now that
+  `wire()` / `sent()` exist. Then `followPanelKey` on the three note components, which is the
+  `setPanelKey` store action rather than the second control the old note claimed.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:
   each rule is asserted by which page is actually on screen (a hidden part is not rendered at all,
