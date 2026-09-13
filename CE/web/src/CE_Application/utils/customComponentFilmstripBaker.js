@@ -241,13 +241,26 @@ function drawShapeFill(ctx, part, frame, fillStyle, opacity = 1, blend = 'normal
  *
  * 'tile' is not a single rect, so it is drawn by the caller; everything else resolves here.
  */
-function imageFitRect(image, frame, fit = 'fill') {
+/**
+ * CSS `background-position` as two fractions. `left`/`top` pin at 0, `right`/`bottom` at 1, and
+ * anything else — including the bare `center` — sits at 0.5 on that axis.
+ */
+function alignFractions(align) {
+  const a = String(align ?? 'center');
+  return {
+    fx: a.includes('left') ? 0 : (a.includes('right') ? 1 : 0.5),
+    fy: a.includes('top') ? 0 : (a.includes('bottom') ? 1 : 0.5),
+  };
+}
+
+function imageFitRect(image, frame, fit = 'fill', align = 'center') {
   const mode = String(fit ?? 'fill');
+  const { fx, fy } = alignFractions(align);
   if (mode === 'stretch') return { sx: 0, sy: 0, sw: image.width, sh: image.height, dx: 0, dy: 0, dw: frame.width, dh: frame.height };
   if (mode === 'original') {
     return {
       sx: 0, sy: 0, sw: image.width, sh: image.height,
-      dx: (frame.width - image.width) / 2, dy: (frame.height - image.height) / 2,
+      dx: fx * (frame.width - image.width), dy: fy * (frame.height - image.height),
       dw: image.width, dh: image.height,
     };
   }
@@ -257,13 +270,16 @@ function imageFitRect(image, frame, fit = 'fill') {
   const useWidth = contain ? imageRatio > frameRatio : imageRatio < frameRatio;
   const dw = useWidth ? frame.width : frame.height * imageRatio;
   const dh = useWidth ? frame.width / imageRatio : frame.height;
+  // ALIGNED, not centred. `background-position` decides which part of a covering image is on
+  // screen and where a contained one sits, and this hardcoded the midpoint — so every alignment
+  // except `center` baked differently from the component it came from.
   return {
     sx: 0,
     sy: 0,
     sw: image.width,
     sh: image.height,
-    dx: (frame.width - dw) / 2,
-    dy: (frame.height - dh) / 2,
+    dx: fx * (frame.width - dw),
+    dy: fy * (frame.height - dh),
     dw,
     dh,
   };
@@ -279,7 +295,8 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
   // The same default the live path uses (plainFillCSS: `at('Fit', isImage ? 'fill' : 'tile')`).
   // This said 'cover' for an overlay, so an untouched overlay baked differently from the one drawn.
   const mode = String(fill?.[`${prefix}Fit`] ?? (isImage ? 'fill' : 'tile'));
-  const rect = imageFitRect(image, frame, mode);
+  const align = fill?.[`${prefix}Align`] ?? 'center';
+  const rect = imageFitRect(image, frame, mode, align);
   ctx.save();
   const path = partPath(ctx, part, frame, part?._children?.Background ?? null);
   if (path) ctx.clip(path);
@@ -300,6 +317,16 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
   ctx.translate(-frame.width / 2, -frame.height / 2);
   const offsetX = numberOr(fill?.[`${prefix}OffsetX`], 0);
   const offsetY = numberOr(fill?.[`${prefix}OffsetY`], 0);
+  // AN OFFSET MOVES THE LAYER, not the image inside it. `fitToCSS` emits the offset as
+  // `transform: translate(...)` on the layer element, so the painted area travels with it and the
+  // strip it vacates shows whatever is behind — the solid fill, or nothing. Applying the offset to
+  // the draw position alone moved the image while the painted area stayed put, which for a covering
+  // image simply slid more of it into view and never opened the gap the component shows.
+  if (offsetX || offsetY) {
+    ctx.beginPath();
+    ctx.rect(offsetX, offsetY, frame.width, frame.height);
+    ctx.clip();
+  }
   if (mode === 'tile') {
     // CSS says `background-size: <tileScale × 25>%` with `background-repeat: repeat`: one value, so
     // the width is that share of the frame and the height follows the aspect ratio. A canvas
@@ -315,9 +342,17 @@ async function drawImageFillLayer(ctx, part, frame, fill, layer) {
       tileCtx.drawImage(image, 0, 0, tile.width, tile.height);
       const pattern = ctx.createPattern(tile, 'repeat');
       if (pattern) {
+        // THE PHASE MATTERS. `background-repeat: repeat` lays the first tile at
+        // `background-position` and repeats outward from there, so a centred tile pattern is
+        // offset by half the leftover — this started every pattern at the frame's own origin and
+        // baked a repeat that was correct in size and wrong in phase, shifting every colour along.
+        const { fx: ax, fy: ay } = { fx: String(align).includes('left') ? 0 : (String(align).includes('right') ? 1 : 0.5),
+          fy: String(align).includes('top') ? 0 : (String(align).includes('bottom') ? 1 : 0.5) };
+        const originX = ax * (frame.width - tile.width) + offsetX;
+        const originY = ay * (frame.height - tile.height) + offsetY;
         ctx.fillStyle = pattern;
-        ctx.translate(offsetX, offsetY);
-        ctx.fillRect(-offsetX, -offsetY, frame.width, frame.height);
+        ctx.translate(originX, originY);
+        ctx.fillRect(-originX, -originY, frame.width, frame.height);
       }
     }
   } else {

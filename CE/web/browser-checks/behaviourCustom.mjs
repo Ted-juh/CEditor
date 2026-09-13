@@ -278,11 +278,40 @@ try {
 
     // --- PERSISTENCE: save the panel, reopen it, and use it again ------------------------------------
     const S = 'Persistence';
+    // THE AUTHORED STATE ON BOTH SIDES. Everything above drove this component through a rehearsal —
+    // dragging slider A, cycling the mode — and a rehearsal does not reach the document. Snapshotting
+    // the live drawing and comparing it to a freshly opened file asks the file to remember a drag,
+    // which is the opposite of the contract. The session is cleared first so both sides are the
+    // component as its author saved it.
+    const resetSession = (target) => kit.page.evaluate(async ({ target }) => {
+      const { resetPanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+      resetPanelPreviewSession(target);
+    }, { target });
+    const rehearsed = await handleA();
+    await resetSession(id);
+    await kit.settle(200);
+    const authored = await handleA();
+    led.check(S, 'a rehearsal is not the document', 'the drag moved the handle on screen and the authored value is still underneath it',
+      true, rehearsed !== authored);
+
     const beforeSave = await kit.dom(id, '.interactive-part');
     const again = await kit.reopen(id);
     led.check(S, 'save/reopen (drawing)', 'a reopened custom component draws the same parts',
       JSON.stringify(beforeSave.map((d) => [d.x, d.y, d.w, d.h, d.bg])),
       JSON.stringify((await kit.dom(again, '.interactive-part')).map((d) => [d.x, d.y, d.w, d.h, d.bg])));
+    // …and the rehearsal really is gone, rather than the two states happening to agree.
+    const reopenedHandle = await kit.page.evaluate(async ({ again }) => {
+      const el = document.querySelector(`[data-control-id="${again}"]`);
+      const host = el.getBoundingClientRect();
+      const h = [...el.querySelectorAll('.interactive-simple-background')]
+        .find((n) => getComputedStyle(n).backgroundColor === 'rgb(234, 246, 255)');
+      if (!h) return null;
+      const b = h.getBoundingClientRect();
+      return Math.round((((b.x - host.x) + b.width / 2) / host.width) * 1000) / 10;
+    }, { again });
+    led.check(S, 'save/reopen (the authored value, not the rehearsed one)',
+      'the reopened handle sits where the author left it, not where the last drag did',
+      authored, reopenedHandle);
     const zones2 = await locateZones(again);
     const sliderAt = zones2.get('sliderAZone');
     assert.ok(sliderAt, 'the reopened component has no slider zone');
@@ -357,18 +386,25 @@ try {
     const tabZones = [...zones.entries()].filter(([n]) => /tab/i.test(n));
     assert.ok(tabZones.length >= 2, 'the tab bank generated fewer than two zones');
     const seen = new Map();
+    // EVERY click is recorded, including the ones that show the wrong number of pages. The earlier
+    // version only recorded a click when exactly one page was up and then asked whether the map had
+    // grown — which cannot fail when two pages are stacked, because that click simply went
+    // unrecorded. The count of pages showing after each press is the promise, so it is the thing
+    // collected.
+    const pageCounts = [];
     for (const [, at] of tabZones) {
       await kit.click(at);
       await kit.settle(160);
       const showing = await pagesShowing();
+      pageCounts.push(showing.length);
       const tab = (await values(id)).tab;
       if (showing.length === 1) seen.set(tab, showing[0]);
     }
     led.check(V, 'pressing a tab swaps the page', 'each generated tab button brings up its own page, by pointer',
       ['one=PAGE ONE', 'three=PAGE THREE', 'two=PAGE TWO'],
       [...seen.entries()].map(([k, v]) => `${k}=${v}`).sort());
-    led.check(V, 'one page at a time', 'no press ever leaves two pages stacked on screen',
-      true, tabZones.length === seen.size || seen.size >= 2);
+    led.check(V, 'one page at a time', 'exactly one page is on screen after every single press, never none and never two',
+      tabZones.map(() => 1), pageCounts);
 
     // The system state, which is a different rule shape: a component-level patch rather than parts.
     await kit.page.evaluate(async ({ id }) => {

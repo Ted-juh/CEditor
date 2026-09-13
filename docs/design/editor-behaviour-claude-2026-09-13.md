@@ -52,9 +52,9 @@ renderer ever reading it.
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
-`behaviourCustom.mjs` — 30 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
+`behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
-`behaviourCustomExport.mjs` — 11 verified, 0 inert, 0 unverified, 0 open defects (the one found is fixed).
+`behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
@@ -266,27 +266,36 @@ translates a Fill's `imageFit` into the panel background's own vocabulary *preci
 agree* — its header says "two functions meant to agree do not stay agreeing". The baker is the
 third, and it had drifted in three places.
 
-**Measured in pixels**, with an 80×20 image of four equal colour columns in a 100×100 frame, sampling
-the baked PNG at the same four points for every mode:
+**Measured in pixels — the live element's own screenshot against the exported PNG**, decoded the same
+way and sampled at the same six fractions of the frame. An earlier version of this check compared the
+live CSS *string* to baked pixels, which tests this file's reading of what `background-size: cover`
+means rather than what the browser painted; review caught that and it is now pixels on both sides.
 
-| `imageFit` | live CSS | baked, before | baked, after |
+Seven mismatches, with an 80×20 image of four colour columns:
+
+| # | Property | Live | Baked, before |
 | --- | --- | --- | --- |
-| `stretch` | `100% 100%` | `R Y G R` ✓ | `R Y G R` |
-| `fill` | `cover` | **`R Y G R`** — a stretch | `G B G G` |
-| `fit` | `contain` | cover | `R Y transparent R` |
-| `original` | `auto` | cover | `R Y transparent transparent` |
-| `tile` | `repeat` | cover | repeats, pattern returns one tile along |
+| 1 | `imageFit: 'fill'` | `cover` | a **stretch** — byte-identical to `'stretch'` |
+| 2 | `imageFit: 'tile'` | repeat at `tileScale × 25%` | no branch at all: fell through to cover |
+| 3 | `imageFit: 'original'` | natural size | no branch: cover |
+| 4 | overlay layer default | `tile` | `cover` — wrong without anybody choosing it |
+| 5 | `imageAlign` | `background-position` | **ignored**; everything centred |
+| 6 | tile phase | starts at `background-position` | started at the frame origin — right size, wrong phase, every colour shifted along |
+| 7 | `imageOffsetX/Y` | translates the **layer**, exposing what is behind | translated the image inside a fixed frame, so a covering image just slid more of itself into view and never opened the gap |
 
-`fill` baked **byte-identical to `stretch`**: an exported filmstrip showed red and yellow where the
-live component showed green and blue. `tile` and `original` had no branch at all and fell through to
-cover — and `tile` is the live **default for an overlay layer**, so that one was wrong without
-anybody choosing it (the baker defaulted an overlay to `cover`).
+Two of these only appear with a probe off the centre line, which is why the check samples
+asymmetrically and tries `top-left`, `center` and `bottom-right` for three fit modes.
 
-**Fix.** `fill` falls into the existing cover branch; `original` draws at natural size, centred;
-`tile` is drawn as a canvas pattern at the same `tileScale × 25%` of the frame width CSS uses, with
-the height following the aspect ratio; the overlay default becomes `tile`, matching the live path.
+**Fixes**, all in the baker: `fill` falls into the cover branch that already existed; `original`
+draws at natural size; `tile` is a canvas pattern at the CSS tile size *and* CSS phase; the overlay
+default becomes `tile`; `imageFitRect` takes the alignment and places the rect with it rather than at
+the midpoint; and an offset clips to the translated frame so the layer moves rather than the image.
 
-Reverting only the `fill` line fails with `expected ["G","B","G","G"], measured ["R","Y","G","R"]`.
+Reverting any one of them fails a specific row — `'fill'`, `'fit' aligned top-left`, `'fill' with
+offset` — rather than the suite generally.
+
+The live-vs-baked pixel standard also covers `flipH`, `flipV`, `rotation` at 90° and 135°, and
+`opacity`, all of which already agreed.
 
 Found from root's reading of the two files; the pixel comparison is what turned it from a suspicion
 into three confirmed mismatches.
@@ -332,6 +341,21 @@ stops. Physical hardware remains separately unverified — but it was never what
 - `Kinetic.friction` / `restitution` / `gravity` / `keepAlive` — the integrator keeps its live state
   in a module-level map this check cannot read. The ball's motion, its stopping, and the fling are
   verified on screen; the individual physics coefficients are not.
+
+**Harness, corrected after review:** `behaviourKit.reopen` used to add the deserialised panel into
+the *same* runtime. Control ids survive a reopen and the preview sessions are keyed by id, so the
+reopened copy inherited the live state of the one it was saved from — and the module-level state the
+surface keeps outside any store (held pads, the kinetic physics map, the run tickers) survived too.
+An assertion could pass on a value the file never carried. `reopen` now clears `localStorage`,
+**reloads the page**, and imports the serialised document into a fresh runtime.
+
+Re-running every suite against it changed exactly one expectation, in the custom pass, and the change
+was mine rather than the product's: the Dual Slider Switch's handle sat at x=78 before the save and
+47.2 after, and 47.2 is the *authored* `valueA` of 0.25. The old comparison was asking a saved file to
+remember a drag. It is now two assertions instead — that a rehearsal moves the handle on screen while
+the authored value stays underneath it, and that the reopened handle is at the authored position.
+curves, notes and motion were unaffected: their reopen rows already compared document-derived
+geometry and fan-out.
 
 **Environment, not product:** `browser-checks/screenDock.mjs` cannot run here — it launches
 `channel: 'msedge'`, which is Windows-only. Everything else in the existing browser suite passes

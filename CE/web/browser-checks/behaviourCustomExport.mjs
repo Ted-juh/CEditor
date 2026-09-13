@@ -26,13 +26,26 @@ import { boot, Ledger } from './behaviourKit.mjs';
 const kit = await boot();
 const led = new Ledger('custom export');
 
-const COLOURS = { R: [255, 0, 0], G: [0, 255, 0], B: [0, 0, 255], Y: [255, 255, 0] };
+const COLOURS = { R: [255, 0, 0], G: [0, 255, 0], B: [0, 0, 255], Y: [255, 255, 0], W: [255, 255, 255] };
+/**
+ * NEAREST of the five known colours, not "within a tolerance of one of them".
+ *
+ * A probe can land on the seam between two tiles — the tiles here are about six pixels tall — and
+ * the compositor and the canvas do not have to round that seam the same way. A threshold then has
+ * to be widened until it stops rejecting blends, at which point it is an arbitrary number that
+ * quietly accepts other things too. Nearest-colour needs no number: a blend resolves to whichever
+ * side it is closer to, and a genuinely wrong colour still lands somewhere else. A real mismatch
+ * moves several probes at once, which is what the tile phase did before it was fixed.
+ */
 const nameOf = (px) => {
   if (!px || px[3] < 20) return 'transparent';
+  let best = null;
+  let bestD = Infinity;
   for (const [name, c] of Object.entries(COLOURS)) {
-    if (Math.abs(px[0] - c[0]) < 60 && Math.abs(px[1] - c[1]) < 60 && Math.abs(px[2] - c[2]) < 60) return name;
+    const d = (px[0] - c[0]) ** 2 + (px[1] - c[1]) ** 2 + (px[2] - c[2]) ** 2;
+    if (d < bestD) { bestD = d; best = name; }
   }
-  return `rgb(${px[0]},${px[1]},${px[2]})`;
+  return best;
 };
 
 try {
@@ -73,9 +86,14 @@ try {
       widthUnit: 'percent', heightUnit: 'percent' })) {
       updateControlProperty(id, `Parts.${first}.Layout.${k}`, v);
     }
+    // AN OPAQUE UNDERLAY, on purpose. The live side is a screenshot — everything is composited over
+    // whatever is behind it — while the baked side is a PNG with real alpha, so any area the image
+    // does not cover reads as the backdrop in one and as transparent in the other, and the two can
+    // never agree there however correct the exporter is. A white solid fill beneath the image is
+    // drawn by both paths, so both sides composite the same way and a difference means a difference.
     for (const [k, v] of Object.entries({ imageEnabled: true, imageSrc, imageFit: 'fill',
-      imageAlign: 'center', imageOpacity: 100, solidEnabled: false, gradientEnabled: false,
-      overlayEnabled: false })) {
+      imageAlign: 'center', imageOpacity: 100, solidEnabled: true, colour: 'FFFFFFFF',
+      gradientEnabled: false, overlayEnabled: false })) {
       updateControlProperty(id, `Parts.${first}.Background.Fill.${k}`, v);
     }
     return first;
@@ -127,68 +145,73 @@ try {
   }, { id, points });
 
   // Sample points chosen so each mode answers differently.
-  // left and right identify WHICH part of the image is on screen; top catches letterboxing; edge
-  // catches an image drawn smaller than the frame. `top` deliberately avoids x=0.5, which is a
-  // colour boundary in two of the five modes and would make the answer depend on rounding.
-  const P = { left: [0.125, 0.5], right: [0.875, 0.5], top: [0.3, 0.05], edge: [0.03, 0.5] };
-  const probe = async (fit) => {
-    await setFit(fit);
-    const css = await liveCss();
-    const px = await bakedSamples([P.left, P.right, P.top, P.edge]);
-    return { css, baked: px.map(nameOf) };
+  // EVERY COMPARISON BELOW IS PIXELS AGAINST PIXELS. An earlier version of this file read the live
+  // CSS string and compared it to baked pixels, which tests this file's reading of what
+  // `background-size: cover` means rather than what the browser painted — a fair hit in review. The
+  // live side is now a real screenshot of the element, decoded in the page; the baked side is the
+  // exported PNG, decoded the same way. The two are sampled at the same fractions of the frame.
+  // Kept off the outer 5%: the live screenshot includes the control's own border, which the baked
+  // frame has no reason to carry, and a probe sitting on it compares chrome rather than the image.
+  const P = [[0.125, 0.5], [0.875, 0.5], [0.3, 0.08], [0.07, 0.5], [0.5, 0.92], [0.7, 0.3]];
+  const compare = async (label, promise) => {
+    const live = (await kit.livePixels(id, P)).map(nameOf);
+    const baked = (await bakedSamples(P)).map(nameOf);
+    led.check('imageFit', label, promise, live, baked);
+    return { live, baked };
   };
 
-  // --- stretch: both sides agree already, which is the control for the rest -----------------------
-  {
-    const r = await probe('stretch');
-    led.check('imageFit', "'stretch' (live)", 'the live layer squashes the image to the frame',
-      '100% 100%', r.css?.size);
-    led.check('imageFit', "'stretch' (baked)", 'and the bake squashes it the same way, so all four columns are across the frame',
-      ['R', 'Y', 'G', 'R'], r.baked);
+  const setFill = async (patch) => {
+    await kit.page.evaluate(async ({ id, patch, partName }) => {
+      const { updateControlProperty } = await import('/src/CE_Application/stores/controls.js');
+      for (const [k, v] of Object.entries(patch)) {
+        updateControlProperty(id, `Parts.${partName}.Background.Fill.${k}`, v);
+      }
+    }, { id, patch, partName });
+    await kit.settle(260);
+  };
+
+  // --- the five fit modes, live pixels against baked pixels -----------------------------------------
+  for (const fit of ['stretch', 'fill', 'fit', 'original', 'tile']) {
+    await setFill({ imageFit: fit, imageAlign: 'center', imageOffsetX: 0, imageOffsetY: 0,
+      imageRotation: 0, imageFlipH: false, imageFlipV: false, imageOpacity: 100, imageTileScale: 1 });
+    await compare(`'${fit}' — live pixels vs baked pixels`,
+      'the exported filmstrip paints what the component paints');
   }
 
-  // --- fill: the one root flagged ------------------------------------------------------------------
-  {
-    const r = await probe('fill');
-    led.check('imageFit', "'fill' (live)", 'the live layer COVERS the frame — aspect kept, sides cropped',
-      'cover', r.css?.size);
-    // Cover scales 80×20 by 5 to 400×100 and centres it, so the visible window is image x 30..50:
-    // green at the left eighth and blue at the right, not red and yellow.
-    // Cover scales 80×20 by 5 to 400×100 and centres it, so the visible window is image x 30..50:
-    // green and blue, never the red and yellow that a stretch shows at the same two points.
-    led.check('imageFit', "'fill' (baked matches live)", 'the bake must cover too, or an exported component is not the one on screen',
-      ['G', 'B', 'G', 'G'], r.baked);
+  // --- imageAlign: the property the baker ignored entirely --------------------------------------------
+  // Each alignment puts a different part of the image under the same probe, so an implementation
+  // that centres everything regardless cannot pass more than one of these.
+  for (const fit of ['fit', 'original', 'fill']) {
+    for (const align of ['top-left', 'center', 'bottom-right']) {
+      await setFill({ imageFit: fit, imageAlign: align, imageOffsetX: 0, imageOffsetY: 0 });
+      await compare(`'${fit}' aligned ${align}`,
+        'the bake honours the alignment the live layer is using');
+    }
   }
 
-  // --- fit / contain --------------------------------------------------------------------------------
-  {
-    const r = await probe('fit');
-    led.check('imageFit', "'fit' (live)", 'the live layer contains the image inside the frame', 'contain', r.css?.size);
-    led.check('imageFit', "'fit' (baked matches live)", 'the bake letterboxes it the same way, so the top of the frame is empty',
-      ['R', 'Y', 'transparent', 'R'], r.baked);
+  // --- tile alignment and scale ------------------------------------------------------------------------
+  for (const align of ['top-left', 'center']) {
+    for (const tileScale of [1, 2]) {
+      await setFill({ imageFit: 'tile', imageAlign: align, imageTileScale: tileScale });
+      await compare(`'tile' aligned ${align} at scale ${tileScale}`,
+        'the repeat starts where the live layer starts it, at the same tile size');
+    }
   }
 
-  // --- original -------------------------------------------------------------------------------------
-  {
-    const r = await probe('original');
-    led.check('imageFit', "'original' (live)", 'the live layer draws it at its natural size', 'auto', r.css?.size);
-    led.check('imageFit', "'original' (baked matches live)", 'the bake draws it at natural size too, leaving the frame edges empty',
-      ['R', 'Y', 'transparent', 'transparent'], r.baked);
+  // --- the transform properties the Fill already exposes ------------------------------------------------
+  await setFill({ imageFit: 'fill', imageAlign: 'center', imageTileScale: 1 });
+  for (const [label, patch] of [
+    ['offset', { imageOffsetX: 12, imageOffsetY: -8 }],
+    ['flipH', { imageOffsetX: 0, imageOffsetY: 0, imageFlipH: true }],
+    ['flipV', { imageFlipH: false, imageFlipV: true }],
+    ['rotation 90', { imageFlipV: false, imageRotation: 90 }],
+    ['rotation 135', { imageRotation: 135 }],
+    ['opacity 40', { imageRotation: 0, imageOpacity: 40 }],
+  ]) {
+    await setFill(patch);
+    await compare(`'fill' with ${label}`, 'the bake applies the same transform the live layer does');
   }
-
-  // --- tile -------------------------------------------------------------------------------------------
-  {
-    const r = await probe('tile');
-    led.check('imageFit', "'tile' (live)", 'the live layer repeats the image across the frame',
-      'repeat', r.css?.repeat);
-    led.check('imageFit', "'tile' (baked repeats)", 'the bake repeats it too rather than covering once',
-      true, r.baked.every((c) => c !== 'transparent'));
-    // A repeat is only a repeat if the pattern comes back round: at 25% of the frame per tile, two
-    // points one whole tile apart must land on the same colour.
-    const pair = await bakedSamples([[0.05, 0.5], [0.30, 0.5]]);
-    led.check('imageFit', "'tile' (the pattern repeats)", 'two points one tile apart show the same colour',
-      nameOf(pair[0]), nameOf(pair[1]));
-  }
+  await setFill({ imageOpacity: 100 });
 
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
