@@ -50,11 +50,11 @@ renderer ever reading it.
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
 `behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
 `behaviourMotion.mjs` — 82 verified, 0 inert, 3 unverified, 0 open defects (the one found is fixed).
-`behaviourCustom.mjs` — 21 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
+`behaviourCustom.mjs` — 30 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
-generators, export/import and persistence — see D-4.
+generators, export/import, persistence and rule-driven states — see D-4.
 
 That is **160 of my 503 catalogue properties** measured against their promised effect, rendered and
 after a reopen. The remaining 343, plus the whole custom-component surface, are not yet done and are
@@ -299,7 +299,9 @@ product. They are listed because the previous pass's real failure was not notici
 - The remaining 343 catalogue properties: Looper, Kinetic, Constellation, Keyboard, StepSequencer,
   ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone, Setlist, Transport, Panic.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
-  properties, generators, export/import and persistence. Variants/states are the remaining gap
-  there: the Tab Group's rule-driven page swap is exercised only through its enum channel, not by
-  asserting which page becomes visible.
+  properties, generators, export/import, persistence and variants/states. The states gap is closed:
+  each rule is asserted by which page is actually on screen (a hidden part is not rendered at all,
+  and each page names itself), by pressing the generated tab buttons rather than by moving the
+  channel, by the system `Disabled` state dimming the control to its declared 0.55, and by a saved
+  component opened with a fresh session starting on its default page and still swapping.
 - Nothing here is a release sign-off, and none of it touches the native GUI or hardware gates.
