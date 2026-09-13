@@ -79,6 +79,7 @@ separate gate, not implied by this document round trip.
 | B59 | Slider / Knob Reverse Mouse | Reversed slider click still increases to 0.75; the drag constructors ignore the setting. | Apply reverse to absolute pointer mapping and linear/relative circular drags, without changing the drawn track direction. Slider decreases to 0.25, Knob's 50px upward drag to 0.30; wheel decreases both again and fresh reopen passes. |
 | B60 | LCD editable field caret | Clicking inside a field throws `regionStartOffset is not defined`, so typing never begins. | Import the shared alignment helper. Real entry covers four charsets, finite/unlimited length, Enter/Escape, left/centre/right caret positions, bound Label/Combobox, disabled-choice skipping, Tab navigation, output and fresh reopen. Pixel entry receives the same charset/commit/cancel/reopen checks. |
 | B61 | Slider activeHandlePolicy | A band configured startFirst moves current on its first arrow key because session initialization hard-codes current. | Seed the session with the existing policy resolver. All three initial roles, crossing disabled/enabled, circular wrapping, exact readout and outbound value pass after fresh reopen. |
+| B62 | Pixel Reset appearance | Reset leaves a strong glow and gamma 3 behind, so its painted canvas differs from the default look. | Reset both appearance settings. Actual canvas matches a default reference with identical content; quarter-brightness alpha confirms gamma resets too. Both survive fresh reopen. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -152,6 +153,12 @@ active-handle/crossing/wrap behavior. B60 and B61 were reproduced before correct
 Combined validation passes: **77 root scenarios, zero browser errors; 4,817 Node tests,
 zero skips; local production frontend build**. These are scenario/assertion counts,
 not a claim that the remaining property catalogue is complete.
+
+Four further focused screen scenarios pass (81 total in the harness): left/right loop
+and bounce scrolling with gap and finite-repeat settling; cursor style/cell and text
+blinking; round/square dot pixels, glow extent and ghost colour/opacity; complete Pixel
+appearance reset with preserved bitmap content. The prior 77 passed together; these four
+have focused passes, without claiming a new combined 81-scenario run.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

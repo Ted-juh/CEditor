@@ -34,7 +34,7 @@
   const ICON_NAMES = Object.keys(ICON_GLYPHS);
   // Reset only appearance (never content: elements/layouts/text/sources).
   const APPEARANCE_KEYS = ['litColour', 'unlitColour', 'screenColour', 'backlightColour', 'glassTint',
-    'backlightOn', 'brightness', 'contrast', 'showGhost', 'showGlass', 'showScanlines', 'dotShape', 'padding'];
+    'backlightOn', 'brightness', 'contrast', 'gamma', 'glow', 'showGhost', 'showGlass', 'showScanlines', 'dotShape', 'padding'];
   function resetAppearance() {
     const d = SECTION_DEFAULTS.Pixel ?? {};
     for (const k of APPEARANCE_KEYS) if (k in d) set(k, d[k]);

@@ -798,6 +798,48 @@ try {
       const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).focus();await page.keyboard.press(c.key);await settle();assert.equal((await node(id).locator('.slider-readout').textContent()).trim(),c.want,JSON.stringify(c));assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),c.out);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
     }
   });
+  await check('LCD scrolling direction gap bounce and finite repeats produce the expected moving windows',async()=>{
+    for(const scroll of ['left','right'])for(const scrollMode of ['loop','bounce']){
+      const id=await fixture('LcdDisplay',{Display:{cols:4,rows:1,lines:['ABCDEFGH'],layouts:[],scroll,scrollMode,scrollSpeed:12,scrollGap:2,scrollRepeat:1,cursor:'off'}});
+      const verify=async()=>{
+        const read=async()=>(await node(id).locator('.lcd-char').allTextContents()).join('');
+        const seen=[];for(let i=0;i<9;i++){seen.push(await read());await page.waitForTimeout(90);}
+        assert.ok(new Set(seen).size>=3,`${scroll}/${scrollMode} visibly advances`);
+        const allowed=scrollMode==='bounce'?['ABCD','BCDE','CDEF','DEFG','EFGH']:Array.from({length:10},(_,i)=>('ABCDEFGH  ABCDEFGH  ').slice(i,i+4));
+        assert.ok(seen.every(v=>allowed.includes(v)),`${scroll}/${scrollMode}: ${JSON.stringify(seen)}`);
+        if(scrollMode==='loop'){
+          const steps=seen.slice(1).map((v,i)=>(allowed.indexOf(v)-allowed.indexOf(seen[i])+10)%10).filter(n=>n!==0);
+          assert.ok(steps.filter(n=>scroll==='left'?n<=3:n>=7).length>steps.length/2,`${scroll}: windows advance in the requested direction: ${steps}`);
+        }
+        await page.waitForTimeout(450);const settled=await read();await page.waitForTimeout(250);assert.equal(await read(),settled,'finite repeat stays settled');assert.equal(settled,scrollMode==='bounce'&&scroll==='right'?'EFGH':'ABCD');
+      };await verify();await reopen(id);await verify();
+    }
+  });
+  await check('LCD cursor row column style and blink affect the actual displayed cell',async()=>{
+    for(const cursor of ['underline','block']){
+      const id=await fixture('LcdDisplay',{Display:{cols:4,rows:2,lines:['ABCD','EFGH'],layouts:[],cursor,cursorRow:1,cursorCol:2,cursorBlink:false,blink:false}});
+      const verify=async()=>{const marker=node(id).locator(`.lcd-cursor-${cursor}`);assert.equal(await marker.count(),1);const index=await marker.evaluate(e=>[...e.closest('.lcd-screen').querySelectorAll('.lcd-cell')].indexOf(e.parentElement));assert.equal(index,6,'row 1 col 2 is the G cell');assert.ok(await marker.isVisible());await page.waitForTimeout(600);assert.equal(await marker.count(),1,'nonblinking cursor stays painted');};await verify();await reopen(id);await verify();
+    }
+    const id=await fixture('LcdDisplay',{Display:{cols:4,rows:1,lines:['ABCD'],layouts:[],cursor:'off',blink:true,blinkRate:180}});
+    const verify=async()=>{const counts=[];for(let i=0;i<9;i++){counts.push(await node(id).locator('.lcd-char').count());await page.waitForTimeout(80);}assert.ok(counts.includes(0)&&counts.includes(4),'blink alternates between visible text and no lit glyphs');};await verify();await reopen(id);await verify();
+  });
+  await check('Pixel appearance paints round or square dots glow and ghost intensity with saved properties',async()=>{
+    const id=await fixture('PixelDisplay',{Transform:{width:160,height:160},Pixel:{pixelsW:8,pixelsH:8,padding:0,litColour:'FFFFFFFF',unlitColour:'FFFF0000',brightness:100,contrast:100,showGhost:false,showGlass:false,dotShape:'round',glow:0,elements:[{id:'dot',kind:'bitmap',x:2,y:2,w:1,h:1,bits:'1'}]}});
+    const pixel=(x,y)=>node(id).locator('canvas').first().evaluate((c,{x,y})=>Array.from(c.getContext('2d').getImageData(x,y,1,1).data),{x,y});
+    assert.deepEqual(await pixel(50,50),[255,255,255,255]);assert.equal((await pixel(43,43))[3],0,'round dot has an empty corner');
+    await tab('Pixels');await props.getByRole('radio',{name:'Square',exact:true}).click();await settle();assert.equal((await pixel(43,43))[3],255,'square dot fills its corner');await reopen(id);assert.equal((await pixel(43,43))[3],255);
+    await tab('Pixels');let input=cell('Glow').locator('input.scrub-value');await input.fill('1');await input.press('Enter');await settle();assert.ok((await pixel(61,50))[3]>40,'glow paints beyond the crisp dot');
+    await props.getByTitle('Ghost dots — faint unlit dots (realism cue)',{exact:true}).click();await settle();assert.deepEqual(await pixel(10,10),[255,0,0,128],'contrast 100 paints half-opacity red ghosts');await reopen(id);assert.ok((await pixel(61,50))[3]>40);assert.deepEqual(await pixel(10,10),[255,0,0,128]);
+  });
+  await check('Pixel Reset appearance restores the painted default while preserving element content',async()=>{
+    const content={pixelsW:16,pixelsH:16,elements:[{id:'bar',kind:'bitmap',x:4,y:4,w:6,h:2,bits:'111111111111'}]};
+    const id=await fixture('PixelDisplay',{Transform:{width:160,height:160},Pixel:{...content,glow:1,gamma:3,brightness:25,dotShape:'square',litColour:'FFFF0000'}},[],[{type:'PixelDisplay',sections:{Core:{id:'default_pixel'},Transform:{x:300,y:50,width:160,height:160},Pixel:content}}]);
+    const png=el=>el.locator('canvas').first().evaluate(c=>c.toDataURL());
+    await tab('Pixels');await props.getByRole('button',{name:'↺ Reset appearance',exact:true}).click();await settle();assert.ok((await png(node(id)))===(await png(node('default_pixel'))),'reset restores default dot rendering');await reopen(id);assert.ok((await png(node(id)))===(await png(node('default_pixel'))));
+    await tab('Pixels');const brightness=cell('Brightness').locator('input.scrub-value');await brightness.fill('25');await brightness.press('Enter');await settle();
+    const alpha=()=>node(id).locator('canvas').first().evaluate(c=>c.getContext('2d').getImageData(40,40,1,1).data[3]);assert.ok(Math.abs(await alpha()-83)<=1,'reset gamma yields the default quarter-brightness response');await reopen(id);assert.ok(Math.abs(await alpha()-83)<=1);
+  });
+
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();
