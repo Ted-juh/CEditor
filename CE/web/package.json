@@ -9,11 +9,18 @@
     "preview": "vite preview",
     "test": "node --import ./test/support/register-svelte.mjs --test",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
+    "test:text-dock": "node browser-checks/textDock.mjs",
+    "test:effects-dock": "node browser-checks/effectsTab.mjs",
+    "test:shape-effects": "node browser-checks/shapeEffects.mjs",
+    "test:screen-dock": "node browser-checks/screenTab.mjs",
+    "test:screen-animation": "node browser-checks/screenAnimation.mjs",
+    "test:screen-runtime": "node browser-checks/screenRuntime.mjs",
+    "test:pixel-selection": "node browser-checks/pixelSelection.mjs",
     "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",
     "docs:help": "node scripts/generate-help-bundle.mjs",
     "test:all": "npm test && npm run test:script-exports",
-    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/panelShot.mjs"
+    "test:browser": "vite build --config browser-checks/vite.config.mjs && node browser-checks/run.mjs && node browser-checks/textPlacement.mjs && node browser-checks/playerInbound.mjs && node browser-checks/learnChips.mjs && node browser-checks/effectsTab.mjs && node browser-checks/typographyTab.mjs && node browser-checks/assetsTab.mjs && node browser-checks/screenTab.mjs && node browser-checks/apiTab.mjs && node browser-checks/libraryTab.mjs && node browser-checks/animationTab.mjs && node browser-checks/designerTab.mjs && node browser-checks/dockOpeners.mjs && node browser-checks/propertyFilter.mjs && node browser-checks/panelStrip.mjs && node browser-checks/insertFlyout.mjs && node browser-checks/panelShot.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
@@ -24,6 +31,7 @@
   },
   "dependencies": {
     "acorn": "^8.17.0",
+    "gifuct-js": "^2.1.2",
     "luaparse": "^0.3.1",
     "lucide-svelte": "^1.0.1",
     "wasmoon": "^1.16.0"

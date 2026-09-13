@@ -57,6 +57,7 @@ public:
 
     /** Used by the vendor-preset loader without exposing worker details to the service. */
     bool applyVstPreset (const juce::File& presetFile);
+    bool refreshProgramList() override;
 
     /** Starts hidden editor construction after the control pipe has been quiet long enough. */
     bool prewarmEditorIfIdle (int quietMs) noexcept override;

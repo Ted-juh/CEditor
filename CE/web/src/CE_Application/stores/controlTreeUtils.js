@@ -42,7 +42,14 @@ export function valueAtPath(control, path) {
 function getDefaultChildTemplate(typeName, childName) {
   if (!typeName || !childName) return undefined;
   const sectionDefaults = SECTION_DEFAULTS[typeName];
-  return sectionDefaults?._children?.[childName];
+  const child = sectionDefaults?._children?.[childName];
+  if (child !== undefined) return child;
+  // Optional effect targets materialise only when edited; ordinary backgrounds stay small.
+  if (((typeName === 'Background' || typeName === 'Border') && childName === 'Effects')
+    || (typeName === 'Fill' && ['SolidEffects', 'GradientEffects', 'ImageEffects', 'OverlayEffects'].includes(childName))) {
+    return { ...SECTION_DEFAULTS.Effects, _type: childName };
+  }
+  return undefined;
 }
 
 /**
@@ -84,11 +91,12 @@ function resolveWriteTarget(control, path, create) {
       continue;
     }
 
-    if (current._children && current._children[key] === undefined) {
+    if (current._children?.[key] === undefined) {
       const defaultChild = getDefaultChildTemplate(current._type, key);
       if (defaultChild !== undefined) {
         // A probe must not leave the section behind it, so it walks a copy of the template.
         if (!create) { current = deepClone(defaultChild); continue; }
+        current._children ??= {};
         current._children[key] = deepClone(defaultChild);
         current = current._children[key];
         continue;

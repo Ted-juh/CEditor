@@ -11,6 +11,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import HeaderPill from '../properties/HeaderPill.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Spline from 'lucide-svelte/icons/spline';
   import CircleDot from 'lucide-svelte/icons/circle-dot';
   import Repeat from 'lucide-svelte/icons/repeat';
@@ -54,8 +55,18 @@
   }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openDesignerTab()}
+  <OpenInDock tab="designer" controlId={core?.id ?? ''} what="this curve" compact />
+{/snippet}
+
 {#if e}
-  <PropertySection title="Envelope" icon={Spline}>
+  <PropertySection title="Envelope" icon={Spline} tools={openDesignerTab}>
     <PropertyCell label="Preset" span={4} hint="Seed a shape. ADSR / AR / AD / DAHDSR keep stages; MSEG / Free let every node move.">
       <select class="val" value={e.preset ?? 'adsr'} onchange={(ev) => applyPreset(ev.target.value)}>
         <option value="adsr">ADSR</option>

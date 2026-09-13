@@ -32,8 +32,8 @@ makeIsolatedPluginInstantiator (const juce::File& liveWorkerExecutable,
     };
 }
 
-/** Vendor .vstpreset loading stays on the isolated instance. The worker uses JUCE's loader,
-    which re-validates the class id against the real instance before applying it. */
+/** Vendor preset loading stays on the isolated instance. The worker validates VST3 class
+    identities and uses the supported NKS, Vanguard FXP and Spire adapters. */
 inline bool applyVstPresetFile (juce::AudioProcessor& processor, const juce::File& presetFile)
 {
     if (auto* isolated = dynamic_cast<IsolatedPluginProxy*> (&processor))

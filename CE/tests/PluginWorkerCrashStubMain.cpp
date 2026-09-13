@@ -80,6 +80,8 @@ juce::var metadata (float gain, bool crashDumpsAvailable,
     juce::Array<juce::var> programNames;
     programNames.add ("Init");
     programNames.add ("Wide");
+    if (parameterCount > 1)
+        for (int i = 2; i < 5001; ++i) programNames.add ("Program " + juce::String (i));
     object->setProperty ("programNames", programNames);
     object->setProperty ("parameters", parameters);
     return juce::var (object);
@@ -137,6 +139,16 @@ bool replyToControl (PluginWorkerControlChannel& control, juce::uint32 generatio
         reply = makeJsonMessage (MessageType::setState, generation,
                                  received.message.requestId,
                                  processorSnapshot (gain, currentProgram));
+    }
+    else if (received.message.type == MessageType::getPrograms)
+    {
+        auto* object = new juce::DynamicObject();
+        juce::Array<juce::var> names;
+        for (int i = 0; i < 5002; ++i) names.add ("Refreshed " + juce::String (i));
+        object->setProperty ("programNames", names);
+        object->setProperty ("currentProgram", 5001);
+        reply = makeJsonMessage (MessageType::getPrograms, generation,
+                                 received.message.requestId, juce::var (object));
     }
     else if (received.message.type == MessageType::setProgram)
     {

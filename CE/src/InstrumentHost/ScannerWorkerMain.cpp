@@ -1,3 +1,4 @@
+#include "VendorPresetLoader.h"
 // CEditorPluginScanner — Hostage's out-of-process VST3 scan worker.
 //
 // This executable is the ONE place a third-party VST3 module gets loaded to ask what it
@@ -194,19 +195,16 @@ static int runAudition (const juce::File& jobFile)
     if (instrument == nullptr)
         return fatal (error.isEmpty() ? juce::String ("the plug-in would not load") : error);
 
-    // A vendor .vstpreset needs the VST3 format to validate the class id inside the file against
-    // the live instance, so a mismatched preset fails here rather than half-applying. Everything
-    // else is a captured blob or a program index and needs no format at all.
+    // Audition uses the same file adapters and identity validation as live preset loading.
     const auto applyState = [] (juce::AudioProcessor& processor, const AnalysisPreset& preset) -> juce::String
     {
-        if (preset.sourceType != "vstpreset")
+        if (! isVendorPresetSource (preset.sourceType))
             return applyPresetStatePlain (processor, preset);
 
         auto* asInstance = dynamic_cast<juce::AudioPluginInstance*> (&processor);
-        juce::MemoryBlock data;
-        if (asInstance == nullptr || ! juce::File (preset.sourceLocator).loadFileAsData (data))
+        if (asInstance == nullptr || ! juce::File (preset.sourceLocator).existsAsFile())
             return "The vendor preset could not be read: " + preset.name;
-        if (! juce::VST3PluginFormat::setStateFromVSTPresetFile (asInstance, data))
+        if (! applyVendorPresetInWorker (*asInstance, juce::File (preset.sourceLocator)))
             return "The plug-in refused this preset: " + preset.name;
         return {};
     };

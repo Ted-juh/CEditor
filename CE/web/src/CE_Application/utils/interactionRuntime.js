@@ -1,4 +1,5 @@
 import { deepClone } from './deepClone.js';
+import { setNestedValue } from '../stores/controlTreeUtils.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
 import {
   formatRangeValue,
@@ -135,6 +136,12 @@ function treeValueAtPath(node, path) {
 
 function setTreeValueAtPath(node, path, value) {
   if (!node || !path) return;
+  // A surface effect may exist only in a state. Use the editor's lazy templates
+  // so Hover can create that target without first changing the base appearance.
+  if (/^Background\.(?:Effects|Border\.Effects|Fill\.(?:Solid|Gradient|Image|Overlay)Effects)\./.test(path)) {
+    setNestedValue(node, path, value);
+    return;
+  }
   const parts = String(path).split('.');
   let current = node;
   for (let index = 0; index < parts.length - 1; index += 1) {

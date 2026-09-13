@@ -16,6 +16,8 @@ struct PluginWorkerBoundary
     /** Schedules hidden editor construction only after control traffic has been quiet for the
         requested interval. Returns false when the caller should retry later. */
     virtual bool prewarmEditorIfIdle (int) noexcept { return true; }
+    /** Refreshes the program names after a bank has changed inside the vendor editor. */
+    virtual bool refreshProgramList() { return true; }
 };
 
 } // namespace ceditor::host

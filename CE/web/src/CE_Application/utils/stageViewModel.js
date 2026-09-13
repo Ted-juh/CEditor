@@ -12,18 +12,55 @@ const EMPTY_SLOT = Object.freeze({
   assigned: false, resolved: false,
 });
 
+/** A selected drawing is a profile, not proof that a MIDI device is connected.
+ * The display broker is independent of both ordinary MIDI and MIDI supplied by a DAW. */
+export function stageControllerContext(layout = {}, devices = {}, surface = {}, ownsAudio = true) {
+  const inputs = (devices.midiInputs ?? []).filter(input => input.enabled);
+  const names = inputs.map(input => input.name || 'MIDI input');
+  const displayState = {
+    connected: 'Connected', connecting: 'Connecting', heldElsewhere: 'Used by another instance', failed: 'Unavailable',
+  }[surface.state];
+  return {
+    profileName: layout.displayName || '',
+    midiLabel: !ownsAudio ? 'MIDI · From host'
+      : names.length === 1 ? `MIDI · ${names[0]}` : `MIDI · ${names.length} inputs enabled`,
+    midiDetail: !ownsAudio ? 'MIDI is supplied by the host application'
+      : names.length ? `Enabled MIDI inputs: ${names.join(', ')}` : 'Enable a MIDI input in Audio & MIDI',
+    midiEnabled: ownsAudio && names.length > 0,
+    displayLabel: displayState ? `Hardware display · ${displayState}${surface.device ? ` · ${surface.device}` : ''}` : '',
+    displayWarning: surface.state === 'heldElsewhere' || surface.state === 'failed',
+  };
+}
+
+function nextSongReadiness(item, preloads = []) {
+  if (!item) return null;
+  if (item.missing) return { state: 'warning', label: 'Needs attention', detail: 'The scene for this song is missing.' };
+  if (!item.rackRecordId) return null;
+  const preload = preloads.find(entry => entry.recordId === item.rackRecordId);
+  if (!preload) return { state: 'idle', label: 'Loads on selection', detail: 'This rack has not been preloaded.' };
+  // Report an error as soon as it arrives, even while other processors are still loading.
+  if (preload.failed > 0 || preload.error || ['degraded', 'failed'].includes(preload.state))
+    return { state: 'warning', label: 'Needs attention', detail: preload.error || 'One or more plug-ins could not be preloaded.' };
+  if (preload.state === 'ready')
+    return { state: 'ready', label: 'Rig preloaded', detail: 'The rack’s plug-ins have been prepared for loading.' };
+  return { state: 'loading', label: `Loading rig…${preload.total > 0 ? ` ${preload.ready}/${preload.total}` : ''}`,
+    detail: 'Preparing the next rack’s plug-ins.' };
+}
+
 export function stageSetlistContext(performance = {}) {
   const items = Array.isArray(performance?.setlist?.items) ? performance.setlist.items : [];
   const rawIndex = Number(performance?.setlist?.currentIndex ?? -1);
   const currentIndex = Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < items.length
     ? rawIndex : -1;
+  const next = currentIndex >= 0 ? items[currentIndex + 1] ?? null : items[0] ?? null;
 
   return {
     items,
     currentIndex,
     current: currentIndex >= 0 ? items[currentIndex] : null,
     previous: currentIndex > 0 ? items[currentIndex - 1] : null,
-    next: currentIndex >= 0 ? items[currentIndex + 1] ?? null : items[0] ?? null,
+    next,
+    nextReadiness: nextSongReadiness(next, performance?.setlist?.preloads),
     canPrevious: currentIndex > 0,
     canNext: items.length > 0 && currentIndex < items.length - 1,
     loadingIndex: Number(performance?.setlist?.loadingIndex ?? -1),

@@ -1,4 +1,6 @@
 <script>
+  import HostConfirmButton from './HostConfirmButton.svelte';
+  import HostPickupIndicator from './HostPickupIndicator.svelte';
   /**
    * HostSurfacePanel.svelte — the controller as a picture (rack-canvas plan, the surface note).
    *
@@ -19,12 +21,17 @@
    */
   import { onDestroy } from 'svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import Search from 'lucide-svelte/icons/search';
+  import GripVertical from 'lucide-svelte/icons/grip-vertical';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Radio from 'lucide-svelte/icons/radio';
+  import HostPartPicker from './HostPartPicker.svelte';
   import {
     hostSurface, hostSurfaceLayout, requestSurfaceLayout, hostState, hostMidiActivity,
     hostMidiLearn, cancelMidiLearn, clearControlSlotMidi,
-    hostParamDrag, assignControlSlot, clearControlSlot, hostParameters, requestParameters,
-    filterParameters, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
-    setControlSlotOptions,
+    hostParamDrag, clearControlSlot, hostParameters, requestParameters,
+    filterParameters, parameterShortlist, surfaceControlSlot, assignSurfaceControl, learnSurfaceControl,
+    setControlSlotOptions, focusRackPart,
     setUserSurface, clearUserSurface, learnUserSurface, finishUserSurfaceLearn,
   } from '../stores/instrumentHost.js';
 
@@ -118,6 +125,13 @@
   const addressable = (control) =>
     control.index >= 0 && ['encoder', 'fader', 'pad'].includes(control.kind);
 
+  const learningControl = (control) => $hostMidiLearn.armed
+    && $hostMidiLearn.pageId === (page?.pageId ?? '')
+    && ($hostMidiLearn.slotId === slotFor(control)?.slotId
+      || $hostMidiLearn.slotId === `${control.kind}-${control.index + 1}`);
+  let mappedCount = $derived(layout.controls.filter((control) => addressable(control)
+    && slotFor(control)?.assigned && slotFor(control)?.resolved).length);
+
   // The knob you are turning, lit — or the pad you are hitting. The frontend does the
   // matching because it already holds what every slot is bound to; the native side just
   // says which controller (or note) moved.
@@ -167,6 +181,8 @@
     // first minute rather than after a trip to the pages list.
     assignSurfaceControl(page?.pageId ?? '', control.kind, control.index,
                          $hostParamDrag.partId, $hostParamDrag.parameterId);
+    selectedControlId = control.controlId;
+    clearArmed = false;
     hostParamDrag.set({ partId: '', parameterId: '', name: '' });
   }
 
@@ -190,9 +206,21 @@
   // A slim column rather than the full Params view: enough to find a parameter and pick it
   // up, with the real editing left where it already is.
   let paramQuery = $state('');
+  let parameterFilter = $state('all');
+  const parameterFilters = [
+    { id: 'all', label: 'All' }, { id: 'favourites', label: 'Favourites' }, { id: 'recent', label: 'Recently touched' },
+  ];
   let focusedPart = $derived($hostState.rack.parts.find(
     (p) => p.partId === $hostState.rack.focusedPartId) ?? null);
-  let parameters = $derived(filterParameters($hostParameters.parameters, paramQuery));
+  let parameterSubset = $derived.by(() => {
+    if ($hostParameters.partId !== focusedPart?.partId) return [];
+    if (parameterFilter === 'all') return $hostParameters.parameters;
+    // These are separate filters: recently touched must include favourites as well.
+    const shortlist = parameterShortlist($hostParameters.parameters,
+      parameterFilter === 'favourites' ? $hostParameters.favourites : [], $hostParameters.touched);
+    return parameterFilter === 'favourites' ? shortlist.pinned : shortlist.recent;
+  });
+  let parameters = $derived(filterParameters(parameterSubset, paramQuery));
   let selectedParameter = $derived(
     parameters.find((parameter) => parameter.id === selectedParameterId) ?? null);
 
@@ -240,13 +268,18 @@
 
   onDestroy(() => clearTimeout(clearTimer));
 </script>
+<svelte:window onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(clearTimer); clearArmed = false; } }} />
 
 <div class="surface" data-testid="host-surface-panel">
+  <div class="workspace-title">
+    <div class="workspace-heading"><SlidersHorizontal size={18} /><div><h2>MIDI learn</h2>
+      <p>Drag a parameter onto a control, then learn its hardware binding.</p></div></div>
+    <span class="connection-state" class:connected={$hostSurface.state === 'connected'}>
+      <i></i>{$hostSurface.state === 'connected' ? ($hostSurface.device || 'Controller connected') : ($hostSurface.state || 'No controller connected')}
+    </span>
+  </div>
   <div class="surface-head">
-    {#if zoom}
-      <button type="button" class="ghost" data-testid="surface-back"
-              onclick={() => (zoom = '')}>← Whole instrument</button>
-    {/if}
+    <span class="eyebrow">CONTROLLER</span>
     {#if layout.userSurface && layout.profiles.length > 0}
       <!-- Two drawings exist: the one you described and the built-in one. Which is shown is
            a choice on the tab, not a consequence of a form — describing a controller must
@@ -281,16 +314,6 @@
         </select>
       </label>
     {/if}
-    <!-- The drag prompt lives HERE, in a row of fixed height, and NOT down beside the
-         drawing. Put in the note under the plate it read better and broke the feature: the
-         sentence wrapped to a different number of lines, the panel above it resized, and the
-         knob you were aiming at moved out from under the pointer mid-drag. Anything that
-         changes size when a drag starts is a target that runs away. -->
-    <span class="dim surface-state">{$hostParamDrag.parameterId
-      ? `Drop ${$hostParamDrag.name} on a knob`
-      : $hostSurface.state === 'connected'
-        ? `connected · ${$hostSurface.device || 'surface'}`
-        : $hostSurface.state}</span>
   </div>
 
   {#if describing}
@@ -321,9 +344,9 @@
                   onclick={() => learnUserSurface()}>Count them for me</button>
         {/if}
         {#if layout.userSurface}
-          <button type="button" class="ghost danger" data-testid="surface-describe-clear"
+          <HostConfirmButton identity="user-surface" data-testid="surface-describe-clear"
                   title="Go back to the built-in profile for a connected controller"
-                  onclick={() => { clearUserSurface(); describing = false; }}>Forget it</button>
+                  onclick={() => { clearUserSurface(); describing = false; }}>Forget it</HostConfirmButton>
         {/if}
       </div>
       {#if layout.learning}
@@ -346,11 +369,21 @@
     <div class="surface-body">
       <!-- The drag source, beside the drawing rather than a tab away. -->
       <div class="param-column" data-testid="surface-parameters">
+        <div class="panel-heading"><strong>Parameters</strong><span>{parameters.length}</span></div>
+        <HostPartPicker parts={$hostState.rack.parts} partId={focusedPart?.partId ?? ''}
+          label="INSTRUMENT" ariaLabel="Parameter source instrument"
+          onchange={(id) => focusRackPart(id, { followEditor: false })} />
         {#if !focusedPart?.hasInstrument}
           <div class="empty-hint">Focus a part with an instrument to see its parameters.</div>
         {:else}
-          <input type="search" placeholder="Search parameters…" bind:value={paramQuery}
-                 aria-label="Search this instrument's parameters" />
+          <label class="parameter-search"><Search size={14} /><input type="search" placeholder="Search parameters…" bind:value={paramQuery}
+                 aria-label="Search this instrument's parameters" /></label>
+          <div class="parameter-filters" role="group" aria-label="Parameter filter">
+            {#each parameterFilters as filter (filter.id)}
+              <button type="button" aria-pressed={parameterFilter === filter.id}
+                onclick={() => (parameterFilter = filter.id)}>{filter.label}</button>
+            {/each}
+          </div>
           <div class="param-scroll">
             {#each parameters as parameter (parameter.id)}
               <button type="button" class="param-chip" draggable="true"
@@ -368,20 +401,35 @@
                    ondragend={() => hostParamDrag.set({ partId: '', parameterId: '', name: '' })}>
                 <!-- A plug-in that reports no name for a parameter still has one to drag: its
                      id, which is at least the thing the plug-in itself calls it. -->
-                {parameter.name || parameter.id || `#${parameter.index}`}
+                <GripVertical size={13} /><span>{parameter.name || parameter.id || `#${parameter.index}`}</span>
               </button>
             {/each}
             {#if parameters.length === 0}
-              <div class="empty-hint">No parameter matches.</div>
+              <div class="empty-hint">{paramQuery.trim() ? 'No parameter matches.'
+                : parameterFilter === 'favourites' ? 'No favourites.'
+                : parameterFilter === 'recent' ? 'No recently touched parameters.' : 'No parameters.'}</div>
             {/if}
           </div>
+          <p class="parameter-hint">Drag to map · or select and assign</p>
         {/if}
       </div>
 
-      <!-- The unit's own proportions, narrowed to whatever slice is on screen: zooming is one
-           viewBox, not a second drawing. Height leads and width follows, so the whole
-           controller fits the dock rather than running off the bottom of it. -->
-      <div class="surface-plate" style={`aspect-ratio:${visibleAspect}`}>
+      <!-- Fit the authored geometry within the available canvas; drag feedback never resizes it. -->
+      <section class="controller-canvas" aria-label="Controller mapping">
+        <div class="panel-heading"><strong>{region?.label || 'Whole controller'}</strong>
+          <span>{mappedCount} mapped</span></div>
+        <div class="region-tabs" aria-label="Controller regions">
+          <button type="button" class:active={!zoom} data-testid="surface-back"
+                  onclick={() => (zoom = '')}>Overview</button>
+          {#each layout.regions as r (r.id)}
+            <button type="button" class:active={zoom === r.id}
+                    aria-pressed={zoom === r.id} data-testid={`surface-region-${r.id}`}
+                    title={`${r.addressable} of ${r.count} controls can be assigned`}
+                    onclick={() => (zoom = zoom === r.id ? '' : r.id)}>{r.label}</button>
+          {/each}
+        </div>
+        <div class="canvas-stage">
+      <div class="surface-plate" style={`--surface-aspect:${visibleAspect};aspect-ratio:${visibleAspect}`}>
         {#each layout.controls as control (control.controlId)}
           {@const slot = slotFor(control)}
           <button type="button"
@@ -391,11 +439,14 @@
                   class:unresolved={slot?.assigned && !slot.resolved}
                   class:lit={slot && litSlotId === slot.slotId}
                   class:selected={selectedControlId === control.controlId}
-                  class:learning={$hostMidiLearn.armed && selectedControlId === control.controlId}
+                  class:learning={learningControl(control)}
                   class:target={hoveredId === control.controlId}
                   data-testid={`surface-${control.controlId}`}
                   title={title(control)}
                   aria-label={title(control)}
+                  aria-pressed={selectedControlId === control.controlId}
+                  tabindex={region && (control.x < region.x || control.y < region.y
+                    || control.x >= region.x + region.w || control.y >= region.y + region.h) ? -1 : 0}
                   class:latched={slot?.toggle && slot?.latched}
                   ondragover={(e) => dragOver(e, control)}
                   ondrop={(e) => dropOn(e, control)}
@@ -412,19 +463,33 @@
                  that drive nothing. -->
             {#if slot?.assigned}
               <span class="ctl-assigned">{slot.displayName}</span>
+              <HostPickupIndicator direction={slot.pickupDirection} />
             {:else}
               <span class="ctl-label">{control.label}</span>
             {/if}
           </button>
         {/each}
       </div>
+        </div>
+        <div class="canvas-caption" role="status" title={$hostParamDrag.name}>
+          {$hostParamDrag.parameterId ? `Drop ${$hostParamDrag.name || 'parameter'} onto a control`
+            : 'Select a control to inspect · drop a parameter to map'}
+        </div>
+        <div class="surface-regions">
+          <span class="state-key"><i class="empty"></i>Empty</span>
+          <span class="state-key"><i class="mapped"></i>Mapped</span>
+          <span class="state-key"><i class="problem"></i>Unresolved</span>
+          <span class="state-key"><i class="moving"></i>Moving</span>
+        </div>
+      </section>
 
       <aside class="control-inspector" data-testid="surface-control-inspector"
              aria-label="Selected controller assignment">
+        <div class="panel-heading"><strong>Assignment</strong></div>
         {#if selectedControl}
           <div class="inspector-head">
             <div>
-              <span class="eyebrow">SELECTED CONTROL</span>
+              <span class="eyebrow">HARDWARE CONTROL</span>
               <strong>{kindLabel[selectedControl.kind] ?? selectedControl.kind} {selectedControl.label}</strong>
             </div>
             <span class="state-pill" class:assigned={selectedSlot?.assigned}
@@ -438,7 +503,8 @@
             <p class="empty-hint">This control is shown because it exists on the hardware, but the current profile cannot address it.</p>
           {:else}
             <div class="assignment-summary">
-              <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}</strong>
+              <strong>{selectedSlot?.assigned ? selectedSlot.displayName : 'No parameter assigned'}
+                <HostPickupIndicator direction={selectedSlot?.pickupDirection} /></strong>
               <span>{selectedSlot?.partName || (selectedParameter
                 ? `Ready to assign ${selectedParameter.name || selectedParameter.id}`
                 : 'Select a parameter or drag one onto the control')}</span>
@@ -459,6 +525,13 @@
                 {$hostMidiLearn.armed ? 'Cancel learning' : 'Learn hardware'}
               </button>
             </div>
+            {#if $hostMidiLearn.armed}
+              <div class="learning-notice" role="status"><Radio size={16} /><span>
+                <strong>Listening for MIDI…</strong>
+                {learningControl(selectedControl) ? 'Move the knob, fader or pad you want to bind.'
+                  : 'Learning is active on another control. Cancel it to start here.'}
+              </span></div>
+            {/if}
 
             {#if selectedSlot?.assigned}
               <div class="option-grid">
@@ -489,54 +562,69 @@
                   </select>
                 </label>
               {/if}
+              {#if selectedSlot.midiCc >= 0 && selectedSlot.midiNote < 0 && selectedControl.kind !== 'pad' && !selectedSlot.toggle}
+                <label>MIDI mode
+                  <select aria-label="MIDI control mode" value={selectedSlot.midiRelative ? 'relative' : 'absolute'}
+                          onchange={(e) => updateSelectedOptions({ midiRelative: e.currentTarget.value === 'relative' })}>
+                    <option value="absolute">Absolute</option>
+                    <option value="relative">Relative (1 / 127)</option>
+                  </select>
+                </label>
+                {#if !selectedSlot.midiRelative}
+                  <div class="check-row">
+                    <span title="Wait until the physical control reaches the current software value">Pickup</span>
+                    <PropertyToggle compact value={selectedSlot.midiPickup} ariaLabel="MIDI pickup"
+                                    onchange={(value) => updateSelectedOptions({ midiPickup: value })} />
+                  </div>
+                {/if}
+              {/if}
               <div class="inspector-actions secondary">
                 {#if selectedSlot.midiCc >= 0 || selectedSlot.midiNote >= 0}
-                  <button type="button" class="ghost"
-                          onclick={() => clearControlSlotMidi(page.pageId, selectedSlot.slotId)}>Clear MIDI binding</button>
+                  <HostConfirmButton identity={JSON.stringify([page.pageId, selectedSlot.slotId])} title="Clear MIDI binding" aria-label="Clear MIDI binding" type="button" class="ghost"
+                          onclick={() => clearControlSlotMidi(page.pageId, selectedSlot.slotId)}>Clear MIDI binding</HostConfirmButton>
                 {/if}
                 <button type="button" class="ghost danger" class:confirming={clearArmed}
                         data-testid="surface-clear-selected" onclick={clearSelected}>
-                  {clearArmed ? 'Confirm clear' : 'Clear assignment'}
+                  {clearArmed ? 'Confirm' : 'Clear assignment'}
                 </button>
               </div>
             {/if}
           {/if}
         {:else}
           <div class="inspector-empty">
-            <span class="eyebrow">ASSIGNMENT INSPECTOR</span>
+            <SlidersHorizontal size={26} />
             <strong>Select a control</strong>
-            <p>Click an encoder, fader or pad to inspect it. Clicking never clears it.</p>
+            <p>Choose a knob, fader or pad on the controller to assign a parameter and learn MIDI.</p>
           </div>
         {/if}
       </aside>
     </div>
 
-    <div class="surface-regions">
-      <span class="state-key"><i class="empty"></i>Empty</span>
-      <span class="state-key"><i class="mapped"></i>Mapped</span>
-      <span class="state-key"><i class="problem"></i>Unresolved</span>
-      <span class="state-key"><i class="moving"></i>Moving</span>
-      {#each layout.regions as r (r.id)}
-        <button type="button" class="toggle" class:on={zoom === r.id}
-                data-testid={`surface-region-${r.id}`}
-                title={r.addressable === r.count
-                         ? `${r.count} ${r.label.toLowerCase()}, all mapped`
-                         : `${r.count} ${r.label.toLowerCase()}, ${r.addressable} mapped`}
-                onclick={() => (zoom = zoom === r.id ? '' : r.id)}>
-          {r.label}
-          <span class="region-count" class:none={r.addressable === 0}>{r.addressable}/{r.count}</span>
-        </button>
-      {/each}
-    </div>
   {/if}
 </div>
 
 <style>
-  .surface { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
-  .surface-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .surface { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; overflow: auto; container-type: inline-size; }
+  button, input, select { font: inherit; }
+  button, select, input { border: 1px solid var(--host-line); border-radius: var(--host-radius-control); background: var(--host-surface-raised); color: var(--host-text); min-height: 30px; padding: 5px 8px; box-sizing: border-box; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--host-accent); background: var(--host-accent-surface); }
+  button:disabled { opacity: .4; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--host-accent); outline-offset: 2px; }
+  button.ghost { background: transparent; }
+  button.danger { color: #e6aaaa; }
+  button.on { border-color: #d4ad61; color: #f1ce87; background: #352d1e; }
+  .workspace-title, .workspace-heading { display: flex; align-items: center; gap: 10px; }
+  .workspace-title { justify-content: space-between; flex-wrap: wrap; }
+  .workspace-heading > :global(svg) { color: var(--host-accent); flex: none; }
+  h2 { margin: 0; font-size: 17px; font-weight: 650; }
+  .workspace-heading p { margin: 3px 0 0; color: var(--host-text-dim); font-size: 12px; }
+  .connection-state { display: inline-flex; align-items: center; gap: 6px; color: var(--host-text-dim); font-size: 11px; }
+  .connection-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--host-text-dim); }
+  .connection-state.connected i { background: #80ba99; }
+  .surface-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
   .dim { color: var(--host-text-dim); font-size: 12px; }
-  .surface-state { margin-left: auto; white-space: nowrap; }
-  .page-picker { display: flex; flex-direction: column; gap: 2px; }
+  .page-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
   .page-picker > span, .eyebrow { color: #81acd0; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
   .page-picker select { min-width: 150px; font-weight: 650; }
 
@@ -547,32 +635,51 @@
   .describe label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b5c0c9; }
   .describe input[type='number'] { width: 62px; }
 
-  /* Left to right, no centring: the column, then the drawing, then whatever is left. Centred,
-     a short dock put a void the width of the column on the LEFT and the drawing in the
-     middle of nowhere. */
   .surface-body {
     flex: 1;
-    min-height: 120px;
-    display: flex;
-    gap: 10px;
-    justify-content: flex-start;
+    min-height: 360px;
+    display: grid;
+    grid-template-columns: minmax(180px, 230px) minmax(240px, 1fr) minmax(230px, 280px);
+    gap: 12px;
   }
   .param-column {
-    flex: none;
-    width: 260px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
     min-height: 0;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--host-line);
+    border-radius: var(--host-radius-panel);
+    background: var(--host-surface);
   }
+  .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
+  .panel-heading strong { font-size: 12px; font-weight: 650; }
+  .panel-heading > span { font-size: 11px; color: var(--host-text-dim); }
   .param-column input { width: 100%; box-sizing: border-box; font-size: 12px; }
-  .param-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-  .param-chip {
+  .parameter-search { position: relative; display: flex; align-items: center; color: var(--host-text-dim); }
+  :global(.host-workspace.host-workspace) .surface .param-column .parameter-search input[type='search'] { min-width: 0; padding-left: 28px; }
+  .parameter-search > :global(svg) { position: absolute; left: 8px; pointer-events: none; }
+  .parameter-filters { display: flex; flex-wrap: wrap; gap: 4px; }
+  :global(.host-workspace.host-workspace) .surface .param-column .parameter-filters button {
+    min-height: 28px; padding: 3px 5px; font-size: 11px; white-space: nowrap;
+  }
+  :global(.host-workspace.host-workspace) .surface .param-column .parameter-filters button[aria-pressed='true'] {
+    color: var(--host-text); background: var(--host-accent-surface); border-color: var(--host-accent);
+  }
+  .param-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .parameter-hint { margin: 0; font-size: 10px; color: var(--host-text-dim); }
+  .empty-hint { padding: 12px; font-size: 12px; color: var(--host-text-dim); line-height: 1.5; }
+  :global(.host-workspace.host-workspace) .surface .param-column button.param-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
     min-height: 30px;
-    padding: 5px 8px;
-    border: 1px solid var(--host-line-soft);
+    padding: 5px 6px;
+    border: 1px solid transparent;
     border-radius: var(--host-radius-control);
-    background: var(--host-surface-raised);
+    background: transparent;
     color: var(--host-text-soft);
     font-size: 12px;
     cursor: grab;
@@ -580,18 +687,27 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .param-chip > :global(svg) { flex: none; color: var(--host-text-dim); opacity: .6; }
+  .param-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .param-chip:hover { border-color: #5b9bd5; color: #d6dbe0; }
   .param-chip.dragging { opacity: 0.45; }
-  .param-chip.selected { border-color: #79b9ee; background: #263b4c; color: #eef7fd; }
+  :global(.host-workspace.host-workspace) .surface .param-column button.param-chip.selected { border-color: var(--host-accent); background: var(--host-accent-surface); color: var(--host-text); }
   .surface-plate {
     position: relative;
-    height: 100%;
-    max-width: 100%;
+    flex: none;
+    width: min(100cqw, calc(100cqh * var(--surface-aspect)));
     border: 1px solid var(--host-line);
     border-radius: var(--host-radius-panel);
     background: var(--host-bg-deep);
     overflow: hidden;
   }
+  .controller-canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); background: var(--host-surface); }
+  .region-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  :global(.host-workspace.host-workspace) .surface .region-tabs button { font-size: 11px; min-height: 28px; background: transparent; border-color: transparent; padding: 4px 7px; }
+  :global(.host-workspace.host-workspace) .surface .region-tabs button.active { background: var(--host-accent-surface); border-color: var(--host-accent); }
+  .canvas-stage { flex: 1; min-height: 120px; min-width: 0; container-type: size; display: flex; justify-content: center; align-items: center; }
+  /* This line never wraps: starting a drag must not move the target under the pointer. */
+  .canvas-caption { flex: none; height: 18px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--host-text-dim); }
 
   /* .ctl.mapped further down sets a background at EQUAL specificity, so a plain .ctl.assigned
      rule loses to it on source order and every assigned knob stays the unassigned blue —
@@ -630,6 +746,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
+    min-height: 0;
     border: 1px solid #333d47;
     border-radius: 2px;
     background: #1b2127;
@@ -643,7 +760,8 @@
   .ctl.mapped { border-color: #4d7fae; background: #22303c; color: #b8c6d2; cursor: pointer; }
   .ctl.mapped:hover { border-color: #7fb4e0; background: #2a3c4b; }
 
-  .ctl.encoder { border-radius: 50%; }
+  .ctl.encoder { border-radius: 50%; box-shadow: inset 0 2px 6px #0005; }
+  .ctl.encoder::before { content: ''; position: absolute; top: 8%; left: calc(50% - 1px); width: 2px; height: 12%; background: currentColor; opacity: .65; }
   .ctl.pad { border-radius: 3px; }
   .ctl.fader { border-radius: 1px; background: #171c21; }
   /* A latched pad is a pad that is ON, and it has to say so from across a room — the LED on
@@ -653,11 +771,10 @@
   .ctl.keys { background: #2a2f34; border-color: #3b4652; }
   .ctl.display { background: #16202a; border-color: #3f5162; }
 
-  .ctl-label { pointer-events: none; white-space: nowrap; }
+  .ctl-label { pointer-events: none; white-space: nowrap; font-size: clamp(7px, 15cqw, 14px); }
 
   .control-inspector {
-    flex: none;
-    width: 280px;
+    min-width: 0;
     min-height: 0;
     overflow-y: auto;
     display: flex;
@@ -672,19 +789,26 @@
   .inspector-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .inspector-head > div, .inspector-empty { display: flex; flex-direction: column; gap: 5px; }
   .inspector-head strong { font-size: 14px; }
-  .state-pill { flex: none; padding: 3px 6px; border: 1px solid #59636c; color: #9da8b1; font-size: 9px; letter-spacing: 0.08em; }
+  .state-pill { flex: none; padding: 3px 6px; border: 1px solid #59636c; border-radius: 4px; color: #9da8b1; font-size: 9px; letter-spacing: 0.08em; }
   .state-pill.assigned { border-color: #4f8b69; color: #a7d8bb; }
   .state-pill.problem { border-color: #8b5555; color: #e6aaaa; }
-  .assignment-summary { display: flex; flex-direction: column; gap: 4px; padding: 9px; border: 1px solid var(--host-line-soft); background: var(--host-bg-deep); }
+  .assignment-summary { display: flex; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); background: var(--host-bg-deep); overflow-wrap: anywhere; }
   .assignment-summary span, .inspector-empty p { color: #9ba6af; font-size: 11px; line-height: 1.35; }
-  .inspector-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .inspector-actions { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .inspector-actions button { font-size: 12px; }
+  .inspector-actions button:first-child:not(.ghost):not(:disabled) { background: var(--host-accent-surface); border-color: var(--host-accent); }
+  .learning-notice { display: flex; gap: 8px; padding: 10px; border: 1px solid #776039; border-radius: var(--host-radius-control); color: #dfc18e; background: #30281c; font-size: 11px; line-height: 1.5; }
+  .learning-notice > :global(svg) { flex: none; margin-top: 2px; }
+  .learning-notice span { display: flex; flex-direction: column; gap: 3px; }
   .inspector-actions.secondary { display: flex; flex-wrap: wrap; }
   .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .option-grid label, .control-inspector > label { display: flex; flex-direction: column; gap: 4px; color: #aab5be; font-size: 11px; }
   .option-grid input { width: 100%; box-sizing: border-box; }
   .control-inspector .check-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; color: #aab5be; font-size: 11px; }
   .control-inspector button.confirming { border-color: #c57575; background: #51282c; color: #ffd8d8; }
-  .inspector-empty { margin: auto 0; text-align: center; }
+  .inspector-empty { margin: auto 0; text-align: center; align-items: center; padding: 12px; }
+  .inspector-empty > :global(svg) { color: var(--host-text-dim); margin-bottom: 8px; }
+  .inspector-empty p { margin: 4px 0; }
 
   .surface-regions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .state-key { display: inline-flex; align-items: center; gap: 4px; color: #8f9ba5; font-size: 10px; }
@@ -692,12 +816,21 @@
   .state-key i.mapped { border-color: #5f9e79; background: #22362a; }
   .state-key i.problem { border-color: #7f5050; background: #2a1d1d; }
   .state-key i.moving { border-color: #e0c060; background: #4a4021; }
-  .region-count { margin-left: 4px; color: #9fd5b6; font-size: 11px; }
-  .region-count.none { color: #7d8894; }
-  .surface-note { margin-left: auto; max-width: 320px; }
-
-  @media (max-width: 1050px) {
-    .param-column { width: 210px; }
-    .control-inspector { width: 240px; }
+  @container (max-width: 900px) {
+    .surface-body { flex: none; grid-template-columns: minmax(170px, .7fr) minmax(240px, 1.3fr); }
+    .param-column, .controller-canvas { height: 330px; box-sizing: border-box; }
+    .control-inspector { grid-column: 1 / -1; overflow: visible; }
+    .inspector-actions { grid-template-columns: 1fr 1fr; }
+    .page-picker { margin-left: 0; }
+  }
+  @container (max-width: 520px) {
+    .surface-body { grid-template-columns: minmax(0, 1fr); }
+    .param-column { height: 240px; }
+    .controller-canvas { height: 300px; }
+    .control-inspector { grid-column: 1; }
+    .page-picker select { min-width: 0; max-width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ctl.learning { animation: none; outline: 2px solid #dfc18e; }
   }
 </style>

@@ -2,12 +2,25 @@
  * Icon assignments for the insert catalog (models/insertCatalog.js), shared
  * by every surface that renders the catalog. One icon per meaning: no icon
  * appears twice anywhere in this file (types + categories + fallback), and
- * the eleven custom components (components/icons/) follow lucide's drawing
+ * the custom components (components/icons/) follow lucide's drawing
  * conventions so the set reads as one family.
+ *
+ * That "no icon appears twice" was a claim rather than a fact, and eight types
+ * had no entry at all, so the flyouts drew the blank fallback square in pairs:
+ * Tabbed Container beside Scroll Area and Progress Bar beside Shape in Layout,
+ * Pitch Wheel beside Mod Wheel in Values, Keyboard and Step Sequencer as the
+ * first two rows of Music. `Numpad` meanwhile borrowed `Number`'s hash.
+ * `insertCatalogIcons.test.js` now checks both halves — every insertable type
+ * has an icon, and no icon is used twice — so the claim is a test.
+ *
+ * Sixteen icons are drawn here rather than taken from lucide, for the things
+ * lucide has no picture of: a knob, a touch strip, a pitch wheel. Each has to
+ * say what it is at 14px, which is the size the flyout draws them at.
  */
 import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
 import BadgeCheck from 'lucide-svelte/icons/badge-check';
 import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
+import Calculator from 'lucide-svelte/icons/calculator';
 import CircleDashed from 'lucide-svelte/icons/circle-dashed';
 import CircleDot from 'lucide-svelte/icons/circle-dot';
 import Container from 'lucide-svelte/icons/container';
@@ -18,6 +31,7 @@ import Group from 'lucide-svelte/icons/group';
 import Hash from 'lucide-svelte/icons/hash';
 import Image from 'lucide-svelte/icons/image';
 import Joystick from 'lucide-svelte/icons/joystick';
+import KeyboardMusic from 'lucide-svelte/icons/keyboard-music';
 import Layers from 'lucide-svelte/icons/layers';
 import LayoutGrid from 'lucide-svelte/icons/layout-grid';
 import LayoutTemplate from 'lucide-svelte/icons/layout-template';
@@ -32,10 +46,12 @@ import Music from 'lucide-svelte/icons/music';
 import OctagonAlert from 'lucide-svelte/icons/octagon-alert';
 import Orbit from 'lucide-svelte/icons/orbit';
 import Palette from 'lucide-svelte/icons/palette';
+import PanelsTopLeft from 'lucide-svelte/icons/panels-top-left';
 import Piano from 'lucide-svelte/icons/piano';
 import Puzzle from 'lucide-svelte/icons/puzzle';
 import RefreshCw from 'lucide-svelte/icons/refresh-cw';
 import Repeat from 'lucide-svelte/icons/repeat';
+import Shapes from 'lucide-svelte/icons/shapes';
 import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
 import Sparkle from 'lucide-svelte/icons/sparkle';
 import Spline from 'lucide-svelte/icons/spline';
@@ -53,12 +69,17 @@ import ChordPadIcon from '../components/icons/ChordPadIcon.svelte';
 import KnobIcon from '../components/icons/KnobIcon.svelte';
 import MatrixPatchIcon from '../components/icons/MatrixPatchIcon.svelte';
 import MetronomeIcon from '../components/icons/MetronomeIcon.svelte';
+import ModWheelIcon from '../components/icons/ModWheelIcon.svelte';
 import PendulumIcon from '../components/icons/PendulumIcon.svelte';
+import PitchWheelIcon from '../components/icons/PitchWheelIcon.svelte';
+import ProgressBarIcon from '../components/icons/ProgressBarIcon.svelte';
 import PushButtonIcon from '../components/icons/PushButtonIcon.svelte';
 import RangeSliderIcon from '../components/icons/RangeSliderIcon.svelte';
 import RibbonStripIcon from '../components/icons/RibbonStripIcon.svelte';
+import ScrollAreaIcon from '../components/icons/ScrollAreaIcon.svelte';
 import SliderIcon from '../components/icons/SliderIcon.svelte';
 import StaircaseIcon from '../components/icons/StaircaseIcon.svelte';
+import StepSequencerIcon from '../components/icons/StepSequencerIcon.svelte';
 
 export const CATEGORY_ICONS = {
   layout: LayoutTemplate,
@@ -75,10 +96,14 @@ export const TYPE_ICONS = {
   TextInput: TextCursorInput,
   Container: Container,
   Group: Group,
+  TabContainer: PanelsTopLeft,
+  ScrollArea: ScrollAreaIcon,
   Image: Image,
   LcdDisplay: Monitor,
   PixelDisplay: Grid3x3,
   Meter: Gauge,
+  ProgressBar: ProgressBarIcon,
+  Shape: Shapes,
   // Buttons & Choices
   MomentaryButton: PushButtonIcon,
   ToggleButton: ToggleLeft,
@@ -94,8 +119,10 @@ export const TYPE_ICONS = {
   Range: RangeSliderIcon,
   Number: Hash,
   Crossfader: ArrowLeftRight,
-  Numpad: Hash,
+  Numpad: Calculator,
   Ribbon: RibbonStripIcon,
+  PitchWheel: PitchWheelIcon,
+  ModWheel: ModWheelIcon,
   Macro: CircleDashed,
   VectorJoystick: Joystick,
   CustomComponent: Puzzle,
@@ -111,6 +138,8 @@ export const TYPE_ICONS = {
   Constellation: Sparkle,
   Constraint: Link2,
   // Music & Performance
+  Keyboard: KeyboardMusic,
+  StepSequencer: StepSequencerIcon,
   ChordPad: ChordPadIcon,
   Arp: ListMusic,
   NoteRibbon: Piano,

@@ -1,4 +1,5 @@
 <script>
+  import EffectSurface from './EffectSurface.svelte';
   import { gradientToCSS } from '../../CE_Application/utils/gradientCSS.js';
   import { normalizeCorner } from '../../CE_Application/utils/cornerNormalization.js';
   import { buildInsetFillClipPath } from '../../CE_Application/utils/cornerPaths.js';
@@ -585,11 +586,15 @@
 </script>
 
 <!-- Fill. Only the layers that draw — see `visibleFillLayers`. -->
+<EffectSurface effects={background?._children?.Effects} {width} {height} target="background">
 {#each visibleFillLayers as layerId (layerId)}
-  <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
+  <EffectSurface effects={fill?._children?.[`${layerId[0].toUpperCase()}${layerId.slice(1)}Effects`]} {width} {height} target={layerId}>
+    <div class="bg-fill-layer" style={fillLayerStyles[layerId]}></div>
+  </EffectSurface>
 {/each}
 
 <!-- Border (CSS) — the plain case, one element instead of eleven -->
+<EffectSurface effects={border?._children?.Effects} {width} {height} target="border">
 {#if cssBorder}
   <div class="bg-border-css" style={cssBorder}></div>
 {/if}
@@ -725,6 +730,9 @@
 
   </svg>
 {/if}
+
+</EffectSurface>
+</EffectSurface>
 
 <style>
   .bg-fill-layer {

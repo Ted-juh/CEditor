@@ -47,3 +47,27 @@ export const TYPOGRAPHY_FEATURE_OPTIONS = [
   { key: 'fractions', label: 'Fractions', tags: ['frac'] },
   { key: 'slashedZero', label: 'Slash 0', tags: ['zero'] },
 ];
+
+/**
+ * Text-flow modes. Pure data, so it lives on this side of the split — `typographyModel.js` needs
+ * the list and must not drag lucide into a module that is meant to run under plain node.
+ */
+export const FLOW_MODE_OPTIONS = [
+  { value: 'rotate', label: 'Rotate' },
+  { value: 'line', label: 'Line' },
+  { value: 'stair', label: 'Stair' },
+  { value: 'arc', label: 'Arc' },
+  { value: 'circle', label: 'Circle' },
+  { value: 'vertical', label: 'Vertical' },
+  { value: 'wave', label: 'Wave' },
+  { value: 'zigzag', label: 'Zigzag' },
+  { value: 'spiral', label: 'Spiral' },
+  { value: 'perimeter', label: 'Perimeter' },
+  { value: 'polyline', label: 'Polyline' },
+  { value: 'bezier', label: 'Bezier' },
+  { value: 'freehand', label: 'Freehand' },
+];
+
+/** Reading orientations without their icons — the icon-bearing TEXT_READING_OPTIONS stays in
+ *  textEditorOptions.js, since an icon is a Svelte component and this side has none. */
+export const TEXT_READING_VALUES = ['ltr', 'rtl', 'mirrored'];

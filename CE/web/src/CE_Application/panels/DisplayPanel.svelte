@@ -11,6 +11,16 @@
   import Play from 'lucide-svelte/icons/play';
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import TypeIcon from 'lucide-svelte/icons/type';
+  import Boxes from 'lucide-svelte/icons/boxes';
+  import MonitorIcon from 'lucide-svelte/icons/monitor';
+  // Braces: Share2 is Routes' and Cable is Device's, and a strip where two tabs wear the same
+  // icon is a strip you cannot scan.
+  import Braces from 'lucide-svelte/icons/braces';
+  import LibraryBig from 'lucide-svelte/icons/library-big';
+  import Spline from 'lucide-svelte/icons/spline';
+  import PencilRuler from 'lucide-svelte/icons/pencil-ruler';
   import Terminal from 'lucide-svelte/icons/terminal';
   import Activity from 'lucide-svelte/icons/activity';
   // Per-icon import, never the lucide-svelte barrel — treeshake is off, so a barrel drags the whole
@@ -29,6 +39,7 @@
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
@@ -44,16 +55,24 @@
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
-  // 'effects' is gone, not renamed: it was a placeholder tab reading "full
-  // editing coming soon" in a prime slot next to Colors and Gradient (B10).
-  // Effects have real editing in the properties panel; a tab that only points
-  // elsewhere costs a slot and a click and teaches the user that the tabs here
-  // may be empty. Left out of this set too, so an install that had it stored as
-  // its last tab sanitises to Colors rather than to nothing at all.
-  // ('layers' was missing here while shipping as a tab — same sanitiser, same
-  // consequence, so it is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  // 'effects' is BACK, and the reason it went is why this one is built the way it is. The first
+  // one was a placeholder reading "full editing coming soon" in a prime slot next to Colors and
+  // Gradient (B10), and it was deleted because a tab that only points elsewhere costs a slot and a
+  // click and teaches the user that the tabs here may be empty. EffectsTab does the editing — the
+  // stack, the specimen, the settings and the looks are all in it — which is the bar that rule
+  // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
+  // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
+  // is listed now.)
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
+    effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
+    type: () => import('../components/TextDock.svelte').then((module) => ({ default: module.default })),
+    assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
+    screen: () => import('../components/ScreenTab.svelte').then((module) => ({ default: module.default })),
+    api: () => import('../components/ApiTab.svelte').then((module) => ({ default: module.default })),
+    library: () => import('../components/LibraryTab.svelte').then((module) => ({ default: module.default })),
+    animation: () => import('../components/AnimationTab.svelte').then((module) => ({ default: module.default })),
+    designer: () => import('../components/DesignerTab.svelte').then((module) => ({ default: module.default })),
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     layers: () => import('./LayersTab.svelte').then((module) => ({ default: module.default })),
@@ -281,6 +300,22 @@
       currentGradient = deepClone(t._initialGradient);
       openTabForAction(impliedDockTab({ gradientTarget: t, lastTab: activeTab }));
     });
+  });
+
+  // --- Editor target: bring the right tab up when something arms it from outside ---
+  // Unlike colour and gradient there is no value to copy in: these tabs read the control itself, so
+  // this only has to notice a NEW target and open its tab. The id guard is what keeps it from
+  // re-opening on every unrelated re-run, since an editor target is long-lived by design (see
+  // stores/editorTarget.js). The kind decides the tab, so adding a tab needs no change here.
+  let lastEditorTargetId = null;
+  $effect(() => {
+    const t = $editorTarget;
+    const id = t ? `${t.kind}:${t.controlId}:${t.domain ?? ''}` : null;
+    if (id && id !== lastEditorTargetId) {
+      lastEditorTargetId = id;
+      openTabForAction(impliedDockTab({ editorTarget: t, lastTab: activeTab }));
+    }
+    if (!t) lastEditorTargetId = null;
   });
 
   // Stop color editing mode
@@ -655,6 +690,14 @@
   const tabs = [
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
+    { id: 'effects',  label: 'Effects',  icon: Sparkles },
+    { id: 'type',     label: 'Text',     icon: TypeIcon },
+    { id: 'assets',   label: 'Assets',   icon: Boxes },
+    { id: 'screen',   label: 'Screen',   icon: MonitorIcon },
+    { id: 'api',      label: 'API',      icon: Braces },
+    { id: 'library',  label: 'Library',  icon: LibraryBig },
+    { id: 'animation', label: 'Animation', icon: Spline },
+    { id: 'designer', label: 'Designer', icon: PencilRuler },
     { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
     { id: 'viewer',   label: 'Viewer',   icon: Image },
     { id: 'layers',   label: 'Layers',   icon: LayersIcon },
@@ -781,6 +824,46 @@
             onswatchrightclick={handleSwatchRightClick}
           />
         </div>
+      </div>
+    {:else if activeTab === 'effects' && activeTabComponent?.default}
+      {@const EffectsTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <EffectsTab />
+      </div>
+    {:else if activeTab === 'type' && activeTabComponent?.default}
+      {@const TypographyTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <TypographyTab />
+      </div>
+    {:else if activeTab === 'assets' && activeTabComponent?.default}
+      {@const AssetsTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <AssetsTab />
+      </div>
+    {:else if activeTab === 'screen' && activeTabComponent?.default}
+      {@const ScreenTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <ScreenTab />
+      </div>
+    {:else if activeTab === 'api' && activeTabComponent?.default}
+      {@const ApiTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <ApiTab />
+      </div>
+    {:else if activeTab === 'library' && activeTabComponent?.default}
+      {@const LibraryTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <LibraryTab />
+      </div>
+    {:else if activeTab === 'animation' && activeTabComponent?.default}
+      {@const AnimationTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <AnimationTab />
+      </div>
+    {:else if activeTab === 'designer' && activeTabComponent?.default}
+      {@const DesignerTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <DesignerTab />
       </div>
     {:else if activeTab === 'notepad' && activeTabComponent?.default}
       {@const NotepadTab = activeTabComponent.default}

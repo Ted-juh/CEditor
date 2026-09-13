@@ -1,0 +1,480 @@
+<title>Property panel space</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ---------------------------------------------------------------------------
+   Palette is the properties panel's own, read out of PropertiesPanel.svelte and
+   properties/*.svelte: panel #1E1E1E, fields #1A1A1A on #333, labels #5B9BD5
+   at 10px uppercase, section rules #2A2A2A. The dock's accent is the design
+   surface's #14B8A6.
+
+   NOTHING HERE IS BUILT. Drawings of a proposal — see property-panel-space-plan.md.
+--------------------------------------------------------------------------- */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --field:#1A1A1A;
+  --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#888; --ink-4:#5F6A73;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;
+     font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:20ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;
+         padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:62ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:26ch}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);
+              border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+         color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+/* --- plate 1: the stack, to scale ---------------------------------------- */
+.stacks{display:flex;gap:46px;align-items:flex-start;min-width:max-content;padding:26px 8px 8px;position:relative}
+.col{width:190px;flex:0 0 190px}
+.barbox{height:640px;display:flex;align-items:flex-end}
+.coltitle{font:600 10px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+          color:var(--ink-4);margin-bottom:8px;height:44px}
+.coltitle b{display:block;font-size:15px;font-family:var(--sans);letter-spacing:0;
+            text-transform:none;color:#E8EEF5}
+.coltitle b.g{color:var(--teal)}
+.bar{background:var(--panel);border:1px solid var(--rule-2);border-radius:3px;overflow:hidden;width:100%}
+.seg{border-bottom:1px solid #232323;display:flex;align-items:center;padding:0 6px;
+     font:400 8.5px/1 var(--mono);color:var(--ink-4);white-space:nowrap;overflow:hidden}
+.seg:last-child{border-bottom:0}
+.seg.hot{background:#2B1F10;color:#E5A029;border-bottom-color:#4A3A1C}
+.seg.hot2{background:#10231F;color:#8FEDE3;border-bottom-color:#1C4740}
+.seg.gone{background:repeating-linear-gradient(45deg,#191919,#191919 4px,#141414 4px,#141414 8px);
+          color:#4A545C}
+/* The barboxes end 710px below the top of .stacks (26 padding + 44 title + 640 box),
+   so a 700px viewport at 1:5 scale is a line 140px above that. */
+.vp{position:absolute;left:0;right:0;top:570px;border-top:1px dashed var(--bad);pointer-events:none}
+.vp span{position:absolute;left:800px;top:-8px;font:600 9px/1 var(--mono);color:var(--bad);
+         background:var(--ground-2);padding:3px 6px;border-radius:3px}
+.tot{margin-top:9px;font:600 12px/1 var(--mono);color:var(--warn)}
+.tot.g{color:var(--teal)}
+.tot small{display:block;font:400 10px/1.4 var(--sans);color:var(--ink-4);margin-top:5px;
+           letter-spacing:0;white-space:normal}
+.moved{margin-top:12px;border:1px dashed #2F3A44;border-radius:4px;padding:7px 8px;
+       background:repeating-linear-gradient(45deg,#191919,#191919 4px,#141414 4px,#141414 8px)}
+.moved b{display:block;font:600 8.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+         color:var(--teal);margin-bottom:6px}
+.moved span{display:block;font:400 9.5px/1.6 var(--mono);color:var(--ink-4)}
+
+/* --- shared editor chrome ------------------------------------------------ */
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.pp{background:var(--panel);border:1px solid var(--rule);border-radius:4px}
+.pphead{padding:7px 9px;border-bottom:1px solid var(--rule);display:flex;
+        justify-content:space-between;align-items:center}
+.pphead b{font-size:11.5px;font-weight:600;color:#E8EEF5}
+.pphead span{font:500 9px/1 var(--mono);color:var(--ink-4)}
+.ppsec{border-bottom:1px solid var(--rule)}
+.ppsech{padding:6px 8px;font:600 11px/1 var(--sans);letter-spacing:.5px;text-transform:uppercase;
+        color:var(--label)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 4px;padding:4px 8px 8px}
+.pc{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pc.s2{grid-column:span 2}.pc.s3{grid-column:span 3}.pc.s4{grid-column:span 4}
+.pcl{font:400 10px/1.1 var(--sans);color:var(--label);text-transform:uppercase;letter-spacing:.3px;
+     padding-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pw{height:26px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);
+    color:var(--ink);font:500 10px/24px var(--mono);padding:0 6px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+.pw.sw{padding:0;display:flex;min-width:0}.pw.sw i{flex:0 0 20px;border-right:1px solid var(--rule-2)}
+.pw.sw em{flex:1;min-width:0;font-style:normal;padding:0 5px;overflow:hidden;text-overflow:ellipsis}
+.pw.chk{display:flex;align-items:center;gap:5px;font-family:var(--sans);font-size:10px}
+.pw.chk s{width:11px;height:11px;border:1px solid var(--rule-2);border-radius:2px;text-decoration:none}
+.pw.chk s.on{background:var(--label);border-color:var(--label)}
+.fade-out{position:relative}
+.fade-out::after{content:'';position:absolute;left:0;right:0;bottom:0;height:64px;
+                 background:linear-gradient(#1e1e1e00,#1E1E1E);pointer-events:none}
+.scrollnote{text-align:center;font:600 9px/1 var(--mono);color:var(--bad);padding:7px 0 9px;
+            background:var(--panel)}
+
+/* --- dock ---------------------------------------------------------------- */
+.dock{background:#15181B;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.docktabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule)}
+.docktabs button{border:1px solid transparent;background:transparent;color:#96A6B2;
+                 font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.docktabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.docktabs button.new{border-style:dashed;border-color:#4A3A1C;color:#E5A029}
+.dockbody{display:flex;gap:12px;padding:12px;min-width:0}
+.spec{flex:0 0 232px;background:#0E1114;border:1px solid var(--rule);border-radius:4px;
+      display:flex;align-items:center;justify-content:center;position:relative}
+.fxcards{display:flex;gap:7px;flex:1 1 0;min-width:0}
+.fxc{flex:1 1 0;min-width:0;background:#181C20;border:1px solid #2C343B;border-radius:4px;padding:7px 6px}
+.fxc.on{border-color:var(--teal-dim);background:#101A1C}
+.fxch{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.fxch b{font:600 10.5px/1 var(--sans);color:#E8EEF5}
+.fxch s{margin-left:auto;width:26px;height:14px;border-radius:7px;background:#22303A;
+        border:1px solid var(--rule-2);position:relative;text-decoration:none}
+.fxch s::after{content:'';position:absolute;top:2px;left:2px;width:8px;height:8px;border-radius:50%;background:#6B7A85}
+.fxc.on .fxch s{background:#0F3A36;border-color:var(--teal-dim)}
+.fxc.on .fxch s::after{left:auto;right:2px;background:var(--teal)}
+.fxr{display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px;align-items:center;margin-top:5px}
+.fxr label{font:400 9px/1.1 var(--sans);color:var(--ink-4);text-align:right}
+.fxr .pw{height:22px;font-size:9px;line-height:20px}
+
+/* --- plate 3: protocol --------------------------------------------------- */
+.proto{display:flex;gap:16px;align-items:stretch;min-width:max-content}
+.box{width:250px;flex:0 0 250px;background:var(--panel);border:1px solid var(--rule-2);border-radius:5px}
+.box.wide{width:400px;flex:0 0 400px}
+.boxh{padding:8px 10px;border-bottom:1px solid var(--rule);font:600 11px/1 var(--mono);
+      color:#E8EEF5;display:flex;justify-content:space-between;align-items:center}
+.boxh i{font-style:normal;font-size:9px;color:var(--ink-4)}
+.boxb{padding:9px 10px 11px}
+.ln{font:400 10px/1.5 var(--mono);color:var(--ink-3);padding:2px 0}
+.ln.dup{color:#E5A029}
+.ln.new{color:#8FEDE3}
+.arrow{display:flex;align-items:center;color:var(--ink-4);font-size:22px}
+.reg{width:100%;border-collapse:collapse;margin-top:8px;font:400 9.5px/1.4 var(--mono)}
+.reg th{text-align:left;color:var(--ink-4);font-weight:600;padding:0 8px 5px 0;
+        border-bottom:1px solid var(--rule);text-transform:uppercase;letter-spacing:.08em;font-size:8.5px}
+.reg td{padding:5px 8px 5px 0;border-bottom:1px solid #232323;color:var(--ink-3);vertical-align:top}
+.reg td:first-child{color:#8FEDE3}
+.reg tr.pending td{color:var(--warn)}
+.reg tr.pending td:first-child{color:var(--warn)}
+
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; properties panel &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>Making room, not cutting properties</h1>
+  <p class="lede">Three drawings for
+    <a href="property-panel-space-plan.md" style="color:var(--teal)">property-panel-space-plan.md</a>:
+    how tall the panel actually is, what the same editor looks like in the dock instead, and the one
+    refactor that has to happen first.</p>
+  <div class="warnbar"><b>Nothing here is built.</b> Drawings, not screenshots. The heights in
+    Plate 1 are computed from the source and the stylesheet, so they are real numbers; the layouts
+    are proposals.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>The Text tab is four and a half screens</h2>
+  <p>Drawn to scale at 1:5. Each block is one <code>PropertySection</code>, sized by the height it
+    actually renders at: a cell is a 10px label plus a 26px field with a 2px gap, rows are packed
+    four columns wide by their <code>span</code>, sections add a 26px header. The dashed line is a
+    700px panel viewport on a 1080p display.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="stacks">
+        <div class="vp"><span>one 700px viewport</span></div>
+
+        <div class="col">
+          <div class="coltitle">Today<b>Text tab</b></div>
+          <div class="barbox"><div class="bar">
+            <div class="seg" style="height:24px">Text · 122</div>
+            <div class="seg" style="height:33px">Font Settings · 167</div>
+            <div class="seg" style="height:33px">Typography · 167</div>
+            <div class="seg" style="height:33px">Multiline · 167</div>
+            <div class="seg" style="height:15px">Position</div>
+            <div class="seg" style="height:15px">Fill</div>
+            <div class="seg" style="height:15px">Solid</div>
+            <div class="seg" style="height:24px">Gradient · 122</div>
+            <div class="seg" style="height:15px">Image Geom</div>
+            <div class="seg" style="height:15px">Image Col</div>
+            <div class="seg" style="height:15px">Texture Geom</div>
+            <div class="seg" style="height:15px">Texture Col</div>
+            <div class="seg hot" style="height:132px">Flow · 662px · 34 cells</div>
+            <div class="seg hot" style="height:213px">Effects · 1,067px · 58 cells</div>
+            <div class="seg" style="height:15px">Line</div>
+          </div></div>
+          <div class="tot">3,090px<small>4.4 screens. Two sections are 56% of it.</small></div>
+        </div>
+
+        <div class="col">
+          <div class="coltitle">After phases 2&ndash;3<b class="g">Text tab</b></div>
+          <div class="barbox"><div class="bar">
+            <div class="seg" style="height:24px">Text · 122</div>
+            <div class="seg" style="height:15px">Position</div>
+            <div class="seg" style="height:15px">Fill</div>
+            <div class="seg" style="height:15px">Solid</div>
+            <div class="seg" style="height:24px">Gradient · 122</div>
+            <div class="seg" style="height:15px">Image Geom</div>
+            <div class="seg" style="height:15px">Image Col</div>
+            <div class="seg" style="height:15px">Texture Geom</div>
+            <div class="seg" style="height:15px">Texture Col</div>
+            <div class="seg" style="height:15px">Line</div>
+          </div></div>
+          <div class="tot g">860px<small>1.2 screens.</small></div>
+          <div class="moved">
+            <b>Now in the dock</b>
+            <span>Effects · 1,067</span><span>Flow · 662</span>
+            <span>Font Settings · 167</span><span>Typography · 167</span><span>Multiline · 167</span>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="coltitle">After phase 4 as well<b class="g">Text tab</b></div>
+          <div class="barbox"><div class="bar">
+            <div class="seg" style="height:24px">Text · 122</div>
+            <div class="seg" style="height:15px">Position</div>
+            <div class="seg" style="height:15px">Line</div>
+          </div></div>
+          <div class="tot g">276px<small>Under half a screen. Whether this far is right is
+            open question 2 in the plan.</small></div>
+          <div class="moved">
+            <b>Now in the dock</b>
+            <span>Effects · 1,067</span><span>Flow · 662</span><span>Typography group · 501</span>
+            <span>Fill stack · 584</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 1</div>
+      <p class="ct">Computed by walking every <code>PropertyCell</code> in
+        <code>TextEditor.svelte</code> and packing spans into rows. Conditional cells are counted, so
+        this is the height with everything visible.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>Portrait panel, landscape dock</h2>
+  <p>The argument is not that the dock is bigger. It is that it is the <b>right shape</b>, and that
+    it can show you the result while you edit. The panel is 600px wide and four columns; the dock
+    sits in the centre column, so on a 1920px display it is about 1,264px wide with a ceiling around
+    820px. Text effects are 58 controls that each change how a glyph looks — the specimen is the
+    point of the editor, and there is nowhere to put one in a 600px strip.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui" style="display:flex;gap:18px;align-items:flex-start">
+
+        <div style="flex:0 0 270px;min-width:0">
+          <div class="coltitle" style="height:auto;margin-bottom:8px">Today · properties panel,
+            600px wide<b>Effects, 1,067px</b></div>
+          <div class="pp fade-out" style="height:420px;overflow:hidden">
+            <div class="pphead"><b>Text</b><span>label · Text</span></div>
+            <div class="ppsec">
+              <div class="ppsech">Effects</div>
+              <div class="grid4">
+                <div class="pc s4"><span class="pcl">Effects</span>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+                    <div class="pw" style="text-align:center;font-family:var(--sans)">Outline</div>
+                    <div class="pw" style="text-align:center;font-family:var(--sans);border-color:var(--label);color:#EAF5FF">2nd Stroke</div>
+                    <div class="pw" style="text-align:center;font-family:var(--sans)">Shadow</div>
+                    <div class="pw" style="text-align:center;font-family:var(--sans)">Glow</div>
+                    <div class="pw" style="text-align:center;font-family:var(--sans)">Inner</div>
+                    <div class="pw" style="text-align:center;font-family:var(--sans)">Emboss</div>
+                  </div></div>
+                <div class="pc s2"><span class="pcl">Outline colour</span><div class="pw sw"><i style="background:#101010"></i><em>FF101010</em></div></div>
+                <div class="pc"><span class="pcl">Width</span><div class="pw">2</div></div>
+                <div class="pc"><span class="pcl">Opacity</span><div class="pw">100</div></div>
+                <div class="pc s2"><span class="pcl">2nd colour</span><div class="pw sw"><i style="background:#5B9BD5"></i><em>FF5B9BD5</em></div></div>
+                <div class="pc"><span class="pcl">Width</span><div class="pw">1</div></div>
+                <div class="pc"><span class="pcl">Offset</span><div class="pw">0</div></div>
+                <div class="pc s2"><span class="pcl">Shadow colour</span><div class="pw sw"><i style="background:#000"></i><em>99000000</em></div></div>
+                <div class="pc"><span class="pcl">Blur</span><div class="pw">4</div></div>
+                <div class="pc"><span class="pcl">Spread</span><div class="pw">0</div></div>
+                <div class="pc"><span class="pcl">Shadow X</span><div class="pw">2</div></div>
+                <div class="pc"><span class="pcl">Shadow Y</span><div class="pw">2</div></div>
+                <div class="pc"><span class="pcl">Angle</span><div class="pw">135</div></div>
+                <div class="pc"><span class="pcl">Distance</span><div class="pw">3</div></div>
+                <div class="pc s2"><span class="pcl">Glow colour</span><div class="pw sw"><i style="background:#14B8A6"></i><em>FF14B8A6</em></div></div>
+                <div class="pc"><span class="pcl">Radius</span><div class="pw">6</div></div>
+                <div class="pc"><span class="pcl">Strength</span><div class="pw">50</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="scrollnote">↓ 15 more rows below the fold ↓</div>
+          <p style="font-size:12px;margin-top:12px;max-width:300px;color:var(--ink-3)">
+            No room for a preview, so you scroll, change a number, scroll back to the canvas, and
+            look.</p>
+        </div>
+
+        <div style="flex:1 1 0;min-width:0">
+          <div class="coltitle" style="height:auto;margin-bottom:8px">Proposed · display panel,
+            ~1,264px wide<b class="g">Effects, one screen</b></div>
+          <div class="dock">
+            <div class="docktabs">
+              <button>Colors</button><button>Gradient</button>
+              <button class="on new">Effects</button>
+              <button>Layers</button><button>Align</button><button>Notepad</button>
+              <button>Viewer</button><button>Device</button><button>Console</button>
+            </div>
+            <div class="dockbody">
+              <div class="spec">
+                <svg width="220" height="140" viewBox="0 0 270 150">
+                  <defs>
+                    <filter id="gl" x="-40%" y="-40%" width="180%" height="180%">
+                      <feGaussianBlur stdDeviation="5" result="b"/>
+                      <feFlood flood-color="#14B8A6" flood-opacity=".85"/>
+                      <feComposite in2="b" operator="in"/>
+                      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  <text x="135" y="80" text-anchor="middle" font-family="IBM Plex Sans, sans-serif"
+                        font-size="46" font-weight="700" fill="#E8EEF5" stroke="#5B9BD5"
+                        stroke-width="1.4" filter="url(#gl)">CUTOFF</text>
+                  <text x="135" y="112" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+                        font-size="10" fill="#5F6A73">live specimen · the control's own text</text>
+                </svg>
+                <span style="position:absolute;left:8px;top:7px;font:600 8.5px/1 var(--mono);
+                             letter-spacing:.1em;color:var(--ink-4)">PREVIEW</span>
+              </div>
+              <div class="fxcards">
+                <div class="fxc on">
+                  <div class="fxch"><b>Outline</b><s></s></div>
+                  <div class="fxr"><label>Colour</label><div class="pw sw"><i style="background:#5B9BD5"></i><em>5B9BD5</em></div></div>
+                  <div class="fxr"><label>Width</label><div class="pw">1.4</div></div>
+                  <div class="fxr"><label>Opacity</label><div class="pw">100</div></div>
+                  <div class="fxr"><label>Join</label><div class="pw">Round</div></div>
+                </div>
+                <div class="fxc on">
+                  <div class="fxch"><b>Glow</b><s></s></div>
+                  <div class="fxr"><label>Colour</label><div class="pw sw"><i style="background:#14B8A6"></i><em>14B8A6</em></div></div>
+                  <div class="fxr"><label>Radius</label><div class="pw">5</div></div>
+                  <div class="fxr"><label>Strength</label><div class="pw">85</div></div>
+                  <div class="fxr"><label>Spread</label><div class="pw">0</div></div>
+                </div>
+                <div class="fxc">
+                  <div class="fxch"><b>Shadow</b><s></s></div>
+                  <div class="fxr"><label>Colour</label><div class="pw sw"><i style="background:#000"></i><em>990000</em></div></div>
+                  <div class="fxr"><label>Blur</label><div class="pw">4</div></div>
+                  <div class="fxr"><label>Angle</label><div class="pw">135</div></div>
+                  <div class="fxr"><label>Distance</label><div class="pw">3</div></div>
+                </div>
+                <div class="fxc">
+                  <div class="fxch"><b>2nd Stroke</b><s></s></div>
+                  <div class="fxr"><label>Colour</label><div class="pw sw"><i style="background:#101010"></i><em>101010</em></div></div>
+                  <div class="fxr"><label>Width</label><div class="pw">1</div></div>
+                  <div class="fxr"><label>Offset</label><div class="pw">0</div></div>
+                  <div class="fxr"><label>Order</label><div class="pw">Under</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:12px;margin-top:12px;max-width:64ch;color:var(--ink-3)">
+            Same 58 controls. Four cards across, each effect's settings under its own switch, and the
+            specimen updating beside them. The dashed tab is the one being added — it does the
+            editing, which is the rule the deleted <code>effects</code> placeholder broke.</p>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 2</div>
+      <p class="ct">Not to one scale: the panel is drawn at 270px for its real 600px and the
+        dock larger than half, so its cards stay readable. The real widths are 600px and about
+        1,264px — so the dock is wider than the drawing suggests, not narrower.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 3</div>
+  <h2>One target store, not four</h2>
+  <p>This is phase 0, and it is worth doing whether or not anything is relocated.
+    <code>colorTarget.js</code> and <code>gradientTarget.js</code> are the same file twice, including
+    an identical fourteen-line block that clears the target when the selection changes —
+    <code>gradientTarget.js</code> says <em>"mirror colorTarget.js"</em> in a comment. Adding Effects
+    and Typography by the current method means four copies.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui proto">
+
+        <div class="box">
+          <div class="boxh">colorTarget.js<i>111 lines</i></div>
+          <div class="boxb">
+            <div class="ln">export const colorTarget</div>
+            <div class="ln">activateColorTarget()</div>
+            <div class="ln">applyColorToTarget()</div>
+            <div class="ln">clearColorTarget()</div>
+            <div class="ln dup">selectedComponentIds.subscribe →</div>
+            <div class="ln dup">&nbsp;&nbsp;clear on selection change</div>
+            <div class="ln dup">resolvedActivePanelId.subscribe →</div>
+            <div class="ln dup">&nbsp;&nbsp;clear on panel change</div>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="boxh">gradientTarget.js<i>111 lines</i></div>
+          <div class="boxb">
+            <div class="ln">export const gradientTarget</div>
+            <div class="ln">activateGradientTarget()</div>
+            <div class="ln">applyGradientToTarget()</div>
+            <div class="ln">clearGradientTarget()</div>
+            <div class="ln dup">selectedComponentIds.subscribe →</div>
+            <div class="ln dup">&nbsp;&nbsp;clear on selection change</div>
+            <div class="ln dup">resolvedActivePanelId.subscribe →</div>
+            <div class="ln dup">&nbsp;&nbsp;clear on panel change</div>
+          </div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <div class="box wide">
+          <div class="boxh" style="color:#8FEDE3">editorTarget.js<i>one lifecycle</i></div>
+          <div class="boxb">
+            <div class="ln new">export const editorTarget &nbsp;// { kind, … }</div>
+            <div class="ln new">activateTarget(kind, target, value)</div>
+            <div class="ln new">applyToTarget(value)</div>
+            <div class="ln new">clearTarget()</div>
+            <div class="ln new">one selection/panel lifecycle, once</div>
+            <div class="ln new">targets carry a SELECTION, not one controlId</div>
+            <table class="reg">
+              <tr><th>kind</th><th>dock tab</th><th>editor</th><th>status</th></tr>
+              <tr><td>colour</td><td>colors</td><td>ColorChooser</td><td>shipped</td></tr>
+              <tr><td>gradient</td><td>gradient</td><td>GradientTab</td><td>shipped</td></tr>
+              <tr class="pending"><td>effects</td><td>effects</td><td>EffectsTab</td><td>phase 2</td></tr>
+              <tr class="pending"><td>typography</td><td>type</td><td>TypeTab</td><td>phase 3</td></tr>
+              <tr class="pending"><td>imagelayer</td><td>layers</td><td>LayerEffectsSection</td><td>phase 4</td></tr>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 3</div>
+      <p class="ct">After this, adding a dock tab is registering a row rather than writing a fourth
+        store. <code>impliedDockTab</code> reads the registry instead of a hardcoded if-chain.</p>
+    </div>
+  </div>
+
+  <div class="warnbar" style="max-width:64ch">
+    <b>The selection line is a bug fix, not a nicety.</b> In <code>BackgroundEditor.svelte</code> the
+    field route writes through <code>updateSelectedProperty</code> when more than one control is
+    selected, while the swatch route builds a target carrying a single <code>controlId</code>. Read
+    from the source that means: with three controls selected, typing a hex paints three and picking
+    the same colour through the dock paints one. Worth confirming in the running app before building
+    on it — but if it holds, every group moved to the dock inherits it.
+  </div>
+</section>
+
+<section class="sec">
+  <p style="color:var(--ink-4);font-size:13px">
+    Companion to <a href="property-panel-space-plan.md" style="color:var(--teal)">property-panel-space-plan.md</a>
+    and <a href="widget-model-mockups.html" style="color:var(--teal)">widget-model-mockups.html</a>.
+    Heights computed from <code>TextEditor.svelte</code> and the panel stylesheet. Nothing here is built.</p>
+</section>
+
+</div>

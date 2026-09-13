@@ -1,7 +1,9 @@
 #pragma once
+#include "SoundcheckMeter.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "LayerRouter.h"
+#include "StereoPeakMeter.h"
 #include "PartMidiFilterCore.h"
 #include "Performance/PerformanceEngine.h"
 #include "Performance/ArpEngine.h"
@@ -334,10 +336,11 @@ private:
 class GainPanProcessor final : public juce::AudioProcessor
 {
 public:
-    GainPanProcessor()
+    explicit GainPanProcessor (bool meterOutput = false, SoundcheckMeter* soundcheckOutput = nullptr)
         : juce::AudioProcessor (BusesProperties()
                                     .withInput ("In", juce::AudioChannelSet::stereo(), true)
-                                    .withOutput ("Out", juce::AudioChannelSet::stereo(), true))
+                                    .withOutput ("Out", juce::AudioChannelSet::stereo(), true)),
+          meterEnabled (meterOutput), soundcheck (soundcheckOutput)
     {
     }
 
@@ -357,11 +360,15 @@ public:
         partIndex = partIndexToUse;
     }
 
-    void prepareToPlay (double, int) override
+    StereoPeakMeter::Reading drainMeter() noexcept { return meter.drain(); }
+
+    void prepareToPlay (double sampleRate, int) override
     {
         // Snap on prepare: a restored mixer position must not fade in from silence.
+        measurementRate = sampleRate;
         currentLeft  = targetLeft.load();
         currentRight = targetRight.load();
+        meter.drain();
     }
 
     void releaseResources() override {}
@@ -380,6 +387,8 @@ public:
 
         currentLeft  = newLeft;
         currentRight = newRight;
+        if (meterEnabled) meter.capture (audio);
+        if (soundcheck != nullptr) soundcheck->capture (audio, measurementRate);
     }
 
     const juce::String getName() const override               { return "CEditor Part Gain/Pan"; }
@@ -401,6 +410,11 @@ private:
     float currentLeft = 1.0f, currentRight = 1.0f;
     LayerRouter* layerRouter = nullptr;
     int partIndex = -1;
+
+    const bool meterEnabled;
+    StereoPeakMeter meter;
+    SoundcheckMeter* soundcheck = nullptr;
+    double measurementRate = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GainPanProcessor)
 };

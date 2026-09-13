@@ -491,7 +491,7 @@ IsolatedPluginProxy::Metadata IsolatedPluginProxy::parseMetadata (const juce::va
     result.tailSeconds = juce::jmax (0.0, (double) value.getProperty ("tailSeconds", 0.0));
 
     if (const auto* programs = value.getProperty ("programNames", {}).getArray())
-        for (int index = 0; index < juce::jmin (programs->size(), 4096); ++index)
+        for (int index = 0; index < programs->size(); ++index)
             result.programNames.push_back ((*programs)[index].toString().substring (0, 256));
     if (result.programNames.empty())
         result.programNames.emplace_back ("Default");
@@ -1161,6 +1161,7 @@ bool IsolatedPluginProxy::hasEditor() const { return metadata.hasEditor; }
 
 int IsolatedPluginProxy::getNumPrograms()
 {
+    const juce::ScopedLock lock (programLock);
     return static_cast<int> (programNames.size());
 }
 
@@ -1466,6 +1467,31 @@ void IsolatedPluginProxy::refreshStateCache() noexcept
         }
     }
     catch (...) {}
+}
+
+bool IsolatedPluginProxy::refreshProgramList()
+{
+    juce::MemoryBlock reply;
+    juce::String error;
+    if (! request (MessageType::getPrograms, {}, MessageType::getPrograms, reply, 5000, error))
+        return false;
+    Message message;
+    message.payload = reply;
+    const auto json = decodeJsonPayload (message, error);
+    const auto namesValue = json.getProperty ("programNames", {});
+    const auto* names = namesValue.getArray();
+    if (error.isNotEmpty() || names == nullptr || names->isEmpty()) return false;
+    std::vector<juce::String> refreshed;
+    for (const auto& name : *names)
+    {
+        if (! name.isString()) return false;
+        refreshed.push_back (name.toString().substring (0, 256));
+    }
+    const juce::ScopedLock lock (programLock);
+    programNames = std::move (refreshed);
+    currentProgram.store (juce::jlimit (0, static_cast<int> (programNames.size()) - 1,
+                                       static_cast<int> (json.getProperty ("currentProgram", 0))));
+    return true;
 }
 
 bool IsolatedPluginProxy::applyVstPreset (const juce::File& presetFile)

@@ -9,7 +9,7 @@
     toggleGlyphBit, invertGlyphBits, shiftGlyphBits, barGlyphSet,
   } from '../utils/lcdUserGlyphs.js';
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
-  import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
+  import { lcdDesignLayoutIds, setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   // Reset only appearance (never content: layouts/zones/text/sources).
   const APPEARANCE_KEYS = ['litColour', 'unlitColour', 'screenColour', 'backlightColour', 'glassTint',
     'backlightOn', 'brightness', 'contrast', 'showGhost'];
@@ -25,6 +25,7 @@
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Segmented from '../properties/Segmented.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Ghost from 'lucide-svelte/icons/ghost';
   import ScanLine from 'lucide-svelte/icons/scan-line';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
@@ -42,9 +43,9 @@
   import Square from 'lucide-svelte/icons/square';
   import PenTool from 'lucide-svelte/icons/pen-tool';
 
-  let { control = null } = $props();
+  let { control = null, dockGroup = '' } = $props();
 
-  let editLayoutId = $state('');
+  let editLayoutId = $derived($lcdDesignLayoutIds[core?.id] ?? '');
 
   let core = $derived(getSection(control, 'Core'));
   let display = $derived(getSection(control, 'Display'));
@@ -173,7 +174,10 @@
     const file = event?.target?.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => set('animSrc', String(reader.result ?? ''));
+    reader.onload = () => {
+      if (file.type === 'image/gif') set('animFrames', 0);
+      set('animSrc', String(reader.result ?? ''));
+    };
     reader.readAsDataURL(file);
   }
 
@@ -218,7 +222,6 @@
   // Select which layout the zone table edits, and preview it on the canvas via
   // the transient design-layout store (view state only — never saved).
   function selectEditLayout(id) {
-    editLayoutId = id;
     setLcdDesignLayout(core?.id, id);
   }
   function addLayout() {
@@ -226,7 +229,6 @@
     const id = genId('lay_');
     next.push({ id, name: `Layout ${next.length + 1}`, zones: [] });
     commitLayouts(next);
-    editLayoutId = id;
     setLcdDesignLayout(core?.id, id);
     if (next.length === 1) {
       const p = clonePages();
@@ -247,7 +249,6 @@
     for (const z of (Array.isArray(copy.zones) ? copy.zones : [])) z.id = genId('z_');
     next.splice(next.indexOf(src) + 1, 0, copy);
     commitLayouts(next);
-    editLayoutId = copy.id;
     setLcdDesignLayout(core?.id, copy.id);
   }
   function renameLayout(id, name) {
@@ -313,6 +314,14 @@
     const p = clonePages();
     if (Array.isArray(p.selectorMap) && p.selectorMap[i]) { p.selectorMap[i][prop] = value; commitPages(p); }
   }
+  function moveSelectorRow(i, delta) {
+    const p = clonePages();
+    const list = p.selectorMap ?? [];
+    const target = i + delta;
+    if (target < 0 || target >= list.length) return;
+    [list[i], list[target]] = [list[target], list[i]];
+    commitPages(p);
+  }
   function removeSelectorRow(i) {
     const p = clonePages();
     if (Array.isArray(p.selectorMap)) { p.selectorMap.splice(i, 1); commitPages(p); }
@@ -339,9 +348,25 @@
   function removeScope(i) { const next = [...activeScope]; next.splice(i, 1); set('activeScope', next); }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openLightingTab()}
+  <OpenInDock tab="effects" controlId={core?.id ?? ''} domain="lighting" what="this screen's lighting" compact />
+{/snippet}
+
+{#snippet openScreenTab()}
+  <OpenInDock tab="screen" controlId={core?.id ?? ''} what="this screen" compact />
+{/snippet}
+
 {#if display}
-  <div class="lcd-inspector">
-  <PropertySection title="Screen" icon={Monitor}>
+  <div class="lcd-inspector" class:screen-dock-editor={!!dockGroup} class:appearance={dockGroup === 'appearance'}>
+  {#if !dockGroup || dockGroup === 'screen'}
+  <div class="screen-section" class:wide={false} data-screen-section="Screen">
+  <PropertySection title="Screen" icon={Monitor} tools={dockGroup ? undefined : openScreenTab}>
     <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
@@ -393,7 +418,11 @@
       <NumberCell label="Rows" value={display.rows ?? 2} defaultValue={2} step={1} min={1} max={16} onchange={(value) => set('rows', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'content'}
+  <div class="screen-section" class:wide={false} data-screen-section="Text">
   <PropertySection title="Text" icon={Type}>
     {#each Array.from({ length: rows }) as _, index}
       <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.">
@@ -401,7 +430,11 @@
       </PropertyCell>
     {/each}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'content'}
+  <div class="screen-section" class:wide={false} data-screen-section="Value">
   <PropertySection title="Value" icon={Hash}>
     {#snippet tools()}
       <button class="hdr-add" type="button" title="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines." onclick={() => addField()}>+ Add</button>
@@ -449,7 +482,11 @@
       </PropertyCell>
     {/each}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'content'}
+  <div class="screen-section" class:wide={false} data-screen-section="Edit Field">
   <PropertySection title="Edit Field" icon={Pencil}>
     <PropertyCell label="Text" span={4} hint="Editable text such as a preset name. Bind a zone with Show = edit to '✎ This screen's text'.">
       <input class="val" type="text" value={display.editText ?? ''} oninput={(event) => set('editText', event.target.value)} />
@@ -466,8 +503,11 @@
       <NumberCell label="Len" value={display.editMaxLength ?? 16} defaultValue={16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
-  {#if String(display.panelType ?? 'character') === 'character'}
+  {#if (!dockGroup || dockGroup === 'content') && String(display.panelType ?? 'character') === 'character'}
+  <div class="screen-section" data-screen-section="Glyphs">
     <PropertySection title="Glyphs" icon={PenTool}>
       {#snippet tools()}
         <button class="hdr-add" type="button"
@@ -536,8 +576,11 @@
         <span class="hint-note">ce.components.lcd.glyph(screen, {glyphSlot + 1}, "…") defines it; a zone reaches it as "\u000{glyphSlot}" in its text.</span>
       </PropertyCell>
     </PropertySection>
+  </div>
   {/if}
 
+  {#if !dockGroup || dockGroup === 'pages' || dockGroup === 'content'}
+  <div class="screen-section" class:wide={true} data-screen-section="Layouts">
   <PropertySection title="Layouts" icon={LayoutGrid}>
     {#snippet tools()}
       {#if layouts.length === 0}
@@ -685,9 +728,13 @@
       {/if}
     {/if}
   </PropertySection>
+  </div>
+  {/if}
 
   {#if layouts.length > 0}
-    <PropertySection title="Pages" icon={Files}>
+    {#if !dockGroup || dockGroup === 'pages'}
+  <div class="screen-section" class:wide={true} data-screen-section="Pages">
+  <PropertySection title="Pages" icon={Files}>
       {#snippet tools()}
         <button class="hdr-add" type="button" title="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first." onclick={() => addSelectorRow()}>+ Rule</button>
         <button class="hdr-add" type="button" title="Add a transient page shown on a control change (for N ms, or until a change)." onclick={() => addOverlay()}>+ Overlay</button>
@@ -741,6 +788,8 @@
                 <option value={String(l.id)}>{l.name ?? l.id}</option>
               {/each}
             </select>
+            <button class="val rule-move" type="button" title="Move rule up" disabled={i === 0} onclick={() => moveSelectorRow(i, -1)}>▲</button>
+            <button class="val rule-move" type="button" title="Move rule down" disabled={i === (pages.selectorMap ?? []).length - 1} onclick={() => moveSelectorRow(i, 1)}>▼</button>
             <button class="val rm" type="button" onclick={() => removeSelectorRow(i)} title="Remove">✕</button>
           </div>
         </PropertyCell>
@@ -789,10 +838,14 @@
         </PropertyCell>
       {/each}
     </PropertySection>
+  </div>
+  {/if}
   {/if}
 
   {#if String(display.panelType ?? '') === 'graphic'}
-    <PropertySection title="Animation" icon={Film}>
+    {#if !dockGroup || dockGroup === 'motion'}
+  <div class="screen-section" class:wide={false} data-screen-section="Animation">
+  <PropertySection title="Animation" icon={Film}>
       <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the zones/text. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
         <select class="val" value={display.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
           <option value="off">Off</option>
@@ -805,10 +858,10 @@
           <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
         </PropertyCell>
         <PropertyCell label="Frames" span={1} compact hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
-          <NumberCell label="Frames" value={display.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+          <NumberCell label="Sheet frames" value={display.animFrames ?? 0} defaultValue={0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
         </PropertyCell>
         <PropertyCell label="FPS" span={1} compact hint="Sprite-sheet playback rate (animated files use their own frame timing).">
-          <NumberCell label="FPS" value={display.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+          <NumberCell label="Sheet FPS" value={display.animFps ?? 12} defaultValue={12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
         </PropertyCell>
         <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
           <PropertyToggle value={display.animLoop !== false} onchange={() => toggle('animLoop', true)} />
@@ -835,8 +888,12 @@
         </PropertyCell>
       {/if}
     </PropertySection>
+  </div>
+  {/if}
   {/if}
 
+  {#if !dockGroup || dockGroup === 'appearance'}
+  <div class="screen-section" class:wide={false} data-screen-section="Colour">
   <PropertySection title="Colour" icon={Palette}>
     <PropertyCell label="Screen colours" span={4} hint="Lit, unlit ghost, screen substrate, backlight wash, glass sheen. Click a swatch to edit it (with alpha) in the Colors tab.">
       <SwatchCluster swatches={[
@@ -851,8 +908,12 @@
       <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
-  <PropertySection title="Lighting" icon={Lamp}>
+  {#if !dockGroup || dockGroup === 'appearance'}
+  <div class="screen-section" class:wide={false} data-screen-section="Lighting">
+  <PropertySection title="Lighting" icon={Lamp} tools={dockGroup ? undefined : openLightingTab}>
     <PropertyCell label="Backlight" span={1} hint="Turn the backlight wash on or off.">
       <PropertyToggle value={display.backlightOn !== false} onchange={() => toggle('backlightOn', true)} />
     </PropertyCell>
@@ -911,7 +972,11 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'motion'}
+  <div class="screen-section" class:wide={false} data-screen-section="Motion">
   <PropertySection title="Motion" icon={Play}>
     <PropertyCell label="Scroll" span={2} hint="Marquee a line that's longer than the column count.">
       <Segmented
@@ -968,7 +1033,11 @@
       <NumberCell label="Col" value={display.cursorCol ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
     </PropertyCell>
   </PropertySection>
+  </div>
+  {/if}
 
+  {#if !dockGroup || dockGroup === 'screen'}
+  <div class="screen-section" class:wide={false} data-screen-section="Layout">
   <PropertySection title="Layout" icon={Square}>
     <PropertyCell label="Padding" span={1} compact hint="Inset from the bezel to the screen (px).">
       <NumberCell label="Pad" value={display.padding ?? 10} defaultValue={10} step={1} min={0} onchange={(value) => set('padding', value)} />
@@ -984,9 +1053,23 @@
     </PropertyCell>
   </PropertySection>
   </div>
+  {/if}
+  </div>
 {/if}
 
 <style>
+  .rule-move { flex: 0 0 26px; width: 26px; padding: 0; }
+  .screen-section { display: contents; }
+  .screen-dock-editor { container: screen-properties / inline-size; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 8px; align-items: start; padding: 8px; }
+  .screen-dock-editor.appearance { grid-template-columns: minmax(0, 1fr); }
+  @container screen-properties (min-width: 700px) {
+    .screen-dock-editor.appearance :global(.property-grid) { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  }
+  .screen-dock-editor .screen-section { display: block; min-width: 0; overflow-x: auto; }
+  .screen-dock-editor .screen-section.wide { grid-column: 1 / -1; }
+  .screen-dock-editor :global(.property-section) { margin: 0; }
+  .screen-dock-editor :global(.val) { min-height: var(--pp-field-height); font-size: var(--pp-field-font); border-radius: var(--pp-field-radius); }
+
   /* The inputs live inside PropertyCell (slotted content), so target them with a
      :global descendant selector under the hashed wrapper. color-scheme keeps the
      native select/number controls dark. !important guards against any inherited

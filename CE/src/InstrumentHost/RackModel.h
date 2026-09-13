@@ -242,7 +242,7 @@ struct ControlSlot
     int index = -1;
 
     // MIDI learn: a controller number bound to this slot drives it from any enabled MIDI
-    // input, absolute 0..127 onto the slot's mapped range. Learn always stores the concrete
+    // input, by default absolute 0..127 onto the slot's mapped range. Learn stores the concrete
     // channel it heard (1..16) so two keyboards on different channels stay two controllers;
     // 0 means any channel and exists for hand-edited manifests. -1 = unbound. Older
     // manifests simply lack the fields and read back unbound — no schema bump needed.
@@ -251,6 +251,8 @@ struct ControlSlot
     // Or a note: most pads send one, and a key on the keyboard is a pad if you say so. One
     // controller per slot — binding a note clears the controller and the other way round.
     int midiNote = -1;
+    bool midiPickup = false;     // opt-in soft takeover for learned absolute CCs
+    bool midiRelative = false;   // learned CC: 1 = increment, 127 = decrement
     // The toggle's own memory, kept with the slot so a latched pad is still latched when the
     // session comes back rather than silently reset under a lit LED.
     bool latched = false;

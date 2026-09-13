@@ -8,6 +8,7 @@
 #include "PluginWorkerCrashReporter.h"
 #include "PluginWorkerJob.h"
 #include "PluginWorkerSharedMemory.h"
+#include "VendorPresetLoader.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <algorithm>
@@ -59,7 +60,7 @@ juce::var createMetadata (juce::AudioProcessor& processor, bool crashDumpsAvaila
                           const juce::String& workerBuildSha256)
 {
     juce::Array<juce::var> programNames;
-    const auto programCount = juce::jlimit (1, 4096, processor.getNumPrograms());
+    const auto programCount = juce::jmax (1, processor.getNumPrograms());
     for (int index = 0; index < programCount; ++index)
         programNames.add (processor.getProgramName (index).substring (0, 256));
 
@@ -666,6 +667,61 @@ public:
     {
     }
 
+    void captureState (juce::MemoryBlock& state)
+    {
+        processor.getStateInformation (state);
+        if (processor.getName() != "Vanguard") return;
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        if (xml == nullptr || ! xml->hasTagName ("VST3PluginState")) return;
+        // Vanguard's bank blob does not reliably restore the current imported patch values.
+        // Retain the native blob for hidden state and supplement its stable parameter IDs.
+        auto* snapshot = xml->createNewChildElement ("HostageVanguardParameters");
+        for (const auto* parameter : processor.getParameters())
+            if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (parameter))
+            {
+                auto* value = snapshot->createNewChildElement ("P");
+                value->setAttribute ("id", hosted->getParameterID());
+                value->setAttribute ("value", static_cast<double> (parameter->getValue()));
+            }
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+    }
+
+    void restoreSupplementalParameters (const juce::MemoryBlock& state)
+    {
+        if (processor.getName() != "Vanguard") return;
+        const auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), static_cast<int> (state.getSize()));
+        const auto* snapshot = xml != nullptr ? xml->getChildByName ("HostageVanguardParameters") : nullptr;
+        if (snapshot == nullptr) return; // native and older Hostage sessions remain readable
+        for (auto* parameter : processor.getParameters())
+            if (const auto* hosted = dynamic_cast<const juce::HostedAudioProcessorParameter*> (parameter))
+                if (const auto* value = snapshot->getChildByAttribute ("id", hosted->getParameterID()))
+                {
+                    const auto normalised = value->getDoubleAttribute ("value", -1);
+                    if (std::isfinite (normalised) && normalised >= 0 && normalised <= 1)
+                        parameter->setValueNotifyingHost (static_cast<float> (normalised));
+                }
+    }
+
+    void waitForDeferredState (const juce::MemoryBlock& beforeState)
+    {
+        // These vendors acknowledge state before all engine/controller updates commit. Keep the message
+        // thread free and wait for changed state to settle before publishing parameters.
+        juce::MemoryBlock previous;
+        int stable = 0;
+        for (int attempt = 0; attempt < 60 && ! threadShouldExit(); ++attempt)
+        {
+            juce::Thread::sleep (25);
+            juce::MemoryBlock current;
+            invokeProcessor ([&] { processor.getStateInformation (current); });
+            if (! current.isEmpty() && current != beforeState && current == previous)
+            {
+                if (++stable >= 4) break;
+            }
+            else stable = 0;
+            previous = std::move (current);
+        }
+    }
+
     void run() override
     {
         while (! threadShouldExit() && ! quit.load (std::memory_order_acquire))
@@ -704,7 +760,7 @@ public:
                                             "invalid worker state request");
                     else
                     {
-                        invokeProcessor ([&] { processor.getStateInformation (reply.payload); },
+                        invokeProcessor ([&] { captureState (reply.payload); },
                                          pickUpMs);
                         if (reply.payload.getSize() > maxPayloadBytes)
                             reply = errorReply (generation, received.message.requestId,
@@ -798,11 +854,20 @@ public:
                 }
                 else if (received.message.type == MessageType::setState)
                 {
+                    juce::MemoryBlock beforeState;
+                    bool deferredState = false;
                     invokeProcessor ([&]
                     {
+                        deferredState = processor.getName() == "Massive X" || processor.getName() == "Vanguard";
+                        if (deferredState) processor.getStateInformation (beforeState);
                         processor.setStateInformation (
                             received.message.payload.getData(),
                             static_cast<int> (received.message.payload.getSize()));
+                    });
+                    if (deferredState) waitForDeferredState (beforeState);
+                    invokeProcessor ([&]
+                    {
+                        restoreSupplementalParameters (received.message.payload);
                         reply = makeJsonMessage (MessageType::setState, generation,
                             received.message.requestId, processorSnapshot (processor));
                     });
@@ -848,6 +913,21 @@ public:
                     // A mode hint: not worth holding the control thread for a busy plug-in.
                     invokeProcessor ([&] { processor.setNonRealtime (nonRealtime); }, 40);
                 }
+                else if (received.message.type == MessageType::getPrograms)
+                {
+                    invokeProcessor ([&]
+                    {
+                        juce::Array<juce::var> names;
+                        const auto count = juce::jmax (1, processor.getNumPrograms());
+                        for (int index = 0; index < count; ++index)
+                            names.add (processor.getProgramName (index).substring (0, 256));
+                        auto* object = new juce::DynamicObject();
+                        object->setProperty ("programNames", names);
+                        object->setProperty ("currentProgram", processor.getCurrentProgram());
+                        reply = makeJsonMessage (MessageType::getPrograms, generation,
+                            received.message.requestId, juce::var (object));
+                    });
+                }
                 else if (received.message.type == MessageType::setProgram)
                 {
                     juce::String jsonError;
@@ -888,25 +968,30 @@ public:
                     const auto json = decodeJsonPayload (received.message, jsonError);
                     const juce::File preset (json.getProperty ("path", {}).toString());
                     auto* instance = dynamic_cast<juce::AudioPluginInstance*> (&processor);
-                    juce::MemoryBlock data;
                     if (jsonError.isNotEmpty() || instance == nullptr
-                        || ! preset.loadFileAsData (data))
+                        || ! preset.existsAsFile())
                         reply = errorReply (generation, received.message.requestId,
-                                            "worker could not apply the VST3 preset");
+                                            "worker could not apply the vendor preset");
                     else
                     {
                         bool applied = false;
+                        juce::MemoryBlock beforeState;
+                        const bool deferredState = preset.hasFileExtension ("nksf;fxp");
                         invokeProcessor ([&]
                         {
-                            applied = juce::VST3PluginFormat::setStateFromVSTPresetFile (
-                                instance, data);
-                            if (applied)
+                            if (deferredState) processor.getStateInformation (beforeState);
+                            applied = ceditor::host::applyVendorPresetInWorker (*instance, preset);
+                        });
+                        if (applied && deferredState) waitForDeferredState (beforeState);
+                        if (applied)
+                            invokeProcessor ([&]
+                            {
                                 reply = makeJsonMessage (MessageType::applyVstPreset, generation,
                                     received.message.requestId, processorSnapshot (processor));
-                        });
+                            });
                         if (! applied)
                             reply = errorReply (generation, received.message.requestId,
-                                                "worker could not apply the VST3 preset");
+                                                "worker could not apply the vendor preset");
                     }
                 }
                 else if (received.message.type == MessageType::editorOpen)

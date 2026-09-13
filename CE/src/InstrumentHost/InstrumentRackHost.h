@@ -61,6 +61,12 @@ public:
         VST3 by delegating its processBlock, tests directly. */
     juce::AudioProcessorGraph& getGraph()                 { return graph; }
 
+    struct MeterReading { juce::String id; float left = 0.0f, right = 0.0f; };
+    /** Controlling thread. Post-insert, post-fader peaks since the previous drain.
+        IDs are part/bus/return IDs or @master (main output pair only). */
+    juce::Array<MeterReading> drainMeters();
+    SoundcheckMeter soundcheckMeter; // tapped after the main output's master fader
+
     // -- instant audition (Stage C) -----------------------------------------------------
     // One node that plays a rendered snapshot while the real plug-in is still loading. It is
     // wired at exactly the point a part's instrument feeds, so the preview runs through that
@@ -290,6 +296,8 @@ public:
                          ControlBinding binding);
     /** Binds or clears the slot's learned MIDI controller. cc -1 clears; channel 0 = any. */
     bool setSlotMidi (const juce::String& pageId, const juce::String& slotId, int cc, int channel);
+    bool setSlotMidiOptions (const juce::String& pageId, const juce::String& slotId,
+                            bool pickup, bool relative);
     /** Binds a note instead of a controller (a pad, or a key used as one). One controller per
         slot: this clears the controller binding, as setSlotMidi clears the note. */
     bool setSlotMidiNote (const juce::String& pageId, const juce::String& slotId, int note, int channel);

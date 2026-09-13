@@ -2684,6 +2684,60 @@ void testProgramListPlaceholdersAndLateNames()
     ceditor::test::StubSynthProcessor::factoryPrograms = {};
 }
 
+void testZebra3ProgramNames()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    const auto dir = freshDataDir ("zebra-program-names");
+    seedCatalog (dir);
+    Library library;
+    LibraryRecord slot;
+    slot.type = "preset"; slot.sourceType = "programList";
+    slot.name = "Program 0"; slot.instrument = "Zebra3"; slot.manufacturer = "u-he";
+    slot.targetCeId = "test-zebra"; slot.sourceLocator = "program://test-zebra/0";
+    const auto oldId = library.addCapturedRecord (slot);
+    slot.sourceType = "userState"; slot.sourceLocator = {};
+    const auto capturedId = library.addCapturedRecord (slot);
+    slot.sourceType = "programList"; slot.instrument = "Other Synth"; slot.manufacturer = "Other";
+    slot.targetCeId = "other"; slot.sourceLocator = "program://other/0";
+    const auto otherId = library.addCapturedRecord (slot);
+    library.saveTo (dir.getChildFile ("library.json"));
+    {
+        Harness h (dir);
+        h.cmd ("getState"); h.cmd ("scanLibrary");
+        Library updated;
+        updated.loadFrom (dir.getChildFile ("library.json"));
+        check (updated.find (oldId) == nullptr && updated.find (capturedId) != nullptr
+               && updated.find (otherId) != nullptr,
+               "update removes old Zebra3 slots even without its worker, while preserving captures and other synths");
+    }
+    // Loading Zebra3 must not recreate the slots after the file scan removed them.
+    PluginCatalog catalog;
+    ModuleScanResult module;
+    module.modulePath = "C:\\fixture\\Zebra3.vst3";
+    PluginClassRecord plugin;
+    plugin.ceId = "test-zebra"; plugin.name = "Zebra3"; plugin.vendor = "u-he"; plugin.isInstrument = true;
+    plugin.descriptionXml = "<PLUGIN name=\"Zebra3\" ceId=\"test-zebra\"/>";
+    module.classes.add (plugin); catalog.commitScanResult (module);
+    catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    StubSynthProcessor::factoryPrograms = { { "Program 0", 0.5f }, { "Preset01", 0.5f },
+                                           { "Glass Keys", 0.3f }, { "Warm Pad", 0.8f } };
+    {
+        Harness h (dir);
+        h.cmd ("getState"); h.cmd ("addPart");
+        h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "test-zebra" } });
+        h.cmd ("getLibrary");
+        juce::StringArray names;
+        for (const auto& record : *h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).getArray())
+            if (record.getProperty ("sourceType", {}).toString() == "programList"
+                && record.getProperty ("targetCeId", {}).toString() == "test-zebra")
+                names.add (record.getProperty ("name", {}).toString());
+        check (names.size() == 2 && names.contains ("Glass Keys") && names.contains ("Warm Pad"),
+               "Zebra3 generic slots stay out while genuinely named program entries remain usable");
+    }
+    StubSynthProcessor::factoryPrograms = {};
+}
+
 void testNearestSounds()
 {
     std::cout << "\nsounds like, and the substitute for a plug-in that has gone" << std::endl;
@@ -4279,6 +4333,191 @@ void testControlPages()
 // central write path the on-screen knob uses. Learn stores the concrete channel it heard,
 // takes a controller away from any slot that already had it (one knob, one slot), and the
 // binding is part of the Performance manifest, so it survives a restart.
+void testSetlistSoundcheck()
+{
+    std::cout << "\nSetlist soundcheck" << std::endl;
+    using namespace ceditor::host;
+    Performance rig;
+    RackPart part; part.partId = "synth"; part.pluginCeId = "synth"; part.pluginName = "Synth";
+    EffectSlot effect; effect.pluginCeId = "effect"; effect.pluginName = "Effect";
+    part.effects.add (effect); rig.parts.add (part);
+    rig.masterEffects.add (effect);
+    BusChain bus; bus.busId = "bus"; bus.effects.add (effect); rig.buses.add (bus);
+    ReturnChain chain; chain.returnId = "return"; chain.effects.add (effect); rig.returns.add (chain);
+    RackPart hardware; hardware.partId = "hardware"; hardware.hardware = true;
+    hardware.midiOutputId = "stage-port"; hardware.midiOutputName = "Stage keys"; rig.parts.add (hardware);
+    ceditor::perf::SetlistItem item; item.itemId = "song"; item.sceneId = "scene";
+    ceditor::perf::Scene scene; scene.sceneId = "scene"; rig.scenes.add (scene);
+    int synthChecks = 0, effectChecks = 0;
+    const auto unavailable = [&] (const juce::String& id) -> juce::String {
+        if (id == "synth") ++synthChecks; else if (id == "effect") ++effectChecks;
+        return "missing";
+    };
+    auto issues = soundcheckReferences (rig, item, unavailable, {});
+    check (synthChecks == 1 && effectChecks == 4 && issues.size() == 3,
+           "check visits instrument, part/master/bus/return effects and missing hardware port; duplicate issues fold");
+    const auto available = [] (const juce::String&) -> juce::String { return {}; };
+    check (soundcheckReferences (rig, item, available, { "stage-port" }).isEmpty(),
+           "known references and an available MIDI output pass without loading");
+    item.sceneId = "gone"; item.pageId = "gone";
+    check (soundcheckReferences (rig, item, available, { "stage-port" }).size() == 2,
+           "missing scene and control page are separate reference issues");
+
+    const auto dir = freshDataDir ("setlist-soundcheck"); seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState"); h.cmd ("addPart");
+    h.cmd ("loadInstrument", { { "partId", h.firstPartId() }, { "ceId", "VST3-good-synth" } });
+    h.service->prepareRuntime (48000, 64);
+    h.cmd ("setSetlistOptions", { { "preloadAhead", 0 } });
+    h.cmd ("addSetlistItem", { { "name", "Opening" } });
+    h.cmd ("addSetlistItem", { { "name", "Missing rig" }, { "rackRecordId", "missing-rack" } });
+    h.cmd ("addSetlistItem", { { "name", "Inherits missing rig" } });
+    const auto songId = h.emits.lastState()->getProperty ("performance", {}).getProperty ("setlist", {})
+        .getProperty ("items", {})[0].getProperty ("itemId", {}).toString();
+    const auto state = [&] { return h.emits.lastState()->getProperty ("soundcheck", {}); };
+    const auto row = [&] { return state().getProperty ("entries", {})[0]; };
+    const int before = h.instantiateCount;
+    h.cmd ("checkSetlistSoundcheck");
+    check (h.instantiateCount == before && state().getProperty ("currentItemId", {}).toString().isEmpty(),
+           "checking a setlist neither loads processors nor recalls a song");
+    check (state().getProperty ("entries", {})[1].getProperty ("issues", {}).size() > 0,
+           "missing Library rig is reported");
+    check (state().getProperty ("entries", {})[2].getProperty ("issues", {})[0].toString().contains ("preceding"),
+           "following Current rig songs inherit an unresolved capture");
+    h.cmd ("startSoundcheck", { { "itemId", songId } });
+    check (h.emits.lastError().isNotEmpty(), "measurement refuses an unrecalled song");
+    h.cmd ("setlistGo", { { "index", 0 } });
+    h.cmd ("startSoundcheck", { { "itemId", songId } });
+    check (state().getProperty ("activeItemId", {}).toString() == songId, "selected loaded song starts measuring");
+    juce::AudioBuffer<float> audio (2, 64); juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    for (int block = 0; block < 4; ++block)
+    {
+        audio.clear(); h.service->getGraph().processBlock (audio, midi); midi.clear();
+    }
+    h.cmd ("finishSoundcheck");
+    check ((bool) row().getProperty ("measured", false) && (double) row().getProperty ("peak", 0) > 0,
+           "completed passage publishes real output peak and RMS");
+    const double peak = row().getProperty ("peak", 0);
+    h.cmd ("startSoundcheck", { { "itemId", songId } }); h.cmd ("finishSoundcheck");
+    check ((double) row().getProperty ("peak", 0) == peak && row().getProperty ("error", {}).toString().contains ("No audio buffers"),
+           "attempt without buffers preserves the previous reading with an explicit error");
+    h.cmd ("checkSetlistSoundcheck");
+    check ((double) row().getProperty ("peak", 0) == peak, "reference recheck retains measured levels");
+}
+
+void testMidiPickup()
+{
+    std::cout << "\nOptional MIDI pickup and relative CCs" << std::endl;
+    const auto dir = freshDataDir ("midi-pickup");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    auto* stub = h.lastStub;
+    h.cmd ("addControlPage", { { "name", "Pickup" } });
+    const auto pageId = h.emits.lastState()->getProperty ("rack", {}).getProperty ("pages", {})[0]
+        .getProperty ("pageId", {}).toString();
+    h.cmd ("assignControlSlot", { { "pageId", pageId }, { "slotId", "s1" },
+        { "partId", partId }, { "parameterId", "cutoff" } });
+    const auto slot = [&h] { return h.emits.lastState()->getProperty ("rack", {})
+        .getProperty ("pages", {})[0].getProperty ("slots", {})[0]; };
+    const auto queue = [&h] (int value) {
+        h.service->noteMidiActivity ("Keys", juce::MidiMessage::controllerEvent (1, 74, value));
+    };
+    const auto move = [&] (int value) { queue (value); h.service->drainParameterEvents(); };
+    const auto near = [stub] (float a, float b) {
+        // The stub's JUCE convenience constructor uses 0.01 steps. Compare the value
+        // the plug-in can represent, while keeping the pickup/relative assertions strict.
+        const auto expected = stub->cutoff->getNormalisableRange().snapToLegalValue (b);
+        const bool matches = std::abs (a - expected) < 0.001f;
+        if (! matches) std::cout << "    actual " << a << ", expected " << expected << std::endl;
+        return matches;
+    };
+    check (! (bool) slot().getProperty ("midiPickup", true)
+        && ! (bool) slot().getProperty ("midiRelative", true), "existing slots default to immediate absolute CCs");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiPickup", true } });
+    stub->cutoff->setValueNotifyingHost (0.75f);
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+    move (0);
+    check (near (stub->cutoff->get(), 0.75f), "learning a pickup control does not jump to its position");
+    check ((int) slot().getProperty ("pickupDirection", 0) == 1, "waiting control indicates increasing position");
+    move (50);
+    check (near (stub->cutoff->get(), 0.75f), "movement below the target waits");
+    move (110);
+    check (near (stub->cutoff->get(), 110.0f / 127.0f), "crossing takes over even when the exact value was skipped");
+    check ((int) slot().getProperty ("pickupDirection", 9) == 0, "indicator disappears after takeover");
+    move (0);
+    check (near (stub->cutoff->get(), 0.0f), "acquired control follows freely in both directions");
+    stub->cutoff->setValueNotifyingHost (0.8f);
+    move (10);
+    check (near (stub->cutoff->get(), 0.8f), "software or preset changes rearm pickup");
+    queue (120); queue (20);
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 20.0f / 127.0f), "a fast crossing and return inside one drain is preserved");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" },
+        { "rangeMin", 0.2 }, { "rangeMax", 0.8 }, { "inverted", true } });
+    stub->cutoff->setValueNotifyingHost (0.65f);
+    move (100);
+    check (near (stub->cutoff->get(), 0.65f) && (int) slot().getProperty ("pickupDirection", 0) == -1,
+        "pickup compares physical position after mapping range and inversion");
+    move (20);
+    check (near (stub->cutoff->get(), 0.2f + (1.0f - 20.0f / 127.0f) * 0.6f), "inverted range takes over correctly");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" },
+        { "rangeMin", 0.8 }, { "rangeMax", 0.2 }, { "inverted", false } });
+    stub->cutoff->setValueNotifyingHost (0.65f);
+    move (100);
+    check (near (stub->cutoff->get(), 0.65f) && (int) slot().getProperty ("pickupDirection", 0) == -1,
+        "reversed endpoints have the same pickup position as an inverted ascending range");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" },
+        { "rangeMin", 0.0 }, { "rangeMax", 1.0 }, { "inverted", false }, { "midiRelative", true } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    for (int i = 0; i < 5; ++i) queue (1);
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 0.5f + 5.0f / 127.0f), "coalescing retains every relative increment and bypasses pickup");
+    move (127);
+    check (near (stub->cutoff->get(), 0.5f + 4.0f / 127.0f), "relative 127 decrements, rather than jumping to maximum");
+    move (64);
+    check (near (stub->cutoff->get(), 0.5f + 4.0f / 127.0f), "unsupported relative encoding is not guessed");
+    stub->cutoff->setValueNotifyingHost (1.0f);
+    queue (1); queue (127);
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 126.0f / 127.0f), "relative turns retain their order at the upper limit");
+    stub->cutoff->setValueNotifyingHost (0.0f);
+    queue (127); queue (1);
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 1.0f / 127.0f), "relative turns retain their order at the lower limit");
+
+    ceditor::host::Performance restored;
+    check (ceditor::host::Performance::fromVar (h.service->captureStateVar(), restored)
+        && restored.pages[0].slots[0].midiPickup && restored.pages[0].slots[0].midiRelative,
+        "both per-control options survive a session round trip");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiRelative", false } });
+    stub->cutoff->setValueNotifyingHost (0.5f);
+    h.service->nudgeControlSlot (pageId, "s1", 1);
+    check (near (stub->cutoff->get(), 0.5f + 1.0f / 127.0f), "dedicated CTRL49 relative nudges never wait for pickup");
+    h.cmd ("setControlSlotValue", { { "pageId", pageId }, { "slotId", "s1" }, { "value", 0.3 } });
+    check (near (stub->cutoff->get(), 0.3f), "on-screen writes bypass pickup");
+    move (0);
+    check (near (stub->cutoff->get(), 0.3f), "hardware must pick up the new on-screen value");
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiPickup", false } });
+    move (0);
+    check (near (stub->cutoff->get(), 0.0f), "turning pickup off restores immediate control");
+
+    h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiPickup", true } });
+    h.cmd ("learnControlSlotMidi", { { "pageId", pageId }, { "slotId", "s1" } });
+    h.service->noteMidiActivity ("Pad", juce::MidiMessage::noteOn (1, 36, (juce::uint8) 100));
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 1.0f), "learned notes remain immediate even with pickup saved on the slot");
+    h.service->noteMidiActivity ("Pad", juce::MidiMessage::noteOff (1, 36));
+    h.service->drainParameterEvents();
+    check (near (stub->cutoff->get(), 0.0f), "pad release is never blocked by pickup");
+}
+
 void testMidiLearn()
 {
     std::cout << "\nMIDI learn for control slots" << std::endl;
@@ -8673,6 +8912,323 @@ void testGeneratedProduct()
 // transaction. The identity story is the heart of it — user metadata survives rescans and
 // renames, a missing source marks instead of deletes, and availability is computed live
 // with a reason a person can act on.
+void testBackgroundPresetScan()
+{
+    const auto dir = freshDataDir ("background-preset-scan");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getLibrary");
+    h.captureScanBody = true;
+    h.cmd ("scanLibrary");
+    check (h.scanBody != nullptr && (bool) h.emits.last ("instrumentHostLibrary")->getProperty ("scanning", false),
+           "preset scan hands discovery to the background executor and reports busy");
+    auto pending = std::move (h.scanBody);
+    h.cmd ("scanLibrary");
+    check (h.scanBody == nullptr, "repeated clicks cannot overlap preset scans");
+    h.cmd ("getLibrary");
+    check (h.emits.last ("instrumentHostLibrary") != nullptr, "saved library remains readable during discovery");
+    pending();
+    check (! (bool) h.emits.last ("instrumentHostLibrary")->getProperty ("scanning", true),
+           "finished discovery returns to the controlling thread and clears busy");
+}
+
+void testCataloguePresetScopeAndEffects()
+{
+    const auto dir = freshDataDir ("catalogue-preset-scope");
+    seedTwoSynthCatalog (dir);
+    struct ProgramsEffect : StubEffectProcessor
+    {
+        int current = 0;
+        int getNumPrograms() override { return 2; }
+        const juce::String getProgramName (int i) override { return i == 0 ? "Small Room" : "Large Hall"; }
+        void setCurrentProgram (int i) override { current = i; }
+        int getCurrentProgram() override { return current; }
+    };
+    juce::StringArray visited;
+    ProgramsEffect* lastProcessor = nullptr;
+    Harness h (dir, {}, [&] (InstrumentHostService::Options& options)
+    {
+        options.instantiate = [&] (const juce::String& xml, double, int,
+                                  InstrumentHostService::InstantiateCallback callback)
+        {
+            visited.add (xml);
+            auto processor = std::make_unique<ProgramsEffect>();
+            lastProcessor = processor.get();
+            callback (std::move (processor), {});
+        };
+    });
+    h.cmd ("getState"); h.cmd ("scanLibrary");
+    const auto view = *h.emits.last ("instrumentHostLibrary");
+    check (visited.size() == 4 && view.getProperty ("scanReport", {}).size() == 4,
+           "scan checks every catalogue instrument and effect with no rack instances");
+    check ((bool) view.getProperty ("updateFinished", false)
+           && (int) view.getProperty ("scanReport", {})[0].getProperty ("programs", 0) == 2
+           && (int) view.getProperty ("scanReport", {})[0].getProperty ("files", -1) == 0,
+           "completed update distinguishes named programs from preset files");
+    check (h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}).size() == 0,
+           "temporary program discovery leaves the rack untouched");
+    juce::String effectRecord;
+    for (const auto& r : *view.getProperty ("records", {}).getArray())
+        if (r.getProperty ("targetCeId", {}).toString() == "VST3-nice-reverb"
+            && r.getProperty ("name", {}).toString() == "Large Hall")
+        {
+            effectRecord = r.getProperty ("recordId", {}).toString();
+            check ((bool) r.getProperty ("isEffect", false), "effect presets are identified for the browser");
+        }
+    check (effectRecord.isNotEmpty(), "an effect's internal programs reach the persistent library");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    const auto parts = [&] { return h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {}); };
+    h.cmd ("loadLibraryRecord", { { "recordId", effectRecord }, { "action", "focused" } });
+    check (parts().size() == 1 && parts()[0].getProperty ("pluginCeId", {}).toString() == "VST3-good-synth"
+        && parts()[0].getProperty ("effects", {}).size() == 1 && lastProcessor->current == 1,
+           "loading an effect preset inserts it while preserving the instrument");
+    const auto count = visited.size();
+    h.cmd ("loadLibraryRecord", { { "recordId", effectRecord }, { "action", "focused" } });
+    check (visited.size() == count && parts()[0].getProperty ("effects", {}).size() == 1,
+           "loading another preset reuses the matching effect slot");
+    h.cmd ("loadLibraryRecord", { { "recordId", effectRecord }, { "action", "add" } });
+    check (parts().size() == 1 && parts()[0].getProperty ("effects", {}).size() == 2,
+           "effect add appends an insert without creating an empty instrument part");
+    h.cmd ("scanLibrary");
+    check (h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size() == 8,
+           "rescanning merges catalogue programs without duplicates");
+}
+
+void testVendorPresetLoadRoutes()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    for (const auto& source : { "nksf", "fxp", "spire", "h2p" })
+    {
+        const auto dir = freshDataDir ("vendor-route-" + juce::String (source));
+        seedTwoSynthCatalog (dir);
+        const auto file = dir.getChildFile ("Fixture.preset");
+        file.replaceWithText ("worker fixture");
+        Library library;
+        LibraryRecord record;
+        record.type = "preset"; record.sourceType = source; record.factory = true;
+        record.sourceLocator = file.getFullPathName(); record.name = "Vendor sound";
+        record.targetCeId = "VST3-good-synth"; record.instrument = "Good Synth";
+        const auto id = library.addCapturedRecord (record);
+        library.saveTo (dir.getChildFile ("library.json"));
+        int applications = 0;
+        bool refuse = false;
+        Harness h (dir, {}, [&] (InstrumentHostService::Options& options)
+        {
+            options.applyVstPreset = [&] (juce::AudioProcessor& processor, const juce::File& path)
+            {
+                check (path == file, "vendor source reaches the worker with its original file");
+                if (refuse) return false;
+                ++applications;
+                static_cast<StubSynthProcessor&> (processor).patch = 17;
+                return true;
+            };
+        });
+        h.cmd ("getState"); h.cmd ("addPart");
+        const auto partId = h.firstPartId();
+        h.cmd ("loadLibraryRecord", { { "recordId", id }, { "action", "focused" }, { "partId", partId } });
+        check (applications == 1 && h.lastStub != nullptr && h.lastStub->patch == 17,
+               "new-instance vendor load applies the file after instantiation");
+        const auto* loaded = h.emits.last ("instrumentHostLibraryLoad");
+        check (loaded != nullptr && loaded->getProperty ("phase", {}).toString() == "loaded"
+               && loaded->getProperty ("recordId", {}).toString() == id,
+               "successful load is reported for the selected preset");
+        const auto before = h.instantiateCount;
+        h.lastStub->patch = 0;
+        h.cmd ("loadLibraryRecord", { { "recordId", id }, { "action", "focused" }, { "partId", partId } });
+        check (applications == 2 && h.lastStub->patch == 17 && h.instantiateCount == before,
+               "same-instrument vendor load uses the same worker and file loader");
+        refuse = true;
+        h.cmd ("loadLibraryRecord", { { "recordId", id }, { "action", "focused" }, { "partId", partId } });
+        check (h.emits.lastError().contains ("refused"), "vendor refusal reaches the Sounds browser");
+        const auto* failed = h.emits.last ("instrumentHostLibraryLoad");
+        check (failed != nullptr && failed->getProperty ("phase", {}).toString() == "failed"
+               && failed->getProperty ("message", {}).toString().contains ("refused"),
+               "the load bar receives an explicit failure and can offer retry");
+        file.deleteFile(); h.cmd ("getLibrary");
+        const auto* view = h.emits.last ("instrumentHostLibrary");
+        check (view != nullptr && ! (bool) view->getProperty ("records", {})[0].getProperty ("available", true),
+               "removed vendor file is unavailable even before another scan");
+    }
+}
+
+void testSavedLibraryAndLoadResults()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    const auto dir = freshDataDir ("library-load-results");
+    seedCatalog (dir);
+    const auto file = dir.getChildFile ("Fixture.h2p");
+    file.replaceWithText ("fixture");
+    Library library;
+    LibraryRecord record;
+    record.type = "preset"; record.sourceType = "h2p"; record.sourceLocator = file.getFullPathName();
+    record.targetCeId = "VST3-good-synth"; record.instrument = "Good Synth";
+    record.name = "Glass Keys"; record.user.favourite = true; record.user.tags.add ("Live");
+    const auto first = library.addCapturedRecord (record);
+    record.name = "Warm Pad";
+    const auto second = library.addCapturedRecord (record);
+    library.saveTo (dir.getChildFile ("library.json"));
+    Harness h (dir, {}, [] (InstrumentHostService::Options& options)
+    { options.applyVstPreset = [] (juce::AudioProcessor&, const juce::File&) { return true; }; });
+    h.cmd ("getState"); h.cmd ("getLibrary");
+    const auto* saved = h.emits.last ("instrumentHostLibrary");
+    check (saved != nullptr && saved->getProperty ("records", {}).size() == 2 && h.instantiateCount == 0
+           && ! (bool) saved->getProperty ("scanning", true), "opening a saved library does not scan or instantiate plug-ins");
+    check ((bool) saved->getProperty ("records", {})[0].getProperty ("favourite", false)
+           && saved->getProperty ("records", {})[0].getProperty ("tags", {})[0].toString() == "Live",
+           "favourites and tags are available from the saved library immediately");
+    h.cmd ("addPart"); h.deferCallbacks = true;
+    h.cmd ("loadLibraryRecord", { { "recordId", first } });
+    check (h.emits.last ("instrumentHostLibraryLoad")->getProperty ("phase", {}).toString() == "loading",
+           "asynchronous construction reports loading before its result arrives");
+    h.cmd ("loadLibraryRecord", { { "recordId", second } });
+    check (h.deferred.size() == 2, "two selections start independent load transactions");
+    auto older = std::move (h.deferred[0]);
+    auto newer = std::move (h.deferred[1]);
+    newer (std::make_unique<StubSynthProcessor>(), {});
+    older (nullptr, "The old worker failed late");
+    const auto* result = h.emits.last ("instrumentHostLibraryLoad");
+    check (result != nullptr && result->getProperty ("recordId", {}).toString() == second
+           && result->getProperty ("phase", {}).toString() == "loaded",
+           "a late result cannot overwrite feedback for the newer preset selection");
+}
+
+void testBuildEditHistory()
+{
+    std::cout << "\nBuild edit history" << std::endl;
+    const auto dir = freshDataDir ("build-edit-history");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    const auto history = [&] { return h.emits.lastState()->getProperty ("editHistory", {}); };
+    const auto count = [&] { return h.service->getRackHost().getPerformance().parts.size(); };
+    h.cmd ("addPart");
+    const auto part = h.firstPartId();
+    check ((bool) history()["canUndo"], "adding a part enables native undo");
+    h.cmd ("setPartMixer", { { "partId", part }, { "volume", 0.3 } });
+    h.cmd ("setPartMixer", { { "partId", part }, { "volume", 0.6 } });
+    h.cmd ("undoHostEdit");
+    check (count() == 1 && std::abs (h.service->getRackHost().getPerformance().findPart (part)->volume - 1.0f) < .001f,
+           "a continuous mixer change is one edit and restores its first value");
+    h.cmd ("redoHostEdit");
+    check (std::abs (h.service->getRackHost().getPerformance().findPart (part)->volume - .6f) < .001f,
+           "redo restores the final mixer value");
+    h.cmd ("removePart", { { "partId", "does-not-exist" } });
+    check (history()["undoLabel"].toString() == "Set part mixer", "a refused removal does not create an undo step");
+    h.cmd ("undoHostEdit");
+    h.cmd ("addControlPage");
+    check (! (bool) history()["canRedo"], "a different edit after undo clears redo");
+
+    h.cmd ("loadInstrument", { { "partId", part }, { "ceId", "VST3-good-synth" } });
+    check (! (bool) history()["canUndo"], "plug-in loading starts a new history boundary");
+    h.cmd ("addControlPage");
+    if (auto* synth = dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (part)))
+        synth->cutoff->setValueNotifyingHost (.81f); // an edit made inside the vendor editor
+    h.cmd ("undoHostEdit");
+    const auto* kept = dynamic_cast<StubSynthProcessor*> (h.service->getRackHost().getInstrument (part));
+    check (kept != nullptr && std::abs (kept->cutoff->get() - .81f) < .001f,
+           "undo preserves vendor-editor changes in a surviving processor");
+    h.cmd ("removePart", { { "partId", part } });
+    check (count() == 0, "confirmed command removes the instrument part");
+    h.cmd ("undoHostEdit");
+    check (count() == 1 && h.service->getRackHost().partHasInstrument (part), "undo restores the deleted part and its processor");
+    h.cmd ("redoHostEdit");
+    check (count() == 0, "redo removes that same part again");
+    h.cmd ("undoHostEdit");
+    h.cmd ("unloadInstrument", { { "partId", part } });
+    h.cmd ("undoHostEdit");
+    check (h.service->getRackHost().partHasInstrument (part), "unload can be undone");
+    h.cmd ("redoHostEdit");
+    check (! h.service->getRackHost().partHasInstrument (part), "redo unload does not silently reload the instrument");
+    h.cmd ("addControlPage");
+    h.cmd ("undoHostEdit");
+    check (! h.service->getRackHost().partHasInstrument (part), "unrelated undo preserves deliberately unloaded parts");
+
+    h.cmd ("loadInstrument", { { "partId", part }, { "ceId", "VST3-good-synth" } });
+    h.cmd ("removePart", { { "partId", part } });
+    h.deferCallbacks = true;
+    h.cmd ("undoHostEdit");
+    check (! (bool) history()["canRedo"] && history()["blockedReason"].toString().contains ("loading"),
+           "history remains disabled while the restored processor is being constructed");
+    const auto pendingCount = count();
+    h.cmd ("redoHostEdit");
+    check (count() == pendingCount, "a repeated history command cannot race an unfinished restore");
+    if (! h.deferred.empty()) h.deferred.back() (std::make_unique<StubSynthProcessor>(), {});
+    h.deferCallbacks = false;
+    check ((bool) history()["canRedo"], "the final load completion re-enables redo");
+    h.cmd ("redoHostEdit");
+    check (count() == 0, "the same redo step survives asynchronous restoration");
+
+    h.cmd ("addPart");
+    h.cmd ("transportPlay");
+    const auto playingCount = count();
+    h.cmd ("undoHostEdit");
+    check (count() == playingCount && history()["blockedReason"].toString().contains ("Stop playback"),
+           "undo cannot rebuild a playing rig");
+    h.cmd ("transportStop");
+    h.cmd ("setStageLock", { { "enabled", true } });
+    h.cmd ("undoHostEdit");
+    check (count() == playingCount && ! (bool) history()["canUndo"], "Stage Lock also guards the native undo command");
+
+    ceditor::host::HostEditHistory bounded;
+    bounded.record ({ "first", "Mixer", "same", 100 });
+    bounded.record ({ "second", "Mixer", "same", 200 });
+    check (bounded.undo.size() == 1 && bounded.undo.front().state == "first", "coalescing retains the pre-gesture checkpoint");
+    bounded.redo.push_back ({ "redo", "Mixer", {}, 0 });
+    bounded.record ({ "branch", "Mixer", "same", 300 });
+    check (bounded.undo.size() == 2 && bounded.undo.back().state == "branch" && bounded.redo.empty(),
+           "a branch after undo never merges into the preceding gesture");
+    for (int i = 0; i < 40; ++i) bounded.record ({ juce::String (i), "Edit", {}, double (i) });
+    check (bounded.undo.size() == bounded.maxEntries, "history has a fixed entry limit");
+    bounded.clear();
+    check (bounded.undo.empty() && bounded.redo.empty(), "a new session clears both history directions");
+}
+
+void testLibrarySaveFeedback()
+{
+    const auto dir = freshDataDir ("library-save-feedback");
+    seedCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState");
+    h.cmd ("addPart");
+    const auto partId = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", partId }, { "ceId", "VST3-good-synth" } });
+    const auto file = dir.getChildFile ("library.json");
+    for (const auto* command : { "saveUserPreset", "saveChainToLibrary", "saveRackToLibrary" })
+    {
+        h.emits.clear();
+        h.cmd (command, { { "partId", partId }, { "name", command } });
+        const auto* saved = h.emits.last ("instrumentHostLibrarySaved");
+        check (saved != nullptr && saved->getProperty ("name", {}).toString() == command,
+               juce::String (command) + " confirms the saved name");
+        ceditor::host::Library persisted;
+        persisted.loadFrom (file);
+        bool found = false;
+        for (const auto& record : persisted.allRecords())
+            found = found || record.name == command;
+        check (found, "success corresponds to a record persisted on disk");
+    }
+    h.cmd ("getLibrary");
+    const auto before = h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size();
+    // A directory at the library file path deterministically refuses replacement on all platforms.
+    check (file.deleteFile() && file.createDirectory().wasOk(), "fixture blocks library writes");
+    for (const auto* command : { "saveUserPreset", "saveChainToLibrary", "saveRackToLibrary" })
+    {
+        h.emits.clear();
+        h.cmd (command, { { "partId", partId }, { "name", "Not saved" } });
+        check (h.emits.last ("instrumentHostLibrarySaved") == nullptr
+                && h.emits.lastError().contains ("Could not save")
+                && h.emits.lastError().contains (file.getFullPathName()),
+               juce::String (command) + " reports a failed write without claiming success");
+        h.cmd ("getLibrary");
+        check (h.emits.last ("instrumentHostLibrary")->getProperty ("records", {}).size() == before,
+               "a failed save leaves no phantom record in memory");
+    }
+}
+
 void testLibrary()
 {
     std::cout << "\nthe unified library" << std::endl;
@@ -10628,6 +11184,51 @@ void testAutomaticEffectFailover()
 }
 } // namespace
 
+void testMixerMeterEvents()
+{
+    std::cout << "\nmixer meter events" << std::endl;
+    const auto dir = freshDataDir ("mixer-meters");
+    seedTwoSynthCatalog (dir);
+    Harness h (dir);
+    h.cmd ("getState"); // initialise the catalogue, as the real bridge does on mount
+    h.cmd ("addPart");
+    const auto part = h.firstPartId();
+    h.cmd ("loadInstrument", { { "partId", part }, { "ceId", "VST3-good-synth" } });
+    check (h.service->getRackHost().partHasInstrument (part), "meter event fixture loads its instrument");
+    h.service->prepareRuntime (48000, 64);
+    juce::AudioBuffer<float> audio (2, 64);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    audio.clear();
+    h.service->getGraph().processBlock (audio, midi);
+    h.service->drainParameterEvents(); // settle any initial non-meter notifications
+    h.emits.clear();
+    midi.clear();
+    audio.clear();
+    h.service->getGraph().processBlock (audio, midi);
+    h.service->drainParameterEvents();
+    check (h.emits.count ("instrumentHostMeters") == 1, "one dedicated meter packet per UI drain");
+    check (h.emits.count ("instrumentHostState") == 0, "meter polling does not push the rack document");
+    const auto* packet = h.emits.last ("instrumentHostMeters");
+    const auto channels = packet != nullptr ? packet->getProperty ("channels", {}) : juce::var();
+    bool foundPart = false, foundMaster = false;
+    for (int i = 0; i < channels.size(); ++i)
+    {
+        const auto id = channels[i].getProperty ("id", {}).toString();
+        if (id == part) foundPart = (double) channels[i].getProperty ("left", 0.0) > 0;
+        if (id == "@master") foundMaster = (double) channels[i].getProperty ("right", 0.0) > 0;
+    }
+    check (foundPart && foundMaster, "part and master peaks cross the native event boundary with stable IDs");
+    h.emits.clear();
+    h.service->drainParameterEvents(); // no new audio
+    packet = h.emits.last ("instrumentHostMeters");
+    const auto idle = packet != nullptr ? packet->getProperty ("channels", {}) : juce::var();
+    for (int i = 0; i < idle.size(); ++i)
+        check ((double) idle[i].getProperty ("left", -1.0) == 0.0
+                 && (double) idle[i].getProperty ("right", -1.0) == 0.0,
+               "stopped audio drains silence instead of replaying an old peak");
+}
+
 int main (int argc, char* argv[])
 {
     if (argc != 2)
@@ -10646,9 +11247,12 @@ int main (int argc, char* argv[])
     std::cout << "InstrumentHostService tests" << std::endl;
 
     testCommandFlow();
+    testMixerMeterEvents();
     testStageLock();
     testFirstClickAndTheOnScreenKeyboard();
     testMidiLearn();
+    testMidiPickup();
+    testSetlistSoundcheck();
     testPresetWalking();
     testFloatingEditors();
     testChordLearn();
@@ -10693,6 +11297,12 @@ int main (int argc, char* argv[])
     testMidiModulesThroughTheGraph();
     testVirtualAddressesAndMacroSlots();
     testRevisionsAndEngine();
+    testBackgroundPresetScan();
+    testCataloguePresetScopeAndEffects();
+    testVendorPresetLoadRoutes();
+    testSavedLibraryAndLoadResults();
+    testLibrarySaveFeedback();
+    testBuildEditHistory();
     testLibrary();
     testSonicProbe();
     testAuditioner();
@@ -10704,6 +11314,7 @@ int main (int argc, char* argv[])
     testPresetMorphOnAMacro();
     testMidiHealth();
     testProgramListPlaceholdersAndLateNames();
+    testZebra3ProgramNames();
     testSubstitutes();
     testBrowseOnSurface();
     testLibraryBrowsing();

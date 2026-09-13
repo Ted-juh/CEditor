@@ -20,6 +20,11 @@
     hostPanic, dismissMidiIssue,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { hostRackIssues } from '../stores/hostPartIssues.js';
+  import { hostPartLabel } from '../utils/hostTargetContext.js';
+  let { onInspectPart = () => {} } = $props();
+  let partIssues = $derived($hostState.rack.parts.flatMap((part, index) =>
+    ($hostRackIssues[part.partId] ?? []).map(issue => ({ part, index, issue }))));
 
   let reliability = $derived($hostState.reliability);
   let safeMode = $derived(reliability.safeMode);
@@ -100,6 +105,21 @@
 
 <div class="reliability-panel" data-testid="host-reliability-panel">
   <div class="reliability-grid">
+    {#if partIssues.length}
+      <section class="block" data-testid="health-part-issues">
+        <strong>Rack diagnostics</strong>
+        {#each partIssues as { part, index, issue } (`${part.partId}:${issue.id}`)}
+          <div class="part-diagnostic">
+            <span><b>{hostPartLabel(part, index)}</b><br />{issue.detail}</span>
+            {#if issue.target !== 'health'}
+              <button type="button" onclick={() => onInspectPart(part.partId, issue)}>
+                {{ mixer: 'Mixer', routing: 'Routing', zone: 'Zone', devices: 'Audio & MIDI', part: 'Rack' }[issue.target]}
+              </button>
+            {/if}
+          </div>
+        {/each}
+      </section>
+    {/if}
     <section class="block">
       <strong>Since the last run</strong>
       {#if recovery.interrupted}
@@ -449,6 +469,10 @@
 </div>
 
 <style>
+  .part-diagnostic { display: flex; align-items: center; gap: 8px; padding: 7px 0;
+    border-bottom: 1px solid var(--host-line-soft); font-size: 12px; line-height: 1.5; }
+  .part-diagnostic > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .part-diagnostic > button { flex: none; }
   .reliability-panel {
     margin: 8px 14px 0;
     padding: 10px;

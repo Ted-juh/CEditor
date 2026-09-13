@@ -1,8 +1,9 @@
 /** Content-aware sizing for the Hostage editor dock. */
 
-export const HOST_DOCK_TABS = Object.freeze(['zone', 'midi', 'inserts', 'routing', 'params', 'rack']);
+export const HOST_DOCK_TABS = Object.freeze(['sounds', 'zone', 'midi', 'inserts', 'routing', 'params', 'rack']);
 
 const TAB_MINIMUMS = Object.freeze({
+  sounds: 360,
   zone: 170,
   midi: 220,
   inserts: 170,
@@ -28,6 +29,8 @@ export function clampDockHeight(height, availableHeight = 0) {
 }
 
 export function preferredDockHeight(tab, contentHeight = 0, availableHeight = 0) {
+  // A scrolling preset list fills its dock; fitting thousands of rows would always maximise it.
+  if (tab === 'sounds') return clampDockHeight(TAB_MINIMUMS.sounds, availableHeight);
   const tabMinimum = TAB_MINIMUMS[tab] ?? 200;
   // Tab bar, resize grip and vertical body padding together occupy about 54 px.
   const contentFit = Math.max(0, Number(contentHeight) || 0) + 54;

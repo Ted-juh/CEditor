@@ -126,8 +126,9 @@
   $effect(() => {
     // Reference the signature so a settings change re-runs (restarts) the loop.
     void motionSignature;
-    // Respect the OS reduced-motion setting: hold a static frame.
-    if (!motionActive || prefersReducedMotion()) {
+    // Keep explicitly authored media playing; reduced UI motion still holds
+    // incidental scrolling/blinking when there is no screen animation.
+    if (!motionActive || (prefersReducedMotion() && !animActive)) {
       frameTime = 0;
       return;
     }
@@ -341,7 +342,7 @@
     const max = live?.max ?? numberOr(behavior?.max, 127);
     const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
     return {
-      present: true,
+      present: live?.present !== false,
       name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
       value: numberOr(live?.value, fallbackValue),
       min,

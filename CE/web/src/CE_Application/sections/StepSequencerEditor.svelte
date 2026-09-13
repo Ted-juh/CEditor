@@ -17,6 +17,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
   import Rows3 from 'lucide-svelte/icons/rows-3';
   import Palette from 'lucide-svelte/icons/palette';
@@ -45,8 +46,18 @@
   }
 </script>
 
+<!--
+  The way into the dock tab that covers this editor, in PropertySection's `tools` slot.
+  Until this button existed the tab could not be reached from the properties panel at all —
+  you had to find it in the dock strip yourself and press "Use selection".
+  utils/dockOpeners.js has the reasoning and the registry.
+-->
+{#snippet openDesignerTab()}
+  <OpenInDock tab="designer" controlId={core?.id ?? ''} what="this pattern" compact />
+{/snippet}
+
 {#if q}
-  <PropertySection title="Sequence" icon={Grid3x3}>
+  <PropertySection title="Sequence" icon={Grid3x3} tools={openDesignerTab}>
     <NumberCell label="Steps" min={1} max={64} step={1} value={q.steps ?? 16} onchange={(v) => set('steps', v)} />
     <PropertyCell label="Follow transport" span={2} hint="Take the tempo and the step boundaries from the panel's shared transport, the way the Arp and the Phrase do. Off, this sequence runs on its own BPM below.">
       <PropertyToggle value={q.syncToTransport === true} onchange={(next) => set('syncToTransport', next)} />

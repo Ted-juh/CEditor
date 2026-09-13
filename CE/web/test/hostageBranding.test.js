@@ -26,10 +26,11 @@ test('the Hostage header separates identity, mode, transport and emergency actio
 
 test('plug-in scanning moved from global chrome into the Library utility', () => {
   const headerEnd = view.indexOf('</header>');
-  const scan = view.indexOf('data-testid="host-scan"');
-  const library = view.indexOf("activeUtility === 'library'");
-  assert.ok(headerEnd >= 0 && library > headerEnd && scan > library);
-  assert.match(view, /data-testid="host-scan"[\s\S]{0,160}Scan plug-ins/);
+  const library = view.indexOf('<HostLibraryPanel');
+  assert.ok(headerEnd >= 0 && library > headerEnd);
+  assert.doesNotMatch(view.slice(0, headerEnd), /data-testid="host-scan"/);
+  const libraryPanel = read('../src/CE_Application/sections/HostLibraryPanel.svelte');
+  assert.match(libraryPanel, /data-testid="host-scan"[\s\S]{0,160}Scan plug-ins/);
 });
 
 test('Hostage is the visible workspace and runtime name', () => {

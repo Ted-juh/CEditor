@@ -1,4 +1,7 @@
 <script>
+  import { onDestroy } from 'svelte';
+  import SetlistSoundcheckRow from './SetlistSoundcheckRow.svelte';
+  import HostConfirmButton from './HostConfirmButton.svelte';
   /**
    * PerformancePanel.svelte — Hostage's performance system.
    *
@@ -37,17 +40,33 @@
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
     addSetlistItem, removeSetlistItem, moveSetlistItem, setSetlistItem, setSetlistOptions,
     setlistGo, setlistNext, setlistPrev,
+    checkSetlistSoundcheck, startSoundcheck, finishSoundcheck,
     addArrangementItem, removeArrangementItem, setArrangementItem, moveArrangementItem,
     setArrangementOptions, startArrangement, stopArrangement,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { PERFORMANCE_GROUPS, performanceGroupFor, restorePerformanceNavigation,
+    storePerformanceNavigation, selectPerformanceTool } from '../utils/performanceNavigation.js';
 
-  let tab = $state('patterns');
+  let { onShowMixer = () => {} } = $props();
+  const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
+  onDestroy(stopMeasurement);
+  const showMixer = () => { stopMeasurement(); onShowMixer(); };
+  let navigation = $state(restorePerformanceNavigation());
+  let tab = $derived(navigation.tab);
+  let activeGroup = $derived(performanceGroupFor(tab));
+  let activeTool = $derived(activeGroup.tools.find(tool => tool.id === tab));
+  const selectTool = (tool) => {
+    if (tool !== 'setlist') stopMeasurement();
+    navigation = selectPerformanceTool(navigation, tool);
+  };
+  $effect(() => storePerformanceNavigation(navigation));
   let selectedPatternId = $state('');
   let selectedLaneId = $state('');
   let selectedStepIndex = $state(-1);
   let retrospectiveSeconds = $state(30);
-  let seenRetrospectivePatternId = $state('');
+  // An old completed capture must not override the remembered tool on remount.
+  let seenRetrospectivePatternId = $state($hostState.performance.capture.lastPatternId);
   let lockKind = $state('parameter');
   let lockTargetId = $state('');
   let lockParameterId = $state('');
@@ -226,7 +245,7 @@
       selectedPatternId = patternId;
       selectedLaneId = '';
       selectedStepIndex = -1;
-      tab = 'patterns';
+      selectTool('patterns');
     }
   });
 
@@ -558,22 +577,22 @@
 
   function routeLfo(lfo) {
     modSourceKey = `lfo:${lfo.lfoId}`;
-    tab = 'modulation';
+    selectTool('modulation');
   }
 
   function routeEnvelope(envelope) {
     modSourceKey = `envelope:${envelope.envelopeId}`;
-    tab = 'modulation';
+    selectTool('modulation');
   }
 
   function routeMseg(mseg) {
     modSourceKey = `mseg:${mseg.msegId}`;
-    tab = 'modulation';
+    selectTool('modulation');
   }
 
   function routeRandom(random) {
     modSourceKey = `random:${random.randomId}`;
-    tab = 'modulation';
+    selectTool('modulation');
   }
 
   const randomModeLabel = (mode) => ({
@@ -855,11 +874,8 @@
 </script>
 
 <div class="perf-panel" data-testid="host-performance-panel">
-  <div class="perf-tabs">
-    {#each [['patterns', 'Patterns'], ['looper', 'Looper'], ['gestures', 'Gestures'], ['recorder', 'Recorder'], ['modulation', 'Modulation'], ['lfos', 'MIDI LFOs'], ['envelopes', 'Envelopes'], ['msegs', 'MSEG'], ['random', 'Random'], ['tuning', 'Tuning'], ['clips', 'Clips & scenes'], ['arranger', 'Arrange'], ['setlist', 'Setlist']] as [id, label] (id)}
-      <button type="button" class="toggle" class:on={tab === id} onclick={() => (tab = id)}
-              data-testid={`perf-tab-${id}`}>{label}</button>
-    {/each}
+  <div class="perf-toolbar">
+    <h2>Performance</h2>
     <span class="perf-spacer"></span>
     <div class="retrospective"
          title={`The last ${performance.capture.historyCapacitySeconds} seconds of MIDI are remembered even while stopped`}>
@@ -890,6 +906,22 @@
     {/if}
   </div>
 
+  <div class="performance-navigation">
+    <nav class="perf-groups" aria-label="Performance groups">
+      {#each PERFORMANCE_GROUPS as group (group.id)}
+        <button type="button" class:on={activeGroup.id === group.id}
+          aria-pressed={activeGroup.id === group.id} data-testid={`perf-group-${group.id}`}
+          onclick={() => selectTool(navigation.lastTools[group.id])}>{group.label}</button>
+      {/each}
+    </nav>
+    <nav class="perf-tabs" aria-label="Tools in selected Performance group">
+      {#each activeGroup.tools as tool (tool.id)}
+        <button type="button" class="toggle" class:on={tab === tool.id} aria-pressed={tab === tool.id}
+          onclick={() => selectTool(tool.id)} data-testid={`perf-tab-${tool.id}`}>{tool.label}</button>
+      {/each}
+    </nav>
+  </div>
+
   {#if tab === 'patterns'}
     <div class="perf-body">
       <div class="pattern-list">
@@ -914,8 +946,8 @@
             <span class="pattern-detail">{visibleLaneCount(pattern)} {visibleLaneCount(pattern) === 1 ? 'lane' : 'lanes'}</span>
             <button type="button" class="ghost" title="Make a launchable clip from this pattern"
                     onclick={() => addClip(pattern.patternId)}>+ Clip</button>
-            <button type="button" class="ghost danger" title="Remove this pattern and its clips"
-                    onclick={() => removePattern(pattern.patternId)}>×</button>
+            <HostConfirmButton identity={JSON.stringify([pattern.patternId])} aria-label="Remove pattern" type="button" class="ghost danger" title="Remove this pattern and its clips"
+                    onclick={() => removePattern(pattern.patternId)}>×</HostConfirmButton>
           </div>
         {/each}
       </div>
@@ -986,8 +1018,8 @@
               <input type="file" accept=".json,application/json,text/plain" onchange={importGrooveFile} />
             </label>
             {#if selectedGroove?.source === 'imported'}
-              <button type="button" class="ghost danger"
-                      onclick={() => removeGrooveTemplate(selectedGroove.grooveId)}>Remove template</button>
+              <HostConfirmButton identity={JSON.stringify([selectedGroove.grooveId])} title="Remove groove template" aria-label="Remove groove template" type="button" class="ghost danger"
+                      onclick={() => removeGrooveTemplate(selectedGroove.grooveId)}>Remove template</HostConfirmButton>
             {/if}
             {#if selectedPattern.appliedGrooveId}
               <span class="groove-applied">Last applied:
@@ -1011,8 +1043,8 @@
                 <PropertyToggle compact label="Mute" value={lane.muted}
                                 ariaLabel={`Mute ${laneLabel(lane)}`}
                                 onchange={(on) => setLaneOptions(selectedPattern.patternId, lane.laneId, { muted: on })} />
-                <button type="button" class="ghost danger" title="Remove this lane"
-                        onclick={() => removeLane(selectedPattern.patternId, lane.laneId)}>×</button>
+                <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, lane.laneId])} aria-label="Remove lane" type="button" class="ghost danger" title="Remove this lane"
+                        onclick={() => removeLane(selectedPattern.patternId, lane.laneId)}>×</HostConfirmButton>
               </div>
 
               {#if lane.type === 'note' || lane.type === 'chord'}
@@ -1196,8 +1228,8 @@
                        onchange={(e) => euclidFill(selectedPattern.patternId, selectedLane.laneId,
                                                    Number(e.currentTarget.value))} />
               </label>
-              <button type="button" class="ghost"
-                      onclick={() => clearLane(selectedPattern.patternId, selectedLane.laneId)}>Clear</button>
+              <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, selectedLane.laneId])} title="Clear lane" aria-label="Clear lane" type="button" class="ghost"
+                      onclick={() => clearLane(selectedPattern.patternId, selectedLane.laneId)}>Clear</HostConfirmButton>
               {#if clipForSelectedPattern}
                 <button type="button" class="toggle"
                         class:on={performance.capture.armed && performance.capture.laneId === selectedLane.laneId}
@@ -1267,9 +1299,10 @@
                   <strong>Parameter locks</strong>
                   <span>Values recalled on this step only</span>
                   {#if selectedStepLocks.length > 0}
-                    <button type="button" class="ghost danger"
+                    <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, selectedLane.laneId,
+                                                          selectedStepIndex])} title="Clear step locks" aria-label="Clear step locks" type="button" class="ghost danger"
                             onclick={() => clearStepLocks(selectedPattern.patternId, selectedLane.laneId,
-                                                          selectedStepIndex)}>Clear step</button>
+                                                          selectedStepIndex)}>Clear step</HostConfirmButton>
                   {/if}
                 </div>
 
@@ -1289,9 +1322,10 @@
                                      selectedStepIndex, lockLane.targetId, lockLane.parameterId,
                                      Number(e.currentTarget.value))} />
                         <output>{lockValueText(lockLane, lockStep)}</output>
-                        <button type="button" class="ghost danger" title="Remove this lock"
+                        <HostConfirmButton identity={JSON.stringify([selectedPattern.patternId, selectedLane.laneId,
+                                                             selectedStepIndex, lockLane.laneId])} aria-label="Remove step lock" type="button" class="ghost danger" title="Remove this lock"
                                 onclick={() => removeStepLock(selectedPattern.patternId, selectedLane.laneId,
-                                                             selectedStepIndex, lockLane.laneId)}>×</button>
+                                                             selectedStepIndex, lockLane.laneId)}>×</HostConfirmButton>
                       </div>
                     {/each}
                   </div>
@@ -1426,11 +1460,11 @@
                 + Overdub
               </button>
               <span class="pass-count">{layer.overdubPasses} {layer.overdubPasses === 1 ? 'overdub' : 'overdubs'}</span>
-              <button type="button" class="ghost danger"
+              <HostConfirmButton identity={JSON.stringify([layer.clipId])} aria-label="Remove MIDI loop" type="button" class="ghost danger"
                       disabled={performance.looper.recording
                         || (performance.gestures.recording && performance.gestures.targetClipId === layer.clipId)}
                       title="Remove this layer and its recorded pattern"
-                      onclick={() => removeMidiLoop(layer.clipId)}>×</button>
+                      onclick={() => removeMidiLoop(layer.clipId)}>×</HostConfirmButton>
             </div>
           {/each}
         </div>
@@ -1510,14 +1544,14 @@
               <button type="button" class="gesture-replace" disabled={performance.gestures.recording}
                       title="Replace only the controls moved in the new take"
                       onclick={() => startGestureRecording(clip.clipId, 'replace')}>Replace</button>
-              <button type="button" class="ghost" disabled={performance.gestures.recording || automationCount === 0}
+              <HostConfirmButton identity={JSON.stringify([clip.clipId])} aria-label="Clear gesture lanes" type="button" class="ghost" disabled={performance.gestures.recording || automationCount === 0}
                       title="Clear every recorded automation lane in this clip"
-                      onclick={() => clearGestureLanes(clip.clipId)}>Clear</button>
+                      onclick={() => clearGestureLanes(clip.clipId)}>Clear</HostConfirmButton>
               <span class="pass-count">{clip.gesturePasses} {clip.gesturePasses === 1 ? 'take' : 'takes'}</span>
               {#if clip.gestureClip}
-                <button type="button" class="ghost danger" disabled={performance.gestures.recording}
+                <HostConfirmButton identity={JSON.stringify([clip.clipId])} aria-label="Remove clip" type="button" class="ghost danger" disabled={performance.gestures.recording}
                         title="Remove this gesture performance and its private pattern"
-                        onclick={() => removeClip(clip.clipId)}>×</button>
+                        onclick={() => removeClip(clip.clipId)}>×</HostConfirmButton>
               {/if}
             </div>
           {/each}
@@ -1603,10 +1637,10 @@
                         || performance.performanceReplay.state !== 'idle'}
                       onclick={() => replayPerformanceTake(take.takeId)}
                       data-testid="perf-replay-performance">▶ Instant Replay</button>
-              <button type="button" class="ghost danger"
+              <HostConfirmButton identity={JSON.stringify([take.takeId])} title="Remove performance take" type="button" class="ghost danger"
                       disabled={performance.performanceRecorder.recording}
                       onclick={() => removePerformanceTake(take.takeId)}
-                      aria-label={`Remove ${take.name}`}>×</button>
+                      aria-label={`Remove ${take.name}`}>×</HostConfirmButton>
             </div>
           {/each}
         </div>
@@ -1626,9 +1660,9 @@
         </div>
         <span class="perf-spacer"></span>
         <span class="route-count">{$hostState.rack.modulationRoutes.length} / 128 routes</span>
-        <button type="button" class="ghost danger"
+        <HostConfirmButton identity={JSON.stringify([])} title="Clear modulation routes" aria-label="Clear modulation routes" type="button" class="ghost danger"
                 disabled={$hostState.rack.modulationRoutes.length === 0}
-                onclick={() => clearModulationRoutes()}>Clear all</button>
+                onclick={() => clearModulationRoutes()}>Clear all</HostConfirmButton>
       </div>
 
       <div class="modulation-add">
@@ -1724,8 +1758,8 @@
                                                            { amount: Number(e.currentTarget.value) })} />
                 <output>{route.amount >= 0 ? '+' : ''}{Math.round(route.amount * 100)}%</output>
               </label>
-              <button type="button" class="ghost danger" title="Remove route"
-                      onclick={() => removeModulationRoute(route.routeId)}>×</button>
+              <HostConfirmButton identity={JSON.stringify([route.routeId])} aria-label="Remove modulation route" type="button" class="ghost danger" title="Remove route"
+                      onclick={() => removeModulationRoute(route.routeId)}>×</HostConfirmButton>
             </div>
           {/each}
         </div>
@@ -1748,11 +1782,7 @@
         <button type="button" class="mod-add-button" onclick={() => addMidiLfo()}>+ LFO</button>
       </div>
 
-      {#if $hostState.rack.midiLfos.length === 0}
-        <div class="looper-empty">
-          No LFOs yet. Add one, choose its waveform and speed, then route it in the matrix.
-        </div>
-      {:else}
+      {#if $hostState.rack.midiLfos.length > 0}
         <div class="lfo-grid">
           {#each $hostState.rack.midiLfos as lfo (lfo.lfoId)}
             <article class="lfo-card" class:disabled={!lfo.enabled}>
@@ -1768,8 +1798,8 @@
                 <button type="button" class="ghost" onclick={() => resetMidiLfo(lfo.lfoId)}>
                   Restart
                 </button>
-                <button type="button" class="ghost danger" title="Remove LFO"
-                        onclick={() => removeMidiLfo(lfo.lfoId)}>×</button>
+                <HostConfirmButton identity={JSON.stringify([lfo.lfoId])} aria-label="Remove MIDI LFO" type="button" class="ghost danger" title="Remove LFO"
+                        onclick={() => removeMidiLfo(lfo.lfoId)}>×</HostConfirmButton>
               </header>
 
               <div class="lfo-scope" aria-label={`${lfo.name} current value ${Math.round(lfo.value * 100)}%`}>
@@ -1909,8 +1939,8 @@
                         </label>
                       {/if}
                       {#if !output.resolved}<span class="route-missing">Unresolved</span>{/if}
-                      <button type="button" class="ghost danger" title="Remove output"
-                              onclick={() => removeMidiLfoOutput(lfo.lfoId, output.outputId)}>×</button>
+                      <HostConfirmButton identity={JSON.stringify([lfo.lfoId, output.outputId])} aria-label="Remove MIDI LFO output" type="button" class="ghost danger" title="Remove output"
+                              onclick={() => removeMidiLfoOutput(lfo.lfoId, output.outputId)}>×</HostConfirmButton>
                     </div>
                   {/each}
                 </div>
@@ -1963,8 +1993,8 @@
                 <button type="button" class="ghost" onclick={() => resetEnvelope(envelope.envelopeId)}>
                   Reset
                 </button>
-                <button type="button" class="ghost danger" title="Remove envelope"
-                        onclick={() => removeEnvelope(envelope.envelopeId)}>×</button>
+                <HostConfirmButton identity={JSON.stringify([envelope.envelopeId])} aria-label="Remove envelope" type="button" class="ghost danger" title="Remove envelope"
+                        onclick={() => removeEnvelope(envelope.envelopeId)}>×</HostConfirmButton>
               </header>
 
               <div class="envelope-scope"
@@ -2120,8 +2150,8 @@
                 <button type="button" class="ghost" onclick={() => resetMseg(mseg.msegId)}>
                   Restart
                 </button>
-                <button type="button" class="ghost danger" title="Remove MSEG"
-                        onclick={() => removeMseg(mseg.msegId)}>×</button>
+                <HostConfirmButton identity={JSON.stringify([mseg.msegId])} aria-label="Remove MSEG" type="button" class="ghost danger" title="Remove MSEG"
+                        onclick={() => removeMseg(mseg.msegId)}>×</HostConfirmButton>
               </header>
 
               <div class="mseg-editor">
@@ -2232,12 +2262,12 @@
                          onchange={(e) => setSelectedMsegPoint(mseg,
                            { curve: Number(e.currentTarget.value) })} />
                 </label>
-                <button type="button" class="ghost danger"
+                <HostConfirmButton identity={selectedPoint.pointId} title="Remove point"
                         disabled={points.length <= 2 || selectedPointIndex === 0
                           || selectedPointIndex === points.length - 1}
                         onclick={(e) => deleteMsegPoint(mseg, selectedPoint, e)}>
                   Remove point
-                </button>
+                </HostConfirmButton>
                 <span class="mseg-point-count">{points.length} / 64 points</span>
               </div>
             </article>
@@ -2289,8 +2319,8 @@
                 <span class="perf-spacer"></span>
                 <button type="button" class="ghost"
                         onclick={() => resetRandomModulator(random.randomId)}>Restart</button>
-                <button type="button" class="ghost danger" title="Remove random modulator"
-                        onclick={() => removeRandomModulator(random.randomId)}>×</button>
+                <HostConfirmButton identity={JSON.stringify([random.randomId])} aria-label="Remove random modulator" type="button" class="ghost danger" title="Remove random modulator"
+                        onclick={() => removeRandomModulator(random.randomId)}>×</HostConfirmButton>
               </header>
 
               <div class="random-scope"
@@ -2669,7 +2699,7 @@
                     onclick={() => freezeMidiClip(clip.clipId, freezeCycles)}>
               {clip.frozenMidi ? 'Frozen' : 'Freeze MIDI'}
             </button>
-            <button type="button" class="ghost danger" onclick={() => removeClip(clip.clipId)}>×</button>
+            <HostConfirmButton identity={JSON.stringify([clip.clipId])} title="Remove clip" aria-label="Remove clip" type="button" class="ghost danger" onclick={() => removeClip(clip.clipId)}>×</HostConfirmButton>
           </div>
         {/each}
       </div>
@@ -2737,7 +2767,7 @@
                     onclick={() => addSetlistItem(scene.sceneId)}>+ Set</button>
             <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
                     onclick={() => addArrangementItem(scene.sceneId)}>+ Arrange</button>
-            <button type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</button>
+            <HostConfirmButton identity={JSON.stringify([scene.sceneId])} title="Remove scene" aria-label="Remove scene" type="button" class="ghost danger" onclick={() => removeScene(scene.sceneId)}>×</HostConfirmButton>
           </div>
           {#if performance.clips.length > 0}
             <div class="scene-clips">
@@ -2826,9 +2856,9 @@
                 <span>{item.bars} {item.bars === 1 ? 'bar' : 'bars'}</span>
               {/if}
             </div>
-            <button type="button" class="ghost danger" disabled={performance.arrangement.playing}
+            <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove arrangement item" type="button" class="ghost danger" disabled={performance.arrangement.playing}
                     aria-label={`Remove ${item.name} from arrangement`}
-                    onclick={() => removeArrangementItem(item.itemId)}>×</button>
+                    onclick={() => removeArrangementItem(item.itemId)}>×</HostConfirmButton>
           </div>
         {/each}
       </div>
@@ -2839,6 +2869,11 @@
     <div class="perf-body setlist-body" data-testid="perf-setlist">
       <div class="perf-head">
         <strong>Setlist</strong>
+        <span class="soundcheck-label" title="Session soundcheck · Main output 1/2 · dBFS">Soundcheck</span>
+        <button type="button" class="ghost" disabled={!performance.setlist.items.length}
+          title="Check saved rig references without loading plug-ins or sending MIDI"
+          onclick={() => checkSetlistSoundcheck()}>Check setlist</button>
+        <button type="button" class="ghost" onclick={showMixer}>Mixer</button>
         <label class="mini-field" title="Warm upcoming full-rack captures before they are needed">Preload
           <select value={String(performance.setlist.preloadAhead)}
                   onchange={(e) => setSetlistOptions({ preloadAhead: Number(e.currentTarget.value) })}>
@@ -2857,6 +2892,7 @@
       {/if}
       {#each performance.setlist.items as item, index (item.itemId)}
         {@const preload = preloadFor(item)}
+        <div class="setlist-entry">
         <div class="setlist-item" class:current={performance.setlist.currentIndex === index}
              class:missing={item.missing} class:loading={performance.setlist.loadingIndex === index}>
           <button type="button" class="ghost setlist-go" onclick={() => setlistGo(index)}>{index + 1}</button>
@@ -2906,14 +2942,20 @@
             <input type="number" min="0" max="300" value={item.tempo}
                    onchange={(e) => setSetlistItem(item.itemId, { tempo: Number(e.currentTarget.value) })} />
           </label>
-          <button type="button" class="ghost danger" onclick={() => removeSetlistItem(item.itemId)}>×</button>
+          <HostConfirmButton identity={JSON.stringify([item.itemId])} title="Remove setlist item" aria-label="Remove setlist item" type="button" class="ghost danger" onclick={() => removeSetlistItem(item.itemId)}>×</HostConfirmButton>
+        </div>
+        <SetlistSoundcheckRow {item} soundcheck={$hostState.soundcheck} onMeasure={startSoundcheck} onStop={finishSoundcheck}/>
         </div>
       {/each}
     </div>
   {/if}
+  <div class="perf-location" data-testid="perf-location" role="status">Performance / {activeGroup.label} / {activeTool.label}</div>
 </div>
 
 <style>
+  .setlist-entry { border:1px solid var(--host-line); border-radius:5px; }
+  .soundcheck-label { font-size:11px; color:var(--host-text-soft); margin-left:8px; }
+  .setlist-item { flex-wrap:wrap; }
   .perf-panel {
     display: flex;
     flex-direction: column;
@@ -2927,13 +2969,24 @@
     overflow-y: auto;
   }
 
-  .perf-tabs { display: flex; align-items: center; gap: 6px; }
+  .perf-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 2px 8px; }
+  .perf-toolbar h2 { margin: 0; font-size: 18px; font-weight: 650; }
+  .performance-navigation { flex: none; border: 1px solid var(--host-line); border-radius: var(--host-radius-panel); overflow: hidden; }
+  .perf-groups { display: flex; flex-wrap: wrap; background: var(--host-bg-deep); border-bottom: 1px solid var(--host-line); padding: 0 8px; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; min-height: 42px; padding: 10px 14px; color: var(--host-text-soft); }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-groups button.on { border-bottom-color: var(--host-accent-strong); background: var(--host-accent-surface); color: var(--host-text); }
+  .perf-tabs { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 10px; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button { background: transparent; border-color: transparent; }
+  :global(.host-workspace.host-workspace) .perf-panel .perf-tabs button.on { background: var(--host-accent-surface); border-color: var(--host-accent); color: var(--host-text); }
+  .perf-location { flex: none; border-top: 1px solid var(--host-line-soft); margin-top: auto; padding: 10px 2px 0; font-size: 11px; color: var(--host-text-soft); }
   .perf-spacer { flex: 1; }
   .recording { color: #e4b3b3; border-color: #7a4a4a; }
   .retrospective {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    flex-wrap: wrap;
+    max-width: 100%;
     flex: 0 0 auto;
     padding-left: 6px;
     border-left: 1px solid #2c343d;
@@ -2951,6 +3004,12 @@
   .history-dot.ready { background: #50b982; box-shadow: 0 0 5px #50b98280; }
   .retro-result { color: #8f9ba6; font-size: 11px; white-space: nowrap; }
   .retro-result.trimmed { color: #d3ae67; }
+  @media (max-width: 650px) {
+    .perf-toolbar > .perf-spacer { display: none; }
+    .retrospective { padding-left: 0; border-left: 0; }
+    :global(.host-workspace.host-workspace) .perf-panel .perf-groups button { padding: 9px 10px; }
+    .perf-groups { padding: 0; }
+  }
 
   .looper-body { display: flex; flex-direction: column; gap: 12px; }
   .looper-toolbar {
@@ -3763,7 +3822,7 @@
   }
   .chip.on { color: #d6dbe0; border-color: #5b9bd5; background: #24313d; }
 
-  .setlist-body { flex-direction: column; }
+  .setlist-body { flex-direction: column; align-items:stretch; gap:8px; }
   .setlist-item { display: flex; align-items: center; gap: 10px; min-height: 34px; font-size: 12px; }
   .setlist-item.current { background: #24313d; border-radius: 4px; }
   .setlist-item.loading { box-shadow: inset 3px 0 #d7863b; }

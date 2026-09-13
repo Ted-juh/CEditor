@@ -1,0 +1,333 @@
+<title>Assets tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* App palette, as with the other mockups. NOTHING HERE IS BUILT. */
+:root{
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333;
+  --ink:#DDD; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --warn:#E5A029; --bad:#D98C8C;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:#E8EEF5;font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding-block:0 100px;padding-left:24px;padding-right:24px}
+.hero{padding:56px 0 32px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(30px,4.5vw,46px)/1.05 var(--sans);letter-spacing:-.02em;margin:16px 0 0;max-width:18ch}
+.lede{font:400 clamp(16px,1.7vw,19px)/1.55 var(--sans);color:var(--ink-2);max-width:62ch;margin:16px 0 0}
+.warnbar{margin-top:26px;border:1px solid #4A3A1C;background:#241d10;border-radius:6px;padding:12px 14px;color:#F1D8A1;font-size:14px;max-width:64ch}
+.warnbar b{color:var(--warn)}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:26ch}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+p{max-width:64ch;color:var(--ink-2);margin:14px 0 0;font-size:15px}
+p b{color:#E8EEF5;font-weight:600}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px}
+ul{max-width:64ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:14px 0 0}
+li{margin-top:8px} li b{color:#E8EEF5;font-weight:600}
+.plate{margin-top:26px}
+.plate-scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:12px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:76ch;margin:0}
+
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink)}
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:#111A21;border-bottom:1px solid var(--rule);align-items:center}
+.dtabs button{border:1px solid transparent;background:transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:5px 9px;border-radius:4px}
+.dtabs button.on{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+.dtabs .who{margin-left:auto;font:500 9px/1 var(--mono);color:var(--ink-4);padding-right:4px}
+.dtabs .who b{color:#8FEDE3}
+.cols{display:flex;gap:10px;padding:10px;align-items:flex-start}
+.colh{display:flex;align-items:center;gap:6px;font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin-bottom:7px;white-space:nowrap}
+.colh s{margin-left:auto;text-decoration:none;font-size:8.5px}
+
+/* library */
+.libcol{flex:0 0 244px;min-width:0}
+.libgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.lib{border:1px solid #2E3540;border-radius:3px;background:#0C0F12;padding:0;overflow:hidden;cursor:pointer;position:relative}
+.lib.on{border-color:var(--teal-dim);box-shadow:0 0 0 1px #0B2320}
+.libbox{height:48px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.libl{display:block;font:500 8px/1 var(--mono);color:var(--ink-4);text-align:center;padding:0 3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib.on .libl{color:#8FEDE3}
+.kind{position:absolute;left:3px;top:3px;font:600 6.5px/1 var(--mono);letter-spacing:.06em;border-radius:2px;padding:2px 3px;text-transform:uppercase}
+.kind.img{background:#173449;color:#9CC7EA;border:1px solid #2E4E66}
+.kind.film{background:#2B1F10;color:#E5A029;border:1px solid #4A3A1C}
+.libtools{display:flex;gap:5px;margin-top:7px}
+.libtools button{flex:1;height:24px;border:1px solid #333B42;background:#12171A;border-radius:3px;color:#9AA6AE;font:600 9px/1 var(--sans)}
+.libtools button.primary{border-color:var(--teal-dim);background:#0B2320;color:#8FEDE3}
+
+/* asset view */
+.assetcol{flex:1 1 0;min-width:280px}
+.stage{background:#0C0F12;border:1px solid var(--rule-2);border-radius:4px;height:196px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.strip{position:relative;height:172px;display:flex}
+.frame{width:34px;height:100%;position:relative;background:linear-gradient(180deg,#243642,#101a20)}
+.frame .dial{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid #4E6272;background:#16222A}
+.frame .dial::after{content:'';position:absolute;left:50%;top:2px;width:2px;height:8px;margin-left:-1px;background:#8FEDE3;transform-origin:1px 9px}
+.frame + .frame{border-left:1px dashed rgba(20,184,166,.5)}
+.frame.cur{outline:1px solid var(--teal);outline-offset:-1px;background:linear-gradient(180deg,#2B4551,#12222A)}
+.frameedge{position:absolute;top:0;bottom:0;width:1px;background:rgba(20,184,166,.45)}
+.stagebar{display:flex;align-items:center;gap:8px;margin-top:8px}
+.stepper{display:flex;gap:3px}
+.stepper button{width:26px;height:24px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);color:#B9C8D4;font:600 10px/1 var(--mono)}
+.readout{font:500 10px/1 var(--mono);color:var(--ink-3)}
+.readout b{color:#E8EEF5}
+.nc{display:flex;height:24px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);overflow:hidden;width:86px}
+.nc i{flex:0 0 26px;font-style:normal;font:600 8px/22px var(--mono);color:#6C767E;text-align:center;background:#151A1E;border-right:1px solid var(--rule-2);cursor:ew-resize}
+.nc em{flex:1;min-width:0;font-style:normal;font:500 10px/22px var(--mono);color:var(--ink);padding:0 6px}
+.nc u{flex:0 0 15px;text-decoration:none;border-left:1px solid var(--rule-2);background:#151A1E;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:6px;line-height:1;color:#6C767E;gap:2px}
+.checkbar{margin-top:8px;border-radius:4px;padding:7px 9px;font:400 9.5px/1.5 var(--sans)}
+.checkbar.bad{border:1px solid #4A3A1C;background:#241d10;color:#F1D8A1}
+.checkbar.bad b{color:var(--warn)}
+.checkbar.good{border:1px solid var(--teal-dim);background:#0B1F1D;color:#A8E6DE}
+.checkbar.good b{color:var(--teal)}
+.fixrow{display:flex;gap:5px;margin-top:6px}
+.fixrow button{border:1px solid #4A3A1C;background:#2B1F10;color:#F1D8A1;border-radius:3px;padding:3px 7px;font:600 8.5px/1 var(--mono)}
+
+/* settings */
+.setcol{flex:0 0 264px;min-width:0}
+.setbox{background:var(--panel);border:1px solid var(--rule-2);border-radius:4px;padding:8px}
+.grp{font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin:12px 0 4px;padding-top:8px;border-top:1px solid #242424}
+.grp:first-child{margin-top:0;padding-top:0;border-top:0}
+.r{display:grid;grid-template-columns:58px minmax(0,1fr);gap:7px;align-items:center;margin-top:6px}
+.r > label{font:400 9.5px/1.15 var(--sans);color:var(--ink-4);text-align:right}
+.f{height:24px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);color:var(--ink);font:500 10px/22px var(--mono);padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.seg{display:flex;height:24px;border:1px solid var(--rule-2);border-radius:3px;overflow:hidden}
+.seg span{flex:1;text-align:center;font:600 9px/22px var(--sans);color:var(--ink-4);background:var(--field);border-right:1px solid var(--rule-2);white-space:nowrap;overflow:hidden}
+.seg span:last-child{border-right:0}
+.seg span.on{background:#173449;color:#EAF5FF}
+
+/* before/after */
+.ba{display:flex;gap:16px;align-items:flex-start;min-width:max-content}
+.balabel{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);margin-bottom:8px}
+.balabel.a{color:var(--teal)}
+.arrowcol{display:flex;align-items:center;align-self:stretch;color:var(--ink-4);font-size:20px}
+.pp{background:var(--panel);border:1px solid var(--rule);border-radius:4px;width:296px}
+.pphead{padding:7px 9px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center}
+.pphead b{font-size:11.5px;font-weight:600;color:#E8EEF5}
+.pphead span{font:500 9px/1 var(--mono);color:var(--ink-4)}
+.ppsech{padding:6px 8px;font:600 11px/1 var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--label)}
+.ppbody{padding:2px 8px 9px}
+.sel{height:24px;border:1px solid var(--rule-2);border-radius:3px;background:var(--field);color:var(--ink);font:500 10px/22px var(--mono);padding:0 6px;display:flex;align-items:center;justify-content:space-between}
+.sel::after{content:'▾';color:var(--ink-4);font-size:9px}
+.smear{height:96px;border:1px solid #333;border-radius:4px;background:repeating-linear-gradient(180deg,#243642 0 3px,#1b2a33 3px 6px);margin-top:7px}
+@media (max-width:640px){ .wrap{padding-left:16px;padding-right:16px} .plate-scroll{padding:12px} }
+</style>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow"><b>CEditor</b> &nbsp;·&nbsp; display panel &nbsp;·&nbsp; candidate 3 &nbsp;·&nbsp; 2026-09-10</div>
+  <h1>The Assets tab</h1>
+  <p class="lede">1,073px, a media library picked from two dropdowns, and a filmstrip frame count
+    that can be wrong in a way nothing in the application checks.</p>
+  <div class="warnbar"><b>Built on 2026-09-10.</b> These are still drawings, not screenshots, and the
+    shipped tab differs from them in two places: frame boundaries are the gaps between separate
+    frame boxes rather than drawn lines, and the offered repairs are computed divisors (150, 100, 90
+    for a 900px strip) rather than the illustrative numbers below. The asset shapes and the slicing
+    arithmetic were read out of <code>CustomAssetsEditor.svelte</code> and
+    <code>InteractivePartRenderer.svelte</code> and are unchanged.</div>
+</div>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 1</div>
+  <h2>The frame count can be wrong, and nothing says so</h2>
+  <p>This is the finding the tab is worth building for — and the version below is the corrected
+    one. <code>InteractivePartRenderer</code> takes the <b>whole image</b> to be exactly
+    <code>frameCount</code> frames. If the file holds anything else — stray rows at the bottom, or a
+    count that is simply wrong — it is sliced at a pitch the frames were not drawn at, and the error
+    grows from nothing at the first frame to the full excess at the last. Measured in Chromium: 128
+    frames of 7px in a 900px file shows the stray rows instead of frame 127; at 904px the error is a
+    whole frame by frame 64.</p>
+  <p style="color:var(--ink-4)">An earlier version of this page said the proportional positioning
+    itself drifts. It does not — that maths is exact — and the claim was reasoned about rather than
+    driven in a browser. <code>browser-checks/assetsTab.mjs</code> measures it now.</p>
+  <p><b>The check is arithmetic the app already has everything for.</b> The asset stores its source;
+    <code>imageDimensions()</code> in the editor already measures the natural size on import.
+    <code>height % frameCount === 0</code> is the whole test, and it has never been run.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui ba">
+        <div>
+          <div class="balabel">Today — one strip, no boundaries, 178px tall</div>
+          <div class="pp">
+            <div class="pphead"><b>Assets</b><span>Filmstrips</span></div>
+            <div class="ppsech">Filmstrips</div>
+            <div class="ppbody">
+              <div class="r" style="grid-template-columns:54px 1fr"><label>Strip</label><div class="sel">knobStrip</div></div>
+              <div class="smear"></div>
+              <div class="r" style="grid-template-columns:54px 1fr"><label>Frames</label><div class="nc" style="width:auto"><i>FR</i><em>128</em><u>▴<br>▾</u></div></div>
+              <div class="r" style="grid-template-columns:54px 1fr"><label>Axis</label><div class="sel">vertical</div></div>
+              <div class="r" style="grid-template-columns:54px 1fr"><label>Interp</label><div class="sel">nearest</div></div>
+              <p style="font-size:10px;color:var(--ink-4);margin:10px 0 0">
+                128 frames in a 96px box. Whether the count matches the image is not answerable from
+                this picture, and nothing else asks.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrowcol">→</div>
+
+        <div>
+          <div class="balabel a">Proposed — frames drawn, and the arithmetic checked</div>
+          <div class="assetcol" style="flex:none;width:470px">
+            <div class="stage">
+              <div class="strip">
+                <div class="frame"><span class="dial"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(18deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(36deg)"></span></div>
+                <div class="frame cur"><span class="dial" style="transform:rotate(54deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(72deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(90deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(108deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(126deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(144deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(162deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(180deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(198deg)"></span></div>
+              </div>
+            </div>
+            <div class="stagebar">
+              <span class="stepper"><button>◂</button><button>▸</button></span>
+              <span class="readout">frame <b>41</b> of 128</span>
+              <span style="margin-left:auto"><span class="nc"><i>FRAME</i><em>41</em><u>▴<br>▾</u></span></span>
+            </div>
+            <div class="checkbar bad">
+              <b>⚠ 900 ÷ 128 = 7.03px per frame — not a whole number.</b>
+              The renderer treats the whole image as exactly 128 frames, so 4px that belong to no
+              frame get spread across the strip and the last frame shows them instead.
+              <div class="fixrow">
+                <button>use 100 (9px)</button>
+                <button>use 90 (10px)</button>
+                <button>use 180 (5px)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 1</div>
+      <p class="ct">In the shipped tab the boundaries are the gaps between separate frame boxes
+        rather than drawn lines, and the frames tile the stage instead of sitting in one row. The
+        offered counts are divisors of the measured height near the current value, limited to ones
+        that are a plausible repair — one click and the frames line up.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================== -->
+<section class="sec">
+  <div class="kicker">Plate 2</div>
+  <h2>The whole tab</h2>
+  <p>Images and filmstrips are one library, so they get one grid rather than two dropdowns. Import
+    and bake are buttons under it instead of a 302px section of their own.</p>
+
+  <div class="plate">
+    <div class="plate-scroll">
+      <div class="ui dock" style="min-width:1030px">
+        <div class="dtabs">
+          <button>Colors</button><button>Gradient</button><button>Effects</button><button>Type</button>
+          <button class="on">Assets</button><button>Layers</button>
+          <span class="who">editing <b>Big Knob</b> · 5 assets</span>
+        </div>
+
+        <div class="cols">
+          <div class="libcol">
+            <div class="colh">Library <s>5</s></div>
+            <div class="libgrid">
+              <div class="lib on"><span class="kind film">film</span>
+                <span class="libbox"><svg width="46" height="42"><rect width="46" height="42" fill="#16222A"/><g stroke="rgba(20,184,166,.4)" stroke-dasharray="2 2"><line x1="0" y1="10" x2="46" y2="10"/><line x1="0" y1="21" x2="46" y2="21"/><line x1="0" y1="31" x2="46" y2="31"/></g><circle cx="23" cy="5" r="3.5" fill="none" stroke="#4E6272"/><circle cx="23" cy="16" r="3.5" fill="none" stroke="#4E6272"/><circle cx="23" cy="26" r="3.5" fill="none" stroke="#4E6272"/></svg></span>
+                <span class="libl">knobStrip</span></div>
+              <div class="lib"><span class="kind img">img</span>
+                <span class="libbox"><svg width="46" height="42"><rect width="46" height="42" fill="#101A20"/><circle cx="23" cy="21" r="14" fill="#243642" stroke="#4E6272"/><circle cx="23" cy="21" r="5" fill="#0E1317"/></svg></span>
+                <span class="libl">knobFace</span></div>
+              <div class="lib"><span class="kind img">img</span>
+                <span class="libbox"><svg width="46" height="42"><rect width="46" height="42" fill="#101A20"/><rect x="6" y="14" width="34" height="14" rx="7" fill="#243642" stroke="#4E6272"/></svg></span>
+                <span class="libl">track</span></div>
+              <div class="lib"><span class="kind film">film</span>
+                <span class="libbox"><svg width="46" height="42"><rect width="46" height="42" fill="#16222A"/><g stroke="rgba(20,184,166,.4)" stroke-dasharray="2 2"><line x1="11" y1="0" x2="11" y2="42"/><line x1="23" y1="0" x2="23" y2="42"/><line x1="34" y1="0" x2="34" y2="42"/></g><rect x="3" y="17" width="6" height="8" fill="#4E6272"/><rect x="15" y="14" width="6" height="14" fill="#4E6272"/><rect x="26" y="11" width="6" height="20" fill="#4E6272"/></svg></span>
+                <span class="libl">meterStrip</span></div>
+              <div class="lib"><span class="kind img">img</span>
+                <span class="libbox"><svg width="46" height="42"><rect width="46" height="42" fill="#101A20"/><path d="M6 30 L16 14 L26 26 L40 10" fill="none" stroke="#4E6272" stroke-width="2"/></svg></span>
+                <span class="libl">bezelGlow</span></div>
+            </div>
+            <div class="libtools">
+              <button class="primary">+ Import</button>
+              <button>Bake…</button>
+            </div>
+          </div>
+
+          <div class="assetcol">
+            <div class="colh">knobStrip <s>900 × 34 · 128 frames</s></div>
+            <div class="stage" style="height:160px">
+              <div class="strip" style="height:138px">
+                <div class="frame"><span class="dial"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(20deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(40deg)"></span></div>
+                <div class="frame cur"><span class="dial" style="transform:rotate(60deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(80deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(100deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(120deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(140deg)"></span></div>
+                <div class="frame"><span class="dial" style="transform:rotate(160deg)"></span></div>
+              </div>
+            </div>
+            <div class="stagebar">
+              <span class="stepper"><button>◂</button><button>▸</button></span>
+              <span class="readout">frame <b>41</b> of 128</span>
+              <span style="margin-left:auto"><span class="nc"><i>FRAME</i><em>41</em><u>▴<br>▾</u></span></span>
+            </div>
+            <div class="checkbar good"><b>✓ 896 ÷ 128 = 7px per frame.</b> Frames land on pixel boundaries.</div>
+          </div>
+
+          <div class="setcol">
+            <div class="colh">Settings</div>
+            <div class="setbox">
+              <div class="grp">Asset</div>
+              <div class="r"><label>Name</label><div class="f">knobStrip</div></div>
+              <div class="r"><label>Source</label><div class="f">knob_128.png</div></div>
+              <div class="r"><label>Package</label><div class="seg"><span>No</span><span class="on">Yes</span></div></div>
+              <div class="grp">Frames</div>
+              <div class="r"><label>Count</label><div class="nc" style="width:auto"><i>FR</i><em>128</em><u>▴<br>▾</u></div></div>
+              <div class="r"><label>Axis</label><div class="seg"><span class="on">Vert</span><span>Horz</span></div></div>
+              <div class="r"><label>Interp</label><div class="seg"><span class="on">Nearest</span><span>Linear</span></div></div>
+              <div class="grp">Drive</div>
+              <div class="r"><label>Value</label><div class="f">mainValue</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <div class="cn">Plate 2</div>
+      <p class="ct">Asset fields are the ones stored on a <code>FilmstripAsset</code>: name, source,
+        frameCount, orientation, interpolation, valueSource and package.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>How the three open questions were decided</h2>
+  <ul>
+    <li><b>How much of Assets?</b> Images, filmstrips and <code>packagePolicy</code>. The
+      <code>fonts</code> and <code>thumbnails</code> maps were left out: nothing reads them, nothing
+      writes them and no export path carries them.</li>
+    <li><b>The frame readout versus the no-sliders rule.</b> No scrub track. Step buttons, a typed
+      frame number, and clicking a frame on the strip — three ways in, none of them a slider.</li>
+    <li><b>What to do when the count does not divide.</b> Warn and repair. The bar names the
+      arithmetic and offers the nearest counts that do divide, each labelled with the frame size it
+      produces; one click applies it.</li>
+  </ul>
+  <p style="margin-top:22px;color:var(--ink-4);font-size:13px">
+    Companion to <a href="assets-tab-design.md" style="color:var(--teal)">assets-tab-design.md</a>,
+    which records what shipped.</p>
+</section>
+
+</div>

@@ -223,7 +223,7 @@ export function parameterInfo(parameter, value) {
       || String(c?.value ?? '') === key);
     const chosen = at >= 0 ? choices[at] : null;
     return {
-      present: true,
+      present: at >= 0,
       name: String(parameter?.name ?? parameter?.id ?? ''),
       value: Math.max(0, at),
       min: 0,

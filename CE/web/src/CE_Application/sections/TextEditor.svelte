@@ -27,6 +27,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { stateEditScope } from '../stores/stateEditScope.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
@@ -34,6 +35,8 @@
   import { deepClone } from '../utils/deepClone.js';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import NumberCell from '../properties/NumberCell.svelte';
+  import TextDockEffects from '../components/typography/TextDockEffects.svelte';
+  import { curvePresetsFor, curvePresetPatch } from '../utils/typographyModel.js';
   import TextLineDecorationControls from './TextLineDecorationControls.svelte';
   import {
     DEFAULT_TEXT_FILL_GRADIENT,
@@ -50,10 +53,27 @@
 
   let {
     control = null,
+    dock = false,
+    dockGroup = $bindable('type'),
+    dockLine = $bindable('underline'),
+    dockEffect = $bindable('outline'),
+    allowMultiSelection = true,
     textPathPrefix = 'Text',
     textOverride = null,
     editorScope = 'component-text',
   } = $props();
+
+  const dockGroups = ['type', 'layout', 'fill', 'flow', 'lines', 'effects'];
+  let multiEditing = $derived(allowMultiSelection && $selectedComponentIds.size > 1);
+
+  function dockTabKeydown(event, index) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? dockGroups.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + dockGroups.length) % dockGroups.length;
+    dockGroup = dockGroups[next];
+    event.currentTarget.parentElement.children[next]?.focus();
+  }
 
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
@@ -124,19 +144,8 @@
   let reflectionEffectActive = $derived.by(() =>
     textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
   );
-  let textEffectControlsVisible = $derived.by(() =>
-    textEffects?.outlineEnabled === true
-    || textEffects?.stroke2Enabled === true
-    || textEffects?.shadowEnabled === true
-    || textEffects?.glowEnabled === true
-    || textEffects?.innerGlowEnabled === true
-    || textEffects?.innerShadowEnabled === true
-    || textEffects?.blurEnabled === true
-    || textEffects?.motionEnabled === true
-    || textEffects?.bevelEnabled === true
-    || reflectionEffectActive
-  );
   let visibleTypographyFeatureOptions = $derived.by(() => {
+    if (dock) return TYPOGRAPHY_FEATURE_OPTIONS;
     if (!selectedFontFeatureSupportKnown) return [];
     return TYPOGRAPHY_FEATURE_OPTIONS.filter((option) =>
       option.tags.some((tag) => selectedFontSupportedFeatures.includes(tag))
@@ -157,7 +166,7 @@
   function set(path, value) {
     if (!core?.id) return;
     const scoped = scopeTextPath(path);
-    if ($selectedComponentIds.size > 1) {
+    if (multiEditing) {
       updateSelectedProperty(scoped, value);
     } else {
       updateControlProperty(core.id, scoped, value);
@@ -212,7 +221,7 @@
   }
 
   function openTextGradientEditor() {
-    if (!core?.id || $selectedComponentIds.size > 1) return;
+    if (!core?.id || multiEditing) return;
     openFillGradientEditor({
       controlId: core.id,
       targetPath: scopeTextPath('Text.Fill'),
@@ -223,7 +232,7 @@
   }
 
   function chooseTextFillAsset(kind) {
-    if (!core?.id || $selectedComponentIds.size > 1) return;
+    if (!core?.id || multiEditing) return;
     browseImage(textFillAssetRequestId(kind));
   }
 
@@ -595,9 +604,6 @@
     );
   }
 
-  function effectProp(name, fallback) {
-    return textEffects?.[name] ?? fallback;
-  }
 
   function toggleTextEffect(name) {
     set(`Text.Effects.${name}`, !(textEffects?.[name] === true));
@@ -607,24 +613,6 @@
     set('Text.Effects.reflectionEnabled', !reflectionEffectActive);
   }
 
-  function setEffectNumber(name, value, step = 0.5) {
-    set(`Text.Effects.${name}`, roundLineValue(value, step));
-  }
-
-  function setEffectColor(name, value) {
-    let normalized = String(value ?? '').replace(/^#/, '').toUpperCase();
-    if (normalized.length === 6) normalized = `FF${normalized}`;
-    if (normalized.length !== 8) return;
-    set(`Text.Effects.${name}`, normalized);
-  }
-
-  function handleEffectColorSwatch(name, fallback) {
-    if (!core?.id) return;
-    activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Text.Effects.${name}` },
-      String(effectProp(name, fallback))
-    );
-  }
 
   function normalizeColorValue(value, fallback = 'FFFFFFFF') {
     let normalized = String(value ?? '').replace(/^#/, '').toUpperCase();
@@ -734,12 +722,55 @@
   }
 </script>
 
-{#if text}
-  <div class="text-editor-sections">
-    <PropertySection
+<!--
+  The way into the dock tabs that cover these sections, in PropertySection's `tools` slot.
+
+  Type, Flow and Effects each have a tab now, and until this button existed none of them could be
+  reached from here — the only way in was to find the tab in the dock strip yourself and press "Use
+  selection". See utils/dockOpeners.js for why the handoff is two halves rather than one.
+
+  Three snippets rather than one because the target carries a DOMAIN: Font Settings, Typography and
+  Multiline are the Type tab's "type" half, Flow is its "flow" half, and Effects is the Effects
+  tab's "text" domain. One snippet with a computed domain would have to know which section rendered
+  it, which a snippet does not.
+-->
+{#snippet openType()}
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="type" what="this text's typography" compact />
+{/snippet}
+{#snippet openFlow()}
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="flow" what="this text's flow" compact />
+{/snippet}
+{#snippet openTextEffects()}
+  <OpenInDock tab="type" controlId={core?.id ?? ''} domain="effects" what="these text effects" compact />
+{/snippet}
+
+{#snippet spacingFields()}
+        <PropertyCell label="Word Spacing" span={1} compact hint="Adjust spacing added to each whitespace character in pixels.">
+          <NumberCell
+            label="Word"
+            value={font?.wordSpacing ?? 0}
+            step={0.5}
+            defaultValue={0}
+            onchange={(value) => set('Text.Font.wordSpacing', value)}
+          />
+        </PropertyCell>
+
+        <PropertyCell label="Letter Spacing" span={1} compact hint="Adjust spacing between characters in pixels">
+          <NumberCell
+            label="Letter"
+            value={font?.letterSpacing ?? 0}
+            step={0.5}
+            defaultValue={0}
+            onchange={(value) => set('Text.Font.letterSpacing', value)}
+          />
+        </PropertyCell>
+
+{/snippet}
+{#snippet textBasics()}
+<PropertySection
       title="Text"
       icon={Pencil}
-      collapsed={textSectionCollapsed}
+      collapsed={dock ? false : textSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('text'), value)}
     >
       <PropertyCell label="Text" span={4} hint="The text content displayed by this component">
@@ -755,19 +786,21 @@
           <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
         </div>
       </PropertyCell>
-      {#if String(core?.controlType ?? '') === 'Label'}
+      {#if !dock && String(core?.controlType ?? '') === 'Label'}
         <PropertyCell label="Editable" span={1} hint="Let the user edit this label's text at runtime. Required before an LCD 'edit' zone can rewrite it.">
           <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
         </PropertyCell>
       {/if}
     </PropertySection>
-
-    {#key fontEditorRenderKey}
+{/snippet}
+{#snippet fontBasics()}
+{#key fontEditorRenderKey}
       <PropertySection
         title="Font Settings"
         icon={Type}
-        collapsed={fontSectionCollapsed}
+        collapsed={dock ? false : fontSectionCollapsed}
         ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
+        tools={dock ? undefined : openType}
       >
         <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
           <select
@@ -824,33 +857,52 @@
           </div>
         </PropertyCell>
 
-        <PropertyCell label="Word Spacing" span={1} compact hint="Adjust spacing added to each whitespace character in pixels.">
-          <NumberCell
-            label="Word"
-            value={font?.wordSpacing ?? 0}
-            step={0.5}
-            defaultValue={0}
-            onchange={(value) => set('Text.Font.wordSpacing', value)}
-          />
-        </PropertyCell>
-
-        <PropertyCell label="Letter Spacing" span={1} compact hint="Adjust spacing between characters in pixels">
-          <NumberCell
-            label="Letter"
-            value={font?.letterSpacing ?? 0}
-            step={0.5}
-            defaultValue={0}
-            onchange={(value) => set('Text.Font.letterSpacing', value)}
-          />
-        </PropertyCell>
+        {#if !dock}
+          {@render spacingFields()}
+        {:else}
+          <PropertyCell label="Colour" span={2} hint="Text fill colour; click the swatch to open the colour editor.">
+            <PropertyColor value={String(textFill?.colour ?? 'FFFFFFFF')} onchange={setFillColor} onswatchclick={handleFillColorSwatch} />
+          </PropertyCell>
+        {/if}
       </PropertySection>
     {/key}
+{/snippet}
 
-    <PropertySection
+{#if text}
+  <div class="text-editor-sections" class:dock-editor={dock}>
+    {#if dock}
+      <div class="dock-basics">
+        <div class="dock-content">{@render textBasics()}</div>
+        <div class="dock-font">{@render fontBasics()}</div>
+      </div>
+      <div class="dock-tabs" role="tablist" aria-label="Text property groups">
+        {#each dockGroups as group, index}
+          <button type="button" role="tab" id={'text-dock-tab-' + group} aria-controls="text-dock-fields" aria-selected={dockGroup === group} tabindex={dockGroup === group ? 0 : -1}
+            class:active={dockGroup === group} onclick={() => { dockGroup = group; }} onkeydown={(event) => dockTabKeydown(event, index)}>{group}</button>
+        {/each}
+      </div>
+    {:else}
+      {@render textBasics()}
+      {@render fontBasics()}
+    {/if}
+    <div class="text-fields" class:dock-fields={dock} id={dock ? 'text-dock-fields' : undefined} role={dock ? 'tabpanel' : undefined} aria-labelledby={dock ? 'text-dock-tab-' + dockGroup : undefined}>
+      {#if !dock || dockGroup === 'type'}
+        <div class="text-group" class:dock-group={dock}>
+          {#if dock}
+      <PropertySection title="Spacing & editing" icon={Pencil}>
+              {@render spacingFields()}
+              {#if String(core?.controlType ?? '') === 'Label'}
+                <PropertyCell label="Editable" span={2} hint="Allow the label text to be edited at runtime."><PropertyToggle value={text?.editable === true} onchange={(value) => set('Text.editable', value)} /></PropertyCell>
+              {/if}
+              <PropertyCell label="Line Height" span={4} compact><NumberCell label="Line H" value={Math.max(0.5, Number(multilineProp('lineHeight', 1.2)))} min={0.5} step={0.1} onchange={(v) => setMultilineNumber('lineHeight', v, 0.1, 0.5)} /></PropertyCell>
+            </PropertySection>
+          {/if}
+          <PropertySection
       title="Typography"
       icon={CaseSensitive}
       collapsed={typographySectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('typography'), value)}
+      tools={dock ? undefined : openType}
     >
       <PropertyCell label="Case" span={2} hint="Apply text case transforms including title, sentence, and small caps modes.">
         <select class="text-select" value={caseModeValue()} onchange={(event) => set('Text.Font.caseMode', event.target.value)}>
@@ -915,12 +967,15 @@
         {/each}
       {/if}
     </PropertySection>
-
-    <PropertySection
+        </div>
+      {/if}
+      {#if !dock || dockGroup === 'layout'}
+        <div class="text-group" class:dock-group={dock}><PropertySection
       title="Multiline"
       icon={TextAlignJustify}
       collapsed={multilineSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('multiline'), value)}
+      tools={dock ? undefined : openType}
     >
       <PropertyCell
         label="Wrap"
@@ -1090,8 +1145,7 @@
         />
       </PropertyCell>
     </PropertySection>
-
-    <PropertySection
+<PropertySection
       title="Position"
       icon={Crosshair}
       collapsed={positionSectionCollapsed}
@@ -1106,6 +1160,18 @@
           />
         </div>
       </PropertyCell>
+
+      {#if dock}
+        <PropertyCell label="Orientation" span={2} hint="Set the text block orientation.">
+          <select class="text-select" value={position?.orientation ?? 'horizontal'} onchange={(event) => setFlowAngle(angleForOrientation(event.target.value))}>
+            <option value="horizontal">Horizontal</option>
+            <option value="rotate90">90°</option>
+            <option value="rotate180">180°</option>
+            <option value="rotate270">270°</option>
+            {#if position?.orientation && !['horizontal', 'rotate90', 'rotate180', 'rotate270'].includes(position.orientation)}<option value={position.orientation}>{position.orientation}</option>{/if}
+          </select>
+        </PropertyCell>
+      {/if}
 
       <PropertyCell label="Offset" span={2} hint="Horizontal uses left minus / right plus. Vertical uses up plus / down minus.">
         <div class="offset-panel">
@@ -1128,9 +1194,10 @@
           <button class="reset-btn" onclick={resetPosition}>Reset</button>
         </div>
       </PropertyCell>
-    </PropertySection>
-
-    <PropertySection
+    </PropertySection></div>
+      {/if}
+      {#if !dock || dockGroup === 'fill'}
+        <div class="text-group" class:dock-group={dock}><PropertySection
       title="Fill"
       icon={PaintBucket}
       collapsed={fillSectionCollapsed}
@@ -1290,13 +1357,15 @@
           </PropertyCell>
         </PropertySection>
       {/if}
-    {/if}
-
-    <PropertySection
+    {/if}</div>
+      {/if}
+      {#if !dock || dockGroup === 'flow'}
+        <div class="text-group" class:dock-wide={dock}><PropertySection
       title="Flow"
       icon={Spline}
       collapsed={orientationSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('orientation'), value)}
+      tools={dock ? undefined : openFlow}
     >
       <PropertyCell label="Reading" span={4} hint="Choose the reading direction or mirror the text glyphs.">
         <div class="reading-row">
@@ -1316,6 +1385,11 @@
       </PropertyCell>
 
       <PropertyCell label="Mode" span={4} hint="How the text flows: as a block, on a line, stepped, or bent onto an arc or circle.">
+        {#if dock}
+          <select class="text-select" value={textFlowModeValue} onchange={(event) => setFlowMode(event.target.value)}>
+            {#each FLOW_MODE_OPTIONS as option}<option value={option.value}>{option.label}</option>{/each}
+          </select>
+        {:else}
         <div class="flow-mode-grid">
           {#each FLOW_MODE_OPTIONS as option}
             <button
@@ -1325,6 +1399,7 @@
             >{option.label}</button>
           {/each}
         </div>
+        {/if}
       </PropertyCell>
 
       <PropertyCell label="Distribution" span={1} hint="Natural uses measured advances, Fit stretches along the path, Justify expands spaces, Fixed uses a constant advance.">
@@ -1373,7 +1448,8 @@
             onchange={setFlowAngle}
           />
         </PropertyCell>
-      {:else if textFlowModeValue === 'stair'}
+      {/if}
+      {#if textFlowModeValue === 'stair'}
         <PropertyCell label="Step X" span={1} compact hint="Horizontal shift applied to each successive character in stair mode.">
           <NumberCell
             label="Step X"
@@ -1497,7 +1573,7 @@
           <NumberCell label="C2 Y" value={Number(position?.flowPathC2Y ?? 100)} step={1} defaultValue={100} onchange={(value) => set('Text.Position.flowPathC2Y', value)} />
         </PropertyCell>
       {:else if textFlowModeValue === 'polyline' || textFlowModeValue === 'freehand'}
-        {#each [0, 1, 2, 3] as index}
+        {#each Array.from({ length: dock ? Math.max(4, position?.[textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints']?.length ?? 0) : 4 }, (_, index) => index) as index}
           <PropertyCell label={`P${index + 1} X`} span={1} compact hint="Path point X as a percentage of the text box.">
             <NumberCell label={`P${index + 1} X`} value={flowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', index * 33)} step={1} defaultValue={index * 33} onchange={(value) => setFlowPointValue(textFlowModeValue === 'freehand' ? 'flowFreehandPoints' : 'flowPolylinePoints', index, 'x', value)} />
           </PropertyCell>
@@ -1506,14 +1582,28 @@
           </PropertyCell>
         {/each}
       {/if}
-
-    </PropertySection>
-
-    <PropertySection
+      {#if dock && textFlowModeValue === 'line'}
+        <PropertyCell label="Step X" compact><NumberCell label="Step X" value={position?.flowStepX ?? 8} onchange={(v) => set('Text.Position.flowStepX', v)} /></PropertyCell>
+        <PropertyCell label="Step Y" compact><NumberCell label="Step Y" value={position?.flowStepY ?? 8} onchange={(v) => set('Text.Position.flowStepY', v)} /></PropertyCell>
+      {/if}
+      {#if dock && curvePresetsFor(textFlowModeValue).length}
+        <PropertyCell label="Path presets" span={4}>
+          <div class="style-row">
+            {#each curvePresetsFor(textFlowModeValue) as preset}
+              <button class="style-btn" onclick={() => { for (const [path, value] of Object.entries(curvePresetPatch(textFlowModeValue, preset))) set(path, value); }}>{preset.label}</button>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+    </PropertySection></div>
+      {/if}
+      {#if !dock}
+        <PropertySection
       title="Effects"
       icon={Sparkles}
       collapsed={effectsSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('effects'), value)}
+      tools={openTextEffects}
     >
       <PropertyCell label="Effects" span={4} hint="Apply text-specific effects to glyphs instead of the whole control box.">
         <div class="effect-toggle-grid">
@@ -1531,423 +1621,18 @@
         </div>
       </PropertyCell>
 
-      {#if textEffectControlsVisible}
-        <PropertyCell label="Text Effects" span={4} hint="Detailed controls for the currently active text effects.">
-          <div class="effect-divider"></div>
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.outlineEnabled === true}
-        <PropertyCell label="Outline Thickness" span={1} compact hint="Extra outline thickness outside the glyph fill, in pixels.">
-          <NumberCell
-            label="Thick"
-            value={Math.max(1, effectProp('outlineThickness', effectProp('outlineWidth', 1)))}
-            min={1}
-            step={1}
-            defaultValue={1}
-            onchange={(value) => {
-              setEffectNumber('outlineThickness', value);
-              setEffectNumber('outlineWidth', value);
-            }}
-          />
-        </PropertyCell>
-        <PropertyCell label="Outline Distance" span={1} compact hint="Gap between the glyph and the outline band, in pixels.">
-          <NumberCell
-            label="Dist"
-            value={Math.max(0, effectProp('outlineDistance', 0))}
-            min={0}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('outlineDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Outline Fill" span={1} hint="Fill from the glyph edge outward, or show only the outer outline band.">
-          <select
-            class="text-select"
-            value={effectProp('outlineFill', true) === false ? 'no' : 'yes'}
-            onchange={(event) => set('Text.Effects.outlineFill', event.target.value !== 'no')}
-          >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Outline Join" span={1} hint="Corner style of the expanded outline on angular glyphs.">
-          <select
-            class="text-select"
-            value={String(effectProp('outlineJoin', 'round'))}
-            onchange={(event) => set('Text.Effects.outlineJoin', event.target.value)}
-          >
-            <option value="round">Round</option>
-            <option value="miter">Miter</option>
-            <option value="bevel">Bevel</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Outline Colour" span={4} hint="AARRGGBB outline colour.">
-          <PropertyColor
-            value={String(effectProp('outlineColour', 'FF000000'))}
-            onchange={(value) => setEffectColor('outlineColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('outlineColour', 'FF000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Placement" span={1} hint="Where the outline band should sit relative to the glyph edge.">
-          <select class="text-select" value={String(effectProp('outlinePlacement', 'outer'))} onchange={(event) => set('Text.Effects.outlinePlacement', event.target.value)}>
-            <option value="outer">Outer</option>
-            <option value="center">Center</option>
-            <option value="inner">Inner</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash" span={1} hint="Render the outline as a dashed stroke.">
-          <select class="text-select" value={effectProp('outlineDashEnabled', false) === true ? 'yes' : 'no'} onchange={(event) => set('Text.Effects.outlineDashEnabled', event.target.value === 'yes')}>
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Length of each outline dash.">
-          <NumberCell label="Len" value={Number(effectProp('outlineDashLength', 8))} min={1} step={1} defaultValue={8} onchange={(value) => setEffectNumber('outlineDashLength', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Gap" span={1} compact disabled={effectProp('outlineDashEnabled', false) !== true} hint="Gap between dashed outline segments.">
-          <NumberCell label="Gap" value={Number(effectProp('outlineDashGap', 4))} min={1} step={1} defaultValue={4} onchange={(value) => setEffectNumber('outlineDashGap', value, 1)} disabled={effectProp('outlineDashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the outline layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('outlineOrder', 40))} step={1} defaultValue={40} onchange={(value) => setEffectNumber('outlineOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.stroke2Enabled === true}
-        <PropertyCell label="2nd Thickness" span={1} compact hint="Thickness of the secondary stroke.">
-          <NumberCell label="Thick" value={Number(effectProp('stroke2Thickness', 1))} min={1} step={1} defaultValue={1} onchange={(value) => setEffectNumber('stroke2Thickness', value, 1)} />
-        </PropertyCell>
-        <PropertyCell label="Placement" span={1} hint="Place the secondary stroke inside, centered on, or outside the glyph edge.">
-          <select class="text-select" value={String(effectProp('stroke2Placement', 'inner'))} onchange={(event) => set('Text.Effects.stroke2Placement', event.target.value)}>
-            <option value="inner">Inner</option>
-            <option value="center">Center</option>
-            <option value="outer">Outer</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash" span={1} hint="Render the secondary stroke as a dashed line.">
-          <select class="text-select" value={effectProp('stroke2DashEnabled', false) === true ? 'yes' : 'no'} onchange={(event) => set('Text.Effects.stroke2DashEnabled', event.target.value === 'yes')}>
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Dash Len" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Length of each secondary stroke dash.">
-          <NumberCell label="Len" value={Number(effectProp('stroke2DashLength', 6))} min={1} step={1} defaultValue={6} onchange={(value) => setEffectNumber('stroke2DashLength', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Gap" span={1} compact disabled={effectProp('stroke2DashEnabled', false) !== true} hint="Gap between secondary stroke dashes.">
-          <NumberCell label="Gap" value={Number(effectProp('stroke2DashGap', 3))} min={1} step={1} defaultValue={3} onchange={(value) => setEffectNumber('stroke2DashGap', value, 1)} disabled={effectProp('stroke2DashEnabled', false) !== true} />
-        </PropertyCell>
-        <PropertyCell label="Stroke Colour" span={2} hint="AARRGGBB colour for the secondary stroke.">
-          <PropertyColor
-            value={String(effectProp('stroke2Colour', 'FFFFFFFF'))}
-            onchange={(value) => setEffectColor('stroke2Colour', value)}
-            onswatchclick={() => handleEffectColorSwatch('stroke2Colour', 'FFFFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the secondary stroke layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('stroke2Order', 45))} step={1} defaultValue={45} onchange={(value) => setEffectNumber('stroke2Order', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.shadowEnabled === true}
-        <PropertyCell label="Style" span={1} hint="Soft uses blur, Long casts repeated flat copies, Extrude builds a hard stacked edge.">
-          <select class="text-select" value={String(effectProp('shadowStyle', 'soft'))} onchange={(event) => set('Text.Effects.shadowStyle', event.target.value)}>
-            <option value="soft">Soft</option>
-            <option value="long">Long</option>
-            <option value="extrude">Extrude</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Shadow X" span={1} compact hint="Horizontal shadow offset in pixels.">
-          <NumberCell
-            label="X"
-            value={effectProp('shadowOffsetX', 1)}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('shadowOffsetX', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Y" span={1} compact hint="Vertical shadow offset in pixels.">
-          <NumberCell
-            label="Y"
-            value={effectProp('shadowOffsetY', 1)}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('shadowOffsetY', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Blur" span={1} compact hint="Blur radius for the text shadow.">
-          <NumberCell
-            label="Blur"
-            value={effectProp('shadowBlur', 2)}
-            min={0}
-            step={0.5}
-            defaultValue={2}
-            onchange={(value) => setEffectNumber('shadowBlur', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow Colour" span={1} hint="AARRGGBB shadow colour.">
-          <PropertyColor
-            value={String(effectProp('shadowColour', '80000000'))}
-            onchange={(value) => setEffectColor('shadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('shadowColour', '80000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Length used by long-shadow and extrude shadow styles.">
-          <NumberCell label="Dist" value={Number(effectProp('shadowDistance', 12))} min={0} step={1} defaultValue={12} onchange={(value) => setEffectNumber('shadowDistance', value, 1)} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
-        </PropertyCell>
-        <PropertyCell label="Steps" span={1} compact disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} hint="Number of repeated copies used for long-shadow and extrude styles.">
-          <NumberCell label="Steps" value={Number(effectProp('shadowSteps', 8))} min={1} step={1} defaultValue={8} onchange={(value) => set('Text.Effects.shadowSteps', Math.max(1, Math.round(Number(value) || 1)))} disabled={String(effectProp('shadowStyle', 'soft')) === 'soft'} />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the shadow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('shadowOrder', 10))} step={1} defaultValue={10} onchange={(value) => setEffectNumber('shadowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.glowEnabled === true}
-        <PropertyCell label="Glow Size" span={1} compact hint="Blur radius for the outer text glow.">
-          <NumberCell
-            label="Size"
-            value={effectProp('glowSize', 4)}
-            min={0}
-            step={0.5}
-            defaultValue={4}
-            onchange={(value) => setEffectNumber('glowSize', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Glow Intensity" span={1} compact hint="Strength of the glow at the chosen size. Higher values stack a brighter halo.">
-          <NumberCell
-            label="Int"
-            value={effectProp('glowIntensity', 1)}
-            min={0}
-            step={0.25}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('glowIntensity', value, 0.25)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Glow Colour" span={2} hint="AARRGGBB glow colour.">
-          <PropertyColor
-            value={String(effectProp('glowColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('glowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('glowColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the glow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('glowOrder', 20))} step={1} defaultValue={20} onchange={(value) => setEffectNumber('glowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.innerGlowEnabled === true}
-        <PropertyCell label="Inner Glow" span={1} compact hint="Blur radius for the inner glow clipped inside glyphs.">
-          <NumberCell
-            label="Size"
-            value={effectProp('innerGlowSize', 3)}
-            min={0}
-            step={0.5}
-            defaultValue={3}
-            onchange={(value) => setEffectNumber('innerGlowSize', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Inner Glow Colour" span={3} hint="AARRGGBB inner glow colour.">
-          <PropertyColor
-            value={String(effectProp('innerGlowColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('innerGlowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('innerGlowColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the inner glow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('innerGlowOrder', 80))} step={1} defaultValue={80} onchange={(value) => setEffectNumber('innerGlowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.innerShadowEnabled === true}
-        <PropertyCell label="Inner X" span={1} compact hint="Horizontal offset of the inner shadow.">
-          <NumberCell label="X" value={Number(effectProp('innerShadowOffsetX', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetX', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Y" span={1} compact hint="Vertical offset of the inner shadow.">
-          <NumberCell label="Y" value={Number(effectProp('innerShadowOffsetY', 1))} step={0.5} defaultValue={1} onchange={(value) => setEffectNumber('innerShadowOffsetY', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Blur" span={1} compact hint="Blur radius for the inner shadow.">
-          <NumberCell label="Blur" value={Number(effectProp('innerShadowBlur', 2))} min={0} step={0.5} defaultValue={2} onchange={(value) => setEffectNumber('innerShadowBlur', value)} />
-        </PropertyCell>
-        <PropertyCell label="Inner Colour" span={1} hint="AARRGGBB inner shadow colour.">
-          <PropertyColor
-            value={String(effectProp('innerShadowColour', '80000000'))}
-            onchange={(value) => setEffectColor('innerShadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('innerShadowColour', '80000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the inner shadow layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('innerShadowOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('innerShadowOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.blurEnabled === true}
-        <PropertyCell label="Blur" span={4} compact hint="Blur applied to the main text fill and outline.">
-          <NumberCell
-            label="Blur"
-            value={effectProp('blurAmount', 1)}
-            min={0}
-            step={0.5}
-            defaultValue={1}
-            onchange={(value) => setEffectNumber('blurAmount', value)}
-          />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.motionEnabled === true}
-        <PropertyCell label="Motion Angle" span={1} compact hint="Direction of the smear in degrees.">
-          <NumberCell
-            label="Angle"
-            value={effectProp('motionAngle', 0)}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('motionAngle', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact hint="Total smear distance in pixels.">
-          <NumberCell
-            label="Dist"
-            value={effectProp('motionDistance', 8)}
-            min={0}
-            step={0.5}
-            defaultValue={8}
-            onchange={(value) => setEffectNumber('motionDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Steps" span={1} compact hint="Number of layered copies used for the smear.">
-          <NumberCell
-            label="Steps"
-            value={effectProp('motionSteps', 4)}
-            min={1}
-            step={1}
-            defaultValue={4}
-            onchange={(value) => set('Text.Effects.motionSteps', Math.max(1, Math.round(Number(value) || 1)))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Motion Colour" span={1} hint="AARRGGBB motion smear colour.">
-          <PropertyColor
-            value={String(effectProp('motionColour', '80FFFFFF'))}
-            onchange={(value) => setEffectColor('motionColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('motionColour', '80FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={1} compact hint="Draw order for the motion layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('motionOrder', 30))} step={1} defaultValue={30} onchange={(value) => setEffectNumber('motionOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if textEffects?.bevelEnabled === true}
-        <PropertyCell label="Bevel Style" span={1} hint="Embossed highlight/shadow treatment.">
-          <select
-            class="text-select"
-            value={String(effectProp('bevelStyle', 'emboss'))}
-            onchange={(event) => set('Text.Effects.bevelStyle', event.target.value)}
-          >
-            <option value="emboss">Emboss</option>
-            <option value="inner">Inner</option>
-            <option value="outer">Outer</option>
-          </select>
-        </PropertyCell>
-        <PropertyCell label="Depth" span={1} compact hint="Offset depth of the highlight/shadow copies.">
-          <NumberCell
-            label="Depth"
-            value={effectProp('bevelDepth', 1.5)}
-            min={0}
-            step={0.5}
-            defaultValue={1.5}
-            onchange={(value) => setEffectNumber('bevelDepth', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Highlight" span={1} hint="AARRGGBB highlight colour.">
-          <PropertyColor
-            value={String(effectProp('bevelHighlightColour', '99FFFFFF'))}
-            onchange={(value) => setEffectColor('bevelHighlightColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('bevelHighlightColour', '99FFFFFF')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Shadow" span={1} hint="AARRGGBB bevel shadow colour.">
-          <PropertyColor
-            value={String(effectProp('bevelShadowColour', '99000000'))}
-            onchange={(value) => setEffectColor('bevelShadowColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('bevelShadowColour', '99000000')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the bevel layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('bevelOrder', 60))} step={1} defaultValue={60} onchange={(value) => setEffectNumber('bevelOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
-
-      {#if reflectionEffectActive}
-        <PropertyCell label="Angle" span={1} compact hint="Direction from the text toward the reflection, in degrees. 0=Up, 90=Right, 180=Down, 270=Left.">
-          <NumberCell
-            label="Angle"
-            value={reflectionProp('reflectionAngle', 180)}
-            step={1}
-            defaultValue={180}
-            onchange={(value) => set('Text.Effects.reflectionAngle', reflectionStoredAngleFromDisplay(value))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Distance" span={1} compact hint="Distance from the text to the mirrored reflection.">
-          <NumberCell
-            label="Dist"
-            value={reflectionProp('reflectionDistance', 8)}
-            min={0}
-            step={0.5}
-            defaultValue={8}
-            onchange={(value) => setEffectNumber('reflectionDistance', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Intensity" span={1} compact hint="Opacity of the reflection layer.">
-          <NumberCell
-            label="Int"
-            value={reflectionProp('reflectionIntensity', 0.45)}
-            min={0}
-            max={1}
-            step={0.05}
-            defaultValue={0.45}
-            onchange={(value) => set('Text.Effects.reflectionIntensity', Math.max(0, Math.min(1, Number(value) || 0)))}
-          />
-        </PropertyCell>
-        <PropertyCell label="Blur" span={1} compact hint="Blur applied to the reflection.">
-          <NumberCell
-            label="Blur"
-            value={reflectionProp('reflectionBlur', 2)}
-            min={0}
-            step={0.5}
-            defaultValue={2}
-            onchange={(value) => setEffectNumber('reflectionBlur', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Fade" span={2} hint="Fade the reflection in, out, or not at all along the reflection distance.">
-          <div class="style-row">
-            <button class="style-btn" onclick={cycleReflectionFadeMode}>
-              {reflectionFadeModeLabel()}
-            </button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Fade Amount" span={1} compact hint="Measured from the near edge of the reflection. Fade Out starts dropping here; Fade In reaches full opacity here.">
-          <NumberCell
-            label="Fade"
-            value={reflectionProp('reflectionFadeAmount', 0)}
-            min={0}
-            step={1}
-            defaultValue={0}
-            onchange={(value) => setEffectNumber('reflectionFadeAmount', value, 1)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Reflection Colour" span={4} hint="AARRGGBB colour for the mirrored reflection layer.">
-          <PropertyColor
-            value={reflectionColorValue()}
-            onchange={(value) => setEffectColor('reflectionColour', value)}
-            onswatchclick={() => handleEffectColorSwatch('reflectionColour', reflectionColorValue())}
-          />
-        </PropertyCell>
-        <PropertyCell label="Order" span={4} compact hint="Draw order for the reflection layer. Lower draws earlier, higher draws later.">
-          <NumberCell label="Order" value={Number(effectProp('reflectionOrder', 5))} step={1} defaultValue={5} onchange={(value) => setEffectNumber('reflectionOrder', value, 1)} />
-        </PropertyCell>
-      {/if}
+      <PropertyCell label="" span={4} compact
+        hint="Thickness, distance, colour, dash, order and the rest — with a live specimen beside them.">
+        <p class="effects-moved">
+          Switch an effect on here; its settings are in <b>Text → Effects</b> in the display dock.
+        </p>
+      </PropertyCell>
     </PropertySection>
-
-    <PropertySection
+      {:else if dockGroup === 'effects'}
+        <TextDockEffects bind:selected={dockEffect} values={textEffects} controlId={core?.id ?? ''} onset={(key, value) => set('Text.Effects.' + key, value)} />
+      {/if}
+      {#if !dock || dockGroup === 'lines'}
+        <div class="text-group" class:dock-wide={dock}><PropertySection
       title="Line"
       icon={Minus}
       collapsed={lineSectionCollapsed}
@@ -1967,7 +1652,17 @@
         </div>
       </PropertyCell>
 
-      {#if font?.underline === true}
+
+      {#if dock}
+        <PropertyCell label="Edit line" span={4} hint="Each decoration keeps its own settings, whether enabled or disabled.">
+          <div class="style-row">
+            {#each ['underline', 'strikethrough', 'overline'] as kind}
+              <button class="style-btn" class:active={dockLine === kind} aria-pressed={dockLine === kind} onclick={() => { dockLine = kind; }}>{kind}</button>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+      {#if dock ? dockLine === 'underline' : font?.underline === true}
         <TextLineDecorationControls
           title="Underline"
           yLabel="Underline Y"
@@ -1996,7 +1691,7 @@
         />
       {/if}
 
-      {#if font?.strikethrough === true}
+      {#if dock ? dockLine === 'strikethrough' : font?.strikethrough === true}
         <TextLineDecorationControls
           title="Strikethrough"
           yLabel="Strike Y"
@@ -2025,7 +1720,7 @@
         />
       {/if}
 
-      {#if font?.overline === true}
+      {#if dock ? dockLine === 'overline' : font?.overline === true}
         <TextLineDecorationControls
           title="Overline"
           yLabel="Overline Y"
@@ -2053,17 +1748,46 @@
           onChangeGap={(value) => setLineNumber('overlineGap', value)}
         />
       {/if}
-    </PropertySection>
+    </PropertySection></div>
+      {/if}
+    </div>
   </div>
 {/if}
 
 <style>
+
+  .text-fields, .text-group { display: contents; }
+  .dock-editor { height: 100%; min-height: 0; container: text-dock / inline-size; }
+  .dock-basics { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 3fr); flex: 0 0 auto; }
+  .dock-content, .dock-font { min-width: 0; }
+  .dock-basics :global(.property-section-header) { display: none; }
+  .dock-basics :global(.property-grid) { padding-top: 8px; }
+  .dock-font :global(.property-grid) { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+  .dock-basics .text-input { height: 26px; padding: 4px 6px; }
+  .dock-basics .text-accept-btn { min-width: 28px; }
+  .dock-editor .effect-toggle-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dock-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 8px 0; border-bottom: 1px solid #333; flex: 0 0 auto; }
+  .dock-tabs button { padding: 5px 12px; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 3px 3px 0 0; background: #1A1A1A; color: #999; font: inherit; font-size: 11px; text-transform: capitalize; cursor: pointer; }
+  .dock-tabs button.active { background: #094771; border-bottom-color: #5B9BD5; color: #FFF; }
+  .dock-tabs button:hover { color: #FFF; }
+  .dock-fields { display: block; flex: 1; min-height: 0; overflow: auto; }
+  .dock-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr)); align-items: start; }
+  .dock-wide { display: block; }
+  .dock-wide :global(.property-grid) { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  @container text-dock (max-width: 700px) {
+    .dock-basics { grid-template-columns: 1fr; }
+    .dock-font :global(.property-grid) { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+    .dock-wide :global(.property-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .dock-editor .effect-toggle-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @container text-dock (max-width: 420px) {
+    .dock-font :global(.property-grid) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
   .text-editor-sections {
     display: flex;
     flex-direction: column;
   }
-
-
 
 
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
@@ -2290,6 +2014,13 @@
     gap: 4px;
   }
 
+  .effects-moved {
+    margin: 0;
+    font: 400 10.5px/1.5 'IBM Plex Sans', system-ui, sans-serif;
+    color: #8a8a94;
+  }
+  .effects-moved b { color: #8FEDE3; font-weight: 600; }
+
   .effect-toggle-grid {
     width: 100%;
     display: grid;
@@ -2304,13 +2035,6 @@
     align-items: center;
     color: #777;
     font-size: 11px;
-  }
-
-  .effect-divider {
-    width: 100%;
-    height: 1px;
-    background: #2a2a2a;
-    margin-top: 4px;
   }
 
   .flow-mode-btn {

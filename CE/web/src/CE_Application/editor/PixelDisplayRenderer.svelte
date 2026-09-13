@@ -9,6 +9,7 @@
   import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE, ICON_GLYPHS } from '../utils/pixelFont.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { pixelElementSelection, pixelSelectionKey, pixelElementId, selectPixelElement } from '../stores/pixelElementSelection.js';
   import { updateControlProperty } from '../stores/controls.js';
 
   let { control = null, allControls = [], width = 0, height = 0, editable = false, scale = 1 } = $props();
@@ -115,7 +116,7 @@
     const max = live?.max ?? numberOr(behavior?.max, 127);
     const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
     return {
-      present: true,
+      present: live?.present !== false,
       name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
       value: numberOr(live?.value, fallbackValue),
       min,
@@ -303,6 +304,7 @@
   // design mode) and drag writes the element's x/y back in grid pixels.
   let dragEl = $state(null); // { i, cx, cy, x, y }
   let resizeEl = $state(null); // { i, cx, cy, w, h }
+  let selectedElementId = $derived($pixelElementSelection.get(pixelSelectionKey(coreId, activeLayoutId)));
 
   function elementPathPrefix(i) {
     if (hasLayouts) {
@@ -321,21 +323,28 @@
     elements.forEach((el, i) => {
       if (el?.visible === false) return;
       const kind = String(el?.kind ?? '');
-      // anim defaults to its rendered 32×16 rect so the grab handle matches the
-      // element instead of collapsing to the 6px minimum.
-      const h = Math.max(3, Math.round(numberOr(el?.h, kind === 'anim' ? 16 : 8)));
-      let w = Math.max(0, Math.round(numberOr(el?.w, kind === 'anim' ? 32 : 0)));
-      // Text without an alignment box: estimate the grab area from the content.
-      if (!PIXEL_WIDGET_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
-        const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
-        w = Math.ceil(h * 0.6 * len);
+      const isText = !PIXEL_WIDGET_KINDS.has(kind) && kind !== 'anim' && kind !== 'bitmap';
+      const h = Math.max(isText ? 3 : 1, Math.round(numberOr(el?.h, kind === 'anim' ? 16 : 8)));
+      let w = Math.max(0, Math.round(numberOr(el?.w, kind === 'anim' ? 32 : kind === 'bitmap' ? 8 : 0)));
+      const auto = isText && w <= 0;
+      if (auto) {
+        const content = kind === 'icon' ? ICON_GLYPHS[String(el?.icon ?? 'play')] ?? ''
+          : kind === 'clock' ? formatClock(el?.clockFormat)
+          : resolveZoneContent({ ...el, show: kind }, controlInfo(String(el?.sourceId ?? '')), 16);
+        const custom = el?.font === 'custom' && pixel?.customFont?.src;
+        const glyphH = custom ? numberOr(pixel.customFont.glyphH, 8) : FONT_H + 1;
+        const advance = custom ? numberOr(pixel.customFont.glyphW, 6) + 1 : FONT_ADVANCE;
+        const fontScale = Math.max(1, Math.floor(h / glyphH));
+        w = Math.max(1, String(content).length * advance * fontScale - fontScale);
       }
       out.push({
         i,
+        id: pixelElementId(el, i),
+        w, h, auto,
         left: numberOr(el?.x, 0) * sx,
         top: numberOr(el?.y, 0) * sy,
-        width: Math.max(6, w * sx),
-        height: Math.max(6, h * sy),
+        width: Math.max(1, w * sx),
+        height: Math.max(1, h * sy),
       });
     });
     return out;
@@ -347,6 +356,7 @@
     event.preventDefault();
     const el = elements[box.i];
     if (!el) return;
+    selectPixelElement(coreId, activeLayoutId, pixelElementId(el, box.i));
     // Grouped elements move together: capture every member's start position.
     const group = String(el.group ?? '').trim();
     const members = elements
@@ -394,6 +404,7 @@
     event.preventDefault();
     const el = elements[box.i];
     if (!el) return;
+    selectPixelElement(coreId, activeLayoutId, pixelElementId(el, box.i));
     const defW = String(el?.kind) === 'anim' ? 32 : Math.max(4, Math.round(numberOr(el?.w, 10)));
     const defH = String(el?.kind) === 'anim' ? 16 : Math.max(3, Math.round(numberOr(el?.h, 8)));
     resizeEl = { i: box.i, cx: event.clientX, cy: event.clientY, w: numberOr(el.w, defW), h: numberOr(el.h, defH) };
@@ -536,9 +547,9 @@
   }
 
   $effect(() => {
-    // Respect the OS reduced-motion setting: render a representative static
-    // frame instead of running the animation loop.
-    if (!motionActive || prefersReducedMotion()) {
+    // Explicit screen media is authored content. Reduced UI motion must not
+    // silently pause a GIF, sprite sheet or selected animation preset.
+    if (!motionActive || (prefersReducedMotion() && !animActive)) {
       frameTime = 0;
       return;
     }
@@ -640,11 +651,16 @@
       {#each overlayBoxes as box (box.i)}
         <div
           class="el-handle"
+          class:selected={selectedElementId === box.id}
+          data-element-id={box.id}
           class:dragging={dragEl?.i === box.i}
           style={`left:${box.left}px; top:${box.top}px; width:${box.width}px; height:${box.height}px;`}
           onmousedown={(event) => startElementDrag(box, event)}
-          title="Drag to move element"
+          title={`Element ${box.i + 1}: ${box.w} × ${box.h} dots. Drag to move.`}
         >
+          {#if selectedElementId === box.id}
+            <span class="el-caption" class:below={box.top < 18}>#{box.i + 1} · {box.auto ? 'auto ' : ''}{box.w} × {box.h} dots</span>
+          {/if}
           <div
             class="el-resize"
             class:resizing={resizeEl?.i === box.i}
@@ -693,6 +709,7 @@
   }
 
   .el-handle:hover,
+  .el-handle.selected,
   .el-handle.dragging {
     border-color: rgba(91, 155, 213, 0.9);
     background: rgba(91, 155, 213, 0.12);
@@ -715,8 +732,12 @@
   }
 
   .el-handle:hover .el-resize,
+  .el-handle.selected .el-resize,
   .el-handle.dragging .el-resize,
   .el-resize.resizing {
     opacity: 1;
   }
+  .el-handle.selected { border: 1px solid #72BEF1; }
+  .el-caption { position: absolute; bottom: 100%; left: -1px; padding: 1px 4px; white-space: nowrap; background: #094771; color: #FFF; font: 10px/14px sans-serif; pointer-events: none; }
+  .el-caption.below { bottom: auto; top: 100%; }
 </style>

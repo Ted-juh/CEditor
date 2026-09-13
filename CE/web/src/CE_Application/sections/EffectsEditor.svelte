@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PropertyButton from '../properties/PropertyButton.svelte';
+  import OpenInDock from '../properties/OpenInDock.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
   import Copy from 'lucide-svelte/icons/copy';
@@ -49,6 +50,11 @@
   host a 3-button switch. PropertySection's `tools` slot exists for exactly this, "a section whose
   only decision lives in its header needs no body rows", and the picker is now beside the title of
   the effects it switches instead of above it in a box of its own.
+
+  The Effects-tab opener rides here too, for the same reason and in the same slot. It is absent on
+  Icon on purpose: the tab covers text, component and screen lighting — `availableDomains` in
+  effectStack.js is the list — and icon effects are not among them. A button that opened a tab
+  which then showed something else would be worse than no button.
 -->
 {#snippet targetPicker()}
   <div class="target-row">
@@ -61,6 +67,10 @@
         onclick={() => selectedTarget = target}
       />
     {/each}
+    {#if selectedTarget === 'component' || selectedTarget === 'text'}
+      <OpenInDock tab="effects" controlId={core?.id ?? ''} domain={selectedTarget}
+                  what={`these ${selectedTarget} effects`} compact />
+    {/if}
   </div>
 {/snippet}
 

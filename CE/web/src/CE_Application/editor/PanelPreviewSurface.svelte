@@ -548,7 +548,9 @@
   function lcdLiveInfoFor(control, display, id) {
     if (isParamSource(id)) return lcdParamInfo(id);
     if (isStateSource(id)) {
-      const layout = findLayout(display?.layouts, resolveLcdActiveLayoutId(control));
+      const activeLayoutId = control?._children?.Core?.controlType === 'PixelDisplay'
+        ? resolvePixelActiveLayoutId(control) : resolveLcdActiveLayoutId(control);
+      const layout = findLayout(display?.layouts, activeLayoutId);
       const key = stateKeyOf(id);
       return key ? stateInfo(lcdStateFor(control)[key], layout?.cursorMax) : null;
     }
@@ -944,7 +946,7 @@
    */
   function lcdRestartLayoutTimeout(control) {
     const controlId = getControlId(control);
-    if (!lcdPressedLayout[controlId]) return;
+    if (!lcdPressedLayout[controlId] || !lcdLayoutTimers[controlId]) return;
     lcdScheduleLayoutTimeout(control, lcdPressedLayout[controlId]);
   }
 
@@ -1173,7 +1175,7 @@
       const section = type === 'LcdDisplay' ? control?._children?.Display
         : type === 'PixelDisplay' ? control?._children?.Pixel : null;
       if (!section) continue;
-      for (const id of collectSourceIds(section)) {
+      for (const id of (type === 'PixelDisplay' ? pixelSourceIds(section) : collectSourceIds(section))) {
         if (!isParamSource(id)) continue;
         const parsed = parseParamSource(id, DEFAULT_DEVICE_ROLE);
         const profileId = String($deviceRoleMappings?.[parsed?.role]?.profileId ?? '');
@@ -4967,9 +4969,7 @@
 
     const live = {};
     for (const id of pixelSourceIds(pixel)) {
-      const resolvedId = isActiveSource(id) ? lcdResolveActive(id, pixel) : id;
-      const src = resolvedId ? controlById(resolvedId) : null;
-      const info = src ? lcdSourceInfo(src) : null;
+      const info = lcdLiveInfoFor(control, pixel, id);
       if (info) live[id] = info;
     }
 

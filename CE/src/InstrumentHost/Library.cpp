@@ -439,10 +439,10 @@ void Library::loadFrom (const juce::File& file)
     *this = fromVar (juce::JSON::parse (file.loadFileAsString()));
 }
 
-void Library::saveTo (const juce::File& file) const
+bool Library::saveTo (const juce::File& file) const
 {
-    file.getParentDirectory().createDirectory();
-    file.replaceWithText (juce::JSON::toString (toVar()));
+    return file.getParentDirectory().createDirectory().wasOk()
+        && file.replaceWithText (juce::JSON::toString (toVar()));
 }
 
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,

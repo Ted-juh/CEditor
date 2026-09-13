@@ -85,22 +85,38 @@ test('the context bar says something useful in its place', () => {
   assert.match(empty, /rail/, 'and where components come from');
 });
 
-// --- B10: the Effects placeholder ------------------------------------------------
+// --- B10: the Effects tab, deleted and rebuilt -----------------------------------
+//
+// These two tests used to assert the Effects tab was GONE. It was deleted in B10 for being a
+// placeholder that read "full editing coming soon" in a prime slot, and the finding behind that
+// deletion — a tab which only points elsewhere costs a slot and a click, and teaches the user that
+// the tabs here may be empty — is the part worth keeping under test. So they now pin the RULE
+// rather than the absence: the tab may exist, and it must do the editing.
 
-test('the Effects tab is gone, not merely emptied', () => {
+test('the Effects tab does the editing rather than pointing at it', () => {
   assert.ok(!/coming soon/i.test(code.displayPanel), 'no "coming soon" placeholder ships');
-  assert.ok(!/id: 'effects'/.test(code.displayPanel), 'and no tab in the strip');
-  assert.ok(!/activeTab === 'effects'/.test(code.displayPanel), 'and no branch to reach');
+  const tab = read(src('CE_Application', 'components', 'EffectsTab.svelte'));
+  // The canvas above supplies the preview; the compact dock still owns real effect editing.
+  for (const piece of ['EffectStackList', 'EffectSettings', 'EffectLooks']) {
+    assert.match(tab, new RegExp(`<${piece}`), `the tab mounts ${piece}`);
+  }
+  assert.doesNotMatch(tab, /<EffectSpecimen/, 'the separate preview stays removed');
+  // And it writes, rather than deep-linking somewhere that writes.
+  assert.match(tab, /updateControlProperty\(/, 'it writes properties itself');
+  assert.match(tab, /applyControlPatch\(/, 'and applies reorder patches itself');
 });
 
-test('a stored "effects" tab falls back instead of rendering nothing', () => {
-  // The sanitiser is the reason removing a tab id is safe: an install whose last tab was
-  // Effects would otherwise open on a branch that no longer exists.
+test('a stored "effects" tab resolves, now that the tab is back', () => {
+  // The sanitiser is why adding or removing a tab id is safe either way: an install whose last tab
+  // was Effects must land on a branch that exists.
   const ids = source.displayPanel.match(/const DISPLAY_TAB_IDS = new Set\(\[([^\]]*)\]\)/)?.[1] ?? '';
   assert.ok(ids, 'the id set is still there');
-  assert.ok(!ids.includes("'effects'"), 'effects is not a valid stored tab');
+  assert.ok(ids.includes("'effects'"), 'effects is a valid stored tab again');
   assert.ok(ids.includes("'layers'"), 'layers is, since it ships as a tab');
   assert.match(source.displayPanel, /if \(!DISPLAY_TAB_IDS\.has\(normalized\)\) return DEFAULT_DISPLAY_TAB;/);
+  // Every id in the set needs somewhere to go.
+  assert.match(source.displayPanel, /activeTab === 'effects'/, 'and a branch to reach');
+  assert.match(source.displayPanel, /id: 'effects'/, 'and a tab in the strip');
 });
 
 // --- B10: the viewer poll --------------------------------------------------------

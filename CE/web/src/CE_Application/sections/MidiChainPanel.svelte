@@ -1,4 +1,5 @@
 <script>
+  import HostConfirmButton from './HostConfirmButton.svelte';
   /**
    * MidiChainPanel.svelte — a part's MIDI inserts, in the order the player put them.
    *
@@ -324,8 +325,8 @@
                 onclick={() => moveMidiSlot(part.partId, slot.slotId, index + 1)}>▼</button>
         <PropertyToggle compact label="Byp" value={slot.bypassed} ariaLabel={`Bypass ${midiSlotLabels[slot.type]}`}
                         onchange={(on) => setMidiSlotBypassed(part.partId, slot.slotId, on)} />
-        <button type="button" class="ghost danger" title="Remove this module"
-                onclick={() => removeMidiSlot(part.partId, slot.slotId)}>×</button>
+        <HostConfirmButton identity={JSON.stringify([part.partId, slot.slotId])} type="button" class="ghost danger" title="Remove this module"
+                onclick={() => removeMidiSlot(part.partId, slot.slotId)}>×</HostConfirmButton>
       </div>
 
       {#if openSlotId === slot.slotId}
@@ -458,8 +459,8 @@
                 {#each slot.fx.keyChords as keyChord (keyChord.key)}
                   <span class="key-badge">
                     {keyName(keyChord.key)} · {keyChord.offsets.length}
-                    <button type="button" class="ghost danger"
-                            onclick={() => clearKeyChord(part.partId, keyChord.key)}>×</button>
+                    <HostConfirmButton title="Clear key chord" identity={JSON.stringify([part.partId, keyChord.key])} type="button" class="ghost danger"
+                            onclick={() => clearKeyChord(part.partId, keyChord.key)}>×</HostConfirmButton>
                   </span>
                 {/each}
               </div>
@@ -910,9 +911,9 @@
                       </label>
                     {/if}
 
-                    <button type="button" class="ghost danger articulation-remove"
+                    <HostConfirmButton identity={JSON.stringify([slot.slotId, articulation.articulationId])} type="button" class="ghost danger articulation-remove"
                             title={`Remove ${articulation.name || `articulation ${articulationIndex + 1}`}`}
-                            onclick={() => removeArticulation(slot, articulation.articulationId)}>×</button>
+                            onclick={() => removeArticulation(slot, articulation.articulationId)}>×</HostConfirmButton>
                   </div>
                 {/each}
               </div>
@@ -988,8 +989,8 @@
                         <option value={length}>{length} steps</option>
                       {/each}
                     </select>
-                    <button type="button" class="ghost"
-                            onclick={() => set(slot, { degreePattern: [] })}>clear</button>
+                    <HostConfirmButton identity={slot.slotId} title="Clear arpeggiator pattern"
+                            onclick={() => set(slot, { degreePattern: [] })}>Clear</HostConfirmButton>
                   {:else}
                     <span class="hint">{slot.arp.patternSemitones
                       ? 'rows are semitones around your lowest key'
@@ -1095,7 +1096,7 @@
                           color: var(--host-text); cursor: pointer; }
   .articulation-trigger span { font: 600 11px var(--host-font-mono, monospace); }
   .articulation-trigger small { color: var(--host-text-dim); font-size: 8px; text-transform: uppercase; }
-  .articulation-remove { align-self: center; margin-left: auto; }
+  .slot :global(.articulation-remove) { align-self: center; margin-left: auto; }
   .response-editor { width: 100%; display: flex; flex-direction: column; gap: 10px; }
   .response-profile { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
   .profile-name { flex: 0 1 260px; }
@@ -1150,5 +1151,5 @@
   .ghost { background: none; border: 1px solid var(--host-line-soft); border-radius: var(--host-radius-control); color: var(--host-text-soft);
            cursor: pointer; font-size: 11px; padding: 2px 6px; }
   .ghost:disabled { opacity: 0.35; cursor: default; }
-  .ghost.danger { color: var(--host-danger); }
+  .slot :global(.ghost.danger) { color: var(--host-danger); }
 </style>

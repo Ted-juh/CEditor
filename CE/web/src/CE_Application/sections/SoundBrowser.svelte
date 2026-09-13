@@ -1,34 +1,15 @@
 <script>
-  /**
-   * SoundBrowser.svelte — the library as a workspace rather than a drawer.
-   *
-   * What this replaces is a scrolling list of grey type with a search box and five filter
-   * buttons, which is the shape the product this succeeds already beat in 2015. Three things
-   * make this one different, and all three are load-bearing rather than decorative:
-   *
-   *   A CHIP CAN BE REFUSED. Every facet value cycles off → keep → refuse, and alt-clicking
-   *   goes straight to refuse. "Pads, but nothing distorted" is the search a person runs the
-   *   moment they know what they do not want, and no preset browser has ever offered it.
-   *
-   *   A COUNT PREDICTS THE CLICK. The number on a chip is what you would have if you clicked
-   *   it — the native side lifts each facet's own selection while counting (Library.h). So the
-   *   strip is a map of where the library goes next, not a report on the filter already on.
-   *
-   *   A SOUND IS A SOUND. A vendor .vstpreset, a state you captured, a hardware synth patch, a
-   *   whole voice chain and a whole rack are one result set, because to somebody looking for a
-   *   bass they are the same thing. That is a Library.h property this view finally shows.
-   *
-   * The view holds the query and the native side answers it; `request` comes back on every
-   * answer so the chips can be restored from the answer alone — including after a mutation,
-   * which re-emits the view you were looking at rather than resetting you to all of it.
+  import HostConfirmButton from './HostConfirmButton.svelte';
+  /** Sounds in the bottom dock: a virtual preset list with one load bar.
+   * The native library owns search and metadata; this view owns selection, density and
+   * optional details and filters. Library management lives beside the rack.
    */
   import {
-    hostLibrary, requestLibrary, scanLibrary, browseLibraryPath, removeLibraryPath,
-    saveUserPreset, saveRackToLibrary, saveChainToLibrary,
+    hostLibrary, hostLibraryLoad, requestLibrary, hostState, setPresetAudition,
+    startSoundComparison, stepSoundComparison, keepSoundComparison, cancelSoundComparison,
     setLibraryUserMetadata, removeLibraryRecord, loadLibraryRecord,
     saveSmartCollection, removeSmartCollection,
     emptyLibraryQuery, normalizeLibraryQuery, cycleLibraryFacet, libraryQueryIsEmpty,
-    hostAnalysis, analyseLibrary, cancelAnalysis,
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase, auditionLibraryRecord,
     hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
     setMorph, clearMorph, setParameter,
@@ -36,16 +17,39 @@
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
+  import { noteName } from '../utils/pianoGeometry.js';
   import PluginTile from './PluginTile.svelte';
+  import { onMount, tick, untrack } from 'svelte';
+  import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import { matchesPresetKind, presetWindow } from '../utils/soundBrowserLayout.js';
 
   let {
     focusedPart = null,
     partTitle = () => '',
     auditionOn = false,
     onToggleAudition = () => {},
+    onManageLibrary = () => {},
   } = $props();
 
-  let query = $state(emptyLibraryQuery());
+  const preferencesKey = 'ceditor.instrumentHost.soundsView.v1';
+  const preferences = readStoredJson(preferencesKey, {}) ?? {};
+  let query = $state(untrack(() => normalizeLibraryQuery($hostLibrary.request)));
+  let presetKind = $state(['instrument', 'effect'].includes(preferences.kind) ? preferences.kind : 'all');
+  let detailsOpen = $state(preferences.details === true);
+  let comfortable = $state(preferences.comfortable === true);
+  let filtersOpen = $state(false);
+  let listElement = $state(null);
+  let listHeight = $state(240);
+  let scrollTop = $state(0);
+  let rowHeight = $derived(comfortable ? 42 : 32);
+  onMount(() => ask(query));
+  $effect(() => writeStoredJson(preferencesKey, { kind: presetKind, details: detailsOpen, comfortable }));
+  $effect(() => {
+    const element = listElement;
+    // Grid/map temporarily unmount the list. Restore its scroll offset before displaying
+    // the saved virtual window, otherwise the top spacer would fill the entire viewport.
+    if (element) untrack(() => { element.scrollTop = scrollTop; });
+  });
   let versionLabel = $state('');
   let namingVersion = $state(false);
   // Where the blend sits between the first save and the current one, 0-100.
@@ -53,7 +57,7 @@
   let onlyDifferences = $state(true);
   // Grid or map. The map is the same records on two measured axes — no projection, no learned
   // embedding, nothing to explain: where a dot sits IS its brightness and its attack.
-  let view = $state('grid');
+  let view = $state('list');
   let axisX = $state('brightness');
   let axisY = $state('attack');
   let hovered = $state(null);
@@ -74,6 +78,10 @@
   // loud. The chips read as what the sound IS; the value underneath stays what the record says.
   const SOURCE_LABELS = {
     vstpreset: 'Vendor preset',
+    nksf: 'NKS preset',
+    fxp: 'Vanguard preset',
+    spire: 'Spire preset',
+    h2p: 'Zebra3 preset',
     programList: "Plug-in's own programs",
     userState: 'Captured by you',
     hardwarePatch: 'Hardware patch',
@@ -157,20 +165,57 @@
     ask(next);
   }
 
-  let records = $derived($hostLibrary.records);
+  let records = $derived($hostLibrary.records.filter((record) => matchesPresetKind(record, presetKind)));
+  let windowRows = $derived(presetWindow(records.length, scrollTop, listHeight, rowHeight));
   // Asking is cheap and the answer is per-record, so it is fetched on selection rather than
   // carried on every record in every library payload.
   let lastAskedSimilar = $state('');
   let selected = $derived(records.find((r) => r.recordId === selectedId) ?? records[0] ?? null);
+  let loadResult = $derived($hostLibraryLoad.recordId === selected?.recordId ? $hostLibraryLoad : null);
+  let updateIssues = $derived($hostLibrary.scanReport.filter((row) => row.reason || row.unavailable > 0).length);
   let facets = $derived($hostLibrary.facets);
   let filtered = $derived(!libraryQueryIsEmpty(query));
 
   function ask(next) {
     query = normalizeLibraryQuery(next);
+    if (query.type !== 'preset') presetKind = 'all';
+    scrollTop = 0;
+    if (listElement) listElement.scrollTop = 0;
     requestLibrary(query);
   }
 
+  function changeKind(value) {
+    presetKind = ['instrument', 'effect'].includes(value) ? value : 'all';
+    ask({ ...query, type: presetKind !== 'all' ? 'preset' : value === 'all' ? '' : value });
+  }
+
+  async function walkPresets(event) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter'].includes(event.key)
+        || event.target.closest('[data-favourite]') || records.length === 0) return;
+    event.preventDefault();
+    if (event.key === 'Enter') { if (selected?.available) loadInto(selected, 'focused'); return; }
+    const current = Math.max(0, records.findIndex((record) => record.recordId === selected?.recordId));
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? records.length - 1
+      : Math.max(0, Math.min(records.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)));
+    selectRecord(records[index].recordId);
+    if (listElement) {
+      const top = index * rowHeight;
+      if (top < listElement.scrollTop) listElement.scrollTop = top;
+      else if (top + rowHeight > listElement.scrollTop + listHeight)
+        listElement.scrollTop = top + rowHeight - listHeight;
+      scrollTop = listElement.scrollTop;
+      await tick();
+      listElement.querySelector(`[data-row-index="${index}"] .preset-pick`)?.focus({ preventScroll: true });
+    }
+  }
+
   export function refresh() { ask(query); }
+  export function search(text) { ask({ ...emptyLibraryQuery(), text }); }
+  let audition = $derived($hostState.rack.presetAudition);
+  let soundComparison = $derived($hostState.rack.soundComparison);
+  let comparisonCandidates = $derived(records.filter(record => record.type === 'preset' && record.available
+    && record.sourceType !== 'hardwarePatch' && focusedPart?.hasInstrument && !focusedPart.hardware
+    && record.targetCeId === focusedPart.pluginCeId).slice(0, 20));
 
   function clickFacet(facet, value, event) {
     // Alt (or right-click) refuses outright; a plain click walks the three states.
@@ -182,10 +227,13 @@
   }
 
   function loadInto(record, action) {
-    const partId = action === 'focused' ? focusedPart?.partId : undefined;
+    if (!record?.available || ($hostLibraryLoad.recordId === record.recordId && $hostLibraryLoad.phase === 'loading')) return;
+    if (record.type === 'rack') { loadLibraryRecord(record.recordId); return; }
+    if ((!focusedPart && action !== 'add') || (record.isEffect && !focusedPart)) return;
+    const partId = action === 'focused' || record.isEffect ? focusedPart?.partId : undefined;
     // With audition on, loading IS the phrase: the native side commits the preset and then
     // plays, one command, so the note never lands on the sound that was there before.
-    if (auditionOn && action !== 'add') auditionLibraryRecord(record.recordId, action, partId);
+    if (auditionOn && action !== 'add' && record.type === 'preset') auditionLibraryRecord(record.recordId, action, partId);
     else loadLibraryRecord(record.recordId, action, partId);
   }
 
@@ -233,7 +281,7 @@
     // how the old list put an instrument somewhere nobody expected. With audition on, a click
     // makes a SOUND — the stored snapshot answers immediately and the plug-in takes over when
     // it arrives, which is the whole difference between browsing and waiting.
-    if (auditionOn && record.available) auditionRecord(record.recordId);
+    if (auditionOn && record.available && !record.isEffect) auditionRecord(record.recordId);
   }
 
   /** When a save happened, in the words somebody would use out loud. */
@@ -268,45 +316,85 @@
 
 </script>
 
-<div class="browser" data-testid="host-sound-browser" aria-label="Sound browser">
+<div class="browser" data-testid="host-sound-browser" aria-label="Sound browser" style={`--preset-row-height:${rowHeight}px`}>
   <div class="head">
     <input type="search" class="search" data-testid="browser-search"
            placeholder="Search sounds, chains and racks…"
            value={query.text}
            oninput={(e) => ask({ ...query, text: e.currentTarget.value })} />
-    <span class="types">
-      {#each [['', 'All'], ['preset', 'Sounds'], ['chain', 'Chains'], ['rack', 'Racks']] as [value, label] (value)}
-        <button type="button" class="toggle" class:on={query.type === value}
-                onclick={() => (value === '' ? ask({ ...query, type: '' }) : clickType(value))}>{label}</button>
-      {/each}
-    </span>
-    <span class="types">
-      {#each [['grid', 'Grid'], ['map', 'Map']] as [value, label] (value)}
-        <button type="button" class="toggle" class:on={view === value} data-testid="view-mode"
-                title={value === 'map'
-                       ? 'The same sounds placed by what they measured, not by what they are called'
-                       : 'The result list'}
-                onclick={() => (view = value)}>{label}</button>
-      {/each}
-    </span>
-    <button type="button" class="toggle" class:on={$hostSurfaceBrowse.browsing}
-            data-testid="mirror-toggle"
-            title="Put the library on the connected controller — encoders scroll and filter, pads load"
-            onclick={() => browseOnSurface(!$hostSurfaceBrowse.browsing)}>⌘ On the keys</button>
-    <button type="button" class="toggle" class:on={auditionOn} data-testid="host-audition"
-            title="When on, clicking a sound loads it into the focused part and plays a short note"
-            onclick={() => onToggleAudition()}>♪ Audition</button>
-    <button type="button" onclick={() => scanLibrary()} data-testid="host-scan-library">Scan presets</button>
-    <button type="button" onclick={() => browseLibraryPath()}>Add folder…</button>
-    <span class="counts" data-testid="browser-counts">
-      {$hostLibrary.counts.matched} of {$hostLibrary.counts.total}
-      {#if $hostLibrary.counts.missing > 0} · {$hostLibrary.counts.missing} missing{/if}
-    </span>
+    <select aria-label="Preset type" value={presetKind !== 'all' ? presetKind : query.type || 'all'}
+            onchange={(event) => changeKind(event.currentTarget.value)}>
+      <option value="all">Everything</option><option value="preset">All presets</option>
+      <option value="instrument">Instruments</option><option value="effect">Effects</option>
+      <option value="chain">Chains</option><option value="rack">Racks</option>
+    </select>
+    <select aria-label="Plug-in filter" value={query.facets.instruments.include.length === 1 ? query.facets.instruments.include[0] : ''}
+            onchange={(event) => ask({ ...query, facets: { ...query.facets, instruments: { include: event.currentTarget.value ? [event.currentTarget.value] : [], exclude: [] } } })}>
+      <option value="">{query.facets.instruments.include.length > 1 ? 'Multiple plug-ins' : 'All plug-ins'}</option>
+      {#each facets.instruments as plugin (plugin.value)}<option value={plugin.value}>{plugin.value}</option>{/each}
+    </select>
+    <button type="button" class="toggle" class:on={query.favouritesOnly} aria-label="Show favourites"
+            aria-pressed={query.favouritesOnly} onclick={() => ask({ ...query, favouritesOnly: !query.favouritesOnly })}>★</button>
+    <button type="button" class="toggle" class:on={filtersOpen} aria-expanded={filtersOpen}
+            onclick={() => (filtersOpen = !filtersOpen)}>Filters{filtered ? ' •' : ''}</button>
+    <button type="button" class="toggle" class:on={detailsOpen} aria-expanded={detailsOpen}
+            data-testid="browser-details" onclick={() => (detailsOpen = !detailsOpen)}>Details</button>
   </div>
 
   <div class="body">
-    <div class="rail">
-      <div class="rail-head">Library</div>
+    <div class="main">
+      {#if filtersOpen}
+      <div class="facets" data-testid="browser-facets">
+      {#if audition.enabled}
+        <div class="audition-config" data-testid="host-audition-config">
+          <strong>Audition phrase</strong>
+          <label>Phrase
+            <select value={audition.phrase}
+                    onchange={(e) => setPresetAudition({ phrase: e.currentTarget.value })}>
+              <option value="single">Single note</option>
+              <option value="chord">Major chord</option>
+              <option value="scale">Major scale</option>
+              <option value="riff">Short riff</option>
+            </select>
+          </label>
+          <label>Root
+            <span class="number-with-note">
+              <input type="number" min="0" max="127" value={audition.rootNote}
+                     onchange={(e) => setPresetAudition({ rootNote: Number(e.currentTarget.value) })} />
+              <small>{noteName(audition.rootNote)}</small>
+            </span>
+          </label>
+          <label>Velocity
+            <input type="number" min="1" max="127" value={audition.velocity}
+                   onchange={(e) => setPresetAudition({ velocity: Number(e.currentTarget.value) })} />
+          </label>
+          <label>Length
+            <span class="number-unit"><input type="number" min="40" max="4000" step="10"
+                     value={audition.noteLengthMs}
+                     onchange={(e) => setPresetAudition({ noteLengthMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
+          </label>
+          {#if audition.phrase === 'scale' || audition.phrase === 'riff'}
+            <label>Gap
+              <span class="number-unit"><input type="number" min="0" max="2000" step="10"
+                       value={audition.gapMs}
+                       onchange={(e) => setPresetAudition({ gapMs: Number(e.currentTarget.value) })} /><small>ms</small></span>
+            </label>
+          {/if}
+          <span class="audition-help">Click a preset name to load and hear it.</span>
+        </div>
+      {/if}
+
+        <div class="browse-settings">      <label class="rail-setting">View <select aria-label="Browser view" bind:value={view}>
+        <option value="list">List</option><option value="grid">Grid</option><option value="map">Map</option>
+      </select></label>
+      <label class="rail-setting">Spacing <select aria-label="Preset row spacing" value={comfortable ? 'comfortable' : 'compact'}
+        onchange={(event) => { comfortable = event.currentTarget.value === 'comfortable'; scrollTop = 0; if (listElement) listElement.scrollTop = 0; }}>
+        <option value="compact">Compact</option><option value="comfortable">Comfortable</option>
+      </select></label>
+      <button type="button" class="toggle" class:on={$hostSurfaceBrowse.browsing} data-testid="mirror-toggle"
+              onclick={() => browseOnSurface(!$hostSurfaceBrowse.browsing)}>⌘ Browse on controller</button>
+</div>
+        <div class="browse-collections">      <div class="rail-head">Library</div>
       <button type="button" class="rail-item" class:on={!filtered}
               onclick={() => ask(emptyLibraryQuery())}>
         <span>All sounds</span><span class="n">{$hostLibrary.counts.total}</span>
@@ -333,8 +421,8 @@
                     onclick={() => ask(collection.query)}>
               <span>{collection.name}</span><span class="n">{collection.count}</span>
             </button>
-            <button type="button" class="ghost danger" title="Forget this search"
-                    onclick={() => removeSmartCollection(collection.collectionId)}>×</button>
+            <HostConfirmButton identity={JSON.stringify([collection.collectionId])} aria-label="Remove smart collection" type="button" class="ghost danger" title="Forget this search"
+                    onclick={() => removeSmartCollection(collection.collectionId)}>×</HostConfirmButton>
           </div>
         {/each}
       {/if}
@@ -350,129 +438,13 @@
         {/each}
       {/if}
 
-      <div class="rail-head">The auditioner</div>
-      {#if $hostAnalysis.running}
-        <div class="listen-progress" data-testid="analysis-progress">
-          <div class="bar"><i style={`width:${$hostAnalysis.total > 0
-            ? Math.round(100 * $hostAnalysis.done / $hostAnalysis.total) : 0}%`}></i></div>
-          <span class="listen-what">{$hostAnalysis.done} of {$hostAnalysis.total} · {$hostAnalysis.what}</span>
-        </div>
-        <button type="button" class="rail-action" onclick={() => cancelAnalysis()}>Stop listening</button>
-      {:else}
-        <button type="button" class="rail-action" data-testid="host-analyse"
-                disabled={$hostLibrary.counts.measurable === 0}
-                title={$hostLibrary.counts.measurable === 0
-                       ? 'Everything with a plug-in behind it has been asked'
-                       : 'Play each of these once and write down what came out'}
-                onclick={() => analyseLibrary()}>
-          {$hostLibrary.counts.measurable === 0
-            ? 'Nothing left to measure'
-            : `Listen to ${$hostLibrary.counts.measurable} sound${$hostLibrary.counts.measurable === 1 ? '' : 's'}`}
-        </button>
-        <!-- Refused sounds are not in `measurable` — that is what remembering a refusal means —
-             so without their own line "nothing left to measure" would be quietly hiding them.
-             This is also the only way back to one: the auditioner will not ask again on its own. -->
-        {#if $hostLibrary.counts.refused > 0}
-          <div class="listen-refused" data-testid="refused-count">
-            {$hostLibrary.counts.refused} could not be heard.
-            <button type="button" class="ghost more" data-testid="host-analyse-all"
-                    title="Ask every sound again, including the ones that refused"
-                    onclick={() => analyseLibrary(true)}>MEASURE EVERYTHING AGAIN</button>
-          </div>
-        {/if}
-        {#if $hostAnalysis.what}
-          <span class="listen-what">{$hostAnalysis.what}</span>
-        {/if}
-      {/if}
       <button type="button" class="rail-item" class:on={query.measuredOnly}
               title="Only sounds the auditioner has played"
               onclick={() => ask({ ...query, measuredOnly: !query.measuredOnly })}>
         <span>Measured</span><span class="n">{$hostLibrary.counts.measured}</span>
       </button>
 
-      {#if $hostLibrary.duplicates.length > 0}
-        <div class="rail-head">Housekeeping</div>
-        <div class="rail-row">
-          <span class="dup-note" data-testid="duplicate-note">
-            {$hostLibrary.duplicates.length} duplicate
-            {$hostLibrary.duplicates.length === 1 ? 'set' : 'sets'} —
-            {$hostLibrary.duplicates.reduce((n, d) => n + d.recordIds.length - 1, 0)} copies
-          </span>
-        </div>
-        {#each $hostLibrary.duplicates.slice(0, 6) as set (set.keyRecordId)}
-          <button type="button" class="rail-item" data-testid="duplicate-set"
-                  title={set.identical ? 'The same bytes, filed more than once'
-                                       : 'The same name, plug-in and measurement'}
-                  onclick={() => ask({ ...emptyLibraryQuery(), text: set.name })}>
-            <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
-          </button>
-        {/each}
-      {/if}
-
-      <div class="rail-head">Capture</div>
-      <!-- A hardware part saves the patch it captured. The library is where a sound lives
-           whichever box makes it, so "warm pad" finds the Serum preset and the Juno patch
-           in one list. -->
-      <button type="button" class="rail-action"
-              disabled={!(focusedPart?.hasInstrument
-                          || (focusedPart?.hardware && focusedPart?.hardwarePatchBytes > 0))}
-              title={focusedPart?.hasInstrument ? `Capture ${partTitle(focusedPart)}'s current state`
-                     : focusedPart?.hardware
-                       ? (focusedPart.hardwarePatchBytes > 0
-                            ? `Save ${partTitle(focusedPart)}'s captured patch to the library`
-                            : 'Capture a patch from the synth first (Routing tab)')
-                       : 'Focus a part with an instrument first'}
-              onclick={() => saveUserPreset(focusedPart.partId)}
-              data-testid="host-save-preset">{focusedPart?.hardware ? 'Save this patch' : 'Save this sound'}</button>
-      <button type="button" class="rail-action" disabled={!focusedPart?.hasInstrument}
-              title={focusedPart?.hasInstrument
-                     ? `Capture ${partTitle(focusedPart)} whole: the instrument and its state, the MIDI modules ahead of it and the inserts behind it`
-                     : 'Focus a part with an instrument first'}
-              onclick={() => saveChainToLibrary(focusedPart.partId)}
-              data-testid="host-save-chain">Save this chain</button>
-      <button type="button" class="rail-action" onclick={() => saveRackToLibrary()}
-              data-testid="host-save-rack">Save the rack</button>
-
-      {#if focusedPart?.morph}
-        <!-- Two sounds of one plug-in and the line between them. The slider is the part's
-             "@morph" address, the same one a macro or a knob rides; nothing here is a save. -->
-        <div class="rail-head">Morph</div>
-        <div class="morph" data-testid="host-morph">
-          <div class="morph-ends">
-            <span class="morph-end" title={focusedPart.morph.nameA}>{focusedPart.morph.nameA}</span>
-            <span class="morph-arrow">↔</span>
-            <span class="morph-end b" title={focusedPart.morph.nameB}>{focusedPart.morph.nameB}</span>
-          </div>
-          <input type="range" min="0" max="100" step="1" data-testid="morph-ride"
-                 aria-label={`Morph ${partTitle(focusedPart)} between ${focusedPart.morph.nameA} and ${focusedPart.morph.nameB}`}
-                 disabled={!focusedPart.morph.live}
-                 value={Math.round(focusedPart.morph.amount * 100)}
-                 oninput={(e) => setParameter(focusedPart.partId, '@morph', Number(e.currentTarget.value) / 100)} />
-          {#if focusedPart.morph.refusal}
-            <div class="notes bad" data-testid="morph-refusal">{focusedPart.morph.refusal}</div>
-          {:else if !focusedPart.morph.live}
-            <div class="notes">Load the instrument to ride it.</div>
-          {:else}
-            <div class="notes">On a macro: it is <b>Morph</b> in {partTitle(focusedPart)}'s parameter list — M+ puts it on the selected macro, ⚡ on a knob.</div>
-          {/if}
-          <button type="button" class="ghost morph-clear" data-testid="morph-clear"
-                  title="Forget the pair. The sound stays where the ride left it."
-                  onclick={() => clearMorph(focusedPart.partId)}>Clear the morph</button>
-        </div>
-      {/if}
-
-      {#if $hostLibrary.paths.length > 0}
-        <div class="rail-head">Scanned folders</div>
-        {#each $hostLibrary.paths as path (path)}
-          <div class="rail-row"><span class="path" title={path}>{path}</span>
-            <button type="button" class="ghost danger"
-                    onclick={() => removeLibraryPath(path)}>×</button></div>
-        {/each}
-      {/if}
-    </div>
-
-    <div class="main">
-      <div class="facets" data-testid="browser-facets">
+</div>
         {#each FACET_LABELS as [facet, label] (facet)}
           {#if facets[facet].length > 0}
             <div class="frow">
@@ -539,7 +511,8 @@
         </div>
       </div>
 
-      {#if $hostVersionDiff && $hostVersionDiff.recordId === selected?.recordId}
+      {/if}
+      {#if detailsOpen && $hostVersionDiff && $hostVersionDiff.recordId === selected?.recordId}
         {@const diff = $hostVersionDiff}
         <div class="diff" data-testid="version-diff">
           <div class="diff-head">
@@ -644,8 +617,29 @@
       {:else if records.length === 0}
         <div class="empty-hint">
           {$hostLibrary.counts.total === 0
-            ? 'Nothing in the library yet — scan presets, or capture the focused part.'
+            ? 'No saved sounds yet. Open Library → Update library, or capture the focused part.'
             : 'Nothing matches. Clear a chip, or refuse fewer things.'}
+        </div>
+      {:else if view === 'list'}
+        <div class="preset-heading" aria-hidden="true"><span>★</span><span>Preset</span><span>Plug-in</span><span class="preset-category">Category</span><span>Type</span></div>
+        <div class="preset-list" data-testid="preset-list" bind:this={listElement} bind:clientHeight={listHeight}
+             onscroll={(event) => (scrollTop = event.currentTarget.scrollTop)} role="group" aria-label="Preset list">
+          <div style={`height:${windowRows.before}px`} aria-hidden="true"></div>
+          {#each records.slice(windowRows.start, windowRows.end) as record, offset (record.recordId)}
+            <div class="preset-row" class:sel={record.recordId === selected?.recordId} class:unavailable={!record.available}
+                 data-testid="preset-row" data-row-index={windowRows.start + offset}>
+              <button type="button" class="preset-star" data-favourite aria-label={`${record.favourite ? 'Remove' : 'Add'} favourite: ${record.name}`}
+                      aria-pressed={record.favourite} onclick={() => setLibraryUserMetadata(record.recordId, { favourite: !record.favourite })}>{record.favourite ? '★' : '☆'}</button>
+              <button type="button" class="preset-pick" aria-pressed={record.recordId === selected?.recordId}
+                      title={record.available ? `${record.name} — ${record.instrument}` : record.reason}
+                      onkeydown={walkPresets} onclick={() => selectRecord(record.recordId)} ondblclick={() => loadInto(record, 'focused')}>
+                <span class="preset-name">{record.name}</span><span>{record.instrument || '—'}</span>
+                <span class="preset-category">{record.category || '—'}</span>
+                <span class="preset-kind">{!record.available ? 'Missing' : record.isEffect ? 'FX' : record.type === 'rack' ? 'Rack' : record.type === 'chain' ? 'Chain' : record.sourceType === 'hardwarePatch' ? 'HW' : 'Inst'}</span>
+              </button>
+            </div>
+          {/each}
+          <div style={`height:${windowRows.after}px`} aria-hidden="true"></div>
         </div>
       {:else}
         <div class="grid" data-testid="browser-grid">
@@ -694,6 +688,7 @@
                   {#if record.type === 'rack'}<span class="badge rack">RACK</span>
                   {:else if record.type === 'chain'}<span class="badge chain">CHAIN</span>{/if}
                   {#if record.sourceType === 'hardwarePatch'}<span class="badge hw">HW</span>{/if}
+                  {#if record.isEffect}<span class="badge">FX</span>{/if}
                   {#if record.sourceType === 'userState'}<span class="badge mine">MINE</span>{/if}
                   {#if !record.available}<span class="badge miss">NEEDS</span>{/if}
                 </span>
@@ -704,7 +699,7 @@
                   <button type="button" disabled={!record.available || !focusedPart}
                           title={focusedPart ? `Load into ${partTitle(focusedPart)}` : 'Focus a rack part first'}
                           onclick={() => loadInto(record, 'focused')}>Load</button>
-                  <button type="button" disabled={!record.available} title="Add as a new part"
+                  <button type="button" disabled={!record.available || (record.isEffect && !focusedPart)} title={record.isEffect ? 'Add an effect to the focused part' : 'Add as a new part'}
                           onclick={() => loadInto(record, 'add')}>+</button>
                 {/if}
               </div>
@@ -714,8 +709,38 @@
       {/if}
     </div>
 
-    {#if selected}
+    {#if detailsOpen}
       <div class="inspector" data-testid="browser-inspector">
+      {#if focusedPart?.morph}
+        <!-- Two sounds of one plug-in and the line between them. The slider is the part's
+             "@morph" address, the same one a macro or a knob rides; nothing here is a save. -->
+        <div class="rail-head">Morph</div>
+        <div class="morph" data-testid="host-morph">
+          <div class="morph-ends">
+            <span class="morph-end" title={focusedPart.morph.nameA}>{focusedPart.morph.nameA}</span>
+            <span class="morph-arrow">↔</span>
+            <span class="morph-end b" title={focusedPart.morph.nameB}>{focusedPart.morph.nameB}</span>
+          </div>
+          <input type="range" min="0" max="100" step="1" data-testid="morph-ride"
+                 aria-label={`Morph ${partTitle(focusedPart)} between ${focusedPart.morph.nameA} and ${focusedPart.morph.nameB}`}
+                 disabled={!focusedPart.morph.live}
+                 value={Math.round(focusedPart.morph.amount * 100)}
+                 oninput={(e) => setParameter(focusedPart.partId, '@morph', Number(e.currentTarget.value) / 100)} />
+          {#if focusedPart.morph.refusal}
+            <div class="notes bad" data-testid="morph-refusal">{focusedPart.morph.refusal}</div>
+          {:else if !focusedPart.morph.live}
+            <div class="notes">Load the instrument to ride it.</div>
+          {:else}
+            <div class="notes">On a macro: it is <b>Morph</b> in {partTitle(focusedPart)}'s parameter list — M+ puts it on the selected macro, ⚡ on a knob.</div>
+          {/if}
+          <HostConfirmButton identity={JSON.stringify([focusedPart.partId])} aria-label="Clear morph" type="button" class="ghost morph-clear" data-testid="morph-clear"
+                  title="Forget the pair. The sound stays where the ride left it."
+                  onclick={() => clearMorph(focusedPart.partId)}>Clear the morph</HostConfirmButton>
+        </div>
+      {/if}
+
+
+        {#if selected}
         <div class="insp-name">{selected.name}</div>
         <div class="insp-sub">{detailLine(selected)}</div>
 
@@ -973,8 +998,11 @@
         {/if}
 
         {#if !selected.factory}
-          <button type="button" class="ghost danger insp-remove"
-                  onclick={() => removeLibraryRecord(selected.recordId)}>Remove this record</button>
+          <HostConfirmButton identity={JSON.stringify([selected.recordId])} title="Remove library record" aria-label="Remove library record" type="button" class="ghost danger insp-remove"
+                  onclick={() => removeLibraryRecord(selected.recordId)}>Remove this record</HostConfirmButton>
+        {/if}
+        {:else}
+          <div class="empty-hint">No preset selected.</div>
         {/if}
       </div>
     {/if}
@@ -1052,11 +1080,69 @@
     </div>
   {/if}
 
+      {#if soundComparison.active}
+        <div class="sound-compare" data-testid="host-sound-comparison">
+          <span class="compare-slot">{soundComparison.index + 1}<small>/{soundComparison.count}</small></span>
+          <span class="compare-copy">
+            <small>Sound Comparison · original: {soundComparison.originalName}</small>
+            <strong>{soundComparison.name || 'Preset unavailable'}</strong>
+          </span>
+          <button type="button" class="ghost" title="Previous preset"
+                  onclick={() => stepSoundComparison(-1)}>‹ Previous</button>
+          <button type="button" class="ghost" title="Next preset"
+                  onclick={() => stepSoundComparison(1)}>Next ›</button>
+          <button type="button" class="compare-keep" onclick={() => keepSoundComparison()}>
+            Keep this sound
+          </button>
+          <button type="button" class="ghost" onclick={() => cancelSoundComparison()}>
+            Cancel · restore original
+          </button>
+        </div>
+      {/if}
+
+  <div class="selection-bar" data-testid="sound-selection-bar">
+    <div class="selection-info">
+      <strong>{selected?.name ?? 'No preset selected'}</strong>
+      <span aria-live="polite" class:load-failed={loadResult?.phase === 'failed'} data-testid="sound-load-result">{selected && !selected.available ? selected.reason
+        : loadResult?.message ? loadResult.message
+        : selected?.type === 'rack' ? 'Restore the saved rack'
+        : focusedPart ? `${selected?.isEffect ? 'Insert on' : 'Load into'} ${partTitle(focusedPart)}`
+        : 'Select a target part, or add an instrument as a new part'}</span>
+    </div>
+    <label class="audition-toggle"><input type="checkbox" checked={auditionOn} onchange={onToggleAudition}
+           data-testid="host-audition" />Audition on load</label>
+        <button type="button" data-testid="host-start-sound-comparison"
+                disabled={soundComparison.active || comparisonCandidates.length < 2}
+                title={comparisonCandidates.length >= 2
+                  ? `Compare ${comparisonCandidates.length} visible presets with the audition phrase`
+                  : 'Show at least two presets for the focused instrument'}
+                onclick={() => startSoundComparison(focusedPart.partId,
+                  comparisonCandidates.map((record) => record.recordId))}>
+          Compare visible ({comparisonCandidates.length})
+        </button>
+    {#if selected?.type !== 'rack'}
+      <button type="button" disabled={!selected?.available || loadResult?.phase === 'loading' || (selected?.isEffect && !focusedPart)}
+              data-testid="sound-add" onclick={() => loadInto(selected, 'add')}>{selected?.isEffect ? 'Add insert' : 'Add part'}</button>
+    {/if}
+    <button type="button" class="load-selected" data-testid="sound-load"
+            disabled={!selected?.available || loadResult?.phase === 'loading' || (selected?.type !== 'rack' && !focusedPart)}
+            onclick={() => loadInto(selected, 'focused')}>{loadResult?.phase === 'loading' ? 'Loading…' : selected?.type === 'rack' ? 'Restore rack' : selected?.isEffect ? 'Load effect' : 'Load'}</button>
+  </div>
+  <div class="browser-status" data-testid="browser-counts">
+    <span>{records.length} shown · {$hostLibrary.counts.total} saved{#if $hostLibrary.scanning} · Updating library…{/if}</span>
+    {#if $hostLibrary.updateFinished && !$hostLibrary.scanning}
+      <button type="button" class="ghost" onclick={onManageLibrary} data-testid="library-update-result">{!$hostLibrary.scanReport.length ? 'No plug-ins available · View results' : updateIssues ? `Update finished · ${updateIssues} ${updateIssues === 1 ? 'plug-in needs' : 'plug-ins need'} attention` : 'Library updated'}</button>
+    {/if}
+    {#if $hostAudition.stage === 'loading' || $hostAudition.stage === 'snapshot' || $hostAudition.stage === 'live'}
+      <span>{$hostAudition.detail || $hostAudition.stage}<button type="button" class="ghost" onclick={stopAudition}>Stop</button></span>
+    {:else}<span>↑ ↓ select · Enter load</span>{/if}
+  </div>
+
   <!-- The audition bar. It is the answer to "what am I hearing, and what is it playing" — the
        two questions a preview that swaps sources underneath you has to keep answering. -->
   <div class="audition" data-testid="audition-bar">
     <button type="button" class="play"
-            disabled={!selected || !selected.available}
+            disabled={!selected || !selected.available || selected.isEffect || selected.type !== 'preset'}
             title={selected?.instant ? 'Play the stored preview now'
                                      : 'Load and play — this one has no preview yet'}
             onclick={() => selected && auditionRecord(selected.recordId)}>▶</button>
@@ -1104,14 +1190,50 @@
 </div>
 
 <style>
+  .browse-settings, .browse-collections { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .browse-collections .rail-head { flex-basis: 100%; margin: 3px 0; }
+  .browse-collections .rail-item { width: auto; gap: 8px; }
+  .browse-settings .rail-setting { margin: 0; }
+  .audition-config {
+    display: flex; align-items: end; gap: 10px; flex-wrap: wrap;
+    padding: 7px 9px;
+    border: 1px solid var(--host-line);
+    background: #171c21;
+  }
+  .audition-config strong { align-self: center; color: #d7dde3; font-size: 12px; }
+  .audition-config label {
+    display: flex; flex-direction: column; gap: 3px;
+    color: #96a2ad; font-size: 10px; text-transform: uppercase;
+  }
+  .audition-config select { width: 112px; }
+  .audition-config input[type="number"] { width: 66px; }
+  .number-with-note, .number-unit { display: inline-flex; align-items: center; gap: 4px; }
+  .number-with-note small, .number-unit small { color: #b7c1ca; font-size: 11px; text-transform: none; }
+  .audition-help { align-self: center; color: #78848f; font-size: 11px; }
+  .sound-compare {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 10px;
+    border: 1px solid #d66f24;
+    background: linear-gradient(90deg, #2a1c13, #171c21 42%);
+  }
+  .compare-slot {
+    display: inline-flex; align-items: baseline; justify-content: center;
+    min-width: 44px; color: #ff9a47; font-size: 22px; font-weight: 750;
+  }
+  .compare-slot small { color: #a87955; font-size: 11px; }
+  .compare-copy { display: flex; flex: 1 1 180px; min-width: 150px; flex-direction: column; }
+  .compare-copy small { color: #9f8877; font-size: 10px; }
+  .compare-copy strong { color: #f1f3f5; font-size: 13px; }
+  .compare-keep { border-color: #d66f24; color: #ffd7b7; }
+
   /* The workspace's controls, repeated because Svelte scopes them: InstrumentHostView's
      button/input rules stop at its own markup, and a browser wearing the browser's default
      chrome inside a dark tool is the first thing rendering it showed. Same values as there. */
   button {
-    background: #232a31;
-    border: 1px solid #3b4652;
+    background: var(--host-surface-raised);
+    border: 1px solid var(--host-line);
     border-radius: 4px;
-    color: #d6dbe0;
+    color: var(--host-text);
     padding: 4px 10px;
     cursor: pointer;
     font: inherit;
@@ -1119,16 +1241,16 @@
   }
   button:hover:not(:disabled) { border-color: #5b9bd5; }
   button:disabled { opacity: 0.5; cursor: default; }
-  button.toggle { padding: 3px 7px; color: #7d8894; }
-  button.toggle.on { color: #d6dbe0; border-color: #5b9bd5; background: #24313d; }
-  button.ghost { background: none; border-color: transparent; color: #7d8894; }
-  button.ghost:hover { color: #d6dbe0; border-color: #3b4652; }
-  button.ghost.danger:hover { color: #e4b3b3; border-color: #7a4a4a; }
+  button.toggle { padding: 3px 7px; color: var(--host-text-dim); }
+  button.toggle.on { color: var(--host-text); border-color: #5b9bd5; background: #24313d; }
+  button.ghost { background: none; border-color: transparent; color: var(--host-text-dim); }
+  button.ghost:hover { color: var(--host-text); border-color: var(--host-line); }
+  .browser :global(button.ghost.danger):hover { color: #e4b3b3; border-color: #7a4a4a; }
   input {
-    background: #14171a;
-    border: 1px solid #3b4652;
+    background: var(--host-field);
+    border: 1px solid var(--host-line);
     border-radius: 4px;
-    color: #d6dbe0;
+    color: var(--host-text);
     padding: 3px 6px;
     font: inherit;
     font-size: 12px;
@@ -1147,50 +1269,33 @@
     gap: 8px;
     margin: 8px 14px 0;
     padding: 10px;
-    border: 1px solid #3b4652;
+    border: 1px solid var(--host-line);
     border-radius: 6px;
-    background: #171a1d;
+    background: var(--host-surface);
     min-height: 0;
   }
 
   .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .search { flex: 1; min-width: 200px; }
-  .types { display: flex; gap: 4px; }
-  .counts { color: #7d8894; font-size: 11px; margin-left: auto; }
-
+  .browser .load-failed { color: #f3a5a5; }
   .body { display: flex; align-items: stretch; gap: 10px; min-height: 0; }
 
-  .rail {
-    width: 186px;
-    flex: 0 0 186px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    overflow-y: auto;
-    max-height: 460px;
-    padding-right: 4px;
-  }
   .rail-head {
-    color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--host-text-dim); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
     margin: 10px 0 3px;
   }
   .rail-head:first-child { margin-top: 0; }
   button.rail-item {
     display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
     background: transparent; border: 1px solid transparent; border-radius: 4px;
-    padding: 4px 7px; color: #9aa5b1; font-size: 12px;
+    padding: 4px 7px; color: var(--host-text-soft); font-size: 12px;
   }
-  button.rail-item:hover:not(:disabled) { background: #1c2126; color: #d6dbe0;
+  button.rail-item:hover:not(:disabled) { background: var(--host-surface-raised); color: var(--host-text);
                                           border-color: transparent; }
-  button.rail-item.on { background: #7fb4e01f; border-color: #4a86bd; color: #d6dbe0; }
-  .rail-item .n { margin-left: auto; color: #7d8894; font-size: 10px; }
+  button.rail-item.on { background: #7fb4e01f; border-color: #4a86bd; color: var(--host-text); }
+  .rail-item .n { margin-left: auto; color: var(--host-text-dim); font-size: 10px; }
   .rail-row { display: flex; align-items: center; gap: 2px; }
   .rail-row .rail-item { flex: 1; min-width: 0; }
-  button.rail-action { width: 100%; text-align: left; font-size: 11px; padding: 4px 7px; }
-  .path {
-    flex: 1; min-width: 0; color: #7d8894; font-size: 10px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl;
-  }
 
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 
@@ -1201,17 +1306,17 @@
   .measured { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
   .axis {
     display: flex; flex-direction: column; gap: 2px; min-width: 132px;
-    padding: 4px 6px; border: 1px solid #2a333d; border-radius: 4px; background: #14181b;
+    padding: 4px 6px; border: 1px solid var(--host-line-soft); border-radius: 4px; background: #14181b;
   }
   .axis.on { border-color: #4a86bd; background: #7fb4e00f; }
   button.axis-name {
     display: flex; align-items: baseline; gap: 5px; background: none; border: 0; padding: 0;
-    color: #9aa5b1; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--host-text-soft); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   }
-  button.axis-name:hover:not(:disabled) { color: #d6dbe0; border-color: transparent; }
+  button.axis-name:hover:not(:disabled) { color: var(--host-text); border-color: transparent; }
   .axis.on button.axis-name { color: #7fb4e0; }
-  .axis-value { text-transform: none; letter-spacing: 0; color: #66707b; font-size: 10px; }
-  .axis.on .axis-value { color: #9aa5b1; }
+  .axis-value { text-transform: none; letter-spacing: 0; color: var(--host-text-dim); font-size: 10px; }
+  .axis.on .axis-value { color: var(--host-text-soft); }
   /* The range inputs wear the workspace, not the browser: WebView2 is Chromium, so the
      -webkit- track and thumb are the ones that apply, and the bare rule keeps a plain browser
      from drawing a default control beside a styled one. */
@@ -1220,20 +1325,20 @@
     -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
   }
   .axis input[type='range']::-webkit-slider-runnable-track {
-    height: 3px; border-radius: 2px; background: #2a333d;
+    height: 3px; border-radius: 2px; background: var(--host-line-soft);
   }
   .axis input[type='range']::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 9px; height: 12px; margin-top: -4.5px; border-radius: 2px;
-    background: #7d8894; border: 1px solid #101315;
+    background: var(--host-text-dim); border: 1px solid var(--host-bg-deep);
   }
   .axis.on input[type='range']::-webkit-slider-runnable-track { background: #24313d; }
   .axis.on input[type='range']::-webkit-slider-thumb { background: #7fb4e0; }
 
-  .thumb { display: block; width: 100%; height: 22px; background: #101315; border-radius: 3px; }
+  .thumb { display: block; width: 100%; height: 22px; background: var(--host-bg-deep); border-radius: 3px; }
   .thumb.unheard {
     display: flex; align-items: center; justify-content: center;
-    border: 1px dashed #2a333d; color: #4d565f; font-size: 9px; letter-spacing: 0.06em;
+    border: 1px dashed var(--host-line-soft); color: #4d565f; font-size: 9px; letter-spacing: 0.06em;
   }
   /* A refusal is not the same absence as "not heard yet": one is waiting its turn, the other
      has had its turn and has an answer. Amber rather than grey, the same colour the duplicate
@@ -1242,30 +1347,18 @@
   .thumb polygon { fill: #6fb0c9; fill-opacity: 0.85; }
   .thumb line { stroke: #7fb4e0; stroke-opacity: 0.3; stroke-width: 0.4; }
 
-  .listen-progress { display: flex; flex-direction: column; gap: 3px; padding: 2px 0; }
-  .listen-progress .bar {
-    height: 4px; border-radius: 2px; background: #101315; border: 1px solid #2a333d;
-    overflow: hidden;
-  }
-  .listen-progress .bar i { display: block; height: 100%; background: #4a86bd; }
-  .listen-what { color: #7d8894; font-size: 10px; padding: 2px 0; }
-  .listen-refused {
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    color: #b08a3d; font-size: 10px; padding: 2px 0;
-  }
-  .dup-note { color: #d9a13c; font-size: 10.5px; padding: 2px 0; }
-  .hint { color: #66707b; font-size: 10.5px; margin-right: auto; }
+  .hint { color: var(--host-text-dim); font-size: 10.5px; margin-right: auto; }
   .flabel {
-    color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--host-text-dim); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
     width: 72px; flex: 0 0 72px;
   }
   button.chip {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 8px; border-radius: 11px; border: 1px solid #3b4652;
-    background: #1c2126; color: #9aa5b1; font-size: 11px;
+    padding: 3px 8px; border-radius: 11px; border: 1px solid var(--host-line);
+    background: var(--host-surface-raised); color: var(--host-text-soft); font-size: 11px;
   }
-  button.chip:hover:not(:disabled) { color: #d6dbe0; border-color: #566372; }
-  .chip .n { color: #66707b; font-size: 10px; }
+  button.chip:hover:not(:disabled) { color: var(--host-text); border-color: #566372; }
+  .chip .n { color: var(--host-text-dim); font-size: 10px; }
   button.chip.on { background: #7fb4e01f; border-color: #4a86bd; color: #7fb4e0; }
   .chip.on .n { color: #4a86bd; }
   /* A refused value is struck through rather than hidden: a chip you cannot see is a filter
@@ -1282,7 +1375,7 @@
   }
   .tile {
     display: flex; flex-direction: column; gap: 4px; min-width: 0;
-    padding: 7px; border: 1px solid #2a333d; border-radius: 5px; background: #14181b;
+    padding: 7px; border: 1px solid var(--host-line-soft); border-radius: 5px; background: #14181b;
   }
   .tile.sel { border-color: #7fb4e0; }
   .tile.unavailable { opacity: 0.62; }
@@ -1291,18 +1384,18 @@
     background: transparent; border: 1px solid transparent; padding: 2px; border-radius: 4px;
     text-align: left; color: inherit;
   }
-  button.tile-body:hover:not(:disabled) { border-color: #3b4652; background: #1c2126; }
+  button.tile-body:hover:not(:disabled) { border-color: var(--host-line); background: var(--host-surface-raised); }
   .tile-text { display: flex; flex-direction: column; min-width: 0; }
   .tile-name {
-    font-weight: 600; font-size: 12px; color: #d6dbe0;
+    font-weight: 600; font-size: 12px; color: var(--host-text);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .tile-sub {
-    color: #7d8894; font-size: 10.5px;
+    color: var(--host-text-dim); font-size: 10.5px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .rack-mark {
-    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 4px; background: #1c2126;
+    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 4px; background: var(--host-surface-raised);
     border: 1px solid #35c46f66; color: #35c46f; display: flex; align-items: center;
     justify-content: center; font-size: 14px;
   }
@@ -1311,7 +1404,7 @@
   .badges { display: flex; gap: 3px; margin-right: auto; }
   .badge {
     font-size: 8.5px; letter-spacing: 0.06em; padding: 2px 4px; border-radius: 2px;
-    border: 1px solid #3b4652; color: #7d8894;
+    border: 1px solid var(--host-line); color: var(--host-text-dim);
   }
   .badge.mine { color: #7fb4e0; border-color: #4a86bd; }
   .badge.hw { color: #d9a13c; border-color: #d9a13c66; }
@@ -1323,40 +1416,35 @@
 
   .inspector {
     width: 234px; flex: 0 0 234px; display: flex; flex-direction: column; gap: 8px;
-    padding-left: 10px; border-left: 1px solid #2a333d; overflow-y: auto; max-height: 460px;
+    padding-left: 10px; border-left: 1px solid var(--host-line-soft); overflow-y: auto; max-height: 460px;
   }
-  .insp-name { font-weight: 600; font-size: 14px; color: #d6dbe0; }
-  .insp-sub { color: #7d8894; font-size: 11px; }
-  .insp-block { border-top: 1px solid #2a333d; padding-top: 7px; }
+  .insp-name { font-weight: 600; font-size: 14px; color: var(--host-text); }
+  .insp-sub { color: var(--host-text-dim); font-size: 11px; }
+  .insp-block { border-top: 1px solid var(--host-line-soft); padding-top: 7px; }
   .insp-head {
-    color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--host-text-dim); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
     margin-bottom: 5px;
   }
   .kv { display: grid; grid-template-columns: 72px 1fr; gap: 3px 8px; font-size: 11px; }
-  .kv .k { color: #66707b; }
-  .kv .v { color: #9aa5b1; overflow-wrap: anywhere; }
+  .kv .k { color: var(--host-text-dim); }
+  .kv .v { color: var(--host-text-soft); overflow-wrap: anywhere; }
   .kv .v.ok { color: #35c46f; }
   .kv .v.bad { color: #d6a3a3; }
   .rating { display: flex; gap: 1px; }
   .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
-  .notes { color: #9aa5b1; font-size: 11px; margin-top: 6px; }
-  button.insp-remove { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
-  .empty-hint { color: #7d8894; font-size: 12px; padding: 12px 0; }
+  .notes { color: var(--host-text-soft); font-size: 11px; margin-top: 6px; }
+  .inspector :global(button.insp-remove) { align-self: flex-start; font-size: 11px; padding: 3px 6px; }
+  .empty-hint { color: var(--host-text-dim); font-size: 12px; padding: 12px 0; }
 
   /* Under roughly 760px the three columns become three rows, in reading order: what you are
      filtering by, what came back, and what one of them is. Each keeps its own scroll so the
      drawer never grows a second scrollbar of its own. */
   @container (max-width: 760px) {
     .body { flex-direction: column; }
-    .rail {
-      width: auto; flex: 0 0 auto; max-height: 190px;
-      padding-right: 0; padding-bottom: 8px;
-      border-bottom: 1px solid #2a333d;
-    }
     .inspector {
       width: auto; flex: 0 0 auto; max-height: 420px;
       padding-left: 0; border-left: 0;
-      padding-top: 8px; border-top: 1px solid #2a333d;
+      padding-top: 8px; border-top: 1px solid var(--host-line-soft);
     }
     /* Two-up tiles rather than one wide one: the grid row is the whole width here. */
     .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 360px; }
@@ -1366,21 +1454,21 @@
   .vrail { display: flex; flex-direction: column; gap: 0; }
   .vrow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px;
           align-items: center; position: relative; padding: 2px 0; }
-  .vrow .pip { width: 6px; height: 6px; border-radius: 50%; background: #3b4652; margin-left: 2px;
+  .vrow .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--host-line); margin-left: 2px;
                z-index: 1; }
   .vrow.now .pip { background: #7fb4e0; box-shadow: 0 0 0 3px #7fb4e026; }
-  .vrow .pip.origin { background: #7d8894; }
+  .vrow .pip.origin { background: var(--host-text-dim); }
   /* The line down the rail is the history; the first and last rows only own half of it. */
   .vrow::before { content: ''; position: absolute; left: 4.5px; top: 0; bottom: 0; width: 1px;
-                  background: #2a333d; }
+                  background: var(--host-line-soft); }
   .vrow:first-child::before { top: 50%; }
   .vrow:last-child::before { bottom: 50%; }
-  button.vlabel { text-align: left; padding: 1px 3px; font-size: 11px; color: #9aa5b1;
+  button.vlabel { text-align: left; padding: 1px 3px; font-size: 11px; color: var(--host-text-soft);
                   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vrow.now button.vlabel { color: #d6dbe0; font-weight: 600; }
-  .vwhen { color: #66707b; font-size: 10px; white-space: nowrap; }
-  .branched { color: #7d8894; font-size: 10.5px; margin-top: 6px; }
-  .branched b { color: #9aa5b1; font-weight: 600; }
+  .vrow.now button.vlabel { color: var(--host-text); font-weight: 600; }
+  .vwhen { color: var(--host-text-dim); font-size: 10px; white-space: nowrap; }
+  .branched { color: var(--host-text-dim); font-size: 10.5px; margin-top: 6px; }
+  .branched b { color: var(--host-text-soft); font-weight: 600; }
   .vblend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   .vblend label { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em; }
   .vblend input { flex: 1; }
@@ -1392,19 +1480,19 @@
 
   .diff {
     display: flex; flex-direction: column; gap: 6px; padding: 9px 10px;
-    border: 1px solid #3b4652; border-radius: 5px; background: #14181b;
+    border: 1px solid var(--host-line); border-radius: 5px; background: #14181b;
   }
   .diff-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .diff-title { font-weight: 600; font-size: 12px; color: #d6dbe0; }
-  .diff-count { color: #7d8894; font-size: 11px; margin-right: auto; }
+  .diff-title { font-weight: 600; font-size: 12px; color: var(--host-text); }
+  .diff-count { color: var(--host-text-dim); font-size: 11px; margin-right: auto; }
   .diff-rows { display: flex; flex-direction: column; max-height: 190px; overflow-y: auto; }
   .drow {
     display: grid; grid-template-columns: 130px 1fr 78px 78px; gap: 8px; align-items: center;
-    padding: 4px 0; border-bottom: 1px solid #1c2126; font-size: 11px;
+    padding: 4px 0; border-bottom: 1px solid var(--host-surface-raised); font-size: 11px;
   }
-  .dname { color: #9aa5b1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .drow.changed .dname { color: #d6dbe0; }
-  .dbar { position: relative; height: 12px; background: #101315; border: 1px solid #2a333d;
+  .dname { color: var(--host-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drow.changed .dname { color: var(--host-text); }
+  .dbar { position: relative; height: 12px; background: var(--host-bg-deep); border: 1px solid var(--host-line-soft);
           border-radius: 2px; }
   /* A's value is the ground the change happened on; B's is drawn thinner on top of it, so a
      row reads as one bar moving rather than two bars competing. */
@@ -1412,15 +1500,15 @@
               border-radius: 1px; }
   .dbar .db { position: absolute; left: 1px; top: 3px; bottom: 3px; border-radius: 1px;
               background: linear-gradient(90deg, #4a86bd, #7fb4e0); }
-  .dval { color: #7d8894; font-size: 10.5px; text-align: right; font-variant-numeric: tabular-nums; }
+  .dval { color: var(--host-text-dim); font-size: 10.5px; text-align: right; font-variant-numeric: tabular-nums; }
   .dval.b { color: #7fb4e0; }
-  .diff-foot { color: #66707b; font-size: 10.5px; }
+  .diff-foot { color: var(--host-text-dim); font-size: 10.5px; }
 
   button.simrow {
     display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left;
     padding: 3px 4px; border-radius: 3px; font-size: 11px;
   }
-  button.simrow:hover:not(:disabled) { background: #1c2126; border-color: transparent; }
+  button.simrow:hover:not(:disabled) { background: var(--host-surface-raised); border-color: transparent; }
   button.simrow.best { border-color: #35c46f66; background: #35c46f0d; }
   .subrow { display: flex; align-items: stretch; gap: 4px; }
   .subrow button.simrow { flex: 1; min-width: 0; }
@@ -1430,26 +1518,26 @@
   .morph-ends { display: flex; align-items: baseline; gap: 6px; font-size: 11px; min-width: 0; }
   .morph-end { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .morph-end.b { text-align: right; }
-  .morph-arrow { flex: 0 0 auto; color: #7d8894; }
+  .morph-arrow { flex: 0 0 auto; color: var(--host-text-dim); }
   .morph input[type="range"] { width: 100%; margin: 0; }
   .morph .notes.bad { color: #e0725c; }
-  button.morph-clear { align-self: flex-start; font-size: 10px; padding: 2px 6px; color: #7d8894; }
+  .morph :global(button.morph-clear) { align-self: flex-start; font-size: 10px; padding: 2px 6px; color: var(--host-text-dim); }
   .maphint {
-    position: absolute; left: 8px; bottom: 6px; font-size: 10px; color: #66707b;
+    position: absolute; left: 8px; bottom: 6px; font-size: 10px; color: var(--host-text-dim);
     pointer-events: none;
   }
   button.keep {
-    flex: 0 0 auto; font-size: 9px; letter-spacing: 0.06em; padding: 0 6px; color: #7d8894;
+    flex: 0 0 auto; font-size: 9px; letter-spacing: 0.06em; padding: 0 6px; color: var(--host-text-dim);
   }
   button.keep.on { color: #d9d3c4; border-color: #6b5426; background: #d9a13c14; }
-  .simname { color: #9aa5b1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .simname { color: var(--host-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
              min-width: 0; flex: 1; }
   .simpct { color: #35c46f; font-size: 10.5px; font-variant-numeric: tabular-nums; }
   .simwhy { font-size: 10px; margin-top: 4px; }
   .subneed { color: #d9a13c; font-size: 11px; margin-bottom: 6px; }
-  .subpart { border-top: 1px solid #1c2126; padding-top: 6px; margin-top: 6px; }
-  .subwant { color: #7d8894; font-size: 10.5px; margin-bottom: 4px; }
-  .subwant b { color: #d6dbe0; font-weight: 600; }
+  .subpart { border-top: 1px solid var(--host-surface-raised); padding-top: 6px; margin-top: 6px; }
+  .subwant { color: var(--host-text-dim); font-size: 10.5px; margin-bottom: 4px; }
+  .subwant b { color: var(--host-text); font-weight: 600; }
 
   .mapwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
   .mapaxes { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
@@ -1457,7 +1545,7 @@
     /* A fixed height rather than flex:1. Growing to fit pushed the audition bar off the bottom
        of the window, which is exactly the control somebody reaches for while browsing a map. */
     position: relative; height: 300px; flex: 0 0 300px;
-    border: 1px solid #2a333d; border-radius: 5px;
+    border: 1px solid var(--host-line-soft); border-radius: 5px;
     background:
       linear-gradient(#1c212633 1px, transparent 1px) 0 0 / 100% 20%,
       linear-gradient(90deg, #1c212633 1px, transparent 1px) 0 0 / 20% 100%,
@@ -1466,10 +1554,10 @@
   }
   button.dot {
     position: absolute; width: 9px; height: 9px; padding: 0; margin: -4.5px 0 0 -4.5px;
-    border-radius: 50%; border: 1px solid #101315; background: #7fb4e0; opacity: 0.8;
+    border-radius: 50%; border: 1px solid var(--host-bg-deep); background: #7fb4e0; opacity: 0.8;
   }
-  button.dot:hover:not(:disabled) { opacity: 1; border-color: #d6dbe0; }
-  button.dot.sel { background: #d6dbe0; box-shadow: 0 0 0 3px #7fb4e044; opacity: 1; }
+  button.dot:hover:not(:disabled) { opacity: 1; border-color: var(--host-text); }
+  button.dot.sel { background: var(--host-text); box-shadow: 0 0 0 3px #7fb4e044; opacity: 1; }
   button.dot.unavailable { background: #566372; opacity: 0.55; }
   .lasso {
     position: absolute; border: 1px dashed #7fb4e0; background: #7fb4e014; pointer-events: none;
@@ -1481,18 +1569,18 @@
   .axlabel.y1 { left: 5px; top: 4px; }
   .mapcard {
     position: absolute; margin: 10px 0 0 10px; padding: 6px 8px; width: 172px;
-    background: #171a1d; border: 1px solid #4a86bd; border-radius: 4px;
+    background: var(--host-surface); border: 1px solid #4a86bd; border-radius: 4px;
     display: flex; flex-direction: column; gap: 1px; pointer-events: none;
     box-shadow: 0 8px 22px #000a;
   }
-  .mapcard-name { font-weight: 600; font-size: 11.5px; color: #d6dbe0; }
-  .mapcard-sub { color: #7d8894; font-size: 10px; }
-  .mapcard-nums { color: #9aa5b1; font-size: 10px; margin-top: 3px; }
+  .mapcard-name { font-weight: 600; font-size: 11.5px; color: var(--host-text); }
+  .mapcard-sub { color: var(--host-text-dim); font-size: 10px; }
+  .mapcard-nums { color: var(--host-text-soft); font-size: 10px; margin-top: 3px; }
   .mapfoot { display: flex; }
 
   .mirror {
     display: flex; gap: 12px; padding: 10px; margin-top: 2px;
-    border: 1px solid #2a333d; border-radius: 5px; background: #101315; flex-wrap: wrap;
+    border: 1px solid var(--host-line-soft); border-radius: 5px; background: var(--host-bg-deep); flex-wrap: wrap;
   }
   /* The screen is drawn as a screen — a character grid in its own phosphor — because that is
      what somebody is checking against, and a styled HTML list would not be it. */
@@ -1528,8 +1616,8 @@
   }
   button.enc.act { border-color: #4a86bd; background: #7fb4e014; }
   button.enc.inert { opacity: 0.45; }
-  .enc-n { font: 600 8.5px/1 ui-monospace, monospace; color: #66707b; letter-spacing: 0.06em; }
-  .enc-v { font-size: 10.5px; color: #9aa5b1; overflow: hidden; text-overflow: ellipsis;
+  .enc-n { font: 600 8.5px/1 ui-monospace, monospace; color: var(--host-text-dim); letter-spacing: 0.06em; }
+  .enc-v { font-size: 10.5px; color: var(--host-text-soft); overflow: hidden; text-overflow: ellipsis;
            white-space: nowrap; max-width: 100%; }
   button.enc.act .enc-v { color: #7fb4e0; }
   .padgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
@@ -1538,29 +1626,101 @@
     white-space: nowrap; background: #7fb4e014; border-color: #4a86bd66;
   }
   button.pad.dim { opacity: 0.45; }
-  .mirror-note { color: #66707b; font-size: 10.5px; line-height: 1.5; }
+  .mirror-note { color: var(--host-text-dim); font-size: 10.5px; line-height: 1.5; }
   .mirror-note b { color: #d9a13c; font-weight: 600; }
 
   .audition {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding: 8px 10px; margin-top: 2px;
-    border: 1px solid #2a333d; border-radius: 5px; background: #101315;
+    border: 1px solid var(--host-line-soft); border-radius: 5px; background: var(--host-bg-deep);
   }
   button.play {
     width: 26px; height: 26px; padding: 0; border-radius: 50%;
     background: #7fb4e01f; border-color: #4a86bd; color: #7fb4e0; font-size: 11px;
   }
   .now { display: flex; flex-direction: column; gap: 1px; min-width: 190px; }
-  .now-name { font-weight: 600; font-size: 12px; color: #d6dbe0; }
-  .now-stage { display: flex; align-items: center; gap: 5px; color: #7d8894; font-size: 10.5px; }
-  .pip { width: 7px; height: 7px; border-radius: 50%; background: #3b4652; flex: 0 0 7px; }
+  .now-name { font-weight: 600; font-size: 12px; color: var(--host-text); }
+  .now-stage { display: flex; align-items: center; gap: 5px; color: var(--host-text-dim); font-size: 10.5px; }
+  .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--host-line); flex: 0 0 7px; }
   .pip.snap { background: #7fb4e0; }
   .pip.live { background: #35c46f; }
   .pip.none { background: #566372; }
   .phrase { display: flex; align-items: center; gap: 4px; }
   .phrase-label {
-    color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--host-text-dim); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
     margin-right: 2px;
   }
-  .cache { margin-left: auto; color: #66707b; font-size: 10.5px; }
+  .cache { margin-left: auto; color: var(--host-text-dim); font-size: 10.5px; }
+
+  /* Dock layout: the results scroll while the toolbar, target and load actions stay put. */
+  .browser { flex: 1; height: 100%; min-width: 0; margin: 0; padding: 0; gap: 0; border: 0;
+             border-radius: 0; background: var(--host-surface, #171a1d); position: relative; overflow: hidden; }
+  .browser .head { flex: none; padding: 7px 10px; gap: 6px; border-bottom: 1px solid var(--host-line, #3b4652); }
+  .browser .search { min-width: 130px; width: 130px; }
+  .browser select { background: var(--host-bg-deep, #14171a); color: var(--host-text, #d6dbe0);
+                    border: 1px solid var(--host-line, #3b4652); border-radius: 4px; font: inherit;
+                    font-size: 12px; padding: 4px 6px; min-width: 0; max-width: 160px; height: 29px; }
+  .browser .head button, .browser .head input { height: 29px; box-sizing: border-box; }
+  .browser .body { flex: 1; min-height: 0; gap: 0; position: relative; flex-direction: row; }
+  .browser .main { min-height: 0; gap: 0; overflow: hidden; }
+  .browser .facets { max-height: 140px; min-height: 0; overflow-y: auto; flex: 0 1 auto; padding: 8px 10px; border-bottom: 1px solid var(--host-line, #3b4652); }
+  .rail-setting, .browser .rail-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .rail-setting { font-size: 12px; margin-top: 5px; }
+  .browser .rail-head { font-size: 11px; }
+  .browser .inspector { width: 240px; flex: 0 0 240px; min-height: 0; max-height: none; overflow-y: auto;
+                       padding: 10px; border-left: 1px solid var(--host-line, #3b4652); border-top: 0;
+                       background: var(--host-surface, #1d232b); box-sizing: border-box; }
+  .preset-list { flex: 1; min-height: 32px; overflow-y: auto; overflow-x: hidden; position: relative; }
+  .preset-heading { display: grid; grid-template-columns: 30px minmax(100px, 1.7fr) minmax(90px, 1fr) minmax(70px, .8fr) 60px;
+                    gap: 6px; padding: 5px 10px; font-size: 11px; color: var(--host-text-soft, #9aa5b1);
+                    background: var(--host-bg, #1d232b); border-bottom: 1px solid var(--host-line, #3b4652); flex: none; }
+  .preset-row { display: flex; gap: 6px; height: var(--preset-row-height); min-height: var(--preset-row-height);
+                box-sizing: border-box; border-bottom: 1px solid var(--host-line-soft, #2b333d); padding: 0 10px; }
+  .preset-row.sel { background: var(--host-selection, #243b37); box-shadow: inset 3px 0 var(--host-accent, #80d8bc); }
+  .preset-row.unavailable .preset-name { color: var(--host-text-dim, #7d8894); }
+  .browser.browser.browser.browser button.preset-star { width: 30px; flex: 0 0 30px; padding: 0; background: none; border: 0; border-radius: 0; color: var(--host-text-soft, #9aa5b1); }
+  .browser.browser.browser.browser button.preset-star[aria-pressed="true"] { color: var(--host-accent, #80d8bc); }
+  .browser.browser.browser.browser button.preset-pick { display: grid; grid-template-columns: minmax(100px, 1.7fr) minmax(90px, 1fr) minmax(70px, .8fr) 60px;
+                               gap: 6px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; border-radius: 0;
+                               text-align: left; align-items: center; color: var(--host-text-soft, #9aa5b1); font-size: 12px; }
+  .browser.browser.browser.browser button.preset-pick:hover:not(:disabled) { background: var(--host-surface-hover, #27323b); border: 0; }
+  .preset-pick > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preset-pick .preset-name { color: var(--host-text, #d6dbe0); }
+  .preset-kind { font-size: 11px; }
+  .browser .grid, .browser .mapwrap { flex: 1; min-height: 0; overflow-y: auto; max-height: none; padding: 8px; }
+  .browser .empty-hint { padding: 14px; }
+  .selection-bar { display: flex; align-items: center; flex: none; gap: 8px; padding: 7px 10px;
+                   border-top: 1px solid var(--host-line, #3b4652); background: var(--host-bg, #1d232b); }
+  .selection-info { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+  .selection-info strong { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .selection-info > span { font-size: 11px; color: var(--host-text-soft, #9aa5b1); overflow-wrap: anywhere; }
+  .audition-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+  .audition-toggle input { margin: 0; }
+  .load-selected { border-color: var(--host-accent, #80d8bc); color: var(--host-text, #d6dbe0); min-width: 70px; }
+  .browser-status { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                    min-height: 23px; padding: 2px 10px; color: var(--host-text-soft, #9aa5b1); font-size: 11px;
+                    border-top: 1px solid var(--host-line-soft, #2b333d); }
+  .browser-status button { padding: 0 5px; }
+  .browser .audition { flex: none; padding: 6px 10px; flex-wrap: wrap; gap: 6px; }
+  .browser .mirror { max-height: 130px; overflow: auto; flex: none; }
+  @container (max-width: 760px) {
+    .browser .inspector { position: absolute; right: 0; top: 0; bottom: 0; z-index: 3; width: 240px; max-width: 100%; }
+    .browser .preset-category { display: none; }
+    .preset-heading { grid-template-columns: 30px minmax(100px, 1.7fr) minmax(85px, 1fr) 60px; }
+    .browser.browser.browser.browser button.preset-pick { grid-template-columns: minmax(100px, 1.7fr) minmax(85px, 1fr) 60px; }
+  }
+  @container (max-width: 500px) {
+    .browser .search { flex-basis: 100%; }
+    .browser .head { gap: 4px; }
+    .browser select { max-width: 115px; }
+    .browser .head button { padding-left: 5px; padding-right: 5px; }
+    .selection-bar { flex-wrap: wrap; gap: 5px; }
+    .selection-info { flex-basis: 100%; }
+    .audition-toggle { margin-right: auto; }
+    .preset-heading { grid-template-columns: 25px minmax(100px, 1.7fr) minmax(70px, 1fr); }
+    .preset-heading > span:last-child, .preset-kind { display: none; }
+    .browser.browser.browser.browser button.preset-pick { grid-template-columns: minmax(100px, 1.7fr) minmax(70px, 1fr); }
+    .browser.browser.browser.browser button.preset-star { width: 25px; flex-basis: 25px; }
+    .browser-status { flex-wrap: wrap; }
+  }
 </style>

@@ -481,8 +481,13 @@ test('a choice parameter reads as its label, not as the bottom of a range it has
   assert.equal(parameterInfo(wave, 2).text, 'Noise');
   // Unset falls back to the parameter's default, as every other kind does.
   assert.equal(parameterInfo(wave, undefined).text, 'Saw');
-  // A value the profile does not have is position 0 rather than a wrong label.
-  assert.equal(parameterInfo(wave, 'triangle').text, '');
+  // An unknown wire value must not masquerade as the first choice.
+  const unknown = parameterInfo(wave, 'triangle');
+  assert.equal(unknown.present, false);
+  assert.equal(unknown.text, '');
+  for (const show of ['value', 'pct', 'bar', 'midiValue']) {
+    assert.equal(resolveZoneContent({ show }, unknown, 8), '', show);
+  }
 });
 
 test('an inert zone that painted nothing does not swallow the soft key underneath it', () => {

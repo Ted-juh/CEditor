@@ -357,6 +357,14 @@ EffectSlot* Performance::findEffect (const juce::String& effectId, juce::String*
                 return &slot;
             }
 
+    for (auto& bus : buses)
+        for (auto& slot : bus.effects)
+            if (slot.effectId == effectId)
+            {
+                if (chainIdOut != nullptr) *chainIdOut = bus.busId;
+                return &slot;
+            }
+
     return nullptr;
 }
 
@@ -555,6 +563,8 @@ juce::var Performance::toVar() const
             s->setProperty ("midiCc",      slot.midiCc);
             s->setProperty ("midiChannel", slot.midiChannel);
             s->setProperty ("midiNote",    slot.midiNote);
+            s->setProperty ("midiPickup",  slot.midiPickup);
+            s->setProperty ("midiRelative", slot.midiRelative);
             s->setProperty ("latched",     slot.latched);
             slotVars.add (juce::var (s));
         }
@@ -1562,6 +1572,8 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                     slot.midiCc      = juce::jlimit (-1, 127, (int) s.getProperty ("midiCc", -1));
                     slot.midiChannel = juce::jlimit (0, 16, (int) s.getProperty ("midiChannel", 0));
                     slot.midiNote    = juce::jlimit (-1, 127, (int) s.getProperty ("midiNote", -1));
+                    slot.midiPickup  = (bool) s.getProperty ("midiPickup", false);
+                    slot.midiRelative = (bool) s.getProperty ("midiRelative", false);
                     slot.latched     = (bool) s.getProperty ("latched", false);
                     page.slots.add (std::move (slot));
                 }

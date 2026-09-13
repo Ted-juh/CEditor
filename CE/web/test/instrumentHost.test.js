@@ -166,6 +166,13 @@ test('normalizeHostState shapes garbage into the structure the view renders', ()
   assert.deepEqual(normalizeHostState('nonsense'), emptyHostState());
 });
 
+test('native edit history fails closed and retains the action and blocking reason', () => {
+  const state = normalizeHostState({ editHistory: { canUndo: 'yes', canRedo: true,
+    undoLabel: 'Remove part', redoLabel: 'Move part', blockedReason: 'Wait for plug-in loading to finish.' } });
+  assert.deepEqual(state.editHistory, { canUndo: false, canRedo: true,
+    undoLabel: 'Remove part', redoLabel: 'Move part', blockedReason: 'Wait for plug-in loading to finish.' });
+});
+
 test('filterInstruments matches name and vendor, case-insensitively', () => {
   const instruments = normalizeHostState({
     instruments: [
@@ -4202,4 +4209,22 @@ test('mock reducer: a panic forgets the stuck notes that reached the part; dismi
   const key = midi().issues.find((i) => i.kind === 'programChange').key;
   dismissMidiIssue(key);
   assert.equal(midi().issues.length, 0, 'dismissing removes the one fact you read');
+});
+
+
+test('vendor sources and background scan state survive library normalization', () => {
+  const library = normalizeHostLibrary({ scanning: true,
+    scanReport: [{ name: 'Effect', kind: 'Effect', count: 2, reason: '' }], records: [
+    { recordId: 'n', sourceType: 'nksf', instrument: 'Massive X', available: true },
+    { recordId: 'v', sourceType: 'fxp', instrument: 'Vanguard', available: true },
+    { recordId: 's', sourceType: 'spire', instrument: 'Spire', available: true },
+    { recordId: 'e', sourceType: 'programList', isEffect: true, available: true },
+  ] });
+  assert.equal(library.scanning, true);
+  assert.deepEqual(library.records.map((record) => record.sourceType), ['nksf', 'fxp', 'spire', 'programList']);
+  assert.equal(library.records[3].isEffect, true);
+  assert.equal(library.scanReport[0].count, 2);
+  assert.deepEqual(normalizeHostLibrary({}).scanReport, []);
+  assert.ok(library.records.every((record) => record.available));
+  assert.equal(normalizeHostLibrary({}).scanning, false);
 });

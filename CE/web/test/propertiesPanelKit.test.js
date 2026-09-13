@@ -52,15 +52,19 @@ test('every .val rule takes its metrics from the panel tokens, not from literals
   assert.deepEqual(offenders, []);
 });
 
-test('the tokens are declared once, on the panel root', () => {
+test('the panel and compact docks share one property theme', () => {
   const panel = read('panels/PropertiesPanel.svelte');
+  const theme = read('properties/propertyTheme.css');
+  assert.match(panel, /import '\.\.\/properties\/propertyTheme\.css'/);
+  assert.match(panel, /class="properties-panel property-theme"/);
   for (const token of ['--pp-field-height', '--pp-field-padding', '--pp-field-radius',
                        '--pp-field-bg', '--pp-field-border', '--pp-field-fg', '--pp-field-font']) {
-    assert.match(panel, new RegExp(`${token}:`), `${token} must be defined on .properties-panel`);
+    assert.match(theme, new RegExp(`${token}:`), `${token} must be defined in the shared theme`);
+    assert.doesNotMatch(panel, new RegExp(`${token}:`), `${token} must not fork the shared theme`);
   }
   // 26px is PropertyToggle's height; a field that does not match it will not line up beside one.
   // The toggle now reads the token rather than repeating the number, which is the point.
-  assert.match(panel, /--pp-field-height:\s*26px/);
+  assert.match(theme, /--pp-field-height:\s*26px/);
   assert.match(read('properties/PropertyToggle.svelte'), /height: var\(--pp-field-height, 26px\)/);
 });
 
@@ -190,8 +194,12 @@ test('the shared control widgets exist and are token-driven and border-box', () 
 // Six ways to render a boolean, nine files mixing two of them in one view. All of them are
 // PropertyToggle now; this fails on the seventh way.
 
-test('no section editor renders a raw checkbox any more', () => {
-  const offenders = sections.filter((f) => /type=['"]checkbox['"]/.test(read(`sections/${f}`)));
+test('property-kit section editors use PropertyToggle for booleans', () => {
+  // Host workspaces share this directory but use their own controls and theme.
+  const offenders = sections.filter((f) => {
+    const source = read(`sections/${f}`);
+    return /<Property(?:Cell|Section)\b/.test(source) && /type=['"]checkbox['"]/.test(source);
+  });
   assert.deepEqual(offenders, [], 'use PropertyToggle — it has a compact form for chips and cells');
 });
 
@@ -251,8 +259,9 @@ test('an unlabelled cell does not reserve the label strip', () => {
 
 // --- Step 5: no editor cancels the shared grid ---------------------------------------------------
 
-test('nothing overrides .property-grid from inside a section', () => {
-  const offenders = sections.filter((f) => /:global\(\.property-grid\)/.test(read(`sections/${f}`)));
+test('section grid overrides are restricted to compact display docks', () => {
+  const offenders = sections.filter((f) => [...read(`sections/${f}`).matchAll(/([^{}]+):global\(\.property-grid\)\s*\{/g)]
+    .some((match) => !/\.(screen-dock-editor|dock-basics|dock-font|dock-wide)\b/.test(match[1])));
   assert.deepEqual(offenders, [], 'BackgroundEditor turned the 4-column grid into a flex column');
 });
 

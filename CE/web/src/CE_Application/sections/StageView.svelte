@@ -1,13 +1,15 @@
 <script>
   /** The calm, locked-down reading of the rig used while playing. */
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import HostPickupIndicator from './HostPickupIndicator.svelte';
   import {
     hostState, hostSurface, hostMidiActivity, hostLastError, hostPanic,
+    hostSurfaceLayout, hostAudioDevices, requestSurfaceLayout, requestAudioDevices,
     setlistPrev, setlistNext, transportPlay, transportStop,
   } from '../stores/instrumentHost.js';
   import { noteName } from '../utils/pianoGeometry.js';
   import {
-    changedSurfaceSlot, stageSetlistContext, stageSurfaceModel, surfaceSlotForMidiActivity,
+    changedSurfaceSlot, stageSetlistContext, stageSurfaceModel, surfaceSlotForMidiActivity, stageControllerContext,
   } from '../utils/stageViewModel.js';
 
   let performance = $derived($hostState.performance);
@@ -17,6 +19,12 @@
     ? performance.scenes.find((scene) => scene.sceneId === setlist.current.sceneId) ?? null
     : null);
   let surface = $derived(stageSurfaceModel($hostState.rack, performance, $hostSurface));
+  let controller = $derived(stageControllerContext($hostSurfaceLayout, $hostAudioDevices, $hostSurface, $hostState.audio.enabled));
+  onMount(() => {
+    requestAudioDevices();
+    // Preserve the profile selected in Build; request its default only when none is loaded.
+    if (!$hostSurfaceLayout.profileId) requestSurfaceLayout();
+  });
   let activeParts = $derived($hostState.rack.parts.filter(
     (part) => part.hasInstrument || part.hardware || part.unresolved));
   let movingSlot = $state(-1);
@@ -54,13 +62,6 @@
     return `${audio.deviceName || 'Audio'} · ${Math.round(audio.cpu * 100)}% CPU`
       + (audio.xruns > 0 ? ` · ${audio.xruns} xruns` : '');
   };
-  const surfaceStatus = (state) => {
-    if (state === 'connected') return $hostSurface.device || 'CTRL49 connected';
-    if (state === 'connecting') return 'CTRL49 connecting';
-    if (state === 'heldElsewhere') return 'CTRL49 used by another instance';
-    if (state === 'failed') return 'CTRL49 unavailable';
-    return 'Looking for CTRL49';
-  };
 </script>
 
 <main class="stage" data-testid="host-stage-view">
@@ -69,11 +70,16 @@
       <span class="status-dot"></span>
       <span>{audioStatus($hostState.audio)}</span>
     </div>
-    <div class="status-item" class:good={$hostSurface.state === 'connected'}
-         class:warn={$hostSurface.state === 'heldElsewhere' || $hostSurface.state === 'failed'}>
+    <div class="status-item" class:good={controller.midiEnabled} title={controller.midiDetail} data-testid="stage-midi-status">
       <span class="status-dot"></span>
-      <span>{surfaceStatus($hostSurface.state)}</span>
+      <span>{controller.midiLabel}</span>
     </div>
+    {#if controller.displayLabel}
+      <div class="status-item" class:good={$hostSurface.state === 'connected'} class:warn={controller.displayWarning}
+           title={$hostSurface.detail || 'Optional hardware-display integration'} data-testid="stage-display-status">
+        <span class="status-dot"></span><span>{controller.displayLabel}</span>
+      </div>
+    {/if}
     {#if $hostLastError}
       <span class="stage-error" role="alert">
         <span>{$hostLastError}</span>
@@ -130,6 +136,13 @@
         <strong>{setlist.next.name}</strong>
         <span class="scene-name">{setlist.next.sceneName || 'Scene'}</span>
         {#if setlist.next.tempo > 0}<span>{setlist.next.tempo} BPM</span>{/if}
+        {#if setlist.nextReadiness}
+          <span class="next-readiness" class:ready={setlist.nextReadiness.state === 'ready'}
+                class:warn={setlist.nextReadiness.state === 'warning'} role="status"
+                title={setlist.nextReadiness.detail}
+                aria-label={`${setlist.nextReadiness.label}. ${setlist.nextReadiness.detail}`}
+                data-testid="stage-next-readiness">{setlist.nextReadiness.label}</span>
+        {/if}
       {:else}
         <strong>End of set</strong>
         <span class="scene-name">No following song</span>
@@ -166,9 +179,11 @@
       </div>
     </section>
 
-    <section class="stage-panel controls-panel" aria-label="CTRL49 controls">
+    <section class="stage-panel controls-panel" aria-label="Controls">
       <div class="panel-head">
-        <div><span class="eyebrow">CTRL49</span><strong>{surface.name}</strong></div>
+        <div><span class="eyebrow" data-testid="stage-controller-name"
+          title={controller.profileName ? `Selected controller profile: ${controller.profileName}` : 'Controls'}>
+          Controls{controller.profileName ? ` · ${controller.profileName}` : ''}</span><strong>{surface.name}</strong></div>
         <span class="page-count">PAGE {surface.pageIndex + 1} / {surface.pageCount}</span>
       </div>
       <div class="stage-controls">
@@ -184,6 +199,7 @@
               ? 'MOVING' : entry.partName || (entry.pending ? 'queued' : entry.active ? 'running' : '')}</span>
             <span class="control-value">
               {entry.assigned ? (entry.valueText || percent(entry.value)) : 'unassigned'}
+              <HostPickupIndicator direction={entry.pickupDirection} />
             </span>
             {#if entry.assigned && Number.isFinite(entry.value)}
               <span class="value-track"><span style={`width:${percent(entry.value)}`}></span></span>
@@ -210,8 +226,11 @@
     background: radial-gradient(circle at 50% -30%, #263441 0, #161b20 42%, #111519 100%);
     color: #e7edf2;
   }
-  .stage-status { display: flex; align-items: center; gap: 18px; min-height: 20px; }
-  .status-item { display: inline-flex; align-items: center; gap: 7px; color: #8f9ba5; font-size: 12px; }
+  .stage-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; min-height: 20px; }
+  .status-item { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: #8f9ba5; font-size: 12px; }
+  .status-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+  .status-dot { flex: none; }
+  .controls-panel .panel-head > div { min-width: 0; overflow-wrap: anywhere; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #64707a; box-shadow: 0 0 0 3px #64707a20; }
   .status-item.good .status-dot { background: #48c47a; box-shadow: 0 0 0 3px #48c47a20; }
   .status-item.warn { color: #e3b275; }
@@ -242,6 +261,9 @@
   .current-song { border-color: #497ba1; background: linear-gradient(135deg, #1c3344, #172128); }
   .current-song strong { font-size: 23px; }
   .next-song strong { font-size: 17px; color: #c2ccd3; }
+  .next-readiness { font-size: 12px; color: #a6b5c1; overflow-wrap: anywhere; }
+  .next-readiness.ready { color: #82bd8d; }
+  .next-readiness.warn { color: #e3b275; }
   .eyebrow { color: #82b3d8; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
   .scene-name { color: #8997a2; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .song-card p { margin: 2px 0 0; color: #c2cbd1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
