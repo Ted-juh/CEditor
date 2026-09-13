@@ -17,7 +17,8 @@
  *            fill attribute is what was ASKED for and a pixel is what happened.
  *   ports()  the fan-out values a multi-port control currently exposes: the actual numbers that
  *            reach a device parameter.
- *   notes()  every note the panel played, from the one funnel they all pass through.
+ *   notes()  every note the panel played, from the one funnel they all pass through, each
+ *            stamped with the moment it left — so a rhythm can be measured and not merely counted.
  *   reopen() serialise the panel to the on-disk format, deserialise it, and OPEN IT AS A PANEL, so
  *            the measurement afterwards goes through the real renderer over a real reload. A model
  *            round-trip that never reaches a renderer is not evidence that anything still works.
@@ -52,7 +53,7 @@ export async function boot({ width = 1700, height = 1000 } = {}) {
   await page.evaluate(async () => {
     const { noteOutputEvents } = await import('/src/CE_Application/stores/noteOutput.js');
     window.__notes = [];
-    noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push(e); });
+    noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push({ ...e, at: performance.now() }); });
   });
 
   const kit = new Kit(page, failures);
@@ -383,7 +384,7 @@ class Kit {
     await this.page.evaluate(async () => {
       const { noteOutputEvents } = await import('/src/CE_Application/stores/noteOutput.js');
       window.__notes = [];
-      noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push(e); });
+      noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push({ ...e, at: performance.now() }); });
     });
 
     const newId = await this.page.evaluate(async ({ payload }) => {

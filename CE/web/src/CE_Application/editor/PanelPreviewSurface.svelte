@@ -3059,7 +3059,8 @@
   const ARP_PAD = 8;
   const arpPhaseState = {};     // id -> phase 0..1 across the whole sequence
   const arpLastIdx = {};
-  const arpMaskStep = {};   // id -> free-running step number, for the Euclidean mask
+  const arpCycles = {};         // id -> how many times the phase has been round
+  const arpLastStep = {};       // id -> the free-running step number last acted on
   const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
@@ -3199,6 +3200,8 @@
         if (!seq.length) {                       // nothing held — park at the start
           arpPhaseState[id] = 0;
           arpLastIdx[id] = -1;
+          arpCycles[id] = 0;
+          delete arpLastStep[id];
           // Forget the synced reading too, or the first frame after notes come
           // back would "catch up" every step of the silence.
           delete arpBeatsState[id];
@@ -3211,15 +3214,29 @@
         arpPhaseState[id] = phase;
         raiseComponentCycle(c, phase, prev);
         const idx = stepIndexAt(phase, seq.length);
-        if (arpLastIdx[id] !== idx) {
+        // A FREE-RUNNING ARP HAS NO STEP NUMBER — it reads a position out of a phase, and a
+        // position has no history. Counting the times the phase has been round gives it one, and
+        // that number does two jobs a bare index cannot:
+        //
+        //   it retriggers. A one-slot sequence — a block chord, or a single held note — sits at
+        //   index 0 for ever, so "fire when the index changes" fired once and then never again:
+        //   `pattern: 'chord'` sounded one chord and fell silent for the rest of the session.
+        //
+        //   it is what a Euclidean rhythm is measured in. Reduced to the sequence, the mask could
+        //   only ever be read as far as the note set is long, and most of a rhythm was unreachable.
+        //
+        // Derived from the wrap count rather than incremented per fire, so a frame that arrives
+        // late leaves the rhythm where the clock says it should be instead of where the frames got
+        // to. It does not fire the steps it slept through — only a synced Arp catches up, because
+        // only a synced Arp has a bar to catch up to.
+        if (phase < prev) arpCycles[id] = (arpCycles[id] ?? 0) + 1;
+        const global = (arpCycles[id] ?? 0) * seq.length + idx;
+        if (arpLastStep[id] !== global) {
           arpLastIdx[id] = idx;
-          // A free-running Arp has no step number of its own — it reads one out of a phase — so the
-          // Euclidean mask needs a counter kept for it. Without one the mask could only ever be read
-          // as far as the note set is long, and most of a rhythm was unreachable.
-          arpMaskStep[id] = (arpMaskStep[id] ?? -1) + 1;
+          arpLastStep[id] = global;
           // A muted step is not a step that fired, so it raises nothing — the event follows the
           // notes, which is what a script lighting an LED off it wants.
-          if (stepFires(live, idx, arpMaskStep[id])) {
+          if (stepFires(live, idx, global)) {
             arpFireStep(c, seq[idx], idx);
             raiseComponent(c, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
           }

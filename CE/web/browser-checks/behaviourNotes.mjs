@@ -10,6 +10,9 @@
  */
 import assert from 'node:assert/strict';
 import { boot, Ledger } from './behaviourKit.mjs';
+// The rhythm checks assert the emitted onsets against the SAME mask the product builds, rather than
+// against a count. arpLayout is plain maths with no Svelte or DOM in it, so node imports it directly.
+import { euclid } from '../src/CE_Application/utils/arpLayout.js';
 
 const kit = await boot();
 const led = new Ledger('notes');
@@ -1110,6 +1113,38 @@ try {
       const updown = (await runFor(1400)).map((e) => e.note);
       led.check(A, "pattern 'updown'", 'up and back again turns round rather than repeating the climb',
         true, updown.length > 3 && new Set(updown).size < updown.length);
+
+      // BLOCK CHORD, AND IT HAS TO KEEP COMING. 'chord' is the one pattern whose sequence is a
+      // single step, so it is the one that catches a tick gated on the step index changing: the
+      // index sits at 0 for ever, the gate never opens again, and the arp sounds one chord and
+      // falls silent for the rest of the session. Counting the notes cannot see it — one triad is
+      // three note-ons, which is not zero — so what is measured is how many separate MOMENTS
+      // notes left at, and how far apart they were.
+      await kit.set(aid, { 'Arp.pattern': 'chord', 'Arp.rate': 8 });
+      // A throwaway lap first, and not for tidiness. Changing the pattern changes the LENGTH of the
+      // sequence — 'updown' walks four steps, 'chord' one — so the first tick after the change is a
+      // legitimate retrigger wherever the old phase happened to be parked, and it can land a few
+      // milliseconds before the wrap that follows it. That is the pattern change being heard, not
+      // the rhythm; one short lap settles it so the measured window is the steady state.
+      await runFor(300);
+      const block = await runFor(1600);
+      // Grouped by a gap, not by a rounded timestamp: the three notes of one chord are three
+      // separate publishes a fraction of a millisecond apart, and rounding can land two of them on
+      // either side of a boundary. A step here is 125ms, so 40ms separates "same chord" from "next
+      // chord" with room to spare either way.
+      const fires = [];
+      for (const e of block) {
+        const last = fires[fires.length - 1];
+        if (!last || e.at - last.at > 40) fires.push({ at: e.at, notes: 1 });
+        else last.notes += 1;
+      }
+      const chordGaps = fires.slice(1).map((f, i) => f.at - fires[i].at);
+      led.check(A, "pattern 'chord' (retriggers)", 'a block chord sounds again every step, not once and then never',
+        true, fires.length >= 8);
+      led.check(A, "pattern 'chord' (on the clock)", 'and lands a step apart — eight a second is 125ms',
+        true, chordGaps.length >= 6 && chordGaps.every((g) => Math.abs(g - 125) <= 45));
+      led.check(A, "pattern 'chord' (the whole chord each time)", 'every one of those moments is the three notes together',
+        true, fires.length > 0 && fires.every((f) => f.notes === 3));
       await kit.set(aid, { 'Arp.pattern': 'up' });
     }
 
@@ -1226,29 +1261,89 @@ try {
       // position in the sequence the arpeggiator fell silent while the properties panel drew the
       // eight-step pattern in full. Indexed by the free-running step number, the emitted rhythm is
       // the configured one and the density follows pulses/steps.
-      const density = async (steps, pulses, ms, rate) => {
+      const RATE = 10;
+      const WINDOW = 2400;                       // ≈ 24 steps
+      /**
+       * The emitted rhythm as STEP NUMBERS, not as a count.
+       *
+       * A count is a weak assertion and root said so: 2 of 8 over 24 steps is "about 6", a
+       * tolerance of ±2 accepts 4 through 8, and a tolerance that accepts zero accepts silence —
+       * the very failure the mask fix was about. Worse, any count at all is satisfied by a
+       * completely wrong pattern with the right density: an evenly-spaced 3-in-8 and the Euclidean
+       * 3-in-8 emit the same number of notes and do not sound remotely alike.
+       *
+       * So each fire is placed on the step grid the rate defines — a fire is one moment however
+       * many notes it sounds, so a block chord collapses to one — and the OFFSETS between fires
+       * are what gets compared to the mask.
+       */
+      const rhythm = async (steps, pulses, ms = WINDOW, rate = RATE) => {
         await kit.set(aid, { 'Arp.euclidEnabled': true, 'Arp.euclidSteps': steps,
           'Arp.euclidPulses': pulses, 'Arp.rate': rate });
         const played = await runFor(ms);
-        return played.length;
+        if (!played.length) return { notes: 0, fires: [], gaps: [] };
+        const t0 = played[0].at;
+        const fires = [...new Set(played.map((e) => Math.round((e.at - t0) / (1000 / rate))))]
+          .sort((a, b) => a - b);
+        return { notes: played.length, fires, gaps: fires.slice(1).map((f, i) => f - fires[i]) };
       };
-      const RATE = 10;
-      const WINDOW = 2400;                       // ≈ 24 steps
-      const expected = (pulses, steps) => Math.round((WINDOW / 1000) * RATE * (pulses / steps));
-      const twoOfEight = await density(8, 2, WINDOW, RATE);
+      /**
+       * Does this set of onsets ARE the configured mask, wherever the window happened to open?
+       *
+       * The window opens at an arbitrary point in the cycle, so the onsets are some rotation of the
+       * pulse positions; every rotation is tried and one has to match exactly. Exactly, not mostly:
+       * a rotation under which every observed onset lands on a pulse AND every pulse in the covered
+       * span produced an onset. Half a rhythm is not the rhythm.
+       */
+      const matchesMask = (fires, steps, pulses) => {
+        const mask = euclid(steps, pulses, 0);
+        if (fires.length < 2) return false;
+        const span = fires[fires.length - 1] - fires[0];
+        for (let phase = 0; phase < steps; phase += 1) {
+          let ok = true;
+          const wanted = [];
+          for (let s = 0; s <= span; s += 1) if (mask[(s + phase) % steps]) wanted.push(s);
+          const got = fires.map((f) => f - fires[0]);
+          if (wanted.length !== got.length) ok = false;
+          else for (let i = 0; i < wanted.length; i += 1) if (wanted[i] !== got[i]) { ok = false; break; }
+          if (ok) return true;
+        }
+        return false;
+      };
+
+      // THE WHOLE MASK, AGAINST A SHORTER NOTE SET. euclid(8, 2) fires on steps 3 and 7; a
+      // three-note chord reaches 0, 1, 2 — so with the mask indexed by position in the sequence the
+      // arpeggiator fell silent while the properties panel drew the eight-step pattern in full.
+      const twoOfEight = await rhythm(8, 2);
       led.check(A, 'euclidSteps beyond the note count', 'a three-note chord plays the whole eight-step rhythm, and is not silenced by it',
-        true, twoOfEight > 0);
-      led.check(A, 'euclid density (2 of 8)', 'about a quarter of the steps fire',
-        expected(2, 8), twoOfEight, (a, b) => Math.abs(a - b) <= 2);
-      const sixOfEight = await density(8, 6, WINDOW, RATE);
-      led.check(A, 'euclid density (6 of 8)', 'and three quarters of them when the mask is fuller',
-        expected(6, 8), sixOfEight, (a, b) => Math.abs(a - b) <= 3);
-      led.check(A, 'euclid density (ordering)', 'a fuller mask is always denser than a sparse one',
-        true, sixOfEight > twoOfEight);
-      const oneOfSixteen = await density(16, 1, WINDOW, RATE);
-      led.check(A, 'euclid over a long mask (1 of 16)', 'a sixteen-step rhythm is read in full too, on the same three notes',
-        expected(1, 16), oneOfSixteen, (a, b) => Math.abs(a - b) <= 2);
-      await kit.set(aid, { 'Arp.euclidEnabled': false, 'Arp.euclidSteps': 8, 'Arp.euclidPulses': 5 });
+        true, twoOfEight.notes > 0 && twoOfEight.fires.length >= 4);
+      led.check(A, 'euclid rhythm (2 of 8)', 'the onsets are the eight-step mask itself, four steps apart',
+        true, matchesMask(twoOfEight.fires, 8, 2) && twoOfEight.gaps.every((g) => g === 4));
+
+      // 3 OF 8 IS THE ONE THAT SEPARATES PLACEMENT FROM DENSITY. Euclid spreads it 3–3–2 — the
+      // tresillo — while an evenly-spaced three-in-eight would be 2.67 apart and emit exactly the
+      // same number of notes. A density check cannot tell the two apart; this one can.
+      const threeOfEight = await rhythm(8, 3);
+      led.check(A, 'euclid rhythm (3 of 8)', 'three pulses in eight land 3–3–2 apart, not evenly spread',
+        true, matchesMask(threeOfEight.fires, 8, 3));
+      led.check(A, 'euclid rhythm (3 of 8, the gaps themselves)', 'every gap is two or three steps and no three consecutive gaps sum to anything but eight',
+        true, threeOfEight.gaps.length >= 3 && threeOfEight.gaps.every((g) => g === 2 || g === 3)
+          && threeOfEight.gaps.slice(2).every((_, i) => threeOfEight.gaps[i] + threeOfEight.gaps[i + 1] + threeOfEight.gaps[i + 2] === 8));
+
+      const sixOfEight = await rhythm(8, 6);
+      led.check(A, 'euclid rhythm (6 of 8)', 'a fuller mask is the fuller mask, onset for onset',
+        true, matchesMask(sixOfEight.fires, 8, 6));
+      led.check(A, 'euclid density (ordering)', 'and is audibly denser than the sparse one',
+        true, sixOfEight.fires.length > twoOfEight.fires.length);
+
+      // A MASK LONGER THAN THE WINDOW IS INTERESTING for the opposite reason: 1 in 16 at ten steps
+      // a second is a note every 1.6 seconds, so the window has to be long enough to contain two of
+      // them or "silent" and "correct" look the same. Two onsets exactly sixteen steps apart is the
+      // whole claim — a mask read only as far as a triad reaches would give none at all.
+      const oneOfSixteen = await rhythm(16, 1, 5200, RATE);
+      led.check(A, 'euclid over a long mask (1 of 16)', 'a sixteen-step rhythm sounds, and sounds every sixteenth step',
+        true, oneOfSixteen.fires.length >= 2 && oneOfSixteen.gaps.every((g) => g === 16));
+      await kit.set(aid, { 'Arp.euclidEnabled': false, 'Arp.euclidSteps': 8, 'Arp.euclidPulses': 5,
+        'Arp.rate': 8 });
     }
 
     // --- latch ------------------------------------------------------------------------------------------------------------
@@ -1302,15 +1397,33 @@ try {
         const { 'stroke-width': _sw, ...geometry } = rest;
         return geometry;
       }));
-      const headIndex = (g) => g.findIndex((n) => n.tag === 'rect' && n.fill === headAccent);
+      // WHICH STEP the head is on, absolutely — not which array index a fill happened to land at.
+      // The cell wells are the only rects the renderer draws with rx=4, one per step in order, and
+      // the head is the one stroked in the accent (at stroke-width 2 while the rest are 1). The
+      // head's own NOTE BLOCK is filled in the accent too, but its height tracks the pitch, so it
+      // is the wrong shape to count positions with — an earlier version of this check looked for
+      // the fill and could not tell where in the lane it had found it.
+      const wells = (g) => g.filter((n) => n.tag === 'rect' && n.rx === 4);
+      const headStep = (g) => wells(g).findIndex((n) => n.stroke === headAccent);
+      // WHERE THE HEAD IS PARKED IS ARRANGED, NOT HOPED FOR. A run stops wherever the clock happened
+      // to be, including on the first step, and "the head moved" asserted against chance is an
+      // assertion that will one day report a bug that is not there. Short bursts until it is
+      // demonstrably off the first step, then the save.
+      for (let attempt = 0; attempt < 12 && headStep(await kit.geo(aid)) <= 0; attempt += 1) {
+        await kit.set(aid, { 'Arp.running': true });
+        await kit.settle(70);
+        await kit.set(aid, { 'Arp.running': false });
+        await kit.settle(90);
+      }
       const beforeGeo = await kit.geo(aid);
       const again = await kit.reopen(aid);
       const afterGeo = await kit.geo(again);
       led.check(A, 'save/reopen (drawing)', 'every step cell, bar and note name returns identical',
         shape(beforeGeo), shape(afterGeo));
       led.check(A, 'save/reopen (the playhead is not restored)',
-        'the arpeggiator had run to a later step before the save and a reopened one starts at the first',
-        true, headIndex(beforeGeo) !== headIndex(afterGeo));
+        'the arpeggiator had run past the first step before the save, and a reopened one is back on it',
+        { parkedOffTheFirstStep: true, reopenedOnTheFirstStep: true },
+        { parkedOffTheFirstStep: headStep(beforeGeo) > 0, reopenedOnTheFirstStep: headStep(afterGeo) === 0 });
       aid = again;
       await kit.preview(true);
       await kit.forget();
@@ -1401,6 +1514,186 @@ try {
     for (const n of cMajor) await sendMidi(midiOn(4, n));
     led.check(C, 'echoChannel (matching)', 'and the watched channel still lights it', true, (await echoedPads()) >= 1);
     for (const n of cMajor) await sendMidi(midiOff(4, n));
+  }
+  await kit.preview(false);
+
+
+  // =============================================================================================
+  // SPLIT ZONE — 16 properties. An input router: a note arrives, a zone claims it, and what leaves
+  // is on that zone's channel, transposed and re-curved. The routed OUTPUT is the measurement.
+  // =============================================================================================
+  await kit.fresh();
+  await kit.preview(true);
+  {
+    const Z = 'SplitZone';
+    const zone = (over = {}) => ({ id: 'z0', label: 'Bass', lowNote: 36, highNote: 59, channel: 1,
+      transpose: 0, curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 0,
+      velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+      bendMode: 'lastPlayed', pressureMode: 'lastPlayed', polyPressure: true,
+      enabled: true, colour: 'FF5B9BD5', ...over });
+    let zid = await kit.make(Z, { 'Transform.width': 520, 'Transform.height': 200,
+      'SplitZone.inputChannel': 0, 'SplitZone.unmatched': 'drop', 'SplitZone.passChannel': 1,
+      'SplitZone.lowNote': 36, 'SplitZone.highNote': 96,
+      'SplitZone.zones': [zone(), zone({ id: 'z1', label: 'Lead', lowNote: 60, highNote: 96,
+        channel: 2, colour: 'FF39D98A' })] });
+    const routed = async (note, { channel = 1, velocity = 100 } = {}) => {
+      await kit.forget();
+      await sendMidi(midiOn(channel, note, velocity));
+      const out = ons(await kit.notes());
+      await sendMidi(midiOff(channel, note));
+      return out;
+    };
+
+    // --- zones[].lowNote / highNote / channel: which zone claims a note ------------------------------
+    {
+      const low = await routed(40);
+      led.check(Z, 'zones[] (the low zone claims a low note)', 'a note in the first zone leaves on that zone channel',
+        { note: 40, channel: 1 }, { note: low[0]?.note, channel: low[0]?.channel });
+      const high = await routed(72);
+      led.check(Z, 'zones[] (the high zone claims a high note)', 'and a note in the second leaves on the other channel',
+        { note: 72, channel: 2 }, { note: high[0]?.note, channel: high[0]?.channel });
+    }
+
+    // --- zones[].transpose: what leaves is not what arrived --------------------------------------------
+    await kit.set(zid, { 'SplitZone.zones': [zone({ transpose: -12 }),
+      zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2, transpose: 7 })] });
+    {
+      led.check(Z, 'zones[].transpose (down)', 'the low zone sends an octave below what was played',
+        28, (await routed(40))[0]?.note);
+      led.check(Z, 'zones[].transpose (up)', 'and the high zone a fifth above',
+        79, (await routed(72))[0]?.note);
+    }
+    await kit.set(zid, { 'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+
+    // --- unmatched / passChannel: a note no zone wants ---------------------------------------------------
+    {
+      await kit.set(zid, { 'SplitZone.unmatched': 'drop' });
+      led.check(Z, "unmatched 'drop'", 'a note below every zone is dropped rather than passed on',
+        0, (await routed(30)).length);
+      await kit.set(zid, { 'SplitZone.unmatched': 'pass', 'SplitZone.passChannel': 8 });
+      const passed = await routed(30);
+      led.check(Z, "unmatched 'pass' + passChannel", 'and is passed through untouched on the pass channel',
+        { note: 30, channel: 8 }, { note: passed[0]?.note, channel: passed[0]?.channel });
+      await kit.set(zid, { 'SplitZone.unmatched': 'drop' });
+    }
+
+    // --- inputChannel ---------------------------------------------------------------------------------------
+    {
+      await kit.set(zid, { 'SplitZone.inputChannel': 0 });
+      led.check(Z, 'inputChannel (0 = omni)', 'a note on any channel is routed', 1, (await routed(40, { channel: 6 })).length);
+      await kit.set(zid, { 'SplitZone.inputChannel': 3 });
+      led.check(Z, 'inputChannel (pinned)', 'a note on another channel is ignored outright',
+        0, (await routed(40, { channel: 6 })).length);
+      led.check(Z, 'inputChannel (matching)', 'and the watched channel is routed as before',
+        1, (await routed(40, { channel: 3 })).length);
+      await kit.set(zid, { 'SplitZone.inputChannel': 0 });
+    }
+
+    // --- zones[].enabled ---------------------------------------------------------------------------------------
+    await kit.set(zid, { 'SplitZone.zones': [zone({ enabled: false }),
+      zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+    led.check(Z, 'zones[].enabled (false)', 'a disabled zone claims nothing', 0, (await routed(40)).length);
+    await kit.set(zid, { 'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+
+    // --- zones[].fixedVelocity / velLow / velHigh / curve -------------------------------------------------------
+    {
+      led.check(Z, "zones[].curve 'linear'", 'a linear curve over the full range forwards the played velocity untouched',
+        100, (await routed(40, { velocity: 100 }))[0]?.velocity);
+      // FIXED VELOCITY IS A CURVE, not an override that sits above the curve. `zoneVelocity` reads
+      // `fixedVelocity` only under `curve: 'fixed'`, which is what the editor's own curve menu
+      // selects — an earlier version of this check set the number and left the curve alone, and the
+      // played velocity came through untouched exactly as the code says it should.
+      await kit.set(zid, { 'SplitZone.zones': [zone({ curve: 'fixed', fixedVelocity: 64 }),
+        zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+      led.check(Z, "zones[].curve 'fixed' + fixedVelocity", 'every note leaves at the one velocity however hard it was played',
+        [64, 64], [(await routed(40, { velocity: 120 }))[0]?.velocity,
+          (await routed(44, { velocity: 12 }))[0]?.velocity]);
+      // soft and hard bend the same input in opposite directions: the curve is applied to
+      // (100-1)/126 and the result scaled back over the zone's range, so 0.7857^0.6 and 0.7857^1.7
+      // put velocity 100 at 110 and 85 against linear's 100.
+      const shaped = async (curve) => {
+        await kit.set(zid, { 'SplitZone.zones': [zone({ curve }),
+          zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+        return (await routed(40, { velocity: 100 }))[0]?.velocity;
+      };
+      const soft = await shaped('soft');
+      const hard = await shaped('hard');
+      led.check(Z, "zones[].curve 'soft' / 'hard'", 'a soft curve lifts a mid-hard note and a hard curve drops it',
+        [110, 85], [soft, hard]);
+      await kit.set(zid, { 'SplitZone.zones': [zone({ velLow: 20, velHigh: 60 }),
+        zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+      const squeezed = (await routed(40, { velocity: 127 }))[0]?.velocity;
+      const gentle = (await routed(40, { velocity: 1 }))[0]?.velocity;
+      led.check(Z, 'zones[].velLow / velHigh', 'the hardest note reaches the top of the narrowed range and the softest its floor',
+        [60, 20], [squeezed, gentle]);
+      await kit.set(zid, { 'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+    }
+
+    // --- zones[].velSwitchLow / velSwitchHigh: two zones on one key, split by how hard ------------------------------
+    {
+      await kit.set(zid, { 'SplitZone.zones': [
+        zone({ id: 'soft', lowNote: 36, highNote: 96, channel: 1, velSwitchLow: 1, velSwitchHigh: 63 }),
+        zone({ id: 'hard', lowNote: 36, highNote: 96, channel: 2, velSwitchLow: 64, velSwitchHigh: 127 })] });
+      led.check(Z, 'zones[].velSwitch (soft)', 'a gentle note goes to the zone that claims the low velocities',
+        1, (await routed(60, { velocity: 30 }))[0]?.channel);
+      led.check(Z, 'zones[].velSwitch (hard)', 'and a hard one to the other, on the same key',
+        2, (await routed(60, { velocity: 120 }))[0]?.channel);
+      await kit.set(zid, { 'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+    }
+
+    // --- lowNote / highNote / showHeader / showLabels / showGaps --------------------------------------------------------
+    {
+      const keys = async () => (await kit.shapes(zid, 'rect')).length;
+      const wide = await keys();
+      await kit.set(zid, { 'SplitZone.lowNote': 48, 'SplitZone.highNote': 72 });
+      led.check(Z, 'lowNote / highNote', 'a narrower drawn range is fewer keys', true, (await keys()) < wide);
+      await kit.set(zid, { 'SplitZone.lowNote': 36, 'SplitZone.highNote': 96 });
+
+      await kit.set(zid, { 'SplitZone.showLabels': true });
+      const named = await kit.texts(zid);
+      led.check(Z, 'showLabels (true)', 'the zone names are drawn on the bands',
+        true, named.includes('Bass') || named.includes('Lead'));
+      await kit.set(zid, { 'SplitZone.showLabels': false });
+      led.check(Z, 'showLabels (false)', 'and stop being drawn',
+        false, (await kit.texts(zid)).includes('Bass'));
+      await kit.set(zid, { 'SplitZone.showLabels': true });
+      const withHeader = (await kit.texts(zid)).length;
+      await kit.set(zid, { 'SplitZone.showHeader': false });
+      led.check(Z, 'showHeader', 'the header strip goes', true, (await kit.texts(zid)).length < withHeader);
+      await kit.set(zid, { 'SplitZone.showHeader': true });
+
+      // A gap is a key no zone claims: 36-59 and 60-96 leave none, so one is opened deliberately.
+      await kit.set(zid, { 'SplitZone.zones': [zone({ highNote: 47 }),
+        zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })], 'SplitZone.showGaps': true,
+        'SplitZone.gapColour': 'FF3A3A46' });
+      const gapsOn = (await kit.shapes(zid, 'rect')).filter((r) => r.fill === rgba('FF3A3A46')).length;
+      await kit.set(zid, { 'SplitZone.showGaps': false });
+      const gapsOff = (await kit.shapes(zid, 'rect')).filter((r) => r.fill === rgba('FF3A3A46')).length;
+      led.check(Z, 'showGaps', 'unclaimed keys are marked, and stop being marked when the flag is off',
+        true, gapsOn > 0 && gapsOff < gapsOn);
+      await kit.set(zid, { 'SplitZone.showGaps': true,
+        'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
+    }
+
+    led.unverified(Z, 'zones[].ccMode / ccList / sustain / bendMode / pressureMode / polyPressure',
+      'which controllers, sustain, bend and pressure each zone forwards',
+      'these route CONTROLLER traffic rather than notes; the note funnel does not carry it and the outbound '
+      + 'boundary capture root uses is the right instrument. Listed rather than claimed.');
+
+    // --- save and reopen, then route again -----------------------------------------------------------------------------
+    {
+      await kit.set(zid, { 'SplitZone.zones': [zone({ transpose: -12, channel: 4 }),
+        zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 5, transpose: 3 })] });
+      const beforeGeo = await kit.geo(zid);
+      const again = await kit.reopen(zid);
+      led.check(Z, 'save/reopen (drawing)', 'keys, bands and labels return identical',
+        JSON.stringify(beforeGeo), JSON.stringify(await kit.geo(again)));
+      zid = again;
+      await kit.preview(true);
+      const out = await routed(40);
+      led.check(Z, 'save/reopen (still routes)', 'a reopened splitter still transposes onto its own channel',
+        { note: 28, channel: 4 }, { note: out[0]?.note, channel: out[0]?.channel });
+    }
   }
   await kit.preview(false);
 

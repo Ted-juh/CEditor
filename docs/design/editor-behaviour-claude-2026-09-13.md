@@ -337,13 +337,81 @@ keeps a counter. The renderer asks a different question again — "will this cel
 with the two lengths cycling past each other every cell takes its turn, and dimming one would be
 drawing a rest that is not there.
 
-**Proven at the density, not just the presence.** Over a 24-step window a 2-of-8 mask fires about six
-times, a 6-of-8 mask about eighteen, and a 1-of-16 mask about one and a half — each within two notes
-of the arithmetic, all on a three-note chord. Reverting the surface line silences the 8-of-2 case
-again.
+**Proven at the placement, not at the count.** The first version of this measurement counted notes,
+and root was right to reject it: 2-of-8 over 24 steps is "about six", a tolerance of ±2 accepts four
+through eight, and a tolerance that accepts zero accepts the very silence the fix was about. Worse,
+a count is satisfied by a completely wrong pattern at the right density — an evenly-spaced 3-in-8
+and a Euclidean 3-in-8 emit the same number of notes and do not sound remotely alike.
 
-Root's call that this was a release bug rather than a design choice; the measurement and the fix
-followed it.
+So each fire is now placed on the step grid the rate defines, and the ONSETS are compared to the
+mask the product itself builds (`euclid()` is imported into the check), under every rotation, with
+an exact match required in both directions — every onset on a pulse, and every pulse in the covered
+span producing an onset:
+
+```
+euclid(8, 2)  pulses 3, 7      onsets exactly four steps apart, on a three-note chord
+euclid(8, 3)  pulses 2, 5, 7   onsets 3–3–2 — the tresillo, not 2.67 apart
+euclid(8, 6)  onset for onset against the fuller mask
+euclid(16, 1) two onsets, exactly sixteen steps apart, over a 5.2s window
+```
+
+3-of-8 is the row that separates placement from density, and 1-of-16 needed a window long enough to
+hold two onsets or "silent" and "correct" would have looked the same.
+
+### Two follow-ups from root's review of the first fix, both real
+
+**`stepEverFires` lit cells that never sound.** The renderer asks "will this cell ever fire?", and
+the first version answered "the lengths differ, so everyone gets a turn eventually". That is false
+whenever the lengths share a divisor: a four-note sequence against `euclid(8, 2)`, whose pulses are
+on 3 and 7, only ever fires cell 3 — both pulses are 3 modulo 4. Three rests were being drawn as
+hits. It now walks one full `lcm(len, mask.length)` cycle and answers by reachable residue.
+`test/arpLayout.test.js` pins the case root named, and checks it against the walk rather than
+against the arithmetic restated; reverting the helper fails it.
+
+**A one-slot sequence could not retrigger — see D-8.** That one turned out to be a separate bug,
+older than this fix, so it has its own entry.
+
+Root's call that the mask/sequence mismatch was a release bug rather than a design choice; the
+measurement and the fix followed it.
+
+---
+
+## D-8 — a block-chord arpeggiator sounded one chord and then fell silent
+
+**Fixed.** The free-running Arp tick in `PanelPreviewSurface.svelte`.
+
+Found while acting on root's review of D-7, which asked what happens when the sequence has one slot.
+It is worse than the review supposed: the arpeggiator does not merely fail to advance a counter, it
+stops playing.
+
+A free-running Arp has no step number. It reads a POSITION out of a phase — `stepIndexAt(phase,
+seq.length)` — and fired when that position changed. With one slot the position is 0 for ever:
+
+```
+pattern: 'chord'   → orderNotes returns [[all the notes]]   → seq.length === 1
+stepIndexAt(any phase, 1) === 0                              → the index never changes
+```
+
+**Measured**, rate 8, a triad, a 1.6-second window:
+
+```
+before   note-ons: 3     one chord, at t=0, and nothing after it for the rest of the session
+after    note-ons: 42    fourteen chords, 117–133ms apart (a step at rate 8 is 125ms)
+```
+
+`pattern: 'chord'` is the whole of the Chord (block) pattern — one of the seven the editor offers —
+and `source: 'input'` with a single key held reaches the same state. Counting notes cannot see it:
+one triad is three note-ons, which is not zero.
+
+**Fix.** The tick counts the times the phase has been round and derives a monotonic step number from
+it — `cycles * seq.length + idx` — which is both the retrigger gate and the number the Euclidean
+mask is measured in. Derived from the wrap count rather than incremented per fire, so a frame that
+arrives late leaves the rhythm where the clock says it should be rather than where the frames got
+to. It still does not fire the steps it slept through: only a synced Arp catches up, because only a
+synced Arp has a bar to catch up to.
+
+**Regression.** Three rows in `behaviourNotes.mjs` measure the MOMENTS notes left at rather than
+their number: fourteen separate fires, each 125ms ± 45 apart, each one the whole three-note chord.
 
 ---
 

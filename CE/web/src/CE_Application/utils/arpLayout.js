@@ -165,9 +165,14 @@ export function stepFires(control, stepIndex, maskIndex = stepIndex) {
 /**
  * Will this CELL ever fire? For the renderer, which draws one cell per note and has no step number.
  *
- * When the rhythm and the note set are the same length each cell has a fixed answer. When they are
- * not, every cell takes its turn on a pulse as the two cycle past each other, so dimming any of them
- * would be drawing a rest that is not there.
+ * The two lengths cycle past each other, so a cell fires if ANY step that lands on it also lands on
+ * a pulse — which is a question about residues, not about the lengths merely differing. "They are
+ * different lengths, so everything gets a turn eventually" is false whenever they share a divisor:
+ * a four-note sequence against euclid(8, 2), whose pulses are on steps 3 and 7, only ever fires
+ * cell 3, because 3 % 4 and 7 % 4 are both 3. Lighting all four would draw three rests as hits.
+ *
+ * So it walks one full cycle of the two together — lcm(len, mask.length) steps — and answers
+ * honestly. Both lengths are small (the mask caps at 64), so the walk is cheap.
  */
 export function stepEverFires(control, stepIndex, sequenceLength = 0) {
   const cfg = arpConfig(control);
@@ -177,8 +182,13 @@ export function stepEverFires(control, stepIndex, sequenceLength = 0) {
   const mask = euclid(cfg.euclidSteps ?? 8, cfg.euclidPulses ?? 5, cfg.euclidRotate ?? 0);
   if (!mask.length) return true;
   const len = Math.max(1, Math.round(num(sequenceLength, 0)));
-  if (len !== mask.length) return mask.some(Boolean);
-  return mask[((Math.round(num(stepIndex, 0)) % mask.length) + mask.length) % mask.length];
+  const cell = ((Math.round(num(stepIndex, 0)) % len) + len) % len;
+  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+  const cycle = (len * mask.length) / gcd(len, mask.length);
+  for (let step = cell; step < cycle; step += len) {
+    if (mask[step % mask.length]) return true;
+  }
+  return false;
 }
 
 // The step index at a phase, for a sequence of `length` steps.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   arpPattern, arpPhase, arpRate, arpBaseNotes, expandOctaves, orderNotes, arpSequence,
-  euclid, stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
+  euclid, stepFires, stepEverFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
   arpGeometry, arpCell, arpCellAt, arpVelocity, arpChannel, ARP_PATTERNS,
   toggleMute, midiNoteLabel, arpUseFlats, arpSource, arpSourceIsExternal, ARP_SOURCES,
   arpSynced, arpDivision, arpBeatsPerStep, syncedStepAt, syncedPhaseAt,
@@ -93,6 +93,54 @@ test('stepFires honours the euclid mask only when enabled', () => {
   for (let i = 0; i < 8; i += 1) assert.equal(stepFires(on, i), mask[i]);
   // it wraps past the mask length
   assert.equal(stepFires(on, 8), mask[0]);
+});
+
+test('stepFires reads the mask by the free-running step, not the sequence position', () => {
+  // euclid(8, 2) puts its pulses on steps 3 and 7. A three-note chord only ever reaches sequence
+  // positions 0, 1 and 2, so a mask read at the sequence position is a mask that never fires — the
+  // arpeggiator went silent while the panel drew the eight-step pattern in full. The two indices
+  // are separate arguments precisely so the caller can pass the step NUMBER for the mask.
+  const c = ap({ euclidEnabled: true, euclidSteps: 8, euclidPulses: 2, euclidRotate: 0 });
+  const mask = euclid(8, 2);
+  assert.deepEqual(mask.map((b, i) => (b ? i : null)).filter((i) => i !== null), [3, 7]);
+  for (let i = 0; i < 3; i += 1) assert.equal(stepFires(c, i), false, `position ${i} alone never fires`);
+  // Walked as a free-running rhythm against a three-note sequence, the configured pattern comes out.
+  const fired = [];
+  for (let step = 0; step < 16; step += 1) if (stepFires(c, step % 3, step)) fired.push(step);
+  assert.deepEqual(fired, [3, 7, 11, 15]);
+  // A hand mute is still read at the sequence position, whatever the mask says.
+  const muted = ap({ euclidEnabled: true, euclidSteps: 8, euclidPulses: 2, mutes: [0] });
+  assert.equal(stepFires(muted, 0, 3), false);
+  assert.equal(stepFires(muted, 1, 3), true);
+});
+
+test('stepEverFires answers about reachable residues, not about the lengths differing', () => {
+  // THE CASE THAT LOOKS LIKE IT SHOULD BE FINE AND IS NOT. Four notes against euclid(8, 2), whose
+  // pulses are on 3 and 7: both are 3 modulo 4, so cell 3 is the ONLY cell that ever sounds. An
+  // implementation reasoning "different lengths, so everyone gets a turn eventually" lights all
+  // four and draws three rests as hits.
+  const c = ap({ euclidEnabled: true, euclidSteps: 8, euclidPulses: 2, euclidRotate: 0 });
+  assert.deepEqual([0, 1, 2, 3].map((i) => stepEverFires(c, i, 4)), [false, false, false, true]);
+  // Confirmed against the walk itself rather than against the arithmetic being restated.
+  for (let cell = 0; cell < 4; cell += 1) {
+    let sounded = false;
+    for (let step = cell; step < 8 * 4; step += 4) if (euclid(8, 2)[step % 8]) sounded = true;
+    assert.equal(stepEverFires(c, cell, 4), sounded, `cell ${cell}`);
+  }
+  // Coprime lengths really do give every cell a turn — three notes against the same mask reach
+  // every residue, which is why the false claim survived as long as it did.
+  assert.deepEqual([0, 1, 2].map((i) => stepEverFires(c, i, 3)), [true, true, true]);
+  // Equal lengths are the plain case: the cell IS the step.
+  const eq = ap({ euclidEnabled: true, euclidSteps: 4, euclidPulses: 2, euclidRotate: 0 });
+  assert.deepEqual([0, 1, 2, 3].map((i) => stepEverFires(eq, i, 4)), [...euclid(4, 2)]);
+  // A sequence longer than the mask: eight notes against a four-step mask, each cell fixed by its
+  // own residue and nothing cycling past anything.
+  const longSeq = ap({ euclidEnabled: true, euclidSteps: 4, euclidPulses: 1, euclidRotate: 0 });
+  const m4 = euclid(4, 1);
+  for (let cell = 0; cell < 8; cell += 1) assert.equal(stepEverFires(longSeq, cell, 8), m4[cell % 4]);
+  // A hand mute still wins, and a disabled mask still lights everything.
+  assert.equal(stepEverFires(ap({ euclidEnabled: true, euclidSteps: 8, euclidPulses: 8, mutes: [1] }), 1, 4), false);
+  assert.equal(stepEverFires(ap({ euclidEnabled: false, euclidSteps: 8, euclidPulses: 1 }), 0, 4), true);
 });
 
 test('step index, swing and gate timing', () => {
