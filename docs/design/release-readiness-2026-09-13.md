@@ -124,19 +124,23 @@ Each proposed change must be checked against the current code and a user workflo
 
 ### Acceptance still required
 
-1. Installer installation/upgrade remains required. The staged runtime, in-app export and
-   REAPER scan/UI/parameter/session-restore pass are verified. DAW-to-hardware MIDI is separate.
-2. Broaden export-format/runtime acceptance beyond the verified VST3 path. Extra script runtimes
-   are currently bundled only for VST3 by the compiling exporter; template export cannot add
-   them. Unsupported combinations now explain their refusal instead of producing false success.
-3. Native first-use and virtual MIDI loopback pass. Physical instrument behavior remains separate
-   from the verified loopback and rendered workflow checks.
-4. Confirm hardware MIDI and session restore against an actual instrument. Automated message
-   checks do not demonstrate the physical synth's behavior.
-5. Hostage's existing 36-feature completion audit and current native suites were reviewed. A
-   fresh physical/performance acceptance pass remains separate from source/test completion.
-6. The reviewed batch is on main and a Windows release candidate is being packaged locally.
-   No public release tag or installer publication has been made by this work.
+The Standard installer upgrade now passes. Post-upgrade comparison exposed a missing Inno Setup
+file-list entry despite correct CMake staging; RC3 includes that entry. Its installation log reports
+success, all nine installed device-profile JSON files match staging, and the installed application,
+scanner, worker, Node and export script match their tested copies. The upgraded Program Files app
+starts, restores existing work and renders Ports. The pre-upgrade installation was backed up.
+
+1. Confirm hardware MIDI and session restore against an actual instrument. The available input
+   is loopMIDI's CEditor Test Out, not a physical synth. Hostage's 36-feature completion audit and
+   native tests were reviewed; its physical/performance acceptance remains part of this gate.
+2. Broaden format/runtime/platform acceptance before advertising beyond Windows VST3 with the
+   verified script runtimes. This candidate does not claim a macOS/Linux or universal-DAW release.
+3. No public release tag or installer publication has been made. Review the physical acceptance
+   result before treating the local candidate as an official first release.
+
+Implementation is committed on main as cc9f70cc. Claude reviewed it independently and confirmed a
+clean, synchronized checkout with only main on the remote. The final installer file-list correction
+and this acceptance record follow as a separate commit.
 
 Builds and tests run locally. GitHub CI is not the iterative test environment, and no workflow
 expansion is needed for this review.

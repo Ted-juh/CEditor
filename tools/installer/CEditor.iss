@@ -56,6 +56,7 @@ Name: "java";   Description: "Java scripting (JDK + jlink JRE, ~195 MB download)
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+Source: "{#MySourceDir}\CE\profiles\*"; DestDir: "{app}\CE\profiles"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginScanner.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginWorker.exe"; DestDir: "{app}"; Flags: ignoreversion
