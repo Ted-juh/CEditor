@@ -69,7 +69,7 @@
   {#each grid.h as y (`h${y}`)}<line x1={geom.x0} y1={y} x2={rightX} y2={y} stroke={gridCss} stroke-width="1" />{/each}
 
   {#if cfg.showCorners !== false}
-    {#each corners as c (c.label + c.x)}
+    {#each corners as c, index (index)}
       <circle cx={c.x < geom.x0 + geom.w / 2 ? geom.x0 + 5 : rightX - 5} cy={c.y < geom.y0 + geom.h / 2 ? geom.y0 + 5 : baseY - 5} r="2.5" fill={cornerCss} />
       <text x={c.x} y={c.y} font-size={labelSize} fill={labelCss} text-anchor={c.ax} dominant-baseline={c.ay} opacity="0.85">{c.label}</text>
     {/each}

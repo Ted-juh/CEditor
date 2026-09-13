@@ -210,6 +210,8 @@
   } from '../utils/midiControlBindings.js';
   import { EMPTY_NRPN_STATE, applyNrpnEvents } from '../utils/nrpn.js';
   import { expressionEventsFromHex } from '../utils/midiNoteInput.js';
+  import { tabGeometry, tabAtPoint, tabPages } from '../utils/tabContainerLayout.js';
+  import { scrollByWheel, scrollGeometry, thumbRect, maxScroll, clampScroll } from '../utils/scrollAreaLayout.js';
   import { latestMidiInputMessage } from '../stores/deviceProfileStores.js';
   import {
     createTimedButtonPreviewController,
@@ -361,6 +363,34 @@
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
   let listboxDrag = null; // { id, startY, startScroll, moved } while drag-scrolling a listbox
+  let listboxMomentumFrame = null;
+  function stopListboxMomentum() {
+    if (listboxMomentumFrame != null) cancelAnimationFrame(listboxMomentumFrame);
+    listboxMomentumFrame = null;
+  }
+  function startListboxMomentum(control, drag) {
+    stopListboxMomentum();
+    const cfg = listboxConfig(control);
+    if (!drag?.moved || cfg.momentum !== true || cfg.scrollMode !== 'smooth'
+        || performance.now() - drag.lastAt > 100) return;
+    let velocity = drag.velocity || 0;
+    let previousAt = performance.now();
+    const id = getControlId(control);
+    const tick = now => {
+      listboxMomentumFrame = null;
+      const current = controlById(id);
+      if (!current || isDisabled(current) || isReadOnly(current)) return;
+      const dt = Math.min(50, now - previousAt);
+      previousAt = now;
+      const before = numberOr(sessionFor(current)?.listboxScrollTop, 0);
+      const max = listboxMaxScroll(lbControl(current), listboxViewport(current), lbFilter(current));
+      const next = Math.max(0, Math.min(max, before + velocity * dt));
+      patchControlSession(id, { listboxScrollTop: next });
+      velocity *= Math.exp(-dt / 180);
+      if (Math.abs(velocity) > 0.02 && next > 0 && next < max) listboxMomentumFrame = requestAnimationFrame(tick);
+    };
+    if (Math.abs(velocity) > 0.02) listboxMomentumFrame = requestAnimationFrame(tick);
+  }
   let listboxDoubleTap = false; // this press is the 2nd tap of a double-click on a listbox
   // Transient interaction-event tracking (onDoubleClick timing, onPointerMove throttle).
   let lastPointerDownAt = 0;
@@ -375,6 +405,7 @@
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
   let openComboboxControlId = $state('');
+  let comboboxQuery = $state('');
 
   const timedButtonPreview = createTimedButtonPreviewController({
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
@@ -386,6 +417,34 @@
   const momentaryButtonPreview = createMomentaryButtonPreviewController({
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
   });
+  const oneShotTimers = new Map();
+  let scrollDrag = null;
+
+  function setScrollOffset(control, offset) {
+    const t = control._children.Transform;
+    const next = clampScroll(offset, t.width, t.height, control);
+    patchControlSession(getControlId(control), { scrollOffset: next });
+    emitDeviceBindingsForPatch(control, { scrollX: next.x, scrollY: next.y });
+    return next;
+  }
+
+  function beginScrollDrag(control, point) {
+    if (control?._children?.Core?.controlType !== 'ScrollArea') return;
+    const t = control._children.Transform, cfg = control._children.ScrollArea;
+    const geom = scrollGeometry(t.width, t.height, control);
+    const axis = geom.showY && point.x >= geom.viewport.w ? 'y'
+      : geom.showX && point.y >= geom.viewport.h ? 'x' : '';
+    if (!axis) return;
+    let offset = sessionFor(control)?.scrollOffset ?? { x: cfg.scrollX ?? 0, y: cfg.scrollY ?? 0 };
+    const thumb = thumbRect(axis, offset, t.width, t.height, control);
+    const length = axis === 'y' ? thumb.h : thumb.w;
+    const track = axis === 'y' ? geom.viewport.h : geom.viewport.w;
+    const ratio = maxScroll(t.width, t.height, control)[axis] / Math.max(1, track - length);
+    if (point[axis] < thumb[axis] || point[axis] > thumb[axis] + length) {
+      offset = setScrollOffset(control, { ...offset, [axis]: (point[axis] - length / 2) * ratio });
+    }
+    scrollDrag = { id: getControlId(control), axis, pointer: point[axis], offset, ratio };
+  }
 
   function bindSurface(node) {
     surfaceRef = node;
@@ -1373,17 +1432,19 @@
   let meterClock = $state(0);
   const meterPeakState = {};
   let meterTickerRunning = false;
+  let meterAnimationFrame = null;
+  onDestroy(() => { if (meterAnimationFrame != null) cancelAnimationFrame(meterAnimationFrame); });
   function ensureMeterTicker() {
     if (meterTickerRunning) return;
     meterTickerRunning = true;
     const loop = () => {
-      const anyPeak = (orderedControls ?? []).some((c) =>
+      const anyPeak = flatControls(orderedControls ?? []).some((c) =>
         isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       meterClock = Date.now();
-      requestAnimationFrame(loop);
+      meterAnimationFrame = requestAnimationFrame(loop);
     };
-    requestAnimationFrame(loop);
+    meterAnimationFrame = requestAnimationFrame(loop);
   }
 
   // Inject the meter's live value + peak-hold onto the resolved Meter section:
@@ -1423,10 +1484,10 @@
       const now = Date.now();
       const prev = meterPeakState[id] ?? { peak: pos, peakAt: now };
       const next = meterPeak({
-        prevPeak: prev.peak, prevPeakAt: prev.peakAt, pos, now,
+        prevPeak: prev.peak, prevPeakAt: prev.peakAt, prevUpdatedAt: prev.updatedAt, pos, now,
         holdMs: numberOr(meter.peakHoldMs, 1200), decayPerSec: numberOr(meter.peakDecayPerSec, 0.4),
       });
-      meterPeakState[id] = next;
+      meterPeakState[id] = { ...next, updatedAt: now };
       nextMeter.__peak = next.peak;
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Meter: nextMeter } } };
@@ -1783,9 +1844,6 @@
   function isNumpadControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Numpad';
   }
-  function numpadControlWith(control, patch) {
-    return { ...control, _children: { ...control._children, Numpad: { ...control._children?.Numpad, ...patch } } };
-  }
   function applyNumpadValueSource(control, resolved) {
     if (!isNumpadControl(control)) return resolved;
     const sess = sessionFor(control);
@@ -1823,7 +1881,7 @@
       // The one place a value leaves this component. Committed to the document so a binding sends
       // it, and announced so a script can act on the entry rather than on every keypress.
       updateControlProperty(id, 'Value.value', result.commit);
-      emitControlPortFanout(numpadControlWith(control, { __pending: '' }), 'commit');
+      emitDeviceBindingsForPatch(control, { valueOverride: result.commit });
       raiseComponent(control, 'onEntered', { value: result.commit });
     }
     return true;
@@ -1842,7 +1900,7 @@
   }
   function ribGeomFor(control) {
     const t = control?._children?.Transform ?? {};
-    return ribbonGeometry(numberOr(t.width, 0), numberOr(t.height, 0), RIB_PAD);
+    return ribbonGeometry(numberOr(t.width, 0), numberOr(t.height, 0), RIB_PAD, control);
   }
   function ribWorkingValue(control) {
     const sess = sessionFor(control)?.ribbonValue;
@@ -5149,10 +5207,12 @@
     return String(getBehavior(control)?.defaultValue ?? '');
   }
   function commitTextValue(control, value) {
+    if (isReadOnly(control) || isDisabled(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const id = getControlId(control);
     if (!id) return;
     const str = String(value ?? '');
-    if (str !== currentTextValue(control)) updateControlProperty(id, 'Behavior.defaultValue', str);
+    if (str === currentTextValue(control)) return;
+    updateControlProperty(id, 'Behavior.defaultValue', str);
     // Emit through the text port (SysEx patch-name value on the device side).
     emitDeviceBindingsForPatch(control, { textValue: str });
   }
@@ -5168,7 +5228,6 @@
   function handleTextFieldKeyDown(control, event) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      commitTextValue(control, event.target?.value);
       event.currentTarget?.blur?.();
     } else if (event.key === 'Escape') {
       // Cancel: restore the committed value and drop focus.
@@ -5315,7 +5374,11 @@
       const label = String(r.displayText ?? '').toLowerCase();
       return mode === 'fuzzy' ? fuzzyMatch(q, label) : label.startsWith(q);
     });
-    if (idx >= 0) selectListboxIndex(control, idx);
+    if (idx >= 0) {
+      const cfg = listboxConfig(control);
+      if (cfg.multiSelect === true || String(cfg.confirmMode ?? 'single') !== 'single') armListboxIndex(control, idx);
+      else selectListboxIndex(control, idx);
+    }
     return true;
   }
 
@@ -5385,6 +5448,16 @@
 
   function rowValue(row) {
     return row?.internalValue ?? row?.id ?? '';
+  }
+
+  function toggleCombobox(controlId) {
+    comboboxQuery = '';
+    openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;
+  }
+
+  function comboboxRows(control) {
+    const query = String(getBehavior(control)?.subtype) === 'searchable' ? comboboxQuery.trim().toLowerCase() : '';
+    return getValueRows(control).filter(row => !query || String(rowLabel(row)).toLowerCase().includes(query));
   }
 
   function rowLabel(row) {
@@ -5801,9 +5874,17 @@
     }
 
     const port = String(binding?.port ?? 'value');
+    if (['pageIndex', 'scrollX', 'scrollY'].includes(port)) return patch[port];
     if (port === 'trigger') {
       if (String(binding?.parameterType ?? '') === 'momentary') {
         return Object.prototype.hasOwnProperty.call(patch, 'pressed') ? patch.pressed === true : undefined;
+      }
+      if (patch.cancelled === true) return undefined;
+      const behavior = getBehavior(control);
+      if (behavior?.buttonType === 'one_shot') return patch.executed === true ? true : undefined;
+      if (isRepeatingBehavior(behavior)) return patch.executed === true ? true : undefined;
+      if (behavior?.buttonType === 'momentary' && behavior.fireOn === 'onPressStart') {
+        return patch.pressed === true ? true : undefined;
       }
       if (patch.executed === true || patch.pressed === false) return true;
       return undefined;
@@ -5964,8 +6045,31 @@
 
   function patchControlSession(controlId, patch = {}) {
     const control = controlById(controlId);
+    const previous = control ? sessionFor(control) : null;
+    const behavior = getBehavior(control);
+    if (behavior?.buttonType === 'one_shot' && patch.pressed === true && !isDisabled(control)) {
+      patch = { ...patch, executed: false };
+    }
+    if (behavior?.buttonType === 'one_shot' && previous?.pressed === true
+        && patch.pressed === false && patch.hover === true && !isDisabled(control)) {
+      patch = { ...patch, executed: true, disabled: behavior.disableAfterUse !== false };
+      const lockout = Math.max(0, numberOr(behavior.lockoutDuration, 0));
+      if (patch.disabled && lockout > 0) {
+        clearTimeout(oneShotTimers.get(controlId));
+        oneShotTimers.set(controlId, setTimeout(() => {
+          oneShotTimers.delete(controlId);
+          updatePanelPreviewSession(controlId, { disabled: false, executed: false });
+        }, lockout));
+      }
+    }
     updatePanelPreviewSession(controlId, patch);
-    if (control) emitDeviceBindingsForPatch(control, patch);
+    if (control) {
+      // Blurring an idle control and cancelling outside its bounds are not trigger releases.
+      const output = { ...patch };
+      if (output.pressed === false && previous?.pressed !== true) delete output.pressed;
+      if (output.hover === false) output.cancelled = true;
+      emitDeviceBindingsForPatch(control, output);
+    }
   }
 
   function customSessionValues(control) {
@@ -6309,6 +6413,10 @@
     if (!isRangeControl(control)) return;
 
     const behavior = getBehavior(control);
+    if (behavior.keyboardEnabled === false) return;
+    if (key.startsWith('Arrow') && behavior.arrowKeyAdjust === false) return;
+    if ((key === 'Home' || key === 'End') && behavior.homeEndAdjust === false) return;
+    if ((key === 'PageUp' || key === 'PageDown') && behavior.pageKeyAdjust === false) return;
     if (isTwoValueSpinner(control)) {
       const session = sessionFor(control);
       const handle = getRangeActiveHandle(session);
@@ -6513,6 +6621,21 @@
     // A display does not scroll to a new value. The script dispatch below is skipped with it: a
     // read-only control that still fired onWheel would let a script do what the wheel may not.
     if (isReadOnly(control)) return;
+    if (isDisabled(control)) return;
+    if (control?._children?.Core?.controlType === 'ScrollArea') {
+      event.preventDefault(); event.stopPropagation();
+      const t = control._children.Transform;
+      const cfg = control._children.ScrollArea;
+      const offset = sessionFor(control)?.scrollOffset ?? { x: cfg.scrollX ?? 0, y: cfg.scrollY ?? 0 };
+      const horizontal = cfg.direction === 'horizontal';
+      const next = scrollByWheel(offset, {
+        x: horizontal ? (event.deltaX || event.deltaY) : event.deltaX,
+        y: horizontal ? 0 : event.deltaY,
+      }, t.width, t.height, control);
+      patchControlSession(getControlId(control), { scrollOffset: next });
+      emitDeviceBindingsForPatch(control, { scrollX: next.x, scrollY: next.y });
+      return;
+    }
     // Fire onWheel for ANY control (before the range-only built-in below returns), so a script can
     // react to the wheel even on non-range controls. delta = +1 up / -1 down; raw deltas included.
     dispatchInteraction(getControlId(control), 'onWheel', {
@@ -6533,6 +6656,7 @@
     // Listbox: wheel scrolls the row viewport (one row per notch).
     if (isListboxControl(control)) {
       control = lbControl(control); // cascading: scroll only the visible rows
+      stopListboxMomentum();
       const rect = event.currentTarget?.getBoundingClientRect?.();
       const viewH = numberOr(control?._children?.Transform?.height, rect ? rect.height / (scale || 1) : 0);
       const max = listboxMaxScroll(control, viewH, lbFilter(control));
@@ -6612,6 +6736,7 @@
   }
 
   function removeWindowListeners() {
+    scrollDrag = null;
     // Server-rendered, onDestroy still runs when the render closes and there is no window to detach
     // from — which made this component impossible to render in a test at all.
     if (typeof window === 'undefined') return;
@@ -6626,8 +6751,11 @@
 
   onDestroy(() => {
     removeWindowListeners();
+    stopListboxMomentum();
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
+    for (const timer of oneShotTimers.values()) clearTimeout(timer);
+    oneShotTimers.clear();
   });
 
   $effect(() => {
@@ -6644,6 +6772,9 @@
     }
     timedButtonPreview.syncKeys(activeControlIds);
     momentaryButtonPreview.syncKeys(activeControlIds);
+    for (const [id, timer] of oneShotTimers) {
+      if (!controlsById.has(id)) { clearTimeout(timer); oneShotTimers.delete(id); }
+    }
 
     if (pointerActiveControlId && !controlsById.has(pointerActiveControlId)) {
       momentaryButtonPreview.cancel(pointerActiveControlId);
@@ -6685,6 +6816,10 @@
       if (Math.abs(dy) > 4) listboxDrag.moved = true;
       const max = listboxMaxScroll(lbControl(control), listboxViewport(control), lbFilter(control));
       const next = Math.max(0, Math.min(max, listboxDrag.startScroll - dy));
+      const now = performance.now();
+      listboxDrag.velocity = (next - listboxDrag.lastScroll) / Math.max(8, now - listboxDrag.lastAt);
+      listboxDrag.lastAt = now;
+      listboxDrag.lastScroll = next;
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
     }
@@ -6887,6 +7022,18 @@
     lastPointerDownAt = downAt;
     const pointerDownLocal = controlLocalPoint(event);
 
+    if (control?._children?.Core?.controlType === 'TabContainer') {
+      const t = control._children.Transform;
+      const index = tabAtPoint(tabGeometry(t.width, t.height, control), pointerDownLocal.x, pointerDownLocal.y, tabPages(control).length);
+      if (index !== null) {
+        event.preventDefault(); event.stopPropagation();
+        const sections = sessionFor(control)?.sectionValues ?? {};
+        patchControlSession(downId, { sectionValues: { ...sections, TabContainer: { ...sections.TabContainer, pageIndex: index } } });
+        emitDeviceBindingsForPatch(control, { pageIndex: index });
+        return;
+      }
+    }
+
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget?.setPointerCapture?.(event.pointerId);
@@ -6895,8 +7042,10 @@
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
     // Arm listbox drag-scroll (a moved drag suppresses the row select on release).
+    stopListboxMomentum();
     listboxDrag = (isListboxControl(control) && listboxConfig(control).dragScroll === true)
-      ? { id: getControlId(control), startY: event.clientY, startScroll: numberOr(sessionFor(control)?.listboxScrollTop, 0), moved: false }
+      ? { id: getControlId(control), startY: event.clientY, startScroll: numberOr(sessionFor(control)?.listboxScrollTop, 0), moved: false,
+          lastScroll: numberOr(sessionFor(control)?.listboxScrollTop, 0), lastAt: performance.now(), velocity: 0 }
       : null;
     // Envelope: grab the node under the cursor (or add/remove on double-click).
     handleEnvelopePointerDown(control, pointerDownLocal, isDoubleTap);
@@ -6999,6 +7148,7 @@
       openComboboxControlId = '';
     }
     pointerActiveElement = event.currentTarget;
+    beginScrollDrag(control, pointerDownLocal);
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerDownZone = '';
     pointerSliderHandle = '';
@@ -7117,6 +7267,12 @@
     event.stopPropagation?.();
     const activeControl = controlById(pointerActiveControlId);
     if (!activeControl || isDisabled(activeControl)) return;
+    if (scrollDrag?.id === getControlId(activeControl)) {
+      const point = controlLocalPoint(event);
+      setScrollOffset(activeControl, { ...scrollDrag.offset,
+        [scrollDrag.axis]: scrollDrag.offset[scrollDrag.axis] + (point[scrollDrag.axis] - scrollDrag.pointer) * scrollDrag.ratio });
+      return;
+    }
 
     if (pianoPress?.id === getControlId(activeControl)) {
       moveKeyboardPress(activeControl, controlLocalPoint(event));
@@ -7146,19 +7302,22 @@
   }
 
   function handleKeyboardCancel(event) {
-    if (!pianoPress) return;
-    releaseKeyboardNotes(pianoPress.id);
-    handleWindowPointerUp(event);
+    if (pianoPress) releaseKeyboardNotes(pianoPress.id);
+    if (!pointerActiveControlId) return;
+    timedButtonPreview.cancel(pointerActiveControlId);
+    momentaryButtonPreview.cancel(pointerActiveControlId);
+    stopListboxMomentum();
+    handleWindowPointerUp(event, { cancelled: true });
   }
 
-  function handleWindowPointerUp(event) {
+  function handleWindowPointerUp(event, { cancelled = false } = {}) {
     if (!pointerActiveControlId) return;
     event.preventDefault?.();
     event.stopPropagation?.();
 
     const activeId = pointerActiveControlId;
     const activeControl = controlById(activeId);
-    const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
+    const inside = !cancelled && isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
 
     phrasePaint = null;
@@ -7362,7 +7521,7 @@
           }
           patchControlSession(activeId, { focused: true, hover: true });
         } else if (isComboboxControl(activeControl)) {
-          openComboboxControlId = openComboboxControlId === activeId ? '' : activeId;
+          toggleCombobox(activeId);
           patchControlSession(activeId, {
             focused: true,
             hover: true,
@@ -7393,6 +7552,7 @@
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    if (!cancelled && listboxDrag?.id === activeId) startListboxMomentum(activeControl, listboxDrag);
     listboxDrag = null;
     removeWindowListeners();
   }
@@ -7407,8 +7567,10 @@
     patchControlSession(controlId, { focused: true });
   }
 
-  function handleBlur(control) {
+  function handleBlur(control, event) {
     const controlId = getControlId(control);
+    if (event?.relatedTarget?.closest?.('.panel-combobox-menu')?.dataset.controlId === controlId) return;
+    const momentaryRelease = momentaryButtonPreview.releasePress(controlId, getBehavior(control));
     if (lcdEdit.active && lcdEdit.id === controlId) {
       lcdEdit = { ...LCD_EDIT_IDLE };
     }
@@ -7429,6 +7591,7 @@
       pressed: false,
       dragging: false,
       valueInputActive: false,
+      ...(momentaryRelease ?? {}),
     });
 
     if (pointerActiveControlId === controlId) {
@@ -7443,6 +7606,7 @@
   function handleKeyDown(control, event) {
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
+    if (getBehavior(control)?.keyboardEnabled === false) return;
 
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';
@@ -7453,6 +7617,7 @@
     if (isListboxControl(control)) {
       if (handleListboxKey(control, event)) return;
       if (handleListboxTypeAhead(control, event)) return;
+      if (event.key === ' ' || event.key === 'Enter') return;
     }
 
     // On-screen editing takes over the keyboard while an LCD zone is active.
@@ -7523,6 +7688,7 @@
         focused: true,
         hover: true,
         pressed: isCustomComponent(control) ? false : true,
+        ...(momentaryButtonPreview.beginPress(controlId, getBehavior(control)) ?? {}),
       });
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
@@ -7568,6 +7734,9 @@
 
   function handleKeyUp(control, event) {
     if (isDisabled(control)) return;
+    if (isReadOnly(control)) return;
+    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isListboxControl(control)) return; // navigation/confirmation is completed on keydown
     if (event.key !== ' ' && event.key !== 'Enter') return;
 
     event.preventDefault();
@@ -7578,7 +7747,7 @@
       patchCustomKeyboardActivation(control, event);
     } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
       if (isComboboxControl(control)) {
-        openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;
+        toggleCombobox(controlId);
       } else {
         commitSelectActionAndEmit(control);
       }
@@ -7587,6 +7756,7 @@
       focused: true,
       hover: true,
       pressed: false,
+      ...(momentaryButtonPreview.releasePress(controlId, getBehavior(control)) ?? {}),
     });
   }
 
@@ -7693,7 +7863,7 @@
       onpreviewpointerdown: (event) => handlePointerDown(control, event),
       onpreviewwheel: (event) => handleRangeWheel(control, event),
       onpreviewfocus: () => handleFocus(control),
-      onpreviewblur: () => handleBlur(control),
+      onpreviewblur: (event) => handleBlur(control, event),
       onpreviewkeydown: (event) => handleKeyDown(control, event),
       onpreviewkeyup: (event) => handleKeyUp(control, event),
       onpreviewvaluefieldinput: (event) => handleRangeFieldInput(control, event),
@@ -7708,6 +7878,8 @@
         value: currentTextValue(control),
         placeholder: String(control?._children?.Text?.content ?? ''),
         disabled: isDisabled(control),
+        readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
+        tabIndex: isReadOnly(control) || behavior?.focusable === false ? -1 : 0,
       } : null,
       onpreviewtextkeydown: (event) => handleTextFieldKeyDown(control, event),
       onpreviewtextfocus: () => handleTextFieldFocus(control),
@@ -7774,8 +7946,20 @@
       {...previewPropsFor(control)}
     />
     {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
-      <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">
-        {#each getValueRows(control) as row (row.id ?? row.internalValue ?? row.displayText)}
+      <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={comboboxMenuStyle(control)} role="listbox"
+        onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) openComboboxControlId = ''; }}>
+        {#if String(getBehavior(control)?.subtype) === 'searchable'}
+          <input class="combobox-search" aria-label="Search choices" placeholder="Search choices…" value={comboboxQuery}
+            oninput={(event) => { comboboxQuery = event.target.value; }}
+            onpointerdown={(event) => event.stopPropagation()}
+            onkeydown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Escape') { event.preventDefault(); openComboboxControlId = ''; }
+              else if (event.key === 'Enter') { event.preventDefault(); const first = comboboxRows(control)[0]; if (first) selectComboboxRow(control, first); }
+              else if (event.key === 'ArrowDown') { event.preventDefault(); event.currentTarget.parentElement?.querySelector('[role="option"]')?.focus(); }
+            }} />
+        {/if}
+        {#each comboboxRows(control) as row (row.id ?? row.internalValue ?? row.displayText)}
           {@const selected = String(rowValue(row)) === String(currentComboboxValue(control))}
           <button
             type="button"
@@ -7795,6 +7979,7 @@
             {rowLabel(row)}
           </button>
         {/each}
+        {#if comboboxRows(control).length === 0}<div class="combobox-empty">No matching choices</div>{/if}
       </div>
     {/if}
     {/if}
@@ -7802,6 +7987,8 @@
 </div>
 
 <style>
+  .combobox-search { box-sizing: border-box; width: 100%; min-width: 0; padding: 6px; background: #1a1a1a; color: #ddd; border: 1px solid #444; font: inherit; }
+  .combobox-empty { padding: 8px; color: #aaa; }
   .panel-surface {
     position: relative;
     border: 1px solid #444;

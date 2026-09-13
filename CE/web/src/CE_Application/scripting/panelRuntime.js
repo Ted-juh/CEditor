@@ -7730,7 +7730,7 @@ function seedSessionSnapshot() {
   for (const [id, s] of Object.entries(sessions)) {
     next.set(id, {
       value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0,
+      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
     });
   }
   live.sessionLast = next;
@@ -7749,12 +7749,16 @@ function onPreviewSessionsChanged(sessions) {
   for (const [id, s] of Object.entries(sessions ?? {})) {
     const cur = {
       value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0,
+      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
     };
     next.set(id, cur);
     const prev = live.sessionLast.get(id);
     if (!prev) continue;
     const name = controlNameById(id);
+    const behavior = flatControls(livePanel()?.controls ?? []).find(c => c?._children?.Core?.id === id)?._children?.Behavior ?? {};
+    const confirmedButton = behavior.buttonType === 'timed' || behavior.buttonType === 'one_shot';
+    const pressStart = behavior.buttonType === 'momentary' && behavior.fireOn === 'onPressStart';
+    const repeating = behavior.buttonType === 'momentary' && behavior.subtype === 'repeating';
     if (!Object.is(prev.value, cur.value) && cur.value !== undefined) {
       events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
       if (s.dragging !== true) events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
@@ -7763,13 +7767,17 @@ function onPreviewSessionsChanged(sessions) {
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
       events.push({ event: cur.pressed ? 'onPointerDown' : 'onPointerUp', controlName: name, payload: mouse });
-      // Release IS a click — except on a button that has been firing all along. A `repeating`
-      // button's contract is "keeps firing while held", so the fires happened during the hold and
-      // the release is the END of them, not one more. Without this a roll always struck once too
-      // often, on the way up.
-      if (!cur.pressed && !(prev.repeats > 0)) {
+      // Script actions follow the same firing edge as the component's output.
+      // A timed hold / click sequence is not an action until it confirms.
+      if (!confirmedButton && !repeating && !(prev.repeats > 0)
+        && (pressStart ? cur.pressed : !cur.pressed && cur.hover)) {
         events.push({ event: 'onClick', controlName: name, payload: mouse });
       }
+    }
+    if (confirmedButton && cur.executed && !prev.executed) {
+      events.push({ event: 'onClick', controlName: name, payload: {
+        x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0,
+      } });
     }
     // A repeat is another FIRING of the button, so it raises the event a firing already raises
     // rather than a new one nobody has heard of: `momentary/repeating` says "keeps firing while

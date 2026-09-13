@@ -69,6 +69,24 @@ export function meterZoneColourAt(pos, cfg = {}) {
   return meterZones(cfg)[meterZoneIndexAt(pos, cfg)].colour;
 }
 
+// Sample the same zone gradient used by the continuous bar, including alpha.
+export function meterFillColourAt(pos, cfg = {}) {
+  const zones = meterZones(cfg);
+  const p = clamp01(num(pos, 0));
+  const index = meterZoneIndexAt(p, cfg);
+  const left = zones[index], right = zones[index + 1];
+  if (cfg.gradient === false || !right || right.from <= left.from) return left.colour;
+  const hex = c => {
+    const value = c.replace(/^#/, '');
+    return /^[\da-f]{6}$/i.test(value) ? `FF${value}` : value;
+  };
+  const a = hex(left.colour), b = hex(right.colour);
+  if (!/^[\da-f]{8}$/i.test(a) || !/^[\da-f]{8}$/i.test(b)) return left.colour;
+  const t = (p - left.from) / (right.from - left.from);
+  return [0, 2, 4, 6].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t)
+    + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
 // How many of `n` LED segments are lit at position `pos`. Segments are indexed
 // 0..n-1; segment i is lit when i < litCount. Rounds so the tip segment lights
 // once the fill passes its midpoint.
@@ -90,13 +108,16 @@ export function meterSegmentCenter(i, n) {
 // peak + when it was set and the current position + time, returns the next
 // { peak, peakAt }. `peakAt` anchors to the last rise so the hold/decay clock
 // is stable across calls.
-export function meterPeak({ prevPeak = 0, prevPeakAt = 0, pos = 0, now = 0, holdMs = 1200, decayPerSec = 0.4 }) {
+export function meterPeak({ prevPeak = 0, prevPeakAt = 0, prevUpdatedAt = null, pos = 0, now = 0, holdMs = 1200, decayPerSec = 0.4 }) {
   const p = clamp01(num(pos, 0));
   const last = clamp01(num(prevPeak, 0));
   if (p >= last) return { peak: p, peakAt: num(now, 0) };
   const elapsed = num(now, 0) - num(prevPeakAt, 0);
   if (elapsed < num(holdMs, 0)) return { peak: last, peakAt: num(prevPeakAt, 0) };
-  const fallen = last - num(decayPerSec, 0) * ((elapsed - num(holdMs, 0)) / 1000);
+  // `last` already includes earlier frames' decay. Subtract only the time since
+  // the preceding update (or the hold boundary on the first falling frame).
+  const start = Math.max(num(prevPeakAt, 0) + num(holdMs, 0), prevUpdatedAt == null ? -Infinity : num(prevUpdatedAt, 0));
+  const fallen = last - num(decayPerSec, 0) * (Math.max(0, num(now, 0) - start) / 1000);
   return { peak: Math.max(p, clamp01(fallen)), peakAt: num(prevPeakAt, 0) };
 }
 
@@ -138,6 +159,11 @@ export function meterArcPath(cx, cy, r, fromPos, toPos, startDeg = 135, sweepDeg
   const a1 = meterArcAngle(toPos, startDeg, sweepDeg);
   const p0 = meterPolar(cx, cy, r, a0);
   const p1 = meterPolar(cx, cy, r, a1);
+  // SVG cannot draw a full circle with one arc whose endpoints coincide.
+  if (Math.abs(a1 - a0) >= 359.999) {
+    const mid = (fromPos + toPos) / 2;
+    return `${meterArcPath(cx, cy, r, fromPos, mid, startDeg, sweepDeg)} ${meterArcPath(cx, cy, r, mid, toPos, startDeg, sweepDeg).replace(/^M [^ ]+ [^ ]+ /, '')}`;
+  }
   const largeArc = Math.abs(a1 - a0) > 180 ? 1 : 0;
   const sweepFlag = a1 >= a0 ? 1 : 0;
   return `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${num(r, 0).toFixed(2)} ${num(r, 0).toFixed(2)} 0 ${largeArc} ${sweepFlag} ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`;

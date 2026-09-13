@@ -18,6 +18,7 @@ import { turingPortValues } from './turingLayout.js';
 import { kineticPortValues } from './kineticLayout.js';
 import { constellationPortValues } from './constellationLayout.js';
 import { constraintPortValues } from './constraintLayout.js';
+import { RIBBON_FAMILY } from '../models/componentFamilies.js';
 
 const RESOLVERS = {
   Keyboard: (control) => ({ note: control._children?.Keyboard?.__note ?? 48, velocity: control._children?.Keyboard?.__velocity ?? 0 }),
@@ -25,7 +26,7 @@ const RESOLVERS = {
   Matrix: (control) => matrixPortValues(control),
   VectorJoystick: (control) => joystickPortValues(control),
   Crossfader: (control) => crossfaderPortValues(control),
-  Ribbon: (control) => ribbonPortValues(control),
+  ...Object.fromEntries([...RIBBON_FAMILY].map(type => [type, ribbonPortValues])),
   Macro: (control) => macroPortValues(control),
   Orbit: (control) => orbitPortValues(control),
   Looper: (control) => looperPortValues(control),

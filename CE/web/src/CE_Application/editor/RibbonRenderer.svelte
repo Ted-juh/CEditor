@@ -29,7 +29,7 @@
   let value = $derived(cfg.__value !== undefined ? Math.max(0, Math.min(1, n(cfg.__value, 0.5))) : ribbonValue(control));
   let touched = $derived(cfg.__touch === true);
   let bipolar = $derived(cfg.bipolar === true);
-  let geom = $derived(ribbonGeometry(width, height, PAD));
+  let geom = $derived(ribbonGeometry(width, height, PAD, control));
   let ind = $derived(ribbonIndicator(value, geom, vertical));
 
   let trackCss = $derived(css(cfg.trackColour, 'rgba(24,24,24,1)'));
@@ -113,8 +113,14 @@
         <line x1={centerAxis} y1={geom.y0 - 1} x2={centerAxis} y2={geom.y0 + geom.h + 1} stroke="rgba(255,255,255,0.45)" stroke-width="1.25" />
       {/if}
     {/if}
+    <!-- Position notch, shared with the flat wheel. -->
+    {#if vertical}
+      <rect x={geom.x0 + 1} y={ind.axis - indSize} width={geom.w - 2} height={indSize * 2} rx={indSize} fill={indCss} opacity={touched ? 1 : 0.85} />
+    {:else}
+      <rect x={ind.axis - indSize} y={geom.y0 + 1} width={indSize * 2} height={geom.h - 2} rx={indSize} fill={indCss} opacity={touched ? 1 : 0.85} />
+    {/if}
     <!-- Rim highlight -->
-    <rect x={geom.x0 + 0.5} y={geom.y0 + 0.5} width={geom.w - 1} height={geom.h - 1} rx={wheelRx} fill="none" stroke={touched ? glowCss : 'rgba(255,255,255,0.08)'} stroke-width={touched ? 2 : 1} />
+    <rect x={geom.x0 + 0.5} y={geom.y0 + 0.5} width={geom.w - 1} height={geom.h - 1} rx={wheelRx} fill="none" stroke={touched && cfg.showGlow !== false ? glowCss : 'rgba(255,255,255,0.08)'} stroke-width={touched && cfg.showGlow !== false ? 2 : 1} />
   {:else if wheel}
     <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={Math.min(geom.w, geom.h) * 0.28} fill={wheelCss} />
     <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={Math.min(geom.w, geom.h) * 0.28} fill={`url(#${gid}-wheel)`} />
@@ -127,7 +133,7 @@
     {:else}
       <rect x={ind.axis - indSize} y={geom.y0 + 1} width={indSize * 2} height={geom.h - 2} rx={indSize} fill={indCss} opacity={touched ? 1 : 0.85} />
     {/if}
-    {#if touched}
+    {#if touched && cfg.showGlow !== false}
       <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={Math.min(geom.w, geom.h) * 0.28} fill="none" stroke={glowCss} stroke-width="2" />
     {/if}
   {:else}
@@ -149,10 +155,10 @@
   {/if}
 
   {#if cfg.label}
-    <text x={geom.x0 + geom.w / 2} y={geom.y0 + geom.h + 1} font-size={labelSize} fill={labelCss} text-anchor="middle" dominant-baseline="hanging" opacity="0.85">{cfg.label}</text>
+    <text x={geom.x0 + geom.w / 2} y={height - 2} font-size={labelSize} fill={labelCss} text-anchor="middle" dominant-baseline="text-after-edge" opacity="0.85">{cfg.label}</text>
   {/if}
   {#if readout}
-    <text x={geom.x0 + geom.w / 2} y={geom.y0 - 1} font-size={labelSize} fill={labelCss} text-anchor="middle" dominant-baseline="auto" opacity="0.9">{readout}</text>
+    <text x={geom.x0 + geom.w / 2} y="2" font-size={labelSize} fill={labelCss} text-anchor="middle" dominant-baseline="text-before-edge" opacity="0.9">{readout}</text>
   {/if}
 </svg>
 

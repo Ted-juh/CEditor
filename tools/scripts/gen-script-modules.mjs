@@ -900,4 +900,4 @@ function run() {
   if (mode === '--check' && stale) process.exit(1);
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop())) run();
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())) run();

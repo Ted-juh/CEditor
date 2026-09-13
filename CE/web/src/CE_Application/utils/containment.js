@@ -11,6 +11,7 @@
  */
 
 import { deepClone } from './deepClone.js';
+import { tabGeometry } from './tabContainerLayout.js';
 
 let remintCounter = 0;
 
@@ -146,7 +147,9 @@ export function contentOrigin(container) {
   const children = container?._children?.Children ?? {};
   const shared = Number.isFinite(Number(children.padding)) ? Number(children.padding) : 0;
   const side = (value) => (value == null || !Number.isFinite(Number(value)) ? shared : Number(value));
-  return { x: side(children.paddingLeft), y: side(children.paddingTop) };
+  const transform = container?._children?.Transform ?? {};
+  const page = container?._children?.TabContainer ? tabGeometry(transform.width, transform.height, container).page : { x: 0, y: 0 };
+  return { x: page.x + side(children.paddingLeft), y: page.y + side(children.paddingTop) };
 }
 
 /**

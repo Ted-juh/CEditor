@@ -118,13 +118,17 @@ export function scrollByWheel(offset, delta, width, height, control) {
   const config = scrollConfig(control);
   const smooth = String(config.scrollMode ?? 'line') === 'smooth';
   const step = smooth
-    ? Math.max(-120, Math.min(120, num(delta?.y, 0)))
+    ? num(delta?.y, 0)
     : num(config.lineHeight, 24) * Math.sign(num(delta?.y, 0));
   const stepX = smooth
-    ? Math.max(-120, Math.min(120, num(delta?.x, 0)))
+    ? num(delta?.x, 0)
     : num(config.lineHeight, 24) * Math.sign(num(delta?.x, 0));
 
-  return clampScroll({ x: num(offset?.x, 0) + stepX, y: num(offset?.y, 0) + step }, width, height, control);
+  const direction = String(config.direction ?? 'vertical');
+  return clampScroll({
+    x: direction === 'vertical' ? 0 : num(offset?.x, 0) + stepX,
+    y: direction === 'horizontal' ? 0 : num(offset?.y, 0) + step,
+  }, width, height, control);
 }
 
 /**

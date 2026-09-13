@@ -1,11 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  meterLinearFraction, meterPosition, meterZones, meterZoneColourAt,
+  meterLinearFraction, meterPosition, meterZones, meterZoneColourAt, meterFillColourAt,
   meterSegmentsLit, meterSegmentCenter, meterPeak, meterTicks, meterArcAngle,
 } from '../src/CE_Application/utils/meterLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+
+test('peak decay has the same speed at different frame rates', () => {
+  const run = interval => {
+    let state = { peak: 1, peakAt: 0, updatedAt: 0 };
+    for (let now = interval; now <= 1000; now += interval) {
+      const next = meterPeak({ prevPeak: state.peak, prevPeakAt: state.peakAt, prevUpdatedAt: state.updatedAt,
+        pos: 0, now, holdMs: 200, decayPerSec: 0.5 });
+      state = { ...next, updatedAt: now };
+    }
+    return state.peak;
+  };
+  assert.ok(near(run(10), 0.6));
+  assert.ok(near(run(100), 0.6));
+});
+
+test('sampled meter gradients blend alpha and RGB while hard zones remain discrete', () => {
+  const cfg = { zones: [{ from: 0, colour: '00FF0000' }, { from: 1, colour: 'FF0000FF' }] };
+  assert.equal(meterFillColourAt(0.5, cfg), '80800080');
+  assert.equal(meterFillColourAt(0.5, { ...cfg, gradient: false }), '00FF0000');
+});
 
 test('linear fraction clamps within min/max', () => {
   assert.equal(meterLinearFraction(5, 0, 10), 0.5);

@@ -5,7 +5,7 @@
   // numeric readout. Visual only; the live value + peak are injected by the
   // preview surface onto the Meter section (Meter.__value / Meter.__peak).
   import {
-    meterConfig, meterPosition, meterZones, meterZoneColourAt,
+    meterConfig, meterPosition, meterZones, meterFillColourAt,
     meterSegmentsLit, meterSegmentCenter, meterTicks,
     meterArcPath, meterArcAngle, meterPolar,
   } from '../utils/meterLayout.js';
@@ -32,6 +32,11 @@
   let orientation = $derived(String(cfg.orientation ?? 'horizontal'));
   let vertical = $derived(orientation === 'vertical');
   let arc = $derived(orientation === 'arc');
+  let barThickness = $derived(Math.max(0, num(cfg.thickness, 0)));
+  let barStyle = $derived(barThickness > 0
+    ? (vertical ? `width:${barThickness}px; max-width:100%; flex:none; height:100%; align-self:center; margin:auto;`
+      : `height:${barThickness}px; max-height:100%; align-self:center;`)
+    : '');
   let segments = $derived(Math.max(0, Math.round(num(cfg.segments, 0))));
   let trackCss = $derived(css(cfg.trackColour, 'rgba(20,20,20,1)'));
   let peakCss = $derived(css(cfg.peakColour, 'rgba(242,242,242,1)'));
@@ -59,7 +64,7 @@
 
   let readout = $derived.by(() => {
     if (cfg.showValue !== true) return '';
-    const p = Math.max(0, Math.round(num(cfg.valuePrecision, 0)));
+    const p = Math.min(6, Math.max(0, Math.round(num(cfg.valuePrecision, 0))));
     return `${cfg.valuePrefix ?? ''}${num(value, 0).toFixed(p)}${cfg.valueSuffix ?? ''}`;
   });
   let ticks = $derived(cfg.showTicks === true ? meterTicks(cfg, cfg.tickCount) : []);
@@ -69,10 +74,20 @@
     if (!arc) return null;
     const w = Math.max(1, width), h = Math.max(1, height);
     const cx = w / 2;
-    const stroke = num(cfg.thickness, 0) > 0 ? num(cfg.thickness, 0) : Math.max(6, Math.min(w, h) * 0.16);
-    const r = Math.max(2, Math.min(w, h * 1.6) / 2 - stroke / 2 - 2);
-    const cy = Math.min(h - stroke / 2 - 2, h * 0.72);
+    const stroke = Math.min(Math.min(w, h) / 2, num(cfg.thickness, 0) > 0 ? num(cfg.thickness, 0) : Math.max(6, Math.min(w, h) * 0.16));
+    const r = Math.max(0, Math.min(w, h) / 2 - stroke / 2 - 2);
+    const cy = h / 2;
     return { cx, cy, r, stroke };
+  });
+  let arcFill = $derived.by(() => {
+    if (!arc || pos <= 0) return [];
+    // Constant-colour zone spans need one path; smooth colour blends use small
+    // spans around the arc, since SVG linear gradients do not follow a curve.
+    const stops = cfg.gradient === false ? zones.map(z => z.from) : Array.from({ length: 128 }, (_, i) => i / 128);
+    return stops.filter(from => from < pos).map((from, i) => ({
+      from, to: Math.min(pos, stops[i + 1] ?? 1),
+      colour: css(meterFillColourAt((from + Math.min(pos, stops[i + 1] ?? 1)) / 2, cfg)),
+    }));
   });
 </script>
 
@@ -82,11 +97,21 @@
   <div class="meter-body">
     {#if arc}
       <svg class="meter-arc" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} preserveAspectRatio="xMidYMid meet">
-        <path d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, 0, 1, cfg.arcStart, cfg.arcSweep)}
-              fill="none" stroke={trackCss} stroke-width={arcGeo.stroke} stroke-linecap="round" />
-        {#if pos > 0}
-          <path d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, 0, pos, cfg.arcStart, cfg.arcSweep)}
-                fill="none" stroke={css(meterZoneColourAt(pos, cfg))} stroke-width={arcGeo.stroke} stroke-linecap="round" />
+        {#if segments > 0}
+          {@const lit = meterSegmentsLit(pos, segments)}
+          {@const gap = Math.min(0.8 / segments, Math.max(0, num(cfg.segmentGap, 2)) / Math.max(1, arcGeo.r * Math.abs(num(cfg.arcSweep, 270)) * Math.PI / 180))}
+          {#each Array(segments) as _, i (i)}
+            <path class="meter-arc-segment" class:lit={i < lit}
+              d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, i / segments + gap / 2, (i + 1) / segments - gap / 2, cfg.arcStart, cfg.arcSweep)}
+              fill="none" stroke={i < lit ? css(meterFillColourAt(meterSegmentCenter(i, segments), cfg)) : trackCss} stroke-width={arcGeo.stroke} />
+          {/each}
+        {:else}
+          <path d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, 0, 1, cfg.arcStart, cfg.arcSweep)}
+                fill="none" stroke={trackCss} stroke-width={arcGeo.stroke} stroke-linecap={num(cfg.rounded, 3) > 0 ? 'round' : 'butt'} />
+          {#each arcFill as span (span.from)}
+            <path class="meter-arc-fill" d={meterArcPath(arcGeo.cx, arcGeo.cy, arcGeo.r, span.from, span.to, cfg.arcStart, cfg.arcSweep)}
+                  fill="none" stroke={span.colour} stroke-width={arcGeo.stroke} />
+          {/each}
         {/if}
         {#if cfg.peakHold === true && peak !== undefined && peak > 0}
           {@const pa = (meterArcAngle(peak, cfg.arcStart, cfg.arcSweep))}
@@ -94,24 +119,33 @@
           {@const p2 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r + arcGeo.stroke / 2, pa)}
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={peakCss} stroke-width="2" />
         {/if}
+        {#each ticks as t (t.pos)}
+          {@const angle = meterArcAngle(t.pos, cfg.arcStart, cfg.arcSweep)}
+          {@const p1 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r - arcGeo.stroke / 2, angle)}
+          {@const p2 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r + arcGeo.stroke / 2, angle)}
+          <line class="meter-tick" x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="rgba(255,255,255,0.4)" stroke-width="1" />
+        {/each}
       </svg>
       {#if readout}<div class="meter-readout arc-readout">{readout}</div>{/if}
     {:else if segments > 0}
       {@const lit = meterSegmentsLit(pos, segments)}
       {@const peakSeg = cfg.peakHold === true && peak !== undefined ? meterSegmentsLit(peak, segments) : -1}
-      <div class="meter-segments" style={`gap:${num(cfg.segmentGap, 2)}px;`}>
+      <div class="meter-segments" style={`${barStyle} gap:${num(cfg.segmentGap, 2)}px;`}>
         {#each Array(segments) as _, i (i)}
           {@const idx = vertical ? segments - 1 - i : i}
           <div class="seg"
                class:lit={idx < lit}
                class:peak={idx === peakSeg - 1 && idx >= lit}
-               style={`background:${idx < lit ? css(meterZoneColourAt(meterSegmentCenter(idx, segments), cfg)) : trackCss}; border-radius:${num(cfg.rounded, 3)}px;`}></div>
+               style={`background:${idx < lit ? css(meterFillColourAt(meterSegmentCenter(idx, segments), cfg)) : trackCss}; border-radius:${num(cfg.rounded, 3)}px; --peak-colour:${peakCss};`}></div>
+        {/each}
+        {#each ticks as t (t.pos)}
+          <div class="meter-tick" style={vertical ? `bottom:${t.pos * 100}%;` : `left:${t.pos * 100}%;`}></div>
         {/each}
       </div>
     {:else}
-      <div class="meter-track" style={`background:${trackCss}; border-radius:${num(cfg.rounded, 3)}px;`}>
+      <div class="meter-track" style={`${barStyle} background:${trackCss}; border-radius:${num(cfg.rounded, 3)}px;`}>
         <div class="meter-clip" style={vertical ? `height:${pos * 100}%;` : `width:${pos * 100}%;`}>
-          <div class="meter-fill" style={`${vertical ? `height:${height}px; width:100%` : `width:${width}px; height:100%`}; background:${gradientCss}; border-radius:${num(cfg.rounded, 3)}px;`}></div>
+          <div class="meter-fill" style={`${vertical ? `height:${pos > 0 ? 100 / pos : 100}%; width:100%` : `width:${pos > 0 ? 100 / pos : 100}%; height:100%`}; background:${gradientCss}; border-radius:${num(cfg.rounded, 3)}px;`}></div>
         </div>
         {#if cfg.peakHold === true && peak !== undefined && peak > 0}
           <div class="meter-peak" style={vertical ? `bottom:${peak * 100}%; background:${peakCss};` : `left:${peak * 100}%; background:${peakCss};`}></div>
@@ -122,8 +156,8 @@
           {/each}
         {/if}
       </div>
-      {#if readout}<div class="meter-readout" class:vert={vertical}>{readout}</div>{/if}
     {/if}
+    {#if !arc && readout}<div class="meter-readout" class:vert={vertical}>{readout}</div>{/if}
   </div>
 
   {#if cfg.label && cfg.labelPosition === 'below'}<div class="meter-label">{cfg.label}</div>{/if}
@@ -153,7 +187,7 @@
   .meter:not(.vertical) .meter-segments { flex-direction: row; }
   .meter.vertical .meter-segments { flex-direction: column; }
   .seg { flex: 1 1 0; min-width: 0; min-height: 0; transition: background 60ms linear; }
-  .seg.peak { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.8); }
+  .seg.peak { box-shadow: inset 0 0 0 1px var(--peak-colour); }
 
   .meter-readout {
     position: absolute; right: 5px; top: 50%; transform: translateY(-50%);

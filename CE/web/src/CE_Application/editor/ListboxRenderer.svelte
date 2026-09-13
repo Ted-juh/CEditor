@@ -107,7 +107,7 @@
   function matchParts(label) {
     const q = String(effMatch ?? '').trim();
     const s = String(label ?? '');
-    if (!q) return [s, '', ''];
+    if (!q || cfg.highlightMatch === false) return [s, '', ''];
     const i = s.toLowerCase().indexOf(q.toLowerCase());
     if (i < 0) return [s, '', ''];
     return [s.slice(0, i), s.slice(i, i + q.length), s.slice(i + q.length)];

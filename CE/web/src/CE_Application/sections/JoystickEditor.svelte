@@ -53,6 +53,11 @@
           <option value="rest">A set value</option>
         </select>
     </PropertyCell>
+    {#if j.returnMode === 'rest'}
+      <PropertyCell label="Rest" span={1} compact hint="Return position (0–1) on each enabled return axis.">
+        <NumberCell label="Rest" min={0} max={1} step={0.01} value={j.returnValue ?? 0.5} defaultValue={0.5} onchange={(v) => set('returnValue', Math.max(0, Math.min(1, num(v, 0.5))))} />
+      </PropertyCell>
+    {/if}
     {#if String(j.returnMode ?? 'none') !== 'none'}
       <PropertyCell label="Axes" span={2} hint="Which axes spring back. Both travel on ONE progress, so the puck moves in a straight line — per-axis timing would make it curve.">
         <select class="val" value={j.returnAxes ?? 'both'} onchange={(e) => set('returnAxes', e.target.value)}>

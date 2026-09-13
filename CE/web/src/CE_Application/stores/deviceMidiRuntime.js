@@ -144,6 +144,18 @@ function flushContinuousParameterSends() {
   }
 }
 
+// A final commit supersedes older queued drag values for this destination.
+// Otherwise the next animation frame can undo a spring's completed return.
+export function discardPendingParameterSends(payload) {
+  const role = payload?.deviceRole ?? DEFAULT_DEVICE_ROLE;
+  const parameter = payload?.parameterId ?? '';
+  for (const [key, queued] of pendingContinuousParameters) {
+    if ((queued?.deviceRole ?? DEFAULT_DEVICE_ROLE) === role && (queued?.parameterId ?? '') === parameter) {
+      pendingContinuousParameters.delete(key);
+    }
+  }
+}
+
 export function queueContinuousParameterSend(payload) {
   const key = [
     payload?.deviceRole ?? DEFAULT_DEVICE_ROLE,

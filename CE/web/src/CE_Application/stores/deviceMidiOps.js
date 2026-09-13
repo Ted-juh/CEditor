@@ -36,7 +36,7 @@ import {
   localProfileMode,
   parseProfileSourceText,
 } from './deviceProfileLocalEngine.js';
-import { queueContinuousParameterSend } from './deviceMidiRuntime.js';
+import { queueContinuousParameterSend, discardPendingParameterSends } from './deviceMidiRuntime.js';
 import { initDeviceProfileBridge, normalizeSyncDirection, refreshProfileParameters } from './deviceProfileSession.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
@@ -207,6 +207,7 @@ export function commitDeviceParameter({
     return;
   }
 
+  discardPendingParameterSends(payload);
   setDeviceParameter(payload);
   if (interactionPhase !== 'continuous') {
     getDeviceDiagnostics();

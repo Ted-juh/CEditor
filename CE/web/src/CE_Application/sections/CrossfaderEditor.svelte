@@ -64,6 +64,11 @@
           <option value="rest">A set value</option>
         </select>
     </PropertyCell>
+    {#if x.returnMode === 'rest'}
+      <PropertyCell label="Rest" span={1} compact hint="Mix to return to (0 = A, 1 = B).">
+        <NumberCell label="Rest" min={0} max={1} step={0.01} value={x.returnValue ?? 0.5} defaultValue={0.5} onchange={(v) => set('returnValue', Math.max(0, Math.min(1, v)))} />
+      </PropertyCell>
+    {/if}
     {#if String(x.returnMode ?? 'none') !== 'none'}
       <NumberCell label="Time (ms)" min={0} max={5000} step={10} value={x.returnTime ?? 250} onchange={(v) => set('returnTime', Math.max(0, v))} />
       <PropertyCell label="Curve" span={2} hint="Linear is the constant-speed walk these controls always had. Exp covers most of the distance early, which is what a real spring does.">

@@ -29,9 +29,13 @@ export function ribbonSnap(value, control) {
 }
 
 // The strip/wheel travel rect (px), inset by padding.
-export function ribbonGeometry(width, height, pad = 8) {
+export function ribbonGeometry(width, height, pad = 8, control = null) {
   const p = Math.max(0, num(pad, 8));
-  return { x0: p, y0: p, w: Math.max(1, num(width, 0) - p * 2), h: Math.max(1, num(height, 0) - p * 2) };
+  const cfg = ribbonConfig(control);
+  const fontSize = Math.max(8, num(control?._children?.Text?._children?.Font?.size, 11));
+  const top = cfg.showValue === true ? Math.max(p, fontSize * 1.25 + 4) : p;
+  const bottom = cfg.label ? Math.max(p, fontSize * 1.25 + 4) : p;
+  return { x0: p, y0: top, w: Math.max(1, num(width, 0) - p * 2), h: Math.max(1, num(height, 0) - top - bottom) };
 }
 // The indicator position (px along the travel axis) for a value. Vertical:
 // value 0 at the BOTTOM. Horizontal: value 0 at the LEFT.

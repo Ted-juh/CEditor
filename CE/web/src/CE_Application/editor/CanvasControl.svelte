@@ -20,8 +20,9 @@
   import KeyboardRenderer from './KeyboardRenderer.svelte';
   import StepSequencerRenderer from './StepSequencerRenderer.svelte';
   import TabContainerRenderer from './TabContainerRenderer.svelte';
-  import { isChildOnActivePage } from '../utils/tabContainerLayout.js';
+  import { isChildOnActivePage, tabGeometry } from '../utils/tabContainerLayout.js';
   import ScrollAreaRenderer from './ScrollAreaRenderer.svelte';
+  import { clampScroll, scrollGeometry } from '../utils/scrollAreaLayout.js';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import MatrixRenderer from './MatrixRenderer.svelte';
   import JoystickRenderer from './JoystickRenderer.svelte';
@@ -600,7 +601,7 @@
   // button that was already there.
   let childControls = $derived(isContainer
     ? sortControlsForRender(getChildControls(control))
-      .filter((child) => !isTabContainer || isChildOnActivePage(child, control))
+      .filter((child) => !isTabContainer || isChildOnActivePage(child, renderControl ?? control))
     : []);
   // WHERE A CHILD'S 0,0 IS. Everything else in the app answers this with containment.contentOrigin
   // — hit-testing, controlPanelRect, the fit measurement, the scenery compiler — and that function
@@ -611,9 +612,21 @@
   // is not where the child is on screen, and a scenery layer visibly sliding its contents on lock.
   // Nothing could write a per-side value before the Children editor existed, which is why it went
   // unnoticed; the same reason it had to be fixed alongside it.
-  let childrenPad = $derived(fitSettings(control).padding);
+  let tabPageRect = $derived(isTabContainer ? tabGeometry(displayW, displayH, renderControl ?? control).page : null);
+  let childrenPad = $derived.by(() => {
+    const pad = fitSettings(control).padding;
+    return tabPageRect ? {
+      left: pad.left + tabPageRect.x, top: pad.top + tabPageRect.y,
+      right: pad.right + displayW - tabPageRect.x - tabPageRect.w,
+      bottom: pad.bottom + displayH - tabPageRect.y - tabPageRect.h,
+    } : pad;
+  });
   let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
-  let childrenClip = $derived(childrenSection?.clip === true);
+  let childrenClip = $derived(isTabContainer || isScrollArea || childrenSection?.clip === true);
+  let childScroll = $derived(isScrollArea ? clampScroll(
+    previewSession?.scrollOffset ?? { x: control?._children?.ScrollArea?.scrollX ?? 0, y: control?._children?.ScrollArea?.scrollY ?? 0 },
+    displayW, displayH, control) : { x: 0, y: 0 });
+  let scrollViewport = $derived(isScrollArea ? scrollGeometry(displayW, displayH, control).viewport : null);
   // The container's own corner radius, so a clip follows the curve rather than the border box.
   // Clamped to half the shorter side exactly as boxElement clamps it, so the two never disagree.
   let childrenClipRadius = $derived(Math.min(
@@ -642,8 +655,8 @@
   // and an anchor inside it would be a control opting out of the layout it was put in.
   let childPositions = $derived(childFlowPositions ?? childAnchoredPositions);
   let childParentOffset = $derived({
-    x: parentOffset.x + displayX + childrenPad.left,
-    y: parentOffset.y + displayY + childrenPad.top,
+    x: parentOffset.x + displayX + childrenPad.left - childScroll.x,
+    y: parentOffset.y + displayY + childrenPad.top - childScroll.y,
   });
   let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
   // The frame this container's children live in: their (0,0) is its content origin, so the bounds
@@ -3377,6 +3390,8 @@
           style={`height:${previewListboxFilter?.height ?? 24}px;`}
           oninput={onpreviewlistboxfilter}
           onpointerdown={(event) => event.stopPropagation()}
+          onkeydown={(event) => event.stopPropagation()}
+          onkeyup={(event) => event.stopPropagation()}
         />
       {/if}
     {/if}
@@ -3389,8 +3404,8 @@
         value={tiValue}
         placeholder={tiPlaceholder}
         disabled={previewTextField?.disabled === true}
-        readonly={!previewInteractive}
-        tabindex={previewInteractive ? 0 : -1}
+        readonly={!previewInteractive || previewTextField?.readOnly === true}
+        tabindex={previewInteractive ? (previewTextField?.tabIndex ?? 0) : -1}
         oninput={previewInteractive ? onpreviewtextinput : undefined}
         onkeydown={previewInteractive ? onpreviewtextkeydown : undefined}
         onfocus={previewInteractive ? onpreviewtextfocus : undefined}
@@ -3956,8 +3971,8 @@
          still goes down unchanged and still means the panel's top-level list: the LCD and pixel
          displays resolve a data source out of it by name, which is a lookup, not geometry. -->
     <div class="children-clip" class:clipped={childrenClip} class:children-interactive={mouseChildrenTakePointer}
-      style={childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}>
-      <div class="children-origin" style="left:{childrenPad.left}px; top:{childrenPad.top}px;">
+      style={`${childrenClip && childrenClipRadius ? `border-radius:${childrenClipRadius}px;` : ''}${scrollViewport ? `width:${scrollViewport.w}px;height:${scrollViewport.h}px;` : ''}${tabPageRect ? `left:${tabPageRect.x}px;top:${tabPageRect.y}px;width:${tabPageRect.w}px;height:${tabPageRect.h}px;` : ''}`}>
+      <div class="children-origin" style="left:{childrenPad.left - childScroll.x - (tabPageRect?.x ?? 0)}px; top:{childrenPad.top - childScroll.y - (tabPageRect?.y ?? 0)}px;">
         {#each childControls as child (child._children?.Core?.id)}
           <CanvasControlNested
             control={child}
