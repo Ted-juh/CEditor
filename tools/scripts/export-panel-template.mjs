@@ -122,13 +122,20 @@ export function findTemplate(templatesDir, format) {
 
 export async function exportFromTemplate({ panelFile, guid, templatesDir, outDir, formats, log = console.log }) {
   const panelDoc = JSON.parse(readFileSync(panelFile, 'utf8'));
+  const explicitFormats = formats !== undefined;
   formats ??= TEMPLATE_FORMATS.filter((format) =>
     format.id === 'vst3' || (format.id === 'clap'
       ? panelDoc.exportSettings?.exportClap !== false
       : panelDoc.exportSettings?.exportLv2 !== false));
   const unsupported = formats.filter((format) => format.id !== 'vst3');
   if (unsupported.length) {
-    throw new Error(`Compiler-free export currently supports VST3 only. Disable ${unsupported.map((format) => format.id.toUpperCase()).join(' and ')} in Panel Properties → Export, or use the compiling exporter. Their template identities are not yet safe for separate panels.`);
+    if (explicitFormats || !formats.some((format) => format.id === 'vst3')) {
+      throw new Error('Compiler-free export currently supports VST3 only. Use the compiling exporter for CLAP and LV2.');
+    }
+    // Older documents contain true for both formats because those were factory defaults.
+    // Keep their settings intact while allowing the installed editor to export a usable VST3.
+    log(`Warning: ${unsupported.map((format) => format.id.toUpperCase()).join(' and ')} skipped: the installed exporter supports VST3 only. Use the compiling exporter for those formats. Exporting VST3; saved format settings are unchanged.`);
+    formats = formats.filter((format) => format.id === 'vst3');
   }
   validateTemplateScripting(panelDoc);
   if (panelDoc.controls?.length && !Array.isArray(panelDoc.exportParameters)) {

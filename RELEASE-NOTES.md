@@ -17,7 +17,8 @@ the app tells you the same thing in **About** and on the **Export** tab.
 **VST3 export without a compiler.** The installer includes a player template, Node and the export
 scripts. It exports VST3 panels using Lua, JavaScript and TypeScript without Visual Studio or a
 source checkout, into Documents → CEditor → Exports. CLAP/LV2 and extra native script runtimes
-require the compiling exporter. Unsupported combinations are refused with an explanation.
+require the compiling exporter. Older panels still export VST3, with skipped formats explained
+in the build log. Unsupported runtimes are refused with an explanation.
 New panels select VST3 only; saved format choices are retained.
 
 ## What you get

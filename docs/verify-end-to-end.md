@@ -151,9 +151,11 @@ Documents → CEditor → Exports, then scan/load it in a host and exercise its 
 Export a second panel and verify distinct plugin identities. Confirm the shipped Node and
 `tools/scripts/shared` identity helpers are used, and the app loads `web/dist` without localhost.
 
-CLAP/LV2 templates and C++/C#/Java/Python template runtimes are currently unsupported. Selecting
-them must explain the refusal and preserve a previous export. Test those supported combinations
-with the compiling exporter in Track A. A standalone per-panel export is not implemented.
+CLAP/LV2 templates and C++/C#/Java/Python template runtimes are currently unsupported. Reopen an
+older panel with CLAP/LV2 selected: it must export VST3, explain the skipped formats in the log and
+preserve its saved format settings. Unsupported runtimes must explain the refusal and preserve
+a previous export. Test those supported combinations with the compiling exporter in Track A.
+A standalone per-panel export is not implemented.
 
 ---
 

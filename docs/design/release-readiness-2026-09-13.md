@@ -44,8 +44,9 @@ Each proposed change must be checked against the current code and a user workflo
   the CEditor runtime component, and copy the outer VST3 bundle without recursing into its DLL.
 - Installed exports prefer their own pipeline and write to Documents/CEditor/Exports. Windows
   template exports rename the internal binary to match its bundle and show the panel's name,
-  vendor and version in the host. CLAP/LV2 templates are refused before touching output because
-  their identities are still fixed at build time. The compiling exporter retains those formats.
+  vendor and version in the host. CLAP/LV2 templates are skipped with an explicit build-log warning
+  because their identities are still fixed at build time. Older panels still export VST3 without
+  changing their saved format settings. The compiling exporter retains those formats.
 - Export's action, identity decision and result are at the top. Advanced identity/module sections
   start collapsed; saved collapse preferences are honored. Explanations wrap instead of truncating.
 
@@ -83,8 +84,8 @@ Each proposed change must be checked against the current code and a user workflo
    checks do not demonstrate the physical synth's behavior.
 5. Hostage's existing 36-feature completion audit and current native suites were reviewed. A
    fresh physical/performance acceptance pass remains separate from source/test completion.
-6. Update packaged documentation, produce a release candidate, and reconcile the reviewed batch
-   with main. No public release tag or installer publication has been made by this work.
+6. The reviewed batch is on main and a Windows release candidate is being packaged locally.
+   No public release tag or installer publication has been made by this work.
 
 Builds and tests run locally. GitHub CI is not the iterative test environment, and no workflow
 expansion is needed for this review.

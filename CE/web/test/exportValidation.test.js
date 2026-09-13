@@ -121,11 +121,24 @@ test('the staged Windows exporter works away from the checkout with bundled Node
     const exportedPanel = path.join(root, 'exports/Validation.vst3/Contents/Resources/panel.cepanel');
     assert.equal(JSON.parse(readFileSync(exportedPanel)).panelGuid, 'validation-guid');
     const previous = readFileSync(exportedPanel, 'utf8');
-    writeFileSync(panelFile, JSON.stringify(scripted('lua', {
-      exportSettings: { exportClap: true, exportLv2: false },
+    writeFileSync(panelFile, JSON.stringify(scripted('cpp', {
+      exportSettings: { exportClap: true, exportLv2: true },
     })));
-    assert.throws(run, /supports VST3 only/);
+    assert.throws(run, /cpp runtime support/);
     assert.equal(readFileSync(exportedPanel, 'utf8'), previous);
+
+    // Panels saved by the previous factory have both flags on without a user choosing them.
+    const legacyPanel = JSON.stringify(scripted('lua', {
+      exportSettings: { exportClap: true, exportLv2: true },
+    }));
+    writeFileSync(panelFile, legacyPanel);
+    assert.match(run().toString(), /CLAP and LV2 skipped.*Exporting VST3/);
+    assert.equal(readFileSync(panelFile, 'utf8'), legacyPanel);
+    assert.deepEqual(JSON.parse(readFileSync(exportedPanel)).exportSettings, {
+      exportClap: true, exportLv2: true,
+    });
+    assert.equal(existsSync(path.join(root, 'exports/Validation.clap')), false);
+    assert.equal(existsSync(path.join(root, 'exports/Validation.lv2')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -212,10 +212,11 @@ the walkthrough is not evidence for every asset format or a second computer.
 
 ## Compiler-free plugin export
 
-The installed exporter supports VST3. CLAP and LV2 templates are refused because their wrappers
+The installed exporter supports VST3. CLAP and LV2 templates are skipped because their wrappers
 still report a build-time identity; copying them per panel would create plugin collisions. Those
 formats remain available through the source-checkout compiling exporter. New panels select VST3
-only, and existing saved format choices are retained.
+only, and existing saved format choices are retained. Older panels with both formats selected
+still export VST3; the build log explains the skipped formats and the compiling-exporter route.
 
 The installed template includes Lua/JavaScript support (TypeScript is prepared by the existing
 export pipeline). It cannot bundle C++/C#/Java handlers or CPython. The compiling exporter currently
