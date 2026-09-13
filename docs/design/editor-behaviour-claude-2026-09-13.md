@@ -43,6 +43,9 @@ renderer ever reading it.
 | Constraint | 10 | 26 | — | — | — |
 | Router | 20 | 35 | — | 3 | — |
 | Drum Pads | 36 | 59 | — | 2 | **2** |
+| Keyboard | 18 | 23 | — | — | — |
+| Note Ribbon | 26 | 22 | — | 1 | — |
+| Chord Pad | 28 | 30 | 1 | 1 | — |
 | Orbit | 15 | 30 | — | 2 | **1** (surface-wide) |
 | Timbre | 14 | 16 | — | — | — |
 | Turing | 19 | 36 | — | 1 | — |
@@ -50,7 +53,7 @@ renderer ever reading it.
 | Kinetic | 15 | 12 | — | 2 | — |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
-`behaviourNotes.mjs` — 59 verified, 0 inert, 2 unverified, 0 open defects (both found ones fixed).
+`behaviourNotes.mjs` — 134 verified, 1 inert, 4 unverified, 0 open defects (both found ones fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 6 unverified, 0 open defects (the two found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
@@ -60,8 +63,8 @@ The custom pass covers all **14 starters** (every declared part drawn with real 
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **194 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 309 are not yet done and are not claimed.
+That is **266 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 237 are not yet done and are not claimed.
 
 ---
 
@@ -306,12 +309,30 @@ into three confirmed mismatches.
 
 **Inert — declared, and read by nothing:**
 
+- `ChordPad.fieldColour`. `ChordPadRenderer` has no `fieldCss` and never reads it — only `padColour`
+  reaches the drawing. It is in neither the ChordPad editor nor the script API, so nothing can set it
+  and nothing would change if it did. Lowest severity of the inert rows: unreachable from every
+  direction, so it has no user-visible symptom at all.
 - `Constellation.showField`. The only `showField` reader in `src/` is `TimbreRenderer`, where it
   gates a per-anchor heat overlay drawn over the base field rect. The Constellation draws the base
   rect and has no overlay at all, so there is nothing for the flag to turn off. It is **not** in the
   properties panel, but it **is** published as a scripting verb (`constellationShowField`) in all
   seven engines, so a script can call it and get nothing. Recorded rather than fixed: giving the
   Constellation a heat field is building a visual feature, which is the owner's call, not a QA fix.
+
+  **Recommended release handling, smallest first.** The verb is not declared in
+  `scripting/componentVerbs.js` — the Constellation block there lists `probe`, `mode`, `blend`,
+  `run`, `rate`, `sync`, `bars`, `links` and nothing else — yet `constellationShowField` reaches all
+  seven engine tables alongside `editable` and `read`, so it is derived rather than written. The
+  cheapest honest fix is therefore to **stop the derivation seeing it**: drop `showField` from the
+  Constellation block of `models/sectionDefaults.js` and regenerate the engine tables. Nothing in the
+  UI shows it, nothing in `src/` reads it, and a script that called it was already getting nothing,
+  so no behaviour is lost and the published API stops promising something it cannot do. A stored
+  panel carrying the key is unaffected — the document format is sparse and ignores keys it does not
+  know. If the tables turn out to be hand-maintained rather than derived, the same change is a
+  one-row deletion in each. Failing either, the honest minimum is a line in the scripting docs
+  marking it reserved and unimplemented. **Not investigated further on instruction; this is the
+  recommendation, not a completed change.**
 
 - `Envelope.xLabel`, `Envelope.yLabel`. No reader in `CE/src`, `CE/web/src`, `tools/` or the script
   API; `EnvelopeRenderer` draws no `<text>` at all. Written only by
@@ -420,8 +441,8 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The remaining 309 catalogue properties: Looper, Keyboard, StepSequencer,
-  ChordPad, Arp, NoteRibbon, Phrase, Recorder, Harmoniser, SplitZone, Setlist, Transport, Panic.
+- The remaining 237 catalogue properties: Looper, StepSequencer, Arp, Phrase, Recorder, Harmoniser,
+  SplitZone, Setlist, Transport, Panic.
 - Custom components: **done for this pass** — all 14 starters, bindings, links, published
   properties, generators, export/import, persistence and variants/states. The states gap is closed:
   each rule is asserted by which page is actually on screen (a hidden part is not rendered at all,
