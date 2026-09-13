@@ -35,7 +35,7 @@ test('row height honors explicit rowHeight, density and two-line', () => {
   assert.equal(listboxRowHeight(c), 22); // auto (comfortable)
   c._children.Listbox = { density: 'compact' };
   assert.equal(listboxRowHeight(c), 18); // 12 + 6
-  c._children.Listbox = { rowHeight: 40 };
+  c._children.Listbox = { rowHeight: 40, twoLine: true };
   assert.equal(listboxRowHeight(c), 40); // explicit
   c._children.Listbox = { twoLine: true };
   assert.equal(listboxRowHeight(c), 22 + Math.round(12 * 0.9) + 2); // + subtitle line

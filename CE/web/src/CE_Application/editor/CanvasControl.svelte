@@ -50,6 +50,7 @@
   import SetlistRenderer from './SetlistRenderer.svelte';
   import TransportRenderer from './TransportRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
+  import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { layerTints } from '../stores/panelLayerActions.js';
   import { normalizeLayerName } from '../utils/panelLayers.js';
@@ -69,7 +70,7 @@
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
   import {
     getMouseSection,
     resolveCursorCss,
@@ -356,7 +357,7 @@
   let listboxMultiSet = $derived.by(() => {
     if (!isListboxControl || (renderControl?._children?.Listbox?.multiSelect !== true)) return null;
     const arr = previewSession?.listboxSelected;
-    return new Set((Array.isArray(arr) ? arr : []).map((v) => String(v)));
+    return new Set((Array.isArray(arr) ? arr : listboxDefaultSelectedValues(listboxRenderControl)).map((v) => String(v)));
   });
   // Now-playing (recalled) row for the ▶ marker (only when nowPlaying is on).
   let listboxNowPlaying = $derived.by(() => {
@@ -3372,7 +3373,7 @@
         control={listboxRenderControl}
         width={displayW}
         height={displayH}
-        selectedValue={interactionRuntime?.signals?.valueRaw}
+        selectedValue={interactionRuntime?.signals?.valueRaw ?? resolveInteractionContext(listboxRenderControl, appliedPreviewSession).valueRaw}
         selectedValues={listboxMultiSet}
         pendingValue={previewSession?.listboxPending ?? ''}
         nowPlayingValue={listboxNowPlaying}

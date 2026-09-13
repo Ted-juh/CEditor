@@ -14,6 +14,7 @@ import { applyPanelValueRoutes } from '../utils/routeSessions.js';
 import { flatControls } from '../utils/containment.js';
 import { resolveRadioSelectedKeys } from '../utils/radioSegmentStyle.js';
 import { isSliderBehavior, getSliderActiveHandle } from '../utils/sliderBehavior.js';
+import { listboxDefaultSelectedValues } from '../utils/listboxLayout.js';
 
 /**
  * Every control in the panel, containers included.
@@ -87,6 +88,9 @@ export function createInteractionPreviewSession(control = null) {
     next.customNormalizedValue = normalizeCustomChannelValue(mainChannel, next.customValues?.[mainChannel?.name ?? 'mainValue']);
   }
   const behavior = control?._children?.Behavior ?? null;
+  if (behavior?.buttonType === 'listbox' && control?._children?.Listbox?.multiSelect === true) {
+    next.listboxSelected = listboxDefaultSelectedValues(control);
+  }
   if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
     next.checked = behavior?.defaultValue === true;
   }
@@ -155,7 +159,8 @@ export function applyPanelDependentChoices(controls = [], sessions = {}) {
     if (dependsResetOnChange(child) || !stillVisible) {
       patch.valueOverrideEnabled = true;
       patch.valueOverride = firstDependentValue(rows, parentValue, parentId);
-      patch.listboxSelected = [];
+      patch.listboxSelected = child?._children?.Listbox?.multiSelect === true && patch.valueOverride !== ''
+        ? [String(patch.valueOverride)] : [];
       patch.listboxPending = '';
       patch.listboxScrollTop = 0;
       patch.listboxNowPlaying = '';

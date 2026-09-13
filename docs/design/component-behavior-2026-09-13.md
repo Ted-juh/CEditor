@@ -82,6 +82,9 @@ separate gate, not implied by this document round trip.
 | B62 | Pixel Reset appearance | Reset leaves a strong glow and gamma 3 behind, so its painted canvas differs from the default look. | Reset both appearance settings. Actual canvas matches a default reference with identical content; quarter-brightness alpha confirms gamma resets too. Both survive fresh reopen. |
 | B63 | Dependent choice output | Changing the bank resets the child visually to B1 while its last emitted value stays Shared. | Emit changed dependent values after the initiating user action. Eighteen parent/child/reset combinations pass with ordered output and fresh reopen. Inbound MIDI updates both controls without echo. |
 | B64 | Multi-level dependent choices | With program before bank in canvas order, a family change updates the bank but leaves the program stale. | Resolve dependencies before children and send in that same order. A reversed three-level chain updates every displayed choice and emits family, bank, program in order after reopen. Cyclic malformed dependencies terminate. |
+| B65 | Listbox multi-select defaults / dependent reset | Multi-select starts with no selected rows despite an authored default; adding another default unticks the first. Dependent reset also clears the visible set instead of selecting its new first match. | Seed and render selectable default rows, allow multiple default flags in the Value editor, and reflect dependent reset in the selected set. Pointer/keyboard toggles, checkbox marks, anchor output, editing two defaults and fresh reopen pass. |
+| B66 | Listbox fixed Row height with subtitles | Fixed height 40 renders as 53 with Two line enabled. | Subtitle allowance applies only to automatic height. Actual row bounds remain 40; auto-height unit checks remain intact. |
+| B67 | Listbox selection styling in the design canvas | No default row is selected outside rehearsal, so changing selection style appears to do nothing. | Use the existing interaction-value resolver for the design-time default. All five visible styles (bar/stripe/outline/check/bold), accent colour and fresh reopen pass. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -167,6 +170,16 @@ batch, including 18 combinations of Combobox/Radio/Cyclic parents, Combobox/List
 children and reset/retain behavior, inbound no-echo, and a reversed three-level chain.
 All **4,819 Node tests pass with zero skips** after B63/B64. Integration validation
 with Claude's corrected arpeggiator follows.
+
+Claude's corrected arpeggiator commits through 11a62c04 are merged at accf0a35.
+Local integrated validation: **4,821 Node tests pass, production build passes,
+expanded note suite 204 verified / 1 inert / 5 unverified / zero defects**. These
+are assertions, not an exhaustive count of unique properties.
+
+Three additional Listbox scenarios (87 total) have focused passes for B65–B67,
+rich-row icons/subtitles/badges/swatches, disabled opacity and empty text. A style
+assertion initially sampled the CSS transition before it finished; the test now
+waits for the 120ms transition before comparing the final style.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

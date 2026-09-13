@@ -18,6 +18,12 @@ export function isSelectableRow(row) {
   return !!row && row.isHeader !== true && row.enabled !== false;
 }
 
+export function listboxDefaultSelectedValues(control) {
+  return listboxRows(control)
+    .filter(row => isSelectableRow(row) && row.selectedByDefault === true)
+    .map(row => String(row.internalValue ?? row.id ?? ''));
+}
+
 // Fuzzy = all of q's chars appear in s in order.
 function fuzzy(q, s) {
   let i = 0;
@@ -72,9 +78,8 @@ export function listboxRowHeight(control) {
   const cfg = listboxConfig(control);
   const font = control?._children?.Text?._children?.Font ?? null;
   const size = Math.max(6, num(font?.size, 12));
-  let h;
-  if (num(cfg.rowHeight, 0) > 0) h = Math.round(cfg.rowHeight);
-  else h = Math.max(18, Math.round(size + (String(cfg.density) === 'compact' ? 6 : 10)));
+  if (num(cfg.rowHeight, 0) > 0) return Math.round(cfg.rowHeight);
+  let h = Math.max(18, Math.round(size + (String(cfg.density) === 'compact' ? 6 : 10)));
   if (cfg.twoLine === true) h += Math.round(size * 0.9) + 2; // room for the subtitle line
   return h;
 }

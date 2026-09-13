@@ -76,7 +76,8 @@
   //
   // Unticking is still allowed and leaves none: the readers fall back to the first enabled row,
   // which is a defined answer rather than an accident.
-  let allowsMultipleDefaults = $derived(String(behavior?.selectionMode ?? 'single') === 'multi');
+  let allowsMultipleDefaults = $derived(String(behavior?.selectionMode ?? 'single') === 'multi'
+    || (buttonType === 'listbox' && getSection(control, 'Listbox')?.multiSelect === true));
 
   function updateRow(index, key, nextValue) {
     const exclusiveDefault = key === 'selectedByDefault' && nextValue === true && !allowsMultipleDefaults;
