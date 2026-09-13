@@ -5571,7 +5571,7 @@
     const behavior = getBehavior(control);
     const base = {
       disabled: isDisabled(control),
-      readOnly: behavior?.keyboardEnabled === false,
+      readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
       inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
       tabIndex: -1,
     };
@@ -5582,7 +5582,7 @@
   }
 
   function beginSpinnerFieldEdit(control, role) {
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const behavior = getBehavior(control);
     const session = sessionFor(control);
@@ -5598,7 +5598,7 @@
   }
 
   function commitSpinnerField(control, role) {
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -5625,7 +5625,7 @@
 
   function handleSpinnerFieldInput(control, role, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
@@ -5638,7 +5638,7 @@
 
   function handleSpinnerFieldKeyDown(control, role, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const handle = spinnerHandleForRole(role);
 
     if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
@@ -6254,7 +6254,7 @@
   }
 
   function beginRangeFieldEdit(control) {
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const controlId = getControlId(control);
     patchControlSession(controlId, {
       focused: true,
@@ -6265,7 +6265,7 @@
   }
 
   function commitRangeFieldInput(control) {
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const controlId = getControlId(control);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -6286,7 +6286,7 @@
 
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
       valueInputActive: true,
@@ -6296,7 +6296,7 @@
 
   function handleRangeFieldKeyDown(control, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
 
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
@@ -7639,7 +7639,7 @@
   function handleKeyDown(control, event) {
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
 
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';
@@ -7768,7 +7768,7 @@
   function handleKeyUp(control, event) {
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
-    if (getBehavior(control)?.keyboardEnabled === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     if (isListboxControl(control)) return; // navigation/confirmation is completed on keydown
     if (event.key !== ' ' && event.key !== 'Enter') return;
 
@@ -7887,7 +7887,7 @@
       previewValueField: previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
         value: resolveRangeDisplayValue(behavior, session),
         disabled: isDisabled(control),
-        readOnly: behavior?.keyboardEnabled === false,
+        readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
         inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
         ariaLabel: `${coreName} value`,
         tabIndex: -1,

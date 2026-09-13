@@ -63,6 +63,7 @@ separate gate, not implied by this document round trip.
 | B43 | Slider / Knob remapped typed readout | On wire range 61–67 displayed as -3–3, typing -2 commits the minimum and displays -3. | Use the slider display-to-wire parser and active-handle setter. Both types display -2 and emit 62, including reopen. |
 | B44 | ProgressBar default readout | The default requests showReadout, which the Meter renderer never reads; no number appears. | Use showValue. Displayed 35%/75% agrees with the visible clipped fill, and 75% survives reopen. |
 | B45 | Leaving Preview during numeric return | Outbound calls continue after leaving rehearsal (21 becomes 44 in 400ms). | Cancel active return tokens on surface destruction and component removal. Real Preview-close check confirms output stops. |
+| B46 | Number / Range Display mode | Inline field bypasses the outer read-only guard: typing and ArrowUp replace 40 with 34. | Native read-only attribute plus field-handler Display guards. Both component types reject actual edits and emit nothing, before/after fresh reopen. |
 
 New screen checks pass without product changes: Pixel bar placement/width in grid dots, source
 changes, brightness and gamma are measured from the canvas pixels before/after reopening. LCD
@@ -85,6 +86,12 @@ Next checkpoint: all **52 root behavioral scenarios pass together with no browse
 All **4,814 Node tests pass with no skips**, and the production frontend build passes after
 B38–B45. The two numeric return lifecycle cases include actual output after release/Preview exit.
 This remains incomplete property coverage, not a release sign-off.
+
+Claude follow-up through e9fd0233 merged at 593ac1ab. Custom and motion suites pass locally;
+CanvasControl now supplies its render namespace to Timbre's gradient IDs. Review identified a
+persistence loophole in Claude's shared reopen helper (sessions survived), a weak page-exclusivity
+assertion, and live CSS rather than live pixels in export comparisons. Claude is strengthening
+these and rerunning them; the affected evidence is provisional until those stronger checks pass.
 
 ### Follow-up after checkpoint 55ab7e10 (in progress)
 

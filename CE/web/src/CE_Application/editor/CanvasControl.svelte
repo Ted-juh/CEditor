@@ -3291,7 +3291,7 @@
     {/if}
 
     {#if isTimbre}
-      <TimbreRenderer control={renderControl} width={displayW} height={displayH} />
+      <TimbreRenderer control={renderControl} width={displayW} height={displayH} idSeed={svgIdSeed} />
     {/if}
 
     {#if isTuring}

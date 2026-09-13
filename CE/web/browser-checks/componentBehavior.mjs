@@ -585,6 +585,12 @@ try {
     const id=await fixture('Slider',{Behavior:{returnMode:'min',returnTime:2500,returnCurve:'linear'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
     await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();await node(id).click({position:{x:275,y:80}});await page.waitForTimeout(150);await props.getByTitle('Exit Preview',{exact:true}).click();await settle();const count=await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length);await page.waitForTimeout(400);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),count,'closing rehearsal must stop its return output');
   });
+  await check('Number and Range Display mode blocks native input edits and outbound values',async()=>{
+    for(const type of ['Number','Range']){
+      const id=await fixture(type,{Behavior:{valueFlow:'display',min:0,max:100,defaultValue:40,defaultStartValue:20,defaultEndValue:80},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const input=node(id).locator('input').first();const before=await input.inputValue();await input.focus();await page.keyboard.press('Control+A');await page.keyboard.type('33');await page.keyboard.press('Enter');await page.keyboard.press('ArrowUp');await settle();assert.equal(await input.inputValue(),before,`${type} Display is read-only through its real inline field`);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').length),0);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+    }
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();
