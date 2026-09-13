@@ -233,6 +233,37 @@ class Kit {
     }, { id, fx, fy });
   }
 
+  /**
+   * The control as the BROWSER ACTUALLY PAINTED IT, sampled at fractions of its box.
+   *
+   * `pixel()` rasterises a serialised copy of the svg, which is the right tool for an svg renderer
+   * and the wrong one for anything drawn with CSS — a background-size, a background-position, a
+   * filter or a blend mode is applied by the compositor and never appears in the markup. This takes
+   * a real screenshot of the element and decodes it in the page (Image → canvas → getImageData),
+   * so what comes back is the compositor's own output.
+   */
+  async livePixels(id, points) {
+    const handle = await this.page.$(`[data-control-id="${id}"]`);
+    if (!handle) return null;
+    const shot = await handle.screenshot({ type: 'png' });
+    const dataUrl = `data:image/png;base64,${shot.toString('base64')}`;
+    return this.page.evaluate(async ({ dataUrl, points }) => {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('shot did not decode')); img.src = dataUrl; });
+      const cv = document.createElement('canvas');
+      cv.width = img.width; cv.height = img.height;
+      const cx = cv.getContext('2d');
+      cx.clearRect(0, 0, cv.width, cv.height);
+      cx.drawImage(img, 0, 0);
+      return points.map(([fx, fy]) => {
+        const d = cx.getImageData(
+          Math.min(cv.width - 1, Math.round(cv.width * fx)),
+          Math.min(cv.height - 1, Math.round(cv.height * fy)), 1, 1).data;
+        return [d[0], d[1], d[2], d[3]];
+      });
+    }, { dataUrl, points });
+  }
+
   /** The fan-out values this control currently offers a device parameter. */
   ports(id) {
     return this.page.evaluate(async ({ id }) => {
@@ -304,31 +335,72 @@ class Kit {
   }
 
   /**
-   * SAVE AND REOPEN, for real: the active panel is serialised to the on-disk `.cepanel` format,
-   * parsed back, and opened as a new panel. Returns the reopened control's id, so the SAME
-   * behavioural assertion can be run again against a renderer that has never seen the original.
+   * SAVE AND REOPEN, for real — including a fresh runtime.
+   *
+   * The panel is serialised to the on-disk `.cepanel` format, the PAGE IS RELOADED, and the
+   * serialised document is imported into the new runtime. Returns the reopened control's id, so the
+   * same behavioural assertion can run again against a renderer that has never seen the original.
+   *
+   * The reload is the point, and it was added after a review caught the earlier version short.
+   * Reopening preserves every control id, and the preview sessions are keyed by control id — so
+   * simply adding the deserialised panel handed the new copy the LIVE state of the one it was saved
+   * from. An assertion could then pass on a value the file never carried: a component "remembering"
+   * its last tab, a pad still latched, a Turing ring still churning. Worse, the module-level state
+   * the surface keeps outside any store — held drum pads, the kinetic physics map, the ribbon's
+   * current press, the run tickers — survived too. A reload clears all of it at once, which no
+   * amount of resetting sessions by id would have done.
+   *
+   * `localStorage` is cleared first so an autosaved session cannot restore the panel behind us and
+   * reintroduce the very id collision this is here to avoid.
    */
   async reopen(id) {
-    const newId = await this.page.evaluate(async ({ id }) => {
-      const { serializePanel, deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
-      const { panels, activePanelId, addPanel } = await import('/src/CE_Application/stores/panels.js');
+    const payload = await this.page.evaluate(async ({ id }) => {
+      const { serializePanel } = await import('/src/CE_Application/stores/panelModel.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
       const list = get(panels);
       const panel = list.find((p) => p.id === get(activePanelId)) ?? list[list.length - 1];
       const index = flat(panel.controls ?? []).findIndex((c) => c._children.Core.id === id);
-      if (index < 0) return '';
+      if (index < 0) return null;
       const json = serializePanel(panel);
-      const reopened = deserializePanel(typeof json === 'string' ? json : JSON.stringify(json), '', 'reopened');
-      addPanel(reopened);
+      return { index, json: typeof json === 'string' ? json : JSON.stringify(json) };
+    }, { id });
+    if (!payload) throw new Error('reopen: the control is not on the active panel');
+
+    const wasPreview = await this.page.evaluate(async () => {
+      const { previewModeEnabled } = await import('/src/CE_Application/stores/interactionPreview.js');
+      let v; previewModeEnabled.subscribe((x) => { v = x; })();
+      return v === true;
+    });
+
+    await this.page.evaluate(() => { try { localStorage.clear(); } catch { /* private mode */ } });
+    await this.page.reload({ waitUntil: 'networkidle' });
+    await this.page.waitForSelector('.app', { timeout: 60000 });
+    await this.settle(200);
+    // The note tap lives on `window`, so it goes with the old page and has to be put back.
+    await this.page.evaluate(async () => {
+      const { noteOutputEvents } = await import('/src/CE_Application/stores/noteOutput.js');
+      window.__notes = [];
+      noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push(e); });
+    });
+
+    const newId = await this.page.evaluate(async ({ payload }) => {
+      const { deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
+      const { panels, addPanel } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
+        const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
+      addPanel(deserializePanel(payload.json, '', 'reopened'));
       const now = get(panels);
       const opened = now[now.length - 1];
-      const again = flat(opened.controls ?? [])[index];
+      const again = flat(opened.controls ?? [])[payload.index];
       return again ? again._children.Core.id : '';
-    }, { id });
+    }, { payload });
     if (!newId) throw new Error('reopen: the control did not come back');
-    await this.settle(260);
+    if (wasPreview) await this.preview(true);
+    await this.settle(300);
     return newId;
   }
 }
