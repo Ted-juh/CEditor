@@ -59,6 +59,7 @@ renderer ever reading it.
 | Looper | 17 | 33 | 1 | — | — |
 | Harmoniser | 31 | 41 | — | 3 | **1** |
 | Setlist | 23 | 36 | — | 4 | — |
+| Phrase | 32 | 48 | — | 2 | **1** |
 | (nested components) | — | 6 | — | — | **1** |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 4 unverified, 0 open defects.
@@ -70,14 +71,14 @@ renderer ever reading it.
 `behaviourClock.mjs` — 76 verified, 0 inert, 1 unverified, 0 open defects (three found, all fixed).
 `behaviourSteps.mjs` — 71 verified, 1 inert, 2 unverified, 0 open defects.
 `behaviourHarmony.mjs` — 77 verified, 0 inert, 7 unverified, 0 open defects (the one found is fixed).
+`behaviourPhrase.mjs` — 48 verified, 0 inert, 2 unverified, 0 open defects (the one found is fixed).
 
 The custom pass covers all **14 starters** (every declared part drawn with real size, every declared
 hit zone located and moving the channel it names), plus bindings, links, published properties,
 generators, export/import, persistence and rule-driven states — see D-4.
 
-That is **437 of my 503 catalogue properties** measured against their promised effect, rendered and
-after a reopen. The remaining 66 — the Phrase Sequencer and the Recorder — are not yet done and are
-not claimed.
+That is **469 of my 503 catalogue properties** measured against their promised effect, rendered and
+after a reopen. The remaining 34 — the Recorder — are not yet done and are not claimed.
 
 ---
 
@@ -840,7 +841,7 @@ product. They are listed because the previous pass's real failure was not notici
 
 ## Still to do in my half
 
-- The remaining 66 catalogue properties: the Phrase Sequencer and the Recorder.
+- The remaining 34 catalogue properties: the Recorder.
 - Then the older unverified rows root asked to close rather than leave standing: `source`/`linkId`/
   `latch` with a real second control and an injected note release, a transport-driven Constellation,
   and the trail and physics coefficients read from visible motion over time. The ledger statements

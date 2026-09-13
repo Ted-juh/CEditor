@@ -98,23 +98,72 @@ try {
       await kit.set(pid, { 'Phrase.direction': 'forward' });
     }
 
-    // --- seed: random is DETERMINISTIC, which is the point -------------------------------------------------
+    // --- seed: random is DETERMINISTIC, which is the point ---------------------------------------
     {
-      // Two sequencers on one clock with one seed have to agree, and a re-render of the same index
-      // must not re-roll. That means the same seed gives the same walk — not "a different order".
-      const walkFrom = async (seed) => {
-        await kit.set(pid, { 'Phrase.direction': 'random', 'Phrase.seed': seed, 'Phrase.rate': 6 });
-        // Start from a known index: stopping resets the free-running accumulator.
-        return (await runFor(1300)).map((e) => e.note).slice(0, 6).join(',');
+      /**
+       * TWO SEQUENCERS ON ONE CLOCK, which is what the seed is for.
+       *
+       * The first version of this check replayed one sequencer twice and asked for the same notes.
+       * That is not the promise and cannot be: the free-running index counts monotonically and is
+       * not reset by stopping, so the second run starts somewhere else, and `stepAtIndex` is a hash
+       * of the INDEX. Same seed, different index, different note — correctly.
+       *
+       * What the seed actually promises is in the source's own words: two sequencers on one clock
+       * with one seed agree, and a repeat of the same index is the same step rather than a new roll.
+       * So: two synced Phrases, same pattern, same seed, different output CHANNELS — the transport
+       * gives them both the same index, and the two channels have to carry the same notes.
+       */
+      const twin = await kit.make(P, { 'Transform.x': 40, 'Transform.y': 380,
+        'Transform.width': PW, 'Transform.height': PH,
+        'Phrase.running': false, 'Phrase.mode': 'degree', 'Phrase.key': 0, 'Phrase.scale': 'minor',
+        'Phrase.baseOctave': 3, 'Phrase.steps': 4, 'Phrase.rows': 4, 'Phrase.direction': 'random',
+        'Phrase.seed': 0, 'Phrase.channel': 2, 'Phrase.velocity': 100, 'Phrase.gate': 0.5,
+        'Phrase.syncToTransport': true, 'Phrase.division': '1/8', 'Phrase.pattern': stair });
+      await kit.set(pid, { 'Phrase.direction': 'random', 'Phrase.seed': 0, 'Phrase.channel': 1,
+        'Phrase.syncToTransport': true, 'Phrase.division': '1/8' });
+      const bothRun = async (ms) => {
+        await kit.page.evaluate(async () => {
+          const { stopTransport, rewindTransport, setTransportBpm } = await import('/src/CE_Application/stores/transport.js');
+          stopTransport(); rewindTransport(); setTransportBpm(240);
+        });
+        await kit.settle(250);
+        await kit.forget();
+        await kit.set(pid, { 'Phrase.running': true });
+        await kit.set(twin, { 'Phrase.running': true });
+        await kit.page.evaluate(async () => {
+          const { startTransport } = await import('/src/CE_Application/stores/transport.js');
+          startTransport();
+        });
+        await kit.settle(ms);
+        await kit.page.evaluate(async () => {
+          const { stopTransport } = await import('/src/CE_Application/stores/transport.js');
+          stopTransport();
+        });
+        await kit.set(pid, { 'Phrase.running': false });
+        await kit.set(twin, { 'Phrase.running': false });
+        await kit.settle(250);
+        const out = ons(await kit.notes());
+        const on = (ch) => out.filter((e) => e.channel === ch).map((e) => e.note);
+        return { a: on(1), b: on(2) };
       };
-      const first = await walkFrom(0);
-      const same = await walkFrom(0);
-      const other = await walkFrom(9);
-      led.check(P, 'seed (the same seed is the same walk)', 'a random direction replayed from the same seed plays the same notes in the same order',
-        first, same);
-      led.check(P, 'seed (a different seed is a different walk)', 'and a different seed is a different order',
-        true, first !== other && first.length > 0);
-      await kit.set(pid, { 'Phrase.direction': 'forward', 'Phrase.seed': 0, 'Phrase.rate': 8 });
+      const agreed = await bothRun(1500);
+      const n = Math.min(agreed.a.length, agreed.b.length);
+      led.check(P, 'seed (two sequencers on one clock agree)',
+        'the same seed on the same clock walks the same random order, note for note, on both channels',
+        true, n >= 5 && agreed.a.slice(0, n).join(',') === agreed.b.slice(0, n).join(','));
+      await kit.set(twin, { 'Phrase.seed': 9 });
+      const diverged = await bothRun(1500);
+      const m = Math.min(diverged.a.length, diverged.b.length);
+      led.check(P, 'seed (a different seed is a different order)',
+        'and changing one of their seeds pulls them apart while both go on playing',
+        true, m >= 5 && diverged.a.slice(0, m).join(',') !== diverged.b.slice(0, m).join(','));
+      await kit.page.evaluate(async (id) => {
+        const { removeControl } = await import('/src/CE_Application/stores/controls.js');
+        removeControl(id);
+      }, twin);
+      await kit.settle(250);
+      await kit.set(pid, { 'Phrase.direction': 'forward', 'Phrase.seed': 0, 'Phrase.channel': 1,
+        'Phrase.syncToTransport': false, 'Phrase.rate': 8 });
     }
 
     // --- transpose / key / scale: the same shape, re-pitched --------------------------------------------------
@@ -204,29 +253,98 @@ try {
 
     // --- a cell's ratchet retriggers inside its own step ---------------------------------------------------------------
     {
+      // MEASURED AS THE GAPS, not as a count. A window ends mid-step, so the last ratchet's tail is
+      // cut and the total comes out at two-thirds of three times rather than three times — which is
+      // the window's edge, not the property. What a ratchet IS is hits inside one step: at rate 4 a
+      // step is 250ms and a triple ratchet puts them 83ms apart, where a plain cell on a four-step
+      // pattern has nothing closer together than a whole lap.
+      const gapsOf = (out) => {
+        const t = out.filter((e) => e.note === 48).map((e) => e.at).sort((a, b) => a - b);
+        return t.slice(1).map((v, i) => v - t[i]);
+      };
       await kit.set(pid, { 'Phrase.pattern': { '0:0': { velocity: null, tie: false } }, 'Phrase.rate': 4 });
-      const plain = (await runFor(2200)).filter((e) => e.note === 48).length;
+      const plain = gapsOf(await runFor(2600));
       await kit.set(pid, { 'Phrase.pattern': { '0:0': { velocity: null, tie: false, ratchet: 3 } } });
-      const ratcheted = (await runFor(2200)).filter((e) => e.note === 48).length;
-      led.check(P, 'pattern (ratchet)', 'a cell set to ratchet three times fires three note-ons inside its own step',
-        true, plain >= 1 && ratcheted >= plain * 2.4 && ratcheted <= plain * 3.6);
+      const ratcheted = gapsOf(await runFor(2600));
+      const inside = (g) => g.filter((v) => v > 45 && v < 130).length;
+      led.check(P, 'pattern (ratchet)',
+        'a cell set to ratchet three times puts extra hits a third of a step apart inside its own step, where a plain cell has nothing closer than a lap',
+        { plainHasNoneInside: true, ratchetHasThem: true },
+        { plainHasNoneInside: plain.length >= 1 && inside(plain) === 0,
+          ratchetHasThem: inside(ratcheted) >= 2 });
       await kit.set(pid, { 'Phrase.pattern': stair, 'Phrase.rate': 8 });
     }
 
-    // --- a cell's chance is deterministic, not Math.random ---------------------------------------------------------------
+    // --- a cell's chance is deterministic, not Math.random ---------------------------------------------
     {
       await kit.set(pid, { 'Phrase.pattern': { '0:0': { velocity: null, tie: false, chance: 0 } },
         'Phrase.rate': 6, 'Phrase.seed': 0 });
       led.check(P, 'pattern (chance 0)', 'a cell that never sounds never sounds', 0, (await runFor(1600)).length);
       await kit.set(pid, { 'Phrase.pattern': { '0:0': { velocity: null, tie: false, chance: 1 } } });
-      led.check(P, 'pattern (chance 1)', 'and one that always sounds always does', true, (await runFor(1600)).length >= 2);
+      const certain = (await runFor(2600)).length;
+      led.check(P, 'pattern (chance 1)', 'and one that always sounds sounds on every lap', true, certain >= 3);
       await kit.set(pid, { 'Phrase.pattern': { '0:0': { velocity: null, tie: false, chance: 0.5 } } });
       const half = (await runFor(2600)).length;
-      const halfAgain = (await runFor(2600)).length;
-      led.check(P, 'pattern (chance 0.5 is a coin the seed already flipped)',
-        'a half-chance cell sounds some of the time, and replayed from the same seed sounds the same number of times — it is a hash of the position, not a new roll each render',
-        true, half > 0 && half === halfAgain);
-      await kit.set(pid, { 'Phrase.pattern': stair, 'Phrase.rate': 8, 'Phrase.seed': 0 });
+      led.check(P, 'pattern (chance 0.5)', 'a half-chance cell sounds on some laps and not others',
+        true, half > 0 && half < certain);
+
+      /**
+       * DETERMINISTIC, and shown the only way it can be: two of them on one clock.
+       *
+       * The first version of this row ran the same sequencer twice and asked for the same number of
+       * hits. It is not that — `cellRoll` is a hash of the INDEX, and the index counts on past a
+       * stop, so the second run rolls a different stretch of the same sequence. What the source
+       * promises is that the roll is a function of position rather than a fresh `Math.random()` per
+       * render: "a pattern sounds the same on the take you recorded as on the take you play back",
+       * and two sequencers on one clock with one seed agree. So two synced Phrases with the same
+       * half-chance cell, on different channels, have to fire on the SAME laps.
+       */
+      const twin = await kit.make(P, { 'Transform.x': 40, 'Transform.y': 380,
+        'Transform.width': PW, 'Transform.height': PH, 'Phrase.running': false,
+        'Phrase.mode': 'degree', 'Phrase.key': 0, 'Phrase.scale': 'minor', 'Phrase.baseOctave': 3,
+        'Phrase.steps': 4, 'Phrase.rows': 4, 'Phrase.direction': 'forward', 'Phrase.seed': 0,
+        'Phrase.channel': 2, 'Phrase.velocity': 100, 'Phrase.gate': 0.5,
+        'Phrase.syncToTransport': true, 'Phrase.division': '1/8',
+        'Phrase.pattern': { '0:0': { velocity: null, tie: false, chance: 0.5 } } });
+      await kit.set(pid, { 'Phrase.syncToTransport': true, 'Phrase.division': '1/8',
+        'Phrase.channel': 1 });
+      await kit.page.evaluate(async () => {
+        const { stopTransport, rewindTransport, setTransportBpm } = await import('/src/CE_Application/stores/transport.js');
+        stopTransport(); rewindTransport(); setTransportBpm(240);
+      });
+      await kit.settle(250);
+      await kit.forget();
+      await kit.set(pid, { 'Phrase.running': true });
+      await kit.set(twin, { 'Phrase.running': true });
+      await kit.page.evaluate(async () => {
+        const { startTransport } = await import('/src/CE_Application/stores/transport.js');
+        startTransport();
+      });
+      // LONG ENOUGH FOR THE COIN TO LAND SEVERAL TIMES. A four-step pattern at 1/8 and 240bpm comes
+      // round to step 0 every 500ms, and a half-chance cell takes about half of those, so 2.6s held
+      // one hit apiece — the two agreed, and one point is not evidence of a sequence.
+      await kit.settle(5400);
+      await kit.page.evaluate(async () => {
+        const { stopTransport } = await import('/src/CE_Application/stores/transport.js');
+        stopTransport();
+      });
+      await kit.set(pid, { 'Phrase.running': false });
+      await kit.set(twin, { 'Phrase.running': false });
+      await kit.settle(250);
+      const rolled = ons(await kit.notes());
+      const onA = rolled.filter((e) => e.channel === 1).map((e) => Math.round(e.at / 60));
+      const onB = rolled.filter((e) => e.channel === 2).map((e) => Math.round(e.at / 60));
+      led.check(P, 'pattern (chance is a hash of the position, not a fresh roll)',
+        'two sequencers on one clock with one seed lose and win the same laps — same count, same moments',
+        true, onA.length >= 3 && onA.length === onB.length
+          && onA.every((v, i) => Math.abs(v - onB[i]) <= 1));
+      await kit.page.evaluate(async (id) => {
+        const { removeControl } = await import('/src/CE_Application/stores/controls.js');
+        removeControl(id);
+      }, twin);
+      await kit.settle(250);
+      await kit.set(pid, { 'Phrase.pattern': stair, 'Phrase.rate': 8, 'Phrase.seed': 0,
+        'Phrase.syncToTransport': false, 'Phrase.channel': 1 });
     }
 
     // --- steps / rows / accentEvery / showHeader / showGutter: the grid, to the pixel -----------------------------------
@@ -261,15 +379,28 @@ try {
         'the lit cell on row zero is the lowest one on screen, because low notes belong low',
         true, lit.length > 0 && Math.max(...(await cells()).map((n) => n.y)) === Math.max(...lit.map((n) => n.y)));
 
-      await kit.set(pid, { 'Phrase.steps': 8, 'Phrase.accentEvery': 4 });
-      await kit.settle(200);
-      const every4 = (await kit.shapes(pid, 'rect', (n) => n.rx === 3)).length;
+      // AN ACCENT IS NOT A LINE. The renderer marks the accented steps on the CELLS — an empty cell
+      // on a bar step is drawn at 0.9 with a faint stroke where the others are 0.6 with none — so
+      // counting a separate marker rect found the playing-column highlight instead, which is drawn
+      // only while running and has nothing to do with the property.
+      const accented = async () => {
+        const cs = await kit.shapes(pid, 'rect', (n) => n.rx === 2
+          && n.stroke === 'rgba(255,255,255,0.09)');
+        return new Set(cs.map((n) => Math.round(n.x))).size;
+      };
+      await kit.set(pid, { 'Phrase.steps': 8, 'Phrase.rows': 4, 'Phrase.pattern': {},
+        'Phrase.accentEvery': 4 });
+      await kit.settle(220);
+      led.check(P, 'accentEvery (4)', 'over eight steps the bar falls on the first and the fifth — two marked columns',
+        2, await accented());
       await kit.set(pid, { 'Phrase.accentEvery': 2 });
-      await kit.settle(200);
-      const every2 = (await kit.shapes(pid, 'rect', (n) => n.rx === 3)).length;
-      led.check(P, 'accentEvery', 'a bar marker every fourth step, and twice as many every second',
-        true, every4 > 0 && every2 > every4);
-      await kit.set(pid, { 'Phrase.accentEvery': 4, 'Phrase.steps': 4, 'Phrase.rows': 4 });
+      await kit.settle(220);
+      led.check(P, 'accentEvery (2)', 'and every second step is four of them', 4, await accented());
+      await kit.set(pid, { 'Phrase.accentEvery': 1 });
+      await kit.settle(220);
+      led.check(P, 'accentEvery (1)', 'every step marked is every column', 8, await accented());
+      await kit.set(pid, { 'Phrase.accentEvery': 4, 'Phrase.steps': 4, 'Phrase.rows': 4,
+        'Phrase.pattern': stair });
     }
 
     // --- editable: click a cell ----------------------------------------------------------------------------------------
