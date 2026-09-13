@@ -3058,7 +3058,8 @@
   // or from whatever a linked Chord Pad is holding.
   const ARP_PAD = 8;
   const arpPhaseState = {};     // id -> phase 0..1 across the whole sequence
-  const arpLastIdx = {};        // id -> last fired step index
+  const arpLastIdx = {};
+  const arpMaskStep = {};   // id -> free-running step number, for the Euclidean mask
   const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
@@ -3173,7 +3174,9 @@
       // A synced Arp has no phase of its own to watch, so the wrap is the step index going back.
       if (arpLastIdx[id] > idx) raiseComponentCycle(control, 0, 1);
       arpLastIdx[id] = idx;
-      if (stepFires(live, idx)) {
+      // `global` is the free-running step number and `idx` the position in the note sequence: the
+      // Euclidean mask is measured in the former, hand mutes in the latter.
+      if (stepFires(live, idx, global)) {
         arpFireStep(control, seq[idx], idx, bpm);
         raiseComponent(control, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
       }
@@ -3210,9 +3213,13 @@
         const idx = stepIndexAt(phase, seq.length);
         if (arpLastIdx[id] !== idx) {
           arpLastIdx[id] = idx;
+          // A free-running Arp has no step number of its own — it reads one out of a phase — so the
+          // Euclidean mask needs a counter kept for it. Without one the mask could only ever be read
+          // as far as the note set is long, and most of a rhythm was unreachable.
+          arpMaskStep[id] = (arpMaskStep[id] ?? -1) + 1;
           // A muted step is not a step that fired, so it raises nothing — the event follows the
           // notes, which is what a script lighting an LED off it wants.
-          if (stepFires(live, idx)) {
+          if (stepFires(live, idx, arpMaskStep[id])) {
             arpFireStep(c, seq[idx], idx);
             raiseComponent(c, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
           }

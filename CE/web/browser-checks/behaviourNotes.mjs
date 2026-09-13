@@ -13,6 +13,17 @@ import { boot, Ledger } from './behaviourKit.mjs';
 
 const kit = await boot();
 const led = new Ledger('notes');
+const hx = (n) => n.toString(16).padStart(2, '0').toUpperCase();
+/** Deliver bytes where a device would; the surface's listener is already running in preview. */
+const sendMidi = async (hex) => {
+  await kit.page.evaluate(async ({ hex }) => {
+    const { latestMidiInputMessage } = await import('/src/CE_Application/stores/deviceProfileStores.js');
+    latestMidiInputMessage.set({ hex, messageType: 'midi', at: Date.now() });
+  }, { hex });
+  await kit.settle(140);
+};
+const midiOn = (ch, note, vel = 100) => `${hx(0x90 + ch - 1)}${hx(note)}${hx(vel)}`;
+const midiOff = (ch, note) => `${hx(0x80 + ch - 1)}${hx(note)}00`;
 const rgba = (hex) => {
   const s = hex.replace(/^#/, '');
   return `rgba(${parseInt(s.slice(2, 4), 16)},${parseInt(s.slice(4, 6), 16)},${parseInt(s.slice(6, 8), 16)},${parseInt(s.slice(0, 2), 16) / 255})`;
@@ -750,8 +761,6 @@ try {
       led.check(N, 'modAxis / modCc', 'the cross axis sends an expression controller as well as the note',
         withoutMod, (await kit.notes()).length);
     }
-    led.unverified(N, 'echo / echoChannel / echoColour', 'inbound notes light the strip',
-      'covered for the Drum Pads in behaviourInbound.mjs; the ribbon shares that path and is not separately measured here');
 
     // --- the colours -------------------------------------------------------------------------------------------------
     await kit.set(nid, { 'NoteRibbon.fieldColour': 'FF101017', 'NoteRibbon.zoneColour': 'FF171720',
@@ -1008,8 +1017,6 @@ try {
       led.check(C, 'showPiano', 'the sounding-notes keyboard strip goes', true, (await kit.geo(cid)).length < withPiano);
       await kit.set(cid, { 'ChordPad.showPiano': true });
     }
-    led.unverified(C, 'echo / echoChannel / echoColour', 'inbound notes light the pads',
-      'the same inbound path measured for the Drum Pads in behaviourInbound.mjs; not separately measured here');
 
     // --- colours -------------------------------------------------------------------------------------------------------
     await kit.set(cid, { 'ChordPad.padColour': 'FF171720', 'ChordPad.inKeyColour': 'FF5B9BD5',
@@ -1041,6 +1048,361 @@ try {
     }
     await kit.preview(false);
   }
+
+
+  // =============================================================================================
+  // ARP — 34 properties. A running note generator: what it plays, in what order, how fast, how
+  // long each note lasts, and which steps are silent.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const A = 'Arp';
+    let aid = await kit.make(A, { 'Transform.width': 460, 'Transform.height': 220,
+      'Arp.running': false, 'Arp.source': 'chord', 'Arp.pattern': 'up', 'Arp.rate': 8,
+      'Arp.syncToTransport': false, 'Arp.octaves': 1, 'Arp.gate': 0.6, 'Arp.swing': 0,
+      'Arp.latch': false, 'Arp.key': 0, 'Arp.scale': 'major', 'Arp.degree': 0,
+      'Arp.chordType': 'triad', 'Arp.baseOctave': 3, 'Arp.velocity': 96, 'Arp.channel': 1,
+      'Arp.euclidEnabled': false, 'Arp.mutes': [], 'Arp.showNotes': true, 'Arp.showHeader': true });
+    await kit.preview(true);
+
+    /** Run the arp for a window and report the note-ons it produced, in order. */
+    const runFor = async (ms) => {
+      await kit.forget();
+      await kit.set(aid, { 'Arp.running': true });
+      await kit.settle(ms);
+      await kit.set(aid, { 'Arp.running': false });
+      await kit.settle(140);
+      return (await kit.notes()).filter((e) => e.kind === 'on');
+    };
+
+    // --- running: nothing until it is told to run ------------------------------------------------
+    {
+      await kit.forget();
+      await kit.settle(500);
+      led.check(A, 'running (false)', 'a stopped arpeggiator plays nothing at all', 0, ons(await kit.notes()).length);
+      const played = await runFor(900);
+      led.check(A, 'running (true) + rate', 'at eight steps a second it plays several notes in under a second',
+        true, played.length >= 4);
+    }
+
+    // --- pattern: the ORDER the notes come out in -------------------------------------------------
+    {
+      // THE MAJORITY DIRECTION over the window, not the first three notes. A window opens wherever
+      // the cycle happens to be and every cycle wraps once — a three-note climb contains one step
+      // down — so "the first three ascend" depends on the phase the sampling started in.
+      const direction = (notes) => {
+        let rising = 0;
+        let falling = 0;
+        for (let i = 1; i < notes.length; i += 1) {
+          if (notes[i] > notes[i - 1]) rising += 1;
+          else if (notes[i] < notes[i - 1]) falling += 1;
+        }
+        return { rising, falling };
+      };
+      await kit.set(aid, { 'Arp.pattern': 'up' });
+      const up = direction((await runFor(1400)).map((e) => e.note));
+      led.check(A, "pattern 'up'", 'the notes mostly climb, turning over once per cycle',
+        true, up.rising > up.falling);
+      await kit.set(aid, { 'Arp.pattern': 'down' });
+      const down = direction((await runFor(1400)).map((e) => e.note));
+      led.check(A, "pattern 'down'", 'and mostly fall the other way', true, down.falling > down.rising);
+      await kit.set(aid, { 'Arp.pattern': 'updown' });
+      const updown = (await runFor(1400)).map((e) => e.note);
+      led.check(A, "pattern 'updown'", 'up and back again turns round rather than repeating the climb',
+        true, updown.length > 3 && new Set(updown).size < updown.length);
+      await kit.set(aid, { 'Arp.pattern': 'up' });
+    }
+
+    // --- chordType / degree / baseOctave / key / scale: WHICH notes -----------------------------------
+    {
+      const triad = new Set((await runFor(900)).map((e) => e.note));
+      led.check(A, "chordType 'triad'", 'three distinct notes cycle', 3, triad.size);
+      await kit.set(aid, { 'Arp.chordType': 'seventh' });
+      led.check(A, "chordType 'seventh'", 'and four with the seventh', 4, new Set((await runFor(1200)).map((e) => e.note)).size);
+      await kit.set(aid, { 'Arp.chordType': 'triad' });
+      const atOct3 = Math.min(...(await runFor(900)).map((e) => e.note));
+      await kit.set(aid, { 'Arp.baseOctave': 4 });
+      led.check(A, 'baseOctave', 'a higher base octave moves the whole set up twelve',
+        atOct3 + 12, Math.min(...(await runFor(900)).map((e) => e.note)));
+      await kit.set(aid, { 'Arp.baseOctave': 3 });
+      const onI = new Set((await runFor(900)).map((e) => e.note % 12));
+      await kit.set(aid, { 'Arp.degree': 4 });
+      led.check(A, 'degree', 'building on a different scale degree plays a different chord',
+        true, [...new Set((await runFor(900)).map((e) => e.note % 12))].join() !== [...onI].join());
+      await kit.set(aid, { 'Arp.degree': 0, 'Arp.scale': 'minor' });
+      led.check(A, 'scale', 'and a different scale does too',
+        true, [...new Set((await runFor(900)).map((e) => e.note % 12))].join() !== [...onI].join());
+      await kit.set(aid, { 'Arp.scale': 'major', 'Arp.key': 5 });
+      led.check(A, 'key', 'as does a different tonic',
+        true, [...new Set((await runFor(900)).map((e) => e.note % 12))].join() !== [...onI].join());
+      await kit.set(aid, { 'Arp.key': 0 });
+    }
+
+    // --- octaves: the set repeated upward ----------------------------------------------------------------
+    {
+      const one = new Set((await runFor(1200)).map((e) => e.note)).size;
+      await kit.set(aid, { 'Arp.octaves': 2 });
+      led.check(A, 'octaves', 'two octaves is twice as many distinct notes as one',
+        one * 2, new Set((await runFor(2000)).map((e) => e.note)).size);
+      await kit.set(aid, { 'Arp.octaves': 1 });
+    }
+
+    // --- channel / velocity ---------------------------------------------------------------------------------
+    await kit.set(aid, { 'Arp.channel': 8, 'Arp.velocity': 70 });
+    {
+      const played = await runFor(700);
+      led.check(A, 'channel + velocity', 'every step carries the declared channel and velocity',
+        true, played.length > 0 && played.every((e) => e.channel === 8 && e.velocity === 70));
+    }
+    await kit.set(aid, { 'Arp.channel': 1, 'Arp.velocity': 96 });
+
+    // --- rate: steps per second ---------------------------------------------------------------------------------
+    {
+      await kit.set(aid, { 'Arp.rate': 3 });
+      const slow = (await runFor(1200)).length;
+      await kit.set(aid, { 'Arp.rate': 12 });
+      const fast = (await runFor(1200)).length;
+      led.check(A, 'rate', 'four times the rate is several times as many notes in the same window',
+        true, fast > slow * 2);
+      await kit.set(aid, { 'Arp.rate': 8 });
+    }
+
+    // --- gate: how long each note is held ------------------------------------------------------------------------
+    {
+      const heldCount = async (gate) => {
+        await kit.set(aid, { 'Arp.gate': gate, 'Arp.rate': 4 });
+        await kit.forget();
+        await kit.set(aid, { 'Arp.running': true });
+        // Sample the sounding count repeatedly and take the maximum overlap.
+        let most = 0;
+        for (let i = 0; i < 14; i += 1) {
+          const all = await kit.notes();
+          most = Math.max(most, ons(all).length - offs(all).length);
+          await kit.settle(60);
+        }
+        await kit.set(aid, { 'Arp.running': false });
+        await kit.settle(160);
+        return most;
+      };
+      const shortGate = await heldCount(0.1);
+      const longGate = await heldCount(0.95);
+      led.check(A, 'gate', 'a long gate leaves notes overlapping where a short one does not',
+        true, longGate >= shortGate);
+      await kit.set(aid, { 'Arp.gate': 0.6, 'Arp.rate': 8 });
+    }
+
+    // --- mutes / editable: silenced steps -------------------------------------------------------------------------
+    {
+      const full = (await runFor(1200)).length;
+      await kit.set(aid, { 'Arp.mutes': [0, 1] });
+      led.check(A, 'mutes', 'muted steps are silent, so fewer notes come out in the same window',
+        true, (await runFor(1200)).length < full);
+      await kit.set(aid, { 'Arp.mutes': [] });
+    }
+
+    // --- euclid: which steps fire ---------------------------------------------------------------------
+    // MEASURED WITHIN THE REACHABLE MASK. `stepFires(control, i)` is called with `i` already reduced
+    // to the note sequence — `idx = global % seq.length` in the surface, and `seq.map((n, i) => …)`
+    // in the renderer — so only `mask[0 … seq.length−1]` is ever consulted. A three-note chord
+    // therefore reads three slots of the mask, whatever `euclidSteps` says. See D-7 below.
+    {
+      await kit.set(aid, { 'Arp.euclidEnabled': false, 'Arp.rate': 8 });
+      const dense = (await runFor(1600)).length;
+      // euclid(3,1) is [rest, rest, pulse] — one of the three slots a triad can reach.
+      await kit.set(aid, { 'Arp.euclidEnabled': true, 'Arp.euclidSteps': 3, 'Arp.euclidPulses': 1 });
+      const sparse = (await runFor(1600)).length;
+      led.check(A, 'euclidEnabled + euclidPulses', 'one pulse in three is sparser than every step, and not silent',
+        true, sparse > 0 && sparse < dense);
+      await kit.set(aid, { 'Arp.euclidPulses': 3 });
+      led.check(A, 'euclidPulses (all)', 'filling every slot is as dense as the mask being off',
+        true, (await runFor(1600)).length >= dense * 0.6);
+      await kit.set(aid, { 'Arp.euclidPulses': 1, 'Arp.euclidRotate': 2 });
+      led.check(A, 'euclidRotate', 'rotating the mask still leaves exactly one slot firing',
+        true, (await runFor(1600)).length > 0);
+      await kit.set(aid, { 'Arp.euclidRotate': 0 });
+
+      // THE WHOLE MASK, AGAINST A SHORTER NOTE SET. This is the case that was broken: euclid(8, 2)
+      // fires on steps 3 and 7, and a three-note chord reaches 0, 1, 2 — so with the mask indexed by
+      // position in the sequence the arpeggiator fell silent while the properties panel drew the
+      // eight-step pattern in full. Indexed by the free-running step number, the emitted rhythm is
+      // the configured one and the density follows pulses/steps.
+      const density = async (steps, pulses, ms, rate) => {
+        await kit.set(aid, { 'Arp.euclidEnabled': true, 'Arp.euclidSteps': steps,
+          'Arp.euclidPulses': pulses, 'Arp.rate': rate });
+        const played = await runFor(ms);
+        return played.length;
+      };
+      const RATE = 10;
+      const WINDOW = 2400;                       // ≈ 24 steps
+      const expected = (pulses, steps) => Math.round((WINDOW / 1000) * RATE * (pulses / steps));
+      const twoOfEight = await density(8, 2, WINDOW, RATE);
+      led.check(A, 'euclidSteps beyond the note count', 'a three-note chord plays the whole eight-step rhythm, and is not silenced by it',
+        true, twoOfEight > 0);
+      led.check(A, 'euclid density (2 of 8)', 'about a quarter of the steps fire',
+        expected(2, 8), twoOfEight, (a, b) => Math.abs(a - b) <= 2);
+      const sixOfEight = await density(8, 6, WINDOW, RATE);
+      led.check(A, 'euclid density (6 of 8)', 'and three quarters of them when the mask is fuller',
+        expected(6, 8), sixOfEight, (a, b) => Math.abs(a - b) <= 3);
+      led.check(A, 'euclid density (ordering)', 'a fuller mask is always denser than a sparse one',
+        true, sixOfEight > twoOfEight);
+      const oneOfSixteen = await density(16, 1, WINDOW, RATE);
+      led.check(A, 'euclid over a long mask (1 of 16)', 'a sixteen-step rhythm is read in full too, on the same three notes',
+        expected(1, 16), oneOfSixteen, (a, b) => Math.abs(a - b) <= 2);
+      await kit.set(aid, { 'Arp.euclidEnabled': false, 'Arp.euclidSteps': 8, 'Arp.euclidPulses': 5 });
+    }
+
+    // --- latch ------------------------------------------------------------------------------------------------------------
+    led.unverified(A, 'latch', 'keep arpeggiating after the source releases',
+      "only meaningful for source 'link' or 'input', where a source releases; the arp's own chord never does");
+    led.unverified(A, 'source / linkId / inputChannel', 'follow a Chord Pad or the MIDI input instead of its own chord',
+      'the link pair needs a second control driving it live; the inbound path is measured for the Router and Drum Pads in behaviourInbound.mjs');
+
+    // --- showNotes / showHeader --------------------------------------------------------------------------------------------
+    {
+      await kit.set(aid, { 'Arp.showNotes': true, 'Arp.showHeader': true });
+      const both = (await kit.texts(aid)).length;
+      await kit.set(aid, { 'Arp.showNotes': false });
+      led.check(A, 'showNotes', 'the note names in the step cells go', true, (await kit.texts(aid)).length < both);
+      await kit.set(aid, { 'Arp.showNotes': true });
+      const withHeader = (await kit.texts(aid)).length;
+      await kit.set(aid, { 'Arp.showHeader': false });
+      led.check(A, 'showHeader', 'and the pattern strip goes too', true, (await kit.texts(aid)).length < withHeader);
+      await kit.set(aid, { 'Arp.showHeader': true });
+    }
+
+    // --- swing ---------------------------------------------------------------------------------------------------------------
+    {
+      const gaps = async (swing) => {
+        await kit.set(aid, { 'Arp.swing': swing, 'Arp.rate': 6 });
+        await kit.forget();
+        await kit.set(aid, { 'Arp.running': true });
+        await kit.settle(2000);
+        await kit.set(aid, { 'Arp.running': false });
+        await kit.settle(140);
+        return ons(await kit.notes()).length;
+      };
+      const straight = await gaps(0);
+      const shuffled = await gaps(1);
+      led.check(A, 'swing', 'a shuffled arp still plays, and delaying the odd steps does not add or lose notes wholesale',
+        true, shuffled > 0 && Math.abs(shuffled - straight) <= Math.max(3, straight * 0.5));
+      await kit.set(aid, { 'Arp.swing': 0 });
+    }
+
+    // --- save and reopen ---------------------------------------------------------------------------------------------------------
+    {
+      await kit.set(aid, { 'Arp.running': false, 'Arp.channel': 6, 'Arp.velocity': 77,
+        'Arp.chordType': 'seventh', 'Arp.baseOctave': 4, 'Arp.pattern': 'down' });
+      // The PLAYHEAD is live position, not document state: it highlights whichever step the clock
+      // last reached, and a reopened arpeggiator has correctly not run yet. Comparing it would ask a
+      // saved file to remember where the music had got to. Shape and text are compared; the head is
+      // asserted separately, which is the stronger statement of the two.
+      const headAccent = 'rgba(242,201,76,1)';
+      // stroke-width encodes the head too (2 against 1), so it comes out with the colours.
+      const shape = (g) => JSON.stringify(g.map(({ fill, stroke, opacity, ...rest }) => {
+        const { 'stroke-width': _sw, ...geometry } = rest;
+        return geometry;
+      }));
+      const headIndex = (g) => g.findIndex((n) => n.tag === 'rect' && n.fill === headAccent);
+      const beforeGeo = await kit.geo(aid);
+      const again = await kit.reopen(aid);
+      const afterGeo = await kit.geo(again);
+      led.check(A, 'save/reopen (drawing)', 'every step cell, bar and note name returns identical',
+        shape(beforeGeo), shape(afterGeo));
+      led.check(A, 'save/reopen (the playhead is not restored)',
+        'the arpeggiator had run to a later step before the save and a reopened one starts at the first',
+        true, headIndex(beforeGeo) !== headIndex(afterGeo));
+      aid = again;
+      await kit.preview(true);
+      await kit.forget();
+      await kit.set(aid, { 'Arp.running': true });
+      await kit.settle(1200);
+      await kit.set(aid, { 'Arp.running': false });
+      await kit.settle(160);
+      const played = ons(await kit.notes());
+      led.check(A, 'save/reopen (still arpeggiates)', 'a reopened arpeggiator runs its own chord on its own channel',
+        true, played.length >= 3 && played.every((e) => e.channel === 6 && e.velocity === 77)
+          && new Set(played.map((e) => e.note)).size === 4);
+    }
+    await kit.preview(false);
+  }
+
+
+  // =============================================================================================
+  // ECHO, PER COMPONENT. Sharing the Drum Pads' inbound path is not evidence that the Ribbon or the
+  // Chord Pad draws anything when a note arrives — each decides for itself which of its own zones or
+  // pads an incoming note lights, and that decision is the property.
+  // =============================================================================================
+  await kit.fresh();
+  await kit.preview(true);
+  {
+    const N = 'NoteRibbon';
+    const rid = await kit.make(N, { 'Transform.width': 520, 'Transform.height': 150,
+      'NoteRibbon.mode': 'chromatic', 'NoteRibbon.baseNote': 48, 'NoteRibbon.octaves': 1,
+      'NoteRibbon.echo': false, 'NoteRibbon.echoChannel': 0, 'NoteRibbon.echoColour': 'FF39D98A' });
+    // An echoed zone is outlined in the echo colour; a resting one never is.
+    const echoed = async () => (await kit.shapes(rid, 'rect'))
+      .filter((r) => r.stroke === rgba('FF39D98A')).length;
+
+    await sendMidi(midiOn(1, 52));
+    led.check(N, 'echo (false)', 'an inbound note lights nothing while the monitor is off', 0, await echoed());
+    await sendMidi(midiOff(1, 52));
+
+    await kit.set(rid, { 'NoteRibbon.echo': true });
+    await sendMidi(midiOn(1, 52));
+    led.check(N, 'echo (true)', 'the zone for that note is outlined', 1, await echoed());
+    led.check(N, 'echoColour', 'in the declared colour', true, (await echoed()) > 0);
+    await sendMidi(midiOff(1, 52));
+    led.check(N, 'echo (note off)', 'and the outline goes when the note ends', 0, await echoed());
+
+    await sendMidi(midiOn(1, 99));
+    led.check(N, 'echo (note off the strip)', 'a note no zone carries lights nothing', 0, await echoed());
+    await sendMidi(midiOff(1, 99));
+
+    await kit.set(rid, { 'NoteRibbon.echoChannel': 3 });
+    await sendMidi(midiOn(1, 52));
+    led.check(N, 'echoChannel (pinned)', 'a note on another channel is ignored', 0, await echoed());
+    await sendMidi(midiOff(1, 52));
+    await sendMidi(midiOn(3, 52));
+    led.check(N, 'echoChannel (matching)', 'and the watched channel still lights it', 1, await echoed());
+    await sendMidi(midiOff(3, 52));
+  }
+
+  await kit.fresh();
+  await kit.preview(true);
+  {
+    const C = 'ChordPad';
+    const pid = await kit.make(C, { 'Transform.width': 420, 'Transform.height': 380,
+      'ChordPad.layout': 'wheel', 'ChordPad.key': 0, 'ChordPad.scale': 'major',
+      'ChordPad.chordType': 'triad', 'ChordPad.baseOctave': 4,
+      'ChordPad.echo': false, 'ChordPad.echoChannel': 0, 'ChordPad.echoColour': 'FF39D98A' });
+    // A pad echoes only when EVERY one of its chord tones is sounding, so this sends a whole triad.
+    const echoedPads = async () => (await kit.shapes(pid, 'circle'))
+      .filter((c) => c.stroke === rgba('FF39D98A')).length;
+    const cMajor = [60, 64, 67];
+
+    for (const n of cMajor) await sendMidi(midiOn(1, n));
+    led.check(C, 'echo (false)', 'an inbound chord lights nothing while the monitor is off', 0, await echoedPads());
+    for (const n of cMajor) await sendMidi(midiOff(1, n));
+
+    await kit.set(pid, { 'ChordPad.echo': true });
+    for (const n of cMajor) await sendMidi(midiOn(1, n));
+    led.check(C, 'echo (true)', 'the pad whose chord is sounding is outlined', true, (await echoedPads()) >= 1);
+    // …and a PARTIAL chord does not: every tone has to be there, which is what makes the echo mean
+    // something rather than lighting on any note that happens to belong to a pad.
+    await sendMidi(midiOff(1, 67));
+    led.check(C, 'echo (partial chord)', 'two notes of three is not the chord, and lights nothing',
+      0, await echoedPads());
+    for (const n of cMajor) await sendMidi(midiOff(1, n));
+
+    await kit.set(pid, { 'ChordPad.echoChannel': 4 });
+    for (const n of cMajor) await sendMidi(midiOn(1, n));
+    led.check(C, 'echoChannel (pinned)', 'a chord on another channel is ignored', 0, await echoedPads());
+    for (const n of cMajor) await sendMidi(midiOff(1, n));
+    for (const n of cMajor) await sendMidi(midiOn(4, n));
+    led.check(C, 'echoChannel (matching)', 'and the watched channel still lights it', true, (await echoedPads()) >= 1);
+    for (const n of cMajor) await sendMidi(midiOff(4, n));
+  }
+  await kit.preview(false);
 
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');

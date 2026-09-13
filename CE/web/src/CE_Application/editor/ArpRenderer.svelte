@@ -7,7 +7,7 @@
   // Arp.__sourceNotes.
   import {
     arpConfig, arpPattern, arpPhase, arpRate, arpBaseNotes, arpSequence,
-    stepFires, stepIndexAt, arpUseFlats, midiNoteLabel,
+    stepFires, stepEverFires, stepIndexAt, arpUseFlats, midiNoteLabel,
     arpGeometry, arpCell, ARP_PATTERN_LABELS, arpSynced, arpDivisionLabel,
   } from '../utils/arpLayout.js';
 
@@ -47,7 +47,7 @@
   let cells = $derived.by(() => seq.map((notes, i) => ({
     i,
     notes,
-    fires: stepFires(control, i),
+    fires: stepEverFires(control, i, seq.length),
     muted: mutes.has(i),
     isHead: i === head,
     c: arpCell(geom, i),
