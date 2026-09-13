@@ -28,9 +28,18 @@ export function applyParameterAdoption(set, controlType, parameter) {
   }
 
   if (parameter?.type === 'integer' || parameter?.type === 'float' || parameter?.type === 'bipolar') {
-    const min = Number(parameter?.range?.min ?? 0);
-    const max = Number(parameter?.range?.max ?? 127);
-    const value = Number(parameter?.default ?? min);
+    // `??` substitutes for null and undefined only, so a profile that carries a range which is
+    // PRESENT but not a number — "abc", [], {} — reached Number() and adopted NaN as the control's
+    // min and max. Profiles are external files (CE/profiles, and whatever a user adds), nothing on
+    // the load path checks the type of a range, and a NaN range poisons every value the control
+    // maps afterwards. Fall back the way a missing range already does.
+    const numberOr = (value, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const min = numberOr(parameter?.range?.min, 0);
+    const max = numberOr(parameter?.range?.max, 127);
+    const value = numberOr(parameter?.default, min);
     set('Behavior.min', min);
     set('Behavior.max', max);
     set('Behavior.defaultCurrentValue', value);

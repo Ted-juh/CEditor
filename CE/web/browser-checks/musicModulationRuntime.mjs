@@ -17,7 +17,7 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
     : { executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1700, height: 1000 } });
 const failures = [];
-page.on('pageerror', (error) => failures.push(String(error)));
+page.on('pageerror', (error) => failures.push(String(error) + '\n' + String(error.stack ?? '').split('\n').slice(0, 6).join('\n')));
 const settle = () => page.waitForTimeout(120);
 
 // Every component that carries state of its own rather than a single value.
@@ -189,6 +189,91 @@ try {
   }
   assert.deepEqual(starterBlank, [], 'starter packages that reached the panel but did not draw');
   console.log(`  ok  ${starterResults.length}/${starterResults.length} starter packages instantiate, reach the panel and draw`);
+
+  // REAL GESTURES, aimed at each component's actual interaction region. A generic drag across the
+  // middle proves nothing — it lands wherever the layout happens to put it — so these compute the
+  // target from the control's own model and press exactly there.
+  //
+  // Both cases below regressed the same way: the pointer-up handler nulled its drag variable and
+  // THEN called the release function, which read `.kind` off it. Every completed drag threw and the
+  // position was never committed. A model write cannot see this; only a real pointer can.
+  const gestureAt = async (type, handle, place, read) => {
+    const id = await insert(type);
+    await settle();
+    await page.evaluate(async () => {
+      const { setPreviewModeEnabled } = await import('/src/CE_Application/stores/interactionPreview.js');
+      setPreviewModeEnabled(true);
+    });
+    await settle();
+    await page.evaluate(async ({ id, place }) => {
+      const { updateControlProperty } = await import('/src/CE_Application/stores/controls.js');
+      for (const [path, value] of Object.entries(place)) updateControlProperty(id, path, value);
+    }, { id, place });
+    await settle();
+    const box = await page.evaluate((id) => {
+      const el = document.querySelector(`[data-control-id="${id}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    }, id);
+    assert.ok(box && box.w > 0, `${type}: no box to aim at`);
+    // The handle's OWN rendered position, not a fraction of the control: the pad is inset and the
+    // y axis is flipped, so a computed guess misses and proves nothing.
+    const spot = await page.evaluate(({ id, handle }) => {
+      const el = document.querySelector(`[data-control-id="${id}"]`);
+      const h = el?.querySelector(handle);
+      if (!h) return null;
+      const r = h.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, { id, handle });
+    assert.ok(spot, `${type}: no element matching "${handle}" to press`);
+    const before = await read(id);
+    const errs = failures.length;
+    await page.mouse.move(spot.x, spot.y);
+    await page.mouse.down();
+    // The drag has to be established before the move: pointerdown and the first pointermove in the
+    // same frame are treated as one event and no drag starts. The renderer's svg is
+    // pointer-events:none — the preview surface takes the pointer and converts it itself.
+    await settle();
+    await page.mouse.move(box.x + box.w * 0.6, box.y + box.h * 0.65, { steps: 8 });
+    await page.mouse.up();
+    await settle();
+    assert.equal(failures.length, errs,
+      `${type}: pointer-up threw — ${failures.slice(errs).join(' | ').split('\n')[0]}`);
+    const after = await read(id);
+    assert.notEqual(after, before, `${type}: a drag onto its handle committed nothing (${before})`);
+    await page.evaluate(async () => {
+      const { setPreviewModeEnabled } = await import('/src/CE_Application/stores/interactionPreview.js');
+      setPreviewModeEnabled(false);
+    });
+    await settle();
+  };
+  const readPath = (id, ...paths) => page.evaluate(async ({ id, paths }) => {
+    const { panels } = await import('/src/CE_Application/stores/panels.js');
+    const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+    const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
+      const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
+    const c = flat(get(panels).flatMap((p) => p.controls ?? [])).find((x) => x._children.Core.id === id);
+    return paths.map((p) => { const [sec, key] = p.split('.'); return String(c?._children?.[sec]?.[key]); }).join(',');
+  }, { id, paths });
+
+  await gestureAt('Timbre', 'svg.timbre circle[r="9"]', { 'Timbre.x': 0.25, 'Timbre.y': 0.25 },
+    (id) => readPath(id, 'Timbre.x', 'Timbre.y'));
+  console.log('  ok  a Timbre puck drag commits its position and does not throw');
+
+  // The whole section, not two keys: a press can land on a STAR rather than the probe, and that
+  // path commits Constellation.presets instead. Either way the release ran and committed something,
+  // which is what the regression is about.
+  await gestureAt('Constellation', 'svg circle[r="14"]', { 'Constellation.probeX': 0.25, 'Constellation.probeY': 0.25 },
+    (id) => page.evaluate(async ({ id }) => {
+      const { panels } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
+        const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
+      const c = flat(get(panels).flatMap((p) => p.controls ?? [])).find((x) => x._children.Core.id === id);
+      return JSON.stringify(c?._children?.Constellation ?? null);
+    }, { id }));
+  console.log('  ok  a Constellation probe drag commits its position and does not throw');
 
   assert.deepEqual(failures, [], 'page errors during the pass');
   console.log('\nmusic/modulation runtime: all checks passed');

@@ -498,3 +498,125 @@ about an API or the DOM, written before reading it:
 Running total across six rounds: **10 false positives, 3 confirmed defects.** Recorded because the
 ratio is the honest measure of this pass — every one came from writing the predicate before reading
 the contract, and every one was caught before it reached a report.
+
+---
+
+## Round 7 — real gestures, and the adoption rules
+
+### C-4 (fixed) — a malformed profile range adopts NaN as the control's range
+
+`utils/parameterAdoptionRules.js`
+
+```js
+const min = Number(parameter?.range?.min ?? 0);
+```
+
+`??` substitutes for null and undefined only, so a range that is **present but not a number** goes
+straight to `Number()`:
+
+```
+{"min":"abc","max":"def"}  ->  Behavior.min = NaN   Behavior.max = NaN
+{"min":[],"max":{}}        ->  Behavior.min = 0     Behavior.max = NaN
+```
+
+Profiles are external files — nine ship in `CE/profiles`, users add their own, and DPD generates
+more — and **nothing on the load path checks the type of a range**: no validation in
+`DeviceProfileService.cpp`, none on the JS side. A single typo therefore poisons every value the
+adopted control maps afterwards, and unlike the response-curve case this is the control's *core*
+range rather than a curve point.
+
+Fixed with a finite check falling back to the same 0/127 a **missing** range already used. Numeric
+strings still adopt exactly — `{min:'12',max:'80'}` is a legitimate profile and still yields 12/80.
+
+`test/parameterAdoptionRules.test.js` — 7 tests, **2 fail against the unfixed file**. They also pin
+the two regressions the module's own header records (a `BPM` unit surviving a rebind to a unitless
+parameter; `+64` surviving a rebind away from a bipolar one), so the documented "rebind, not merge"
+rule is now enforced rather than described.
+
+Same root cause as C-1, in a different file: `??` does not catch a value that is present and wrong.
+
+### C-5 (fixed) — every Timbre AND Constellation drag threw and lost the edit
+
+`editor/PanelPreviewSurface.svelte:7148`
+
+```js
+if (timbreDrag && activeControl) {
+  timbreDrag = null;              // cleared one line too early
+  releaseTimbreDrag(activeControl);
+}
+```
+
+`releaseTimbreDrag` reads `timbreDrag.kind` as its first statement (`:2396`), on the value that was
+just nulled. The guard is right; the clearing is one line above where it belongs.
+
+Every completed Timbre Space drag therefore throws
+`TypeError: Cannot read properties of null (reading 'kind')` on pointer-up **and silently loses the
+edit** — the throw precedes `updateControlProperty(id, 'Timbre.x'/'Timbre.y', …)` at `:2401–2402`
+and the session cleanup at `:2405`, so the puck snaps back and stale `timbreX`/`timbreY`/
+`timbreDrag` keys stay on the session. `:6668` guards the same variable correctly, which is what
+makes this read as a slip.
+
+**It is two components, not one.** `releaseConstDrag` (`:2786`) has the identical defect: the
+pointer-up handler at `:7167` nulls `constDrag` and then calls a function whose first statement
+reads `constDrag.kind`. So a Preset Constellation star or probe drag threw and lost its position
+too.
+
+Three other release functions looked the same to a grep — `orbitDrag`, `routerDrag`,
+`constraintDrag` — and are **not** affected: the match was a session KEY NAME in a string literal
+(`orbitNodes`, `routerCurve`, `constraintDrag`), not a dereference. `releaseTuringDrag` never reads
+its variable at all.
+
+Fixed by passing the drag in as an argument rather than reading the module variable, so the call
+order cannot break the function again, plus an early return if it is ever absent.
+
+Found by a **real pointer gesture**, not a model write — the model path is fine; the pointer path
+into it is broken. That is the coverage direct edits cannot reach.
+
+### The gesture regression, and what it took to aim it
+
+`browser-checks/musicModulationRuntime.mjs` now presses the handle's **own rendered position**
+(`svg.timbre circle[r="9"]`, `svg circle[r="14"]`) rather than a fraction of the control. Two things
+a generic drag would never have found, both of which made the first attempts prove nothing:
+
+- the renderer's `<svg>` is **`pointer-events: none`** — the preview surface takes the pointer and
+  converts it itself, so aiming at the SVG's own hit area is meaningless;
+- pointerdown and the first pointermove **in the same frame are treated as one event** and no drag
+  starts at all. The press needs a settle before the move.
+
+Verified as a regression test: with the fix reverted it fails with the exact
+`TypeError: Cannot read properties of null (reading 'kind')`.
+
+### Open question for root, not filed as a defect
+
+Adoption clears stale fields **within** a type branch but not **across** one. Rebinding a Knob from
+a float parameter to a boolean leaves `Behavior.min/max/unit/displayMin/displayMax/showSign`
+behind; choice→numeric leaves `Value.rows`; action→numeric leaves `Behavior.buttonType/subtype`.
+24 such pairs.
+
+The header's rule ("adoption is a REBIND, not a merge") argues these should be cleared too, but the
+sentence sits inside the numeric branch and may only ever have meant that branch. I could not
+demonstrate a user-visible symptom — nothing obvious renders `Behavior.unit` for a non-numeric
+control — so it is recorded as a question rather than a bug. Root owns the adopt entry points.
+
+### Probed clean — `customComponentClipboard`
+
+Against its documented contract: pasted names never collide with existing ones or with each other
+across 25 repeated pastes; a zone following a pasted part re-points at the copy while a zone
+following a part **outside** the payload is correctly left alone; z-index climbs above the
+destination's top and is unique per part; offsets are applied; parts arrive unlocked.
+
+Latent only: `buildPastePatch({parts:[null]})` throws. Unreachable — the sole producer filters with
+`.filter(Boolean)` (`CustomDesignSurfaceEditor.svelte:2362`).
+
+### Gesture pass, stated honestly
+
+```
+1/8 controls changed their own model from a real pointer drag
+```
+
+**Only Timbre is a confirmed defect.** The other six that did not move — StepSequencer, Envelope,
+DrumPads, Keyboard, NoteRibbon, Orbit — are most likely my generic 30%→60% horizontal drag landing
+outside their interactive regions, not bugs. They are not reported as findings and each needs a
+gesture shaped for it before anything can be claimed.
+
+Running total: **12 false positives, 5 confirmed defects** (4 fixed, 1 awaiting ownership).

@@ -2390,13 +2390,18 @@
       emitControlPortFanout(timbreControlWith(control, p), 'continuous');
     }
   }
-  function releaseTimbreDrag(control) {
+  // The drag arrives as an ARGUMENT rather than being read off the module variable, because the
+  // caller clears that variable before calling — and used to clear it one line too early, so this
+  // read threw on the null and the position was never committed. Taking it explicitly means the
+  // call order cannot break the function again.
+  function releaseTimbreDrag(control, drag) {
     const id = getControlId(control);
     const sess = sessionFor(control);
-    if (timbreDrag.kind === 'anchor' && Array.isArray(sess?.timbreAnchors)) {
+    if (!drag) return;
+    if (drag.kind === 'anchor' && Array.isArray(sess?.timbreAnchors)) {
       updateControlProperty(id, 'Timbre.anchors', sess.timbreAnchors);
       emitControlPortFanout(timbreControlWith(control, timbrePuckWorking(control), sess.timbreAnchors), 'commit');
-    } else if (timbreDrag.kind === 'puck') {
+    } else if (drag.kind === 'puck') {
       const puck = timbrePuckWorking(control);
       updateControlProperty(id, 'Timbre.x', puck.x);
       updateControlProperty(id, 'Timbre.y', puck.y);
@@ -2788,12 +2793,15 @@
       emitControlPortFanout(constControlWith(control, p), 'continuous');
     }
   }
-  function releaseConstDrag(control) {
+  // Same shape as releaseTimbreDrag above, and it had the same defect: the caller nulls constDrag
+  // before calling, so reading `.kind` here threw and the star or probe position was lost.
+  function releaseConstDrag(control, drag) {
     const id = getControlId(control);
     const sess = sessionFor(control);
-    if (constDrag.kind === 'star' && Array.isArray(sess?.constPresets)) {
+    if (!drag) return;
+    if (drag.kind === 'star' && Array.isArray(sess?.constPresets)) {
       updateControlProperty(id, 'Constellation.presets', sess.constPresets);
-    } else if (constDrag.kind === 'probe' && typeof sess?.constX === 'number') {
+    } else if (drag.kind === 'probe' && typeof sess?.constX === 'number') {
       updateControlProperty(id, 'Constellation.probeX', sess.constX);
       updateControlProperty(id, 'Constellation.probeY', sess.constY);
     }
@@ -7146,8 +7154,9 @@
 
     // Release a timbre puck / anchor: commit its position.
     if (timbreDrag && activeControl) {
+      const drag = timbreDrag;
       timbreDrag = null;
-      releaseTimbreDrag(activeControl);
+      releaseTimbreDrag(activeControl, drag);
     }
 
     // Release a turing edit: commit the seeded sequence.
@@ -7165,8 +7174,9 @@
 
     // Release a constellation probe / star: commit its position.
     if (constDrag && activeControl) {
+      const drag = constDrag;
       constDrag = null;
-      releaseConstDrag(activeControl);
+      releaseConstDrag(activeControl, drag);
     }
 
     // Release a constraint member: commit the solved values.
