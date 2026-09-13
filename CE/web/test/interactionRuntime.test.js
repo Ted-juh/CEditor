@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 
 import { resolveInteractionContext, resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 
+test('choice defaults never resolve a header or disabled option as the selected value', () => {
+  const rows = [
+    { id: 'heading', isHeader: true, selectedByDefault: true },
+    { id: 'disabled', enabled: false, selectedByDefault: true },
+    { id: 'valid', displayText: 'Available' },
+  ];
+  for (const buttonType of ['listbox', 'combobox', 'cyclic', 'radio']) {
+    for (const defaultValue of ['missing', 'heading', 'disabled']) {
+      const context = resolveInteractionContext({ _children: {
+        Behavior: { buttonType, valueType: 'enum', defaultValue }, Value: { rows },
+      } });
+      assert.equal(context.valueRaw, 'valid', `${buttonType}: ${defaultValue}`);
+      assert.equal(context.valueDisplay, 'Available');
+    }
+  }
+});
+
 function makeSelectedStateSection() {
   return {
     enabled: true,

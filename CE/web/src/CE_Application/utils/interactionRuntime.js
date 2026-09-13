@@ -53,13 +53,14 @@ function hasCheckedStateSignal(signals) {
 }
 
 function findDefaultRow(rows = []) {
-  return rows.find((row) => row?.selectedByDefault === true && row?.enabled !== false)
-    ?? rows.find((row) => row?.enabled !== false)
+  return rows.find((row) => row?.selectedByDefault === true && row?.enabled !== false && row?.isHeader !== true)
+    ?? rows.find((row) => row?.enabled !== false && row?.isHeader !== true)
     ?? null;
 }
 
 function findRowByInternalValue(rows = [], value) {
-  return rows.find((row) => String(row?.internalValue ?? row?.id ?? '') === String(value ?? ''))
+  return rows.find((row) => row?.enabled !== false && row?.isHeader !== true
+    && String(row?.internalValue ?? row?.id ?? '') === String(value ?? ''))
     ?? null;
 }
 

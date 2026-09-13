@@ -254,3 +254,11 @@ native/hardware gates. This list is an active work record, not a completion repo
 | LcdDisplay / PixelDisplay | Token values, rows/columns, seven-segment glyphs, grid elements/source/brightness/gamma, existing GIF/runtime/selection suites | Remaining screen properties, element kinds, paging, interaction and appearance combinations |
 | Macro | Four curves, depth/output range, visibility/editability, multiple-instance SVG references | Remaining lanes, labels, target/routing and style settings |
 | ToggleButton / RadioButtonGroup / CyclicButton | Default/Allow Off, multiple selection/deselection, cycle disabled rows/wrap, rendered selection and emitted values | Remaining selection-group, row styling/layout and navigation settings |
+
+### Design choices checkpoint (89 scenarios)
+
+B68: Dependent Listbox and RadioButtonGroup showed no rows in design view when every row belonged to a parent group. Resolve the authored parent defaults through the existing dependent-choice resolver. Actual visible B-group rows, Preview and fresh reopen now agree.
+
+B69: Choice default resolution could select a section header or disabled row. Skip both for explicit/default fallback lookup. Real Listbox selection, End/Home/Arrow navigation, scroll-into-view, emitted value and reopen pass. A unit regression covers the same invalid defaults across Listbox, Combobox, Cyclic and Radio.
+
+The previous 87 browser scenarios passed together with zero page errors. These two additional cases pass individually; all 4,822 Node tests pass with zero skips. Exhaustive property coverage and native/hardware gates remain open.

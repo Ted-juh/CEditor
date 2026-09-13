@@ -84,6 +84,8 @@
     raisesOnClick,
   } from '../utils/mouseBehavior.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
+  import { flatControls } from '../utils/containment.js';
+  import { applyPanelDependentChoices } from '../stores/interactionPreview.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
   import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
@@ -307,7 +309,12 @@
       + `text-align:${align};`
       + `padding:${Math.max(0, Number(cl?.paddingTop) || 4)}px ${Math.max(0, Number(cl?.paddingRight) || 8)}px ${Math.max(0, Number(cl?.paddingBottom) || 4)}px ${Math.max(0, Number(cl?.paddingLeft) || 8)}px;`;
   });
-  let previewSession = $derived(previewSessionOverride ?? null);
+  // Design view needs the same authored parent choices as Preview, otherwise
+  // dependent lists appear empty until interaction mode is entered.
+  let designChoiceSession = $derived(previewSessionOverride == null && dependsOnId(control)
+    ? applyPanelDependentChoices(flatControls(allControls), {})?.[control?._children?.Core?.id] ?? null
+    : null);
+  let previewSession = $derived(previewSessionOverride ?? designChoiceSession);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);

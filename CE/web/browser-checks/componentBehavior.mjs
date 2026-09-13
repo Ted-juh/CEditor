@@ -899,6 +899,23 @@ try {
     const selected=()=>node(id).locator('.listbox-row.selected .lb-label').allTextContents();
     const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();assert.deepEqual(await selected(),['Alpha']);await node('multi_parent').click();await page.locator('.panel-combobox-menu').getByRole('option',{name:'B',exact:true}).click();await settle();assert.deepEqual(await selected(),['Beta'],'Reset pick must visibly select the matching row in multi-select too');await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
   });
+  await check('Dependent choices show the correct default group in design view and keep it in Preview after reopening',async()=>{
+    for(const type of ['Listbox','RadioButtonGroup']){
+      const rows=['A','B'].map(s=>({id:s+'1',internalValue:s+'1',displayText:s+'1',parentValue:s,enabled:true,selectedByDefault:s==='A'}));
+      const id=await fixture(type,{Behavior:{defaultValue:'A1'},Value:{rows,dependsOn:'design_parent'}},[],[{type:'Combobox',sections:{Core:{id:'design_parent'},Transform:{x:50,y:300,width:260,height:48},Behavior:{defaultValue:'B'},Value:{rows:['A','B'].map(s=>({id:s,internalValue:s,displayText:s,enabled:true,selectedByDefault:s==='B'}))}}}]);
+      const verify=async()=>{
+        if(type==='Combobox')assert.ok((await node(id).textContent()).includes('B1'),'design canvas shows the choice from default parent B');
+        else assert.deepEqual(await node(id).locator(type==='Listbox'?'.lb-label':'.radio-group-label').allTextContents(),['B1'],'design canvas filters to the default parent group');
+        await props.getByTitle('Enter Preview',{exact:true}).click();await settle();assert.ok((await node(id).textContent()).includes('B1'));await props.getByTitle('Exit Preview',{exact:true}).click();
+      };await verify();await reopen(id);await verify();
+    }
+  });
+  await check('Listbox default selection and keyboard navigation skip section headers and disabled rows',async()=>{
+    const rows=[{id:'header',displayText:'SECTION',isHeader:true,enabled:true},{id:'disabled',internalValue:'disabled',displayText:'Unavailable',enabled:false},...['Alpha','Beta','Gamma'].map(v=>({id:v,internalValue:v,displayText:v,enabled:true}))];
+    const id=await fixture('Listbox',{Transform:{height:96},Behavior:{defaultValue:'missing'},Value:{rows},Listbox:{rowHeight:32,keyboardNav:true,scrollIntoView:true},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'selectedChoice',deviceRole:'mainSynth',parameterId:'choice',dryRun:true}]}});
+    const selected=()=>node(id).locator('.listbox-row.selected .lb-label').allTextContents();
+    const verify=async()=>{assert.deepEqual(await selected(),['Alpha'],'design default is the first enabled option, never a header');await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.deepEqual(await selected(),['Alpha']);await node(id).focus();await page.keyboard.press('End');await settle();assert.deepEqual(await selected(),['Gamma']);const b=await node(id).boundingBox();const row=await node(id).locator('.listbox-row.selected').boundingBox();assert.ok(row.y>=b.y&&row.y+row.height<=b.y+b.height,'End scrolls the selected row into view');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),'Gamma');await page.keyboard.press('Home');await settle();assert.deepEqual(await selected(),['Alpha']);await page.keyboard.press('ArrowDown');await settle();assert.deepEqual(await selected(),['Beta']);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
+  });
 } finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();
