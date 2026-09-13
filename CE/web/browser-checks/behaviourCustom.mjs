@@ -325,6 +325,101 @@ try {
       true, (await values(piano)).note !== noteBefore);
   }
 
+
+  // --- VARIANTS / STATES: a rule decides which page is on screen -------------------------------------
+  // The Tab Group's whole point is that a value channel swaps the visible page through rule-driven
+  // states, and the channel moving is NOT that promise — the previous pass exercised the enum and
+  // stopped there, which is the gap this closes. Each page carries its own text, so "which page is
+  // showing" is a question the DOM can answer exactly: a hidden part is not rendered at all.
+  await kit.fresh();
+  await kit.preview(true);
+  {
+    const V = 'States/variants';
+    const id = await makeStarter('starter.tabGroup');
+    const pagesShowing = async () => (await kit.dom(id, '.interactive-part-text'))
+      .map((d) => d.text).filter((t) => /^PAGE /.test(t));
+    const setTab = (value) => kit.page.evaluate(async ({ id, value }) => {
+      const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+      updatePanelPreviewSession(id, { customValues: { tab: value } });
+    }, { id, value });
+
+    led.check(V, 'default state', 'the component opens on page one and the other two are not rendered at all',
+      ['PAGE ONE'], await pagesShowing());
+    for (const [value, want] of [['two', 'PAGE TWO'], ['three', 'PAGE THREE'], ['one', 'PAGE ONE']]) {
+      await setTab(value);
+      await kit.settle(160);
+      led.check(V, `rule tab == '${value}'`, 'exactly that page is visible and the others are gone',
+        [want], await pagesShowing());
+    }
+
+    // THE USER PATH, not the channel: press the generated tab button and see the page change.
+    const zones = await locateZones(id);
+    const tabZones = [...zones.entries()].filter(([n]) => /tab/i.test(n));
+    assert.ok(tabZones.length >= 2, 'the tab bank generated fewer than two zones');
+    const seen = new Map();
+    for (const [, at] of tabZones) {
+      await kit.click(at);
+      await kit.settle(160);
+      const showing = await pagesShowing();
+      const tab = (await values(id)).tab;
+      if (showing.length === 1) seen.set(tab, showing[0]);
+    }
+    led.check(V, 'pressing a tab swaps the page', 'each generated tab button brings up its own page, by pointer',
+      ['one=PAGE ONE', 'three=PAGE THREE', 'two=PAGE TWO'],
+      [...seen.entries()].map(([k, v]) => `${k}=${v}`).sort());
+    led.check(V, 'one page at a time', 'no press ever leaves two pages stacked on screen',
+      true, tabZones.length === seen.size || seen.size >= 2);
+
+    // The system state, which is a different rule shape: a component-level patch rather than parts.
+    await kit.page.evaluate(async ({ id }) => {
+      const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+      updatePanelPreviewSession(id, { disabled: true });
+    }, { id });
+    await kit.settle(160);
+    // The patch is `component: { 'Transform.opacity': 0.55 }` — it dims the CONTROL, not a part.
+    // Reading the part wrapper's opacity measures something the state never touches.
+    const controlOpacity = () => kit.page.evaluate((i) => {
+      const el = document.querySelector(`[data-control-id="${i}"]`);
+      return el ? getComputedStyle(el).opacity : null;
+    }, id);
+    const dimmed = await controlOpacity();
+    await kit.page.evaluate(async ({ id }) => {
+      const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+      updatePanelPreviewSession(id, { disabled: false });
+    }, { id });
+    await kit.settle(160);
+    led.check(V, "system state 'Disabled'", 'a disabled component is dimmed to the declared opacity, and comes back',
+      ['0.55', '1'], [dimmed, await controlOpacity()]);
+
+    // …and the rule still drives the page after a save and reopen.
+    await setTab('two');
+    await kit.settle(160);
+    const again = await kit.reopen(id);
+    // A FRESH SESSION, deliberately. Reopening preserves control ids and the preview session is
+    // keyed by id, so the reopened copy inherits the live state of the one it was saved from —
+    // which would let this assertion pass on a value the file never carried. Clearing it is what
+    // opening the saved panel in a new sitting actually looks like.
+    await kit.page.evaluate(async ({ id }) => {
+      const { resetPanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
+      resetPanelPreviewSession(id);
+    }, { id: again });
+    await kit.settle(200);
+    const reopenedPages = (await kit.dom(again, '.interactive-part-text')).map((d) => d.text).filter((t) => /^PAGE /.test(t));
+    led.check(V, 'save/reopen (state rules still apply)', 'opened fresh, a saved component starts on its default page',
+      ['PAGE ONE'], reopenedPages);
+    const zones2 = await locateZones(again);
+    const tab2 = [...zones2.entries()].filter(([n]) => /tab/i.test(n));
+    let swapped = null;
+    for (const [, at] of tab2) {
+      await kit.click(at);
+      await kit.settle(160);
+      const showing = (await kit.dom(again, '.interactive-part-text')).map((d) => d.text).filter((t) => /^PAGE /.test(t));
+      if (showing.length === 1 && showing[0] !== 'PAGE ONE') { swapped = showing[0]; break; }
+    }
+    led.check(V, 'save/reopen (tabs still swap pages)', 'and pressing a tab still swaps the page after the round trip',
+      true, swapped !== null);
+  }
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');

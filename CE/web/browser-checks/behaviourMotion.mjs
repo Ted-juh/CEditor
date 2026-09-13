@@ -570,6 +570,343 @@ try {
     }
   }
 
+
+  // =============================================================================================
+  // CONSTELLATION — 19 properties. A map of preset stars; the probe either snaps to the nearest or
+  // morphs between them, and the numbers the targets receive are the whole component.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const K = 'Constellation';
+    const targets = [{ id: 'cutoff', label: 'Filter Cutoff', colour: 'FF39D98A' },
+      { id: 'reso', label: 'Resonance', colour: 'FF5B9BD5' }];
+    const presets = [
+      { id: 's0', label: 'Low', x: 0.1, y: 0.1, colour: 'FF5B9BD5', values: { cutoff: 0, reso: 0 } },
+      { id: 's1', label: 'High', x: 0.9, y: 0.9, colour: 'FFF2994A', values: { cutoff: 1, reso: 0.5 } },
+    ];
+    let id = await kit.make(K, { 'Transform.width': 340, 'Transform.height': 300,
+      'Constellation.targets': targets, 'Constellation.presets': presets,
+      'Constellation.running': false, 'Constellation.mode': 'blend', 'Constellation.blendPower': 2 });
+    const outs = async () => {
+      const p = await kit.ports(id);
+      return { cutoff: r3(p.target_0), reso: r3(p.target_1) };
+    };
+
+    // --- mode 'snap' vs 'blend': two genuinely different rules ------------------------------------
+    await kit.set(id, { 'Constellation.probeX': 0.4, 'Constellation.probeY': 0.4, 'Constellation.mode': 'snap' });
+    led.check(K, "mode 'snap'", 'the probe recalls the nearest preset whole, with no morphing',
+      { cutoff: 0, reso: 0 }, await outs());
+    await kit.set(id, { 'Constellation.probeX': 0.6, 'Constellation.probeY': 0.6 });
+    led.check(K, "mode 'snap' (crosses over)", 'past the midpoint it recalls the other one, whole',
+      { cutoff: 1, reso: 0.5 }, await outs());
+    await kit.set(id, { 'Constellation.mode': 'blend', 'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5 });
+    led.check(K, "mode 'blend'", 'equidistant between two stars is the average of their patches',
+      { cutoff: 0.5, reso: 0.25 }, await outs());
+
+    // --- blendPower: how sharply the nearest star takes over --------------------------------------
+    await kit.set(id, { 'Constellation.probeX': 0.3, 'Constellation.probeY': 0.3, 'Constellation.blendPower': 1 });
+    const soft = (await outs()).cutoff;
+    await kit.set(id, { 'Constellation.blendPower': 8 });
+    const sharp = (await outs()).cutoff;
+    led.check(K, 'blendPower', 'a higher power pulls the blend closer to the nearer star',
+      true, sharp < soft);
+    await kit.set(id, { 'Constellation.blendPower': 2 });
+
+    // --- probeX / probeY, and the targets that follow them -------------------------------------------
+    await kit.set(id, { 'Constellation.probeX': 0.9, 'Constellation.probeY': 0.9 });
+    led.check(K, 'probeX / probeY', 'standing on a star emits that star patch exactly',
+      { cutoff: 1, reso: 0.5 }, await outs());
+    led.check(K, 'targets[] → ports', 'every target is its own binding, named as the author named it',
+      ['target_0=Filter Cutoff', 'target_1=Resonance'], await kit.page.evaluate(async ({ id }) => {
+        const { getComponentPorts } = await import('/src/CE_Application/models/componentPorts.js');
+        const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+        const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+        const live = get(panels).find((p) => p.id === get(activePanelId));
+        const c = (live?.controls ?? []).find((x) => x._children.Core.id === id);
+        return getComponentPorts(c).map((p) => `${p.id}=${p.label}`);
+      }, { id }));
+
+    // --- showLabels / showLinks / linkCount / showField ------------------------------------------------
+    await kit.set(id, { 'Constellation.showLabels': true });
+    led.check(K, 'showLabels (true)', 'each star is named on the map',
+      true, (await kit.texts(id)).includes('Low') && (await kit.texts(id)).includes('High'));
+    await kit.set(id, { 'Constellation.showLabels': false });
+    led.check(K, 'showLabels (false)', 'the names go', false, (await kit.texts(id)).includes('Low'));
+    await kit.set(id, { 'Constellation.showLabels': true });
+    {
+      // Links need more than two stars to be interesting: k nearest neighbours of each.
+      const five = [0, 1, 2, 3, 4].map((i) => ({ id: `p${i}`, label: `P${i}`, x: 0.15 + i * 0.17,
+        y: 0.2 + (i % 2) * 0.4, colour: 'FF5B9BD5', values: { cutoff: i / 4, reso: 0.2 } }));
+      await kit.set(id, { 'Constellation.presets': five, 'Constellation.showLinks': true, 'Constellation.linkCount': 1 });
+      const one = (await kit.shapes(id, 'line')).length;
+      await kit.set(id, { 'Constellation.linkCount': 3 });
+      const three = (await kit.shapes(id, 'line')).length;
+      led.check(K, 'showLinks + linkCount', 'more neighbours per star draws more constellation lines',
+        true, one > 0 && three > one);
+      await kit.set(id, { 'Constellation.showLinks': false });
+      led.check(K, 'showLinks (false)', 'and they all go', 0, (await kit.shapes(id, 'line')).length);
+      await kit.set(id, { 'Constellation.presets': presets, 'Constellation.showLinks': true, 'Constellation.linkCount': 2 });
+    }
+    {
+      // MEASURED, then recorded rather than fixed. `Constellation.showField` is read by nothing:
+      // the only `showField` reader in src/ is TimbreRenderer, where it gates a per-anchor heat
+      // overlay drawn over the base field rect. The Constellation draws the base rect and has no
+      // overlay at all, so there is nothing for the flag to turn off — and giving it one would be
+      // building a visual feature, not fixing a defect. It IS published as a scripting verb
+      // (`constellationShowField`) in all seven engines, so a script can call it and get nothing.
+      const before = (await kit.geo(id)).length;
+      await kit.set(id, { 'Constellation.showField': false });
+      const after = (await kit.geo(id)).length;
+      await kit.set(id, { 'Constellation.showField': true });
+      led.inert(K, 'showField', 'heat field behind the stars',
+        `no reader in src/ (only TimbreRenderer reads showField); ${before} shapes drawn either way, `
+        + 'and the scripting verb constellationShowField therefore does nothing');
+    }
+
+    // --- running + wanderRate: the probe drifts on its own ------------------------------------------------
+    {
+      await kit.preview(true);
+      const probeAt = async () => {
+        const p = await kit.shapes(id, 'circle', (c) => c.r === 14);
+        return p[0] ? `${Math.round(p[0].cx)},${Math.round(p[0].cy)}` : 'gone';
+      };
+      await kit.set(id, { 'Constellation.running': false, 'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5 });
+      const parked = await probeAt();
+      await kit.settle(500);
+      led.check(K, 'running (false)', 'a still probe stays where it was put', parked, await probeAt());
+      await kit.set(id, { 'Constellation.running': true, 'Constellation.wanderRate': 1.5 });
+      await kit.settle(350);
+      const drifted = await probeAt();
+      await kit.settle(350);
+      led.check(K, 'running (true) + wanderRate', 'a wandering probe is somewhere else on each look',
+        true, drifted !== parked && (await probeAt()) !== drifted);
+      await kit.set(id, { 'Constellation.running': false, 'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5 });
+      await kit.preview(false);
+    }
+    led.unverified(K, 'syncToTransport / wanderBars', 'run the wander off the panel transport',
+      'needs a running transport; the free-running wanderRate path is verified above');
+
+    // --- editable, with outbound matching what is displayed ------------------------------------------------
+    await kit.preview(true);
+    {
+      await kit.set(id, { 'Constellation.editable': true, 'Constellation.mode': 'blend',
+        'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5 });
+      const box = await kit.box(id);
+      const probe = await kit.spot(id, 'svg circle[r="14"]', 0);
+      assert.ok(probe, 'Constellation: no probe to drag');
+      // THE Y AXIS IS FLIPPED, as it is on every field component here: probeY 1 is the TOP of the
+      // control. Dragging to the bottom-right of the screen and expecting (0.9, 0.9) measures the
+      // test's assumption, not the component — it committed (0.903, 0.093), which is exactly right.
+      await kit.drag(probe, { x: box.x + box.w * 0.88, y: box.y + box.h * 0.12 });
+      const moved = { x: await kit.read(id, 'Constellation.probeX'), y: await kit.read(id, 'Constellation.probeY') };
+      led.check(K, 'editable (true)', 'a drag to the top-right commits a high probe position on both axes',
+        'both past 0.7', `x=${r3(moved.x)} y=${r3(moved.y)}`,
+        () => moved.x > 0.7 && moved.y > 0.7);
+      const expected = await kit.page.evaluate(async ({ id }) => {
+        const cl = await import('/src/CE_Application/utils/constellationLayout.js');
+        const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+        const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+        const live = get(panels).find((p) => p.id === get(activePanelId));
+        const c = (live?.controls ?? []).find((x) => x._children.Core.id === id);
+        return cl.constellationPortValues(c);
+      }, { id });
+      led.check(K, 'editable → outbound matches displayed', 'the targets receive the blend at the committed probe position',
+        { cutoff: r3(expected.target_0), reso: r3(expected.target_1) }, await outs());
+
+      await kit.set(id, { 'Constellation.probeX': 0.5, 'Constellation.probeY': 0.5, 'Constellation.editable': false });
+      const frozen = { x: await kit.read(id, 'Constellation.probeX'), y: await kit.read(id, 'Constellation.probeY') };
+      const probe2 = await kit.spot(id, 'svg circle[r="14"]', 0);
+      await kit.drag(probe2, { x: box.x + box.w * 0.15, y: box.y + box.h * 0.15 });
+      led.check(K, 'editable (false)', 'the same drag moves nothing', frozen,
+        { x: await kit.read(id, 'Constellation.probeX'), y: await kit.read(id, 'Constellation.probeY') });
+      await kit.set(id, { 'Constellation.editable': true });
+    }
+    await kit.preview(false);
+
+    // --- save and reopen -------------------------------------------------------------------------------------
+    {
+      await kit.set(id, { 'Constellation.probeX': 0.3, 'Constellation.probeY': 0.7,
+        'Constellation.mode': 'snap', 'Constellation.showLabels': true });
+      const beforeGeo = await kit.geo(id);
+      const beforeOuts = await outs();
+      const again = await kit.reopen(id);
+      led.check(K, 'save/reopen (drawing)', 'stars, links, labels and probe return identical',
+        JSON.stringify(beforeGeo), JSON.stringify(await kit.geo(again)));
+      id = again;
+      led.check(K, 'save/reopen (outbound)', 'and the targets still receive the same patch', beforeOuts, await outs());
+    }
+  }
+
+  // =============================================================================================
+  // KINETIC — 15 properties. A ball with physics: the ports are its position and speed.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const N = 'Kinetic';
+    let id = await kit.make(N, { 'Transform.width': 300, 'Transform.height': 300,
+      'Kinetic.running': false, 'Kinetic.initial': { x: 0.25, y: 0.75, vx: 0, vy: 0 } });
+    const ports = async () => {
+      const p = await kit.ports(id);
+      return { x: r3(p.x), y: r3(p.y), speed: r3(p.speed) };
+    };
+
+    // --- initial: the resting state IS the port values ------------------------------------------------
+    led.check(N, 'initial (position → ports)', 'the ball position is what a bound parameter receives',
+      { x: 0.25, y: 0.75 }, { x: (await ports()).x, y: (await ports()).y });
+    await kit.set(id, { 'Kinetic.initial': { x: 0.8, y: 0.2, vx: 0, vy: 0 } });
+    led.check(N, 'initial (moved)', 'and it follows when the start point changes',
+      { x: 0.8, y: 0.2 }, { x: (await ports()).x, y: (await ports()).y });
+    await kit.set(id, { 'Kinetic.initial': { x: 0.5, y: 0.5, vx: 0.6, vy: 0.8 } });
+    led.check(N, 'initial (velocity → speed port)', 'the speed port is the magnitude of the start velocity, normalised',
+      true, (await ports()).speed > 0);
+
+    // --- running: the physics integrate, and stop ---------------------------------------------------------
+    {
+      await kit.preview(true);
+      const ballAt = async () => {
+        const c = await kit.shapes(id, 'circle');
+        return c.length ? `${Math.round(c[0].cx)},${Math.round(c[0].cy)}` : 'gone';
+      };
+      await kit.set(id, { 'Kinetic.running': false });
+      const still = await ballAt();
+      await kit.settle(500);
+      led.check(N, 'running (false)', 'a stopped ball does not move', still, await ballAt());
+      await kit.set(id, { 'Kinetic.running': true, 'Kinetic.gravity': 0, 'Kinetic.friction': 0,
+        'Kinetic.restitution': 1, 'Kinetic.keepAlive': 0 });
+      await kit.settle(300);
+      const moved = await ballAt();
+      await kit.settle(300);
+      led.check(N, 'running (true)', 'a running ball is somewhere else on each look',
+        true, moved !== still && (await ballAt()) !== moved);
+
+      // --- friction: energy is lost, so the ball ends up slower ------------------------------------------
+      const speedAfter = async (friction, ms) => {
+        await kit.set(id, { 'Kinetic.running': false, 'Kinetic.initial': { x: 0.5, y: 0.5, vx: 0.9, vy: 0 },
+          'Kinetic.friction': friction, 'Kinetic.gravity': 0, 'Kinetic.restitution': 1, 'Kinetic.keepAlive': 0 });
+        await kit.set(id, { 'Kinetic.running': true });
+        await kit.settle(ms);
+        const v = (await kit.session(id))?.kineticState;
+        await kit.set(id, { 'Kinetic.running': false });
+        return v ? Math.hypot(v.vx ?? 0, v.vy ?? 0) : null;
+      };
+      const slippery = await speedAfter(0, 600);
+      const draggy = await speedAfter(2, 600);
+      if (slippery === null || draggy === null) {
+        led.unverified(N, 'friction / restitution / gravity / keepAlive', 'air drag, bounce energy, downward pull and the re-kick',
+          'the integrator keeps its live state somewhere this check cannot read; the ball motion itself is verified above');
+      } else {
+        led.check(N, 'friction', 'air drag leaves the ball slower than the same throw with none',
+          true, draggy < slippery);
+      }
+      await kit.set(id, { 'Kinetic.running': false });
+      await kit.preview(false);
+    }
+
+    // --- showTrail / showWalls, and the colours -------------------------------------------------------------
+    await kit.set(id, { 'Kinetic.showWalls': true, 'Kinetic.wallColour': 'FF2A6BA8',
+      'Kinetic.ballColour': 'FF39D98A', 'Kinetic.fieldColour': 'FF0D0D12' });
+    {
+      const shapes = await kit.geo(id);
+      led.check(N, 'ballColour', 'the ball takes the declared colour',
+        true, shapes.some((n) => n.tag === 'circle' && n.fill === rgba('FF39D98A')));
+      led.check(N, 'fieldColour', 'the field takes its own colour',
+        true, shapes.some((n) => n.tag === 'rect' && n.fill === rgba('FF0D0D12')));
+      const wallsOn = (await kit.geo(id)).length;
+      await kit.set(id, { 'Kinetic.showWalls': false });
+      led.check(N, 'showWalls', 'the walls are drawn, and go with the flag',
+        true, (await kit.geo(id)).length < wallsOn);
+      await kit.set(id, { 'Kinetic.showWalls': true });
+    }
+    led.unverified(N, 'showTrail', 'a comet trail behind the ball',
+      'the trail only exists while the physics run, so its shape is a moving target');
+
+    // --- editable: fling it ------------------------------------------------------------------------------------
+    await kit.preview(true);
+    {
+      await kit.set(id, { 'Kinetic.running': false, 'Kinetic.editable': true,
+        'Kinetic.initial': { x: 0.5, y: 0.5, vx: 0, vy: 0 } });
+      const box = await kit.box(id);
+      // MEASURED ON SCREEN. A fling writes the live physics state the ticker integrates, not
+      // Kinetic.initial — preview is a rehearsal, so the document keeps the start point the author
+      // set. Asserting the document here would report a working fling as dead.
+      const ballAt = async () => {
+        const c = await kit.shapes(id, 'circle');
+        return c.length ? `${Math.round(c[0].cx)},${Math.round(c[0].cy)}` : 'gone';
+      };
+      const rest = await ballAt();
+      const ball = await kit.spot(id, 'svg circle', 0);
+      assert.ok(ball, 'Kinetic: no ball to fling');
+      await kit.drag(ball, { x: box.x + box.w * 0.8, y: box.y + box.h * 0.3 });
+      led.check(N, 'editable (true)', 'flinging the ball moves it across the field', true, (await ballAt()) !== rest);
+      led.check(N, 'editable (the document is left alone)', 'and the authored start point is untouched by the rehearsal',
+        { x: 0.5, y: 0.5 }, await (async () => {
+          const i = await kit.read(id, 'Kinetic.initial');
+          return { x: r3(i.x), y: r3(i.y) };
+        })());
+
+      await kit.set(id, { 'Kinetic.running': false, 'Kinetic.editable': false,
+        'Kinetic.initial': { x: 0.5, y: 0.5, vx: 0, vy: 0 } });
+      await kit.settle(150);
+      const frozenAt = await ballAt();
+      const ball2 = await kit.spot(id, 'svg circle', 0);
+      await kit.drag(ball2, { x: box.x + box.w * 0.2, y: box.y + box.h * 0.8 });
+      led.check(N, 'editable (false)', 'the same fling does not move it at all', frozenAt, await ballAt());
+      await kit.set(id, { 'Kinetic.editable': true });
+    }
+    await kit.preview(false);
+
+    // --- save and reopen -----------------------------------------------------------------------------------------
+    {
+      await kit.set(id, { 'Kinetic.initial': { x: 0.3, y: 0.6, vx: 0.4, vy: -0.2 },
+        'Kinetic.gravity': 0.3, 'Kinetic.restitution': 0.8, 'Kinetic.running': false });
+      const beforeGeo = await kit.geo(id);
+      const beforePorts = await ports();
+      const again = await kit.reopen(id);
+      led.check(N, 'save/reopen (drawing)', 'ball, walls and field return identical',
+        JSON.stringify(beforeGeo), JSON.stringify(await kit.geo(again)));
+      led.check(N, 'save/reopen (outbound)', 'position and speed survive the round trip', beforePorts,
+        await (async () => { const p = await kit.ports(again); return { x: r3(p.x), y: r3(p.y), speed: r3(p.speed) }; })());
+    }
+  }
+
+
+  // =============================================================================================
+  // DUPLICATE SVG IDS ACROSS TWO INSTANCES — swept over every type in this half of the catalogue.
+  //
+  // SVG ids are DOCUMENT-global and `url(#…)` resolves to the first match, so a renderer that names
+  // a gradient, clip path, mask, filter or pattern after its index alone breaks the moment a panel
+  // holds two of that component: the second silently paints with the first one's definition. It is
+  // worse the more the two differ in size or colour, and it is invisible to any check that looks at
+  // one instance at a time — which is every check in this repository before this one.
+  //
+  // Found in Timbre (tsHeat-0 and tsHeat-1 defined twice, at cx=78,cy=282,r=204 and cx=38,cy=122,
+  // r=84) and independently by root in the Macro. This sweeps the rest rather than waiting to be
+  // told about them one at a time.
+  // =============================================================================================
+  {
+    const MINE = ['Envelope', 'Matrix', 'Orbit', 'Looper', 'Router', 'Timbre', 'Turing', 'Kinetic',
+      'Constellation', 'Constraint', 'Keyboard', 'StepSequencer', 'ChordPad', 'Arp', 'NoteRibbon',
+      'DrumPads', 'Phrase', 'Recorder', 'Harmoniser', 'SplitZone', 'Setlist', 'Transport', 'Panic'];
+    const collisions = [];
+    for (const type of MINE) {
+      await kit.fresh();
+      await kit.make(type, { 'Transform.width': 360, 'Transform.height': 300 });
+      await kit.make(type, { 'Transform.width': 170, 'Transform.height': 140 });
+      await kit.settle(160);
+      const dupes = await kit.page.evaluate(() => {
+        const ids = [...document.querySelectorAll('svg [id]')].map((n) => n.id).filter(Boolean);
+        const seen = new Set();
+        const twice = new Set();
+        for (const id of ids) { if (seen.has(id)) twice.add(id); else seen.add(id); }
+        return [...twice];
+      });
+      if (dupes.length) collisions.push(`${type}: ${dupes.slice(0, 4).join(', ')}`);
+    }
+    led.check('SVG ids', 'unique across two instances',
+      'two of the same component on one panel never define the same svg id twice',
+      [], collisions);
+  }
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
