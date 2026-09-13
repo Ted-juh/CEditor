@@ -24,6 +24,13 @@ const TEMPO = { id: 'bpm', name: 'Tempo', type: 'float', range: { min: 20, max: 
   display: { unit: 'BPM' } };
 const PLAIN = { id: 'lvl', name: 'Level', type: 'integer', range: { min: 0, max: 127 }, default: 64 };
 
+test('null range limits and default preserve the existing missing-value fallback', () => {
+  const patches = parameterAdoptionPatches('Knob', { type:'integer', range:{min:12,max:null}, default:null });
+  assert.equal(patches['Behavior.max'],127);
+  assert.equal(patches['Behavior.defaultCurrentValue'],12);
+  assert.equal(parameterAdoptionPatches('Knob',{type:'integer',range:{min:0,max:127},default:0})['Behavior.defaultCurrentValue'],0);
+});
+
 test('a range that is not a number falls back rather than adopting NaN', () => {
   // "abc" is what a hand-written or generated profile actually produces; [] and {} are what a
   // malformed one does. All three used to reach Number() unguarded.

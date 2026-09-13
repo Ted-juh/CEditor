@@ -20,6 +20,14 @@ import {
 const IDENTITY = [0, 16, 32, 48, 64, 79, 95, 111, 127];
 const WITH_NAN = [0, 16, 32, 48, NaN, 80, 96, 112, 127];
 
+test('null and absent points preserve the identity fallback while explicit zero stays zero', () => {
+  for (const missing of [null, undefined]) {
+    assert.deepEqual(normalizeResponseCurvePoints(new Array(9).fill(missing)), IDENTITY);
+  }
+  const points = [...IDENTITY];points[4] = 0;
+  assert.equal(normalizeResponseCurvePoints(points)[4], 0);
+});
+
 test('every curve answers a finite 0..1 for any input a caller can hand it', () => {
   for (const curve of RESPONSE_CURVES) {
     for (const input of [0, 1, 0.5, -1, 2, NaN, Infinity, -Infinity, undefined, null, '0.5']) {

@@ -183,7 +183,7 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Back pedal" span={1} compact hint="A second CC for 'previous'. Blank means no back pedal.">
-        <NumberCell label="Back" value={footswitchBackCc(control) ?? ''} step={1} min={0} max={127} onchange={(value) => set('footBackCc', value === '' ? null : clampInt(value, 0, 127, 65))} />
+        <NumberCell label="Back" allowEmpty value={footswitchBackCc(control) ?? ''} step={1} min={0} max={127} onchange={(value) => set('footBackCc', value === '' ? null : clampInt(value, 0, 127, 65))} />
       </PropertyCell>
       {#if String(p.footAction ?? 'next') === 'goto'}
         <PropertyCell label="Scene" span={1} compact hint="1-based, as the list shows it.">
@@ -216,10 +216,10 @@
             <button type="button" class="mini danger" title="Remove" onclick={() => removeScene(i)}>×</button>
           </div>
           <div class="line">
-            <label class="lbl">PC<span class="tiny nc-wrap"><NumberCell value={s.program ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { program: optInt(value, 0, 127) })} /></span></label>
-            <label class="lbl">Bank<span class="tiny nc-wrap"><NumberCell value={s.bankMsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankMsb: optInt(value, 0, 127) })} /></span></label>
-            <label class="lbl">/<span class="tiny nc-wrap"><NumberCell value={s.bankLsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankLsb: optInt(value, 0, 127) })} /></span></label>
-            <label class="lbl">BPM<span class="tiny nc-wrap"><NumberCell value={s.bpm ?? ''} step={1} min={20} max={300} onchange={(value) => updateScene(i, { bpm: value === '' ? null : clampInt(value, 20, 300, 120) })} /></span></label>
+            <label class="lbl">PC<span class="tiny nc-wrap"><NumberCell ariaLabel="Program change" allowEmpty value={s.program ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { program: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">Bank<span class="tiny nc-wrap"><NumberCell ariaLabel="Bank MSB" allowEmpty value={s.bankMsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankMsb: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">/<span class="tiny nc-wrap"><NumberCell ariaLabel="Bank LSB" allowEmpty value={s.bankLsb ?? ''} step={1} min={0} max={127} onchange={(value) => updateScene(i, { bankLsb: optInt(value, 0, 127) })} /></span></label>
+            <label class="lbl">BPM<span class="tiny nc-wrap"><NumberCell ariaLabel="Scene tempo" allowEmpty value={s.bpm ?? ''} step={1} min={20} max={300} onchange={(value) => updateScene(i, { bpm: value === '' ? null : clampInt(value, 20, 300, 120) })} /></span></label>
             <button type="button" class="mini wide" onclick={() => capture(i)}>Capture</button>
           </div>
           <div class="line">

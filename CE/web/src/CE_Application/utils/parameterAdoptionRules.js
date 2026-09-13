@@ -34,6 +34,7 @@ export function applyParameterAdoption(set, controlType, parameter) {
     // the load path checks the type of a range, and a NaN range poisons every value the control
     // maps afterwards. Fall back the way a missing range already does.
     const numberOr = (value, fallback) => {
+      if (value == null) return fallback;
       const n = Number(value);
       return Number.isFinite(n) ? n : fallback;
     };

@@ -850,11 +850,18 @@ export function initHistory() {
 
   // Keep the baseline's selection current while the document itself is
   // unchanged, so an undo entry pairs each state with the selection the user
-  // had in it. Skipped while an edit is pending — a delete clears the
-  // selection as part of the gesture, and the entry must keep the PRE-edit
-  // selection to hand back on undo.
+  // had in it. While an edit is pending, keep the PRE-edit baseline intact
+  // and update the pending state's selection instead. Insert selects its new
+  // control after the document write; delete similarly clears selection after
+  // its write. Each resulting snapshot needs that resulting selection.
   selectedComponentIds.subscribe((ids) => {
-    if (isRestoring || suppressed || debounceTimer) return;
+    if (isRestoring || suppressed) return;
+    if (debounceTimer) {
+      if (pendingContext?.kind === 'panel' && contextKey(pendingContext) === contextKey(activeContext())) {
+        pendingSelection = [...ids];
+      }
+      return;
+    }
     lastSelection = [...ids];
   });
 

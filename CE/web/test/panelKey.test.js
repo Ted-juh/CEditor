@@ -39,7 +39,7 @@ test('every note section carries the flag, and it is off', () => {
     assert.ok(Object.hasOwn(SECTION_DEFAULTS[name], 'key'), `${name} has no key`);
     assert.ok(Object.hasOwn(SECTION_DEFAULTS[name], 'scale'), `${name} has no scale`);
   }
-  assert.equal(KEY_SCALE_SECTIONS.length, 6);
+  assert.equal(KEY_SCALE_SECTIONS.length, 7);
 });
 
 test('a control with no key section is simply not a follower', () => {

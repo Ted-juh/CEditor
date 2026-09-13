@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>CEditor</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      /* Dark UA theme for native form controls (select/input/etc.) app-wide, so
+         they never fall back to a white background in the dark UI. */
+      :root { color-scheme: dark; }
+      /* Durable dark styling for the LCD Display inspector's fields. Kept in this
+         static global stylesheet (not the component) so Svelte HMR can't drop it
+         on a hot update, which was flipping these fields back to a light look. */
+      .lcd-inspector .val {
+        background: #1A1A1A !important;
+        color: #DDD !important;
+        border: 1px solid #333 !important;
+        border-radius: 4px;
+      }
+      .lcd-inspector .val option { background: #1A1A1A; color: #DDD; }
+      /* Kill native number spinners globally — WebView2/Chromium */
+      input[type="number"]::-webkit-inner-spin-button,
+      input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      #app { height: 100%; }
+      body {
+        background: #1E1E1E;
+        color: #E0E0E0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./editorAcceptance.entry.js"></script>
+    <script>
+      // Global: select all text on focus for every input in the app
+      document.addEventListener('focusin', (e) => {
+        if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) {
+          e.target.select();
+        }
+      });
+    </script>
+  </body>
+</html>

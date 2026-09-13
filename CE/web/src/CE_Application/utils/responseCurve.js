@@ -23,7 +23,8 @@ export function normalizeResponseCurvePoints(points) {
     const identity = Math.round(index * 127 / (RESPONSE_CURVE_POINT_COUNT - 1));
     // A point that is not a finite number reads as "no point here", exactly like a missing one, so
     // the curve stays on the identity line there rather than dropping to the floor.
-    const raw = Number(source?.[index]);
+    const point = source?.[index];
+    const raw = point == null ? NaN : Number(point);
     return Math.round(clamp(Number.isFinite(raw) ? raw : identity, 0, 127));
   });
 }

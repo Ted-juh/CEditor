@@ -14,6 +14,7 @@
   import Music from 'lucide-svelte/icons/music';
   import Palette from 'lucide-svelte/icons/palette';
   import SwatchCluster from '../properties/SwatchCluster.svelte';
+  import { NOTE_SHARP, SCALE_LABELS } from '../utils/chordPadLayout.js';
 
   let { control = null } = $props();
 
@@ -49,6 +50,18 @@
 
   <PropertySection title="Key & scale" icon={Music}>
     <PanelKeyCell {control} section="Keyboard" />
+    {#if k.followPanelKey !== true}
+      <PropertyCell label="Key" span={1}>
+        <select class="val" aria-label="Keyboard key" value={k.key ?? 0} onchange={(event) => set('key', Number(event.target.value))}>
+          {#each NOTE_SHARP as name, index}<option value={index}>{name}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Scale" span={3}>
+        <select class="val" aria-label="Keyboard scale" value={k.scale ?? 'major'} onchange={(event) => set('scale', event.target.value)}>
+          {#each Object.entries(SCALE_LABELS) as [value, label]}<option {value}>{label}</option>{/each}
+        </select>
+      </PropertyCell>
+    {/if}
     <PropertyCell
       label="Out of key"
       span={2}

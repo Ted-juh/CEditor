@@ -216,13 +216,20 @@ function restorePanelDeviceSession(panel, label) {
   });
 }
 
+let recoveryWarningShown = false;
 function persistUnsavedSessionSnapshot() {
-  persistSessionSnapshot({
+  const stored = persistSessionSnapshot({
     panelList: get(panels),
     activeEditorTab: get(activeEditorTab),
     autosaveEnabled: get(autosaveEnabled),
     restoreUnsavedWork: get(restoreUnsavedWork),
   });
+  if (!stored && !recoveryWarningShown) {
+    recoveryWarningShown = true;
+    notify('Automatic recovery could not save your latest changes. Save your open panels to files before closing CEditor.', { kind: 'error', duration: 0 });
+  } else if (stored) {
+    recoveryWarningShown = false;
+  }
 }
 
 export function flushUnsavedSessionSnapshot() {

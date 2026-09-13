@@ -39,6 +39,7 @@
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { showDisplayPanel } from '../stores/panelVisibility.js';
   import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
@@ -188,6 +189,9 @@
   $effect(() => {
     const req = $displayTabRequest;
     if (req) {
+      // Consume visibility and tab together: clearing the request here can run
+      // before App's effect has observed it and leave the requested tab hidden.
+      showDisplayPanel.set(true);
       handleTabClick(impliedDockTab({ tabRequest: req, lastTab: activeTab }));
       displayTabRequest.set(null);
     }

@@ -8,7 +8,7 @@
   // Whites are drawn first and blacks over them, because a black key overlaps its neighbours and
   // painter's order is the only thing that decides which one you see. `keyboardKeys` returns them
   // in that order already, so this file does not re-sort and cannot disagree with the hit test.
-  import { keyboardConfig, keyboardKeys } from '../utils/keyboardLayout.js';
+  import { keyboardConfig, keyboardContext, keyboardKeys } from '../utils/keyboardLayout.js';
 
   let { control = null, width = 0, height = 0, held = [], context = null } = $props();
 
@@ -24,7 +24,7 @@
   let cfg = $derived(keyboardConfig(control));
   let keys = $derived(keyboardKeys(control, width, height, {
     held: cfg.__held ?? held,
-    context: cfg.__context ?? context,
+    context: cfg.__context ?? context ?? keyboardContext(control),
   }));
   let whiteCss = $derived(css(cfg.whiteColour, 'rgba(232,232,232,1)'));
   let blackCss = $derived(css(cfg.blackColour, 'rgba(26,26,26,1)'));

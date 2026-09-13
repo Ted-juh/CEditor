@@ -28,6 +28,14 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
 
+function findPython3(spawnSync) {
+  // Windows commonly installs Python 3 as python.exe, without a python3 alias.
+  return [process.env.CEDITOR_TEST_PYTHON, 'python3', 'python'].filter(Boolean).find(command => {
+    const probe = spawnSync(command, ['-c', 'import sys; assert sys.version_info.major == 3'], { encoding: 'utf8' });
+    return !probe.error && probe.status === 0;
+  });
+}
+
 function extractRawString(file, tag) {
   // Normalize CRLF from Windows checkouts (core.autocrlf): the preludes are authored LF, and the
   // C++ compiler sees them LF, so the agreement tests must too.
@@ -423,14 +431,14 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
 
 test('the Python engine prelude computes what the WebView runtime computes', async (t) => {
   const { spawnSync } = await import('node:child_process');
-  const probe = spawnSync('python3', ['-c', 'pass'], { encoding: 'utf8' });
-  if (probe.error || probe.status !== 0) {
-    t.skip('python3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.skip('Python 3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
     return;
   }
 
   const all = [...CASES, ...STRUCT_CASES];
-  const run = spawnSync('python3', ['-c', PY_DRIVER], {
+  const run = spawnSync(python, ['-c', PY_DRIVER], {
     input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: all }),
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
@@ -635,13 +643,13 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
 
 test('the Python prelude encodes and decodes JSON byte-for-byte as the WebView does', async (t) => {
   const { spawnSync } = await import('node:child_process');
-  const probe = spawnSync('python3', ['-c', 'pass'], { encoding: 'utf8' });
-  if (probe.error || probe.status !== 0) {
-    t.skip('python3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
+  const python = findPython3(spawnSync);
+  if (!python) {
+    t.skip('Python 3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
     return;
   }
 
-  const run = spawnSync('python3', ['-c', PY_JSON_DRIVER], {
+  const run = spawnSync(python, ['-c', PY_JSON_DRIVER], {
     input: JSON.stringify({
       prelude: extractRawString('PythonScriptEngine.cpp', 'PY'),
       encode: JSON_CASES.map((c) => c.value),

@@ -1,5 +1,6 @@
 <script>
   import { onDestroy, untrack } from 'svelte';
+  import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
@@ -487,7 +488,7 @@
     // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
     // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
     const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
-    const resolved = resolveInteractiveControl(control, previewOverrides);
+    const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
 
@@ -3512,6 +3513,94 @@
     return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: next } } };
   }
 
+  // --- Piano keyboard: note-on/off, glissando and latched chords ---------------
+  // Retain the actual note/channel sent for each physical key. A transpose or
+  // channel edit while a key is held must not send its note-off to a different voice.
+  const pianoHeld = {}; // control id -> Map(physical key, sent note/channel)
+  let pianoPress = null;
+  function isKeyboardControl(control) {
+    return control?._children?.Core?.controlType === 'Keyboard';
+  }
+  function syncKeyboardSession(id) {
+    patchControlSession(id, { keyboardHeld: [...(pianoHeld[id]?.keys() ?? [])] });
+  }
+  function releaseKeyboardKey(id, key) {
+    const held = pianoHeld[id];
+    const message = held?.get(key);
+    if (!message) return;
+    held.delete(key);
+    // Two scale-quantized keys can sound the same voice; release it only once.
+    if (![...held.values()].some(other => other.note === message.note && other.channel === message.channel)) {
+      sendNoteBytes(noteOffBytes(message.channel, message.note), `note_off_${message.note}`, 'Keyboard', id);
+    }
+    const control = controlById(id);
+    if (control) {
+      raiseComponent(control, 'onRelease', { id: String(key), note: message.note, notes: [message.note] });
+      const current = [...held.values()].at(-1) ?? { ...message, velocity: 0 };
+      patchControlSession(id, { keyboardLast: current });
+      emitControlPortFanout(keyboardControlWith(control, current), 'commit');
+    }
+    syncKeyboardSession(id);
+  }
+  function releaseKeyboardNotes(id) {
+    for (const key of [...(pianoHeld[id]?.keys() ?? [])]) releaseKeyboardKey(id, key);
+    delete pianoHeld[id];
+    if (pianoPress?.id === id) pianoPress = null;
+  }
+  function keyboardKeyAt(control, point) {
+    const t = control?._children?.Transform ?? {};
+    return keyboardNoteAt(control, numberOr(t.width, 0), numberOr(t.height, 0), point.x, point.y);
+  }
+  function playKeyboardKey(control, key, latch) {
+    if (key == null) return;
+    const id = getControlId(control);
+    const held = (pianoHeld[id] ??= new Map());
+    if (latch && held.has(key)) { releaseKeyboardKey(id, key); return; }
+    const message = keyboardPress(control, key, { context: keyboardContext(control) });
+    if (!message) return;
+    const alreadySounding = [...held.values()].some(other => other.note === message.note && other.channel === message.channel);
+    held.set(key, message);
+    patchControlSession(id, { keyboardLast: message });
+    if (!alreadySounding) sendNoteBytes(noteOnBytes(message.channel, message.note, message.velocity), `note_on_${message.note}`, 'Keyboard', id);
+    raiseComponent(control, 'onHit', { id: String(key), note: message.note, notes: [message.note], velocity: message.velocity });
+    emitControlPortFanout(keyboardControlWith(control, message), 'commit');
+    syncKeyboardSession(id);
+  }
+  function handleKeyboardPointerDown(control, point) {
+    if (!isKeyboardControl(control)) return;
+    const key = keyboardKeyAt(control, point);
+    if (key == null) return;
+    const id = getControlId(control);
+    const latch = keyboardConfig(control).latch === true;
+    pianoPress = { id, key, latch };
+    playKeyboardKey(control, key, latch);
+  }
+  function moveKeyboardPress(control, point) {
+    if (!pianoPress || pianoPress.id !== getControlId(control)) return;
+    const key = keyboardKeyAt(control, point);
+    if (key === pianoPress.key) return;
+    if (!pianoPress.latch) releaseKeyboardKey(pianoPress.id, pianoPress.key);
+    pianoPress.key = key;
+    playKeyboardKey(control, key, pianoPress.latch);
+  }
+  function releaseKeyboardPress() {
+    if (!pianoPress) return;
+    if (!pianoPress.latch) releaseKeyboardKey(pianoPress.id, pianoPress.key);
+    pianoPress = null;
+  }
+  function keyboardControlWith(control, message) {
+    return { ...control, _children: { ...control._children,
+      Keyboard: { ...control._children.Keyboard, __note: message?.note, __velocity: message?.velocity },
+    } };
+  }
+  function applyKeyboardValueSource(control, resolved) {
+    if (!isKeyboardControl(control)) return resolved;
+    const base = keyboardControlWith(resolved?.control ?? control, sessionFor(control)?.keyboardLast);
+    return { ...resolved, control: { ...base, _children: { ...base._children,
+      Keyboard: { ...base._children.Keyboard, __held: sessionFor(control)?.keyboardHeld ?? [], __context: keyboardContext(control) },
+    } } };
+  }
+
   // --- Drum Pads: fixed-note trigger grid --------------------------------------
   // Fourth note-emitting control, on the shared raw-MIDI path. Three trigger
   // modes (hold / one-shot gate / toggle), velocity from the strike height, and
@@ -4837,6 +4926,7 @@
   function silenceLocalNoteControls() {
     for (const c of (orderedControls ?? [])) {
       if (isChordPadControl(c)) chordAllOff(c);
+      else if (isKeyboardControl(c)) releaseKeyboardNotes(getControlId(c));
       else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
       else if (isPhraseControl(c)) phraseAllOff(c);
       else if (isRecorderControl(c)) recorderAllOff(c);
@@ -6527,6 +6617,7 @@
     if (typeof window === 'undefined') return;
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
+    window.removeEventListener('pointercancel', handleKeyboardCancel);
     rangeScrub?.end();
     rangeScrub = null;
     sliderScrub?.end();
@@ -6548,6 +6639,9 @@
     // changes: a plain nested button held for a second was fine, while one whose own handler kept
     // writing (a roll firing notes on a timer) tore its own listeners off mid-gesture.
     const activeControlIds = [...controlsById.keys()];
+    for (const id of Object.keys(pianoHeld)) {
+      if (!controlsById.has(id)) releaseKeyboardNotes(id);
+    }
     timedButtonPreview.syncKeys(activeControlIds);
     momentaryButtonPreview.syncKeys(activeControlIds);
 
@@ -6840,6 +6934,7 @@
     handleArpPointerDown(control, pointerDownLocal);
     // Ribbon Keyboard: press the strip to sound the pitch there.
     handleNoteRibbonPointerDown(control, pointerDownLocal);
+    handleKeyboardPointerDown(control, pointerDownLocal);
     // Drum Pads: strike the pad under the pointer.
     handleDrumPadsPointerDown(control, pointerDownLocal);
     // Panic: silence everything.
@@ -6945,6 +7040,7 @@
       }
       window.addEventListener('pointermove', handleWindowPointerMove);
       window.addEventListener('pointerup', handleWindowPointerUp);
+      window.addEventListener('pointercancel', handleKeyboardCancel);
       return;
     }
 
@@ -7012,6 +7108,7 @@
 
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleKeyboardCancel);
   }
 
   function handleWindowPointerMove(event) {
@@ -7020,6 +7117,11 @@
     event.stopPropagation?.();
     const activeControl = controlById(pointerActiveControlId);
     if (!activeControl || isDisabled(activeControl)) return;
+
+    if (pianoPress?.id === getControlId(activeControl)) {
+      moveKeyboardPress(activeControl, controlLocalPoint(event));
+      return;
+    }
 
     if (isCustomComponent(activeControl)) {
       updateCustomDragFromPointer(activeControl, event);
@@ -7041,6 +7143,12 @@
     if (draggingRange) {
       updateScrubRangeFromPointer(activeControl, event);
     }
+  }
+
+  function handleKeyboardCancel(event) {
+    if (!pianoPress) return;
+    releaseKeyboardNotes(pianoPress.id);
+    handleWindowPointerUp(event);
   }
 
   function handleWindowPointerUp(event) {
@@ -7193,6 +7301,7 @@
     }
 
     // Release the ribbon: note-off + recentre the bend (unless latched).
+    releaseKeyboardPress();
     if (ribbonPress && activeControl && ribbonPress.id === getControlId(activeControl)) {
       releaseRibbonPress(activeControl);
     }

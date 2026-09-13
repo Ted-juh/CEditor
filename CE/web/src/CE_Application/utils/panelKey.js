@@ -22,7 +22,7 @@ import { DEFAULT_MUSICAL_CONTEXT, SCALES, intervalsFor, normalizeContext, rootFr
 import { flatControls } from './containment.js';
 
 /** The sections that carry a key and a scale of their own. */
-export const KEY_SCALE_SECTIONS = ['ChordPad', 'Arp', 'NoteRibbon', 'Phrase', 'Harmoniser', 'Recorder'];
+export const KEY_SCALE_SECTIONS = ['ChordPad', 'Arp', 'NoteRibbon', 'Phrase', 'Harmoniser', 'Recorder', 'Keyboard'];
 
 /**
  * Panel scale name → component scale name.

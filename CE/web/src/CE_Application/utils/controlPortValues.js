@@ -20,6 +20,7 @@ import { constellationPortValues } from './constellationLayout.js';
 import { constraintPortValues } from './constraintLayout.js';
 
 const RESOLVERS = {
+  Keyboard: (control) => ({ note: control._children?.Keyboard?.__note ?? 48, velocity: control._children?.Keyboard?.__velocity ?? 0 }),
   Envelope: (control) => envelopeStageValues(control),
   Matrix: (control) => matrixPortValues(control),
   VectorJoystick: (control) => joystickPortValues(control),

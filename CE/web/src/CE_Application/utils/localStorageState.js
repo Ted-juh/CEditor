@@ -50,14 +50,15 @@ export function readStoredJson(key, fallback) {
 }
 
 export function writeStoredJson(key, value) {
-  if (!canUseLocalStorage()) return;
-  if (overQuotaKeys.has(key)) return;
+  if (!canUseLocalStorage()) return false;
+  if (overQuotaKeys.has(key)) return false;
 
   try {
     const raw = JSON.stringify(value);
-    if (storedValueCache.get(key) === raw) return;
+    if (storedValueCache.get(key) === raw) return true;
     localStorage.setItem(key, raw);
     storedValueCache.set(key, raw);
+    return true;
   } catch (error) {
     if (isQuotaError(error)) {
       overQuotaKeys.add(key);
@@ -66,6 +67,7 @@ export function writeStoredJson(key, value) {
       storedValueCache.delete(key);
     }
     // Any other persistence failure is ignored, so UI state still works in memory.
+    return false;
   }
 }
 

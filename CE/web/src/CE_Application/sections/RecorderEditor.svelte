@@ -112,7 +112,8 @@
     </PropertyCell>
 
     <TransportSyncCells
-      {control} section="Recorder"
+      synced={p.syncToTransport === true}
+      onchange={(value) => set('syncToTransport', value)}
       hint="The loop is a number of bars, so it keeps its musical length when the tempo changes."
     >
       {#snippet children()}

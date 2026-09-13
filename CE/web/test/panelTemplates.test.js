@@ -49,6 +49,25 @@ test('size presets are sane', () => {
   }
 });
 
+test('every starter fits every offered size and a custom size without clipping or stretching knobs', () => {
+  for (const template of PANEL_TEMPLATES) {
+    for (const size of [...PANEL_SIZE_PRESETS, { width: 80, height: 80 }]) {
+      const panel = buildPanelFromTemplate({ templateId: template.id, ...size });
+      for (const control of panel.controls) {
+        const t = control._children.Transform;
+        const name = `${template.id}/${size.width}x${size.height}/${control._children.Core.name}`;
+        assert.ok(t.x >= 0 && t.y >= 0, name);
+        assert.ok(t.x + t.width <= panel.width + 1e-6, `${name}: off right edge`);
+        assert.ok(t.y + t.height <= panel.height + 1e-6, `${name}: off bottom edge`);
+        if (control._children.Core.controlType === 'Knob') assert.equal(t.width, t.height, name);
+        if (control._children.Core.controlType === 'Background') {
+          assert.equal(t.width, panel.width);assert.equal(t.height, panel.height);
+        }
+      }
+    }
+  }
+});
+
 test('document colours harvest deduplicates, ranks by use, strips alpha', () => {
   const panel = {
     bgColour: 'FF222222',

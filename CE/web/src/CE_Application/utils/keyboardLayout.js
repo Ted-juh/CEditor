@@ -17,6 +17,7 @@ import {
   isBlackKey, keyRect, noteAtPoint, splitGeometry, whiteKeyCount,
 } from './splitZoneLayout.js';
 import { isInScale, normalizeContext } from './musicalContext.js';
+import { SCALES as COMPONENT_SCALES } from './chordPadLayout.js';
 
 const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clampInt = (value, lo, hi) => Math.min(hi, Math.max(lo, Math.round(num(value, lo))));
@@ -26,6 +27,12 @@ export const OCTAVE_LABEL_PC = 0;
 
 export function keyboardConfig(control) {
   return control?._children?.Keyboard ?? {};
+}
+
+export function keyboardContext(control) {
+  const config = keyboardConfig(control);
+  // Panel-key broadcasts use the component vocabulary (pentatonicMaj/Min).
+  return { root: config.key ?? 0, scale: COMPONENT_SCALES[config.scale] ?? config.scale ?? 'major' };
 }
 
 /**

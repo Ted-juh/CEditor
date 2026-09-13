@@ -669,14 +669,15 @@ try {
 
 
   // --- 8. The Keyboard: press a key, hear the note ---------------------------------------------
-  // THIS ONE FAILS TODAY, AND IT IS MEANT TO. It is last so everything above still reports.
+  // Regression for the previously unwired Keyboard. It failed at a85ecb06 and passes
+  // with the integrated runtime wiring. It stays last so the preceding checks report too.
   //
   // `keyboardLayout.js` exports the entire interaction — `keyboardNoteAt` (which key is under the
   // pointer), `keyboardPress` (what that key sends, transpose and scale lock applied),
-  // `keyboardHold`, `keyboardGlide`. NOTHING IN src/ IMPORTS ANY OF THE FOUR. The preview surface
-  // has no Keyboard branch in its pointer-down dispatcher, and `KeyboardRenderer` reads
-  // `previewSession.keyboardHeld`, a session key nothing anywhere writes. So the press lands on the
-  // control — the session says `pressed` — and the panel plays nothing. It is the same shape the
+  // `keyboardHold`, `keyboardGlide`. At the failing baseline nothing in src/ imported any of them.
+  // The preview surface had no Keyboard branch in its pointer-down dispatcher, and the
+  // `previewSession.keyboardHeld` needed by the renderer was never written. The press landed on the
+  // control — the session said `pressed` — and the panel played nothing. It is the same shape the
   // Designer tab's header records for the Step Sequencer: the layout module had the hit test and
   // both writers all along, and nothing imported them.
   //

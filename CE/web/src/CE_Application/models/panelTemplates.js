@@ -118,5 +118,20 @@ export function buildPanelFromTemplate({ name, width, height, templateId }) {
   panel.width = Math.max(80, Math.round(width || template.width));
   panel.height = Math.max(80, Math.round(height || template.height));
   panel.controls = template.build();
+  // Keep the starter usable at the size selected in the dialog. Shrink the
+  // arrangement proportionally when necessary; larger canvases keep its
+  // original control sizes. The background always covers the whole panel.
+  const scale = Math.min(1, panel.width / template.width, panel.height / template.height);
+  for (const control of panel.controls) {
+    const t = control._children.Transform;
+    if (control._children.Core.controlType === 'Background') {
+      t.width = panel.width;
+      t.height = panel.height;
+    } else if (scale < 1) {
+      for (const key of ['x', 'y', 'width', 'height']) t[key] *= scale;
+      const font = control._children.Text?._children?.Font;
+      if (font && Number.isFinite(font.size)) font.size *= scale;
+    }
+  }
   return panel;
 }

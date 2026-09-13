@@ -744,3 +744,18 @@ disputed, C-7 confirmed and owned by root.
   fourteen; only these three have had a value or button gesture.
 - Everything behind `#if JUCE_WINDOWS`, and the native GUI acceptance gate, which is blocked on the
   window-automation failure and is not mine.
+
+## Integrated result — Codex verification after a85ecb06
+
+The historical failing/disputed status above is superseded by the integrated checks. Codex
+independently reproduced C-6 by clicking the actual properties opener with the dock closed, then
+verified the fix that opens the dock before DisplayPanel consumes the request. C-7 is wired into
+the existing note-output path; this entire music/modulation check now passes locally on Windows
+Edge, including the originally failing Keyboard assertion.
+
+Codex's additional full-App Keyboard tests cover white/black keys, glissando, latch chords, note
+on/off, pointer cancellation, transpose/channel, exit cleanup, local key/scale, pentatonic refusal,
+panel-key following and quantization. The note/velocity device-binding resolver also has a unit
+regression. The combined Node suite passes 4,810 tests with zero failures/skips, and the complete
+existing browser suite passes. Native dialogs/shutdown and physical hardware remain open acceptance
+requirements; this is not release sign-off.

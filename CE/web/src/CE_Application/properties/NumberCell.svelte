@@ -15,6 +15,9 @@
     min = undefined,
     max = undefined,
     label = '',
+    ariaLabel = '',
+    title = undefined,
+    allowEmpty = false,
     defaultValue = undefined,
     disabled = false,
     onchange = null,
@@ -30,6 +33,7 @@
   // Display the stored value faithfully (typed values are not snapped to
   // step); toFixed(6) only strips float noise like 0.30000000000000004.
   function format(v) {
+    if (v === '' || v == null) return '';
     const n = Number(v ?? 0);
     return Number.isFinite(n) ? String(parseFloat(n.toFixed(6))) : '0';
   }
@@ -58,11 +62,13 @@
     },
   });
 
-  function nudge(dir, mult) {
+  function nudge(dir, mult, from = value) {
     if (disabled) return;
     const quantum = step > 0 ? step : 1;
-    const next = clamp(parseFloat((Math.round((value + dir * quantum * mult) / quantum) * quantum).toFixed(6)));
+    const next = clamp(parseFloat((Math.round((Number(from) + dir * quantum * mult) / quantum) * quantum).toFixed(6)));
+    if (!Number.isFinite(next)) return value;
     if (next !== value) onchange?.(next);
+    return next;
   }
 
   function beginEdit(e) {
@@ -72,12 +78,18 @@
   }
 
   function commit() {
+    if (!editing) return;
     const v = parseFloat(draft);
-    if (!isNaN(v)) {
+    editing = false;
+    if (draft === format(value)) return;
+    if (allowEmpty && draft.trim() === '') {
+      if (value !== '') onchange?.('');
+      return;
+    }
+    if (Number.isFinite(v)) {
       const next = clamp(v);
       if (next !== value) onchange?.(next);
     }
-    editing = false;
   }
 
   function handleKeydown(e) {
@@ -88,16 +100,18 @@
       editing = false;
       e.target.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      commit();
-      nudge(e.key === 'ArrowUp' ? 1 : -1, e.shiftKey ? 10 : 1);
-      editing = false;
+      const typed = parseFloat(draft);
+      const next = nudge(e.key === 'ArrowUp' ? 1 : -1, e.shiftKey ? 10 : 1,
+        editing && Number.isFinite(typed) ? clamp(typed) : value);
+      draft = format(next);
+      editing = true;
       queueMicrotask(() => inputEl?.select());
       e.preventDefault();
     }
   }
 </script>
 
-<div class="number-cell" class:disabled>
+<div class="number-cell" class:disabled {title}>
   {#if bounded}
     <span class="nc-fill" style="width:{fillPct}%"></span>
   {/if}
@@ -107,7 +121,7 @@
   <input class="nc-value"
          type="text"
          inputmode="decimal"
-         aria-label={label || 'Value'}
+         aria-label={ariaLabel || label || 'Value'}
          {disabled}
          bind:this={inputEl}
          value={editing ? draft : format(value)}

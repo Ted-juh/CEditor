@@ -40,10 +40,12 @@
     },
   });
 
-  function nudge(dir, mult) {
+  function nudge(dir, mult, from = value) {
     const quantum = step > 0 ? step : 1;
-    const next = clamp(parseFloat((Math.round((value + dir * quantum * mult) / quantum) * quantum).toFixed(6)));
+    const next = clamp(parseFloat((Math.round((from + dir * quantum * mult) / quantum) * quantum).toFixed(6)));
+    if (!Number.isFinite(next)) return value;
     if (next !== value) onchange?.(next);
+    return next;
   }
 
   function beginEdit(e) {
@@ -53,12 +55,14 @@
   }
 
   function commit() {
+    if (!editing) return;
     const v = parseFloat(draft);
-    if (!isNaN(v)) {
+    editing = false;
+    if (draft === format(value)) return;
+    if (Number.isFinite(v)) {
       const next = clamp(v);
       if (next !== value) onchange?.(next);
     }
-    editing = false;
   }
 
   function handleKeydown(e) {
@@ -69,9 +73,11 @@
       editing = false;
       e.target.blur();
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      commit();
-      nudge(e.key === 'ArrowUp' ? 1 : -1, e.shiftKey ? 10 : 1);
-      editing = false;
+      const typed = parseFloat(draft);
+      const next = nudge(e.key === 'ArrowUp' ? 1 : -1, e.shiftKey ? 10 : 1,
+        editing && Number.isFinite(typed) ? clamp(typed) : value);
+      draft = format(next);
+      editing = true;
       queueMicrotask(() => inputEl?.select());
       e.preventDefault();
     }
