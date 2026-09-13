@@ -541,7 +541,12 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     const auto editTime = juce::Time::getMillisecondCounterHiRes();
     const bool mergingEdit = ! group.isEmpty() && editHistory.redo.empty() && ! editHistory.undo.empty()
         && editHistory.undo.back().group == group && editTime - editHistory.undo.back().time < 600.0;
-    const auto beforeEdit = label.isNotEmpty() && ! mergingEdit ? historySnapshot() : juce::String();
+    // Only an edit that removes a processor needs its live opaque state for undo.
+    // Metadata edits retain the processor; capturing every VST here can stall zone editing.
+    const bool removesProcessor = cmd == "removePart" || cmd == "unloadInstrument"
+        || cmd == "removeEffect" || cmd == "removeBus" || cmd == "removeReturn";
+    const auto beforeEdit = label.isNotEmpty() && ! mergingEdit
+        ? historySnapshot (removesProcessor) : juce::String();
     const juce::ScopeGuard finishHistory { [&, this]
     {
         if (label.isEmpty() || restoringEditHistory) return;
@@ -1981,6 +1986,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             const std::scoped_lock lock (midiActivityLock);
             pendingCcs.clear();
         }
+        // A pad may arrive before the next drain; arm its input queue immediately.
+        refreshSlotNoteListening();
         emitMidiLearn (true, pageId, slotId, -1, 0);
         return;
     }
@@ -1989,6 +1996,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     {
         midiLearnPageId.clear();
         midiLearnSlotId.clear();
+        refreshSlotNoteListening();
         emitMidiLearn (false, {}, {}, -1, 0);
         return;
     }
@@ -8124,9 +8132,9 @@ juce::String InstrumentHostService::historyModel() const
     return juce::JSON::toString (model);
 }
 
-juce::String InstrumentHostService::historySnapshot()
+juce::String InstrumentHostService::historySnapshot (bool capturePluginState)
 {
-    auto snapshot = rack.captureState().toVar();
+    auto snapshot = (capturePluginState ? rack.captureState() : rack.getPerformance()).toVar();
     juce::Array<juce::var> unloaded;
     for (const auto& part : rack.getPerformance().parts)
         if (part.pluginCeId.isNotEmpty() && ! rack.partHasInstrument (part.partId)) unloaded.add (part.partId);
@@ -8138,7 +8146,8 @@ juce::String InstrumentHostService::historyBlockedReason()
 {
     if (stageLocked) return "Leave Stage Lock to undo Build edits.";
     if (historyPendingLoads > 0) return "Wait for plug-in loading to finish.";
-    if (rack.getEngine().getTransport().isPlaying() || performanceRecording || midiLoopRecording || gestureRecording
+    if (rack.getEngine().getTransport().isPlaying() || rack.getEngine().getTransport().isPlayingOrPending()
+        || performanceRecording || midiLoopRecording || gestureRecording
         || arrangementPlaying || performanceReplay.state != PerformanceReplayRuntime::State::idle)
         return "Stop playback and recording to undo Build edits.";
     return {};

@@ -36,6 +36,7 @@ try {
   (await import('/src/CE_Application/stores/displayTab.js')).displayTabRequest.set({tab:'type'});return ids;
  });
  await page.locator('.text-dock').waitFor();await page.locator('.studio-rail').getByRole('button',{name:'Screen',exact:true}).click();await dock.waitFor();
+ await dock.locator('.target-bar strong').filter({hasText:/^LCD screen$/}).waitFor();
  assert.equal(await dock.locator('.target-bar strong').innerText(),'LCD screen');
  assert.equal(await dock.locator('canvas,.screen-stage').count(),0);
  assert.equal(await dock.getByRole('button',{name:'Use selection',exact:true}).count(),0);

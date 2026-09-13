@@ -810,7 +810,7 @@ private:
 
     void emitState();
     juce::String historyModel() const;
-    juce::String historySnapshot();
+    juce::String historySnapshot (bool capturePluginState = true);
     juce::String historyBlockedReason();
     void restoreEditHistory (bool redo);
     void emitError (const juce::String& message);

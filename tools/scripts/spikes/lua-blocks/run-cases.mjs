@@ -80,3 +80,4 @@ console.log(`\n${pass} passed, ${fail} failed`);
 // Show one regenerated script in full, to prove the output is real Lua a human would accept.
 console.log('\n--- regenerated from blocks (case 2) ---');
 console.log(blocksToLua(luaToBlocks(CASES['conditional with elseif, and a nested call'].trim())));
+process.exitCode = fail ? 1 : 0;

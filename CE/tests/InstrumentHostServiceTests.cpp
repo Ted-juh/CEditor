@@ -4428,7 +4428,14 @@ void testMidiPickup()
         h.service->noteMidiActivity ("Keys", juce::MidiMessage::controllerEvent (1, 74, value));
     };
     const auto move = [&] (int value) { queue (value); h.service->drainParameterEvents(); };
-    const auto near = [] (float a, float b) { return std::abs (a - b) < 0.001f; };
+    const auto near = [stub] (float a, float b) {
+        // The stub's JUCE convenience constructor uses 0.01 steps. Compare the value
+        // the plug-in can represent, while keeping the pickup/relative assertions strict.
+        const auto expected = stub->cutoff->getNormalisableRange().snapToLegalValue (b);
+        const bool matches = std::abs (a - expected) < 0.001f;
+        if (! matches) std::cout << "    actual " << a << ", expected " << expected << std::endl;
+        return matches;
+    };
     check (! (bool) slot().getProperty ("midiPickup", true)
         && ! (bool) slot().getProperty ("midiRelative", true), "existing slots default to immediate absolute CCs");
     h.cmd ("setControlSlotOptions", { { "pageId", pageId }, { "slotId", "s1" }, { "midiPickup", true } });

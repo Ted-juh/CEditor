@@ -31,4 +31,28 @@ Some upstream features remain authored through scripts/JSON: soft-key actions,
 layout return timers, menu visibility conditions and direct parameter source strings.
 They are preserved; this integration does not add missing authoring UI for them.
 
-No remote branch was pushed or merged as part of this local integration.
+The first integration above was local. The subsequent publication audit with Claude
+found exactly three non-main remote branches: the GUI work already included here,
+`innovative-midi-features-bryc31` (nine commits, seven new/updated design and Lua
+prototype files), and `sled-display-examples-nbnh7x`. The innovative work is now
+included. The sled branch's tree is identical to main (`d97ef7e03760`); its changes
+were already rebased onto main, so its duplicate ancestry is not replayed.
+
+Full publication validation builds every native Release target and runs all 33
+CTest suites. It found and fixed three defects in the local Instrument Host work:
+undo history captured opaque plug-in state during metadata edits; undo could race
+a queued transport start; and MIDI pad learn could miss the first note before the
+next event drain. The pickup fixture assertions now respect the stub plug-in's
+0.01 parameter step instead of demanding unrepresentable values. All 33 suites pass.
+
+The full browser sequence passes, with opener assertions updated for the compact
+Text dock and an explicit wait for its asynchronously selected Screen target.
+The screen-runtime regression additionally checks absent/deleted sources across
+all five readout kinds in both LCD and Pixel renderers. The Lua prototype's eleven
+round trips pass on Windows after correcting its file URL conversion; failures
+now produce a nonzero exit status.
+
+Publication uses one combined PR with CI enabled, followed by removal of obsolete
+remote branches after verifying preservation. A verified external Git bundle
+contains all original refs and local recovery snapshots. The existing Alpha0.04
+release tag is retained.

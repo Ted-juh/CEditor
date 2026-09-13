@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { luaToBlocks, blocksToLua, sameMeaning, countRaw } from './roundtrip.mjs';
 
-const dir = new URL('../../../ctrl49/', import.meta.url).pathname;
+const dir = fileURLToPath(new URL('../../../ctrl49/', import.meta.url));
 const files = readdirSync(dir).filter((f) => f.endsWith('.lua'));
 
 let pass = 0, fail = 0;
@@ -21,3 +22,4 @@ for (const f of files) {
   }
 }
 console.log(`\n${pass} passed, ${fail} failed, over ${files.length} real Lua files`);
+process.exitCode = fail ? 1 : 0;

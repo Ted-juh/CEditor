@@ -56,7 +56,7 @@ const settle = () => page.waitForTimeout(500);
 const titles = await ev(() => window.__ho.titles());
 check('every covered section carries an opener, and each names its tab', () => {
   assert.equal(titles.length, 8, `openers: ${titles.join(' | ')}`);
-  for (const tab of ['Animation tab', 'Designer tab', 'Type tab', 'Effects tab', 'Library tab']) {
+  for (const tab of ['Animation tab', 'Designer tab', 'Text tab', 'Library tab']) {
     assert.ok(titles.some((t) => t.includes(tab)), `nothing opens the ${tab}: ${titles.join(' | ')}`);
   }
 });
@@ -93,25 +93,25 @@ check('and lands on the sequencer grid rather than the empty state', () => {
 
 // --- Type, and its two halves -----------------------------------------------------------------
 
-await ev(() => window.__ho.clickByTitle("typography in the Type tab"));
+await ev(() => window.__ho.clickByTitle("typography in the Text tab"));
 await settle();
 check('a typography section opens the Type tab in its "type" half', () => {});
-assert.equal(await ev(() => window.__ho.activeTab()), 'Type');
+assert.equal(await ev(() => window.__ho.activeTab()), 'Text');
 assert.equal(await ev(() => window.__ho.target()), 'typography:ctrl_label:type');
 
-await ev(() => window.__ho.clickByTitle("flow in the Type tab"));
+await ev(() => window.__ho.clickByTitle("flow in the Text tab"));
 await settle();
 check('and Flow opens the same tab in its other half — the domain really travels', () => {});
 assert.equal(await ev(() => window.__ho.target()), 'typography:ctrl_label:flow');
-assert.equal(await ev(() => window.__ho.activeTab()), 'Type');
+assert.equal(await ev(() => window.__ho.activeTab()), 'Text');
 
 // --- Effects ----------------------------------------------------------------------------------
 
-await ev(() => window.__ho.clickByTitle('text effects in the Effects tab'));
+await ev(() => window.__ho.clickByTitle('text effects in the Text tab'));
 await settle();
-check('the text Effects section opens the Effects tab in its text domain', () => {});
-assert.equal(await ev(() => window.__ho.activeTab()), 'Effects');
-assert.equal(await ev(() => window.__ho.target()), 'effects:ctrl_label:text');
+check('the text Effects section opens the Text tab in its effects group', () => {});
+assert.equal(await ev(() => window.__ho.activeTab()), 'Text');
+assert.equal(await ev(() => window.__ho.target()), 'typography:ctrl_label:effects');
 
 // --- Library, which arms nothing ---------------------------------------------------------------
 
