@@ -3778,7 +3778,13 @@
         drumHit(control, hit.pad, hit.strikeY, { velocity: base, roll: true });
         return true;
       default:
-        drumHit(control, hit.pad, hit.strikeY);
+        // `base` and not a recomputation. drumHit only receives strikeY, so when it works the
+        // velocity out itself it calls strikeVelocity(control, strikeY) with no strikeX — which
+        // defaults to 0.5, making dx always zero. Under velocityFrom 'centre' that collapsed the
+        // documented Chebyshev falloff to the vertical axis alone: a strike on the left rim came
+        // out as loud as one dead centre, which is the exact case the rule was written for. Every
+        // corner branch above already passes `base`; only the plain hit threw it away.
+        drumHit(control, hit.pad, hit.strikeY, { velocity: base });
         return true;
     }
   }

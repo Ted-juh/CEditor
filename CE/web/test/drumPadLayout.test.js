@@ -60,8 +60,15 @@ test('the hi-hats share a choke group, and choke silences the others', () => {
 test('chromatic map + per-pad overrides', () => {
   const chrom = drumPads(dp({ map: 'chromatic', rows: 2, cols: 2, baseNote: 60 }));
   assert.deepEqual(chrom.map((p) => p.note), [60, 61, 62, 63]);
-  // a chromatic pad on a GM note still reads as a pitch, not as a drum
-  assert.equal(drumPads(dp({ map: 'chromatic', rows: 1, cols: 1, baseNote: 36 }))[0].label, 'Kick');
+  // A chromatic pad on a GM note reads as a PITCH, not as a drum — which is what this comment
+  // always said and what the properties panel's own hint promises ("Chromatic = labelled by
+  // pitch"). The assertion under it used to read 'Kick': `drumNoteLabel` prefers the General MIDI
+  // name whenever one exists, and one exists for every note from 35 to 81 — the entire range a drum
+  // grid uses — so Chromatic was indistinguishable from GM everywhere it mattered. The expectation
+  // had been written down from the output rather than from the rule directly above it.
+  assert.equal(drumPads(dp({ map: 'chromatic', rows: 1, cols: 1, baseNote: 36 }))[0].label, 'C2');
+  // …and the GM map is untouched by that: it still names the kit.
+  assert.equal(drumPads(dp({ map: 'gm', rows: 1, cols: 1, baseNote: 36 }))[0].label, 'Kick');
   // overrides re-point / rename / recolour a single pad without touching the rest
   const over = drumPads(dp({
     map: 'gm', rows: 2, cols: 2, baseNote: 36,
