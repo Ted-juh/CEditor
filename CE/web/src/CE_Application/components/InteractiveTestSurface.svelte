@@ -1387,15 +1387,19 @@
     }
     if (draggingRange) {
       const rect = hitboxElement?.getBoundingClientRect?.();
+      // Same seed the panel surface passes: a relative track's start value is its current one.
+      const dragMin = getRangeMin(behavior);
+      const dragSpan = getRangeMax(behavior) - dragMin;
+      const dragRole = nextSliderHandle || currentSliderActiveHandle();
+      const dragStart = dragSpan > 0 ? (currentSliderRoleValue(dragRole) - dragMin) / dragSpan : 0;
       if (rect && (!isSliderControl() || isLinearSliderGeometry(behavior))) {
-        sliderScrub = isSliderControl() ? createSliderTrackScrub(behavior, mouse) : createRangeTrackScrub(behavior, mouse);
+        sliderScrub = isSliderControl()
+          ? createSliderTrackScrub(behavior, mouse, dragStart)
+          : createRangeTrackScrub(behavior, mouse, dragStart);
         sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
       } else if (rect && getCircularSliderDragMode(behavior) !== 'absolute') {
         // Relative dial drag: start from the picked handle's value, no jump.
-        const min = getRangeMin(behavior);
-        const span = getRangeMax(behavior) - min;
-        const role = nextSliderHandle || currentSliderActiveHandle();
-        sliderScrub = createCircularSliderScrub(behavior, span > 0 ? (currentSliderRoleValue(role) - min) / span : 0, mouse);
+        sliderScrub = createCircularSliderScrub(behavior, dragStart, mouse);
         sliderScrub.begin(scrubSample(event), { bounds: rect });
       }
       updateSliderRangeFromPointer(event, nextSliderHandle);

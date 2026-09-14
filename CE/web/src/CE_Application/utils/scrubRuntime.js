@@ -2,7 +2,7 @@
 // pointer→value maths; this module only translates a control's behavior block
 // (orientation, direction, reverseMouseDirection, step, bounds) into
 // DragScrubOptions so both preview surfaces build identical scrubs.
-import { DragScrub, presets } from '../scrub/dragScrub';
+import { DragScrub, defaultOptions, presets } from '../scrub/dragScrub';
 import {
   getRangeMin,
   getRangeMax,
@@ -28,7 +28,20 @@ import { readStoredJson } from './localStorageState.js';
 // absent or untouched section contributes {} and leaves the options identical
 // to what they were before the Mouse tab existed.
 function withMouse(options, mouse) {
-  return { ...options, ...mouseScrubOverrides(mouse, options) };
+  const overrides = mouseScrubOverrides(mouse, options);
+  // A TRACK SCRUB CARRIES NO SENSITIVITY OF ITS OWN, and it is right not to: an absolute mapping
+  // has nothing to scale, because the value IS the pointer's position along the track. The Mouse
+  // section can switch that mapping to relative, though, and from that moment `pixels ×
+  // sensitivity` is the whole of the maths — with the core's own default silently supplying the
+  // number. `mouseScrubOverrides` then finds no resolved sensitivity to multiply and drops the
+  // author's `dragSensitivity` on the floor: the field sits in the same tab as the mode that made
+  // it meaningful and does nothing. So name the default here, before the section is layered on,
+  // and let the override scale it like any other.
+  if (overrides.tracking === 'relative' && !Number.isFinite(Number(options?.sensitivity))) {
+    const base = { ...options, sensitivity: defaultOptions.sensitivity };
+    return { ...base, ...mouseScrubOverrides(mouse, base) };
+  }
+  return { ...options, ...overrides };
 }
 
 // The historical spinner feel: one step per 18 px of travel.
@@ -103,29 +116,35 @@ export function createCircularSliderScrub(behavior, startNormalized = 0, mouse =
   }, mouse), Math.max(0, Math.min(1, numberOr(startNormalized, 0))));
 }
 
-function linearTrackScrub(vertical, inverted, mouse) {
+// `startNormalized` is where the control stands at pointer-down, 0..1. An absolute track ignores
+// it entirely — the first move overwrites the value with the pointer's position — which is why it
+// was hard-coded to 0 for as long as absolute was the only mapping. Once the Mouse section switches
+// the track to relative tracking the seed IS the value: the surface writes `scrub.value` on
+// pointer-down, so a scrub seeded at 0 snapped the control to its minimum before the pointer had
+// moved at all, and every press threw the setting away.
+function linearTrackScrub(vertical, inverted, mouse, startNormalized = 0) {
   return new DragScrub(withMouse({
     ...(vertical ? presets.linearVertical : presets.linearHorizontal),
     invertX: !vertical && inverted,
     invertY: vertical && inverted,
     min: 0,
     max: 1,
-  }, mouse), 0);
+  }, mouse), Math.max(0, Math.min(1, numberOr(startNormalized, 0))));
 }
 
 // Linear slider: absolute track mapping over the hitbox, normalised 0..1.
-export function createSliderTrackScrub(behavior, mouse = null) {
+export function createSliderTrackScrub(behavior, mouse = null, startNormalized = 0) {
   const vertical = getSliderOrientation(behavior) === 'vertical';
   const direction = getSliderDirection(behavior);
   const inverted = vertical ? direction === 'ttb' : direction === 'rtl';
-  return linearTrackScrub(vertical, inverted !== isMouseDirectionReversed(behavior), mouse);
+  return linearTrackScrub(vertical, inverted !== isMouseDirectionReversed(behavior), mouse, startNormalized);
 }
 
 // Range-family slider role: same mapping, orientation read from the range block.
-export function createRangeTrackScrub(behavior, mouse = null) {
+export function createRangeTrackScrub(behavior, mouse = null, startNormalized = 0) {
   const vertical = getRangeOrientation(behavior) === 'vertical';
   const direction = getRangeDirection(behavior);
-  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl', mouse);
+  return linearTrackScrub(vertical, vertical ? direction === 'ttb' : direction === 'rtl', mouse, startNormalized);
 }
 
 export function createRangeScrub(behavior, startValue = 0, mouse = null) {

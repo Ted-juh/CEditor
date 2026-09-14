@@ -7460,17 +7460,24 @@
       const rect = pointerActiveElement?.getBoundingClientRect?.();
       const dragBehavior = getBehavior(control);
       const dragMouse = getMouse(control);
+      // Where the handle under the pointer stands right now, 0..1. A dial that drags relatively has
+      // always needed it; a linear track needs it too the moment the Mouse section switches its
+      // tracking to relative, because from then on the seed IS the value and a scrub seeded at zero
+      // snaps the control to its minimum on press.
+      const dragMin = getRangeMin(dragBehavior);
+      const dragSpan = getRangeMax(dragBehavior) - dragMin;
+      const dragRole = nextSliderHandle || currentSliderActiveHandle(control);
+      const dragStart = dragSpan > 0
+        ? (currentSliderRoleValue(control, dragRole) - dragMin) / dragSpan
+        : 0;
       if (rect && (!isSliderControl(control) || isLinearSliderGeometry(dragBehavior))) {
         sliderScrub = isSliderControl(control)
-          ? createSliderTrackScrub(dragBehavior, dragMouse)
-          : createRangeTrackScrub(dragBehavior, dragMouse);
+          ? createSliderTrackScrub(dragBehavior, dragMouse, dragStart)
+          : createRangeTrackScrub(dragBehavior, dragMouse, dragStart);
         sliderScrub.begin(scrubSample(event), { bounds: rect, jumpToPointer: true });
       } else if (rect && getCircularSliderDragMode(dragBehavior) !== 'absolute') {
         // Relative dial drag: start from the picked handle's value, no jump.
-        const min = getRangeMin(dragBehavior);
-        const span = getRangeMax(dragBehavior) - min;
-        const role = nextSliderHandle || currentSliderActiveHandle(control);
-        sliderScrub = createCircularSliderScrub(dragBehavior, span > 0 ? (currentSliderRoleValue(control, role) - min) / span : 0, dragMouse);
+        sliderScrub = createCircularSliderScrub(dragBehavior, dragStart, dragMouse);
         sliderScrub.begin(scrubSample(event), { bounds: rect });
       }
       updateSliderRangeFromPointer(control, event, nextSliderHandle);
