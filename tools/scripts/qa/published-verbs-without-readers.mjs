@@ -20,9 +20,10 @@
  * repository's own rule is not to delete a supported property to make a checklist green.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const APP = '/home/user/CEditor/CE/web/src/CE_Application';
+const APP = fileURLToPath(new URL('../../../CE/web/src/CE_Application/', import.meta.url));
 const DEFAULTS = join(APP, 'models/sectionDefaults.js');
 
 // Every source file except two, and the second exclusion is the one that matters.
@@ -62,7 +63,7 @@ const SHARED = files.filter((f) => /PanelPreviewSurface|panelRuntime|componentTa
 const ownFilesFor = (section) => {
   const stem = section.toLowerCase();
   return files.filter((f) => {
-    const base = f.split('/').pop().toLowerCase();
+    const base = basename(f).toLowerCase();
     return base.startsWith(stem) || base.startsWith(stem.replace(/s$/, ''));
   });
 };
@@ -82,7 +83,7 @@ const sectionsDeclaring = (key) => {
   return out;
 };
 
-const { COMPONENT_FAMILIES } = await import(join(APP, 'scripting/componentVerbs.js'));
+const { COMPONENT_FAMILIES } = await import(pathToFileURL(join(APP, 'scripting/componentVerbs.js')).href);
 
 const rows = [];
 const unresolved = [];

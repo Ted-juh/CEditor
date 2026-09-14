@@ -16,8 +16,10 @@
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-const CB = '/home/user/CEditor/CE/web/browser-checks';
-const APP = '/home/user/CEditor/CE/web/src/CE_Application';
+import { fileURLToPath } from 'node:url';
+const WEB = fileURLToPath(new URL('../../../CE/web/', import.meta.url));
+const CB = join(WEB, 'browser-checks');
+const APP = join(WEB, 'src/CE_Application');
 const DEF = join(APP, 'models/sectionDefaults.js');
 
 const src = readFileSync(DEF, 'utf8');
