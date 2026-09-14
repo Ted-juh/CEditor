@@ -137,6 +137,127 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // SPLIT ZONE — a keyboard, so the interesting colours are the KEYS, and one needs a note held.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const Z = 'SplitZone';
+    const zone = (over = {}) => ({ id: 'z0', label: 'Bass', lowNote: 36, highNote: 59, channel: 1,
+      transpose: 0, curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
+      velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+      bendMode: 'lastPlayed', pressureMode: 'lastPlayed', polyPressure: true,
+      enabled: true, colour: 'FF5B9BD5', ...over });
+    const zid = await kit.make(Z, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 620, 'Transform.height': 180, 'SplitZone.lowNote': 48,
+      'SplitZone.highNote': 72, 'SplitZone.inputChannel': 0, 'SplitZone.showHeader': true,
+      'SplitZone.showLabels': true,
+      'SplitZone.zones': [zone({ id: 'z0', lowNote: 48, highNote: 59, channel: 4 }),
+        zone({ id: 'z1', label: 'Lead', lowNote: 60, highNote: 72, channel: 9 })],
+      'SplitZone.faceColour': C.face, 'SplitZone.whiteColour': C.white,
+      'SplitZone.blackColour': C.black, 'SplitZone.litColour': C.lit,
+      'SplitZone.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(400);
+
+    {
+      const rects = await kit.shapes(zid, 'rect');
+      const widest = rects.slice().sort((a, b) => b.width - a.width)[0];
+      led.check(Z, 'faceColour', 'the face behind the keyboard takes the face colour',
+        rgba(C.face), widest?.fill ?? null);
+    }
+    // WHITE AND BLACK KEYS IN THE SAME SCENARIO, and counted rather than merely found: a renderer
+    // that painted every key the white colour would still satisfy "at least one key is white".
+    // Two octaves from C to C is fifteen naturals and ten accidentals.
+    {
+      const whites = await kit.shapes(zid, 'rect', (n) => n.fill === rgba(C.white));
+      const blacks = await kit.shapes(zid, 'rect', (n) => n.fill === rgba(C.black));
+      led.check(Z, 'whiteColour + blackColour',
+        'the naturals take one colour and the accidentals the other, in the numbers a two-octave keyboard has',
+        { whites: 15, blacks: 10 }, { whites: whites.length, blacks: blacks.length });
+    }
+    // litColour needs a note actually sounding, so the fixture plays one at the hardware input.
+    {
+      const litBefore = (await kit.shapes(zid, 'rect', (n) => n.fill === rgba(C.lit))).length;
+      await kit.page.evaluate(async ({ hex }) => {
+        const { latestMidiInputMessage } = await import('/src/CE_Application/stores/deviceProfileStores.js');
+        latestMidiInputMessage.set({ hex, messageType: 'midi', at: Date.now() });
+      }, { hex: '903C64' });                       // note-on, middle C
+      await kit.settle(320);
+      const litDuring = (await kit.shapes(zid, 'rect', (n) => n.fill === rgba(C.lit))).length;
+      await kit.page.evaluate(async ({ hex }) => {
+        const { latestMidiInputMessage } = await import('/src/CE_Application/stores/deviceProfileStores.js');
+        latestMidiInputMessage.set({ hex, messageType: 'midi', at: Date.now() });
+      }, { hex: '803C00' });
+      await kit.settle(320);
+      const litAfter = (await kit.shapes(zid, 'rect', (n) => n.fill === rgba(C.lit))).length;
+      led.check(Z, 'litColour', 'a key lights in the lit colour while it is held and goes back to its own colour when it is let go',
+        { before: 0, during: 1, after: 0 },
+        { before: litBefore, during: litDuring, after: litAfter });
+    }
+    {
+      const texts = await kit.shapes(zid, 'text', (n) => n.fill === rgba(C.label));
+      led.check(Z, 'labelColour', 'the header line and the input readout take the label colour',
+        true, texts.length >= 2);
+    }
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
+  // CONSTELLATION — the probe is three circles and a line, all in one colour.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const K = 'Constellation';
+    const kid = await kit.make(K, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 400, 'Transform.height': 320, 'Constellation.running': false,
+      'Constellation.showLabels': true,
+      'Constellation.fieldColour': C.field, 'Constellation.probeColour': C.probe,
+      'Constellation.linkColour': C.link, 'Constellation.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(400);
+
+    {
+      const rects = await kit.shapes(kid, 'rect');
+      const widest = rects.slice().sort((a, b) => b.width - a.width)[0];
+      led.check(K, 'fieldColour', 'the field the stars sit in takes the field colour',
+        rgba(C.field), widest?.fill ?? null);
+    }
+    // The probe is drawn three times over — a soft halo, a ring and a dot — so the row counts all
+    // three rather than accepting the first circle it finds.
+    {
+      const probe = await kit.shapes(kid, 'circle',
+        (n) => n.fill === rgba(C.probe) || n.stroke === rgba(C.probe));
+      led.check(K, 'probeColour', 'the probe takes the probe colour in all three of the circles it is drawn from — halo, ring and centre dot',
+        3, probe.length);
+    }
+    {
+      const links = await kit.shapes(kid, 'line', (n) => n.stroke === rgba(C.link));
+      led.check(K, 'linkColour', 'the lines between the stars take the link colour',
+        true, links.length >= 1);
+    }
+    {
+      const texts = await kit.shapes(kid, 'text', (n) => n.fill === rgba(C.label));
+      led.check(K, 'labelColour', 'the star names and the mode caption take the label colour',
+        true, texts.length >= 2);
+    }
+    // A reopen, because a colour written into the session rather than the document would survive
+    // every row above and none of this one.
+    {
+      await kit.reopen(kid);
+      await kit.preview(true);
+      await kit.settle(400);
+      const rects = await kit.shapes(kid, 'rect');
+      const widest = rects.slice().sort((a, b) => b.width - a.width)[0];
+      const probe = await kit.shapes(kid, 'circle',
+        (n) => n.fill === rgba(C.probe) || n.stroke === rgba(C.probe));
+      led.check(K, 'save/reopen (the four colours)',
+        'a reopened constellation paints its field and its probe in the colours the file carried',
+        { field: rgba(C.field), probe: 3 }, { field: widest?.fill ?? null, probe: probe.length });
+    }
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
