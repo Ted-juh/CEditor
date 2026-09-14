@@ -282,6 +282,9 @@ test('a session change that lands mid-dispatch is not lost', async () => {
   const { MODULES } = await import('../src/CE_Application/scripting/panelApi.js');
 
   const button = createControl('Button', { name: 'Talk' });
+  // This regression exercises event delivery during an in-flight dispatch,
+  // so opt in explicitly now that Behavior.emitValueChange is effective.
+  button._children.Behavior.emitValueChange = true;
   const id = button._children.Core.id;
   panels.set([{ id: 'p', name: 'P', controls: [button], scripting: { modules: MODULES.map((m) => m.id) } }]);
   activePanelId.set('p');

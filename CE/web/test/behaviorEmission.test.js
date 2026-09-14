@@ -143,4 +143,3 @@ test('mixed bool state is a script-visible value without inventing a boolean', a
     assert.deepEqual(seen, ['mixed']);
   });
 });
-

@@ -7751,7 +7751,7 @@ function controlNameById(id) {
   // listener registered as on("pad38", "pointerDown", …) matches a name, so every press, release,
   // click and hover on a control inside a Group went nowhere. It looked like the pad was dead;
   // it was the envelope that was wrong.
-  const c = controlByRuntimeId(id);
+  const c = flatControls(livePanel()?.controls ?? []).find((x) => x?._children?.Core?.id === id);
   return c?._children?.Core?.name ?? id;
 }
 
@@ -7761,7 +7761,11 @@ function controlNameById(id) {
  * Non-slider value controls have one Value switch; sliders split continuous change from commit.
  */
 function behaviorEmits(control, eventName) {
-  const behavior = control?._children?.Behavior ?? {};
+  const behavior = control?._children?.Behavior;
+  // Components without a Behavior section predate these switches and keep the
+  // event contract they already had. A missing section is not an implicit set
+  // of false flags.
+  if (!behavior) return true;
   if (eventName === 'onClick') return behavior.emitClick !== false;
   if (eventName === 'onStateChanged') return behavior.emitStateChange !== false;
   if (eventName === 'onValueChange' || eventName === 'onControlChanged') {
