@@ -584,6 +584,42 @@ try {
           reasonNamesTheScale: r.skipped.every((e) => /wholeTone/.test(String(e.reason))) });
     }
 
+    // --- the OTHER four sections that declare it ---------------------------------------------------------
+    {
+      // KEY_SCALE_SECTIONS names seven: ChordPad, Arp, NoteRibbon, Phrase, Harmoniser, Recorder and
+      // Keyboard. The rows above cover the three that were asked for plus the ChordPad holdout, and
+      // a coverage sweep found the remaining three untested by anything. They are the same
+      // mechanism, so the interesting question is not whether the broadcast works again — it is
+      // whether panelKeyPlan REACHES all seven, since a section missing from that list would follow
+      // nothing and look exactly like a section that had opted out.
+      const key = (id, section) => kit.read(id, `${section}.key`);
+      const arp = await kit.make('Arp', { 'Transform.x': 40, 'Transform.y': 420,
+        'Transform.width': 300, 'Transform.height': 120, 'Arp.running': false,
+        'Arp.key': 0, 'Arp.scale': 'major', 'Arp.followPanelKey': true });
+      const ribbon = await kit.make('NoteRibbon', { 'Transform.x': 360, 'Transform.y': 420,
+        'Transform.width': 260, 'Transform.height': 120, 'NoteRibbon.key': 0,
+        'NoteRibbon.scale': 'major', 'NoteRibbon.followPanelKey': true });
+      const keys = await kit.make('Keyboard', { 'Transform.x': 640, 'Transform.y': 420,
+        'Transform.width': 300, 'Transform.height': 120, 'Keyboard.key': 0,
+        'Keyboard.scale': 'major', 'Keyboard.followPanelKey': true });
+      await kit.settle(320);
+      const r = await setKey(9, 'phrygian');                 // A phrygian: a root and a mode both moved
+      await kit.settle(420);
+      led.check('Arp', 'followPanelKey', 'an arpeggiator that opted in is re-keyed by the same broadcast',
+        { key: 9, scale: 'phrygian' }, { key: await key(arp, 'Arp'), scale: await kit.read(arp, 'Arp.scale') });
+      led.check('NoteRibbon', 'followPanelKey', 'and a note ribbon',
+        { key: 9, scale: 'phrygian' },
+        { key: await key(ribbon, 'NoteRibbon'), scale: await kit.read(ribbon, 'NoteRibbon.scale') });
+      led.check('Keyboard', 'followPanelKey', 'and a keyboard — the seventh and last section that declares it',
+        { key: 9, scale: 'phrygian' }, { key: await key(keys, 'Keyboard'), scale: await kit.read(keys, 'Keyboard.scale') });
+      led.check('Harmoniser', 'followPanelKey (every section that declares it is reached)',
+        'one call moves all six followers on the panel and leaves the one holdout alone, so no section in KEY_SCALE_SECTIONS is silently missing from the plan',
+        { changed: 6, holdoutUntouched: 0 },
+        { changed: r.changed, holdoutUntouched: Number(await kit.read(holdout, 'ChordPad.key')) });
+      await setKey(5, 'dorian');
+      await kit.settle(360);
+    }
+
     // --- and the follower is still following after a save and reopen --------------------------------------
     {
       await setKey(5, 'dorian');
