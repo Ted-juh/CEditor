@@ -91,11 +91,26 @@ The long tail is **colours**: `fieldColour`, `labelColour`, `trackColour` and fr
 components. Cheap to check and cheap to break, since a renderer that stops reading one is invisible
 until somebody authors a dark panel.
 
-**Two sections should probably be struck from the denominator rather than tested.** `Designer`
-(13 keys) and `Assets` (5) are authoring-session state and asset bookkeeping, not component
-behaviour — a `selectedHitZone` has no promised effect to verify. They are left in the count here
-rather than quietly removed, because deciding what does not need testing is a decision somebody
-should make deliberately.
+**Ruled 14 September, and the first half of the ruling corrects this document's own earlier
+suggestion.** It proposed striking both `Designer` (13 keys) and `Assets` (5) from the denominator
+as "authoring-session state and asset bookkeeping". That was right about one and wrong about the
+other, which is why the rule was to decide deliberately rather than quietly.
+
+- **`Designer` — struck.** Every key is where the AUTHOR is standing in the custom-component
+  designer: `selectedLayer`, `selectedHitZone`, `selectedGenerator`, `activeVariant`, the preview
+  toggles. They do have effects, but on the designer's own surface rather than on the rendered
+  control, so they belong to an authoring matrix and are counted there. A `selectedHitZone` has no
+  promised effect a component-behaviour suite could verify.
+- **`Assets` — NOT struck, and the earlier suggestion would have removed five real properties.**
+  Checked rather than assumed: `images` has 95 readers in `src/`, `filmstrips` 58, `thumbnails` 11 —
+  these are the content maps every image and filmstrip renderer reads, not bookkeeping. And
+  `packagePolicy.embedAssets` and `warnMissingFonts` are behaviour with a user-visible consequence:
+  they decide whether a shared panel carries its artwork and whether a missing font is announced,
+  which is exactly the failure the panel-sharing work exists to prevent — a package that looks
+  perfect on the author's disk and has no pictures on anybody else's. They stay in the count.
+
+The lesson is the one this document already records about the inert sweep, pointed at itself: a
+section that *looks* like bookkeeping is a lead, not a verdict, and the readers are cheap to count.
 
 ---
 

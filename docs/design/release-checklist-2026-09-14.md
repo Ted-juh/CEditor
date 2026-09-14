@@ -14,7 +14,7 @@ environment at all.
 
 | | |
 | --- | --- |
-| **MET** | Evidence exists and was re-run against the current tree |
+| **MET** | Evidence exists and was re-run against the current tree, or a decision has been taken |
 | **STALE** | Evidence exists but predates changes since; needs re-running, not re-doing |
 | **OPEN** | Known work, owner named |
 | **OFF-SITE** | Cannot be established here; needs the Windows machine or hardware |
@@ -39,7 +39,7 @@ environment at all.
 | B2. Every registered type reached by at least one half | **MET** | 58/58; `TestBox` is internal and not user-reachable |
 | B3. The 241 unreached properties closed or consciously deferred | **OPEN** | 112 in the editor half — see `assignment-codex-2026-09-14.md` |
 | B4. Authoring stages driven, not just renderers | **OPEN** | Panel editor, Custom designer, Screen Builder, Sequencer/Envelope designers, scripting/routing, Player/export. `designerTab.mjs` already covers the Sequencer designer writing a pattern |
-| B5. A decision on `Designer` and `Assets` — session state, not behaviour | **OPEN** | 18 keys. Needs a ruling, not tests |
+| B5. A decision on `Designer` and `Assets` — session state, not behaviour | **MET** | Ruled 14 Sep. `Designer` (13 keys) struck as authoring-surface state; `Assets` (5) **kept** — `images`/`filmstrips`/`thumbnails` have 95/58/11 readers and `packagePolicy` decides whether a shared panel carries its artwork. See the matrix document |
 
 ## C. The combined panel
 
