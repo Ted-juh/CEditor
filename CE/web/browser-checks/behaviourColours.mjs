@@ -258,6 +258,92 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // TIMBRE and KINETIC — two fields, and a label colour that paints one thing only.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const T = 'Timbre';
+    const tid = await kit.make(T, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 360, 'Transform.height': 300, 'Timbre.showLabels': true,
+      'Timbre.axisX': 'Bright', 'Timbre.axisY': 'Soft',
+      'Timbre.fieldColour': C.field, 'Timbre.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(380);
+    {
+      const rects = await kit.shapes(tid, 'rect');
+      const widest = rects.slice().sort((a, b) => b.width - a.width)[0];
+      led.check(T, 'fieldColour', 'the pad the anchors sit in takes the field colour',
+        rgba(C.field), widest?.fill ?? null);
+    }
+    {
+      // The anchor names AND both axis captions; the axis ones are the pair a check that only
+      // looked at the anchors would miss, and they are the labels an author actually renames.
+      const texts = await kit.shapes(tid, 'text', (n) => n.fill === rgba(C.label));
+      const axes = texts.filter((n) => n.text === 'Bright' || n.text === 'Soft');
+      led.check(T, 'labelColour', 'the anchor names and BOTH axis captions take the label colour',
+        { some: true, bothAxes: 2 }, { some: texts.length >= 2, bothAxes: axes.length });
+    }
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const N = 'Kinetic';
+    // KINETIC'S LABEL COLOUR PAINTS EXACTLY ONE THING: the gravity hint, a short arrow down the
+    // right-hand edge. And the hint is only drawn when gravity is above 0.01 — so authored with
+    // gravity off, the property is invisible and a check would call it dead. That is the row.
+    const nid = await kit.make(N, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 360, 'Transform.height': 300, 'Kinetic.running': false,
+      'Kinetic.gravity': 0, 'Kinetic.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(380);
+    const hint = async () => (await kit.shapes(nid, 'line', (n) => n.stroke === rgba(C.label))).length
+      + (await kit.shapes(nid, 'path', (n) => n.stroke === rgba(C.label))).length;
+    const off = await hint();
+    await kit.set(nid, { 'Kinetic.gravity': 3 });
+    await kit.settle(320);
+    const on = await hint();
+    led.check(N, 'labelColour', 'the label colour paints the gravity hint — the arrow down the right-hand edge — and nothing else',
+      { withoutGravity: 0, withGravity: 2 }, { withoutGravity: off, withGravity: on });
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
+  // NOTE RIBBON — the touch colour needs a finger on it.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const R = 'NoteRibbon';
+    const rid = await kit.make(R, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 520, 'Transform.height': 160, 'NoteRibbon.showHeader': true,
+      'NoteRibbon.showZones': true, 'NoteRibbon.touchColour': C.touch,
+      'NoteRibbon.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(380);
+    {
+      const texts = await kit.shapes(rid, 'text', (n) => n.fill === rgba(C.label));
+      led.check(R, 'labelColour', 'the mode caption and the zone names take the label colour',
+        true, texts.length >= 2);
+    }
+    {
+      // The touch marker is a line drawn where the finger is, so it does not exist until there is
+      // one. Pressed and held through the real preview surface rather than injected.
+      const marks = async () => (await kit.shapes(rid, 'line', (n) => n.stroke === rgba(C.touch))).length;
+      const before = await marks();
+      const box = await kit.box(rid);
+      await kit.page.mouse.move(box.x + box.w * 0.5, box.y + box.h * 0.6);
+      await kit.page.mouse.down();
+      await kit.settle(260);
+      const during = await marks();
+      await kit.page.mouse.up();
+      await kit.settle(260);
+      led.check(R, 'touchColour', 'the touch marker is drawn in the touch colour while a finger is on the ribbon, and there is no marker before one lands',
+        { before: 0, during: true }, { before, during: during >= 1 });
+    }
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
