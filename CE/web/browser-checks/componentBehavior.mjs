@@ -900,11 +900,11 @@ try {
     const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();assert.deepEqual(await selected(),['Alpha']);await node('multi_parent').click();await page.locator('.panel-combobox-menu').getByRole('option',{name:'B',exact:true}).click();await settle();assert.deepEqual(await selected(),['Beta'],'Reset pick must visibly select the matching row in multi-select too');await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
   });
   await check('Dependent choices show the correct default group in design view and keep it in Preview after reopening',async()=>{
-    for(const type of ['Listbox','RadioButtonGroup']){
+    for(const type of ['Combobox','CyclicButton','Listbox','RadioButtonGroup']){
       const rows=['A','B'].map(s=>({id:s+'1',internalValue:s+'1',displayText:s+'1',parentValue:s,enabled:true,selectedByDefault:s==='A'}));
       const id=await fixture(type,{Behavior:{defaultValue:'A1'},Value:{rows,dependsOn:'design_parent'}},[],[{type:'Combobox',sections:{Core:{id:'design_parent'},Transform:{x:50,y:300,width:260,height:48},Behavior:{defaultValue:'B'},Value:{rows:['A','B'].map(s=>({id:s,internalValue:s,displayText:s,enabled:true,selectedByDefault:s==='B'}))}}}]);
       const verify=async()=>{
-        if(type==='Combobox')assert.ok((await node(id).textContent()).includes('B1'),'design canvas shows the choice from default parent B');
+        if(type==='Combobox'||type==='CyclicButton')assert.ok((await node(id).textContent()).includes('B1'),'design canvas shows the choice from default parent B');
         else assert.deepEqual(await node(id).locator(type==='Listbox'?'.lb-label':'.radio-group-label').allTextContents(),['B1'],'design canvas filters to the default parent group');
         await props.getByTitle('Enter Preview',{exact:true}).click();await settle();assert.ok((await node(id).textContent()).includes('B1'));await props.getByTitle('Exit Preview',{exact:true}).click();
       };await verify();await reopen(id);await verify();
@@ -916,7 +916,38 @@ try {
     const selected=()=>node(id).locator('.listbox-row.selected .lb-label').allTextContents();
     const verify=async()=>{assert.deepEqual(await selected(),['Alpha'],'design default is the first enabled option, never a header');await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.deepEqual(await selected(),['Alpha']);await node(id).focus();await page.keyboard.press('End');await settle();assert.deepEqual(await selected(),['Gamma']);const b=await node(id).boundingBox();const row=await node(id).locator('.listbox-row.selected').boundingBox();assert.ok(row.y>=b.y&&row.y+row.height<=b.y+b.height,'End scrolls the selected row into view');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),'Gamma');await page.keyboard.press('Home');await settle();assert.deepEqual(await selected(),['Alpha']);await page.keyboard.press('ArrowDown');await settle();assert.deepEqual(await selected(),['Beta']);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
   });
-} finally {
+  await check('Nested Meter keeps linked peak hold and decay after grouping and reopening',async()=>{
+    const id=await fixture('Meter',{Meter:{valueSourceId:'nested_meter_source',peakHold:true,peakHoldMs:150,peakDecayPerSec:0.5}},[],[{type:'Slider',sections:{Core:{id:'nested_meter_source'},Transform:{x:50,y:300,width:300,height:60},Behavior:{defaultCurrentValue:1}}}]);
+    await page.evaluate(async id=>{const p=await import('/src/CE_Application/stores/panels.js');p.selectedComponentIds.set(new Set([id,'nested_meter_source']));(await import('/src/CE_Application/stores/controls.js')).groupSelectionIntoContainer();p.selectedComponentIds.set(new Set([id]));},id);await settle();
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await settle();const peak=()=>node(id).locator('.meter-peak').evaluate(e=>parseFloat(e.style.left)/100);assert.ok(await peak()>.99);await node('nested_meter_source').focus();await page.keyboard.press('Home');await page.waitForTimeout(75);assert.ok(await peak()>.99);await page.waitForTimeout(400);const level=await peak();assert.ok(level>.70&&level<.93,`nested peak decays at configured rate: ${level}`);};await verify();await reopen(id);await verify();
+  });
+  await check('LCD soft key resolves a grouped value target by authored name and emits the displayed value',async()=>{
+    const id=await fixture('LcdDisplay',{Display:{cols:16,rows:2,pages:{defaultLayoutId:'home'},layouts:[{id:'home',name:'Home',zones:[{id:'set',row:1,colStart:1,colEnd:8,show:'static',text:'[SET]',press:{set:'NestedCutoff',to:0.75}}]}]}},[],[{type:'Knob',sections:{Core:{id:'nested_cutoff',name:'NestedCutoff'},Transform:{x:50,y:300,width:160,height:100},Behavior:{min:0,max:1,step:0.01,precision:2,defaultCurrentValue:0},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}}}]);
+    await page.evaluate(async()=>{const p=await import('/src/CE_Application/stores/panels.js');p.selectedComponentIds.set(new Set(['nested_cutoff']));(await import('/src/CE_Application/stores/controls.js')).groupSelectionIntoContainer();});await settle();
+    const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.match((await node(id).locator('.lcd-char').allTextContents()).join(''),/\[SET\]/);await node(id).locator('.lcd-cell').nth(1).click();await settle();assert.equal(Number(await node('nested_cutoff').locator('.slider-readout').textContent()),.75,'soft key updates the nested knob readout');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='cutoff').at(-1)?.payload.value),.75,'nested knob sends the value to its bound parameter');};await verify();await reopen(id);await verify();
+  });  await check('TextInput shows authored text or placeholder and preserves font and zero padding in the editable field',async()=>{
+    const id=await fixture('TextInput',{Text:{content:'Name here',_children:{Font:{family:'Georgia',size:24,weightValue:700,style:'Italic',letterSpacing:3,wordSpacing:5,caseMode:'uppercase',underline:true},Fill:{colour:'FF00FF00'}}},ContentLayout:{horizontalAlign:'right',paddingLeft:0,paddingRight:0,paddingTop:0,paddingBottom:0},Behavior:{defaultValue:'Warm pad'},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'text',deviceRole:'mainSynth',parameterId:'name',dryRun:true}]}});
+    const field=()=>node(id).locator('.canvas-text-input');
+    const verify=async()=>{
+      assert.equal(await field().inputValue(),'Warm pad','design view shows the authored value');assert.equal(await field().getAttribute('placeholder'),'Name here');
+      await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+      const css=await field().evaluate(e=>{const s=getComputedStyle(e);return{font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,style:s.fontStyle,letter:s.letterSpacing,word:s.wordSpacing,transform:s.textTransform,decoration:s.textDecorationLine,align:s.textAlign,colour:s.color,padding:s.padding};});
+      assert.deepEqual(css,{font:'Georgia',size:'24px',weight:'700',style:'italic',letter:'3px',word:'5px',transform:'uppercase',decoration:'underline',align:'right',colour:'rgb(0, 255, 0)',padding:'0px'});
+      await field().fill('New patch');await field().press('Enter');await settle();assert.equal(await field().inputValue(),'New patch','case styling does not rewrite the committed text');assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),'New patch');
+      await field().fill('');await field().press('Enter');await settle();assert.equal(await field().getAttribute('placeholder'),'Name here');assert.equal(await field().evaluate(e=>e.matches(':placeholder-shown')),true);
+    };await verify();await reopen(id);await verify();
+  });
+  await check('Numpad readout key visibility spacing and colours agree with its hit regions after reopening',async()=>{
+    const id=await fixture('Numpad',{Transform:{width:240,height:300},Numpad:{gap:10,keyColour:'FFFF0000',actionColour:'FF0000FF',keyLabelColour:'FFFFFFFF',displayTextColour:'FF00FF00',keyDownColour:'FFFFFF00',displayColour:'FF202020',borderColour:'FFFF00FF'}});
+    const svg=()=>node(id).locator('svg.numpad');const key=label=>svg().locator('text').filter({hasText:new RegExp(`^${label}$`)});
+    const verify=async()=>{
+      const keys=await svg().locator('rect').evaluateAll(es=>es.map(e=>({x:+e.getAttribute('x'),w:+e.getAttribute('width'),fill:getComputedStyle(e).fill,stroke:getComputedStyle(e).stroke})));
+      assert.equal(keys[1].fill,'rgb(255, 0, 0)');assert.equal(keys[10].fill,'rgb(0, 0, 255)');assert.equal(keys[0].fill,'rgb(32, 32, 32)');assert.ok(keys.every(k=>k.stroke==='rgb(255, 0, 255)'));assert.equal(keys[2].x-keys[1].x-keys[1].w,10);assert.equal(await svg().locator('text').first().evaluate(e=>getComputedStyle(e).fill),'rgb(0, 255, 0)');
+      await tab('Numpad');await choose('Idle readout','blank');assert.equal(await svg().locator('text').first().textContent(),'');await toggle('Clear key');await toggle('Enter key');assert.equal(await key('C').count(),0);assert.equal(await key('↵').count(),0);await toggle('Readout');assert.equal(await svg().locator('text').count(),10);
+      await props.getByTitle('Enter Preview',{exact:true}).click();const one=await key('1').boundingBox();await page.mouse.move(one.x+one.width/2,one.y+one.height/2);await page.mouse.down();await settle();assert.equal(await svg().locator('rect').first().evaluate(e=>getComputedStyle(e).fill),'rgb(255, 255, 0)');await page.mouse.up();
+      await props.getByTitle('Exit Preview',{exact:true}).click();await tab('Numpad');await toggle('Readout');await toggle('Enter key');await toggle('Clear key');await choose('Idle readout','value');
+    };await verify();await reopen(id);await verify();
+  });} finally {
   await writeFile(join(out,'results.json'),JSON.stringify({results,errors},null,2));
   await browser.close(); await server.close();
 }

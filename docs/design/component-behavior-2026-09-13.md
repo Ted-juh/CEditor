@@ -262,3 +262,14 @@ B68: Dependent Listbox and RadioButtonGroup showed no rows in design view when e
 B69: Choice default resolution could select a section header or disabled row. Skip both for explicit/default fallback lookup. Real Listbox selection, End/Home/Arrow navigation, scroll-into-view, emitted value and reopen pass. A unit regression covers the same invalid defaults across Listbox, Combobox, Cyclic and Radio.
 
 The previous 87 browser scenarios passed together with zero page errors. These two additional cases pass individually; all 4,822 Node tests pass with zero skips. Exhaustive property coverage and native/hardware gates remain open.
+### 2026-09-14 checkpoint: 93 scenarios pass together
+
+- B70: LCD soft-key `press.set` could find a grouped value target by id but not by its authored name. Use the existing flattened control list for name lookup. Real grouped knob readout reaches 0.75 and emits exactly 0.75, including fresh reopen.
+- B71: TextInput design view always showed an empty value/placeholder. Show Behavior.defaultValue until an actual preview value is supplied. Default, edit, commit, blank placeholder and fresh reopen pass.
+- B72: TextInput's editable field ignored italic, spacing, case and decorations exposed in Text settings. Apply native font styling, OpenType/variation settings and basic decoration styles. Uppercase styling leaves the committed and emitted string unchanged. This does not claim complete support for complex text paths, independent decoration geometry, sentence/title casing or layered text effects on a native input.
+- B73: TextInput zero padding fell through `||` to 4/8px defaults. Use finite-number fallback that preserves zero. Actual native input computed padding is 0px.
+- B68 follow-up: dependent Combobox/Cyclic faces also used a different default resolver. They now use the same interaction context and authored parent session as Preview; all four selector families agree after fresh reopen.
+- Nested Meter peak decay was already fixed in root's earlier work; the new grouped-source/grouped-meter regression proves hold and configured decay after reopen.
+- Numpad readout/blank placeholder, Clear/Enter visibility, key spacing, pressed-key colour, label/action/readout/border colours and fresh reopen pass.
+
+All **93 root real-App scenarios pass together, with zero browser errors**. **4,822 Node tests pass, zero skips**. Claude's integrated clock suite has **76 verified, 1 unverified, 0 defects**; assertion totals are not unique-property counts. The latest production build passed before the B70–B73 changes and must be refreshed. Combined-panel and remaining property/native/hardware work is still open.

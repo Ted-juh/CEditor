@@ -105,7 +105,7 @@
     applyTextCaseMode, applyTextReadingOrientation, buildFontFeatureSettings,
     buildFontVariationSettings, buildGlowShadowLayers, buildSingleBlurFilterValue,
     buildTextBlurFilterValue, buildTextFillLayerStyle, buildTextShadowValue,
-    cssColor, customHitZoneStyle, getDefaultValueRowLabel, getEnabledValueRows, lineCanvasFont,
+    cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
     normalizeLastLineAlign, normalizeScriptMode, normalizeTextCaseMode,
     normalizeTextFlowMode, normalizeTextLayerOrder, normalizeTextOrientation,
@@ -295,19 +295,31 @@
     }
     return fallback;
   }
-  let tiValue = $derived(String(previewTextField?.value ?? ''));
+  let tiValue = $derived(String(previewTextField?.value ?? control?._children?.Behavior?.defaultValue ?? ''));
   let tiPlaceholder = $derived(String(previewTextField?.placeholder ?? control?._children?.Text?.content ?? ''));
   let tiStyle = $derived.by(() => {
     const font = control?._children?.Text?._children?.Font ?? null;
     const cl = control?._children?.ContentLayout ?? null;
     const colour = argbCss(control?._children?.Text?._children?.Fill?.colour, 'rgba(224,224,224,1)');
     const align = String(cl?.horizontalAlign ?? 'left');
+    const decorations = [font?.underline && 'underline', font?.strikethrough && 'line-through', font?.overline && 'overline'].filter(Boolean);
+    const caseMode = normalizeTextCaseMode(font?.caseMode);
     return `color:${colour};`
       + `font-family:${String(font?.family ?? 'Arial')};`
       + `font-size:${Math.max(6, Number(font?.size) || 12)}px;`
       + `font-weight:${Number(font?.weightValue) || 400};`
+      + `font-style:${font?.style === 'Italic' ? 'italic' : 'normal'};`
+      + `letter-spacing:${numberOr(font?.letterSpacing, 0)}px;word-spacing:${numberOr(font?.wordSpacing, 0)}px;`
+      + `font-feature-settings:${buildFontFeatureSettings(font) || 'normal'};`
+      + `font-variation-settings:${buildFontVariationSettings(font?.variationAxes) || 'normal'};`
+      + `font-variant-caps:${textCaseVariantCaps(caseMode)};`
+      + `text-transform:${['uppercase', 'lowercase'].includes(caseMode) ? caseMode : 'none'};`
+      + `text-decoration-line:${decorations.join(' ') || 'none'};`
+      + `text-decoration-thickness:${Math.max(0, numberOr(font?.underlineThickness, 1))}px;`
+      + `text-underline-offset:${numberOr(font?.underlineOffset, 0)}px;`
+      + `text-decoration-color:${font?.underlineColour ? argbCss(font.underlineColour, colour) : colour};`
       + `text-align:${align};`
-      + `padding:${Math.max(0, Number(cl?.paddingTop) || 4)}px ${Math.max(0, Number(cl?.paddingRight) || 8)}px ${Math.max(0, Number(cl?.paddingBottom) || 4)}px ${Math.max(0, Number(cl?.paddingLeft) || 8)}px;`;
+      + `padding:${Math.max(0, numberOr(cl?.paddingTop, 4))}px ${Math.max(0, numberOr(cl?.paddingRight, 8))}px ${Math.max(0, numberOr(cl?.paddingBottom, 4))}px ${Math.max(0, numberOr(cl?.paddingLeft, 8))}px;`;
   });
   // Design view needs the same authored parent choices as Preview, otherwise
   // dependent lists appear empty until interaction mode is entered.
@@ -1832,8 +1844,7 @@
     // "Clean" -- and the disagreement is invisible until you run it. Same resolution preview
     // uses, so the two cannot say different things.
     if (isSelectorFace) {
-      const label = getDefaultValueRowLabel(sourceValueSection ?? valueSection);
-      if (label) return label;
+      return String(resolveInteractionContext(renderControl, appliedPreviewSession).valueDisplay ?? '');
     }
 
     return String(text?.content ?? '');

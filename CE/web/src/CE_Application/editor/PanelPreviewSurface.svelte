@@ -1064,7 +1064,7 @@
     if (setName) {
       // Addressed the way a script addresses a control — by NAME, falling back to an id — because
       // a panel author typing into the inspector has the name in front of them and not the id.
-      const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === setName)
+      const target = allControls.find((c) => String(c?._children?.Core?.name ?? '') === setName)
         ?? controlById(setName);
       if (!target) return false;
       const behavior = getBehavior(target);
