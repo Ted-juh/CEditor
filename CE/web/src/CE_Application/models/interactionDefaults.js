@@ -714,6 +714,16 @@ export function createStatesDefaults(type) {
             'Text.Fill.colour': 'FFFFFFFF',
           },
         }),
+        Mixed: createStateNode('Mixed', {
+          group: 'logical',
+          description: 'Indeterminate visual state when mixed values are allowed.',
+          when: { mixed: true },
+          component: {
+            'Background.Fill.colour': 'FF806019',
+            'Background.Border.colour': 'FFFFD166',
+            'Text.Fill.colour': 'FFFFFFFF',
+          },
+        }),
         Disabled: createStateNode('Disabled', {
           group: 'system',
           description: 'Dim the control when disabled.',

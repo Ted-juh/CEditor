@@ -7003,6 +7003,7 @@ function probeNames(script) {
 function samplePayload(event) {
   if (event === 'onPanelReady') return { firstTime: true };
   if (event === 'onValueChange' || event === 'onValueChanged') return 64;
+  if (event === 'onActiveHandleChanged') return { activeHandle: 'current', previousActiveHandle: 'start' };
   if (event && event.startsWith('on') && (event.includes('Pointer') || event.includes('Click'))) return { x: 0, y: 0 };
   return undefined;
 }
@@ -7708,11 +7709,15 @@ function onPanelsChanged() {
     const { sig, value } = controlValueState(c);
     next.set(id, sig);
     if (live.last.has(id) && live.last.get(id) !== sig) {
-      events.push({ event: 'onValueChange', controlName: name, payload: value });
-      events.push({ event: 'onValueChanged', controlName: name, payload: value });
-      // Panel-wide mirror of the same change, for a script that watches everything at once
-      // rather than attaching to each control.
-      events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
+      if (behaviorEmits(c, 'onValueChange')) {
+        events.push({ event: 'onValueChange', controlName: name, payload: value });
+        // Panel-wide mirror of the same change, for a script that watches everything at once
+        // rather than attaching to each control.
+        events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
+      }
+      if (behaviorEmits(c, 'onValueChanged')) {
+        events.push({ event: 'onValueChanged', controlName: name, payload: value });
+      }
     }
   }
   live.last = next;
@@ -7732,8 +7737,13 @@ function sessionValue(session) {
   const cv = session.customValues;
   if (cv && typeof cv === 'object') { const vals = Object.values(cv); if (vals.length) return vals[0]; }
   if (session.valueOverrideEnabled === true) return session.valueOverride;
+  if (session.mixed === true) return 'mixed';
   if (typeof session.checked === 'boolean') return session.checked;
   return undefined;
+}
+
+function controlByRuntimeId(id) {
+  return flatControls(livePanel()?.controls ?? []).find((x) => x?._children?.Core?.id === id) ?? null;
 }
 
 function controlNameById(id) {
@@ -7741,8 +7751,29 @@ function controlNameById(id) {
   // listener registered as on("pad38", "pointerDown", …) matches a name, so every press, release,
   // click and hover on a control inside a Group went nowhere. It looked like the pad was dead;
   // it was the envelope that was wrong.
-  const c = flatControls(livePanel()?.controls ?? []).find((x) => x?._children?.Core?.id === id);
+  const c = controlByRuntimeId(id);
   return c?._children?.Core?.name ?? id;
+}
+
+/**
+ * Behavior's emission switches gate only script/runtime events. The preview session is still
+ * updated first, and binding/link/device fan-out remains in the surface/store that owns it.
+ * Non-slider value controls have one Value switch; sliders split continuous change from commit.
+ */
+function behaviorEmits(control, eventName) {
+  const behavior = control?._children?.Behavior ?? {};
+  if (eventName === 'onClick') return behavior.emitClick !== false;
+  if (eventName === 'onStateChanged') return behavior.emitStateChange !== false;
+  if (eventName === 'onValueChange' || eventName === 'onControlChanged') {
+    return behavior.emitValueChange === true;
+  }
+  if (eventName === 'onValueChanged') {
+    const slider = String(behavior.family ?? '').toLowerCase() === 'range'
+      && String(behavior.role ?? '').toLowerCase() === 'slider';
+    return slider ? behavior.emitValueCommit !== false : behavior.emitValueChange === true;
+  }
+  if (eventName === 'onActiveHandleChanged') return behavior.emitActiveHandleChange === true;
+  return true;
 }
 
 function seedSessionSnapshot() {
@@ -7751,7 +7782,9 @@ function seedSessionSnapshot() {
   for (const [id, s] of Object.entries(sessions)) {
     next.set(id, {
       value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
+      disabled: s.disabled === true, dragging: s.dragging === true,
+      repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
+      activeHandle: String(s.activeHandle ?? ''),
     });
   }
   live.sessionLast = next;
@@ -7770,20 +7803,34 @@ function onPreviewSessionsChanged(sessions) {
   for (const [id, s] of Object.entries(sessions ?? {})) {
     const cur = {
       value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
-      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
+      disabled: s.disabled === true, dragging: s.dragging === true,
+      repeats: Number(s.repeatCount) || 0, executed: s.executed === true,
+      activeHandle: String(s.activeHandle ?? ''),
     };
     next.set(id, cur);
     const prev = live.sessionLast.get(id);
     if (!prev) continue;
     const name = controlNameById(id);
-    const behavior = flatControls(livePanel()?.controls ?? []).find(c => c?._children?.Core?.id === id)?._children?.Behavior ?? {};
+    const control = controlByRuntimeId(id);
+    const behavior = control?._children?.Behavior ?? {};
     const confirmedButton = behavior.buttonType === 'timed' || behavior.buttonType === 'one_shot';
     const pressStart = behavior.buttonType === 'momentary' && behavior.fireOn === 'onPressStart';
     const repeating = behavior.buttonType === 'momentary' && behavior.subtype === 'repeating';
-    if (!Object.is(prev.value, cur.value) && cur.value !== undefined) {
-      events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
-      if (s.dragging !== true) events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
-      events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
+    const valueChanged = !Object.is(prev.value, cur.value) && cur.value !== undefined;
+    if (valueChanged) {
+      if (behaviorEmits(control, 'onValueChange')) {
+        events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
+        events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
+      }
+      if (s.dragging !== true && behaviorEmits(control, 'onValueChanged')) {
+        events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
+      }
+    }
+    // Drag commits are an edge, not another value. The last drag sample already advanced the
+    // baseline, so waiting for a value difference on pointer-up swallowed the commit entirely.
+    if (!valueChanged && prev.dragging && !cur.dragging && cur.value !== undefined
+        && behaviorEmits(control, 'onValueChanged')) {
+      events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
     }
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
@@ -7792,13 +7839,17 @@ function onPreviewSessionsChanged(sessions) {
       // A timed hold / click sequence is not an action until it confirms.
       if (!confirmedButton && !repeating && !(prev.repeats > 0)
         && (pressStart ? cur.pressed : !cur.pressed && cur.hover)) {
-        events.push({ event: 'onClick', controlName: name, payload: mouse });
+        if (behaviorEmits(control, 'onClick')) {
+          events.push({ event: 'onClick', controlName: name, payload: mouse });
+        }
       }
     }
     if (confirmedButton && cur.executed && !prev.executed) {
-      events.push({ event: 'onClick', controlName: name, payload: {
-        x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0,
-      } });
+      if (behaviorEmits(control, 'onClick')) {
+        events.push({ event: 'onClick', controlName: name, payload: {
+          x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0,
+        } });
+      }
     }
     // A repeat is another FIRING of the button, so it raises the event a firing already raises
     // rather than a new one nobody has heard of: `momentary/repeating` says "keeps firing while
@@ -7807,7 +7858,9 @@ function onPreviewSessionsChanged(sessions) {
     if (cur.repeats > prev.repeats) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
       for (let i = prev.repeats; i < cur.repeats; i += 1) {
-        events.push({ event: 'onClick', controlName: name, payload: mouse });
+        if (behaviorEmits(control, 'onClick')) {
+          events.push({ event: 'onClick', controlName: name, payload: mouse });
+        }
       }
     }
     if (prev.hover !== cur.hover) {
@@ -7818,7 +7871,17 @@ function onPreviewSessionsChanged(sessions) {
     // to look instead of reconstructing it from four events.
     if (prev.pressed !== cur.pressed || prev.hover !== cur.hover || prev.disabled !== cur.disabled) {
       const stateName = cur.disabled ? 'disabled' : cur.pressed ? 'pressed' : cur.hover ? 'hover' : 'normal';
-      events.push({ event: 'onStateChanged', controlName: name, payload: stateName });
+      if (behaviorEmits(control, 'onStateChanged')) {
+        events.push({ event: 'onStateChanged', controlName: name, payload: stateName });
+      }
+    }
+    if (prev.activeHandle !== cur.activeHandle && cur.activeHandle
+        && behaviorEmits(control, 'onActiveHandleChanged')) {
+      events.push({
+        event: 'onActiveHandleChanged',
+        controlName: name,
+        payload: { activeHandle: cur.activeHandle, previousActiveHandle: prev.activeHandle || null },
+      });
     }
   }
   live.sessionLast = next;
@@ -8156,6 +8219,7 @@ export function setLiveScripts(scripts, panelId = null) {
  */
 export function dispatchInteraction(controlId, eventName, payload) {
   if (!live.enabledGlobal) return undefined;
+  if (!behaviorEmits(controlByRuntimeId(controlId), eventName)) return undefined;
   const event = { event: eventName, controlName: controlNameById(controlId), payload };
   if (live.dispatching) {
     return new Promise((resolve, reject) => {

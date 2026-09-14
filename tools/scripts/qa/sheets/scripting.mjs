@@ -1,4 +1,4 @@
-// scripting.mjs — QA-04: seven languages against thirty-seven events.
+// scripting.mjs — QA-04: seven languages against thirty-eight events.
 //
 // What breaks here, and why nothing else catches it. `validate-script-exports` proves each language
 // COMPILES and runs against the panel API; `manualReference.test.js` proves each event is

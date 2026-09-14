@@ -8037,6 +8037,10 @@
   function previewAriaCheckedFor(control) {
     const role = previewRoleFor(control);
     if (role !== 'radio' && role !== 'checkbox') return undefined;
+    const behavior = getBehavior(control);
+    if (role === 'checkbox' && behavior?.allowMixed === true && sessionFor(control)?.mixed === true) {
+      return 'mixed';
+    }
     return sessionFor(control)?.checked === true;
   }
 

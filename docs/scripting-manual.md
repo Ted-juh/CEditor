@@ -379,6 +379,7 @@ Your handler is passed the data directly. When there is one thing to pass, you g
 |---|---|---|---|
 | `"valueChange"` | `onValueChange(value)` | `value` | Fires over and over while the value is moving. Use it for things on screen that should follow the control. |
 | `"valueChanged"` | `onValueChanged(value)` | `value` | Fires once, when the value settles. This is the moment to tell the synth. |
+| `"activeHandleChanged"` | `onActiveHandleChanged(info)` | `info` | A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end. |
 | `"click"` | `onClick(mouse)` | `mouse` | Clicked. mouse.x, mouse.y. |
 | `"doubleClick"` | `onDoubleClick(mouse)` | `mouse` | Double-clicked. |
 | `"pointerDown"` | `onPointerDown(mouse)` | `mouse` | Mouse pressed. mouse.x/.y/.button/.modifiers. |

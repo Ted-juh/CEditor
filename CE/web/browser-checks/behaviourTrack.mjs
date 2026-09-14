@@ -88,6 +88,16 @@ const focusAnd = async (id, ...keys) => {
   await kit.settle(220);
   return (await readoutOf(id))?.text ?? null;
 };
+const beginSliderEventCapture = () => kit.page.evaluate(async () => {
+  window.__sliderBehaviorEvents = [];
+  const api = (await import('/src/CE_Application/scripting/panelRuntime.js'))
+    .scriptApiForTesting('', 'behavior-slider-browser');
+  for (const event of ['onValueChange', 'onValueChanged', 'onActiveHandleChanged']) {
+    api.on('*', event, (payload) => window.__sliderBehaviorEvents.push({ event, payload }));
+  }
+});
+const sliderEvents = () => kit.page.evaluate(() => window.__sliderBehaviorEvents ?? []);
+const clearSliderEvents = () => kit.page.evaluate(() => { window.__sliderBehaviorEvents = []; });
 
 /** A plain slider with a readable range, at a row the editor chrome cannot swallow. */
 const slider = (y, extra = {}) => kit.make('Slider', {
@@ -537,6 +547,72 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
+  // emission — continuous movement, the release commit, and active-handle metadata are distinct.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const sid = await slider(110, { 'Behavior.showTicks': false,
+      'Behavior.emitValueChange': true, 'Behavior.emitValueCommit': true });
+    await kit.preview(true);
+    await kit.settle(650);
+    await beginSliderEventCapture();
+    const box = await kit.box(sid);
+    const y = box.y + box.h / 2;
+    await kit.drag({ x: box.x + box.w * 0.4, y }, { x: box.x + box.w * 0.75, y });
+    await kit.settle(450);
+    const emitted = await sliderEvents();
+
+    led.check(B, 'emitValueChange + emitValueCommit',
+      'a real drag reports continuous resolved values while moving, then one settled value on release; the commit is an edge and does not depend on the final value changing again',
+      { changed: true, commits: 1, commitLast: true, moved: true },
+      { changed: emitted.some((entry) => entry.event === 'onValueChange'),
+        commits: emitted.filter((entry) => entry.event === 'onValueChanged').length,
+        commitLast: emitted.at(-1)?.event === 'onValueChanged',
+        moved: Number((await readoutOf(sid))?.text ?? -1) > 60 });
+
+    await kit.set(sid, { 'Behavior.emitValueChange': false, 'Behavior.emitValueCommit': false });
+    await kit.settle(300);
+    await clearSliderEvents();
+    await kit.drag({ x: box.x + box.w * 0.75, y }, { x: box.x + box.w * 0.25, y });
+    await kit.settle(450);
+    led.check(B, 'emitValueChange + emitValueCommit (false)',
+      'both off, the handle still moves through the normal session/binding path while the two script events stay silent',
+      { events: 0, moved: true },
+      { events: (await sliderEvents()).length, moved: Number((await readoutOf(sid))?.text ?? 101) < 40 });
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const sid = await slider(110, { 'Behavior.valueMode': 'range', 'Behavior.showTicks': false,
+      'Behavior.defaultStartValue': 20, 'Behavior.defaultEndValue': 80,
+      'Behavior.activeHandlePolicy': 'startFirst', 'Behavior.emitActiveHandleChange': true });
+    await kit.preview(true);
+    await kit.settle(650);
+    await beginSliderEventCapture();
+    const box = await kit.box(sid);
+    const y = box.y + box.h / 2;
+    await kit.click({ x: box.x + box.w * 0.9, y });
+    await kit.settle(400);
+    const emitted = (await sliderEvents()).filter((entry) => entry.event === 'onActiveHandleChanged');
+    led.check(B, 'emitActiveHandleChange',
+      'moving focus from the low to the high handle emits one explicit event whose metadata names both sides of the transition',
+      [{ activeHandle: 'end', previousActiveHandle: 'start' }], emitted.map((entry) => entry.payload));
+
+    await kit.set(sid, { 'Behavior.emitActiveHandleChange': false });
+    await kit.settle(300);
+    await clearSliderEvents();
+    await kit.click({ x: box.x + box.w * 0.1, y });
+    await kit.settle(400);
+    led.check(B, 'emitActiveHandleChange (false)',
+      'off, the low handle still becomes active but the metadata event is suppressed',
+      { activeHandle: 'start', events: 0 },
+      { activeHandle: (await kit.session(sid))?.activeHandle,
+        events: (await sliderEvents()).filter((entry) => entry.event === 'onActiveHandleChanged').length });
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
   // save/reopen — every one of these is authored state.
   // =============================================================================================
   await kit.fresh();
@@ -544,7 +620,8 @@ try {
     const sid = await slider(110, { 'Behavior.showTicks': true, 'Behavior.majorTickCount': 5,
       'Behavior.minorTickCount': 1, 'Behavior.tickPlacement': 'cross',
       'Behavior.prefix': '<', 'Behavior.suffix': '>', 'Behavior.unit': 'Hz',
-      'Behavior.step': 5, 'Behavior.defaultCurrentValue': 40 });
+      'Behavior.step': 5, 'Behavior.defaultCurrentValue': 40,
+      'Behavior.emitValueCommit': false, 'Behavior.emitActiveHandleChange': false });
     const again = await kit.reopen(sid);
     await kit.preview(true);
     await kit.settle(700);
@@ -558,6 +635,11 @@ try {
       })());
     led.check(B, 'save/reopen (the keyboard)', 'and still moves by the step it was authored with',
       '<45> Hz', await focusAnd(again, 'ArrowRight'));
+    led.check(B, 'save/reopen (slider emission)',
+      'and keeps the two slider-specific runtime switches rather than silently restoring their defaults',
+      { emitValueCommit: false, emitActiveHandleChange: false },
+      { emitValueCommit: await kit.read(again, 'Behavior.emitValueCommit'),
+        emitActiveHandleChange: await kit.read(again, 'Behavior.emitActiveHandleChange') });
   }
   await kit.preview(false);
 

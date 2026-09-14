@@ -15,7 +15,7 @@
   "scriptId": "qa_04_scripting",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-04 — 7 languages × 37 events",
+  "description": "QA-04 — 7 languages × 38 events",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -114,7 +114,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\n7 carrier controls, one per language, each holding a handler for all\n37 events the panel API defines — 259 scripts in one document.\n\nHOW TO RUN THE PASS\n\n  1. Open the Scripts tab. Every carrier should list its full set with no blanks.\n  2. Click into a handful per language. The body should name the right function for the\n     event and be written in that language — not a Lua body under a Python badge.\n  3. Run Validate. A language whose toolchain is absent reports SKIP, which is not a\n     failure; a language whose toolchain is present and reports errors is.\n  4. Check the tiles: each caption is the handler name and its group, each body the payload\n     the handler receives. A tile reading \"—\" takes no payload.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - an empty script body for a language/event pair\n  - a handler named for a different event than its caption\n  - the same body under two different languages\n  - an event in the API that has no row here (the generator is stale — re-run it)\n\nWHAT IT CANNOT PROVE\n\nThat the events FIRE. This is an authoring-path sheet: it proves the editor can make every\nhandler, not that the runtime calls them. Firing is covered by scriptFlow, scriptTimersState\nand scriptMidiInHandles in the test suite, and by QA-05 for the verbs a handler would call."
+        "content": "WHAT THIS SHEET IS\n\n7 carrier controls, one per language, each holding a handler for all\n38 events the panel API defines — 266 scripts in one document.\n\nHOW TO RUN THE PASS\n\n  1. Open the Scripts tab. Every carrier should list its full set with no blanks.\n  2. Click into a handful per language. The body should name the right function for the\n     event and be written in that language — not a Lua body under a Python badge.\n  3. Run Validate. A language whose toolchain is absent reports SKIP, which is not a\n     failure; a language whose toolchain is present and reports errors is.\n  4. Check the tiles: each caption is the handler name and its group, each body the payload\n     the handler receives. A tile reading \"—\" takes no payload.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - an empty script body for a language/event pair\n  - a handler named for a different event than its caption\n  - the same body under two different languages\n  - an event in the API that has no row here (the generator is stale — re-run it)\n\nWHAT IT CANNOT PROVE\n\nThat the events FIRE. This is an authoring-path sheet: it proves the editor can make every\nhandler, not that the runtime calls them. Firing is covered by scriptFlow, scriptTimersState\nand scriptMidiInHandles in the test suite, and by QA-05 for the verbs a handler would call."
       }
     ]
   },
@@ -135,7 +135,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_lua_37_handlers_one_per_event",
+          "name": "group_lua_38_handlers_one_per_event",
           "id": "qa_group_0",
           "controlType": "Label"
         },
@@ -160,7 +160,7 @@
           }
         },
         "Text": {
-          "content": "lua — 37 handlers, one per event",
+          "content": "lua — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -244,7 +244,7 @@
           }
         },
         "Text": {
-          "content": "lua\n37 handlers"
+          "content": "lua\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -271,6 +271,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_lua_activeHandleChanged": {
+              "id": "qa04_lua_activeHandleChanged",
+              "name": "lua: onActiveHandleChanged",
+              "language": "lua",
+              "source": "function onActiveHandleChanged(info)\n  \nend\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_lua_click": {
@@ -863,7 +875,7 @@
           }
         },
         "Text": {
-          "content": "onClick  ·  control",
+          "content": "onActiveHandleChanged  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -883,8 +895,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_click",
-          "id": "qa04_lua_click_tile",
+          "name": "lua_activeHandleChanged",
+          "id": "qa04_lua_activeHandleChanged_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -904,7 +916,7 @@
           }
         },
         "Text": {
-          "content": "(mouse)",
+          "content": "(info)",
           "_children": {
             "Font": {
               "size": 10
@@ -935,7 +947,7 @@
           }
         },
         "Text": {
-          "content": "onDoubleClick  ·  control",
+          "content": "onClick  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -955,8 +967,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_doubleClick",
-          "id": "qa04_lua_doubleClick_tile",
+          "name": "lua_click",
+          "id": "qa04_lua_click_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1007,7 +1019,7 @@
           }
         },
         "Text": {
-          "content": "onPointerDown  ·  control",
+          "content": "onDoubleClick  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -1027,8 +1039,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_pointerDown",
-          "id": "qa04_lua_pointerDown_tile",
+          "name": "lua_doubleClick",
+          "id": "qa04_lua_doubleClick_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1079,7 +1091,7 @@
           }
         },
         "Text": {
-          "content": "onPointerMove  ·  control",
+          "content": "onPointerDown  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -1099,8 +1111,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_pointerMove",
-          "id": "qa04_lua_pointerMove_tile",
+          "name": "lua_pointerDown",
+          "id": "qa04_lua_pointerDown_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1151,7 +1163,7 @@
           }
         },
         "Text": {
-          "content": "onPointerUp  ·  control",
+          "content": "onPointerMove  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -1171,8 +1183,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_pointerUp",
-          "id": "qa04_lua_pointerUp_tile",
+          "name": "lua_pointerMove",
+          "id": "qa04_lua_pointerMove_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1223,7 +1235,7 @@
           }
         },
         "Text": {
-          "content": "onHoverStart  ·  control",
+          "content": "onPointerUp  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -1243,8 +1255,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_hoverStart",
-          "id": "qa04_lua_hoverStart_tile",
+          "name": "lua_pointerUp",
+          "id": "qa04_lua_pointerUp_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1264,7 +1276,7 @@
           }
         },
         "Text": {
-          "content": "—",
+          "content": "(mouse)",
           "_children": {
             "Font": {
               "size": 10
@@ -1295,7 +1307,7 @@
           }
         },
         "Text": {
-          "content": "onHoverEnd  ·  control",
+          "content": "onHoverStart  ·  control",
           "_children": {
             "Font": {
               "size": 11
@@ -1315,8 +1327,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_hoverEnd",
-          "id": "qa04_lua_hoverEnd_tile",
+          "name": "lua_hoverStart",
+          "id": "qa04_lua_hoverStart_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1367,6 +1379,78 @@
           }
         },
         "Text": {
+          "content": "onHoverEnd  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "lua_hoverEnd",
+          "id": "qa04_lua_hoverEnd_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 376,
+          "y": 190,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "—",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_11",
+          "id": "qa_cap_11",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 550,
+          "y": 168,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
           "content": "onWheel  ·  control",
           "_children": {
             "Font": {
@@ -1392,7 +1476,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 190,
           "width": 150,
           "height": 34
@@ -1421,12 +1505,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_11",
-          "id": "qa_cap_11",
+          "name": "caption_qa_cap_12",
+          "id": "qa_cap_12",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 168,
           "width": 150,
           "height": 18
@@ -1464,7 +1548,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 190,
           "width": 150,
           "height": 34
@@ -1493,12 +1577,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_12",
-          "id": "qa_cap_12",
+          "name": "caption_qa_cap_13",
+          "id": "qa_cap_13",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 168,
           "width": 150,
           "height": 18
@@ -1533,78 +1617,6 @@
         "Core": {
           "name": "lua_controlChanged",
           "id": "qa04_lua_controlChanged_tile",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 724,
-          "y": 190,
-          "width": 150,
-          "height": 34
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1A1F24"
-            },
-            "Corners": {
-              "radius": 3
-            }
-          }
-        },
-        "Text": {
-          "content": "(info)",
-          "_children": {
-            "Font": {
-              "size": 10
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_13",
-          "id": "qa_cap_13",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 898,
-          "y": 168,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "onTimer  ·  panel",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "lua_timer",
-          "id": "qa04_lua_timer_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1655,7 +1667,7 @@
           }
         },
         "Text": {
-          "content": "onBeat  ·  time",
+          "content": "onTimer  ·  panel",
           "_children": {
             "Font": {
               "size": 11
@@ -1675,8 +1687,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_beat",
-          "id": "qa04_lua_beat_tile",
+          "name": "lua_timer",
+          "id": "qa04_lua_timer_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1696,7 +1708,7 @@
           }
         },
         "Text": {
-          "content": "(time)",
+          "content": "(info)",
           "_children": {
             "Font": {
               "size": 10
@@ -1727,7 +1739,7 @@
           }
         },
         "Text": {
-          "content": "onBar  ·  time",
+          "content": "onBeat  ·  time",
           "_children": {
             "Font": {
               "size": 11
@@ -1747,8 +1759,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_bar",
-          "id": "qa04_lua_bar_tile",
+          "name": "lua_beat",
+          "id": "qa04_lua_beat_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1799,7 +1811,7 @@
           }
         },
         "Text": {
-          "content": "onTransport  ·  time",
+          "content": "onBar  ·  time",
           "_children": {
             "Font": {
               "size": 11
@@ -1819,8 +1831,8 @@
     {
       "_children": {
         "Core": {
-          "name": "lua_transport",
-          "id": "qa04_lua_transport_tile",
+          "name": "lua_bar",
+          "id": "qa04_lua_bar_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -1871,6 +1883,78 @@
           }
         },
         "Text": {
+          "content": "onTransport  ·  time",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "lua_transport",
+          "id": "qa04_lua_transport_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 28,
+          "y": 274,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(time)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_18",
+          "id": "qa_cap_18",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 202,
+          "y": 252,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
           "content": "onParameterReceived  ·  device",
           "_children": {
             "Font": {
@@ -1896,7 +1980,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 274,
           "width": 150,
           "height": 34
@@ -1925,12 +2009,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_18",
-          "id": "qa_cap_18",
+          "name": "caption_qa_cap_19",
+          "id": "qa_cap_19",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 252,
           "width": 150,
           "height": 18
@@ -1968,7 +2052,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 274,
           "width": 150,
           "height": 34
@@ -1997,12 +2081,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_19",
-          "id": "qa_cap_19",
+          "name": "caption_qa_cap_20",
+          "id": "qa_cap_20",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 252,
           "width": 150,
           "height": 18
@@ -2040,7 +2124,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 274,
           "width": 150,
           "height": 34
@@ -2069,12 +2153,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_20",
-          "id": "qa_cap_20",
+          "name": "caption_qa_cap_21",
+          "id": "qa_cap_21",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 252,
           "width": 150,
           "height": 18
@@ -2112,7 +2196,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 274,
           "width": 150,
           "height": 34
@@ -2141,12 +2225,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_21",
-          "id": "qa_cap_21",
+          "name": "caption_qa_cap_22",
+          "id": "qa_cap_22",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 252,
           "width": 150,
           "height": 18
@@ -2184,7 +2268,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 274,
           "width": 150,
           "height": 34
@@ -2213,12 +2297,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_22",
-          "id": "qa_cap_22",
+          "name": "caption_qa_cap_23",
+          "id": "qa_cap_23",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 252,
           "width": 150,
           "height": 18
@@ -2253,78 +2337,6 @@
         "Core": {
           "name": "lua_noteIn",
           "id": "qa04_lua_noteIn_tile",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 898,
-          "y": 274,
-          "width": 150,
-          "height": 34
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1A1F24"
-            },
-            "Corners": {
-              "radius": 3
-            }
-          }
-        },
-        "Text": {
-          "content": "(note)",
-          "_children": {
-            "Font": {
-              "size": 10
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_23",
-          "id": "qa_cap_23",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1072,
-          "y": 252,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "onNoteOffIn  ·  device",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "lua_noteOffIn",
-          "id": "qa04_lua_noteOffIn_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -2375,6 +2387,78 @@
           }
         },
         "Text": {
+          "content": "onNoteOffIn  ·  device",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "lua_noteOffIn",
+          "id": "qa04_lua_noteOffIn_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1246,
+          "y": 274,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(note)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_25",
+          "id": "qa_cap_25",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 1420,
+          "y": 252,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
           "content": "onSysexIn  ·  device",
           "_children": {
             "Font": {
@@ -2400,7 +2484,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 274,
           "width": 150,
           "height": 34
@@ -2429,13 +2513,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_25",
-          "id": "qa_cap_25",
+          "name": "caption_qa_cap_26",
+          "id": "qa_cap_26",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 252,
+          "x": 28,
+          "y": 336,
           "width": 150,
           "height": 18
         },
@@ -2469,78 +2553,6 @@
         "Core": {
           "name": "lua_deviceConnected",
           "id": "qa04_lua_deviceConnected_tile",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1420,
-          "y": 274,
-          "width": 150,
-          "height": 34
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1A1F24"
-            },
-            "Corners": {
-              "radius": 3
-            }
-          }
-        },
-        "Text": {
-          "content": "(device)",
-          "_children": {
-            "Font": {
-              "size": 10
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "caption_qa_cap_26",
-          "id": "qa_cap_26",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 28,
-          "y": 336,
-          "width": 150,
-          "height": 18
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            }
-          }
-        },
-        "Text": {
-          "content": "onDeviceDisconnected  ·  device",
-          "_children": {
-            "Font": {
-              "size": 11
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 0,
-          "paddingBottom": 0
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "lua_deviceDisconnected",
-          "id": "qa04_lua_deviceDisconnected_tile",
           "controlType": "Label"
         },
         "Transform": {
@@ -2591,6 +2603,78 @@
           }
         },
         "Text": {
+          "content": "onDeviceDisconnected  ·  device",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "lua_deviceDisconnected",
+          "id": "qa04_lua_deviceDisconnected_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 202,
+          "y": 358,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(device)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_28",
+          "id": "qa_cap_28",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 376,
+          "y": 336,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
           "content": "onStep  ·  component",
           "_children": {
             "Font": {
@@ -2616,7 +2700,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 358,
           "width": 150,
           "height": 34
@@ -2645,12 +2729,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_28",
-          "id": "qa_cap_28",
+          "name": "caption_qa_cap_29",
+          "id": "qa_cap_29",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 336,
           "width": 150,
           "height": 18
@@ -2688,7 +2772,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 358,
           "width": 150,
           "height": 34
@@ -2717,12 +2801,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_29",
-          "id": "qa_cap_29",
+          "name": "caption_qa_cap_30",
+          "id": "qa_cap_30",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 336,
           "width": 150,
           "height": 18
@@ -2760,7 +2844,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 358,
           "width": 150,
           "height": 34
@@ -2789,12 +2873,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_30",
-          "id": "qa_cap_30",
+          "name": "caption_qa_cap_31",
+          "id": "qa_cap_31",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 336,
           "width": 150,
           "height": 18
@@ -2832,7 +2916,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 358,
           "width": 150,
           "height": 34
@@ -2861,12 +2945,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_31",
-          "id": "qa_cap_31",
+          "name": "caption_qa_cap_32",
+          "id": "qa_cap_32",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 336,
           "width": 150,
           "height": 18
@@ -2904,7 +2988,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 358,
           "width": 150,
           "height": 34
@@ -2933,12 +3017,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_32",
-          "id": "qa_cap_32",
+          "name": "caption_qa_cap_33",
+          "id": "qa_cap_33",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 336,
           "width": 150,
           "height": 18
@@ -2976,7 +3060,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 358,
           "width": 150,
           "height": 34
@@ -3005,12 +3089,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_33",
-          "id": "qa_cap_33",
+          "name": "caption_qa_cap_34",
+          "id": "qa_cap_34",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 336,
           "width": 150,
           "height": 18
@@ -3048,7 +3132,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 358,
           "width": 150,
           "height": 34
@@ -3077,13 +3161,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_34",
-          "id": "qa_cap_34",
+          "name": "caption_qa_cap_35",
+          "id": "qa_cap_35",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 336,
+          "x": 28,
+          "y": 420,
           "width": 150,
           "height": 18
         },
@@ -3120,8 +3204,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 358,
+          "x": 28,
+          "y": 442,
           "width": 150,
           "height": 34
         },
@@ -3149,12 +3233,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_35",
-          "id": "qa_cap_35",
+          "name": "caption_qa_cap_36",
+          "id": "qa_cap_36",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 420,
           "width": 150,
           "height": 18
@@ -3192,7 +3276,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 442,
           "width": 150,
           "height": 34
@@ -3221,12 +3305,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_36",
-          "id": "qa_cap_36",
+          "name": "caption_qa_cap_37",
+          "id": "qa_cap_37",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 420,
           "width": 150,
           "height": 18
@@ -3264,7 +3348,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 442,
           "width": 150,
           "height": 34
@@ -3293,12 +3377,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_37",
-          "id": "qa_cap_37",
+          "name": "caption_qa_cap_38",
+          "id": "qa_cap_38",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 420,
           "width": 150,
           "height": 18
@@ -3336,7 +3420,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 442,
           "width": 150,
           "height": 34
@@ -3365,7 +3449,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_javascript_37_handlers_one_per_event",
+          "name": "group_javascript_38_handlers_one_per_event",
           "id": "qa_group_1",
           "controlType": "Label"
         },
@@ -3390,7 +3474,7 @@
           }
         },
         "Text": {
-          "content": "javascript — 37 handlers, one per event",
+          "content": "javascript — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -3411,8 +3495,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_38",
-          "id": "qa_cap_38",
+          "name": "caption_qa_cap_39",
+          "id": "qa_cap_39",
           "controlType": "Label"
         },
         "Transform": {
@@ -3474,7 +3558,7 @@
           }
         },
         "Text": {
-          "content": "javascript\n37 handlers"
+          "content": "javascript\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -3501,6 +3585,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_javascript_activeHandleChanged": {
+              "id": "qa04_javascript_activeHandleChanged",
+              "name": "javascript: onActiveHandleChanged",
+              "language": "javascript",
+              "source": "function onActiveHandleChanged(info) {\n  \n}\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_javascript_click": {
@@ -3931,8 +4027,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_39",
-          "id": "qa_cap_39",
+          "name": "caption_qa_cap_40",
+          "id": "qa_cap_40",
           "controlType": "Label"
         },
         "Transform": {
@@ -4003,8 +4099,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_40",
-          "id": "qa_cap_40",
+          "name": "caption_qa_cap_41",
+          "id": "qa_cap_41",
           "controlType": "Label"
         },
         "Transform": {
@@ -4075,12 +4171,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_41",
-          "id": "qa_cap_41",
+          "name": "caption_qa_cap_42",
+          "id": "qa_cap_42",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 546,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "javascript_activeHandleChanged",
+          "id": "qa04_javascript_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 568,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_43",
+          "id": "qa_cap_43",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 546,
           "width": 150,
           "height": 18
@@ -4118,7 +4286,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 568,
           "width": 150,
           "height": 34
@@ -4147,12 +4315,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_42",
-          "id": "qa_cap_42",
+          "name": "caption_qa_cap_44",
+          "id": "qa_cap_44",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 546,
           "width": 150,
           "height": 18
@@ -4190,7 +4358,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 568,
           "width": 150,
           "height": 34
@@ -4219,12 +4387,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_43",
-          "id": "qa_cap_43",
+          "name": "caption_qa_cap_45",
+          "id": "qa_cap_45",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 546,
           "width": 150,
           "height": 18
@@ -4262,7 +4430,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 568,
           "width": 150,
           "height": 34
@@ -4291,12 +4459,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_44",
-          "id": "qa_cap_44",
+          "name": "caption_qa_cap_46",
+          "id": "qa_cap_46",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 546,
           "width": 150,
           "height": 18
@@ -4334,7 +4502,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 568,
           "width": 150,
           "height": 34
@@ -4363,13 +4531,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_45",
-          "id": "qa_cap_45",
+          "name": "caption_qa_cap_47",
+          "id": "qa_cap_47",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 546,
+          "x": 28,
+          "y": 650,
           "width": 150,
           "height": 18
         },
@@ -4406,8 +4574,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 568,
+          "x": 28,
+          "y": 672,
           "width": 150,
           "height": 34
         },
@@ -4435,12 +4603,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_46",
-          "id": "qa_cap_46",
+          "name": "caption_qa_cap_48",
+          "id": "qa_cap_48",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4478,7 +4646,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4507,12 +4675,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_47",
-          "id": "qa_cap_47",
+          "name": "caption_qa_cap_49",
+          "id": "qa_cap_49",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4550,7 +4718,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4579,12 +4747,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_48",
-          "id": "qa_cap_48",
+          "name": "caption_qa_cap_50",
+          "id": "qa_cap_50",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4622,7 +4790,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4651,12 +4819,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_49",
-          "id": "qa_cap_49",
+          "name": "caption_qa_cap_51",
+          "id": "qa_cap_51",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4694,7 +4862,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4723,12 +4891,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_50",
-          "id": "qa_cap_50",
+          "name": "caption_qa_cap_52",
+          "id": "qa_cap_52",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4766,7 +4934,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4795,12 +4963,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_51",
-          "id": "qa_cap_51",
+          "name": "caption_qa_cap_53",
+          "id": "qa_cap_53",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4838,7 +5006,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4867,12 +5035,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_52",
-          "id": "qa_cap_52",
+          "name": "caption_qa_cap_54",
+          "id": "qa_cap_54",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4910,7 +5078,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 672,
           "width": 150,
           "height": 34
@@ -4939,12 +5107,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_53",
-          "id": "qa_cap_53",
+          "name": "caption_qa_cap_55",
+          "id": "qa_cap_55",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 650,
           "width": 150,
           "height": 18
@@ -4982,7 +5150,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 672,
           "width": 150,
           "height": 34
@@ -5011,13 +5179,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_54",
-          "id": "qa_cap_54",
+          "name": "caption_qa_cap_56",
+          "id": "qa_cap_56",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 650,
+          "x": 28,
+          "y": 734,
           "width": 150,
           "height": 18
         },
@@ -5054,8 +5222,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 672,
+          "x": 28,
+          "y": 756,
           "width": 150,
           "height": 34
         },
@@ -5083,12 +5251,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_55",
-          "id": "qa_cap_55",
+          "name": "caption_qa_cap_57",
+          "id": "qa_cap_57",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5126,7 +5294,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5155,12 +5323,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_56",
-          "id": "qa_cap_56",
+          "name": "caption_qa_cap_58",
+          "id": "qa_cap_58",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5198,7 +5366,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5227,12 +5395,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_57",
-          "id": "qa_cap_57",
+          "name": "caption_qa_cap_59",
+          "id": "qa_cap_59",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5270,7 +5438,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5299,12 +5467,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_58",
-          "id": "qa_cap_58",
+          "name": "caption_qa_cap_60",
+          "id": "qa_cap_60",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5342,7 +5510,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5371,12 +5539,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_59",
-          "id": "qa_cap_59",
+          "name": "caption_qa_cap_61",
+          "id": "qa_cap_61",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5414,7 +5582,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5443,12 +5611,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_60",
-          "id": "qa_cap_60",
+          "name": "caption_qa_cap_62",
+          "id": "qa_cap_62",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5486,7 +5654,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5515,12 +5683,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_61",
-          "id": "qa_cap_61",
+          "name": "caption_qa_cap_63",
+          "id": "qa_cap_63",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5558,7 +5726,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5587,12 +5755,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_62",
-          "id": "qa_cap_62",
+          "name": "caption_qa_cap_64",
+          "id": "qa_cap_64",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 734,
           "width": 150,
           "height": 18
@@ -5630,7 +5798,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 756,
           "width": 150,
           "height": 34
@@ -5659,13 +5827,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_63",
-          "id": "qa_cap_63",
+          "name": "caption_qa_cap_65",
+          "id": "qa_cap_65",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 734,
+          "x": 28,
+          "y": 818,
           "width": 150,
           "height": 18
         },
@@ -5702,8 +5870,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 756,
+          "x": 28,
+          "y": 840,
           "width": 150,
           "height": 34
         },
@@ -5731,12 +5899,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_64",
-          "id": "qa_cap_64",
+          "name": "caption_qa_cap_66",
+          "id": "qa_cap_66",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 818,
           "width": 150,
           "height": 18
@@ -5774,7 +5942,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 840,
           "width": 150,
           "height": 34
@@ -5803,12 +5971,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_65",
-          "id": "qa_cap_65",
+          "name": "caption_qa_cap_67",
+          "id": "qa_cap_67",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 818,
           "width": 150,
           "height": 18
@@ -5846,7 +6014,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 840,
           "width": 150,
           "height": 34
@@ -5875,12 +6043,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_66",
-          "id": "qa_cap_66",
+          "name": "caption_qa_cap_68",
+          "id": "qa_cap_68",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 818,
           "width": 150,
           "height": 18
@@ -5918,7 +6086,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 840,
           "width": 150,
           "height": 34
@@ -5947,12 +6115,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_67",
-          "id": "qa_cap_67",
+          "name": "caption_qa_cap_69",
+          "id": "qa_cap_69",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 818,
           "width": 150,
           "height": 18
@@ -5990,7 +6158,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 840,
           "width": 150,
           "height": 34
@@ -6019,12 +6187,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_68",
-          "id": "qa_cap_68",
+          "name": "caption_qa_cap_70",
+          "id": "qa_cap_70",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 818,
           "width": 150,
           "height": 18
@@ -6062,7 +6230,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 840,
           "width": 150,
           "height": 34
@@ -6091,12 +6259,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_69",
-          "id": "qa_cap_69",
+          "name": "caption_qa_cap_71",
+          "id": "qa_cap_71",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 818,
           "width": 150,
           "height": 18
@@ -6134,7 +6302,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 840,
           "width": 150,
           "height": 34
@@ -6163,12 +6331,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_70",
-          "id": "qa_cap_70",
+          "name": "caption_qa_cap_72",
+          "id": "qa_cap_72",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 818,
           "width": 150,
           "height": 18
@@ -6206,7 +6374,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 840,
           "width": 150,
           "height": 34
@@ -6235,12 +6403,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_71",
-          "id": "qa_cap_71",
+          "name": "caption_qa_cap_73",
+          "id": "qa_cap_73",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 818,
           "width": 150,
           "height": 18
@@ -6278,7 +6446,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 840,
           "width": 150,
           "height": 34
@@ -6307,13 +6475,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_72",
-          "id": "qa_cap_72",
+          "name": "caption_qa_cap_74",
+          "id": "qa_cap_74",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 818,
+          "x": 28,
+          "y": 902,
           "width": 150,
           "height": 18
         },
@@ -6350,8 +6518,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 840,
+          "x": 28,
+          "y": 924,
           "width": 150,
           "height": 34
         },
@@ -6379,12 +6547,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_73",
-          "id": "qa_cap_73",
+          "name": "caption_qa_cap_75",
+          "id": "qa_cap_75",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 902,
           "width": 150,
           "height": 18
@@ -6422,7 +6590,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 924,
           "width": 150,
           "height": 34
@@ -6451,12 +6619,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_74",
-          "id": "qa_cap_74",
+          "name": "caption_qa_cap_76",
+          "id": "qa_cap_76",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 902,
           "width": 150,
           "height": 18
@@ -6494,7 +6662,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 924,
           "width": 150,
           "height": 34
@@ -6523,12 +6691,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_75",
-          "id": "qa_cap_75",
+          "name": "caption_qa_cap_77",
+          "id": "qa_cap_77",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 902,
           "width": 150,
           "height": 18
@@ -6566,7 +6734,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 924,
           "width": 150,
           "height": 34
@@ -6595,7 +6763,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_typescript_37_handlers_one_per_event",
+          "name": "group_typescript_38_handlers_one_per_event",
           "id": "qa_group_2",
           "controlType": "Label"
         },
@@ -6620,7 +6788,7 @@
           }
         },
         "Text": {
-          "content": "typescript — 37 handlers, one per event",
+          "content": "typescript — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -6641,8 +6809,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_76",
-          "id": "qa_cap_76",
+          "name": "caption_qa_cap_78",
+          "id": "qa_cap_78",
           "controlType": "Label"
         },
         "Transform": {
@@ -6704,7 +6872,7 @@
           }
         },
         "Text": {
-          "content": "typescript\n37 handlers"
+          "content": "typescript\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -6731,6 +6899,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_typescript_activeHandleChanged": {
+              "id": "qa04_typescript_activeHandleChanged",
+              "name": "typescript: onActiveHandleChanged",
+              "language": "typescript",
+              "source": "function onActiveHandleChanged(info) {\n  \n}\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_typescript_click": {
@@ -7161,8 +7341,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_77",
-          "id": "qa_cap_77",
+          "name": "caption_qa_cap_79",
+          "id": "qa_cap_79",
           "controlType": "Label"
         },
         "Transform": {
@@ -7233,8 +7413,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_78",
-          "id": "qa_cap_78",
+          "name": "caption_qa_cap_80",
+          "id": "qa_cap_80",
           "controlType": "Label"
         },
         "Transform": {
@@ -7305,12 +7485,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_79",
-          "id": "qa_cap_79",
+          "name": "caption_qa_cap_81",
+          "id": "qa_cap_81",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 1028,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "typescript_activeHandleChanged",
+          "id": "qa04_typescript_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 1050,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_82",
+          "id": "qa_cap_82",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 1028,
           "width": 150,
           "height": 18
@@ -7348,7 +7600,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 1050,
           "width": 150,
           "height": 34
@@ -7377,12 +7629,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_80",
-          "id": "qa_cap_80",
+          "name": "caption_qa_cap_83",
+          "id": "qa_cap_83",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 1028,
           "width": 150,
           "height": 18
@@ -7420,7 +7672,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 1050,
           "width": 150,
           "height": 34
@@ -7449,12 +7701,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_81",
-          "id": "qa_cap_81",
+          "name": "caption_qa_cap_84",
+          "id": "qa_cap_84",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 1028,
           "width": 150,
           "height": 18
@@ -7492,7 +7744,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 1050,
           "width": 150,
           "height": 34
@@ -7521,12 +7773,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_82",
-          "id": "qa_cap_82",
+          "name": "caption_qa_cap_85",
+          "id": "qa_cap_85",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 1028,
           "width": 150,
           "height": 18
@@ -7564,7 +7816,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 1050,
           "width": 150,
           "height": 34
@@ -7593,13 +7845,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_83",
-          "id": "qa_cap_83",
+          "name": "caption_qa_cap_86",
+          "id": "qa_cap_86",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 1028,
+          "x": 28,
+          "y": 1132,
           "width": 150,
           "height": 18
         },
@@ -7636,8 +7888,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 1050,
+          "x": 28,
+          "y": 1154,
           "width": 150,
           "height": 34
         },
@@ -7665,12 +7917,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_84",
-          "id": "qa_cap_84",
+          "name": "caption_qa_cap_87",
+          "id": "qa_cap_87",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -7708,7 +7960,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -7737,12 +7989,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_85",
-          "id": "qa_cap_85",
+          "name": "caption_qa_cap_88",
+          "id": "qa_cap_88",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -7780,7 +8032,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -7809,12 +8061,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_86",
-          "id": "qa_cap_86",
+          "name": "caption_qa_cap_89",
+          "id": "qa_cap_89",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -7852,7 +8104,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -7881,12 +8133,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_87",
-          "id": "qa_cap_87",
+          "name": "caption_qa_cap_90",
+          "id": "qa_cap_90",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -7924,7 +8176,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -7953,12 +8205,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_88",
-          "id": "qa_cap_88",
+          "name": "caption_qa_cap_91",
+          "id": "qa_cap_91",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -7996,7 +8248,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -8025,12 +8277,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_89",
-          "id": "qa_cap_89",
+          "name": "caption_qa_cap_92",
+          "id": "qa_cap_92",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -8068,7 +8320,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -8097,12 +8349,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_90",
-          "id": "qa_cap_90",
+          "name": "caption_qa_cap_93",
+          "id": "qa_cap_93",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -8140,7 +8392,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -8169,12 +8421,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_91",
-          "id": "qa_cap_91",
+          "name": "caption_qa_cap_94",
+          "id": "qa_cap_94",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1132,
           "width": 150,
           "height": 18
@@ -8212,7 +8464,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1154,
           "width": 150,
           "height": 34
@@ -8241,13 +8493,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_92",
-          "id": "qa_cap_92",
+          "name": "caption_qa_cap_95",
+          "id": "qa_cap_95",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1132,
+          "x": 28,
+          "y": 1216,
           "width": 150,
           "height": 18
         },
@@ -8284,8 +8536,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1154,
+          "x": 28,
+          "y": 1238,
           "width": 150,
           "height": 34
         },
@@ -8313,12 +8565,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_93",
-          "id": "qa_cap_93",
+          "name": "caption_qa_cap_96",
+          "id": "qa_cap_96",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8356,7 +8608,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8385,12 +8637,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_94",
-          "id": "qa_cap_94",
+          "name": "caption_qa_cap_97",
+          "id": "qa_cap_97",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8428,7 +8680,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8457,12 +8709,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_95",
-          "id": "qa_cap_95",
+          "name": "caption_qa_cap_98",
+          "id": "qa_cap_98",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8500,7 +8752,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8529,12 +8781,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_96",
-          "id": "qa_cap_96",
+          "name": "caption_qa_cap_99",
+          "id": "qa_cap_99",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8572,7 +8824,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8601,12 +8853,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_97",
-          "id": "qa_cap_97",
+          "name": "caption_qa_cap_100",
+          "id": "qa_cap_100",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8644,7 +8896,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8673,12 +8925,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_98",
-          "id": "qa_cap_98",
+          "name": "caption_qa_cap_101",
+          "id": "qa_cap_101",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8716,7 +8968,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8745,12 +8997,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_99",
-          "id": "qa_cap_99",
+          "name": "caption_qa_cap_102",
+          "id": "qa_cap_102",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8788,7 +9040,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8817,12 +9069,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_100",
-          "id": "qa_cap_100",
+          "name": "caption_qa_cap_103",
+          "id": "qa_cap_103",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1216,
           "width": 150,
           "height": 18
@@ -8860,7 +9112,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1238,
           "width": 150,
           "height": 34
@@ -8889,13 +9141,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_101",
-          "id": "qa_cap_101",
+          "name": "caption_qa_cap_104",
+          "id": "qa_cap_104",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1216,
+          "x": 28,
+          "y": 1300,
           "width": 150,
           "height": 18
         },
@@ -8932,8 +9184,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1238,
+          "x": 28,
+          "y": 1322,
           "width": 150,
           "height": 34
         },
@@ -8961,12 +9213,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_102",
-          "id": "qa_cap_102",
+          "name": "caption_qa_cap_105",
+          "id": "qa_cap_105",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9004,7 +9256,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9033,12 +9285,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_103",
-          "id": "qa_cap_103",
+          "name": "caption_qa_cap_106",
+          "id": "qa_cap_106",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9076,7 +9328,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9105,12 +9357,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_104",
-          "id": "qa_cap_104",
+          "name": "caption_qa_cap_107",
+          "id": "qa_cap_107",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9148,7 +9400,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9177,12 +9429,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_105",
-          "id": "qa_cap_105",
+          "name": "caption_qa_cap_108",
+          "id": "qa_cap_108",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9220,7 +9472,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9249,12 +9501,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_106",
-          "id": "qa_cap_106",
+          "name": "caption_qa_cap_109",
+          "id": "qa_cap_109",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9292,7 +9544,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9321,12 +9573,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_107",
-          "id": "qa_cap_107",
+          "name": "caption_qa_cap_110",
+          "id": "qa_cap_110",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9364,7 +9616,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9393,12 +9645,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_108",
-          "id": "qa_cap_108",
+          "name": "caption_qa_cap_111",
+          "id": "qa_cap_111",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9436,7 +9688,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9465,12 +9717,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_109",
-          "id": "qa_cap_109",
+          "name": "caption_qa_cap_112",
+          "id": "qa_cap_112",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1300,
           "width": 150,
           "height": 18
@@ -9508,7 +9760,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1322,
           "width": 150,
           "height": 34
@@ -9537,13 +9789,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_110",
-          "id": "qa_cap_110",
+          "name": "caption_qa_cap_113",
+          "id": "qa_cap_113",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1300,
+          "x": 28,
+          "y": 1384,
           "width": 150,
           "height": 18
         },
@@ -9580,8 +9832,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1322,
+          "x": 28,
+          "y": 1406,
           "width": 150,
           "height": 34
         },
@@ -9609,12 +9861,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_111",
-          "id": "qa_cap_111",
+          "name": "caption_qa_cap_114",
+          "id": "qa_cap_114",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1384,
           "width": 150,
           "height": 18
@@ -9652,7 +9904,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1406,
           "width": 150,
           "height": 34
@@ -9681,12 +9933,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_112",
-          "id": "qa_cap_112",
+          "name": "caption_qa_cap_115",
+          "id": "qa_cap_115",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1384,
           "width": 150,
           "height": 18
@@ -9724,7 +9976,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1406,
           "width": 150,
           "height": 34
@@ -9753,12 +10005,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_113",
-          "id": "qa_cap_113",
+          "name": "caption_qa_cap_116",
+          "id": "qa_cap_116",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1384,
           "width": 150,
           "height": 18
@@ -9796,7 +10048,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1406,
           "width": 150,
           "height": 34
@@ -9825,7 +10077,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_python_37_handlers_one_per_event",
+          "name": "group_python_38_handlers_one_per_event",
           "id": "qa_group_3",
           "controlType": "Label"
         },
@@ -9850,7 +10102,7 @@
           }
         },
         "Text": {
-          "content": "python — 37 handlers, one per event",
+          "content": "python — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -9871,8 +10123,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_114",
-          "id": "qa_cap_114",
+          "name": "caption_qa_cap_117",
+          "id": "qa_cap_117",
           "controlType": "Label"
         },
         "Transform": {
@@ -9934,7 +10186,7 @@
           }
         },
         "Text": {
-          "content": "python\n37 handlers"
+          "content": "python\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -9961,6 +10213,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_python_activeHandleChanged": {
+              "id": "qa04_python_activeHandleChanged",
+              "name": "python: onActiveHandleChanged",
+              "language": "python",
+              "source": "def onActiveHandleChanged(info):\n    pass\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_python_click": {
@@ -10391,8 +10655,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_115",
-          "id": "qa_cap_115",
+          "name": "caption_qa_cap_118",
+          "id": "qa_cap_118",
           "controlType": "Label"
         },
         "Transform": {
@@ -10463,8 +10727,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_116",
-          "id": "qa_cap_116",
+          "name": "caption_qa_cap_119",
+          "id": "qa_cap_119",
           "controlType": "Label"
         },
         "Transform": {
@@ -10535,12 +10799,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_117",
-          "id": "qa_cap_117",
+          "name": "caption_qa_cap_120",
+          "id": "qa_cap_120",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 1510,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "python_activeHandleChanged",
+          "id": "qa04_python_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 1532,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_121",
+          "id": "qa_cap_121",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 1510,
           "width": 150,
           "height": 18
@@ -10578,7 +10914,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 1532,
           "width": 150,
           "height": 34
@@ -10607,12 +10943,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_118",
-          "id": "qa_cap_118",
+          "name": "caption_qa_cap_122",
+          "id": "qa_cap_122",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 1510,
           "width": 150,
           "height": 18
@@ -10650,7 +10986,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 1532,
           "width": 150,
           "height": 34
@@ -10679,12 +11015,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_119",
-          "id": "qa_cap_119",
+          "name": "caption_qa_cap_123",
+          "id": "qa_cap_123",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 1510,
           "width": 150,
           "height": 18
@@ -10722,7 +11058,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 1532,
           "width": 150,
           "height": 34
@@ -10751,12 +11087,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_120",
-          "id": "qa_cap_120",
+          "name": "caption_qa_cap_124",
+          "id": "qa_cap_124",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 1510,
           "width": 150,
           "height": 18
@@ -10794,7 +11130,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 1532,
           "width": 150,
           "height": 34
@@ -10823,13 +11159,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_121",
-          "id": "qa_cap_121",
+          "name": "caption_qa_cap_125",
+          "id": "qa_cap_125",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 1510,
+          "x": 28,
+          "y": 1614,
           "width": 150,
           "height": 18
         },
@@ -10866,8 +11202,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 1532,
+          "x": 28,
+          "y": 1636,
           "width": 150,
           "height": 34
         },
@@ -10895,12 +11231,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_122",
-          "id": "qa_cap_122",
+          "name": "caption_qa_cap_126",
+          "id": "qa_cap_126",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -10938,7 +11274,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -10967,12 +11303,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_123",
-          "id": "qa_cap_123",
+          "name": "caption_qa_cap_127",
+          "id": "qa_cap_127",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11010,7 +11346,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11039,12 +11375,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_124",
-          "id": "qa_cap_124",
+          "name": "caption_qa_cap_128",
+          "id": "qa_cap_128",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11082,7 +11418,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11111,12 +11447,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_125",
-          "id": "qa_cap_125",
+          "name": "caption_qa_cap_129",
+          "id": "qa_cap_129",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11154,7 +11490,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11183,12 +11519,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_126",
-          "id": "qa_cap_126",
+          "name": "caption_qa_cap_130",
+          "id": "qa_cap_130",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11226,7 +11562,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11255,12 +11591,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_127",
-          "id": "qa_cap_127",
+          "name": "caption_qa_cap_131",
+          "id": "qa_cap_131",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11298,7 +11634,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11327,12 +11663,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_128",
-          "id": "qa_cap_128",
+          "name": "caption_qa_cap_132",
+          "id": "qa_cap_132",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11370,7 +11706,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11399,12 +11735,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_129",
-          "id": "qa_cap_129",
+          "name": "caption_qa_cap_133",
+          "id": "qa_cap_133",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1614,
           "width": 150,
           "height": 18
@@ -11442,7 +11778,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1636,
           "width": 150,
           "height": 34
@@ -11471,13 +11807,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_130",
-          "id": "qa_cap_130",
+          "name": "caption_qa_cap_134",
+          "id": "qa_cap_134",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1614,
+          "x": 28,
+          "y": 1698,
           "width": 150,
           "height": 18
         },
@@ -11514,8 +11850,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1636,
+          "x": 28,
+          "y": 1720,
           "width": 150,
           "height": 34
         },
@@ -11543,12 +11879,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_131",
-          "id": "qa_cap_131",
+          "name": "caption_qa_cap_135",
+          "id": "qa_cap_135",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11586,7 +11922,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11615,12 +11951,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_132",
-          "id": "qa_cap_132",
+          "name": "caption_qa_cap_136",
+          "id": "qa_cap_136",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11658,7 +11994,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11687,12 +12023,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_133",
-          "id": "qa_cap_133",
+          "name": "caption_qa_cap_137",
+          "id": "qa_cap_137",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11730,7 +12066,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11759,12 +12095,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_134",
-          "id": "qa_cap_134",
+          "name": "caption_qa_cap_138",
+          "id": "qa_cap_138",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11802,7 +12138,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11831,12 +12167,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_135",
-          "id": "qa_cap_135",
+          "name": "caption_qa_cap_139",
+          "id": "qa_cap_139",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11874,7 +12210,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11903,12 +12239,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_136",
-          "id": "qa_cap_136",
+          "name": "caption_qa_cap_140",
+          "id": "qa_cap_140",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -11946,7 +12282,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -11975,12 +12311,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_137",
-          "id": "qa_cap_137",
+          "name": "caption_qa_cap_141",
+          "id": "qa_cap_141",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -12018,7 +12354,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -12047,12 +12383,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_138",
-          "id": "qa_cap_138",
+          "name": "caption_qa_cap_142",
+          "id": "qa_cap_142",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1698,
           "width": 150,
           "height": 18
@@ -12090,7 +12426,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1720,
           "width": 150,
           "height": 34
@@ -12119,13 +12455,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_139",
-          "id": "qa_cap_139",
+          "name": "caption_qa_cap_143",
+          "id": "qa_cap_143",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1698,
+          "x": 28,
+          "y": 1782,
           "width": 150,
           "height": 18
         },
@@ -12162,8 +12498,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1720,
+          "x": 28,
+          "y": 1804,
           "width": 150,
           "height": 34
         },
@@ -12191,12 +12527,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_140",
-          "id": "qa_cap_140",
+          "name": "caption_qa_cap_144",
+          "id": "qa_cap_144",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12234,7 +12570,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12263,12 +12599,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_141",
-          "id": "qa_cap_141",
+          "name": "caption_qa_cap_145",
+          "id": "qa_cap_145",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12306,7 +12642,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12335,12 +12671,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_142",
-          "id": "qa_cap_142",
+          "name": "caption_qa_cap_146",
+          "id": "qa_cap_146",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12378,7 +12714,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12407,12 +12743,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_143",
-          "id": "qa_cap_143",
+          "name": "caption_qa_cap_147",
+          "id": "qa_cap_147",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12450,7 +12786,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12479,12 +12815,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_144",
-          "id": "qa_cap_144",
+          "name": "caption_qa_cap_148",
+          "id": "qa_cap_148",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12522,7 +12858,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12551,12 +12887,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_145",
-          "id": "qa_cap_145",
+          "name": "caption_qa_cap_149",
+          "id": "qa_cap_149",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12594,7 +12930,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12623,12 +12959,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_146",
-          "id": "qa_cap_146",
+          "name": "caption_qa_cap_150",
+          "id": "qa_cap_150",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12666,7 +13002,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12695,12 +13031,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_147",
-          "id": "qa_cap_147",
+          "name": "caption_qa_cap_151",
+          "id": "qa_cap_151",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1782,
           "width": 150,
           "height": 18
@@ -12738,7 +13074,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 1804,
           "width": 150,
           "height": 34
@@ -12767,13 +13103,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_148",
-          "id": "qa_cap_148",
+          "name": "caption_qa_cap_152",
+          "id": "qa_cap_152",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1782,
+          "x": 28,
+          "y": 1866,
           "width": 150,
           "height": 18
         },
@@ -12810,8 +13146,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 1804,
+          "x": 28,
+          "y": 1888,
           "width": 150,
           "height": 34
         },
@@ -12839,12 +13175,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_149",
-          "id": "qa_cap_149",
+          "name": "caption_qa_cap_153",
+          "id": "qa_cap_153",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1866,
           "width": 150,
           "height": 18
@@ -12882,7 +13218,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 1888,
           "width": 150,
           "height": 34
@@ -12911,12 +13247,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_150",
-          "id": "qa_cap_150",
+          "name": "caption_qa_cap_154",
+          "id": "qa_cap_154",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1866,
           "width": 150,
           "height": 18
@@ -12954,7 +13290,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 1888,
           "width": 150,
           "height": 34
@@ -12983,12 +13319,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_151",
-          "id": "qa_cap_151",
+          "name": "caption_qa_cap_155",
+          "id": "qa_cap_155",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1866,
           "width": 150,
           "height": 18
@@ -13026,7 +13362,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 1888,
           "width": 150,
           "height": 34
@@ -13055,7 +13391,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_cpp_37_handlers_one_per_event",
+          "name": "group_cpp_38_handlers_one_per_event",
           "id": "qa_group_4",
           "controlType": "Label"
         },
@@ -13080,7 +13416,7 @@
           }
         },
         "Text": {
-          "content": "cpp — 37 handlers, one per event",
+          "content": "cpp — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -13101,8 +13437,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_152",
-          "id": "qa_cap_152",
+          "name": "caption_qa_cap_156",
+          "id": "qa_cap_156",
           "controlType": "Label"
         },
         "Transform": {
@@ -13164,7 +13500,7 @@
           }
         },
         "Text": {
-          "content": "cpp\n37 handlers"
+          "content": "cpp\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -13191,6 +13527,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_cpp_activeHandleChanged": {
+              "id": "qa04_cpp_activeHandleChanged",
+              "name": "cpp: onActiveHandleChanged",
+              "language": "cpp",
+              "source": "void onActiveHandleChanged(CeContext& ctx, const CeEvent& event) {\n  \n}\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_cpp_click": {
@@ -13621,8 +13969,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_153",
-          "id": "qa_cap_153",
+          "name": "caption_qa_cap_157",
+          "id": "qa_cap_157",
           "controlType": "Label"
         },
         "Transform": {
@@ -13693,8 +14041,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_154",
-          "id": "qa_cap_154",
+          "name": "caption_qa_cap_158",
+          "id": "qa_cap_158",
           "controlType": "Label"
         },
         "Transform": {
@@ -13765,12 +14113,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_155",
-          "id": "qa_cap_155",
+          "name": "caption_qa_cap_159",
+          "id": "qa_cap_159",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 1992,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "cpp_activeHandleChanged",
+          "id": "qa04_cpp_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 2014,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_160",
+          "id": "qa_cap_160",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 1992,
           "width": 150,
           "height": 18
@@ -13808,7 +14228,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 2014,
           "width": 150,
           "height": 34
@@ -13837,12 +14257,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_156",
-          "id": "qa_cap_156",
+          "name": "caption_qa_cap_161",
+          "id": "qa_cap_161",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 1992,
           "width": 150,
           "height": 18
@@ -13880,7 +14300,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 2014,
           "width": 150,
           "height": 34
@@ -13909,12 +14329,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_157",
-          "id": "qa_cap_157",
+          "name": "caption_qa_cap_162",
+          "id": "qa_cap_162",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 1992,
           "width": 150,
           "height": 18
@@ -13952,7 +14372,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 2014,
           "width": 150,
           "height": 34
@@ -13981,12 +14401,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_158",
-          "id": "qa_cap_158",
+          "name": "caption_qa_cap_163",
+          "id": "qa_cap_163",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 1992,
           "width": 150,
           "height": 18
@@ -14024,7 +14444,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 2014,
           "width": 150,
           "height": 34
@@ -14053,13 +14473,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_159",
-          "id": "qa_cap_159",
+          "name": "caption_qa_cap_164",
+          "id": "qa_cap_164",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 1992,
+          "x": 28,
+          "y": 2096,
           "width": 150,
           "height": 18
         },
@@ -14096,8 +14516,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 2014,
+          "x": 28,
+          "y": 2118,
           "width": 150,
           "height": 34
         },
@@ -14125,12 +14545,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_160",
-          "id": "qa_cap_160",
+          "name": "caption_qa_cap_165",
+          "id": "qa_cap_165",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14168,7 +14588,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14197,12 +14617,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_161",
-          "id": "qa_cap_161",
+          "name": "caption_qa_cap_166",
+          "id": "qa_cap_166",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14240,7 +14660,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14269,12 +14689,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_162",
-          "id": "qa_cap_162",
+          "name": "caption_qa_cap_167",
+          "id": "qa_cap_167",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14312,7 +14732,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14341,12 +14761,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_163",
-          "id": "qa_cap_163",
+          "name": "caption_qa_cap_168",
+          "id": "qa_cap_168",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14384,7 +14804,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14413,12 +14833,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_164",
-          "id": "qa_cap_164",
+          "name": "caption_qa_cap_169",
+          "id": "qa_cap_169",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14456,7 +14876,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14485,12 +14905,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_165",
-          "id": "qa_cap_165",
+          "name": "caption_qa_cap_170",
+          "id": "qa_cap_170",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14528,7 +14948,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14557,12 +14977,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_166",
-          "id": "qa_cap_166",
+          "name": "caption_qa_cap_171",
+          "id": "qa_cap_171",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14600,7 +15020,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14629,12 +15049,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_167",
-          "id": "qa_cap_167",
+          "name": "caption_qa_cap_172",
+          "id": "qa_cap_172",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2096,
           "width": 150,
           "height": 18
@@ -14672,7 +15092,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2118,
           "width": 150,
           "height": 34
@@ -14701,13 +15121,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_168",
-          "id": "qa_cap_168",
+          "name": "caption_qa_cap_173",
+          "id": "qa_cap_173",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2096,
+          "x": 28,
+          "y": 2180,
           "width": 150,
           "height": 18
         },
@@ -14744,8 +15164,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2118,
+          "x": 28,
+          "y": 2202,
           "width": 150,
           "height": 34
         },
@@ -14773,12 +15193,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_169",
-          "id": "qa_cap_169",
+          "name": "caption_qa_cap_174",
+          "id": "qa_cap_174",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -14816,7 +15236,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -14845,12 +15265,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_170",
-          "id": "qa_cap_170",
+          "name": "caption_qa_cap_175",
+          "id": "qa_cap_175",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -14888,7 +15308,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -14917,12 +15337,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_171",
-          "id": "qa_cap_171",
+          "name": "caption_qa_cap_176",
+          "id": "qa_cap_176",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -14960,7 +15380,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -14989,12 +15409,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_172",
-          "id": "qa_cap_172",
+          "name": "caption_qa_cap_177",
+          "id": "qa_cap_177",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -15032,7 +15452,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -15061,12 +15481,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_173",
-          "id": "qa_cap_173",
+          "name": "caption_qa_cap_178",
+          "id": "qa_cap_178",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -15104,7 +15524,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -15133,12 +15553,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_174",
-          "id": "qa_cap_174",
+          "name": "caption_qa_cap_179",
+          "id": "qa_cap_179",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -15176,7 +15596,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -15205,12 +15625,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_175",
-          "id": "qa_cap_175",
+          "name": "caption_qa_cap_180",
+          "id": "qa_cap_180",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -15248,7 +15668,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -15277,12 +15697,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_176",
-          "id": "qa_cap_176",
+          "name": "caption_qa_cap_181",
+          "id": "qa_cap_181",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2180,
           "width": 150,
           "height": 18
@@ -15320,7 +15740,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2202,
           "width": 150,
           "height": 34
@@ -15349,13 +15769,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_177",
-          "id": "qa_cap_177",
+          "name": "caption_qa_cap_182",
+          "id": "qa_cap_182",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2180,
+          "x": 28,
+          "y": 2264,
           "width": 150,
           "height": 18
         },
@@ -15392,8 +15812,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2202,
+          "x": 28,
+          "y": 2286,
           "width": 150,
           "height": 34
         },
@@ -15421,12 +15841,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_178",
-          "id": "qa_cap_178",
+          "name": "caption_qa_cap_183",
+          "id": "qa_cap_183",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15464,7 +15884,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15493,12 +15913,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_179",
-          "id": "qa_cap_179",
+          "name": "caption_qa_cap_184",
+          "id": "qa_cap_184",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15536,7 +15956,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15565,12 +15985,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_180",
-          "id": "qa_cap_180",
+          "name": "caption_qa_cap_185",
+          "id": "qa_cap_185",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15608,7 +16028,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15637,12 +16057,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_181",
-          "id": "qa_cap_181",
+          "name": "caption_qa_cap_186",
+          "id": "qa_cap_186",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15680,7 +16100,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15709,12 +16129,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_182",
-          "id": "qa_cap_182",
+          "name": "caption_qa_cap_187",
+          "id": "qa_cap_187",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15752,7 +16172,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15781,12 +16201,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_183",
-          "id": "qa_cap_183",
+          "name": "caption_qa_cap_188",
+          "id": "qa_cap_188",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15824,7 +16244,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15853,12 +16273,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_184",
-          "id": "qa_cap_184",
+          "name": "caption_qa_cap_189",
+          "id": "qa_cap_189",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15896,7 +16316,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15925,12 +16345,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_185",
-          "id": "qa_cap_185",
+          "name": "caption_qa_cap_190",
+          "id": "qa_cap_190",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2264,
           "width": 150,
           "height": 18
@@ -15968,7 +16388,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2286,
           "width": 150,
           "height": 34
@@ -15997,13 +16417,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_186",
-          "id": "qa_cap_186",
+          "name": "caption_qa_cap_191",
+          "id": "qa_cap_191",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2264,
+          "x": 28,
+          "y": 2348,
           "width": 150,
           "height": 18
         },
@@ -16040,8 +16460,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2286,
+          "x": 28,
+          "y": 2370,
           "width": 150,
           "height": 34
         },
@@ -16069,12 +16489,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_187",
-          "id": "qa_cap_187",
+          "name": "caption_qa_cap_192",
+          "id": "qa_cap_192",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2348,
           "width": 150,
           "height": 18
@@ -16112,7 +16532,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2370,
           "width": 150,
           "height": 34
@@ -16141,12 +16561,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_188",
-          "id": "qa_cap_188",
+          "name": "caption_qa_cap_193",
+          "id": "qa_cap_193",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2348,
           "width": 150,
           "height": 18
@@ -16184,7 +16604,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2370,
           "width": 150,
           "height": 34
@@ -16213,12 +16633,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_189",
-          "id": "qa_cap_189",
+          "name": "caption_qa_cap_194",
+          "id": "qa_cap_194",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2348,
           "width": 150,
           "height": 18
@@ -16256,7 +16676,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2370,
           "width": 150,
           "height": 34
@@ -16285,7 +16705,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_csharp_37_handlers_one_per_event",
+          "name": "group_csharp_38_handlers_one_per_event",
           "id": "qa_group_5",
           "controlType": "Label"
         },
@@ -16310,7 +16730,7 @@
           }
         },
         "Text": {
-          "content": "csharp — 37 handlers, one per event",
+          "content": "csharp — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -16331,8 +16751,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_190",
-          "id": "qa_cap_190",
+          "name": "caption_qa_cap_195",
+          "id": "qa_cap_195",
           "controlType": "Label"
         },
         "Transform": {
@@ -16394,7 +16814,7 @@
           }
         },
         "Text": {
-          "content": "csharp\n37 handlers"
+          "content": "csharp\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -16421,6 +16841,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_csharp_activeHandleChanged": {
+              "id": "qa04_csharp_activeHandleChanged",
+              "name": "csharp: onActiveHandleChanged",
+              "language": "csharp",
+              "source": "void onActiveHandleChanged(CeContext ctx, CeEvent e) {\n  \n}\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_csharp_click": {
@@ -16851,8 +17283,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_191",
-          "id": "qa_cap_191",
+          "name": "caption_qa_cap_196",
+          "id": "qa_cap_196",
           "controlType": "Label"
         },
         "Transform": {
@@ -16923,8 +17355,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_192",
-          "id": "qa_cap_192",
+          "name": "caption_qa_cap_197",
+          "id": "qa_cap_197",
           "controlType": "Label"
         },
         "Transform": {
@@ -16995,12 +17427,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_193",
-          "id": "qa_cap_193",
+          "name": "caption_qa_cap_198",
+          "id": "qa_cap_198",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 2474,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "csharp_activeHandleChanged",
+          "id": "qa04_csharp_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 2496,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_199",
+          "id": "qa_cap_199",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 2474,
           "width": 150,
           "height": 18
@@ -17038,7 +17542,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 2496,
           "width": 150,
           "height": 34
@@ -17067,12 +17571,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_194",
-          "id": "qa_cap_194",
+          "name": "caption_qa_cap_200",
+          "id": "qa_cap_200",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 2474,
           "width": 150,
           "height": 18
@@ -17110,7 +17614,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 2496,
           "width": 150,
           "height": 34
@@ -17139,12 +17643,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_195",
-          "id": "qa_cap_195",
+          "name": "caption_qa_cap_201",
+          "id": "qa_cap_201",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 2474,
           "width": 150,
           "height": 18
@@ -17182,7 +17686,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 2496,
           "width": 150,
           "height": 34
@@ -17211,12 +17715,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_196",
-          "id": "qa_cap_196",
+          "name": "caption_qa_cap_202",
+          "id": "qa_cap_202",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 2474,
           "width": 150,
           "height": 18
@@ -17254,7 +17758,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 2496,
           "width": 150,
           "height": 34
@@ -17283,13 +17787,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_197",
-          "id": "qa_cap_197",
+          "name": "caption_qa_cap_203",
+          "id": "qa_cap_203",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 2474,
+          "x": 28,
+          "y": 2578,
           "width": 150,
           "height": 18
         },
@@ -17326,8 +17830,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 2496,
+          "x": 28,
+          "y": 2600,
           "width": 150,
           "height": 34
         },
@@ -17355,12 +17859,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_198",
-          "id": "qa_cap_198",
+          "name": "caption_qa_cap_204",
+          "id": "qa_cap_204",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17398,7 +17902,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17427,12 +17931,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_199",
-          "id": "qa_cap_199",
+          "name": "caption_qa_cap_205",
+          "id": "qa_cap_205",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17470,7 +17974,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17499,12 +18003,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_200",
-          "id": "qa_cap_200",
+          "name": "caption_qa_cap_206",
+          "id": "qa_cap_206",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17542,7 +18046,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17571,12 +18075,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_201",
-          "id": "qa_cap_201",
+          "name": "caption_qa_cap_207",
+          "id": "qa_cap_207",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17614,7 +18118,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17643,12 +18147,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_202",
-          "id": "qa_cap_202",
+          "name": "caption_qa_cap_208",
+          "id": "qa_cap_208",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17686,7 +18190,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17715,12 +18219,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_203",
-          "id": "qa_cap_203",
+          "name": "caption_qa_cap_209",
+          "id": "qa_cap_209",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17758,7 +18262,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17787,12 +18291,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_204",
-          "id": "qa_cap_204",
+          "name": "caption_qa_cap_210",
+          "id": "qa_cap_210",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17830,7 +18334,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17859,12 +18363,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_205",
-          "id": "qa_cap_205",
+          "name": "caption_qa_cap_211",
+          "id": "qa_cap_211",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2578,
           "width": 150,
           "height": 18
@@ -17902,7 +18406,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2600,
           "width": 150,
           "height": 34
@@ -17931,13 +18435,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_206",
-          "id": "qa_cap_206",
+          "name": "caption_qa_cap_212",
+          "id": "qa_cap_212",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2578,
+          "x": 28,
+          "y": 2662,
           "width": 150,
           "height": 18
         },
@@ -17974,8 +18478,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2600,
+          "x": 28,
+          "y": 2684,
           "width": 150,
           "height": 34
         },
@@ -18003,12 +18507,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_207",
-          "id": "qa_cap_207",
+          "name": "caption_qa_cap_213",
+          "id": "qa_cap_213",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18046,7 +18550,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18075,12 +18579,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_208",
-          "id": "qa_cap_208",
+          "name": "caption_qa_cap_214",
+          "id": "qa_cap_214",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18118,7 +18622,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18147,12 +18651,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_209",
-          "id": "qa_cap_209",
+          "name": "caption_qa_cap_215",
+          "id": "qa_cap_215",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18190,7 +18694,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18219,12 +18723,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_210",
-          "id": "qa_cap_210",
+          "name": "caption_qa_cap_216",
+          "id": "qa_cap_216",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18262,7 +18766,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18291,12 +18795,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_211",
-          "id": "qa_cap_211",
+          "name": "caption_qa_cap_217",
+          "id": "qa_cap_217",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18334,7 +18838,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18363,12 +18867,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_212",
-          "id": "qa_cap_212",
+          "name": "caption_qa_cap_218",
+          "id": "qa_cap_218",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18406,7 +18910,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18435,12 +18939,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_213",
-          "id": "qa_cap_213",
+          "name": "caption_qa_cap_219",
+          "id": "qa_cap_219",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18478,7 +18982,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18507,12 +19011,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_214",
-          "id": "qa_cap_214",
+          "name": "caption_qa_cap_220",
+          "id": "qa_cap_220",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2662,
           "width": 150,
           "height": 18
@@ -18550,7 +19054,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2684,
           "width": 150,
           "height": 34
@@ -18579,13 +19083,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_215",
-          "id": "qa_cap_215",
+          "name": "caption_qa_cap_221",
+          "id": "qa_cap_221",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2662,
+          "x": 28,
+          "y": 2746,
           "width": 150,
           "height": 18
         },
@@ -18622,8 +19126,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2684,
+          "x": 28,
+          "y": 2768,
           "width": 150,
           "height": 34
         },
@@ -18651,12 +19155,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_216",
-          "id": "qa_cap_216",
+          "name": "caption_qa_cap_222",
+          "id": "qa_cap_222",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -18694,7 +19198,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -18723,12 +19227,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_217",
-          "id": "qa_cap_217",
+          "name": "caption_qa_cap_223",
+          "id": "qa_cap_223",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -18766,7 +19270,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -18795,12 +19299,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_218",
-          "id": "qa_cap_218",
+          "name": "caption_qa_cap_224",
+          "id": "qa_cap_224",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -18838,7 +19342,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -18867,12 +19371,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_219",
-          "id": "qa_cap_219",
+          "name": "caption_qa_cap_225",
+          "id": "qa_cap_225",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -18910,7 +19414,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -18939,12 +19443,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_220",
-          "id": "qa_cap_220",
+          "name": "caption_qa_cap_226",
+          "id": "qa_cap_226",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -18982,7 +19486,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -19011,12 +19515,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_221",
-          "id": "qa_cap_221",
+          "name": "caption_qa_cap_227",
+          "id": "qa_cap_227",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -19054,7 +19558,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -19083,12 +19587,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_222",
-          "id": "qa_cap_222",
+          "name": "caption_qa_cap_228",
+          "id": "qa_cap_228",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -19126,7 +19630,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -19155,12 +19659,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_223",
-          "id": "qa_cap_223",
+          "name": "caption_qa_cap_229",
+          "id": "qa_cap_229",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2746,
           "width": 150,
           "height": 18
@@ -19198,7 +19702,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 2768,
           "width": 150,
           "height": 34
@@ -19227,13 +19731,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_224",
-          "id": "qa_cap_224",
+          "name": "caption_qa_cap_230",
+          "id": "qa_cap_230",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2746,
+          "x": 28,
+          "y": 2830,
           "width": 150,
           "height": 18
         },
@@ -19270,8 +19774,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 2768,
+          "x": 28,
+          "y": 2852,
           "width": 150,
           "height": 34
         },
@@ -19299,12 +19803,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_225",
-          "id": "qa_cap_225",
+          "name": "caption_qa_cap_231",
+          "id": "qa_cap_231",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2830,
           "width": 150,
           "height": 18
@@ -19342,7 +19846,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 2852,
           "width": 150,
           "height": 34
@@ -19371,12 +19875,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_226",
-          "id": "qa_cap_226",
+          "name": "caption_qa_cap_232",
+          "id": "qa_cap_232",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2830,
           "width": 150,
           "height": 18
@@ -19414,7 +19918,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 2852,
           "width": 150,
           "height": 34
@@ -19443,12 +19947,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_227",
-          "id": "qa_cap_227",
+          "name": "caption_qa_cap_233",
+          "id": "qa_cap_233",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2830,
           "width": 150,
           "height": 18
@@ -19486,7 +19990,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 2852,
           "width": 150,
           "height": 34
@@ -19515,7 +20019,7 @@
     {
       "_children": {
         "Core": {
-          "name": "group_java_37_handlers_one_per_event",
+          "name": "group_java_38_handlers_one_per_event",
           "id": "qa_group_6",
           "controlType": "Label"
         },
@@ -19540,7 +20044,7 @@
           }
         },
         "Text": {
-          "content": "java — 37 handlers, one per event",
+          "content": "java — 38 handlers, one per event",
           "_children": {
             "Font": {
               "size": 13,
@@ -19561,8 +20065,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_228",
-          "id": "qa_cap_228",
+          "name": "caption_qa_cap_234",
+          "id": "qa_cap_234",
           "controlType": "Label"
         },
         "Transform": {
@@ -19624,7 +20128,7 @@
           }
         },
         "Text": {
-          "content": "java\n37 handlers"
+          "content": "java\n38 handlers"
         },
         "Scripts": {
           "_type": "Scripts",
@@ -19651,6 +20155,18 @@
               "event": "onValueChanged",
               "enabled": true,
               "description": "Fires once, when the value settles. This is the moment to tell the synth.",
+              "group": ""
+            },
+            "qa04_java_activeHandleChanged": {
+              "id": "qa04_java_activeHandleChanged",
+              "name": "java: onActiveHandleChanged",
+              "language": "java",
+              "source": "void onActiveHandleChanged(CeContext ctx, CeEvent e) {\n  \n}\n",
+              "scope": "component",
+              "target": "self",
+              "event": "onActiveHandleChanged",
+              "enabled": true,
+              "description": "A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.",
               "group": ""
             },
             "qa04_java_click": {
@@ -20081,8 +20597,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_229",
-          "id": "qa_cap_229",
+          "name": "caption_qa_cap_235",
+          "id": "qa_cap_235",
           "controlType": "Label"
         },
         "Transform": {
@@ -20153,8 +20669,8 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_230",
-          "id": "qa_cap_230",
+          "name": "caption_qa_cap_236",
+          "id": "qa_cap_236",
           "controlType": "Label"
         },
         "Transform": {
@@ -20225,12 +20741,84 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_231",
-          "id": "qa_cap_231",
+          "name": "caption_qa_cap_237",
+          "id": "qa_cap_237",
           "controlType": "Label"
         },
         "Transform": {
           "x": 610,
+          "y": 2956,
+          "width": 150,
+          "height": 18
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            }
+          }
+        },
+        "Text": {
+          "content": "onActiveHandleChanged  ·  control",
+          "_children": {
+            "Font": {
+              "size": 11
+            }
+          }
+        },
+        "ContentLayout": {
+          "horizontalAlign": "left",
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "java_activeHandleChanged",
+          "id": "qa04_java_activeHandleChanged_tile",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 610,
+          "y": 2978,
+          "width": 150,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1A1F24"
+            },
+            "Corners": {
+              "radius": 3
+            }
+          }
+        },
+        "Text": {
+          "content": "(info)",
+          "_children": {
+            "Font": {
+              "size": 10
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "caption_qa_cap_238",
+          "id": "qa_cap_238",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 784,
           "y": 2956,
           "width": 150,
           "height": 18
@@ -20268,7 +20856,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 610,
+          "x": 784,
           "y": 2978,
           "width": 150,
           "height": 34
@@ -20297,12 +20885,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_232",
-          "id": "qa_cap_232",
+          "name": "caption_qa_cap_239",
+          "id": "qa_cap_239",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 2956,
           "width": 150,
           "height": 18
@@ -20340,7 +20928,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 784,
+          "x": 958,
           "y": 2978,
           "width": 150,
           "height": 34
@@ -20369,12 +20957,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_233",
-          "id": "qa_cap_233",
+          "name": "caption_qa_cap_240",
+          "id": "qa_cap_240",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 2956,
           "width": 150,
           "height": 18
@@ -20412,7 +21000,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 958,
+          "x": 1132,
           "y": 2978,
           "width": 150,
           "height": 34
@@ -20441,12 +21029,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_234",
-          "id": "qa_cap_234",
+          "name": "caption_qa_cap_241",
+          "id": "qa_cap_241",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 2956,
           "width": 150,
           "height": 18
@@ -20484,7 +21072,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1132,
+          "x": 1306,
           "y": 2978,
           "width": 150,
           "height": 34
@@ -20513,13 +21101,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_235",
-          "id": "qa_cap_235",
+          "name": "caption_qa_cap_242",
+          "id": "qa_cap_242",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 2956,
+          "x": 28,
+          "y": 3060,
           "width": 150,
           "height": 18
         },
@@ -20556,8 +21144,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1306,
-          "y": 2978,
+          "x": 28,
+          "y": 3082,
           "width": 150,
           "height": 34
         },
@@ -20585,12 +21173,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_236",
-          "id": "qa_cap_236",
+          "name": "caption_qa_cap_243",
+          "id": "qa_cap_243",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20628,7 +21216,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -20657,12 +21245,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_237",
-          "id": "qa_cap_237",
+          "name": "caption_qa_cap_244",
+          "id": "qa_cap_244",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20700,7 +21288,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -20729,12 +21317,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_238",
-          "id": "qa_cap_238",
+          "name": "caption_qa_cap_245",
+          "id": "qa_cap_245",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20772,7 +21360,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -20801,12 +21389,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_239",
-          "id": "qa_cap_239",
+          "name": "caption_qa_cap_246",
+          "id": "qa_cap_246",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20844,7 +21432,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -20873,12 +21461,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_240",
-          "id": "qa_cap_240",
+          "name": "caption_qa_cap_247",
+          "id": "qa_cap_247",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20916,7 +21504,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -20945,12 +21533,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_241",
-          "id": "qa_cap_241",
+          "name": "caption_qa_cap_248",
+          "id": "qa_cap_248",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -20988,7 +21576,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -21017,12 +21605,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_242",
-          "id": "qa_cap_242",
+          "name": "caption_qa_cap_249",
+          "id": "qa_cap_249",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -21060,7 +21648,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -21089,12 +21677,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_243",
-          "id": "qa_cap_243",
+          "name": "caption_qa_cap_250",
+          "id": "qa_cap_250",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3060,
           "width": 150,
           "height": 18
@@ -21132,7 +21720,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3082,
           "width": 150,
           "height": 34
@@ -21161,13 +21749,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_244",
-          "id": "qa_cap_244",
+          "name": "caption_qa_cap_251",
+          "id": "qa_cap_251",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3060,
+          "x": 28,
+          "y": 3144,
           "width": 150,
           "height": 18
         },
@@ -21204,8 +21792,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3082,
+          "x": 28,
+          "y": 3166,
           "width": 150,
           "height": 34
         },
@@ -21233,12 +21821,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_245",
-          "id": "qa_cap_245",
+          "name": "caption_qa_cap_252",
+          "id": "qa_cap_252",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21276,7 +21864,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21305,12 +21893,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_246",
-          "id": "qa_cap_246",
+          "name": "caption_qa_cap_253",
+          "id": "qa_cap_253",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21348,7 +21936,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21377,12 +21965,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_247",
-          "id": "qa_cap_247",
+          "name": "caption_qa_cap_254",
+          "id": "qa_cap_254",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21420,7 +22008,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21449,12 +22037,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_248",
-          "id": "qa_cap_248",
+          "name": "caption_qa_cap_255",
+          "id": "qa_cap_255",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21492,7 +22080,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21521,12 +22109,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_249",
-          "id": "qa_cap_249",
+          "name": "caption_qa_cap_256",
+          "id": "qa_cap_256",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21564,7 +22152,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21593,12 +22181,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_250",
-          "id": "qa_cap_250",
+          "name": "caption_qa_cap_257",
+          "id": "qa_cap_257",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21636,7 +22224,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21665,12 +22253,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_251",
-          "id": "qa_cap_251",
+          "name": "caption_qa_cap_258",
+          "id": "qa_cap_258",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21708,7 +22296,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21737,12 +22325,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_252",
-          "id": "qa_cap_252",
+          "name": "caption_qa_cap_259",
+          "id": "qa_cap_259",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3144,
           "width": 150,
           "height": 18
@@ -21780,7 +22368,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3166,
           "width": 150,
           "height": 34
@@ -21809,13 +22397,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_253",
-          "id": "qa_cap_253",
+          "name": "caption_qa_cap_260",
+          "id": "qa_cap_260",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3144,
+          "x": 28,
+          "y": 3228,
           "width": 150,
           "height": 18
         },
@@ -21852,8 +22440,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3166,
+          "x": 28,
+          "y": 3250,
           "width": 150,
           "height": 34
         },
@@ -21881,12 +22469,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_254",
-          "id": "qa_cap_254",
+          "name": "caption_qa_cap_261",
+          "id": "qa_cap_261",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -21924,7 +22512,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -21953,12 +22541,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_255",
-          "id": "qa_cap_255",
+          "name": "caption_qa_cap_262",
+          "id": "qa_cap_262",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -21996,7 +22584,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22025,12 +22613,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_256",
-          "id": "qa_cap_256",
+          "name": "caption_qa_cap_263",
+          "id": "qa_cap_263",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22068,7 +22656,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22097,12 +22685,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_257",
-          "id": "qa_cap_257",
+          "name": "caption_qa_cap_264",
+          "id": "qa_cap_264",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22140,7 +22728,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 550,
+          "x": 724,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22169,12 +22757,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_258",
-          "id": "qa_cap_258",
+          "name": "caption_qa_cap_265",
+          "id": "qa_cap_265",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22212,7 +22800,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 724,
+          "x": 898,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22241,12 +22829,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_259",
-          "id": "qa_cap_259",
+          "name": "caption_qa_cap_266",
+          "id": "qa_cap_266",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22284,7 +22872,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 898,
+          "x": 1072,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22313,12 +22901,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_260",
-          "id": "qa_cap_260",
+          "name": "caption_qa_cap_267",
+          "id": "qa_cap_267",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22356,7 +22944,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1072,
+          "x": 1246,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22385,12 +22973,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_261",
-          "id": "qa_cap_261",
+          "name": "caption_qa_cap_268",
+          "id": "qa_cap_268",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3228,
           "width": 150,
           "height": 18
@@ -22428,7 +23016,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1246,
+          "x": 1420,
           "y": 3250,
           "width": 150,
           "height": 34
@@ -22457,13 +23045,13 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_262",
-          "id": "qa_cap_262",
+          "name": "caption_qa_cap_269",
+          "id": "qa_cap_269",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3228,
+          "x": 28,
+          "y": 3312,
           "width": 150,
           "height": 18
         },
@@ -22500,8 +23088,8 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1420,
-          "y": 3250,
+          "x": 28,
+          "y": 3334,
           "width": 150,
           "height": 34
         },
@@ -22529,12 +23117,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_263",
-          "id": "qa_cap_263",
+          "name": "caption_qa_cap_270",
+          "id": "qa_cap_270",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3312,
           "width": 150,
           "height": 18
@@ -22572,7 +23160,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 28,
+          "x": 202,
           "y": 3334,
           "width": 150,
           "height": 34
@@ -22601,12 +23189,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_264",
-          "id": "qa_cap_264",
+          "name": "caption_qa_cap_271",
+          "id": "qa_cap_271",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3312,
           "width": 150,
           "height": 18
@@ -22644,7 +23232,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 202,
+          "x": 376,
           "y": 3334,
           "width": 150,
           "height": 34
@@ -22673,12 +23261,12 @@
     {
       "_children": {
         "Core": {
-          "name": "caption_qa_cap_265",
-          "id": "qa_cap_265",
+          "name": "caption_qa_cap_272",
+          "id": "qa_cap_272",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3312,
           "width": 150,
           "height": 18
@@ -22716,7 +23304,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 376,
+          "x": 550,
           "y": 3334,
           "width": 150,
           "height": 34

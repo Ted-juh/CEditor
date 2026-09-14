@@ -1222,6 +1222,14 @@
                   "Background.Border.thickness": 3
                 }
               }
+            },
+            "Mixed": {
+              "description": "QA: Mixed",
+              "patches": {
+                "component": {
+                  "Background.Border.thickness": 3
+                }
+              }
             }
           }
         }

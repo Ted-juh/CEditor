@@ -2,8 +2,8 @@
  * behaviourButtons.mjs — the button half of the `Behavior` section.
  *
  * What kind of control this is (`family`, `role`, `buttonType`), what a press means (one shot,
- * toggle, cyclic, press-to-talk, double-click), and the ten settings around them that turned out
- * to be declared and not connected.
+ * toggle, cyclic, press-to-talk, double-click), and the mixed-state and runtime-emission switches
+ * that shape the actual preview surface.
  *
  * TWO THINGS TO KNOW BEFORE READING THE ROWS.
  *
@@ -13,13 +13,9 @@
  * the skin over it. Where a row is about what the control IS rather than what it did, the evidence
  * is the ARIA `role` the surface puts on the element, which is `previewRoleFor`'s whole output.
  *
- * And TEN OF THE PROPERTIES IN THIS BLOCK ARE NOT CONNECTED — six of them with a chip or a toggle
- * in the Properties panel. They are written out at the end with what was checked, because "no
- * reader" is a claim that has been wrong here before: a key can be reached by a computed name
- * (the drum pads' corner fields), by a whole-section pass, or by a generated script verb. All
- * three were checked for each one — there is no computed access to `behavior` anywhere in src/,
- * none of the ten appears in the scripting or export tables, and `derivedFlagVerbs` mints verbs
- * only for `show*` booleans and `editable`, which none of them is.
+ * The original audit found ten declared settings without a runtime effect. Six now have direct
+ * interaction assertions below. The remaining model-only fields and `uncheckOnClick` are still
+ * written out at the end with the exact source checks used to classify them.
  */
 import assert from 'node:assert/strict';
 import { boot, Ledger } from './behaviourKit.mjs';
@@ -36,6 +32,26 @@ const sess = async (id) => {
 };
 const roleOf = (id) => kit.page.evaluate(({ id }) =>
   document.querySelector(`[data-control-id="${id}"]`)?.getAttribute('role') ?? null, { id });
+const beginEventCapture = (targets) => kit.page.evaluate(async ({ targets }) => {
+  window.__behaviorEvents = [];
+  const api = (await import('/src/CE_Application/scripting/panelRuntime.js'))
+    .scriptApiForTesting('', 'behavior-button-browser');
+  for (const [label, target] of Object.entries(targets)) {
+    for (const event of ['onClick', 'onStateChanged', 'onValueChange', 'onValueChanged']) {
+      api.on(target, event, (payload) => window.__behaviorEvents.push({ label, event, payload }));
+    }
+  }
+}, { targets });
+const capturedEvents = () => kit.page.evaluate(() => window.__behaviorEvents ?? []);
+const clearEventCapture = () => kit.page.evaluate(() => { window.__behaviorEvents = []; });
+const mixedAppearance = (id) => kit.page.evaluate(({ id }) => {
+  const root = document.querySelector(`[data-control-id="${id}"]`);
+  const nodes = root ? [root, ...root.querySelectorAll('*')] : [];
+  return {
+    aria: root?.getAttribute('aria-checked') ?? null,
+    hasMixedFill: nodes.some((node) => getComputedStyle(node).backgroundColor === 'rgb(128, 96, 25)'),
+  };
+}, { id });
 
 const centre = async (id) => {
   const b = await kit.box(id);
@@ -331,7 +347,93 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
-  // The ten that are declared and not connected.
+  // Script emission switches — the interaction still happens; only the runtime report is gated.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const emitted = await mk('ToggleButton', 110, {
+      'Behavior.emitClick': true, 'Behavior.emitStateChange': true, 'Behavior.emitValueChange': true,
+    });
+    const quiet = await mk('ToggleButton', 180, {
+      'Behavior.emitClick': false, 'Behavior.emitStateChange': false, 'Behavior.emitValueChange': false,
+    });
+    await kit.preview(true);
+    await kit.settle(650);
+    await beginEventCapture({
+      emitted: await kit.read(emitted, 'Core.name'),
+      quiet: await kit.read(quiet, 'Core.name'),
+    });
+
+    await tap(emitted);
+    const loud = (await capturedEvents()).filter((entry) => entry.label === 'emitted');
+    await clearEventCapture();
+    const quietSession = await tap(quiet);
+    const silent = (await capturedEvents()).filter((entry) => entry.label === 'quiet');
+
+    led.check(B, 'emitClick + emitStateChange + emitValueChange',
+      'with all three switches on, a real toggle press reports its click, interaction state and value through the script runtime',
+      { click: true, state: true, change: true, committed: true },
+      { click: loud.some((entry) => entry.event === 'onClick'),
+        state: loud.some((entry) => entry.event === 'onStateChanged'),
+        change: loud.some((entry) => entry.event === 'onValueChange'),
+        committed: loud.some((entry) => entry.event === 'onValueChanged') });
+    led.check(B, 'emit flags suppress runtime output, not the action',
+      'with the same three switches off, the toggle still changes visibly/runtime and remains available to bindings, while those script events stay silent',
+      { checked: true, events: 0 },
+      { checked: quietSession.checked === true, events: silent.length });
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
+  // allowMixed — a real third bool state, including visual and accessibility output.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const mixed = await mk('ToggleButton', 110, { 'Behavior.allowMixed': true });
+    const twoState = await mk('ToggleButton', 180, { 'Behavior.allowMixed': false });
+    await kit.preview(true);
+    await kit.settle(650);
+
+    await tap(mixed); // off -> on
+    const mixedSession = await tap(mixed); // on -> mixed
+    const appearance = await mixedAppearance(mixed);
+    await tap(twoState);
+    const ordinary = await tap(twoState);
+
+    led.check(B, 'allowMixed',
+      'enabled on a bool toggle, the third activation reaches a distinct mixed session state, a distinct authored visual, and the ARIA indeterminate value',
+      { checked: false, mixed: true, aria: 'mixed', hasMixedFill: true },
+      { checked: mixedSession.checked === true, mixed: mixedSession.mixed === true,
+        aria: appearance.aria, hasMixedFill: appearance.hasMixedFill });
+    led.check(B, 'allowMixed (false)',
+      'disabled, the same two activations remain the established two-state on/off cycle with no hidden mixed stop',
+      { checked: false, mixed: false, aria: 'false' },
+      { checked: ordinary.checked === true, mixed: ordinary.mixed === true,
+        aria: (await mixedAppearance(twoState)).aria });
+  }
+  await kit.preview(false);
+
+  // Fresh-runtime persistence for the Behavior settings added here.
+  await kit.fresh();
+  {
+    const sid = await mk('ToggleButton', 110, { 'Behavior.allowMixed': true,
+      'Behavior.emitClick': false, 'Behavior.emitStateChange': false, 'Behavior.emitValueChange': false });
+    const again = await kit.reopen(sid);
+    await kit.preview(true);
+    await kit.settle(650);
+    await tap(again);
+    const state = await tap(again);
+    led.check(B, 'save/reopen (mixed + emission flags)',
+      'a fresh runtime keeps the authored third state and all three script-emission switches rather than falling back to the type defaults',
+      { allowMixed: true, emitClick: false, emitStateChange: false, emitValueChange: false, mixed: true, aria: 'mixed' },
+      { allowMixed: await kit.read(again, 'Behavior.allowMixed'), emitClick: await kit.read(again, 'Behavior.emitClick'),
+        emitStateChange: await kit.read(again, 'Behavior.emitStateChange'), emitValueChange: await kit.read(again, 'Behavior.emitValueChange'),
+        mixed: state.mixed === true, aria: (await mixedAppearance(again)).aria });
+  }
+  await kit.preview(false);
+
+  // =============================================================================================
+  // The model-only fields that remain intentionally unsupported.
   //
   // Each was checked three ways before being written down here, because "no reader" has been wrong
   // in this repo before: a repo-wide search for the key name, a search for computed access to
@@ -350,25 +452,6 @@ try {
   led.inert(B, 'uncheckOnClick',
     'let a click turn a checked toggle back off',
     'read ONLY by InteractionPreviewTab.svelte, which is the editor’s Interaction Preview dock — not the panel preview surface and not the player. The panel path spells the same idea `allowUncheck` (interactionPreview.js: `if (wasChecked && behavior?.allowUncheck === false) return {}`), which is read and has an editor cell. So this is one concept with two names, one of which reaches the product and one of which reaches a dock. Smallest honest release treatment: nothing in the UI offers it, so nothing promises it; the fix worth doing later is deleting one of the two names, not implementing the second.');
-  led.inert(B, 'allowMixed',
-    'allow a third, mixed state on a toggle',
-    'USER-VISIBLE AND NOT CONNECTED. It has a chip in the Behavior tab — "Mixed — allow a mixed state where the design calls for it" — and its only reader is InteractionPreviewTab.svelte, the editor dock. On a real panel and in the player a toggle has two states whatever the chip says; the `mixed` session flag exists and is never set by any panel-surface path. Smallest honest release treatment: hide the chip, or say in the release note that the mixed state is a design-time preview only. Implementing a tri-state toggle on the panel is a feature, not a defect fix.');
-
-  led.inert(B, 'emitClick',
-    'expose click events to the scripting/runtime layer',
-    'USER-VISIBLE AND NOT CONNECTED, and the tab says so itself: the chip’s own tooltip reads "expose click events to the FUTURE scripting/runtime layer". Read by nothing but the editor that writes it. The scripting layer that shipped does not consult it — a control’s script handlers run whether or not the chip is lit. Smallest honest release treatment: the tooltip already carries the caveat; either keep it and leave the chip, or drop the three emit chips until there is something behind them.');
-  led.inert(B, 'emitStateChange',
-    'expose state changes to the scripting/runtime layer',
-    'the same as emitClick in every respect, including the word "future" in its own tooltip, and declared beside it.');
-  led.inert(B, 'emitValueChange',
-    'expose value changes to the scripting/runtime layer',
-    'the same again, with a toggle of its own in the Behavior tab rather than a chip. Read by nothing outside the editor that writes it.');
-  led.inert(B, 'emitValueCommit',
-    'emit on pointer release and on a confirmed edit',
-    'USER-VISIBLE AND ALMOST NOT CONNECTED: a chip in the Slider tab, and exactly one reader — InteractiveTestSurface.svelte:173, where it gates a 180ms `executed` pulse. That surface is the editor’s Interaction Preview and Custom Designer dock, not the panel preview and not the player, so a slider on a finished panel emits nothing different either way. Of the five emit flags this is the one with real behaviour behind it, in the one place a user is least likely to be looking.');
-  led.inert(B, 'emitActiveHandleChange',
-    'emit metadata when the active handle changes',
-    'a chip in the Slider tab beside emitValueCommit, and no reader anywhere — not even the test surface. The active handle itself is live and verified (behaviourTrack.mjs measures trackClickMode moving it); what is missing is any code that treats this flag as permission to report the move.');
 
   // =============================================================================================
   // save/reopen — the press semantics are authored state.

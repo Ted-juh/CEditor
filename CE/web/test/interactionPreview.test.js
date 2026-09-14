@@ -95,6 +95,18 @@ function makeSliderControl(id, behaviorOverrides = {}) {
   };
 }
 
+function makeToggleControl(id, { allowMixed = false } = {}) {
+  return {
+    _children: {
+      Core: { id, name: 'Toggle', controlType: 'ToggleButton', enabled: true },
+      Behavior: {
+        family: 'select', role: 'toggle', buttonType: 'toggle', valueType: 'bool',
+        defaultValue: false, allowUncheck: true, allowMixed,
+      },
+    },
+  };
+}
+
 function makeCustomComponent(id) {
   return {
     _children: {
@@ -269,6 +281,65 @@ test('commitPanelPreviewSelectAction respects non-wrapping cyclic buttons at the
 
     commitPanelPreviewSelectAction('cycle_nowrap');
     assert.equal(get(panelPreviewSessions).cycle_nowrap?.valueOverride, 'state_3');
+  } finally {
+    panels.set(previousPanels);
+    activePanelId.set(previousActivePanelId);
+    activeEditorTab.set(previousActiveEditorTab);
+    panelPreviewSessions.set(previousPreviewSessions);
+  }
+});
+
+test('allowMixed adds an off-on-mixed cycle to bool toggles', () => {
+  const previousPanels = get(panels);
+  const previousActivePanelId = get(activePanelId);
+  const previousActiveEditorTab = get(activeEditorTab);
+  const previousPreviewSessions = get(panelPreviewSessions);
+  const control = makeToggleControl('toggle_mixed', { allowMixed: true });
+  const panel = { id: 105, name: 'Preview Panel', controls: [control] };
+
+  try {
+    panels.set([panel]);
+    activePanelId.set(panel.id);
+    activeEditorTab.set({ type: 'panel', id: panel.id });
+    panelPreviewSessions.set({ toggle_mixed: createInteractionPreviewSession(control) });
+
+    assert.deepEqual(commitPanelPreviewSelectAction('toggle_mixed'), {
+      checked: true, mixed: false, valueOverrideEnabled: false,
+    });
+    assert.deepEqual(commitPanelPreviewSelectAction('toggle_mixed'), {
+      checked: false, mixed: true, valueOverrideEnabled: false,
+    });
+    assert.deepEqual(commitPanelPreviewSelectAction('toggle_mixed'), {
+      checked: false, mixed: false, valueOverrideEnabled: false,
+    });
+  } finally {
+    panels.set(previousPanels);
+    activePanelId.set(previousActivePanelId);
+    activeEditorTab.set(previousActiveEditorTab);
+    panelPreviewSessions.set(previousPreviewSessions);
+  }
+});
+
+test('bool toggles remain two-state when allowMixed is false', () => {
+  const previousPanels = get(panels);
+  const previousActivePanelId = get(activePanelId);
+  const previousActiveEditorTab = get(activeEditorTab);
+  const previousPreviewSessions = get(panelPreviewSessions);
+  const control = makeToggleControl('toggle_two_state');
+  const panel = { id: 106, name: 'Preview Panel', controls: [control] };
+
+  try {
+    panels.set([panel]);
+    activePanelId.set(panel.id);
+    activeEditorTab.set({ type: 'panel', id: panel.id });
+    panelPreviewSessions.set({ toggle_two_state: createInteractionPreviewSession(control) });
+
+    commitPanelPreviewSelectAction('toggle_two_state');
+    assert.equal(get(panelPreviewSessions).toggle_two_state.checked, true);
+    assert.equal(get(panelPreviewSessions).toggle_two_state.mixed, false);
+    commitPanelPreviewSelectAction('toggle_two_state');
+    assert.equal(get(panelPreviewSessions).toggle_two_state.checked, false);
+    assert.equal(get(panelPreviewSessions).toggle_two_state.mixed, false);
   } finally {
     panels.set(previousPanels);
     activePanelId.set(previousActivePanelId);

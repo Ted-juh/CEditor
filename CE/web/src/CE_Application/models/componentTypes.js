@@ -48,6 +48,11 @@ function createButtonStates({ includeSelected = false, includeExecuted = false }
       'Background.Fill.colour': 'FF2D6F9C',
       'Text.Fill.colour': 'FFFFFFFF',
     });
+    children.Mixed = createStateNode('Mixed', { mixed: true }, {
+      'Background.Fill.colour': 'FF806019',
+      'Background.Border.colour': 'FFFFD166',
+      'Text.Fill.colour': 'FFFFFFFF',
+    });
   }
 
   if (includeExecuted) {

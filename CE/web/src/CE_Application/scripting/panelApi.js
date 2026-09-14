@@ -492,6 +492,7 @@ export const LIFECYCLE_HOOKS = [
 export const CONTROL_EVENTS = [
   { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Fires over and over while the value is moving. Use it for things on screen that should follow the control.' },
   { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Fires once, when the value settles. This is the moment to tell the synth.' },
+  { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A multi-value slider changed its active handle. info.activeHandle and info.previousActiveHandle name start, current or end.' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'Clicked. mouse.x, mouse.y.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'Double-clicked.' },
   { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'Mouse pressed. mouse.x/.y/.button/.modifiers.' },

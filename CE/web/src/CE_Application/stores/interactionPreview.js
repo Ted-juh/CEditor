@@ -514,11 +514,16 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
 
   const wasChecked = currentPreviewBoolValue(control, currentSession);
   if (wasChecked && behavior?.allowUncheck === false) return {};
-  const patch = {
-    checked: !wasChecked,
-    mixed: false,
-    valueOverrideEnabled: false,
-  };
+  // A bool control remains the familiar off/on toggle unless the author explicitly enables the
+  // third state. With it enabled, activation cycles off -> on -> mixed -> off. Keep `checked`
+  // false while mixed: ARIA exposes the third value separately and boolean device bindings must
+  // never receive an invented third numeric value.
+  const allowMixed = behavior?.allowMixed === true && valueType === 'bool';
+  const patch = allowMixed && currentSession?.mixed === true
+    ? { checked: false, mixed: false, valueOverrideEnabled: false }
+    : allowMixed && wasChecked
+      ? { checked: false, mixed: true, valueOverrideEnabled: false }
+      : { checked: !wasChecked, mixed: false, valueOverrideEnabled: false };
   updatePanelPreviewSession(controlId, patch);
   return patch;
 }
