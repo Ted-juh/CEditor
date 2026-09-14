@@ -1,5 +1,60 @@
 # Integration checkpoint — 14 September 2026
 
+## Release continuation — current Windows checkpoint
+
+The authorized ineffective-option set is now implemented on Windows main through `43d50bc4`:
+
+- `Icon.tint` uses a real mask tint for valid non-white colours while the default/white/invalid
+  cases retain the original full-colour image. Fit, opacity, transforms and effects remain intact.
+- Container, Group, TabContainer and ScrollArea now carry the Mouse section they need.
+  `interceptChildClicks=true` preserves existing child interaction; false routes the gesture to the
+  parent and suppresses child runtime output.
+- Behavior emission flags now gate their named script events without gating normal control,
+  binding, link or device state. Slider change/commit are distinct; active-handle changes carry the
+  previous and current handle. Bool toggles with `allowMixed` cycle off/on/mixed, expose
+  `aria-checked="mixed"`, and do not invent a boolean device value.
+- `looper.quantize`, `constellation.showField` and `meter.showScaleLabels` now change actual playback
+  timing or rendered pixels and survive save/reopen. The published-verb audit no longer reports
+  them.
+
+The changes were split into isolated worktrees before editing, then cherry-picked without conflict.
+Live Claude CLI coordination was attempted first, but its saved OAuth session returned 401; the
+checked-in Claude assignment and design records therefore remained the lead specification. File
+ownership was agreed before the isolated edits, and the one shared renderer file changed in
+disjoint hunks.
+
+### Current Windows evidence
+
+- Full Node suite: **4,871/4,871 passed**, zero failures or skips.
+- Script-export checks: **7 passed**, 2 environment skips (C# SDK and Java compiler absent).
+- Frontend production build: passed.
+- Eight directly affected browser ledgers: Lists 19, Mouse 42, Widgets 18, Motion 115, Steps 73,
+  Outbound 53, Buttons 27 and Track 43 — **390 verified rows, zero defects**. These measure real
+  pixels, gestures, runtime events and reopen persistence rather than property writes. The
+  create/configure/bind/preview/share/reopen walkthrough also passed 17/17, and the focused
+  first-use release workflow passed.
+- Coverage scan: 59 of 1,046 declared properties unmatched by its textual heuristic, down from 68.
+  The published-verb audit reports only four Drum Pads corner false positives whose readers use
+  computed key names.
+- Fresh native Release build from `43d50bc4`: **34/34 CTest tests passed**. The installer compiled,
+  upgraded the Program Files copy with exit 0, and the installed editor and VST3 template match
+  staging byte-for-byte. Installed editor SHA-256:
+  `04AA9528DD9B5D10A7BB9FA2495D43B9C086CBBF4DE606FB1303396FD1545255`.
+- Installed, compiler-free export produced a 61-parameter QA VST3 and a scripted two-parameter
+  VST3 with regenerated manifests and distinct identities. Both passed the installed isolated
+  scanner/worker: 64 blocks, state serialization/restore, worker alive. The scripted export emitted
+  CC 20/21/22 with no window open. The generic Player and built standalone each started responsive
+  with a WebView2 child process.
+
+The refreshed native file-dialog/recovery walkthrough is the one partial gate. CEditor itself
+starts cleanly, and the current browser workflow proves save/share/reopen semantics, but the
+supported native-window automation service is not configured on this machine. The Program Files
+Save/Open/Share dialogs and malformed-package refusal were therefore not clicked unattended; their
+last direct evidence remains the 13 September run. Physical MIDI, broader DAW coverage and other
+platforms/formats remain explicitly deferred.
+
+## Previous synchronized source checkpoint
+
 Claude confirmed `b81fc112267474b796a70735890b47a06c9913af` as his complete,
 clean checkpoint, with no unpublished or in-flight edits. It contains 53 commits
 after the previous shared main, `45ad9820`. Codex fast-forwarded the canonical
@@ -33,7 +88,7 @@ Claude agreed to synchronize his checkout after main is pushed and to retire the
 fully merged exchange branch. The final synchronization is verified separately
 against the remote refs and Claude's checkout acknowledgement.
 
-## Work still needed before a release
+## Work still needed at that previous checkpoint (superseded by the current section above)
 
 1. Refresh the installed Windows candidate: RC3 predates the fixes. Re-run the
    Windows Release build/native tests, native save/open/share/recovery, and

@@ -1,7 +1,7 @@
 # Residual issues and unsupported features
 
-Compiled 14 September 2026 by the behaviour pass. **This is not release approval.** It is the list
-of things that are known, are not fixed, and should not be discovered by a user instead.
+Compiled 14 September 2026 by the behaviour pass and updated by Windows integration. **This is not
+release approval.** It records both what remains and the formerly residual items closed in this pass.
 
 Three kinds of thing are kept apart on purpose, because collapsing them is how a release note comes
 to overclaim:
@@ -14,7 +14,7 @@ to overclaim:
 
 ## 1. Inert options — declared, and read by nothing
 
-Nine, derived rather than collected: every key in `sectionDefaults.js` (1,046 across 63 sections)
+Six remain, derived rather than collected: every key in `sectionDefaults.js` (1,046 across 63 sections)
 checked against every mention in `CE/web/src` (723 files), then each survivor confirmed by hand
 against the renderer, the editor and the script verb tables. Four candidates from the same sweep
 were thrown out as false positives — the Drum Pads' corner actions are read through a key built by
@@ -24,20 +24,18 @@ concatenation, which no literal search can see.
 derives this list. A hand-made list goes stale the moment somebody adds a verb — which is exactly
 what happened to the custom-export count in the behaviour ledger — and the mechanism below means new
 ones arrive without anybody writing a verb-table line. The script reports two buckets: verbs with no
-reader at all, and verbs whose key name is shared across sections so a reader cannot be attributed
-(`Constellation.showField` lands there, because the Timbre reads a `showField` of its own).
+reader at all, and verbs whose key name is shared across sections so a reader cannot be attributed.
 
-**These three have a caller and give it silence. Worst of the group.**
+**The three caller-visible failures are closed.**
 
-| Option | Published as | What a script author gets |
+| Option | Published as | What it does now |
 | --- | --- | --- |
-| `Looper.quantizeLoop` | `looper.quantize`, written by hand in `componentVerbs.js` | The call succeeds; the loop length snaps to nothing |
-| `Constellation.showField` | `constellation.showField`, **derived** — `derivedFlagVerbs` mints a verb for every `show*` boolean in a section | The call succeeds; there is no field to show |
-| `Meter.showScaleLabels` | `meter.showScaleLabels`, derived the same way | The call succeeds; the meter never labels its ticks |
+| `Looper.quantizeLoop` | `looper.quantize`, written by hand in `componentVerbs.js` | Free-running playback snaps to the nearest whole beat at the live BPM without rewriting the authored loop length; synced loops retain their existing clock contract |
+| `Constellation.showField` | `constellation.showField`, derived from the section boolean | Toggles the clipped soft field layers behind the preset stars |
+| `Meter.showScaleLabels` | `meter.showScaleLabels`, derived the same way | Draws the scale values independently of tick lines in bar, segment, arc and vertical modes |
 
-`Meter.showScaleLabels` is the one worth a second look: it is not an orphan key but **the
-unimplemented half of a shipping feature.** `showTicks` and `tickCount` are both read, so the meter
-draws its scale ticks and has never labelled them, under a comment that says "Scale ticks + labels".
+Each has runtime-effect and save/reopen browser coverage. The published-verb audit no longer reports
+them; its four Drum Pads corner candidates are the known computed-key false positives.
 
 **These six are reachable from nowhere — no UI, no verb — so they have no user-visible symptom.**
 
@@ -49,42 +47,29 @@ draws its scale ticks and has never labelled them, under a comment that says "Sc
 | `ChordPad.fieldColour` | `ChordPadRenderer` has no `fieldCss` |
 | `Envelope.xLabel`, `Envelope.yLabel` | `EnvelopeRenderer` draws no `<text>` at all; written only by `tools/scripts/an1x-panel/` |
 
-**The decision each one needs is small.** Implement it, or stop the API promising it — for the two
-derived verbs that means removing the `show*` key from the section, since the verb is generated from
-the declaration rather than written down. **Do not delete a supported property to make a checklist
+**The decision each one needs is small.** Implement it, alias it to the existing concept, or remove
+the unreachable declaration deliberately. **Do not delete a supported property to make a checklist
 green**; every row above was hand-checked precisely so that nobody has to take that risk.
 
-### 1a. `Mouse.interceptChildClicks` — read, and unreachable. Needs a ruling, not a fix
+### 1a. `Mouse.interceptChildClicks` — DONE
 
-Added after the Mouse pass, and it is a different shape from the nine above: **this one has a
-reader.** `CanvasControl` puts `children-interactive` on the `.children-clip` layer and the CSS
-beside it gives that layer back its pointer events, under a comment that names the use case
-exactly — *"a decorative frame can stop taking clicks without disabling the controls it contains"*.
+The four child-bearing types now declare `Mouse`: Container, Group, TabContainer and ScrollArea.
+The existing default, `interceptChildClicks=true`, preserves the old child-interactive behavior.
+Setting it false makes the parent own the gesture and suppresses the child's pointer/runtime path.
 
-The layer only exists for a control that **has** children, and no component type can both have
-children and carry the setting:
+The current type relation is:
 
 | | Types |
 | --- | --- |
 | Declare `Children` | Container, Group, TabContainer, ScrollArea |
-| Declare `Mouse` | Range, Number, Slider, Knob, CustomComponent |
-| Both | **none** |
+| Declare `Mouse` | Range, Number, Slider, Knob, CustomComponent, Container, Group, TabContainer, ScrollArea |
+| Both | **Container, Group, TabContainer, ScrollArea** |
 
-So the Child Clicks chip is in the Mouse tab for every control that can never use it, and absent
-from the four that the feature was written for. Two ways out, and **the choice is the owner's
-because it is a product decision, not a defect fix**:
+The scenery compiler permits the exact neutral default block, so existing child-bearing scenery
+continues to fold; an authored Mouse change keeps the control live. Evidence is in
+`componentTypes.test.js`, `sceneryCompile.test.js` and `browser-checks/behaviourMouse.mjs`.
 
-- **Hide the chip** where the control has no `Children` section. One `{#if}` in `MouseEditor.svelte`;
-  changes no document; leaves the container case unbuilt.
-- **Add `Mouse` to the four container types.** What the CSS was written for, and it would also give a
-  container `interceptClicks` (a transparent decorative frame, which is what a container mostly is),
-  `cursor` and `bringToFrontOnClick`. Bigger: adding a section to a type changes the shape of every
-  newly created control of that type, so the QA panels and the generated fixtures want a look.
-
-Not done here, deliberately. The behaviour pass records what is true; adding a section to four types
-on my own initiative is the kind of change the handoff asks to be proposed rather than taken.
-
-### 1c. The `Behavior` section's ten — three model-only, two dock-only, five emit flags
+### 1c. The `Behavior` section — emission and mixed state DONE; model-only aliases remain
 
 From `behaviourButtons.mjs` and `behaviourTrack.mjs`. Each was checked three ways before being
 written down — a repo-wide search for the key name, a search for computed access to `behavior`
@@ -99,28 +84,30 @@ export tables — because "no reader" has been wrong in this repository before.
 | `Behavior.toggleOn` | Declared beside it, same in every respect |
 | `Behavior.activationKeys` | Defaults to `['Enter', 'Space']`. The keyboard path that exists reads `keyboardEnabled`, `arrowKeyAdjust`, `pageKeyAdjust` and `homeEndAdjust` — all four verified — and hard-codes which keys do what. A description of the behaviour, not a setting that shapes it |
 
-**Two reach only the editor's Interaction Preview dock**, not the panel surface and not the player:
+`Behavior.uncheckOnClick` remains an editor-dock-only alias of the live `allowUncheck` concept.
+`allowMixed`, formerly in this bucket, is now live on bool toggles: off → on → mixed → off, with a
+distinct visual, `aria-checked="mixed"`, script value `"mixed"`, and no invented boolean sent to a
+device.
 
 | Option | Note |
 | --- | --- |
 | `Behavior.uncheckOnClick` | The panel spells the same idea `allowUncheck`, which is read and has a cell. One concept, two names; the fix worth doing later is deleting one, not implementing the second |
-| `Behavior.allowMixed` | **User-visible**: a chip in the Behavior tab, "Mixed — allow a mixed state where the design calls for it". On a real panel a toggle has two states whatever the chip says |
+| `Behavior.allowMixed` | **DONE.** Live on the panel/player and verified through reopen |
 
-**The five emit flags**, which the handoff asked to be inspected by name:
+**The five emit flags are now runtime gates**, not document-only metadata:
 
 | Option | Where it is offered | What reads it |
 | --- | --- | --- |
-| `emitClick` | chip, Behavior tab | nothing. Its own tooltip says "expose click events to the **future** scripting/runtime layer" |
-| `emitStateChange` | chip, Behavior tab | nothing. Same tooltip wording |
-| `emitValueChange` | toggle, Behavior tab | nothing |
-| `emitValueCommit` | chip, Slider tab | one line — `InteractiveTestSurface.svelte:173`, a 180ms `executed` pulse in the editor dock. The only one of the five with real behaviour behind it, in the place a user is least likely to look |
-| `emitActiveHandleChange` | chip, Slider tab | nothing, not even the test surface. The active handle itself is live and verified |
+| `emitClick` | chip, Behavior tab | Gates `onClick` only |
+| `emitStateChange` | chip, Behavior tab | Gates `onStateChanged` only |
+| `emitValueChange` | toggle, Behavior tab | Gates continuous `onValueChange` and the panel `onControlChanged` mirror |
+| `emitValueCommit` | chip, Slider tab | Gates one settled `onValueChanged` at drag end |
+| `emitActiveHandleChange` | chip, Slider tab | Gates `onActiveHandleChanged`, whose payload names current and previous handles |
 
-**Smallest honest release treatment.** The three model-only fields need nothing: no UI promises
-them. The two dock-only ones and the five flags are a single decision — either drop the six chips
-and the toggle until there is something behind them, or keep them and say in the release note that
-the emit flags and the mixed state are design-time only. Three of the seven already carry the
-caveat in their own tooltip.
+The gates affect script output only. Session state, bindings, links and device flow still update,
+which is the compatibility boundary these settings promise. Components without a Behavior section
+retain their earlier event contract. Unit and browser tests cover independent suppression, slider
+commit timing, active-handle metadata, mixed-state accessibility and save/reopen.
 
 **Two more, from the slider half, that are not options but are worth the same paragraph:**
 
@@ -137,12 +124,11 @@ caveat in their own tooltip.
   the zone a scrub would start in is an `<input>` whose focus handler opens text editing and stops
   propagation first. Measured, not read off the source.
 
-### 1d. Seven more user-visible options with nothing behind them, from the rest of priority 2
+### 1d. User-visible options found in the rest of priority 2 — DONE
 
-All found the same way and each checked the same three ways before being written down — the key
-name repo-wide, computed access to the section object, and the scripting and export tables. They
-are grouped by what it would take to make the promise true, because that is the decision each one
-needs.
+All were found the same way and checked through the key name repo-wide, computed access to the
+section object, and the scripting and export tables. The implementation record is kept here so the
+closure remains auditable.
 
 **~~A small fix, not a feature~~ / ~~Remove the unimplemented options~~ — RULED, AND ALL FIVE NOW WORK
 (14 September 2026).** The owner's ruling was to implement rather than remove, including the two
@@ -181,11 +167,11 @@ Evidence: `panelCustomComponentLinks.test.js` (+7), `customComponentPackage.test
 `browser-checks/behaviourShared.mjs` (6 rows, was 2 inert) and `browser-checks/behaviourAssets.mjs`
 (5 rows, was 2 inert). Each fix was reverted on its own and fails exactly its own rows: 7, 4 and 5.
 
-**A feature, so say so in the release note or drop the cell:**
+**The last feature in this group is now implemented:**
 
 | Option | Note |
 | --- | --- |
-| `Icon.tint` | **Two places in the UI say it exists**: a colour field in the Icon tab ("Primary tint applied to the imported icon") and the Effects tab's own help text pointing at it ("Primary icon tint still lives in Icon"). `CanvasControl` draws the icon as a plain `<img src={dataUrl}>`, and the style it builds carries object-fit, opacity, both flips, the rotation and the effect filters — with no colour step anywhere. Recolouring an arbitrary image needs a mask or an SVG rewrite |
+| `Icon.tint` | **DONE, 14 September 2026.** Valid non-white RRGGBB/AARRGGBB values render the source as a CSS mask filled with the tint. White/default/invalid values retain the original full-colour `<img>`, preserving existing panels; fit, opacity, flips, rotation and effects are applied in both paths. Browser checks measure the changed raster and reopen it |
 | ~~`Core.tooltip`~~ | **DONE, 14 September 2026.** Rendered as a `title` on the control, in preview and in the player — which are the same surface, so there is one implementation rather than two free to drift |
 | ~~`Core.screenReaderText`~~ | **DONE, same change.** The author's text is now what a screen reader is given, replacing the generated "<name> preview" that was covering it |
 
@@ -284,17 +270,18 @@ out to be a property that was never declared.
   drivers, ports or timing on a real machine.
 - **No claim beyond Windows.** macOS and Linux, other DAWs and export formats besides the tested
   VST3 path are not covered by the Windows evidence in `release-readiness-2026-09-13.md`.
-- **The installed RC3 is older than the frontend fixes**, D-1 through D-18 included. The bundle needs
-  refreshing before any acceptance is quoted against it.
+- **The installed bundle was refreshed on 14 September.** Its editor and VST3 template hashes match
+  the package staging tree. Native file-dialog/recovery acceptance is still only partial because the
+  supported native-window automation service was not configured; see the release checklist D3.
 - **Preview is a rehearsal, not the player.** Runtime movement in preview is not an authored value
   saved in the document, and several checks exist only to keep that distinction honest.
 - **Assertion rows are not unique properties.** Fifteen suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
-  more useful one — **66** of 1,046 declared properties are named by no check at all, down from 241
+  more useful one — **59** of 1,046 declared properties are named by no check at all, down from 241
   when this list was written. **The editor-and-shared half is closed.** What each section leaves
   behind is recorded above with its reason rather than papered over with a row that names the
-  property and proves nothing, and the matrix cannot see those notes: of the 66, ten are the
-  `Behavior` group in §1c, ten are the `Designer` session-state block already ruled out of the
+  property and proves nothing, and the matrix cannot see those notes: of the 59, four are the
+  remaining `Behavior` aliases/options in §1c, ten are the `Designer` session-state block already ruled out of the
   denominator, and most of the rest are the inert and closed-elsewhere rows listed here. The
   genuine remainder is a handful of two-property tails.
 
