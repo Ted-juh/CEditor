@@ -565,18 +565,21 @@ export const COMPONENT_TYPES = {
   },
 
   Container: {
-    sections: ['Background', 'Effects', 'Grid', 'Children'],
+    sections: ['Background', 'Effects', 'Grid', 'Mouse', 'Children'],
     // HOST AUTOMATION.
     // Nothing to automate: this type holds no value, only appearance and layout.
     exportValues: [],
     defaultOverrides: {
       Transform: { width: 300, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },
+      // Nested controls were interactive before containers exposed the Mouse section. Keep that
+      // default while letting an author turn Child Clicks off to make the frame one hit target.
+      Mouse: { interceptChildClicks: true },
     },
   },
 
   Group: {
-    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Grid', 'Children'],
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Grid', 'Mouse', 'Children'],
     // HOST AUTOMATION.
     // Nothing to automate: this type holds no value, only appearance and layout.
     exportValues: [],
@@ -600,6 +603,7 @@ export const COMPONENT_TYPES = {
         paddingBottom: 4,
       },
       Grid: { enabled: true, snap: true, size: 10 },
+      Mouse: { interceptChildClicks: true },
     },
   },
 
@@ -1306,7 +1310,7 @@ export const COMPONENT_TYPES = {
   },
 
   TabContainer: {
-    sections: ['Background', 'TabContainer', 'Effects', 'Grid', 'Children'],
+    sections: ['Background', 'TabContainer', 'Effects', 'Grid', 'Mouse', 'Children'],
     // HOST AUTOMATION. The page, as a choice — switching pages from a DAW is a real thing to want,
     // and `valueKind: 'choice'` is what makes it arrive as named pages rather than as a float.
     exportValues: [{
@@ -1318,6 +1322,7 @@ export const COMPONENT_TYPES = {
     defaultOverrides: {
       Transform: { width: 320, height: 220 },
       Grid: { enabled: true, snap: true, size: 10 },
+      Mouse: { interceptChildClicks: true },
       Background: {
         _children: {
           Fill: { colour: 'FF1A1A20' },
@@ -1329,7 +1334,7 @@ export const COMPONENT_TYPES = {
   },
 
   ScrollArea: {
-    sections: ['Background', 'ScrollArea', 'Effects', 'Grid', 'Children'],
+    sections: ['Background', 'ScrollArea', 'Effects', 'Grid', 'Mouse', 'Children'],
     // HOST AUTOMATION: none. A scroll position is where somebody is LOOKING, not a parameter of the
     // instrument, and a DAW writing it would move the view under the player's hands.
     exportValues: [],
@@ -1337,6 +1342,7 @@ export const COMPONENT_TYPES = {
     defaultOverrides: {
       Transform: { width: 280, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },
+      Mouse: { interceptChildClicks: true },
       Background: {
         _children: {
           Fill: { colour: 'FF1A1A20' },

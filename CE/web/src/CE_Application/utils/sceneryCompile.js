@@ -52,7 +52,21 @@ const num = (value, fallback = 0) => numberOr(value, fallback);
 // Grid is on the list because a container's Grid is snapping, not paint — CanvasControl reads it
 // only from the drag path. Effects is on the list but checked, because its DEFAULT is inert and
 // refusing every control that merely has the section would refuse the Background type itself.
-const SCENERY_SECTIONS = new Set(['Core', 'Transform', 'Background', 'Effects', 'Grid', 'Children']);
+const SCENERY_SECTIONS = new Set(['Core', 'Transform', 'Background', 'Effects', 'Grid', 'Mouse', 'Children']);
+const CHILD_CONTAINER_TYPES = new Set(['Container', 'Group', 'TabContainer', 'ScrollArea']);
+
+/**
+ * Mouse is drawable only in the exact state that preserves the old container behaviour. Anything
+ * authored — including Child Clicks off — needs a live element for its pointer/focus semantics.
+ */
+function mouseIsSceneryNeutral(control, mouse) {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  if (!CHILD_CONTAINER_TYPES.has(type) || !mouse || typeof mouse !== 'object') return false;
+  const expected = { ...SECTION_DEFAULTS.Mouse, interceptChildClicks: true };
+  const keys = Object.keys(mouse);
+  return keys.length === Object.keys(expected).length
+    && keys.every((key) => Object.hasOwn(expected, key) && Object.is(mouse[key], expected[key]));
+}
 
 /**
  * Does this Effects section actually draw anything? Its defaults are all off.
@@ -94,6 +108,10 @@ export function whyControlNotScenery(control) {
   const children = control?._children;
   if (!children || typeof children !== 'object') return 'not a control';
   if (children.Core?.visible === false) return null;      // nothing to draw: safe to drop
+
+  if (children.Mouse && !mouseIsSceneryNeutral(control, children.Mouse)) {
+    return 'has a Mouse section';
+  }
 
   for (const name of Object.keys(children)) {
     if (!SCENERY_SECTIONS.has(name)) {

@@ -103,7 +103,7 @@
   } from './canvasControlTextGeometry.js';
   import {
     applyTextCaseMode, applyTextReadingOrientation, buildFontFeatureSettings,
-    buildFontVariationSettings, buildGlowShadowLayers, buildSingleBlurFilterValue,
+    buildFontVariationSettings, buildGlowShadowLayers, buildIconTintStyle, buildSingleBlurFilterValue,
     buildTextBlurFilterValue, buildTextFillLayerStyle, buildTextShadowValue,
     cssColor, customHitZoneStyle, getEnabledValueRows, lineCanvasFont,
     lineGeometry, lineLayerFor, normalizeFillMode, normalizeKey,
@@ -112,7 +112,7 @@
     normalizeTextReadingOrientation, parseHexColor, resolveTextFlowAngle,
     safeSvgId, scriptBaselineShiftForMode, scriptScaleForMode,
     sortTextVisualLayers, svgTextAnchorFor, textAlignFor, textCaseVariantCaps,
-    textEffectColor, textOrientationAngle,
+    textEffectColor, textOrientationAngle, usesIconTint,
   } from './canvasControlStyles.js';
   import {
     buildBlockTextLayoutState, buildCustomFlowDecorationFor,
@@ -3097,6 +3097,7 @@
     ].join('; ');
   });
   let hasIcon = $derived(!isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
+  let iconIsTinted = $derived(usesIconTint(icon?.tint));
   let iconEffects = $derived(icon?._children?.Effects ?? null);
   let iconSizeValue = $derived(Math.max(4, Number(icon?.size ?? 16)));
   let iconContainerStyle = $derived.by(() => {
@@ -3164,6 +3165,11 @@
       filters.length ? `filter:${filters.join(' ')}` : '',
     ].join('; ');
   });
+  let iconTintStyle = $derived(buildIconTintStyle(
+    icon?.tint,
+    resolvedStoredIcon?.dataUrl,
+    icon?.fit,
+  ));
 
   // The layer stack names the style it wants; each layout mode owns the actual variable, so the
   // shared stack does not need to know which spelling applies.
@@ -3533,7 +3539,11 @@
 
     {#if hasIcon}
       <div class="icon-content" style={iconContainerStyle}>
-        <img class="icon-image" style={iconStyle} src={resolvedStoredIcon.dataUrl} alt="" />
+        {#if iconIsTinted}
+          <div class="icon-image icon-image-tinted" style={`${iconStyle}; ${iconTintStyle}`} aria-hidden="true"></div>
+        {:else}
+          <img class="icon-image" style={iconStyle} src={resolvedStoredIcon.dataUrl} alt="" />
+        {/if}
       </div>
     {/if}
 
@@ -4095,15 +4105,14 @@
   /* --- Mouse section, preview/runtime only (see mouseAppliesToSurface) --- */
 
   /* interceptClicks off: the pointer passes straight through to whatever sits
-     behind. Nested controls inside it are unaffected — the existing
-     `.children-origin :global(.canvas-control.preview-interactive)` rule
-     already hands them their own pointer events back, so a decorative frame
-     can stop taking clicks without disabling the controls it contains. */
+     behind. A container whose Child Clicks remains on still hands nested
+     controls their own pointer events back, so a decorative frame can stop
+     taking clicks without disabling the controls it contains. */
   .canvas-control.mouse-transparent {
     pointer-events: none;
   }
 
-  /* interceptChildClicks on: parts inside the control become targets in their
+  /* interceptChildClicks on: nested controls become targets in their
      own right, rather than the control being one opaque hit area.
      Qualified by .preview-interactive, like every other re-enable in this
      file: outside preview a click on a child must still select the container,
@@ -4120,9 +4129,9 @@
     outline-offset: 1px;
   }
 
-  /* Nested-children layers. Transparent to pointer events so the container's
-     own handlers and the children's handlers both work; children re-enable
-     interaction via their own .canvas-control. */
+  /* Nested-children layers. Transparent to pointer events so Child Clicks off
+     makes the container one hit target; the on-state below re-enables both the
+     layer and each nested control. */
   .children-clip {
     position: absolute;
     inset: 0;
@@ -4143,12 +4152,11 @@
     height: 100%;
     pointer-events: none;
   }
-  /* The "children re-enable interaction" half of the comment above, which was never actually
-     written: pointer-events: none INHERITS, so every nested control was transparent and a button
-     inside a Group could not be hovered, pressed or focused in preview — the parent swallowed the
-     lot. Scoped to preview-interactive on purpose. In the EDITOR the transparency is wanted:
-     clicking a child selects its container, which is how dragging a group around works. */
-  .children-origin :global(.canvas-control.preview-interactive) {
+  /* Child Clicks is true by default on the four container types to preserve the behaviour panels
+     had before they exposed a Mouse section. Turning it off now has the documented far-end effect:
+     the child stays drawn, but the pointer targets the container. Scoped to preview-interactive on
+     purpose; editor selection keeps using the separate selected-child rule below. */
+  .children-clip.children-interactive .children-origin :global(.canvas-control.preview-interactive) {
     pointer-events: auto;
   }
 

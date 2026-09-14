@@ -255,6 +255,47 @@ test('a section nobody has written yet is refused rather than ignored', () => {
   assert.equal(whyControlNotScenery(control), 'has a SomethingNew section');
 });
 
+test('a container Mouse section folds only while it preserves the historical child target', () => {
+  const parent = createControl('Container', {
+    Core: { id: 'mouse-parent', name: 'mouse-parent', layer: 'Scenery' },
+  });
+  parent._children.Background._children.Border.enabled = false;
+  assert.equal(parent._children.Mouse.interceptChildClicks, true);
+  assert.equal(whyControlNotScenery(parent), null);
+  assert.equal(compileScenery([parent], 400, 300).folded, 1);
+
+  parent._children.Mouse.interceptChildClicks = false;
+  assert.equal(whyControlNotScenery(parent), 'has a Mouse section');
+  assert.equal(compileScenery([parent], 400, 300).folded, 0);
+});
+
+test('authored container Mouse behaviour stays live instead of being baked into scenery', () => {
+  const mutations = [
+    (mouse) => { mouse.cursor = 'pointer'; },
+    (mouse) => { mouse.interceptClicks = false; },
+    (mouse) => { mouse.bringToFrontOnClick = true; },
+    (mouse) => { mouse.hitTestShape = 'ellipse'; },
+    (mouse) => { mouse.focusable = true; },
+  ];
+  for (const mutate of mutations) {
+    const parent = createControl('Container');
+    mutate(parent._children.Mouse);
+    assert.equal(whyControlNotScenery(parent), 'has a Mouse section');
+  }
+});
+
+test('Mouse is scenery-neutral only for the four types that can contain children', () => {
+  for (const type of ['Container', 'Group', 'TabContainer', 'ScrollArea']) {
+    const control = createControl(type);
+    control._children.Mouse.interceptChildClicks = false;
+    assert.equal(whyControlNotScenery(control), 'has a Mouse section', `${type} ignored Child Clicks`);
+  }
+
+  const background = box('mouse-background');
+  background._children.Mouse = { ...createControl('Container')._children.Mouse };
+  assert.equal(whyControlNotScenery(background), 'has a Mouse section');
+});
+
 test('a container is refused for what its children are', () => {
   const parent = createControl('Container', { Core: { id: 'p', name: 'p', layer: 'Scenery' } });
   parent._children.Children._children = {

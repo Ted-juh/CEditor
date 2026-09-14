@@ -1,5 +1,5 @@
 /**
- * behaviourLists.mjs — the `Listbox` appearance and navigation tail (8), the `Icon` section (6)
+ * behaviourLists.mjs — the `Listbox` appearance and navigation tail (8), the `Icon` section (7)
  * and the three `Value` fields the matrix found unreached.
  *
  * TWO SETUP FACTS, both of which make the difference between a row and a null result.
@@ -233,6 +233,22 @@ try {
     await kit.set(id, { 'Icon.assetId': entry.id });
     await kit.settle(550);
 
+    const centrePixel = async () => (await kit.livePixels(id, [[0.5, 0.5]]))?.[0] ?? null;
+    const nearColour = (pixel, expected, tolerance = 8) => pixel != null
+      && expected.every((value, index) => Math.abs(pixel[index] - value) <= tolerance);
+    const importedPixel = await centrePixel();
+    await kit.set(id, { 'Icon.tint': 'FF22CC44' });
+    await kit.settle(650);
+    const tintedPixel = await centrePixel();
+    led.check(I, 'tint',
+      'opaque white keeps the imported magenta pixels, while a green tint replaces their colour through the icon alpha — measured from the browser compositor rather than from the stored field',
+      { imported: true, tinted: true, changed: true },
+      { imported: nearColour(importedPixel, [255, 0, 255, 255]),
+        tinted: nearColour(tintedPixel, [34, 204, 68, 255]),
+        changed: JSON.stringify(importedPixel) !== JSON.stringify(tintedPixel) });
+    await kit.set(id, { 'Icon.tint': 'FFFFFFFF' });
+    await kit.settle(500);
+
     // THE PROPERTIES ARE ON THE <img>, NOT ON ITS BOX. `.icon-content` positions and sizes the
     // icon's slot (that is where ContentLayout's offsets and z-index land); the fit and the two
     // flips are written onto the `.icon-image` inside it.
@@ -270,6 +286,24 @@ try {
       { h: true, v: true, different: true, bothIsItsOwn: true },
       { h: acrossX !== plain, v: acrossY !== plain, different: acrossX !== acrossY,
         bothIsItsOwn: both !== plain && both !== acrossX && both !== acrossY });
+
+    await kit.set(id, { 'Icon.tint': 'FF22CC44', 'Icon.opacity': 0.65,
+      'Icon.rotation': 15, 'Icon.flipH': true, 'Icon.flipV': false,
+      'Icon.Effects.glowEnabled': true, 'Icon.Effects.glowSize': 3 });
+    await kit.settle(600);
+    led.check(I, 'tint (the image transforms and effects path is retained)',
+      'the tinted element keeps the same fit, opacity and transform declarations as the full-colour image; tint changes only how its pixels are supplied',
+      { tintedElement: true, fit: 'contain', opacity: '0.65', transformed: true,
+        filtered: true, masked: true },
+      await kit.page.evaluate(({ id }) => {
+        const n = document.querySelector(`[data-control-id="${id}"] .icon-image`);
+        const cs = n ? getComputedStyle(n) : null;
+        return { tintedElement: n?.classList.contains('icon-image-tinted') === true,
+          fit: cs?.objectFit ?? null, opacity: cs?.opacity ?? null,
+          transformed: !!cs && cs.transform !== 'none',
+          filtered: !!cs && cs.filter !== 'none',
+          masked: !!cs && cs.webkitMaskImage !== 'none' };
+      }, { id }));
   }
   await kit.preview(false);
 
@@ -322,10 +356,6 @@ try {
   }
   await kit.preview(false);
 
-  led.inert(I, 'tint',
-    'recolour the imported icon',
-    'USER-VISIBLE AND NOT CONNECTED. The Icon tab offers a colour field for it — "Primary tint applied to the imported icon" — and the Effects tab points at that field in its own help text ("Primary icon tint still lives in Icon"), so two places in the UI say the property exists. Nothing reads it: CanvasControl draws the icon as a plain `<img src={dataUrl}>`, and the style it builds for that image carries object-fit, opacity, the two flips, the rotation and the effect filters, with no colour step anywhere. A repo-wide search for the key outside the model defaults finds the two editors that write and mention it and nothing else. Smallest honest release treatment: the recolour a tint implies needs a mask or an SVG rewrite and is a feature, so either drop the cell or say in the release note that icons are drawn as imported.');
-
   led.inert(V, 'showMapping',
     'show the value-mapping table in the inspector',
     'an EDITOR-ONLY switch, and correctly so: its only reader is ValueEditor.svelte, where it opens and closes the mapping section of the Value tab. Nothing in a rendered panel could read it, because it is about the inspector rather than the control. Recorded here so the matrix row has an answer rather than looking like a gap.');
@@ -352,6 +382,26 @@ try {
         cards: (await countOf(again, '.listbox-row.card')) > 0,
         thin: await hasClass(again, '.listbox-scrollbar', 'thin'),
         rows: (await countOf(again, '.listbox-row')) > 0 });
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const entry = await installIcon();
+    const id = await kit.make('Button', { 'Transform.x': 70, 'Transform.y': 110,
+      'Transform.width': 180, 'Transform.height': 100, 'Text.content': '',
+      'ContentLayout.mode': 'icon_only', 'Icon.assetId': entry.id, 'Icon.size': 48,
+      'Icon.tint': 'FF22CC44' });
+    const again = await kit.reopen(id);
+    await installIcon();
+    await kit.settle(650);
+    const pixel = (await kit.livePixels(again, [[0.5, 0.5]]))?.[0] ?? null;
+    led.check(I, 'save/reopen',
+      'the authored tint survives a fresh runtime and recolours the re-resolved library icon again, rather than relying on a live DOM state',
+      { stored: 'FF22CC44', green: true },
+      { stored: await kit.read(again, 'Icon.tint'),
+        green: pixel != null && Math.abs(pixel[0] - 34) <= 8
+          && Math.abs(pixel[1] - 204) <= 8 && Math.abs(pixel[2] - 68) <= 8 });
   }
   await kit.preview(false);
 

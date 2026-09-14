@@ -33,6 +33,7 @@ import {
   showsFocusOutline,
 } from '../src/CE_Application/utils/mouseBehavior.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
+import { COMPONENT_TYPES, createControl } from '../src/CE_Application/models/componentTypes.js';
 import {
   createRangeScrub,
   createSliderTrackScrub,
@@ -40,6 +41,21 @@ import {
 } from '../src/CE_Application/utils/scrubRuntime.js';
 
 const DEFAULT_MOUSE = SECTION_DEFAULTS.Mouse;
+
+test('every child-container type exposes Mouse without changing nested interaction by default', () => {
+  const childContainers = Object.entries(COMPONENT_TYPES)
+    .filter(([, spec]) => spec.sections.includes('Children'))
+    .map(([name]) => name);
+  assert.deepEqual(childContainers, ['Container', 'Group', 'TabContainer', 'ScrollArea']);
+
+  for (const type of childContainers) {
+    const control = createControl(type);
+    assert.ok(control._children.Mouse, `${type} has no Mouse section`);
+    assert.equal(control._children.Mouse.interceptChildClicks, true,
+      `${type} no longer preserves nested-control pointer behaviour`);
+    assert.ok(control._children.Children, `${type} has no Children section`);
+  }
+});
 
 // --- The no-op contract ---------------------------------------------------
 

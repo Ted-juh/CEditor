@@ -41,6 +41,34 @@ export function cssColor(hex) {
   return rgbaColor(parseHexColor(hex));
 }
 
+/**
+ * Opaque white is the Icon section's backwards-compatible "use the imported colours" value.
+ * Any other valid colour asks for a monochrome tint through the image's alpha mask.
+ */
+export function usesIconTint(value) {
+  const hex = String(value ?? '').replace(/^#/, '').toUpperCase();
+  if (!/^(?:[0-9A-F]{6}|[0-9A-F]{8})$/.test(hex)) return false;
+  return hex !== 'FFFFFF' && hex !== 'FFFFFFFF';
+}
+
+/** CSS for the tinted icon path. The same element receives opacity, transforms and effects. */
+export function buildIconTintStyle(value, dataUrl, fit = 'contain') {
+  if (!usesIconTint(value) || !dataUrl) return '';
+  const source = `url(${JSON.stringify(String(dataUrl))})`;
+  const size = fit === 'cover' ? 'cover' : 'contain';
+  return [
+    `background-color:${cssColor(value)}`,
+    `-webkit-mask-image:${source}`,
+    `mask-image:${source}`,
+    `-webkit-mask-size:${size}`,
+    `mask-size:${size}`,
+    '-webkit-mask-position:center',
+    'mask-position:center',
+    '-webkit-mask-repeat:no-repeat',
+    'mask-repeat:no-repeat',
+  ].join('; ');
+}
+
 export function textEffectColor(value, fallback = 'FFFFFFFF') {
   return rgbaColor(parseHexColor(value, fallback));
 }

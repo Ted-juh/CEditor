@@ -14,11 +14,10 @@
  * ellipse hit shape would clip its own resize handles. So every fixture below enters preview, and a
  * row that checked the editor would be checking the wrong surface.
  *
- * The section exists on FIVE of the fifty-eight component types — Range, Number, Slider, Knob and
- * CustomComponent — and `createControl` builds only the sections a type declares. A write to
- * `Mouse.cursor` on a Label is silently dropped, because there is no section to write it into. The
- * first block below measures that rather than assuming it, and every other fixture here is one of
- * the five.
+ * The section exists on the five pointer-operated controls plus the four child containers. The
+ * latter expose `interceptChildClicks`, preserving the old child-interactive default while making
+ * its off-state usable. `createControl` still builds only sections a type declares: a write to
+ * `Mouse.cursor` on a Label is silently dropped. The first block measures both sides.
  *
  * The interesting pointer rows are only visible with a SECOND CONTROL to lose the click to. "Does
  * this control still respond" cannot distinguish a pointer that passed through from one that was
@@ -119,9 +118,13 @@ try {
           && (COMPONENT_TYPES[n].sections ?? []).includes('Children')),
       };
     });
-    led.check(M, 'the section’s reach', 'the Mouse tab is offered on the controls a pointer operates — the four range widgets and the custom component — and not on the fifty-three that it does not',
-      { total: 58, withMouse: ['Range', 'Number', 'Slider', 'Knob', 'CustomComponent'] },
+    led.check(M, 'the section’s reach', 'the Mouse tab is offered on the five pointer-operated controls and the four controls that can contain children',
+      { total: 58, withMouse: ['Range', 'Number', 'Slider', 'Knob', 'CustomComponent',
+        'Container', 'Group', 'TabContainer', 'ScrollArea'] },
       { total: reach.total, withMouse: reach.withMouse });
+    led.check(M, 'the section’s reach (child containers)',
+      'every type that owns a Children section now owns Mouse too, so Child Clicks is offered exactly where a nested target can exist',
+      ['Container', 'Group', 'TabContainer', 'ScrollArea'], reach.containersWithMouse);
 
     await kit.fresh();
     const label = await kit.make('Label', { 'Transform.x': 60, 'Transform.y': 120,
@@ -131,6 +134,64 @@ try {
       'and a property written onto a type that has no Mouse section does not quietly appear there — `createControl` builds only the sections a type declares, so the write lands nowhere rather than half-creating one',
       null, await kit.read(label, 'Mouse'));
   }
+
+  // =============================================================================================
+  // interceptChildClicks — whether the nested control or its container owns the runtime gesture.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const parent = await kit.make('Container', { 'Transform.x': 70, 'Transform.y': 110,
+      'Transform.width': 300, 'Transform.height': 170, 'Core.name': 'Parent' });
+    const child = await kit.make('ToggleButton', { 'Transform.width': 150,
+      'Transform.height': 60, 'Core.name': 'Child' });
+    await kit.page.evaluate(async ({ child, parent }) => {
+      const { reparentControls } = await import('/src/CE_Application/stores/controls.js');
+      reparentControls([{ id: child, x: 45, y: 45 }], parent);
+    }, { child, parent });
+    await kit.preview(true);
+    await kit.settle(550);
+
+    const targetAtChild = async () => {
+      const b = await kit.box(child);
+      return kit.page.evaluate(({ x, y }) =>
+        document.elementFromPoint(x, y)?.closest?.('[data-control-id]')?.getAttribute('data-control-id') ?? null,
+      { x: b.x + b.w / 2, y: b.y + b.h / 2 });
+    };
+
+    const targetOn = await targetAtChild();
+    await kit.click(await (async () => {
+      const b = await kit.box(child);
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    })());
+    const childAfterOn = await kit.session(child);
+    led.check(M, 'interceptChildClicks (true)',
+      'the preserved default makes the nested toggle the hit-test target and the gesture changes that child at runtime',
+      { target: child, childChanged: true },
+      { target: targetOn, childChanged: childAfterOn?.pressed === false
+        && Number.isFinite(childAfterOn?.pointerX) });
+
+    await kit.set(parent, { 'Mouse.interceptChildClicks': false });
+    await kit.settle(350);
+    const targetOff = await targetAtChild();
+    const childBeforeOff = await kit.session(child);
+    await kit.click(await (async () => {
+      const b = await kit.box(child);
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    })());
+    led.check(M, 'interceptChildClicks (false)',
+      'off makes the container one opaque hit area: the same point targets the parent and the nested toggle does not change again',
+      { target: parent, childUnchanged: true },
+      { target: targetOff,
+        childUnchanged: JSON.stringify(await kit.session(child)) === JSON.stringify(childBeforeOff) });
+
+    const again = await kit.reopen(parent);
+    await kit.settle(500);
+    led.check(M, 'interceptChildClicks (save/reopen)',
+      'the off-state survives a fresh runtime and still routes a point over the visible child to the reopened parent',
+      { stored: false, target: again },
+      { stored: await kit.read(again, 'Mouse.interceptChildClicks'), target: await targetAtChild() });
+  }
+  await kit.preview(false);
 
   // =============================================================================================
   // interceptClicks — the click either lands here or falls through to what is behind.
@@ -478,15 +539,11 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
-  // The two fields with nothing behind them.
+  // The one field with nothing behind it.
   // =============================================================================================
   led.unsupported(M, 'draggable',
     'move this control with the pointer at runtime',
     'the Mouse tab offers no cell for it and nothing in src/ reads it. Deliberate, and the reason is written at MouseEditor.svelte:13 — moving a control with the pointer at runtime is a feature rather than a setting, and there is no runtime behind it. It is in the model defaults only because the whole section shipped there before anything read any of it, and the four range types then set it to true in their templates, which reads as a promise and is not one. Smallest honest release treatment: leave the key (removing a defaulted field rewrites every panel on disk for no gain) and drop `draggable: true` from the four type templates, so nothing in a saved document claims a behaviour that does not exist.');
-
-  led.inert(M, 'interceptChildClicks',
-    'let the parts inside this control take the pointer themselves',
-    'READ, AND UNREACHABLE. CanvasControl consumes it (`children-interactive` on `.children-clip`, re-enabling pointer events the clip layer otherwise refuses) and the CSS comment beside it describes the case exactly: "a decorative frame can stop taking clicks without disabling the controls it contains". But the children layer only renders for a control that HAS children, and no type has both sections: Children belongs to Container, Group, TabContainer and ScrollArea, and Mouse to Range, Number, Slider, Knob and CustomComponent. The intersection is empty, so the cell is in the tab for every control that can never use it. Smallest honest release treatment is a decision for the owner, not a fix to make here: either hide the cell (it is one `{#if}`) or add `Mouse` to the four container types, which is what the CSS was written for and would also give a container `interceptClicks` and `cursor`. Recorded rather than done because adding a section to a type changes the shape of every newly created control of it.');
 
   // =============================================================================================
   // save/reopen — the section is authored state, so a fresh runtime has to carry all of it.
