@@ -86,6 +86,26 @@ document itself arrived. If it is to be reviewed and executed rather than rewrit
 It is described as a fragment for the `componentBehavior.mjs` harness whose fixture coordinates and
 custom-part colour selectors may need adjustment, and explicitly as not evidence until it runs.
 
+**Before building anything: most of the panel already exists, and it is GENERATED.**
+`CE/qa/QA-01-components.cepanel` places **all 58 registered types** — `TestBox` included — across 125
+controls. `qaPanels.test.js` already regenerates every sheet in memory, server-renders every control
+on it, and fails if the committed copy differs. So the built-in half of "a panel containing almost
+every built-in" is done, and rebuilding it by hand would be work thrown away twice over: once
+because it exists, and once because `CE/qa/README.md` says in bold not to hand-edit these files.
+They are generated from the model and hand edits are lost on the next regeneration. **Change
+`tools/scripts/qa/make-qa-panels.mjs` instead.**
+
+What is genuinely missing from it is two things, and they are the two the combined-panel assignment
+is actually about:
+
+- **The custom starters.** `CUSTOM_COMPONENT_STARTERS` exports 14; QA-01 carries **one**
+  `CustomComponent` instance. Extending the generator to place all 14 is the smaller and more
+  durable job than authoring a second panel beside it.
+- **Interaction.** QA-01 is a render sheet. Every control on it is drawn and checked; none of it is
+  touched. Independent selection and gestures, linked values and outputs, clock-driven components
+  running together, undo/redo, save/reopen and responsiveness are all still to do, and they are
+  what the assignment is for.
+
 One thing that pass should look for specifically, because this pass found it twice and both times it
 was invisible in the drawing: **live state written to one place and read from another.** D-15 is the
 clean example — the Phrase song chain swapped the riff into the preview session, the renderer read
