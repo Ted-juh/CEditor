@@ -80,6 +80,9 @@ found, both fixed — the second is D-15).
 `behaviourRecorder.mjs` — 42 verified, 0 inert, 2 unverified, 1 closed elsewhere, 0 open defects.
 `behaviourOutbound.mjs` — 53 verified, 8 inert, **0 unverified**, 0 open defects (one found, fixed:
 D-15). Bytes on the wire and the panel key; it also carries the derived inert sweep.
+`behaviourColours.mjs` — 36 verified, 0 inert, 0 unverified, 0 open defects. The colour tail the
+coverage matrix turned up: thirteen components, and nine of the properties only exist under a
+condition the fixture has to arrange — see the note below.
 `behaviourLinks.mjs` — 33 verified, 0 inert, 0 unverified, 0 open defects. The suite that exists to
 close the rows the old ledger called unobservable; see the section on those below.
 
@@ -777,6 +780,42 @@ thing heard when the chain is off, so the first row cannot pass by accident.
 path, a store the same render reads. This is the same seam from the other side: writing live state
 to one place and reading it from another. Worth stating as its own rule, because the two look
 nothing alike in the code and are the same mistake about where state lives.
+
+---
+
+## A property can be alive and invisible, which is how a sweep kills one
+
+Worth its own heading because it is the most reusable thing this pass learned, and it points the
+opposite way from the inert sweep beside it.
+
+`behaviourColours.mjs` covers thirty-six colour and size properties across thirteen components.
+**Nine of them do not exist until a condition is arranged**, and every one would read as dead to a
+check that merely set the property and looked for it:
+
+| Property | Invisible until |
+| --- | --- |
+| `Arp.restColour` | a step that never fires in the WHOLE cycle — nine cells under an eight-step mask have none |
+| `Arp.headColour` | the sequence is running |
+| `Arp.stepColour` | a step that does fire |
+| `SplitZone.litColour` | a note is held down |
+| `DrumPads.hitColour` | a pad is HELD — a click is measured after the halo has gone |
+| `NoteRibbon.touchColour` | a finger is on the strip |
+| `Kinetic.labelColour` | gravity is above 0.01, since it paints only the gravity hint |
+| `Keyboard.outOfKeyColour` | a key whose NATURALS fall outside it — C major has none |
+| `ChordPad.minorColour` | the wheel layout; the grid layout has no rings |
+| `Ribbon.wheelColour` | the wheel style; `style` defaults to the flat strip |
+
+And four rows found nothing on the first attempt without any of them being a product bug: a fixture
+whose grid was shorter than assumed, a layout with no rings, an axis read the wrong way round, and a
+colour spelled `rgb(0, 170, 255)` by `getComputedStyle` against the `rgba(0,170,255,1)` the renderer
+produces.
+
+**The rule.** The inert sweep's danger is a false positive — calling a live property dead because
+its key is built by concatenation. This is the same danger from the other side, and it is worse,
+because the evidence looks like diligence: you set the property, you looked, you found nothing.
+A null result is a lead. Read the renderer, find the condition, and pair every colour row with a
+negative — the grid layout wearing none of the minor colour, the chromatic keyboard wearing none of
+the out-of-key colour — so that a renderer painting everything one colour fails instead of passing.
 
 ---
 
