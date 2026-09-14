@@ -1677,10 +1677,13 @@ try {
         'SplitZone.zones': [zone(), zone({ id: 'z1', lowNote: 60, highNote: 96, channel: 2 })] });
     }
 
-    led.unverified(Z, 'zones[].ccMode / ccList / sustain / bendMode / pressureMode / polyPressure',
+    led.closed(Z, 'zones[].ccMode / ccList / sustain / bendMode / pressureMode / polyPressure',
       'which controllers, sustain, bend and pressure each zone forwards',
-      'these route CONTROLLER traffic rather than notes; the note funnel does not carry it and the outbound '
-      + 'boundary capture root uses is the right instrument. Listed rather than claimed.');
+      'behaviourOutbound.mjs, at the outbound boundary this row correctly named as the right instrument: '
+      + 'ccMode all/none/list, a ccList that passes 74 and not 1, sustain as its own switch, one message '
+      + 'per channel when two zones share one, bendMode off/always/lastPlayed, pressureMode with sounding '
+      + 'told apart from lastPlayed by releasing the key, and polyPressure following its note through the '
+      + "zone's transposition.");
 
     // --- save and reopen, then route again -----------------------------------------------------------------------------
     {

@@ -64,8 +64,8 @@ renderer ever reading it.
 | (nested components) | — | 6 | — | — | **1** |
 
 `behaviourCurves.mjs` — 146 verified, 2 inert, 0 unverified, 4 closed elsewhere, 0 open defects.
-`behaviourNotes.mjs` — 204 verified, 1 inert, 1 unverified, 4 closed elsewhere, 0 open defects (four
-found, all fixed).
+`behaviourNotes.mjs` — 204 verified, 1 inert, **0 unverified**, 5 closed elsewhere, 0 open defects
+(four found, all fixed).
 `behaviourMotion.mjs` — 113 verified, 1 inert, 0 unverified, 6 closed elsewhere, 0 open defects (the two
 found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
