@@ -273,6 +273,134 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // The built-ins AND all fourteen custom starters, on ONE panel.
+  //
+  // QA-01 and QA-07 are two committed sheets ON PURPOSE, and the generator says why: QA-01 is every
+  // component TYPE at its authored defaults, and there is one `CustomComponent` type, which renders
+  // as whatever package it carries — so placing it proves nothing about the fourteen real starters.
+  // QA-07 builds those through `createCustomComponentStarterPatch`, the same patch the designer's
+  // Starters flyout applies, because they arrive by a different code path entirely
+  // (`instantiateCustomComponentPackageControl`, not `createControl`).
+  //
+  // Two sheets is right for looking at. It is not enough for the question the combined pass exists
+  // to ask, which is whether the two KINDS interfere when they share a surface — so this block
+  // builds that panel here, at run time, rather than forcing the two sheets together and churning a
+  // committed file that is deliberately split.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const both = await kit.page.evaluate(async ({ json }) => {
+      const { deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
+      const { addPanel, panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const { createControl } = await import('/src/CE_Application/models/componentTypes.js');
+      const { CUSTOM_COMPONENT_STARTERS, createCustomComponentStarterPatch } =
+        await import('/src/CE_Application/utils/customComponentFactory.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+
+      // The sheet's own builder, kept identical on purpose: a starter that breaks in the app has to
+      // break here too, which a hand-written fixture would not guarantee.
+      const buildStarter = (starter, id) => {
+        const control = createControl('CustomComponent', { Core: { id, name: id } });
+        const patch = createCustomComponentStarterPatch(starter.id);
+        for (const [dotPath, value] of Object.entries(patch ?? {})) {
+          const parts = String(dotPath).split('.');
+          if (parts.length === 1) { control._children[parts[0]] = value; continue; }
+          const field = parts.pop();
+          let node = control._children;
+          for (const key of parts) node = node?.[key]?._children ?? node?.[key];
+          if (node && typeof node === 'object') node[field] = value;
+        }
+        const size = starter.dimensions ?? {};
+        control._children.Transform = {
+          ...control._children.Transform,
+          width: Math.max(120, size.width ?? 180),
+          height: Math.max(80, size.height ?? 140),
+        };
+        return control;
+      };
+
+      const panel = deserializePanel(json, '', 'QA-01 + starters');
+      const starters = CUSTOM_COMPONENT_STARTERS.map((starter, i) => {
+        const control = buildStarter(starter, `mix_${starter.id}`);
+        control._children.Transform.x = 1660;
+        control._children.Transform.y = 40 + i * 200;
+        return control;
+      });
+      panel.controls = [...(panel.controls ?? []), ...starters];
+      panel.width = Math.max(panel.width ?? 1600, 2100);
+      addPanel(panel);
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const flat = (cs, out = []) => {
+        for (const c of cs ?? []) {
+          out.push(c);
+          const kids = c?._children?.Children?._children;
+          if (kids) flat(Object.values(kids), out);
+        }
+        return out;
+      };
+      const all = flat(live?.controls ?? []);
+      return {
+        total: all.length,
+        starters: starters.map((c) => String(c._children.Core.id)),
+        starterCount: CUSTOM_COMPONENT_STARTERS.length,
+      };
+    }, { json });
+    await kit.settle(1800);
+    const beforeErrors = kit.failures.length;
+    await kit.preview(true);
+    await kit.settle(3000);
+
+    led.check(P, 'the built-ins and every custom starter on one panel',
+      'all fourteen starters, built through the same patch the designer applies, added to the catalogue rather than sitting on a sheet of their own — which is the only arrangement in which the two kinds can interfere at all',
+      { starters: 14, total: 139 },
+      { starters: both.starterCount, total: both.total });
+
+    const mixed = await surfaceReport();
+    led.check(P, 'and every one of them mounts and draws',
+      'a hundred and thirty-nine controls, each with an element on the surface and something of its own drawn inside it — a custom component that renders beside a built-in is the case QA-01 cannot reach and QA-07 only reaches alone',
+      { rendered: both.total, blank: [] },
+      { rendered: mixed.length, blank: mixed.filter((n) => n.parts === 0).map((n) => n.id).slice(0, 6) });
+
+    led.check(P, 'starters specifically',
+      'and the fourteen are among them rather than mounting as empty shells: each has an element and drew inside it',
+      { missing: [], blank: [] },
+      { missing: both.starters.filter((id) => !mixed.some((n) => n.id === id)),
+        blank: mixed.filter((n) => both.starters.includes(n.id) && n.parts === 0).map((n) => n.id) });
+
+    led.check(P, 'no page errors with both kinds on the surface at once',
+      'the mixed panel raises nothing while it mounts and enters preview',
+      beforeErrors, kit.failures.length);
+
+    // Independence ACROSS the two kinds: drive a built-in, and check no starter moved with it.
+    const starterValues = async () => {
+      const out = {};
+      for (const id of both.starters) out[id] = JSON.stringify((await kit.session(id))?.customValues ?? {});
+      return out;
+    };
+    const builtIn = await kit.page.evaluate(async () => {
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const hit = (live?.controls ?? [])
+        .find((c) => String(c?._children?.Core?.controlType ?? '') === 'Slider');
+      return hit ? String(hit._children.Core.id) : '';
+    });
+    const beforeValues = await starterValues();
+    const { box: sbox, visible: sVisible } = await bringIntoView(builtIn);
+    led.check(P, 'the built-in slider can be reached on the mixed panel too',
+      'the panel is wider as well as tall now, so the same scroll-into-view precondition applies on both axes',
+      true, sVisible);
+    await kit.drag({ x: sbox.x + sbox.w * 0.2, y: sbox.y + sbox.h / 2 },
+      { x: sbox.x + sbox.w * 0.85, y: sbox.y + sbox.h / 2 });
+    await kit.settle(700);
+    const afterValues = await starterValues();
+    led.check(P, 'and driving a built-in leaves every custom component alone',
+      'dragging the slider changes the slider and not one of the fourteen custom components — the two kinds keep their own value stores, which is the interference this whole block exists to ask about',
+      [], both.starters.filter((id) => beforeValues[id] !== afterValues[id]));
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
