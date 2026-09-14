@@ -344,6 +344,110 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // KEYBOARD, DRUM PADS, TRANSPORT, ROUTER — three more conditionals and one plain grid.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const K = 'Keyboard';
+    // OUT-OF-KEY ONLY PAINTS A WHITE KEY. A black key outside the scale takes the black colour, so
+    // the row has to be read on the naturals — and it needs a key where some naturals are OUT, which
+    // C major is not: every white key is in C major. C minor leaves E, A and B outside, three per
+    // octave, and the fixture spans two.
+    const kid = await kit.make(K, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 620, 'Transform.height': 160, 'Keyboard.lowNote': 48,
+      'Keyboard.highNote': 72, 'Keyboard.key': 0, 'Keyboard.scale': 'minor',
+      'Keyboard.outOfKeyColour': C.out });
+    await kit.preview(true);
+    await kit.settle(380);
+    const outs = await kit.shapes(kid, 'rect', (n) => n.fill === rgba(C.out));
+    led.check(K, 'outOfKeyColour', 'the naturals outside the scale take the out-of-key colour — in C minor that is E, A and B, twice over a two-octave span, plus the top C\'s neighbours',
+      true, outs.length >= 6);
+    await kit.set(kid, { 'Keyboard.scale': 'chromatic' });
+    await kit.settle(320);
+    led.check(K, 'outOfKeyColour (a scale with nothing outside it)',
+      'and a chromatic keyboard has no key outside its scale at all, so none of them wears it',
+      0, (await kit.shapes(kid, 'rect', (n) => n.fill === rgba(C.out))).length);
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const D = 'DrumPads';
+    const did = await kit.make(D, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 360, 'Transform.height': 360, 'DrumPads.rows': 2,
+      'DrumPads.cols': 2, 'DrumPads.baseNote': 36, 'DrumPads.showHeader': true,
+      'DrumPads.hitColour': C.hit });
+    await kit.preview(true);
+    await kit.settle(380);
+    const lit = async () => (await kit.shapes(did, 'rect', (n) => n.fill === rgba(C.hit))).length;
+    const before = await lit();
+    // Held rather than clicked: the halo is drawn for the pad that is DOWN, so a press-and-release
+    // would be measured after it had already gone.
+    const box = await kit.box(did);
+    await kit.page.mouse.move(box.x + box.w * 0.25, box.y + box.h * 0.75);
+    await kit.page.mouse.down();
+    await kit.settle(280);
+    const during = await lit();
+    await kit.page.mouse.up();
+    await kit.settle(280);
+    led.check(D, 'hitColour', 'the pad under the finger wears a halo in the hit colour while it is struck, and no pad wears one before the strike',
+      { before: 0, during: true }, { before, during: during >= 1 });
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const T = 'Transport';
+    // beatColour paints the count-in ring and the beat pips. The count-in is the reachable half
+    // from here: it draws a ring round the play button and turns the readout that colour, and it is
+    // a state the panel can be put into without waiting for a particular beat to come round.
+    const tid = await kit.make(T, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 420, 'Transform.height': 80, 'Transport.bpm': 90,
+      'Transport.source': 'internal', 'Transport.countInBars': 2, 'Transport.showPosition': true,
+      'Transport.beatColour': C.beat });
+    await kit.preview(true);
+    await kit.settle(380);
+    const inBeat = async () => (await kit.shapes(tid, 'circle', (n) => n.stroke === rgba(C.beat))).length
+      + (await kit.shapes(tid, 'text', (n) => n.fill === rgba(C.beat))).length;
+    const idle = await inBeat();
+    await kit.page.evaluate(async () => {
+      const { startTransportWithCountIn } = await import('/src/CE_Application/stores/transport.js');
+      startTransportWithCountIn(2, 0);
+    });
+    await kit.settle(400);
+    const counting = await inBeat();
+    await kit.page.evaluate(async () => {
+      const { stopTransport } = await import('/src/CE_Application/stores/transport.js');
+      stopTransport();
+    });
+    await kit.settle(300);
+    led.check(T, 'beatColour', 'counting in, the transport rings its play button and turns its readout the beat colour, and neither wears it while the clock is idle',
+      { idle: 0, counting: true }, { idle, counting: counting >= 1 });
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const R = 'Router';
+    const rid = await kit.make(R, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 420, 'Transform.height': 220, 'Router.showGrid': true,
+      'Router.gridColour': C.grid });
+    await kit.preview(true);
+    await kit.settle(380);
+    const lines = await kit.shapes(rid, 'line', (n) => n.stroke === rgba(C.grid));
+    led.check(R, 'gridColour', 'the transfer curve\'s grid lines take the grid colour, both directions of them',
+      true, lines.length >= 4);
+    // …and showGrid turns them off, which is the row that proves the colour is on the grid rather
+    // than on something else that happens to be the same shape.
+    await kit.set(rid, { 'Router.showGrid': false });
+    await kit.settle(320);
+    led.check(R, 'gridColour (with the grid switched off)',
+      'and nothing wears it once the grid is switched off, so the colour really is the grid\'s',
+      0, (await kit.shapes(rid, 'line', (n) => n.stroke === rgba(C.grid))).length);
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
