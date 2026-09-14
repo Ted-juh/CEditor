@@ -1,7 +1,7 @@
 # QA panel suite
 
 Generated `.cepanel` sheets that put the program's own surface on screen, so a beta pass is
-"open eight files and look" rather than a checklist nobody finishes.
+"open nine files and look" rather than a checklist nobody finishes.
 
 **Do not hand-edit these files.** They are generated from the model, and edits are lost on the next
 regeneration. Change the generator instead:
@@ -16,9 +16,10 @@ server-renders every control on it, and fails if the committed copy differs.
 
 ## The sheets
 
-Eight sheets, numbered in the order a pass runs them: what renders, what renders under pressure,
+Nine sheets, numbered in the order a pass runs them: what renders, what renders under pressure,
 what happens when you touch it, what a script can do to it, what the component API can do to it, a
 whole real device, the components a user builds themselves, and what leaves the building.
+QA-09 then deliberately combines the hardest custom-component paths in one interactive rig.
 
 | File | What it proves | What it cannot prove |
 |---|---|---|
@@ -30,6 +31,7 @@ whole real device, the components a user builds themselves, and what leaves the 
 | `QA-06-roland-gaia.cepanel` | A real hardware editor: **every parameter of the Roland GAIA SH-01 profile bound to a control**, all three tone layers on screen at once, each control adopting its range and choices from the profile. | Without a synth attached it proves the bytes we would send, not that the synth liked them. |
 | `QA-07-packages.cepanel` | All **14 custom-component starters**, built through the designer's own patch, instantiated by the real package path, each printing its readiness verdict. This is the sheet QA-02's eleven authoring exemptions defer to. | Wiring is validated, not exercised. A hit zone pointing at the right behavior and never firing looks identical here. |
 | `QA-08-export.cepanel` | **The parameter list the exported plugin will have.** Which of the 50 types export anything and which do not and why, plus 14 recipes for the derivation branches a default panel never reaches — named choices, device wires, raw CC and NRPN, the inbound-only messages that must get no wire. | That the host and the panel agree. The C++ processor builds its APVTS from the same document, and the two have drifted before. |
+| `QA-09-custom-stress.cepanel` | **Fourteen package-instantiated custom components under pressure:** arcs, ticks, meters, grids, XY, envelope, waveform icons, arpeggiator, keyboard and matrix, plus an XY→meter public route and JavaScript→Lua visual side effects. | Physical MIDI and DAW-host behavior remain separate platform checks. |
 
 ### About QA-06
 

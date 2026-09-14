@@ -14,6 +14,8 @@ import {
   resolveCustomInteractionPatch,
 } from '../src/CE_Application/utils/customComponentInteraction.js';
 import { createCustomComponentStressTest } from '../src/CE_Application/utils/customComponentStressTest.js';
+import { createCustomComponentStressPanel } from '../src/CE_Application/utils/customComponentStressTest.js';
+import { createCustomComponentExportEnvelope } from '../src/CE_Application/utils/customComponentPackage.js';
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { applyPatchObject } from '../src/CE_Application/stores/controlTreeUtils.js';
@@ -70,6 +72,26 @@ test('custom component starters create valid package-ready controls', () => {
     assert.ok(Object.keys(control._children.ValueChannels._children).length >= 1);
     assert.ok(Object.keys(control._children.PublishedProperties.outputs).length >= 1);
   }
+});
+
+test('the adversarial stress rig instantiates all fourteen packages with its route and two-language script chain', () => {
+  const stress = createCustomComponentStressTest();
+  assert.equal(stress.definitions.length, 14);
+  const entries = stress.definitions.map((definition) => ({
+    ...definition,
+    envelope: createCustomComponentExportEnvelope(definition.component, definition.metadata),
+  }));
+  const panel = createCustomComponentStressPanel(entries);
+
+  assert.equal(panel.controls.length, 14);
+  assert.deepEqual(panel.controls.map((control) => control._children.Core.controlType),
+    Array(14).fill('CustomComponent'));
+  assert.deepEqual(panel.scripts.map((script) => script.language).sort(), ['javascript', 'lua']);
+  assert.deepEqual(panel.scripts.map((script) => script.event), ['onValueChanged', 'onValueChanged']);
+  const route = panel.controls[6]._children.Links._children.stress_xy_x_to_meter_level;
+  assert.equal(route.source, 'x');
+  assert.equal(route.targetControlId, 'stress_instance_5');
+  assert.equal(route.targetPort, 'level');
 });
 
 test('custom component starters replace stale default runtime targets', () => {

@@ -25,7 +25,7 @@ disjoint hunks.
 
 ### Current Windows evidence
 
-- Full Node suite: **4,871/4,871 passed**, zero failures or skips.
+- Full Node suite: **4,876/4,876 passed**, zero failures or skips.
 - Script-export checks: **7 passed**, 2 environment skips (C# SDK and Java compiler absent).
 - Frontend production build: passed.
 - Eight directly affected browser ledgers: Lists 19, Mouse 42, Widgets 18, Motion 115, Steps 73,
@@ -45,6 +45,28 @@ disjoint hunks.
   scanner/worker: 64 blocks, state serialization/restore, worker alive. The scripted export emitted
   CC 20/21/22 with no window open. The generic Player and built standalone each started responsive
   with a WebView2 child process.
+
+### Adversarial custom-component follow-up
+
+The deterministic QA set now also includes `QA-09-custom-stress.cepanel`: fourteen deliberately
+dense package-instantiated controls, including generated piano and modulation-matrix zones. Its
+routed chain drives XY Pad `x` into Segment Meter `level`; a JavaScript value-change handler selects
+a waveform, then a Lua handler mirrors meter changes into a vertical LED ladder.
+
+- `npm run test:browser:custom`: **100 verified rows, zero defects** across the existing custom,
+  export and new stress ledgers. The 17 stress rows measure painted parts and sampled colours, real
+  dial/range/button/transport/keyboard/matrix/XY gestures, exact enum payloads, routed values,
+  JavaScript and Lua logs and visible side effects, then repeat the script/link chain after a fresh
+  save/reopen. The older custom ledger retains one explicitly unverified display-only classification;
+  it is not a failure and the generated-zone interactions are covered by the stress ledger.
+- The QA generator reproduces all nine committed sheets byte-for-byte. The frontend production
+  build passes, as do **4,876 unit tests** and **34/34 native tests**.
+- Compiler-free export of QA-09 generated a distinct 25-parameter VST3. The staged scanner and
+  worker loaded it out of process, processed 64 blocks and restored 3,072 bytes of state.
+
+This follow-up changes the stress fixture, acceptance coverage and committed QA material, not the
+installed application binaries. The native dialog limitation and the physical MIDI/DAW/platform
+deferrals below are unchanged.
 
 The refreshed native file-dialog/recovery walkthrough is the one partial gate. CEditor itself
 starts cleanly, and the current browser workflow proves save/share/reopen semantics, but the

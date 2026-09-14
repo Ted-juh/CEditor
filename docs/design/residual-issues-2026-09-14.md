@@ -10,6 +10,12 @@ to overclaim:
 - **Unverified** — real behaviour this pass has not measured, with the actual reason.
 - **Not proven** — things no test here could establish, however green it is.
 
+The custom-component stress follow-up adds a ninth deterministic QA sheet and 17 browser rows. It
+closes generated piano/matrix interaction, a routed XY-to-meter value, JavaScript-to-Lua visible
+side effects and save/reopen persistence for one deliberately dense fourteen-component panel. Its
+compiler-free VST3 also passes isolated scan, processing and state restore. This does not change the
+native-dialog, physical-MIDI, broader-DAW or non-Windows limits recorded below.
+
 ---
 
 ## 1. Inert options — declared, and read by nothing

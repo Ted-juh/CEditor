@@ -12,6 +12,7 @@ import {
   createValueChannel,
 } from './customComponentFactory.js';
 import { instantiateCustomComponentPackageControl } from './customComponentPackage.js';
+import { createScript } from '../scripting/scriptModel.js';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -995,7 +996,7 @@ export function createCustomComponentStressTest() {
     waveformSelectorComponent(),
     keyboardComponent(),
     modMatrixComponent(),
-  ].slice(0, 12);
+  ];
 
   return {
     generatedAt: new Date().toISOString(),
@@ -1011,7 +1012,7 @@ export function createCustomComponentStressPanel(entries = []) {
   panel.bgColour = 'FF202427';
   panel.gridEnabled = true;
   panel.gridSize = 20;
-  panel.description = 'Stress panel generated from 12 saved custom component packages.';
+  panel.description = 'Stress panel generated from 14 saved custom component packages, with a routed and scripted runtime chain.';
   panel.notepad = {
     activeNoteIndex: 0,
     notes: [
@@ -1035,9 +1036,11 @@ export function createCustomComponentStressPanel(entries = []) {
     [760, 330, 720, 300],
     [30, 520, 280, 150],
     [350, 540, 260, 100],
+    [660, 680, 300, 110],
+    [1010, 665, 190, 190],
   ];
 
-  panel.controls = entries.slice(0, 12).map((entry, index) => {
+  panel.controls = entries.slice(0, 14).map((entry, index) => {
     const [x, y, width, height] = placements[index];
     const control = instantiateCustomComponentPackageControl(entry.envelope ?? entry, {
       id: `stress_instance_${index + 1}`,
@@ -1053,12 +1056,70 @@ export function createCustomComponentStressPanel(entries = []) {
     return control ?? clone(entry.component);
   }).filter(Boolean);
 
+  // One deliberately cross-cutting chain turns this from a gallery into a runtime rig:
+  // XY Pad.x routes to Segment Meter.level, JavaScript selects a waveform from the same gesture,
+  // and Lua mirrors the routed meter value into the LED ladder. The browser acceptance pass
+  // asserts all three visible results after a real drag and after a save/reopen.
+  const xy = panel.controls.find((control) => control?._children?.Core?.id === 'stress_instance_7');
+  if (xy?._children?.Links?._children) {
+    xy._children.Links._children.stress_xy_x_to_meter_level = {
+      _type: 'Link',
+      name: 'stress_xy_x_to_meter_level',
+      enabled: true,
+      type: 'external-output',
+      source: 'x',
+      target: 'stress_instance_5.level',
+      targetControlId: 'stress_instance_5',
+      targetPort: 'level',
+      condition: '',
+      expression: '',
+      notes: 'QA-09 runtime chain: XY x drives the segment meter.',
+      routeMeta: {
+        source: { controlId: 'stress_instance_7', label: 'X', type: 'float' },
+        target: { controlId: 'stress_instance_5', label: 'Level', type: 'float' },
+        compatibility: 'compatible',
+        warning: '',
+      },
+    };
+  }
+
+  panel.scripts = [
+    createScript({
+      id: 'stress_xy_waveform_js',
+      name: 'XY chooses waveform (JavaScript)',
+      language: 'javascript',
+      scope: 'component',
+      target: 'XY Pad',
+      event: 'onValueChanged',
+      source: `function onValueChanged(value) {
+  const n = Number(value);
+  set("Waveform Selector.waveform", n >= 0.5 ? "square" : "sine");
+  log("stress-js:" + n.toFixed(3));
+}
+`,
+    }),
+    createScript({
+      id: 'stress_meter_ladder_lua',
+      name: 'Meter mirrors ladder (Lua)',
+      language: 'lua',
+      scope: 'component',
+      target: 'Segment Meter',
+      event: 'onValueChanged',
+      source: `function onValueChanged(value)
+  local n = tonumber(value) or 0
+  set("Vertical LED Ladder.amount", n)
+  log("stress-lua:" .. tostring(n))
+end
+`,
+    }),
+  ];
+
   return panel;
 }
 
 export const CUSTOM_COMPONENT_STRESS_NOTES = `Custom Component Designer stress notes
 
-Generated 12 saved custom components and loaded package instances into one panel:
+Generated 14 saved custom components and loaded package instances into one panel:
 1. Neon Dial - circular arc/tick dial with pointer binding.
 2. Triple Macro Rings - three independent circular channels and hit zones.
 3. Fine Horizontal Scale - horizontal line, generated ticks, fill and thumb bindings.
@@ -1071,6 +1132,13 @@ Generated 12 saved custom components and loaded package instances into one panel
 10. Arpeggiator Sequencer - generated runtime step editor with note blocks.
 11. ADSR Envelope - multi-channel envelope display with draggable phase zones.
 12. Waveform Selector - segmented enum selector with individual hit zones.
+13. Mini Keyboard - generated two-octave keybed with per-key hit zones.
+14. Mod Matrix - generated 4x4 modulation grid with a selected-cell channel.
+
+Runtime chain:
+- XY Pad.x routes through the public component API into Segment Meter.level.
+- A JavaScript onValueChanged handler selects the waveform from the same XY gesture.
+- A Lua onValueChanged handler mirrors the routed meter level into the LED ladder.
 
 What looks strong:
 - The same component package model can represent circular, horizontal, vertical, grid, button, meter, keyboard, and arpeggiator patterns.

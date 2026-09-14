@@ -17,6 +17,7 @@
     "test:screen-runtime": "node browser-checks/screenRuntime.mjs",
     "test:pixel-selection": "node browser-checks/pixelSelection.mjs",
     "test:component-behavior": "node browser-checks/componentBehavior.mjs",
+    "test:browser:custom": "node browser-checks/behaviourCustom.mjs && node browser-checks/behaviourCustomExport.mjs && node browser-checks/behaviourCustomStress.mjs",
     "test:release-workflow": "vite build --config browser-checks/vite.config.mjs && node browser-checks/releaseWorkflow.mjs",
     "qa:panels": "node ../../tools/scripts/qa/make-qa-panels.mjs",
     "docs:manual": "node scripts/generate-scripting-manual.mjs",

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { buildComponentsSheet } from './sheets/components.mjs';
+import { buildCustomStressSheet } from './sheets/customStress.mjs';
 import { buildExportSheet } from './sheets/export.mjs';
 import { buildGaiaSheet } from './sheets/gaia.mjs';
 import { buildPackagesSheet } from './sheets/packages.mjs';
@@ -49,6 +50,7 @@ export const SHEETS = [
   { file: 'QA-06-roland-gaia.cepanel', build: buildGaiaSheet, commit: true },
   { file: 'QA-07-packages.cepanel', build: buildPackagesSheet, commit: true },
   { file: 'QA-08-export.cepanel', build: buildExportSheet, commit: true },
+  { file: 'QA-09-custom-stress.cepanel', build: buildCustomStressSheet, commit: true },
 ];
 
 /**
