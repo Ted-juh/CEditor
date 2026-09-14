@@ -54,6 +54,50 @@ derived verbs that means removing the `show*` key from the section, since the ve
 the declaration rather than written down. **Do not delete a supported property to make a checklist
 green**; every row above was hand-checked precisely so that nobody has to take that risk.
 
+### 1a. `Mouse.interceptChildClicks` — read, and unreachable. Needs a ruling, not a fix
+
+Added after the Mouse pass, and it is a different shape from the nine above: **this one has a
+reader.** `CanvasControl` puts `children-interactive` on the `.children-clip` layer and the CSS
+beside it gives that layer back its pointer events, under a comment that names the use case
+exactly — *"a decorative frame can stop taking clicks without disabling the controls it contains"*.
+
+The layer only exists for a control that **has** children, and no component type can both have
+children and carry the setting:
+
+| | Types |
+| --- | --- |
+| Declare `Children` | Container, Group, TabContainer, ScrollArea |
+| Declare `Mouse` | Range, Number, Slider, Knob, CustomComponent |
+| Both | **none** |
+
+So the Child Clicks chip is in the Mouse tab for every control that can never use it, and absent
+from the four that the feature was written for. Two ways out, and **the choice is the owner's
+because it is a product decision, not a defect fix**:
+
+- **Hide the chip** where the control has no `Children` section. One `{#if}` in `MouseEditor.svelte`;
+  changes no document; leaves the container case unbuilt.
+- **Add `Mouse` to the four container types.** What the CSS was written for, and it would also give a
+  container `interceptClicks` (a transparent decorative frame, which is what a container mostly is),
+  `cursor` and `bringToFrontOnClick`. Bigger: adding a section to a type changes the shape of every
+  newly created control of that type, so the QA panels and the generated fixtures want a look.
+
+Not done here, deliberately. The behaviour pass records what is true; adding a section to four types
+on my own initiative is the kind of change the handoff asks to be proposed rather than taken.
+
+### 1b. The Mouse tab reaches five of fifty-eight types — worth knowing, probably correct
+
+Not a defect and not on anybody's list, but it surprised this pass and it belongs where somebody
+will find it. `Mouse` is declared by **Range, Number, Slider, Knob and CustomComponent**. A Label,
+a Button, an LCD, a Meter, a Keyboard — the other fifty-three — have no Mouse section at all, and a
+write to `Mouse.cursor` on one of them is silently dropped rather than creating the section
+(`createControl` builds only what a type declares; measured, not assumed).
+
+For the drag half that is plainly right: nothing else has a value a drag could move. For `cursor`,
+`interceptClicks`, `hitTestShape` and `bringToFrontOnClick` it is arguable — a decorative Shape that
+does not swallow clicks, or a Label that says "grab" over a drag handle, are both reasonable things
+to want. Recorded as a question rather than a gap, and it is the same question as 1a: which types
+should carry this section.
+
 ## 2. Unverified behaviour, with the real reason
 
 Six rows across eleven suites. Every one that could be closed by looking harder has been: of the
@@ -91,19 +135,22 @@ out to be a property that was never declared.
   drivers, ports or timing on a real machine.
 - **No claim beyond Windows.** macOS and Linux, other DAWs and export formats besides the tested
   VST3 path are not covered by the Windows evidence in `release-readiness-2026-09-13.md`.
-- **The installed RC3 is older than the frontend fixes**, D-1 through D-15 included. The bundle needs
+- **The installed RC3 is older than the frontend fixes**, D-1 through D-18 included. The bundle needs
   refreshing before any acceptance is quoted against it.
 - **Preview is a rehearsal, not the player.** Runtime movement in preview is not an authored value
   saved in the document, and several checks exist only to keep that distinction honest.
-- **Assertion rows are not unique properties.** Eleven suites report a few hundred rows between them;
+- **Assertion rows are not unique properties.** Twelve suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
-  more useful one — 241 of 1,046 declared properties are named by no check at all.
+  more useful one — **204** of 1,046 declared properties are named by no check at all, down from 241
+  when this list was written. The Mouse section accounts for the latest eleven; its remaining two
+  are `interceptChildClicks` and `draggable`, both recorded above rather than papered over with a
+  row that names them and proves nothing.
 
 ## 4. Defects found and fixed in this pass
 
-D-1 through D-15, each with a regression that fails on revert. Recorded in full in
+D-1 through D-18, each with a regression that fails on revert. Recorded in full in
 `editor-behaviour-claude-2026-09-13.md`; the shape is worth carrying into the next pass, because
-fourteen of the fifteen are two mistakes rather than fifteen:
+fourteen of the first fifteen are two mistakes rather than fifteen:
 
 - **D-8 to D-14** were one fault — writing, from the render path, a store that the same render
   reads. Four of them blanked the canvas outright; the rest were silent.
@@ -112,6 +159,20 @@ fourteen of the fifteen are two mistakes rather than fifteen:
   the note-firing path read the document — so the grid and the sound disagreed for as long as the
   song ran, with every pixel correct.
 
-**The lesson for the combined-panel pass** is that neither of those is visible in a screenshot. A
+- **D-16 to D-18** are the first three of the editor-and-shared half, and they are a third shape
+  again: **a setting that is published, edited and saved, and that nothing downstream can act on.**
+  A drag sensitivity with no number to multiply, a relative drag seeded at zero because the path was
+  written when only an absolute one existed, and a Focusable switch outranked by an index its own
+  type template had already set. None of them throws, none of them looks wrong, and all three
+  needed the value measured on the other side of a real gesture.
+
+**The lesson for the combined-panel pass** is that none of those is visible in a screenshot. A
 panel with several clock-driven components running at once is the best chance of finding the next
 one, and the thing to watch is output, not appearance.
+
+**And the lesson from D-16 to D-18 for the rest of priority 2**, where the remaining 204 unreached
+properties are mostly settings rather than sounds: check what a setting does at the far end of the
+chain it belongs to, not that the tab wrote it. Each of the three was written correctly into the
+document and read correctly out of it; the break was one layer further on, in a default that was
+never named, a seed that was never used, or a precedence rule that was right in isolation and wrong
+against the templates the product actually ships.

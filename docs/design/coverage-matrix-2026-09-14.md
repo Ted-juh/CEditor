@@ -31,7 +31,7 @@ await toggle('Ticks');
 
 — so the key `strokeWidth` never appears as text anywhere in a test that exercises it thoroughly
 through the actual authoring surface. Counting only keys reported **386 properties (37%) unreached**.
-Counting labels as well reported **241 (23%)** when this was written, and **212 (20%)** after the
+Counting labels as well reported **241 (23%)** when this was written, **212 (20%)** after the
 colour tail was closed. The first number was wrong, and
 wrong in the worst direction: it called the editor half untested where it is strongest.
 
@@ -80,7 +80,7 @@ Largest concentrations first. Run `node tools/scripts/qa/coverage-matrix.mjs` fo
 | `Behavior` | 48 / 94 | Button modes (`buttonType`, `requiredClicks`, `clickWindow`, `lockoutDuration`), keyboard adjustment (`arrowKeyAdjust`, `pageKeyAdjust`, `homeEndAdjust`), tick geometry and min/max label placement, readout `prefix`/`suffix`/`unit`, and the four `emit*` flags |
 | `Display` | 24 / 64 | LCD image/animation sources, palette and glass, char/line spacing, value prefix/suffix |
 | `Pixel` | 14 / 44 | The same families on the pixel screen, plus `layoutTransition`/`transitionMs` |
-| `Mouse` | 10 / 13 | `cursor`, the three `intercept*`, `draggable`, `hitTestShape`, drag mode/sensitivity, axis inversion |
+| `Mouse` | 10 / 13 → **2 / 13** | closed by `behaviourMouse.mjs`; the two left are `draggable` (not a property) and `interceptChildClicks` (read, unreachable — needs a ruling) |
 | `Designer` | 10 / 13 | Authoring-stage state; arguably not behaviour at all — see below |
 | `ContentLayout` | 8 / 15 | Icon/text offsets and z-order |
 | `Listbox` | 8 / 29 | `density`, `zebra`, `cardRows`, `fadeEdges`, `scrollbar`, `selectionAnim`, `recallOnSelect`, `nowPlaying` |
@@ -111,6 +111,41 @@ other, which is why the rule was to decide deliberately rather than quietly.
 
 The lesson is the one this document already records about the inert sweep, pointed at itself: a
 section that *looks* like bookkeeping is a lead, not a verdict, and the readers are cheap to count.
+
+---
+
+## The editor half, first block: `Mouse` is closed
+
+Re-run after `behaviourMouse.mjs`: **204 of 1,046 (20%)**, down from 212. Eleven of the section's
+thirteen are now exercised by `behaviourMouse.mjs`; the remaining two are recorded with reasons
+rather than given a row that names them and proves nothing:
+
+- `draggable` — not a property. No cell in the tab and no reader anywhere, deliberately.
+- `interceptChildClicks` — read by `CanvasControl`, and unreachable: no component type declares both
+  `Mouse` and `Children`, so the layer it acts on never exists on a control that can carry it. Needs
+  a ruling (see `residual-issues-2026-09-14.md` §1a), not a check.
+
+**Three defects, in a section whose every property reads as a setting.** That is the point worth
+carrying into the rest of this half. `Mouse` looked like the safest block on the list — thirteen
+booleans, an enum and two numbers, no clock, no MIDI, nothing to race — and it produced D-16, D-17
+and D-18. Every one of the three was written correctly into the document, read correctly out of it,
+and broke one layer further on: a sensitivity with nothing to multiply, a drag seeded at zero by a
+path that predated relative tracking, and a Focusable switch outranked by an index its own type
+template had already set.
+
+**What that cost in fixtures, since the remaining blocks will pay the same.** Four of the rows here
+first measured nothing for reasons that were mine, not the product's:
+
+- `Transform.y` past about 240 puts the control under the editor chrome at this viewport, and the
+  press lands on the chrome. Third suite this has caught.
+- `Behavior.defaultValue` does not clear a preview session's `valueOverride`, so "reset it and drag
+  again" measures the previous answer. Every drag comparison here gets its own control.
+- A knob's default `circularDragMode` is `absolute` — jump to the angle under the pointer, and no
+  scrub object at all — so a vertical drag from the centre of an untouched knob moves nothing and
+  reads as a dead sensitivity.
+- The Mouse section is declared by five of the fifty-eight types, so a fixture built on a Label or a
+  Container reports the whole section dead. The suite now measures that reach in its first two rows
+  rather than assuming it.
 
 ---
 
@@ -159,7 +194,8 @@ Unchanged from the handoff's own split, with the matrix attached to it:
 
 - **Editor/properties half:** `Behavior`, `Display`, `Pixel`, `Listbox`, `TabContainer`,
   `ContentLayout`, `Mouse` — 112 of the 244, and all of it authored through the panel that half
-  already drives.
+  already drives. `Mouse` is done (`behaviourMouse.mjs`, 38 verified, three defects); `Behavior` at
+  48 unreached is the largest block left and the obvious next one.
 - **Behaviour/output half:** the colour tail on the music components, `ExternalAPI`, and the
   authoring-stage rows the per-component ledgers now carry explicitly (`Setlist.scenes[].note`,
   `Recorder.slot`, the `quantizeTake` argument group).

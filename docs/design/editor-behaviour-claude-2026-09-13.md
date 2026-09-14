@@ -85,6 +85,9 @@ coverage matrix turned up: thirteen components, and nine of the properties only 
 condition the fixture has to arrange — see the note below.
 `behaviourLinks.mjs` — 33 verified, 0 inert, 0 unverified, 0 open defects. The suite that exists to
 close the rows the old ledger called unobservable; see the section on those below.
+`behaviourMouse.mjs` — 38 verified, 1 inert, **0 unverified**, 1 not a property, 0 open defects
+(three found, all fixed: D-16, D-17, D-18). The first suite of the editor-and-shared half: the
+whole Mouse section, which the coverage matrix found entirely unreached.
 
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
@@ -780,6 +783,169 @@ thing heard when the chain is off, so the first row cannot pass by accident.
 path, a store the same render reads. This is the same seam from the other side: writing live state
 to one place and reading it from another. Worth stating as its own rule, because the two look
 nothing alike in the code and are the same mistake about where state lives.
+
+---
+
+## D-16 — a drag sensitivity that only worked where it was not needed
+
+**Fixed.** `utils/scrubRuntime.js`, `withMouse`.
+
+The Mouse tab has a Drag Mode selector and, in the cell beside it, a Sensitivity number with the
+hint *"Multiplier on the control's own drag rate. 1 leaves it exactly as it is; 2 makes the same
+travel cover twice the range."* Setting the mode to `relative` and the sensitivity to 3 on a slider
+changed nothing at all. Setting it to 0.5 changed nothing either. The field was live on a knob and
+dead on a slider, and nothing in the tab said so.
+
+`mouseScrubOverrides` scales an existing number rather than inventing one:
+
+```js
+const sensitivity = getDragSensitivity(mouse);
+if (sensitivity !== 1 && Number.isFinite(Number(resolved?.sensitivity))) {
+  overrides.sensitivity = Number(resolved.sensitivity) * sensitivity;
+}
+```
+
+That guard is right for the case it was written for. `presets.linearHorizontal` is
+`{ axis: 'x', tracking: 'absolute' }` — **no sensitivity at all**, deliberately, because an
+absolute mapping has nothing to scale: the value *is* the pointer's position along the track, and
+multiplying it is meaningless. A knob carries `sensitivity: 1/250` in its preset and scales
+properly.
+
+**What the guard missed is that the same section can turn the absolute mapping into a relative
+one.** `dragMode: 'relative'` sets `tracking: 'relative'`, and from that moment `pixels ×
+sensitivity` is the whole of the arithmetic — with the core's own `defaultOptions.sensitivity`
+(1/200) silently supplying the number. So the mode made the sensitivity meaningful and the
+sensitivity was then dropped on the floor, one cell away in the same tab.
+
+The fix names the default before the section is layered on, so there is something to multiply:
+
+```js
+if (overrides.tracking === 'relative' && !Number.isFinite(Number(options?.sensitivity))) {
+  const base = { ...options, sensitivity: defaultOptions.sensitivity };
+  return { ...base, ...mouseScrubOverrides(mouse, base) };
+}
+```
+
+An absolute track is untouched and still ignores the field, which is correct and is now a row of its
+own: two sliders at sensitivity 1 and 3 land on the same tenth, because the pointer went to the
+same place.
+
+**The regression** is in `behaviourMouse.mjs`: a slider in relative mode at sensitivity 3, dragged
+30 px, must land at 0.95 rather than 0.65. Reverting `withMouse` fails exactly that row.
+
+---
+
+## D-17 — pressing a relative slider threw its value away
+
+**Fixed.** `utils/scrubRuntime.js` (`linearTrackScrub` and its two exported callers), and the two
+preview surfaces that build the scrub.
+
+Found while measuring D-16, and much worse than it. On a slider whose Mouse tab said `dragMode:
+relative`, **pressing the control snapped it to its minimum before the pointer had moved at all.**
+Not on the first press — on every press. A panel authored that way lost the value each time it was
+touched.
+
+```js
+function linearTrackScrub(vertical, inverted, mouse) {
+  return new DragScrub(withMouse({ ... }, mouse), 0);   // <- the seed
+}
+```
+
+The hard-coded `0` is invisible under absolute tracking, which is the only kind a linear track had
+when the line was written: the first move overwrites the value with the pointer's position, so the
+seed never surfaces. Under relative tracking the seed *is* the value, and the surface writes it out
+on pointer-down:
+
+```js
+const normalized = sliderScrub ? (sliderScrub.move(scrubSample(event)) ?? sliderScrub.value) : ...;
+```
+
+`move()` at the anchor travels no pixels and returns `null`, so the fallback runs and `sliderScrub.value`
+— zero — is committed. Measured: a slider sitting at 0.44, pressed dead centre and released without
+moving, read **0**.
+
+The dial path a dozen lines below already did the right thing, seeding
+`createCircularSliderScrub` with `(currentSliderRoleValue(control, role) - min) / span`. The fix
+hoists that expression above the branch and hands it to the track scrub as well, so both kinds of
+relative drag start from where the control stands. `createSliderTrackScrub` and
+`createRangeTrackScrub` take the seed as a third argument that defaults to 0, so every existing
+caller and every absolute drag behaves exactly as before.
+
+**D-16 and D-17 are one assumption seen twice**: the linear-track path was written when absolute was
+the only mapping it could have, and the Mouse section can now change that from the outside. One
+symptom was a setting that did nothing; the other was a control that lost its value. Neither is
+visible without putting the section into relative mode and then *looking at the value*, which is why
+a "does the drag still work" check would have passed both.
+
+**The regression** is the `dragMode (D-17 …)` row: drag a relative slider past three quarters, then
+press it without moving, and it must still be past three quarters.
+
+---
+
+## D-18 — the Focusable switch did nothing, on every control that offers it
+
+**Fixed.** `utils/mouseBehavior.js`, `resolveTabIndex`.
+
+The Mouse tab's Focus section is headed by a switch whose own hint reads *"Let the control take
+keyboard focus in preview and in the plugin. **Off keeps it out of the tab order entirely.**"*
+Turning it off left the control in the tab order. Tab still reached it; the ring still appeared.
+
+```js
+export function resolveTabIndex(mouse = null) {
+  const explicit = mouse?.tabIndex;
+  if (explicit !== undefined && explicit !== null && Number.isFinite(Number(explicit))) {
+    return Math.trunc(Number(explicit));          // <- wins over focusable
+  }
+  return isFocusable(mouse) ? 0 : -1;
+}
+```
+
+The comment above it explained the precedence as protecting the author's ordering — *"an explicit
+order survives toggling focusable"* — and on its own terms that is a reasonable thing to want.
+
+**What makes it a defect is which controls have the section.** `Mouse` is declared by five of the
+fifty-eight component types — Range, Number, Slider, Knob and CustomComponent — and all five ship
+`tabIndex: 0` in their type template. So every control that has the tab already had an "author-set"
+index before the author had set anything, the explicit branch always won, and the switch could
+never reach the `isFocusable` line. A published, user-visible toggle that cannot change anything
+anywhere.
+
+The fix is to let focus-off win, while still keeping the number:
+
+```js
+export function resolveTabIndex(mouse = null) {
+  if (!isFocusable(mouse)) return -1;
+  ...
+}
+```
+
+Measured on a slider: shipped `0`; Focusable off `-1`; Focusable on again `7` where seven was
+authored, with `Mouse.tabIndex` still reading 7 in the document while it was off. The niche the Tab
+Index cell advertises in those words — *"-1 means reachable by click but skipped by Tab"* — is
+`focusable: true` with an explicit `-1` and is untouched.
+
+Two things were checked before changing the templates rather than the resolver, because the
+templates looked like the cheaper fix and are not:
+
+- **Dropping `tabIndex: 0` from the five templates makes it worse.** `SECTION_DEFAULTS.Mouse` is
+  itself `tabIndex: -1`, and `createControl` clones the defaults before applying the template — so
+  removing the override does not leave "no explicit index", it leaves an explicit `-1`, and every
+  new slider ships out of the tab order. Measured, not reasoned: a fresh slider read `-1`.
+- **`Mouse.tabIndex` cannot set a positive order on four of the five types anyway.** The preview
+  surface hands anything with an ARIA role of its own (`slider`, `button`, `spinbutton`, …) index 0,
+  and `effectiveTabIndex` lets the surface win for everything except -1. Authoring 7 on a slider
+  renders 0; on a CustomComponent, which has no such role, it renders 7. That one is *documented* in
+  the cell's hint — "controls with a role of their own keep the order the surface assigns" — so it
+  is a row in the ledger rather than a defect.
+
+`draggable: true` came out of the same five templates in the same commit. Nothing reads it,
+deliberately (`MouseEditor.svelte:13` — moving a control with the pointer at runtime is a feature,
+not a setting, and there is no runtime behind it), and writing `true` into every saved document
+claimed a behaviour the product does not have. The key itself stays in `SECTION_DEFAULTS`: removing
+a defaulted field rewrites every panel on disk for no gain.
+
+**The regression** is the `focusable (D-18 …)` row: untick Focusable on a shipped slider and the
+element must read `tabindex="-1"`.
 
 ---
 
