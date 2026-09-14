@@ -30,6 +30,7 @@ environment at all.
 | A3. Remaining unverified rows are honest and individually reasoned | **MET** | Six rows. Four are inspector actions the rendered control never performs; one is a runtime conditional; one is a statement of fact |
 | A4. No declared option silently does nothing | **OPEN** | Nine inert options. Three are live script verbs giving callers silence — see section E |
 | A5. Save/reopen in a fresh runtime for every family | **MET** | `kit.reopen()` clears storage, reloads the page and imports the document; every suite carries reopen rows |
+| A6. The unit suite still passes with the behaviour fixes in | **MET** | 4,822 tests, 4,821 pass, 0 fail, exit 0 — re-run 14 Sep after D-15 changed `PanelPreviewSurface.svelte`. Matches the pre-change figure, so nothing regressed. The rehearsal tests, which cover the preview-session-versus-document distinction D-15 turns on, are green |
 
 ## B. The editor and the authoring stages
 
