@@ -112,13 +112,15 @@ contract on a custom component that the link engine does not consult.
 `behaviourAssets.mjs` — 1 verified, 2 inert, **0 unverified**, 2 not a property, 1 closed
 elsewhere, 0 open defects. What a packaged component actually carries, and the packaging toggle
 that changes nothing.
-`behaviourCombined.mjs` — 21 verified, **0 unverified**, 0 open defects. Priority 3: all 58
+`behaviourCombined.mjs` — 29 verified, **0 unverified**, 0 open defects. Priority 3: all 58
 registered types and 125 controls on one panel, opened from `CE/qa/QA-01-components.cepanel`
 through the app's own `deserializePanel`, then operated — mounting, drawing, independence of
 gesture, the clock-driven components running together, and a full save/reopen round trip. Then the
 same crowd again with **all fourteen custom starters added to it — 139 controls**, which is the only
-arrangement in which the two kinds can interfere at all. Measured on this machine: **opening
-2,346ms, entering preview 3,183ms.**
+arrangement in which the two kinds can interfere at all. Then undo and redo across the big panel —
+one control moved back, its neighbour untouched — and a panel link carrying a value from one custom
+component to another through the Links editor's own two functions. Measured on this machine:
+**opening 2,346ms, entering preview 3,183ms.**
 
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
