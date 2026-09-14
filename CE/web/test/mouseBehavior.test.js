@@ -118,12 +118,20 @@ test('interceptClicks false is the only thing that stops taking the pointer', ()
 
 // --- Focus ---------------------------------------------------------------
 
-test('tab index follows focusable unless the author set one', () => {
+test('tab index follows focusable, and focus off wins over the index', () => {
   assert.equal(resolveTabIndex({ focusable: true }), 0);
   assert.equal(resolveTabIndex({ focusable: false }), -1);
-  // An explicit index survives toggling focusable off and on again.
-  assert.equal(resolveTabIndex({ focusable: false, tabIndex: 3 }), 3);
+  // FOCUS OFF WINS. This assertion used to read `3`, and that is what made the Focusable switch
+  // inert everywhere it is offered: the four range types and CustomComponent all ship `tabIndex: 0`
+  // in their templates, so every control with the Mouse tab had an "author-set" index before the
+  // author had set anything, and unticking Focusable left it in the tab order — against the
+  // switch's own hint, "off keeps it out of the tab order entirely".
+  assert.equal(resolveTabIndex({ focusable: false, tabIndex: 3 }), -1);
+  // The number is not forgotten, only overruled: switching focus back on restores the order.
   assert.equal(resolveTabIndex({ focusable: true, tabIndex: 3 }), 3);
+  // And the documented niche is untouched — focusable with an explicit -1 is "reachable by click,
+  // skipped by Tab", which is what the Tab Index cell offers in those words.
+  assert.equal(resolveTabIndex({ focusable: true, tabIndex: -1 }), -1);
   assert.equal(resolveTabIndex({ focusable: true, tabIndex: 2.7 }), 2);
   assert.equal(resolveTabIndex({ focusable: true, tabIndex: 'nonsense' }), 0);
 });

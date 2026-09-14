@@ -166,14 +166,23 @@ function containerLayout() {
   return control;
 }
 
-/** Mouse: every interaction default inverted, so a control that ignores the section is obvious. */
+/**
+ * Mouse: every interaction default inverted, so a control that ignores the section is obvious.
+ *
+ * `draggable` is deliberately NOT set. It is the one field in the section with no reader at all
+ * (MouseEditor.svelte:13 — moving a control with the pointer at runtime is a feature, not a
+ * setting), so inverting it cannot make anything obvious; it only writes a dead key into a
+ * committed fixture. It used to be here and was invisible in the output because the four range
+ * types and CustomComponent claimed `draggable: true` in their templates, so the serializer
+ * dropped it as a default. That claim is gone, and this line went with it.
+ */
 function mouseTuned() {
   const control = createControl('Knob', {
     Core: { id: 'qa02_mouse', name: 'qa02_mouse' },
     Transform: { width: 90, height: 90 },
   });
   Object.assign(control._children.Mouse ?? (control._children.Mouse = { _type: 'Mouse' }), {
-    cursor: 'crosshair', draggable: true, focusable: true, focusOutline: true, tabIndex: 3,
+    cursor: 'crosshair', focusable: true, focusOutline: true, tabIndex: 3,
     hitTestShape: 'ellipse', dragMode: 'vertical', dragSensitivity: 2.5, invertY: true,
     bringToFrontOnClick: true,
   });

@@ -149,16 +149,27 @@ export function showsFocusOutline(mouse = null) {
 }
 
 /**
- * Tab index for preview/runtime. A focusable control with no explicit index
- * gets 0 (in tab order); a non-focusable one gets -1. An author-set index is
- * honoured either way, so an explicit order survives toggling focusable.
+ * Tab index for preview/runtime. A focusable control with no explicit index gets 0 (in tab order);
+ * a non-focusable one gets -1.
+ *
+ * FOCUS OFF WINS OVER THE INDEX. The switch's own hint says "off keeps it out of the tab order
+ * entirely", and the four range types plus CustomComponent ship with `tabIndex: 0` in their
+ * templates — so while the index was honoured either way, unticking Focusable on the only five
+ * types that offer this tab did nothing at all. The author's number is still KEPT in the document
+ * rather than zeroed, which is what "an explicit order survives toggling focusable" was protecting:
+ * switch focus back on and the order comes back with it. What it cannot do is put a control the
+ * author has just made unfocusable back into the tab order.
+ *
+ * `focusable: true` with an explicit -1 is left exactly as it was, and is a real authoring choice
+ * the tab offers in those words: reachable by click, skipped by Tab.
  */
 export function resolveTabIndex(mouse = null) {
+  if (!isFocusable(mouse)) return -1;
   const explicit = mouse?.tabIndex;
   if (explicit !== undefined && explicit !== null && Number.isFinite(Number(explicit))) {
     return Math.trunc(Number(explicit));
   }
-  return isFocusable(mouse) ? 0 : -1;
+  return 0;
 }
 
 export function raisesOnClick(mouse = null) {

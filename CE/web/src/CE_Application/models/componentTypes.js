@@ -457,7 +457,11 @@ export const COMPONENT_TYPES = {
     ports: getComponentPorts('Range'),
     defaultOverrides: {
       Transform: { width: 200, height: 40 },
-      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      // `tabIndex: 0` is deliberate — a control a pointer operates is a natural tab stop, and the
+      // section default (-1) would leave it click-reachable but skipped by Tab. No `draggable`:
+      // nothing reads it (MouseEditor.svelte:13), so claiming true in every saved document promised
+      // a behaviour the product does not have.
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       ...createDefaultInteractiveSections('Range'),
     },
   },
@@ -467,7 +471,11 @@ export const COMPONENT_TYPES = {
     ports: getComponentPorts('Number'),
     defaultOverrides: {
       Transform: { width: 132, height: 38 },
-      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      // `tabIndex: 0` is deliberate — a control a pointer operates is a natural tab stop, and the
+      // section default (-1) would leave it click-reachable but skipped by Tab. No `draggable`:
+      // nothing reads it (MouseEditor.svelte:13), so claiming true in every saved document promised
+      // a behaviour the product does not have.
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       ...createDefaultInteractiveSections('Number'),
     },
   },
@@ -477,7 +485,11 @@ export const COMPONENT_TYPES = {
     ports: getComponentPorts('Slider'),
     defaultOverrides: {
       Transform: { width: 220, height: 48 },
-      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      // `tabIndex: 0` is deliberate — a control a pointer operates is a natural tab stop, and the
+      // section default (-1) would leave it click-reachable but skipped by Tab. No `draggable`:
+      // nothing reads it (MouseEditor.svelte:13), so claiming true in every saved document promised
+      // a behaviour the product does not have.
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       ...createDefaultInteractiveSections('Slider'),
     },
   },
@@ -487,7 +499,11 @@ export const COMPONENT_TYPES = {
     ports: getComponentPorts('Knob'),
     defaultOverrides: {
       Transform: { width: 100, height: 100 },
-      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      // `tabIndex: 0` is deliberate — a control a pointer operates is a natural tab stop, and the
+      // section default (-1) would leave it click-reachable but skipped by Tab. No `draggable`:
+      // nothing reads it (MouseEditor.svelte:13), so claiming true in every saved document promised
+      // a behaviour the product does not have.
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       ...createDefaultInteractiveSections('Knob'),
     },
   },
@@ -524,7 +540,11 @@ export const COMPONENT_TYPES = {
           Corners: { radius: 10 },
         },
       },
-      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      // `tabIndex: 0` is deliberate — a control a pointer operates is a natural tab stop, and the
+      // section default (-1) would leave it click-reachable but skipped by Tab. No `draggable`:
+      // nothing reads it (MouseEditor.svelte:13), so claiming true in every saved document promised
+      // a behaviour the product does not have.
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       Parts: createCustomComponentBlankPartsDefaults(),
       Bindings: createCustomComponentBlankBindingsDefaults(),
       States: {
