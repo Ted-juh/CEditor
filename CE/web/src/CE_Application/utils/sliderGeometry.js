@@ -259,6 +259,17 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
   const geometry = getSliderGeometry(behavior);
   const minMaxPlacement = String(behavior?.labelMinMaxPlacement ?? 'auto').trim().toLowerCase();
   const readoutPlacement = String(behavior?.labelReadoutPlacement ?? 'auto').trim().toLowerCase();
+  // THE GAPS APPLY UNDER `auto` TOO, and they did not used to. Both `auto` branches carried the
+  // distance as a literal — 22 below a horizontal track, 14 above it for the readout — which are
+  // exactly the two defaults declared beside them in sectionDefaults.js. So the Gap cells in the
+  // Slider editor, whose hint is the unqualified "distance from the track", moved nothing at all
+  // until the Position dropdown next to them was taken off `auto`; and because each cell SHOWED
+  // the same number the literal used, it read as though it were already in effect. Naming the
+  // default here instead of inlining it leaves every existing horizontal slider and every readout
+  // pixel-identical and makes the cells live. The vertical min/max literal was 18 rather than 22,
+  // so a vertical slider left on `auto` with an untouched gap moves four pixels further from its
+  // track — the one visible change, taken deliberately: two orientations that disagreed with each
+  // other and with the number the editor was showing is the thing being fixed.
   const minMaxGap = numberOr(behavior?.labelMinMaxGap, 22);
   const readoutGap = numberOr(behavior?.labelReadoutGap, 14);
   const minMaxOffsetX = numberOr(behavior?.labelMinMaxOffsetX, 0);
@@ -338,7 +349,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       ? frame.x1 - minMaxGap
       : (minMaxPlacement === 'center'
         ? frame.x1
-        : frame.x1 + (minMaxPlacement === 'auto' ? 18 : minMaxGap));
+        : frame.x1 + minMaxGap);
     const minY = direction === 'ttb' ? frame.y2 : frame.y1;
     const maxY = direction === 'ttb' ? frame.y1 : frame.y2;
     const anchors = {
@@ -348,7 +359,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       current: { x: currentPoint.x + 22, y: currentPoint.y + 4 },
       end: { x: endPoint.x + 22, y: endPoint.y + 4 },
       title: { x: width / 2, y: height - 14 },
-      value: { x: width / 2, y: 14 },
+      value: { x: width / 2, y: readoutGap },
     };
     return applyReadoutPlacement(anchors, width / 2, height / 2);
   }
@@ -357,7 +368,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
     ? frame.y1 - minMaxGap
     : (minMaxPlacement === 'center'
       ? frame.y1
-      : frame.y1 + (minMaxPlacement === 'auto' ? 22 : minMaxGap));
+      : frame.y1 + minMaxGap);
   const minX = direction === 'rtl' ? frame.x2 : frame.x1;
   const maxX = direction === 'rtl' ? frame.x1 : frame.x2;
   const anchors = {
@@ -367,7 +378,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
     current: { x: currentPoint.x, y: currentPoint.y - 18 },
     end: { x: endPoint.x, y: endPoint.y - 18 },
     title: { x: width / 2, y: height - 12 },
-    value: { x: width / 2, y: 14 },
+    value: { x: width / 2, y: readoutGap },
   };
   return applyReadoutPlacement(anchors, width / 2, height / 2);
 }
