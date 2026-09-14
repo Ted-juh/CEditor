@@ -291,10 +291,11 @@ try {
       await stop();
     }
 
-    // --- runOnLoad ------------------------------------------------------------------------------------------------
-    led.unverified(T, 'runOnLoad', 'start the clock as soon as the panel opens',
-      'it fires once, on the transition into preview with the flag already set; the surface is already in '
-      + 'preview by the time this check can set the flag, and reopening a panel is measured separately below');
+    // --- runOnLoad: see the block at the end of this file ----------------------------------------------------------
+    // It cannot be measured HERE, and the reason is about this block rather than about the product:
+    // the flag is read once, on the transition into preview, and this block has been in preview
+    // since line 52. That was written up as "nothing can observe it", which was wrong — a check
+    // only has to author the flag BEFORE turning preview on, which is what the last block does.
 
     // --- showTap: tap tempo ------------------------------------------------------------------------------------------
     {
@@ -794,6 +795,120 @@ try {
   }
   await kit.preview(false);
   await kit.unwire();
+
+  // =============================================================================================
+  // TRANSPORT runOnLoad — the flag is read on the way INTO preview, so it has to be set first.
+  // =============================================================================================
+  //
+  // This lived as an unverified row for one pass, on the grounds that "the surface is already in
+  // preview by the time this check can set the flag". True of the block above and not of the
+  // product: the order is the check's to choose. Authoring the transport with preview OFF and then
+  // turning it on is exactly what opening a saved panel does.
+  //
+  // Two things make the flag genuinely single-shot, and both are asserted rather than worked
+  // around. It is read inside the configure effect, which is skipped when the signature has not
+  // changed — and `runOnLoad` is not IN that signature, so toggling it alone can never re-trigger
+  // it. And it refuses to start a clock that is following something else.
+  await kit.fresh();
+  {
+    const T = 'Transport';
+    const stopNow = async () => {
+      await kit.page.evaluate(async () => {
+        const { stopTransport } = await import('/src/CE_Application/stores/transport.js');
+        stopTransport();
+      });
+      await kit.settle(140);
+    };
+    const running = () => kit.page.evaluate(async () => {
+      const { isTransportRunning, transportBeatsNow } = await import('/src/CE_Application/stores/transport.js');
+      return { running: isTransportRunning(), beats: transportBeatsNow() };
+    });
+    /** Author a transport with preview OFF, then open preview — the order a saved panel arrives in. */
+    const openWith = async (patch) => {
+      await kit.preview(false);
+      await stopNow();
+      await kit.fresh();
+      const id = await kit.make(T, { 'Transform.x': 60, 'Transform.y': 60,
+        'Transform.width': 360, 'Transform.height': 64, 'Transport.source': 'internal',
+        'Transport.beatsPerBar': 4, 'Transport.beatUnit': 4, 'Transport.loopEnabled': false,
+        'Transport.countInBars': 0, 'Transport.clockOut': false, 'Transport.clockDevice': '',
+        'Transport.editable': true, 'Transport.swing': 0, ...patch });
+      await kit.preview(true);
+      await kit.settle(420);
+      return id;
+    };
+
+    // --- the flag off, and then on -----------------------------------------------------------------
+    {
+      // A DIFFERENT BPM IN EACH SCENARIO, and it is load-bearing rather than decoration. The
+      // configure effect is skipped whenever the signature is unchanged, and the signature is
+      // bpm|source|clockOut|beatsPerBar|loop…|swing|clockDevice. Two scenarios at the same tempo
+      // would give the second one a signature the surface had already configured, so the effect
+      // body — and the flag with it — would never run, and the row would report a silent clock as
+      // a working "off".
+      await openWith({ 'Transport.bpm': 101, 'Transport.runOnLoad': false });
+      const off = await running();
+      await openWith({ 'Transport.bpm': 102, 'Transport.runOnLoad': true });
+      const on = await running();
+      led.check(T, 'runOnLoad (false)', 'a panel whose transport does not ask to start opens with the clock stopped',
+        { running: false }, { running: off.running });
+      led.check(T, 'runOnLoad (true)', 'and one that does asks opens with it already running',
+        { running: true, moving: true }, { running: on.running, moving: on.beats > 0 });
+    }
+
+    // --- it really is the panel opening, not the flag being written ------------------------------------
+    {
+      // The distinction the property name makes: on LOAD. Setting it on a panel already open does
+      // nothing, and should do nothing — a transport that started because somebody ticked a box in
+      // the inspector would be a surprise in the middle of a performance.
+      await kit.preview(false);
+      await stopNow();
+      await kit.fresh();
+      const id = await kit.make(T, { 'Transform.x': 60, 'Transform.y': 60,
+        'Transform.width': 360, 'Transform.height': 64, 'Transport.source': 'internal',
+        'Transport.bpm': 103, 'Transport.beatsPerBar': 4, 'Transport.beatUnit': 4,
+        'Transport.loopEnabled': false, 'Transport.countInBars': 0, 'Transport.clockOut': false,
+        'Transport.clockDevice': '', 'Transport.editable': true, 'Transport.swing': 0,
+        'Transport.runOnLoad': false });
+      await kit.preview(true);
+      await kit.settle(400);
+      const before = await running();
+      await kit.set(id, { 'Transport.runOnLoad': true });
+      await kit.settle(500);
+      led.check(T, 'runOnLoad (ticked while the panel is already open)',
+        'ticking it on a panel that is already open starts nothing — it is a decision about opening, and a clock that began because somebody touched an inspector would be a surprise mid-performance',
+        { before: false, after: false }, { before: before.running, after: (await running()).running });
+    }
+
+    // --- a master clock only ----------------------------------------------------------------------------
+    {
+      // "Run-on-load is a decision only a MASTER clock gets to make. Following a DAW or an incoming
+      // clock, pressing play is the other end's job, and starting ourselves would show a running
+      // transport parked at bar 1."
+      await openWith({ 'Transport.bpm': 104, 'Transport.runOnLoad': true, 'Transport.source': 'external' });
+      const follower = await running();
+      led.check(T, 'runOnLoad (a following clock)',
+        'a transport that is following an incoming clock does not start itself, however much the flag asks — pressing play is the other end\'s job',
+        { running: false }, { running: follower.running });
+    }
+
+    // --- and it survives the file --------------------------------------------------------------------------
+    {
+      const id = await openWith({ 'Transport.bpm': 106, 'Transport.runOnLoad': true });
+      await kit.preview(false);
+      await stopNow();
+      await kit.reopen(id);
+      // reopen() reloads the page and imports the document, which is the real "opening a panel".
+      await kit.preview(true);
+      await kit.settle(600);
+      const back = await running();
+      led.check(T, 'save/reopen (runOnLoad)',
+        'a saved panel carrying the flag starts its clock when it is opened again, which is the whole promise',
+        { flag: true, running: true }, { flag: await kit.read(id, 'Transport.runOnLoad'), running: back.running });
+      await kit.preview(false);
+      await stopNow();
+    }
+  }
 
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');

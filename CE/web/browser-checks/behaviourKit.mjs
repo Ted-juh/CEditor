@@ -510,6 +510,20 @@ export class Ledger {
   }
 
   /**
+   * A catalogued property that TURNS OUT NOT TO EXIST.
+   *
+   * Distinct from `inert`, which is a real declared field nothing reads. This is a row that was
+   * catalogued by assuming a family-wide convention applied to a component that never declared it —
+   * so there is no field, no default, no editor row and no verb. Recorded rather than deleted,
+   * because a silently vanishing row looks like coverage that was dropped, and the next person to
+   * read the component's properties will make the same assumption unless the answer is written
+   * down. Nothing here is a defect: a property that was never promised cannot be broken.
+   */
+  unsupported(type, property, promise, why) {
+    this.rows.push({ type, property, promise, expected: '—', measured: why, status: 'not a property' });
+  }
+
+  /**
    * A property this suite does not measure because ANOTHER suite does.
    *
    * Distinct from `unverified`, and the distinction was worth adding a status for: a row saying
@@ -554,8 +568,10 @@ export class Ledger {
     const i = this.count('inert');
     const u = this.count('unverified');
     const c = this.count('closed elsewhere');
+    const n = this.count('not a property');
     const closed = c ? `, ${c} closed elsewhere` : '';
-    console.log(`\n${this.title}: ${v} verified, ${i} inert, ${u} unverified${closed}, ${this.failures.length} defects, of ${this.rows.length} rows`);
+    const none = n ? `, ${n} not a property` : '';
+    console.log(`\n${this.title}: ${v} verified, ${i} inert, ${u} unverified${closed}${none}, ${this.failures.length} defects, of ${this.rows.length} rows`);
     for (const f of this.failures) console.log(`   ${f}`);
   }
 }

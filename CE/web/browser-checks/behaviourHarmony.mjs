@@ -347,17 +347,53 @@ try {
     }
 
     // --- forwardBend / forwardPressure ------------------------------------------------------------------------------------
-    led.unverified(H, 'forwardBend / forwardPressure',
+    led.closed(H, 'forwardBend / forwardPressure',
       'pass the input’s bend and aftertouch through to the chord’s channel',
-      'these emit controller traffic rather than notes, so the note funnel cannot see them; they need the '
-      + 'outbound-boundary tap and a bend/aftertouch arriving on the input, which is a separate fixture');
-    led.unverified(H, 'followPanelKey', 'take the key and scale from the panel instead of its own',
-      'the panel key is a panel-level broadcast written by another control; it needs a second control '
-      + 'driving it, and is the same mechanism already listed unverified for the Phrase and the Recorder');
-    led.unverified(H, 'voiceLeading', 'keep the voices close between chords',
-      'the leading is applied against the PREVIOUS chord, which lives in the held-state map rather than '
-      + 'in the document; two chords in sequence through the funnel show the pitches, but the map this '
-      + 'check can read does not distinguish "led" from "re-derived"');
+      'behaviourOutbound.mjs, as the bytes themselves: both switches off and on, onto the CHORD\'s '
+      + 'channel rather than the input\'s, with all fourteen bits of the bend intact, the input channel '
+      + 'pinned and omni, and a reopen. The separate fixture it wanted is that suite.');
+    led.closed(H, 'followPanelKey', 'take the key and scale from the panel instead of its own',
+      'behaviourOutbound.mjs. The reason given here was wrong: no control writes the panel key. '
+      + 'setPanelKey is a store action, and following is a BROADCAST — it writes the key and scale into '
+      + 'each follower\'s own section, so the document, the drawn header and the notes played all move, '
+      + 'and a holdout beside them does not.');
+
+    // --- voiceLeading: measured in the PITCHES, which is where it happens ------------------------------
+    {
+      // The reason this row used to carry — "the map this check can read does not distinguish led
+      // from re-derived" — was looking in the wrong place. Leading does not leave a mark in a map;
+      // it CHANGES WHICH NOTES SOUND, and the funnel carries every one of them. Two chords in
+      // sequence and a comparison of the added voices is the whole measurement.
+      await kit.set(hid, { 'Harmoniser.mode': 'diatonic', 'Harmoniser.key': 0,
+        'Harmoniser.scale': 'major', 'Harmoniser.size': 3, 'Harmoniser.keepPlayed': true,
+        'Harmoniser.inversion': 0, 'Harmoniser.octaveSpread': 0 });
+      /** Play C, then G, and report the voices G added — the played note excluded, since leading
+       *  deliberately leaves that one where the finger put it. */
+      const secondChord = async (mode) => {
+        await kit.set(hid, { 'Harmoniser.voiceLeading': mode });
+        await kit.settle(200);
+        await play(60);                                   // establish a previous chord: C E G
+        const out = pitches(await play(67));              // then G, which is where the rule bites
+        return out.filter((n) => n !== 67);
+      };
+      const off = await secondChord('off');
+      const closest = await secondChord('closest');
+      led.check(H, "voiceLeading 'off'", 'with leading off the second chord is always root position: G above the played note gives B and D above it',
+        [71, 74], off);
+      led.check(H, "voiceLeading 'closest'",
+        'and with closest it re-voices those same two notes to sit near the chord before it rather than stacking upward — the same pitch classes, moved by an octave',
+        { sameClasses: true, moved: true, closer: true },
+        { sameClasses: String(closest.map((n) => n % 12).sort()) === String(off.map((n) => n % 12).sort()),
+          moved: String(closest) !== String(off),
+          // "least total movement" is the promise, so the led voicing must be nearer to C E G.
+          closer: closest.reduce((d, n) => d + Math.min(...[60, 64, 67].map((m) => Math.abs(n - m))), 0)
+            < off.reduce((d, n) => d + Math.min(...[60, 64, 67].map((m) => Math.abs(n - m))), 0) });
+      led.check(H, 'voiceLeading (the played note is left alone)',
+        'the note the finger played stays where it was played in every mode — leading the added voices is harmonising, moving the played one would be transposing the performance',
+        { off: true, closest: true },
+        { off: !off.includes(67), closest: !closest.includes(67) });
+      await kit.set(hid, { 'Harmoniser.voiceLeading': 'off' });
+    }
 
     // --- save and reopen ---------------------------------------------------------------------------------------------------
     {
@@ -662,16 +698,56 @@ try {
     }
 
     // --- scenes[].enabled + note + sysex + capturePaths ----------------------------------------------------------------
-    led.unverified(S, 'scenes[].enabled', 'skip a scene when stepping past it',
-      'stepIndex is unit-tested over disabled scenes, and the step path here goes through the same reducer; '
-      + 'what this pass could add is a second walk of the same function, not a new observation');
+    // --- scenes[].enabled: a disabled scene is stepped OVER -------------------------------------------
+    {
+      // This row used to say a check here "would be a second walk of the same function, not a new
+      // observation". That is true of calling stepIndex directly and false of what is done here: a
+      // real pedal press goes footswitchEdge -> setlistStep -> stepIndex -> the index write -> the
+      // recall, and the question is whether a disabled scene is skipped BY THE WHOLE PATH. The
+      // reducer being unit-tested says nothing about the four things wired around it.
+      // Local copies: the pedal and park helpers above are scoped to the footswitch block.
+      const press = async (value) => {
+        await kit.page.evaluate(async ({ hex }) => {
+          const { latestMidiInputMessage } = await import('/src/CE_Application/stores/deviceProfileStores.js');
+          latestMidiInputMessage.set({ hex, messageType: 'midi', at: Date.now() });
+        }, { hex: `${hx(0xB0)}${hx(64)}${hx(value)}` });
+        await kit.settle(280);
+        return Number(await kit.read(sid, 'Setlist.index'));
+      };
+      const parkAt = async (index) => { await kit.set(sid, { 'Setlist.index': index }); await kit.settle(300); };
+      const scenes = [
+        scene({ id: 'e1', name: 'One', program: 1 }),
+        scene({ id: 'e2', name: 'Two (off)', program: 2, enabled: false }),
+        scene({ id: 'e3', name: 'Three', program: 3 })];
+      await kit.set(sid, { 'Setlist.scenes': scenes, 'Setlist.wrap': false,
+        'Setlist.footEnabled': true, 'Setlist.footCc': 64, 'Setlist.footThreshold': 64,
+        'Setlist.footAction': 'next', 'Setlist.footChannel': 0, 'Setlist.sendProgram': true });
+      await parkAt(0);
+      await kit.forgetSent();
+      const landed = await press(127);
+      await kit.settle(260);
+      const wire = await kit.sent();
+      const programs = wire.filter((m) => m.status === 0xC0).map((m) => m.data1);
+      led.check(S, 'scenes[].enabled (stepped over)',
+        'one press of the pedal from the first scene lands on the THIRD, because the second is switched off — it is skipped rather than stopped at',
+        2, landed);
+      led.check(S, 'scenes[].enabled (and the skipped scene never sounds)',
+        'and the synth is sent the third scene\'s program change alone, never the disabled one it passed through',
+        [3], programs);
+      await kit.set(sid, { 'Setlist.scenes': [scene({ id: 'e1', name: 'One', program: 1 }),
+        scene({ id: 'e2', name: 'Two', program: 2 }), scene({ id: 'e3', name: 'Three', program: 3 })] });
+      await kit.settle(200);
+    }
+
     led.unverified(S, 'scenes[].note', 'a free-text note on the scene',
       'stored and shown in the Setlist editor, which is a properties-panel surface rather than the rendered '
-      + 'control; the renderer draws the name, the tempo and a badge, and never the note');
-    led.unverified(S, 'scenes[].sysex', 'a system-exclusive message sent with the scene',
-      'sceneMessages appends it as a `sysex` entry and the recall hands it to the same outbound door as the '
-      + 'rest, so the wire would show it; no fixture here has a real device dump to send, and inventing '
-      + 'bytes would test this file rather than the product');
+      + 'control; the renderer draws the name, the tempo and a badge, and never the note. This one is a real '
+      + 'gap in the AUTHORING pass rather than in this component\'s behaviour.');
+    led.closed(S, 'scenes[].sysex', 'a system-exclusive message sent with the scene',
+      'behaviourOutbound.mjs. The reason given here — that inventing bytes would test the file rather '
+      + 'than the product — was wrong about what there is to test: the framing and the stripping of a '
+      + 'high-bit byte from the body are the component\'s OWN promises, and they hold for any bytes at '
+      + 'all. The order against the program change is measured there too.');
     led.unverified(S, 'capturePaths', 'which panel paths a capture stores',
       'capture is an editor action on the Setlist inspector, not something the rendered control does; '
       + 'captureScene is pure and unit-tested, and the recall half of the same contract is verified above');

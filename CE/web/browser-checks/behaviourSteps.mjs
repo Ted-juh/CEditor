@@ -361,12 +361,20 @@ try {
           muted: played.some((e) => e.note === 44) });
     }
 
-    led.unverified(S, 'position', 'the step the sequencer is parked on',
-      'a live playhead, injected as __position and never written to the document; the drawn head is '
-      + 'measured above, and the document field is not read by the renderer at all');
-    led.unverified(S, 'editable', 'click cells in preview',
-      'the sequencer grid has no in-preview pointer path — cells are edited in the Sequencer designer '
-      + 'dock, which is root’s half of the surface; flagged rather than claimed');
+    // Both of these were carried as "unverified" for a pass. Neither is a gap in the testing; they
+    // are answers, and looking properly gave two different ones.
+    led.inert(S, 'position', 'the step the sequencer is parked on',
+      'DECLARED AND UNREACHABLE. The ticker keeps the live index in a module map inside the surface '
+      + '(`seqPosition[id] ?? -1`) and injects it for the renderer as `__position`; the document\'s own '
+      + '`position` is seeded from nothing, read by nothing and written by nothing. It is not in the '
+      + 'StepSequencer editor, and it is not a scripting verb because the Step Sequencer has no verb '
+      + 'family at all. The drawn playhead IS measured above — that is the live one.');
+    led.unsupported(S, 'editable', 'click cells in preview',
+      'NOT A PROPERTY. `editable` is not declared in the StepSequencer section of sectionDefaults, it '
+      + 'is not in the editor, and derivedFlagVerbs only mints the verb when the section declares the '
+      + 'boolean — which this one does not. The catalogue row came from assuming the family-wide '
+      + '`editable` convention applied here. Cells are authored in the Sequencer designer dock, and '
+      + 'that the click there writes StepSequencer.pattern is covered by browser-checks/designerTab.mjs.');
   }
   await kit.preview(false);
 
