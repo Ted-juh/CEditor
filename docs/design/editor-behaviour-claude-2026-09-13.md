@@ -88,6 +88,13 @@ close the rows the old ledger called unobservable; see the section on those belo
 `behaviourMouse.mjs` — 38 verified, 1 inert, **0 unverified**, 1 not a property, 0 open defects
 (three found, all fixed: D-16, D-17, D-18). The first suite of the editor-and-shared half: the
 whole Mouse section, which the coverage matrix found entirely unreached.
+`behaviourTrack.mjs` — 38 verified, 1 inert, **0 unverified**, 0 open defects (one found, fixed:
+D-19). The slider half of `Behavior`: ticks, the centre and the fill, both label groups with their
+gaps, offsets and placements, the number formatting, both snap modes, all three keyboard groups
+and the two-handle track click.
+`behaviourButtons.mjs` — 22 verified, 7 inert, **0 unverified**, 3 not a property, 0 open defects.
+The button half: what a control announces itself to be, what a press means, and the ten settings
+in the section that are declared and not connected.
 
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
@@ -946,6 +953,49 @@ a defaulted field rewrites every panel on disk for no gain.
 
 **The regression** is the `focusable (D-18 …)` row: untick Focusable on a shipped slider and the
 element must read `tabindex="-1"`.
+
+---
+
+## D-19 — both label gaps did nothing until the dropdown beside them was moved
+
+**Fixed.** `utils/sliderGeometry.js`, `buildSliderLabelAnchors`.
+
+The Slider editor's Labels section has two Gap cells. The min/max one's hint is *"Distance from the
+track for generated min and max labels"* — unqualified — and the number it shows is 22. Change it to
+44 and nothing moved.
+
+Every `auto` branch carried the distance as a literal:
+
+```js
+const anchorY = minMaxPlacement === 'above'
+  ? frame.y1 - minMaxGap
+  : (minMaxPlacement === 'center'
+    ? frame.y1
+    : frame.y1 + (minMaxPlacement === 'auto' ? 22 : minMaxGap));
+```
+
+So the gap applied only once the Position dropdown next to it had been taken off `auto` — and
+`auto` is where every slider starts. The readout's anchor was the same shape, `{ x: width / 2,
+y: 14 }`, with its own gap ignored in the same way.
+
+**What made it invisible is that two of the three literals ARE the declared defaults of the fields
+they were standing in for**: `labelMinMaxGap: 22` and `labelReadoutGap: 14`, both in
+`sectionDefaults.js`. The cell showed the number the literal used, so it read as already in effect.
+That is the same trap as D-18, where the five type templates pinned `tabIndex: 0` and made the
+Focusable switch unreachable — **a default that happens to agree with the hard-coded behaviour hides
+the fact that the field is not being read at all.** Two of the four defects in this half are that
+one mistake.
+
+Naming the defaults instead of inlining them leaves every existing horizontal slider and every
+readout pixel-identical. One visible change, taken deliberately: the vertical min/max literal was 18
+rather than 22, so a vertical slider left on `auto` with an untouched gap now sits four pixels
+further from its track. Two orientations that disagreed with each other and with the number the
+editor was showing is the thing being fixed.
+
+**The regression** is in `behaviourTrack.mjs` — the gap must move the end labels by exactly the
+difference — and the contract is also pinned at the unit level in `test/sliderLabelAnchors.test.js`,
+because the anchors are a pure function and a future refactor meets the test there first. Both fail
+on revert; the unit file fails four of its seven.
 
 ---
 
