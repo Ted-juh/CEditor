@@ -71,11 +71,15 @@ found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
 `behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
-`behaviourClock.mjs` — 76 verified, 0 inert, 1 unverified, 0 open defects (three found, all fixed).
-`behaviourSteps.mjs` — 71 verified, 1 inert, 2 unverified, 0 open defects.
-`behaviourHarmony.mjs` — 77 verified, 0 inert, 7 unverified, 0 open defects (the one found is fixed).
-`behaviourPhrase.mjs` — 48 verified, 0 inert, 2 unverified, 0 open defects (the one found is fixed).
-`behaviourRecorder.mjs` — 40 verified, 0 inert, 4 unverified, 0 open defects.
+`behaviourClock.mjs` — 81 verified, 0 inert, **0 unverified**, 0 open defects (three found, all fixed).
+`behaviourSteps.mjs` — 71 verified, 2 inert, **0 unverified**, 1 not a property, 0 open defects.
+`behaviourHarmony.mjs` — 82 verified, 0 inert, 2 unverified, 3 closed elsewhere, 0 open defects (the one
+found is fixed).
+`behaviourPhrase.mjs` — 50 verified, 0 inert, **0 unverified**, 1 closed elsewhere, 0 open defects (two
+found, both fixed — the second is D-15).
+`behaviourRecorder.mjs` — 42 verified, 0 inert, 2 unverified, 1 closed elsewhere, 0 open defects.
+`behaviourOutbound.mjs` — 53 verified, 8 inert, **0 unverified**, 0 open defects (one found, fixed:
+D-15). Bytes on the wire and the panel key; it also carries the derived inert sweep.
 `behaviourLinks.mjs` — 33 verified, 0 inert, 0 unverified, 0 open defects. The suite that exists to
 close the rows the old ledger called unobservable; see the section on those below.
 
