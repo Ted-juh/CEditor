@@ -339,8 +339,9 @@ try {
   }
 
   // --- phaseSourceId: only meaningful with a live driving control ------------------------------------
-  led.unverified(T, 'phaseSourceId', 'a range control drives the playhead phase in preview',
-    'needs a second bound control driving it live; covered as a pair in the routing pass, not here');
+  led.closed(T, 'phaseSourceId', 'a range control drives the playhead phase in preview',
+    'behaviourLinks.mjs, with a real slider dragged by the pointer: the playhead lands a tenth, a half and '
+    + 'nine tenths of the way across the plot, and an envelope naming nothing ignores the slider');
 
   // --- the fan-out values a device parameter would actually receive ----------------------------------
   {
@@ -888,12 +889,13 @@ try {
     await kit.preview(false);
 
     // --- the conditional group that needs a second live control -------------------------------------------------
-    led.unverified(R, 'sourceControlId', "source 'link': follow another control on the panel",
-      'needs a second control driving it live through the preview surface; covered in the routing pass');
-    led.unverified(R, 'inputChannel', 'MIDI sources: which channel to watch (0 = omni)',
-      'needs inbound MIDI; no device in this environment and the preview surface takes __input directly');
-    led.unverified(R, 'polyMode', 'per-note aftertouch collapsed to one value: highest | last',
-      'same — needs inbound polyphonic aftertouch');
+    led.closed(R, 'sourceControlId', "source 'link': follow another control on the panel",
+      'behaviourLinks.mjs: the live input bar fills to exactly where the named slider is standing, and drops '
+      + "it for the test input as soon as the source is not 'link'");
+    led.closed(R, 'inputChannel', 'MIDI sources: which channel to watch (0 = omni)',
+      'behaviourInbound.mjs, omni and pinned, by injecting bytes at latestMidiInputMessage');
+    led.closed(R, 'polyMode', 'per-note aftertouch collapsed to one value: highest | last',
+      'behaviourInbound.mjs, highest and last, from injected polyphonic pressure');
 
     // --- save and reopen -------------------------------------------------------------------------------------------
     {
