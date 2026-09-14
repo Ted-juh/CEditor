@@ -160,6 +160,46 @@ fixture's reason:
   suite measures the whole number on the wire instead of asserting the type in the lane.
 
 
+### The authoring stages — three surfaces nothing had opened
+
+Gate B4 asks for the authoring stages to be driven and not just the renderers, and the distinction
+it turns on is the handoff's own: a passing unit test is insufficient evidence. Three of the six
+areas it names were already driven and the row understated it, the same way C2's premise was wrong —
+the panel editor, the Screen Builder, the Sequencer and Envelope designers and the Player/export
+half all have suites. Three had **heavy model coverage and no browser coverage at all**, which is
+exactly the gap between "the model accepts this" and "a person can do it".
+
+`authoringScripts.mjs` — 7 verified. Thirty-five script suites in `CE/web/test/` cover what
+`createScript` returns, what `validateScript` objects to and what the runtime does with a source
+string. None opens the editor. So scripting was proven everywhere except where a person touches it.
+The suite selects a control, presses Script Editor in the Look bar (the only route in), adds a
+script from a lifecycle group, types into the real CodeEditor, and presses Run — and the control
+the script names moves. That last row is the one the other six exist to reach. Two traps: the
+editor is a TAB whose Look bar button only appears for a control that HAS a Scripts section, and
+the API is `set(path, value)` with one dotted path — the three-argument spelling is accepted, does
+nothing, and reads exactly like a broken Run button.
+
+`authoringSurface.mjs` — 7 verified. `CustomDesignSurfaceEditor.svelte` is the largest file in the
+repository and the one place a component is MADE; thirty-five custom-component suites cover what a
+component is once it exists and none of them draws one. A drag with the rectangle tool produces a
+part that is **100 × 70 at (40, 40)** — the exact numbers, because a tool that adds a fixed box and
+a tool that records the drag are indistinguishable under a loose assertion. The inspector then
+takes it to 150 in the document and on the artboard together, undo is measured **per step** (the
+resize comes back before the drawing does), and the part survives a reopen in a fresh runtime. One
+trap: a part's geometry is in its `Layout` child, so `part.width` reads undefined and a size check
+built on it measures zero for every part ever drawn.
+
+`authoringLinks.mjs` — 4 verified. `behaviourLinks` and `behaviourCombined` both prove a link
+carries a value, and both BUILD the link by calling `createPanelCustomRouteLink` and patching the
+control — the one thing a user cannot do. So routing was proven at both ends and never in the
+middle. The suite presses Create route in the Route Builder and then runs the link it wrote through
+the same resolver the engine's own tests use. It also pins the new External switches from the
+authoring end: with them off the builder offers nothing, so the switch and the picker are one fact
+rather than two that agree today. Two traps: the React tab only exists in the properties panel
+while the Component Designer is open, and the Links pane is labelled **"Value → Value"** — its
+contents sit in the DOM under `display:none` the whole time, six candidate buttons and all, so a
+row asserting existence would be green whether or not an author could ever see it.
+
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
 that observed it — and a reader had no way to tell a real gap from a stale sentence. `Ledger.closed`
