@@ -541,14 +541,72 @@ try {
       await kit.set(pid, { 'Phrase.pattern': stair, 'Phrase.rate': 8, 'Phrase.gate': 0.5 });
     }
 
-    led.unverified(P, 'patterns / chain / chainOn / chainLoop', 'a song chain of stored patterns',
-      'the chain swaps the pattern through the preview SESSION rather than the document, and the swap '
-      + 'is driven by the lap counter; the notes that come out are the same notes either way, so what '
-      + 'this pass could assert is which pattern the session holds — which is state, not behaviour. '
-      + 'songChain.js is pure and unit-tested.');
-    led.unverified(P, 'followPanelKey', 'take the key and scale from the panel instead of its own',
-      'a panel-level broadcast written by another control; it needs a second control driving it, and '
-      + 'is the same mechanism listed for the Harmoniser and the Recorder');
+    // --- patterns / chain / chainOn / chainLoop: a song that changes riff ------------------------------
+    {
+      // THE OLD REASON WAS WRONG ABOUT THE FIXTURE, NOT ABOUT THE PRODUCT. It said "the notes that
+      // come out are the same notes either way, so what this pass could assert is which pattern the
+      // session holds — which is state, not behaviour". That is only true when the stored patterns
+      // are the same pattern. Give slot 0 and slot 1 DIFFERENT cells and the chain is audible: the
+      // first lap plays one riff and the second plays the other, through the same note funnel every
+      // other row here uses.
+      const lowRow = { '0:3': { velocity: null, tie: false }, '1:3': { velocity: null, tie: false },
+        '2:3': { velocity: null, tie: false }, '3:3': { velocity: null, tie: false } };
+      const highRow = { '0:0': { velocity: null, tie: false }, '1:0': { velocity: null, tie: false },
+        '2:0': { velocity: null, tie: false }, '3:0': { velocity: null, tie: false } };
+      // Row 3 and row 0 of a four-row grid are different degrees, so the two riffs are different
+      // PITCHES rather than different placements of the same one.
+      await kit.set(pid, { 'Phrase.running': false, 'Phrase.direction': 'forward',
+        'Phrase.pattern': lowRow, 'Phrase.chainOn': false,
+        'Phrase.patterns': [{ id: 'p1', name: 'A', cells: lowRow }, { id: 'p2', name: 'B', cells: highRow }] });
+      await kit.settle(260);
+      const soloPitch = [...new Set((await runFor(700)).map((n) => n.note))];
+
+      // Two links of one lap each. A lap is four steps, and a step is 125ms at rate 8, so each
+      // link owns half a second.
+      await kit.set(pid, { 'Phrase.chain': [{ slot: 0, repeats: 1 }, { slot: 1, repeats: 1 }],
+        'Phrase.chainOn': true, 'Phrase.chainLoop': true });
+      await kit.settle(260);
+      // THE PITCH SET OVER SEVERAL LAPS, not a slice of the run by position. A stopped phrase keeps
+      // its step index and the chain counts laps off that same index, so neither the notes nor the
+      // laps start where a fresh reader would assume — slicing [0,4) and [4,8) compares two windows
+      // that may sit anywhere in the song. Which pitches were heard at all answers the question the
+      // property actually makes: does the riff change on its own?
+      const chained = [...new Set((await runFor(2200)).map((n) => n.note))].sort((a, b) => a - b);
+      const both = [...new Set([...soloPitch, ...chained])].sort((a, b) => a - b);
+      led.check(P, 'patterns + chain + chainOn', 'a chain of two stored patterns is heard as BOTH riffs across successive laps — different pitches, not a different arrangement of the same pitch',
+        { heardBoth: true, moreThanOne: true },
+        { heardBoth: String(chained) === String(both) && chained.length === 2, moreThanOne: chained.length > 1 });
+      await kit.set(pid, { 'Phrase.chainOn': false });
+      await kit.settle(260);
+      const plain = [...new Set((await runFor(2200)).map((n) => n.note))];
+      led.check(P, 'chainOn (false)', 'switched off, the chain is ignored and the authored pattern is the only thing heard, however many laps go by',
+        soloPitch, plain);
+      // PUT THE SESSION BACK TOO, not just the document. The chain swaps the riff by writing into
+      // the preview session, and clearing the document's pattern does not touch that — so the rows
+      // after this one would go on drawing the last riff the chain loaded while the file held the
+      // stair, and the save/reopen row below would compare a rehearsal against a saved panel and
+      // call the difference a fault. Exactly the distinction the chain fix above is about, met from
+      // the other side.
+      await kit.set(pid, { 'Phrase.chainOn': false, 'Phrase.chain': [], 'Phrase.patterns': [],
+        'Phrase.pattern': stair });
+      await kit.page.evaluate(async (id) => {
+        const { panelPreviewSessions } = await import('/src/CE_Application/stores/interactionPreview.js');
+        panelPreviewSessions.update((all) => {
+          const sess = all?.[id];
+          if (!sess) return all;
+          const next = { ...sess };
+          delete next.phrasePattern;
+          return { ...all, [id]: next };
+        });
+      }, pid);
+      await kit.settle(260);
+    }
+
+    led.closed(P, 'followPanelKey', 'take the key and scale from the panel instead of its own',
+      'behaviourOutbound.mjs. The reason given here was wrong: the panel key is not written by a '
+      + 'control at all. setPanelKey is a store action that broadcasts into each follower\'s own '
+      + 'section, and the phrase is measured there three ways — the document, the drawn header and '
+      + 'the pitches it plays.');
 
     // --- save and reopen ----------------------------------------------------------------------------------------------------
     {

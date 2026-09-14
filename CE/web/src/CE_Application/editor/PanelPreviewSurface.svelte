@@ -4638,13 +4638,33 @@
       }, lastMs));
     }
   }
+  /**
+   * The control as the SONG CHAIN left it.
+   *
+   * `pumpPhraseChain` swaps the riff by writing the new cells into the preview session, which is
+   * right — preview is a rehearsal and the saved panel keeps the pattern its author drew. But the
+   * firing path below reads the pattern straight off the document, so the chain used to change what
+   * was DRAWN and never what was PLAYED: `applyPhraseValueSource` overlays the session pattern for
+   * the renderer, and nothing did the same for the notes. A song set up to change riff showed the
+   * second riff on the grid while the sequencer went on playing the first one.
+   *
+   * Only the pattern is overlaid. Channel, velocity, swing, direction and the step count are the
+   * author's and come from the document, as they always did.
+   */
+  function phrasePlayControl(control) {
+    const cells = sessionFor(control)?.phrasePattern;
+    if (!cells) return control;
+    const cfg = control?._children?.Phrase;
+    if (!cfg) return control;
+    return { ...control, _children: { ...control._children, Phrase: { ...cfg, pattern: cells } } };
+  }
   function phraseFireIndex(control, index, bpm) {
     const id = getControlId(control);
     // Swing delays the odd steps. The step is worked out at fire time rather
     // than captured now, so a pattern edited during the delay plays as edited —
     // and the pending timer lives in phraseTimers so Panic can cancel it.
     const fire = () => {
-      const r = phrasePlayStep(phraseSounding[id] ?? PHRASE_EMPTY, control, index);
+      const r = phrasePlayStep(phraseSounding[id] ?? PHRASE_EMPTY, phrasePlayControl(control), index);
       phraseSounding[id] = r.sounding;
       runPhraseSends(control, index, r.sends, bpm);
     };

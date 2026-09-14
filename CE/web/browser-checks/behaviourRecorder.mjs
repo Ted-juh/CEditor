@@ -421,13 +421,53 @@ try {
         true, playing.some((n) => n.tag === 'line' && n.stroke === rgba('FFFFDD00')));
     }
 
-    led.unverified(R, 'slot / slots', 'several takes on one recorder',
-      'swapping is an editor action on the Recorder inspector rather than something the rendered '
-      + 'control does; the copy-in-each-direction rule it exists for is pure and unit-tested');
-    led.unverified(R, 'chain / chainOn / chainLoop', 'a song chain of stored takes',
-      'the same chain engine the Phrase uses, and unverified for the same reason: the swap happens '
-      + 'in the preview session rather than the document, so what could be asserted is which take '
-      + 'the session holds, which is state and not behaviour');
+    led.unverified(R, 'slot (the inspector\'s store/recall buttons)', 'swap the live take for a stored one by hand',
+      'the SLOTS are now measured — the chain rows below play two of them — but `slot`, the '
+      + 'index the inspector\'s store and recall buttons move, is an editor action rather than '
+      + 'something the rendered control does. It belongs to the authoring pass, not to this one, '
+      + 'and is listed there rather than dismissed.');
+    // --- chain / chainOn / chainLoop: a song that changes take ------------------------------------
+    {
+      // Unverified for a pass on the grounds that "what could be asserted is which take the session
+      // holds, which is state and not behaviour". Wrong for the same reason it was wrong on the
+      // Phrase: that only holds when the stored takes are the same take. Two slots holding
+      // DIFFERENT pitches make the swap audible, and audible is what the chain is for — the whole
+      // point of a song chain on a panel is that the riff changes without anyone touching anything.
+      const takeOf = (note) => ({ events: [{ t: 0, note, velocity: 100, dur: 0.3 }], pending: {} });
+      await freshRecorder({ 'Recorder.seconds': 1, 'Recorder.playing': false,
+        'Recorder.slots': [{ id: 'a', name: 'A', events: takeOf(60).events },
+          { id: 'b', name: 'B', events: takeOf(72).events }],
+        'Recorder.chain': [{ slot: 0, repeats: 1 }, { slot: 1, repeats: 1 }],
+        'Recorder.chainOn': true, 'Recorder.chainLoop': true });
+      await kit.settle(300);
+      await kit.forget();
+      await kit.set(rid, { 'Recorder.playing': true });
+      await kit.settle(2700);                       // a one-second loop: several laps
+      await kit.set(rid, { 'Recorder.playing': false });
+      await kit.settle(250);
+      const heard = [...new Set(ons(await kit.notes()).map((e) => e.note))].sort((a, b) => a - b);
+      led.check(R, 'slots + chain + chainOn', 'a chain of two stored takes plays both of them across successive laps, so the song changes without anyone touching the panel',
+        [60, 72], heard);
+
+      // Switched off, the chain is inert and the live take stands — which is the property doing
+      // its job rather than the chain failing to.
+      await freshRecorder({ 'Recorder.seconds': 1, 'Recorder.playing': false,
+        'Recorder.take': takeOf(60),
+        'Recorder.slots': [{ id: 'a', name: 'A', events: takeOf(60).events },
+          { id: 'b', name: 'B', events: takeOf(72).events }],
+        'Recorder.chain': [{ slot: 0, repeats: 1 }, { slot: 1, repeats: 1 }],
+        'Recorder.chainOn': false });
+      await kit.settle(300);
+      await kit.forget();
+      await kit.set(rid, { 'Recorder.playing': true });
+      await kit.settle(2700);
+      await kit.set(rid, { 'Recorder.playing': false });
+      await kit.settle(250);
+      const oneTake = [...new Set(ons(await kit.notes()).map((e) => e.note))];
+      led.check(R, 'chainOn (false)', 'switched off, every lap is the same take and the second slot is never heard',
+        [60], oneTake);
+      await freshRecorder({});
+    }
     led.unverified(R, 'grid / quantizeStrength / quantizeLength / snapToScale',
       'pull the take onto a grid, and pitch-correct it into the key',
       'all four are arguments to `quantizeTake`, which has exactly one caller in src/: the Quantise '
@@ -436,9 +476,12 @@ try {
       + 'defect — a destructive edit applied on demand is a reasonable design — but it means these '
       + 'are inspector behaviour rather than playback behaviour, and a green playback row for them '
       + 'would have meant nothing. quantizeTake itself is pure and unit-tested.');
-    led.unverified(R, 'followPanelKey', 'take the key and scale from the panel instead of its own',
-      'a panel-level broadcast written by another control; the same mechanism listed for the '
-      + 'Harmoniser and the Phrase');
+    led.closed(R, 'followPanelKey', 'take the key and scale from the panel instead of its own',
+      'behaviourOutbound.mjs. The reason given here was wrong — no control writes the panel key; '
+      + 'setPanelKey is a store action that broadcasts into each follower\'s own section. Worth '
+      + 'knowing what following buys the RECORDER specifically: its key and scale are read only by '
+      + 'quantizeTake, so the broadcast changes the document and the quantiser\'s next result, and '
+      + 'nothing about what the take plays back. That is the honest scope of it.');
 
     // --- save and reopen -----------------------------------------------------------------------------------------
     {

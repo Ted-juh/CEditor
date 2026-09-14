@@ -710,6 +710,72 @@ column count goes 0 → 1 → 0.
 
 ---
 
+## D-15 — the Phrase Sequencer's song chain changed the grid and never the notes
+
+**Fixed.** `PanelPreviewSurface.svelte`, the Phrase firing path.
+
+A song chain is the reason to put a sequencer on a panel at all: the riff changes on its own,
+lap by lap, without anyone touching anything. `pumpPhraseChain` does the swap by writing the
+newly-loaded cells into the preview session —
+
+```js
+patchControlSession(id, { phrasePattern: cells });
+```
+
+— which is the right place. Preview is a rehearsal, and the saved panel keeps the pattern its
+author drew; writing the chain's choice into the document would rewrite the file every lap.
+
+The renderer knows about that session copy. `applyPhraseValueSource` ends with
+
+```js
+const sess = sessionFor(control);
+if (sess?.phrasePattern) next.pattern = sess.phrasePattern;
+```
+
+The firing path does not. `phraseFireIndex` is handed `c` straight from `phraseControls()` — raw
+document controls — and `playStep` → `stepNotes` → `phrasePattern(control)` reads
+`control._children.Phrase.pattern`. So the chain loaded the second riff, drew the second riff, and
+went on playing the first one. **The grid and the sound disagreed, silently, for as long as the
+song ran.**
+
+**Why no renderer test could have caught it.** The drawing was right. Every pixel of the grid showed
+the riff the chain had selected; only the notes were wrong. This is the exact case the assignment's
+own rule is about — a changed property and a correct-looking component are not evidence — and it
+took measuring the note funnel across several laps to see.
+
+**Why the Recorder's chain was fine.** The two share `songChain.js` and look identical at the call
+site. They do not share a destination: `pumpRecorderChain` ends in `setLiveTake(control, take)`, and
+the playback path reads that same live-take map. The Phrase wrote to a place its own playback never
+read. Two components, one engine, one of them wired to a store nobody downstream consulted.
+
+**The fix** is a control-shaped overlay applied at fire time and nowhere else:
+
+```js
+function phrasePlayControl(control) {
+  const cells = sessionFor(control)?.phrasePattern;
+  if (!cells) return control;
+  const cfg = control?._children?.Phrase;
+  if (!cfg) return control;
+  return { ...control, _children: { ...control._children, Phrase: { ...cfg, pattern: cells } } };
+}
+```
+
+Only the pattern is overlaid. Channel, velocity, swing, direction and the step count stay with the
+document, which is where the author put them.
+
+**The regression** is in `behaviourPhrase.mjs`: two stored patterns on *different rows* — so
+different pitches rather than a different arrangement of the same one — chained one lap each, and
+the assertion is that both riffs are heard across several laps. On the unfixed surface only the
+first riff ever sounds. The matching `chainOn: false` row proves the authored pattern is the only
+thing heard when the chain is off, so the first row cannot pass by accident.
+
+**This is the mirror image of D-8 through D-14.** Those were all one fault — writing, from the render
+path, a store the same render reads. This is the same seam from the other side: writing live state
+to one place and reading it from another. Worth stating as its own rule, because the two look
+nothing alike in the code and are the same mistake about where state lives.
+
+---
+
 ## Rows that are not "verified", stated plainly
 
 **Inert — declared, and read by nothing:**
