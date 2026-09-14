@@ -446,11 +446,11 @@
     <PropertyCell label="Name" span={2} hint="Addressable name for external links and future scripts.">
       <input class="val" type="text" value={api?.addressableName ?? ''} onchange={(event) => set('ExternalAPI.addressableName', event.target.value)} />
     </PropertyCell>
-    <PropertyCell label="Policy" span={2} hint="Published-only keeps internals private by default.">
+    <PropertyCell label="Policy" span={2} hint="How much of this component other components may link to. Narrowing it stops links that relied on the wider setting.">
       <select class="val" value={api?.linkPolicy ?? 'publishedOnly'} onchange={(event) => set('ExternalAPI.linkPolicy', event.target.value)}>
-        <option value="publishedOnly">publishedOnly</option>
-        <option value="advancedOptIn">advancedOptIn</option>
-        <option value="allInternals">allInternals</option>
+        <option value="publishedOnly">Published only — just the properties above</option>
+        <option value="advancedOptIn">Advanced — also value channels not marked private</option>
+        <option value="allInternals">All internals — every value channel</option>
       </select>
     </PropertyCell>
     <PropertyCell label="External" span={2} hint="Accept external input links, emit external output links. Hover a chip for its name.">

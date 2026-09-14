@@ -12,9 +12,11 @@
     fingerprintCustomComponent,
     normalizeCustomComponentEnvelope,
     customComponentPackageProvenance,
+    missingCustomComponentFonts,
     summarizeCustomComponent,
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
+  import { availableFonts } from '../stores/appSettings.js';
   import { deepClone } from '../utils/deepClone.js';
   import LibraryBig from 'lucide-svelte/icons/library-big';
 
@@ -58,9 +60,29 @@
   let importText = $state('');
   let importPreview = $derived(parseImportPreview(importText));
   let importSummaryItems = $derived(summaryItems(importPreview.envelope?.summary));
+  /**
+   * Fonts the incoming package asks for that this machine does not have.
+   *
+   * IN THE PREVIEW, not after the import, because that is where it is still a decision. The Assets
+   * tab's Fonts toggle promises a warning "when downloaded components reference missing fonts" and
+   * nothing collected the names or compared them until now; a warning that arrived after the
+   * package was already in the library would be a notification rather than a warning.
+   *
+   * Across every package in a library file rather than only the first, deduplicated by family: a
+   * library of twenty components sharing one typeface is one problem, not twenty, and the one
+   * component that names a different one must not be lost behind the other nineteen. The toggle is
+   * read per package inside `missingCustomComponentFonts`, so a component that switched the warning
+   * off contributes nothing here even when its neighbours do.
+   */
+  let importFontWarnings = $derived([...new Set(
+    (importPreview.envelopes ?? [])
+      .flatMap((envelope) => missingCustomComponentFonts(envelope?.component, $availableFonts ?? [])),
+  )].map((family) => `Warning: the font "${family}" is not installed here, so text using it will fall back to a substitute.`));
+
   let importIssueList = $derived([
     ...(importPreview.envelope?.validation?.issues ?? []),
     ...(importPreview.envelope?.validation?.warnings ?? []).map((warning) => `Warning: ${warning}`),
+    ...importFontWarnings,
   ]);
   let libraryStatus = $state('');
   let packageValidation = $derived(control ? validateCustomComponentPackage(control) : { ok: false, issues: [], warnings: [] });

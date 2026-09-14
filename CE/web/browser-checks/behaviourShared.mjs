@@ -65,23 +65,93 @@ try {
       'two custom components with published endpoints between them, which is what makes the three containment settings answerable at all',
       true, open.endpoints > 0 && open.candidates > 0);
 
-    await kit.set(a, { 'ExternalAPI.emitsExternalLinks': false });
-    await kit.set(b, { 'ExternalAPI.acceptsExternalLinks': false });
-    await kit.settle(600);
-    const shut = await routeCandidates();
-    led.inert(X, 'acceptsExternalLinks + emitsExternalLinks',
-      'refuse external links into, or out of, this component',
-      `USER-VISIBLE AND NOT ENFORCED. Both are chips in the Published Properties tab, with hints that promise containment — "allow other components to drive published inputs" and "allow this component to drive other components". With BOTH switched off on a panel of two custom components, the link engine still offers ${shut.endpoints} endpoints and ${shut.candidates} routes between them, against ${open.endpoints} and ${open.candidates} with them on: the same numbers. \`panelCustomComponentLinks.js\` never mentions either key — \`listPanelCustomApiEndpoints\` filters on \`PublishedProperties.inputs\`/\`outputs\` and their \`enabled\` flag, and nothing else — and a repo-wide search finds them only in the editor that writes them and the factory that seeds them. Smallest honest release treatment: the containment is one filter in \`listPanelCustomApiEndpoints\`, so this is a small fix rather than a feature; until it is made, the chips should not be in the tab.`);
+    // An unpublished channel left public, and one marked private — the two things the wider
+    // policies are about. Written through the app's own `createValueChannel`, because a channel
+    // patched in as a plain object is silently dropped: the patch layer wants `_type:
+    // 'ValueChannel'` on it, and a default component carries only published, public channels, so
+    // without these the three policies are indistinguishable on the fixture rather than in the
+    // product. That is exactly how they came to be recorded inert.
+    await kit.page.evaluate(async (id) => {
+      const { createValueChannel } = await import('/src/CE_Application/utils/customComponentFactory.js');
+      const { applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+      applyControlPatch(id, {
+        'ValueChannels.gain': createValueChannel('gain', { label: 'Gain', min: 0, max: 2, defaultValue: 1 }),
+        'ValueChannels.secret': createValueChannel('secret', { label: 'Secret', publicInput: false, publicOutput: false }),
+      });
+    }, a);
+    await kit.settle(500);
+    const offered = async () => kit.page.evaluate(async () => {
+      const { listPanelCustomApiEndpoints } = await import('/src/CE_Application/utils/panelCustomComponentLinks.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      return listPanelCustomApiEndpoints(live?.controls ?? [])
+        .filter((e) => e.controlName === 'Alpha').map((e) => `${e.direction}:${e.channel}`);
+    });
 
-    await kit.set(a, { 'ExternalAPI.emitsExternalLinks': true,
-      'ExternalAPI.acceptsExternalLinks': true, 'ExternalAPI.linkPolicy': 'allInternals' });
-    await kit.set(b, { 'ExternalAPI.acceptsExternalLinks': true,
-      'ExternalAPI.linkPolicy': 'allInternals' });
-    await kit.settle(600);
-    const widened = await routeCandidates();
-    led.inert(X, 'linkPolicy',
-      'choose how much of a component the outside may reach — published only, an advanced opt-in, or all internals',
-      `THE DEFAULT IS THE ONLY ONE IMPLEMENTED. The dropdown offers publishedOnly, advancedOptIn and allInternals; the engine implements publishedOnly and reads the field nowhere. Widening both components to allInternals leaves the endpoint list exactly as it was — ${widened.endpoints} endpoints, where publishedOnly gave ${open.endpoints} — because the only thing \`listPanelCustomApiEndpoints\` ever walks is the published entries. So the safe option is what the product does and the two wider ones promise access it cannot give. Smallest honest release treatment is the opposite of the one above: remove the two unimplemented options from the dropdown, which leaves the behaviour unchanged and the promise true.`);
+    const published = await offered();
+    led.check(X, 'linkPolicy — publishedOnly', 'the default reaches only the properties the author published, so a component\'s internals stay its own',
+      ['input:mainValue', 'input:mode', 'input:accentColour', 'output:mainValue', 'output:mode'],
+      published);
+
+    await kit.set(a, { 'ExternalAPI.linkPolicy': 'advancedOptIn' });
+    await kit.settle(500);
+    led.check(X, 'linkPolicy — advancedOptIn', 'widening it adds the value channels the author has NOT marked private — `gain` appears in both directions, `secret` in neither. The opt-in is the channel\'s own publicInput/publicOutput, which the Value Channels editor already shows as "private in"/"private out" and the export layer already honours, so the policy reads a marker that existed rather than inventing one',
+      ['input:mainValue', 'input:mode', 'input:accentColour', 'input:gain',
+       'output:mainValue', 'output:mode', 'output:gain'],
+      await offered());
+
+    await kit.set(a, { 'ExternalAPI.linkPolicy': 'allInternals' });
+    await kit.settle(500);
+    led.check(X, 'linkPolicy — allInternals', 'the widest setting reaches the private channel too, which is what its name says and why it is not the default',
+      ['input:mainValue', 'input:mode', 'input:accentColour', 'input:gain', 'input:secret',
+       'output:mainValue', 'output:mode', 'output:gain', 'output:secret'],
+      await offered());
+
+    await kit.set(a, { 'ExternalAPI.linkPolicy': 'publishedOnly', 'ExternalAPI.emitsExternalLinks': false });
+    await kit.settle(500);
+    led.check(X, 'emitsExternalLinks', 'switching it off takes away everything this component could drive others WITH — its outputs go, its inputs stay, so the component can still be driven while driving nothing',
+      ['input:mainValue', 'input:mode', 'input:accentColour'], await offered());
+
+    await kit.set(a, { 'ExternalAPI.emitsExternalLinks': true, 'ExternalAPI.acceptsExternalLinks': false });
+    await kit.settle(500);
+    led.check(X, 'acceptsExternalLinks', 'and the mirror of it: with inbound refused the component offers only what it can drive others with',
+      ['output:mainValue', 'output:mode'], await offered());
+
+    // THE HALF THAT MAKES THESE SWITCHES RATHER THAN PICKER FILTERS. The list above is what the
+    // Links editor draws; this is the run time. A link made while the component accepted input has
+    // to stop moving it once it does not — otherwise the setting says "do not let others drive
+    // this" while others go on driving it, which is the shape of defect this whole pass is about.
+    const carried = async () => kit.page.evaluate(async () => {
+      const { applyPanelCustomLinkRoutes } = await import('/src/CE_Application/utils/panelCustomComponentLinks.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const controls = live?.controls ?? [];
+      const alpha = controls.find((c) => c?._children?.Core?.name === 'Alpha');
+      const beta = controls.find((c) => c?._children?.Core?.name === 'Beta');
+      const alphaId = alpha?._children?.Core?.id;
+      const betaId = beta?._children?.Core?.id;
+      alpha._children.Links = { _type: 'Links', enabled: true, _children: { route: {
+        _type: 'Link', enabled: true, type: 'external-output', source: 'mainValue',
+        target: `${betaId}.mainValue`, targetControlId: betaId, targetPort: 'mainValue' } } };
+      const out = applyPanelCustomLinkRoutes(controls, {
+        [alphaId]: { customValues: { mainValue: 0.73 } },
+        [betaId]: { customValues: { mainValue: 0 } },
+      });
+      return out?.[betaId]?.customValues?.mainValue ?? null;
+    });
+
+    await kit.set(a, { 'ExternalAPI.acceptsExternalLinks': true });
+    await kit.set(b, { 'ExternalAPI.acceptsExternalLinks': false });
+    await kit.settle(500);
+    const refused = await carried();
+    await kit.set(b, { 'ExternalAPI.acceptsExternalLinks': true });
+    await kit.settle(500);
+    const allowed = await carried();
+    led.check(X, 'acceptsExternalLinks (at run time, not only in the picker)',
+      'a link already authored into this component stops carrying a value the moment the switch goes off, and carries it again when it comes back — one field changes between the two measurements, so this is the switch and not the fixture. A permission the editor enforces and the runtime ignores is a suggestion',
+      { refused: 0, allowed: 0.73 }, { refused, allowed });
 
     led.check(X, 'addressableName', 'the addressable name is the component’s public handle, and it is carried into the endpoints the engine lists rather than being a note in the inspector',
       true, await (async () => {

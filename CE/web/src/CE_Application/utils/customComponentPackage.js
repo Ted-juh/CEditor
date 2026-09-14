@@ -816,6 +816,97 @@ function mergeValidationWithCompatibility(validation, envelope) {
   };
 }
 
+/**
+ * The Assets tab's Embed toggle, applied.
+ *
+ * ON (the default, and what every component has done until now): the image and filmstrip bytes
+ * travel inside the package, and it opens anywhere.
+ *
+ * OFF: the bytes are left out and the REFERENCES ARE KEPT — every asset still appears by name, with
+ * its dimensions, its mime type and the file it was imported from, so a recipient is told exactly
+ * what the component wants rather than finding blank parts and guessing. `sourceType: 'linked'`
+ * is what says the omission was deliberate; the manifest then reports `hasSource: false` and zero
+ * bytes, which is the same thing said in the numbers.
+ *
+ * WORTH KNOWING BEFORE YOU TURN IT OFF, because the failure only exists on the other machine: a
+ * component packaged without its assets looks perfect on the author's, and arrives with no
+ * pictures. That is the trap the panel package format was built to close. It is offered because
+ * there are real reasons to want it — a component whose artwork is licensed, or shared separately,
+ * or simply too large to send — and those are the author's call, not the packager's.
+ *
+ * Both copies have to be stripped. The envelope carries `assets` (the section) and `component`
+ * (the whole control, which contains the same section), so stripping one leaves the bytes in the
+ * file by the other route, and the toggle appears to do nothing for the one reason nobody checks.
+ */
+function withoutEmbeddedSources(assets) {
+  const strip = (group) => Object.fromEntries(Object.entries(group ?? {}).map(([name, entry]) => {
+    if (!entry?.source) return [name, entry];
+    const { source, ...rest } = entry;
+    return [name, { ...rest, sourceType: 'linked' }];
+  }));
+  return {
+    ...assets,
+    images: strip(assets?.images),
+    filmstrips: strip(assets?.filmstrips),
+  };
+}
+
+function embedsAssets(control) {
+  return control?._children?.Assets?.packagePolicy?.embedAssets !== false;
+}
+
+/**
+ * Every font family a component's parts ask for, plus any the author declared.
+ *
+ * A FONT IS THE ONE ASSET A PACKAGE CANNOT CARRY. Images and filmstrips travel as bytes inside the
+ * envelope; a typeface is named, and whether it resolves depends on the machine the component is
+ * opened on. So the honest thing a package can do is say which ones it wants, and the honest thing
+ * the app can do on the way in is say which of those are not here — which is what the Assets tab's
+ * Fonts toggle has been promising ("Warn when downloaded components reference missing fonts") while
+ * nothing collected the names or did the comparing.
+ *
+ * Read from the MATERIALIZED snapshot, so a family used only by a generated part — tick labels are
+ * the common case — is found. `Assets.fonts` is merged in as the declared list: it was in the model
+ * with no writer and no reader, and this gives it both, without a new authoring surface.
+ *
+ * The default family is excluded. `InteractivePartRenderer` falls back to Arial when a part names
+ * nothing, so a component with no typography at all would otherwise arrive warning about a font it
+ * never asked for.
+ */
+export function listCustomComponentFontFamilies(control) {
+  const families = new Set();
+  const add = (value) => {
+    const family = String(value ?? '').trim();
+    if (family && family.toLowerCase() !== 'arial') families.add(family);
+  };
+
+  for (const name of Object.keys(control?._children?.Assets?.fonts ?? {})) add(name);
+
+  const materialized = materializedCustomComponentSnapshot(control, {});
+  for (const part of Object.values(objectChildren(materialized?._children?.Parts))) {
+    add(part?._children?.Text?._children?.Font?.family);
+  }
+  return [...families].sort();
+}
+
+/**
+ * The families this component wants that the machine does not have.
+ *
+ * `available` is the caller's list — `availableFonts` in the app, which is the built-in faces plus
+ * whatever the user has imported. Passed in rather than imported so this module stays free of
+ * stores and testable without one, the same split `panelPackage.js` uses for reading assets.
+ *
+ * Returns [] when the component has switched the warning off. That is the toggle: an author who
+ * knows their audience has the font, or who is shipping to themselves, should not be told twice.
+ */
+export function missingCustomComponentFonts(control, available = []) {
+  if (control?._children?.Assets?.packagePolicy?.warnMissingFonts === false) return [];
+  const have = new Set((Array.isArray(available) ? available : [])
+    .map((entry) => String(entry?.value ?? entry?.family ?? entry ?? '').trim().toLowerCase())
+    .filter(Boolean));
+  return listCustomComponentFontFamilies(control).filter((family) => !have.has(family.toLowerCase()));
+}
+
 export function createCustomComponentExportEnvelope(control, metadata = {}) {
   const normalizedMetadata = normalizeCustomComponentMetadata(control, metadata);
   const validation = validateCustomComponentPackage(control);
@@ -825,7 +916,19 @@ export function createCustomComponentExportEnvelope(control, metadata = {}) {
   const capabilities = inferCustomComponentCapabilities(control);
   const readiness = analyzeCustomComponentReadiness(control);
   const publicApiSummary = summarizeCustomComponentPublicApi(control);
-  const assetManifest = summarizeCustomComponentAssets(control);
+  const embed = embedsAssets(control);
+  const packagedComponent = deepClone(control);
+  const packagedAssets = deepClone(control?._children?.Assets ?? {});
+  if (!embed && packagedComponent?._children?.Assets) {
+    packagedComponent._children.Assets = withoutEmbeddedSources(packagedComponent._children.Assets);
+  }
+  // The manifest describes WHAT IS IN THIS FILE, so it is taken after the strip rather than before.
+  // Taking it before reads better — the package could then say what a 2.4 MB filmstrip would have
+  // weighed — and it would be a lie in the file: `hasSource: true` beside no source, which is worse
+  // than saying less. What a recipient actually needs survives the strip anyway: the name, the
+  // dimensions, the mime type and the file it came from, with `sourceType: 'linked'` and zero bytes
+  // saying plainly that the bytes are elsewhere.
+  const assetManifest = summarizeCustomComponentAssets(packagedComponent);
   return {
     format: CUSTOM_COMPONENT_PACKAGE_FORMAT,
     formatVersion: CUSTOM_COMPONENT_PACKAGE_VERSION,
@@ -842,11 +945,20 @@ export function createCustomComponentExportEnvelope(control, metadata = {}) {
     capabilities,
     publicApiSummary,
     assetManifest,
+    // The families this component needs, travelling with it so the receiving machine can compare
+    // them against its own without re-walking a component it has not opened yet.
+    fontManifest: {
+      families: listCustomComponentFontFamilies(control),
+      warnMissing: control?._children?.Assets?.packagePolicy?.warnMissingFonts !== false,
+    },
     validation,
     publicApi: deepClone(control?._children?.PublishedProperties ?? {}),
     externalApi: deepClone(control?._children?.ExternalAPI ?? {}),
-    component: deepClone(control),
-    assets: deepClone(control?._children?.Assets ?? {}),
+    component: packagedComponent,
+    assets: embed ? packagedAssets : withoutEmbeddedSources(packagedAssets),
+    // Said in the envelope rather than left to be inferred from absent bytes, so a reader can tell
+    // "the author chose not to send these" from "this file is truncated".
+    assetsEmbedded: embed,
   };
 }
 

@@ -144,20 +144,42 @@ name repo-wide, computed access to the section object, and the scripting and exp
 are grouped by what it would take to make the promise true, because that is the decision each one
 needs.
 
-**A small fix, not a feature — the code is one filter away:**
+**~~A small fix, not a feature~~ / ~~Remove the unimplemented options~~ — RULED, AND ALL FIVE NOW WORK
+(14 September 2026).** The owner's ruling was to implement rather than remove, including the two
+this list had proposed deleting. What each does now, and what it cost:
 
-| Option | Where it is offered | What was measured |
-| --- | --- | --- |
-| `ExternalAPI.acceptsExternalLinks` | chip, Published Properties tab: "allow other components to drive published inputs" | With both switches OFF on a panel of two custom components, `listPanelCustomApiEndpoints` offers the same endpoints and the same routes as with them on. The engine filters on `PublishedProperties.inputs`/`outputs` and their `enabled` flag and reads neither key |
-| `ExternalAPI.emitsExternalLinks` | chip, same tab: "allow this component to drive other components" | as above — the two are one measurement |
-| `Assets.packagePolicy.embedAssets` | toggle, Assets tab: "Package images and filmstrips with saved components" | With it OFF, `createCustomComponentExportEnvelope` still returns the image by name and still carries its bytes, in an envelope the same size to within the policy flag itself. The packager reads `Assets.images` only to validate that a part's target exists |
-
-**Remove the unimplemented options and the promise becomes true, with no behaviour change:**
-
-| Option | Note |
+| Option | What it does now |
 | --- | --- |
-| `ExternalAPI.linkPolicy` | Three options — `publishedOnly`, `advancedOptIn`, `allInternals`. The engine implements the first and reads the field nowhere; widening both components to `allInternals` leaves the endpoint list identical. The safe default is what the product does, and the two wider options promise access it cannot give |
-| `Assets.packagePolicy.warnMissingFonts` | No reader, and no font-checking step in the import path for it to gate. `Assets.fonts`, the map it would check against, is declared and read by nothing either — so the warning has neither a trigger nor a source |
+| `ExternalAPI.acceptsExternalLinks` | Off, the component offers no inputs: nothing external can drive it. **And it applies at run time**, not only to the picker — a link authored before the switch went off stops carrying a value. That half is the point of the setting; a permission the editor enforces and the runtime ignores is a suggestion |
+| `ExternalAPI.emitsExternalLinks` | The mirror: off, the component offers no outputs and drives nothing, while remaining drivable |
+| `ExternalAPI.linkPolicy` | All three options implemented against markers the model already carried. `publishedOnly` (unchanged, still the default) reaches the published contract; `advancedOptIn` adds value channels the author has **not** marked private — `publicInput`/`publicOutput`, which the Value Channels editor already shows as "private in"/"private out" and the export layer already honours; `allInternals` reaches the private ones too. A published entry always wins over the bare channel behind it, so publishing's renames and narrowed ranges survive a wider policy. The dropdown's three raw values were relabelled to say what they do |
+| `Assets.packagePolicy.embedAssets` | Off, the artwork is left out of the package and **the references are kept** — every asset still appears by name, at its real size, with its mime type and source filename, marked `sourceType: 'linked'`. The envelope carries `assetsEmbedded` so a reader can tell a deliberate omission from a truncated file |
+| `Assets.packagePolicy.warnMissingFonts` | The check now exists. `listCustomComponentFontFamilies` collects the families a component's parts actually render with (from the materialized snapshot, so generated tick labels count) merged with any declared in `Assets.fonts` — which gains a writer and a reader in the same change — and `missingCustomComponentFonts` compares them against `availableFonts`. Surfaced in the **import preview**, where it is still a decision, rather than after the package is in the library |
+
+Three things worth keeping from doing it:
+
+- **The endpoint lister is also the run-time resolver**, which is what made "one filter" the right
+  size for the first two and the wrong description of the job. `applyPanelCustomLinkRoutes` looked
+  endpoints up but fell back to the raw channel when it found none — correct for working out a type
+  to convert through, and useless as a gate. The gate is now explicit and separate from that
+  fallback. A test caught this; the first implementation passed the picker rows and failed the
+  run-time one.
+- **A refused link is still LISTED, marked `blocked`.** Hiding it would leave the author with a link
+  in their document that they cannot see, understand or delete. Kept apart from `missing`, because
+  the two need different answers — a setting to change, versus a component to restore.
+- **The envelope carries the Assets section twice**, once on its own and once inside `component`, so
+  a strip that missed either would leave the bytes in the file by the other route and the toggle
+  would appear to do nothing for the one reason nobody checks.
+
+**The one behaviour change to know about.** Narrowing the Policy, unpublishing a property, or
+disabling one now stops links that depended on it from carrying a value. That is the same sentence
+read forwards — those settings decide what other components may reach — and it is the same family
+of defect as the rest of this pass, where a control could be disabled and go on being driven. It is
+recorded here rather than left to be discovered.
+
+Evidence: `panelCustomComponentLinks.test.js` (+7), `customComponentPackage.test.js` (+11),
+`browser-checks/behaviourShared.mjs` (6 rows, was 2 inert) and `browser-checks/behaviourAssets.mjs`
+(5 rows, was 2 inert). Each fix was reverted on its own and fails exactly its own rows: 7, 4 and 5.
 
 **A feature, so say so in the release note or drop the cell:**
 

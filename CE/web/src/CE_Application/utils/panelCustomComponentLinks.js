@@ -19,30 +19,127 @@ function isCustomComponent(control) {
   return String(control?._children?.Core?.controlType ?? '') === 'CustomComponent';
 }
 
+/**
+ * The three link policies, which decide WHICH of a component's values other components may reach.
+ *
+ * The vocabulary was in the model and in the Policy dropdown long before anything read it, and the
+ * dropdown offers the raw names with one hint beside them — "Published-only keeps internals private
+ * by default". So the names are the specification, and both wider settings are built out of markers
+ * the model already carries rather than out of a new field:
+ *
+ *   publishedOnly   only what `PublishedProperties` lists. The deliberate public contract, and what
+ *                   the engine did when the other two were unread — so this stays the default and
+ *                   every existing panel behaves exactly as it did.
+ *   advancedOptIn   that, plus any value channel the author has NOT marked private. `publicInput`
+ *                   and `publicOutput` are the opt-in: they already exist on every channel, the
+ *                   Value Channels editor already shows them as "private in" / "private out", and
+ *                   the export layer already honours them. An internal a component wants reachable
+ *                   is one it has not marked private.
+ *   allInternals    every channel, private markers included. The escape hatch, and it says so.
+ *
+ * A channel reached through the two wider settings is offered under its own name, with its own
+ * type and bounds. A PUBLISHED entry always wins over the bare channel behind it: publishing is
+ * where an author renames a channel, relabels it or narrows its range, and a wider policy is meant
+ * to add reach, never to discard that.
+ */
+export const LINK_POLICIES = ['publishedOnly', 'advancedOptIn', 'allInternals'];
+
+export function getLinkPolicy(control) {
+  const policy = String(control?._children?.ExternalAPI?.linkPolicy ?? 'publishedOnly').trim();
+  return LINK_POLICIES.includes(policy) ? policy : 'publishedOnly';
+}
+
+/**
+ * Whether this component accepts links INTO it / emits links OUT of it at all.
+ *
+ * Two chips in the Published Properties tab, above the Policy dropdown, and a different question
+ * from it: the policy says how much of the component is reachable, these say whether any of it is.
+ * Both default true, so a component that has never been near the tab is unchanged.
+ *
+ * THE SWITCH APPLIES AT RUN TIME, not only to the picker. `listPanelCustomApiEndpoints` is what the
+ * Links editor lists, and it is also what `applyPanelCustomLinkRoutes` resolves against while the
+ * panel runs — so turning a direction off stops links already authored in that direction from
+ * carrying a value, and drops them from the route list. That is the honest reading of "allow other
+ * components to drive published inputs": a switch that only hid the endpoint from a picker would
+ * leave the component being driven by every link made before it was turned off, which is the
+ * opposite of what it says.
+ */
+function acceptsDirection(control, direction) {
+  const api = control?._children?.ExternalAPI ?? {};
+  return direction === 'output' ? api.emitsExternalLinks !== false : api.acceptsExternalLinks !== false;
+}
+
+function endpointFrom(control, direction, name, entry, channel) {
+  return {
+    controlId: controlId(control),
+    controlName: controlName(control),
+    direction,
+    name,
+    channel: String(entry?.channel || name),
+    label: String(entry?.label || name),
+    type: String(entry?.type ?? channel?.type ?? 'float'),
+    min: entry?.min ?? channel?.min,
+    max: entry?.max ?? channel?.max,
+    step: entry?.step ?? channel?.step,
+    defaultValue: entry?.defaultValue ?? channel?.defaultValue,
+    values: Array.isArray(entry?.values) ? [...entry.values] : (Array.isArray(channel?.values) ? [...channel.values] : undefined),
+  };
+}
+
+/** True when the policy lets this channel be reached in this direction without being published. */
+function policyAdmitsChannel(policy, channel, direction) {
+  if (policy === 'allInternals') return true;
+  if (policy !== 'advancedOptIn') return false;
+  return direction === 'output' ? channel?.publicOutput !== false : channel?.publicInput !== false;
+}
+
 function publishedEntries(control, direction) {
+  if (!acceptsDirection(control, direction)) return [];
+
   const published = control?._children?.PublishedProperties ?? {};
   const entries = direction === 'output' ? published.outputs : published.inputs;
   const channels = control?._children?.ValueChannels?._children ?? {};
-  return Object.entries(entries ?? {})
-    .filter(([, entry]) => entry?.enabled !== false)
-    .map(([name, entry]) => {
-      const channelName = String(entry?.channel || name);
-      const channel = channels[channelName] ?? {};
-      return {
-        controlId: controlId(control),
-        controlName: controlName(control),
-        direction,
-        name,
-        channel: channelName,
-        label: String(entry?.label || name),
-        type: String(entry?.type ?? channel?.type ?? 'float'),
-        min: entry?.min ?? channel?.min,
-        max: entry?.max ?? channel?.max,
-        step: entry?.step ?? channel?.step,
-        defaultValue: entry?.defaultValue ?? channel?.defaultValue,
-        values: Array.isArray(entry?.values) ? [...entry.values] : (Array.isArray(channel?.values) ? [...channel.values] : undefined),
-      };
-    });
+
+  const out = [];
+  const claimed = new Set();
+  for (const [name, entry] of Object.entries(entries ?? {})) {
+    if (entry?.enabled === false) continue;
+    const channelName = String(entry?.channel || name);
+    claimed.add(channelName);
+    out.push(endpointFrom(control, direction, name, entry, channels[channelName] ?? {}));
+  }
+
+  // The wider policies, added after the published contract so a published entry keeps its name,
+  // label and narrowed range and an unpublished channel is never listed twice.
+  const policy = getLinkPolicy(control);
+  if (policy === 'publishedOnly') return out;
+  for (const [channelName, channel] of Object.entries(channels)) {
+    if (claimed.has(channelName)) continue;
+    if (!policyAdmitsChannel(policy, channel, direction)) continue;
+    out.push(endpointFrom(control, direction, channelName,
+      { channel: channelName, label: channel?.label || channelName }, channel ?? {}));
+  }
+  return out;
+}
+
+/**
+ * Whether a component will carry a link on this channel in this direction.
+ *
+ * One rule, asked twice: the Links editor asks it by listing endpoints, and the run time asks it
+ * here. Keeping both on `publishedEntries` is the point — a permission that the picker enforces and
+ * the runtime does not is not a permission, it is a suggestion, and a component whose author has
+ * turned external input off would go on being driven by every link made before they turned it off.
+ *
+ * The cost is worth stating where somebody reads it: narrowing the Policy, unpublishing a property,
+ * or disabling one, all stop links that depended on it from carrying a value. That is the same
+ * sentence read forwards — those settings decide what other components may reach — and the Links
+ * editor keeps LISTING such a link, marked `blocked`, rather than hiding it, so the author can see
+ * why it stopped and remove it.
+ */
+export function panelCustomLinkPermitted(control, channel, direction) {
+  if (!isCustomComponent(control)) return false;
+  const wanted = String(channel ?? '');
+  return publishedEntries(control, direction).some((endpoint) => endpoint.channel === wanted);
 }
 
 export function listPanelCustomApiEndpoints(controls = []) {
@@ -307,6 +404,13 @@ export function listPanelCustomRouteLinks(controls = []) {
         : null;
       const compatibility = endpointTypeCompatibility(sourceEndpoint, targetEndpoint);
       const broken = !target || !targetControl || !targetEndpoint;
+      // A link the two components' own settings now refuse. Listed rather than hidden: the author
+      // made it, it is in their document, and a link that vanishes from the editor is one they
+      // cannot see, understand or delete. `blocked` is kept apart from `missing` because they need
+      // different answers — this one is a setting to change, that one is a component to restore.
+      const blocked = !broken
+        && (!panelCustomLinkPermitted(sourceControl, sourceChannel, 'output')
+          || !panelCustomLinkPermitted(targetControl, targetChannel, 'input'));
       routes.push({
         key: `${sourceId}.${name}`,
         name,
@@ -316,8 +420,13 @@ export function listPanelCustomRouteLinks(controls = []) {
         source: sourceEndpoint,
         target: targetEndpoint,
         targetRef: target,
-        compatibility: broken ? { status: 'missing', warning: 'Target component or input is missing.' } : compatibility,
+        compatibility: broken
+          ? { status: 'missing', warning: 'Target component or input is missing.' }
+          : (blocked
+            ? { status: 'blocked', warning: 'One of these components does not allow this link. Check its External switches and Policy.' }
+            : compatibility),
         broken,
+        blocked,
       });
     }
   }
@@ -378,6 +487,11 @@ export function applyPanelCustomLinkRoutes(controls = [], sessions = {}) {
       const channelName = targetInputChannel(targetControl, target.port);
       const channel = targetControl?._children?.ValueChannels?._children?.[channelName];
       if (!channel) continue;
+      // The permission check, and deliberately not the endpoint lookup below it: that one falls
+      // back to the raw channel when it finds nothing, which is right for working out a type to
+      // convert through and wrong as a gate — it is why these settings used to be picker-only.
+      if (!panelCustomLinkPermitted(sourceControl, source, 'output')) continue;
+      if (!panelCustomLinkPermitted(targetControl, channelName, 'input')) continue;
       const sourceEndpoint = endpointFor(endpoints, sourceId, source, 'output') ?? {
         type: sourceControl?._children?.ValueChannels?._children?.[source]?.type ?? 'float',
         ...(sourceControl?._children?.ValueChannels?._children?.[source] ?? {}),

@@ -203,3 +203,140 @@ test('applyPanelCustomLinkRoutes rescales numeric public routes into target rang
   assert.equal(routed.target.customValues.mainValue, 64);
   assert.equal(routed.target.customNormalizedValue, 64 / 127);
 });
+
+// ---------------------------------------------------------------------------------------------
+// The External chips and the Policy dropdown, which sat in the Published Properties tab being
+// written to the document and read by nothing. Both now decide what `listPanelCustomApiEndpoints`
+// offers — which is the Links editor's picker AND the run-time resolver, so these cover both.
+// ---------------------------------------------------------------------------------------------
+
+function withApi(control, api) {
+  control._children.ExternalAPI = { _type: 'ExternalAPI', version: 1, ...api };
+  return control;
+}
+
+/** A private channel the published contract does not mention — what the wider policies are for. */
+function withPrivateChannel(control, name = 'internalTrim') {
+  control._children.ValueChannels._children[name] = {
+    type: 'float', min: 0, max: 1, step: 0.01, defaultValue: 0.5,
+    publicInput: false, publicOutput: false, label: 'Internal Trim',
+  };
+  return control;
+}
+
+/** An unpublished channel left public — the opt-in `advancedOptIn` reads. */
+function withOptInChannel(control, name = 'gain') {
+  control._children.ValueChannels._children[name] = {
+    type: 'float', min: 0, max: 2, step: 0.01, defaultValue: 1, label: 'Gain',
+  };
+  return control;
+}
+
+const key = (endpoint) => `${endpoint.direction}:${endpoint.channel}`;
+
+test('acceptsExternalLinks off removes the component\'s inputs, leaving its outputs', () => {
+  const control = withApi(makeCustom('a', 'A'), { acceptsExternalLinks: false });
+  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key), ['output:mainValue']);
+});
+
+test('emitsExternalLinks off removes the component\'s outputs, leaving its inputs', () => {
+  const control = withApi(makeCustom('a', 'A'), { emitsExternalLinks: false });
+  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key), ['input:mainValue', 'input:mode']);
+});
+
+test('both off removes the component from linking entirely', () => {
+  const control = withApi(makeCustom('a', 'A'), { acceptsExternalLinks: false, emitsExternalLinks: false });
+  assert.deepEqual(listPanelCustomApiEndpoints([control]), []);
+});
+
+test('a direction turned off stops links already authored in it from carrying a value', () => {
+  // The half that makes this a switch rather than a filter on a picker. A link made while the
+  // component accepted input must stop moving the target once it does not — otherwise the setting
+  // says "do not let others drive this" while others go on driving it.
+  const source = makeCustom('source', 'Source', 0.2);
+  const target = withApi(makeCustom('target', 'Target', 0), { acceptsExternalLinks: false });
+  source._children.Links._children.routeMain = {
+    _type: 'Link', enabled: true, type: 'external-output',
+    source: 'mainValue', target: 'target.mainValue',
+    targetControlId: 'target', targetPort: 'mainValue',
+  };
+  const sessions = { source: { customValues: { mainValue: 0.73 } }, target: { customValues: { mainValue: 0 } } };
+
+  assert.equal(applyPanelCustomLinkRoutes([source, target], sessions).target.customValues.mainValue, 0);
+
+  // And the same panel with the switch back on, so the assertion above is the switch and not the
+  // fixture: one field changes, and the value arrives.
+  target._children.ExternalAPI.acceptsExternalLinks = true;
+  assert.equal(applyPanelCustomLinkRoutes([source, target], sessions).target.customValues.mainValue, 0.73);
+});
+
+test('publishedOnly is the default and offers only the published contract', () => {
+  const control = withOptInChannel(withPrivateChannel(makeCustom('a', 'A')));
+  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key),
+    ['input:mainValue', 'input:mode', 'output:mainValue']);
+  // Named explicitly, to prove the default is the value and not the absence of the section.
+  assert.deepEqual(listPanelCustomApiEndpoints([withApi(control, { linkPolicy: 'publishedOnly' })]).map(key),
+    ['input:mainValue', 'input:mode', 'output:mainValue']);
+});
+
+test('advancedOptIn adds unpublished channels that are not marked private, and keeps out the ones that are', () => {
+  const control = withApi(withOptInChannel(withPrivateChannel(makeCustom('a', 'A'))), { linkPolicy: 'advancedOptIn' });
+  const offered = listPanelCustomApiEndpoints([control]).map(key);
+  assert.deepEqual(offered, [
+    'input:mainValue', 'input:mode', 'input:gain',
+    'output:mainValue', 'output:mode', 'output:gain',
+  ]);
+  assert.equal(offered.some((k) => k.endsWith(':internalTrim')), false);
+  // The channel's own bounds come with it, so a link built on one is not silently 0..1.
+  const gain = listPanelCustomApiEndpoints([control]).find((e) => e.channel === 'gain');
+  assert.deepEqual([gain.min, gain.max, gain.label], [0, 2, 'Gain']);
+});
+
+test('allInternals reaches the private channel too', () => {
+  const control = withApi(withOptInChannel(withPrivateChannel(makeCustom('a', 'A'))), { linkPolicy: 'allInternals' });
+  const offered = listPanelCustomApiEndpoints([control]).map(key);
+  assert.equal(offered.includes('input:internalTrim'), true);
+  assert.equal(offered.includes('output:internalTrim'), true);
+});
+
+test('a published entry keeps its own label and range under a wider policy, and is not listed twice', () => {
+  // Publishing is where an author renames a channel or narrows its range. A wider policy adds
+  // reach; it must not hand back the bare channel beside the published version of the same thing.
+  const control = withApi(makeCustom('a', 'A'), { linkPolicy: 'allInternals' });
+  control._children.PublishedProperties.inputs.mainValue.label = 'Cutoff';
+  control._children.PublishedProperties.inputs.mainValue.max = 0.5;
+  const inputs = listPanelCustomApiEndpoints([control]).filter((e) => e.direction === 'input' && e.channel === 'mainValue');
+  assert.equal(inputs.length, 1);
+  assert.equal(inputs[0].label, 'Cutoff');
+  assert.equal(inputs[0].max, 0.5);
+});
+
+test('an unknown policy value falls back to publishedOnly rather than opening the component up', () => {
+  const control = withApi(withPrivateChannel(makeCustom('a', 'A')), { linkPolicy: 'everything' });
+  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key),
+    ['input:mainValue', 'input:mode', 'output:mainValue']);
+});
+
+test('a refused link is still listed, marked blocked rather than hidden or missing', () => {
+  // The author made this link and it is in their document. Hiding it would leave them with
+  // something they cannot see, understand or delete; calling it "missing" would send them looking
+  // for a component that is right there.
+  const source = makeCustom('source', 'Source', 0.2);
+  const target = withApi(makeCustom('target', 'Target', 0), { acceptsExternalLinks: false });
+  source._children.Links._children.routeMain = {
+    _type: 'Link', enabled: true, type: 'external-output',
+    source: 'mainValue', target: 'target.mainValue',
+    targetControlId: 'target', targetPort: 'mainValue',
+  };
+
+  const [route] = listPanelCustomRouteLinks([source, target]);
+  assert.equal(route.blocked, true);
+  assert.equal(route.broken, false);
+  assert.equal(route.compatibility.status, 'blocked');
+  assert.match(route.compatibility.warning, /does not allow this link/);
+
+  target._children.ExternalAPI.acceptsExternalLinks = true;
+  const [allowed] = listPanelCustomRouteLinks([source, target]);
+  assert.equal(allowed.blocked, false);
+  assert.equal(allowed.compatibility.status, 'compatible');
+});

@@ -383,6 +383,12 @@
         <div><strong>{outboundRouteCount}</strong><span>outbound</span></div>
         <div><strong>{inboundRouteCount}</strong><span>inbound</span></div>
         <div><strong>{selectedPanelRoutes.filter((route) => route.broken).length}</strong><span>broken</span></div>
+        <!-- Links the two components' own settings now refuse: an External switch turned off, or a
+             Policy narrowed under a link that relied on the wider one. Counted apart from "broken"
+             because they need a different answer — a setting to change, not a component to restore
+             — and shown at all because a refused link that vanished from this list would be one the
+             author could not see, understand or delete. -->
+        <div><strong>{selectedPanelRoutes.filter((route) => route.blocked).length}</strong><span>blocked</span></div>
       </div>
       {#if selectedPanelRoutes.length}
         <div class="panel-flow-list">
@@ -390,6 +396,7 @@
             <button
               type="button"
               class:broken={route.broken}
+              class:blocked={route.blocked}
               onclick={() => {
                 if (route.source.controlId === core?.id) selectedName = route.name;
                 routeStatus = route.source.controlId === core?.id ? `Selected ${route.name}.` : `Route lives on ${route.source.controlName}.`;
@@ -671,6 +678,7 @@
   }
   .panel-flow-list button:hover { border-color: #5B9BD5; color: #FFF; }
   .panel-flow-list button.broken { border-color: #7A4C4C; }
+  .panel-flow-list button.blocked { border-color: #7A6A4C; }
   .panel-flow-list span,
   .panel-flow-list strong,
   .panel-flow-list em {

@@ -13,6 +13,8 @@ import {
   instantiateCustomComponentPackageControl,
   normalizeCustomComponentLibraryEnvelope,
   normalizeCustomComponentEnvelope,
+  listCustomComponentFontFamilies,
+  missingCustomComponentFonts,
   summarizeCustomComponentAssets,
   summarizeCustomComponent,
   summarizeCustomComponentPublicApi,
@@ -705,4 +707,144 @@ test('customComponentPackageProvenance captures shareable package identity and r
   assert.ok(provenance.capabilities.labels.includes('slider'));
   assert.equal(provenance.publicApiSummary.counts.outputs, 1);
   assert.equal(provenance.assetManifest.counts.total, 0);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The Assets tab's Embed toggle. It shipped as a switch that wrote to the document and was read
+// nowhere: the bytes travelled either way. These pin both positions, and the second copy — the
+// envelope carries the Assets section twice, once on its own and once inside `component`, and a
+// strip that misses either leaves the bytes in the file by the other route.
+// ---------------------------------------------------------------------------------------------
+
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+function withArtwork(policy = undefined) {
+  return makeCustomComponent({
+    Assets: {
+      images: { face: { source: PNG, mimeType: 'image/png', width: 64, height: 64, sourceFileName: 'face.png' } },
+      filmstrips: { knob: { source: PNG, frameCount: 31, frameWidth: 64, frameHeight: 64 } },
+      ...(policy === undefined ? {} : { packagePolicy: { embedAssets: policy } }),
+    },
+  });
+}
+
+const sourcesIn = (envelope) => [
+  envelope.assets?.images?.face?.source,
+  envelope.assets?.filmstrips?.knob?.source,
+  envelope.component?._children?.Assets?.images?.face?.source,
+  envelope.component?._children?.Assets?.filmstrips?.knob?.source,
+];
+
+test('embedAssets defaults on, and the artwork travels in both copies of the section', () => {
+  const envelope = createCustomComponentExportEnvelope(withArtwork());
+  assert.deepEqual(sourcesIn(envelope), [PNG, PNG, PNG, PNG]);
+  assert.equal(envelope.assetsEmbedded, true);
+  // An explicit true is the same as the default, so an author who has touched the toggle and put
+  // it back gets the same package as one who never opened the tab.
+  assert.deepEqual(sourcesIn(createCustomComponentExportEnvelope(withArtwork(true))), [PNG, PNG, PNG, PNG]);
+});
+
+test('embedAssets off leaves the bytes out of both copies', () => {
+  const envelope = createCustomComponentExportEnvelope(withArtwork(false));
+  assert.deepEqual(sourcesIn(envelope), [undefined, undefined, undefined, undefined]);
+  assert.equal(envelope.assetsEmbedded, false);
+  assert.equal(JSON.stringify(envelope).includes('iVBORw0KGgo'), false);
+});
+
+test('embedAssets off keeps every reference, so a recipient is told what is wanted', () => {
+  // The difference between a package that omits its artwork and one that is simply broken.
+  const envelope = createCustomComponentExportEnvelope(withArtwork(false));
+  const image = envelope.assets.images.face;
+  assert.equal(typeof image, 'object');
+  assert.deepEqual([image.mimeType, image.width, image.height, image.sourceFileName],
+    ['image/png', 64, 64, 'face.png']);
+  assert.equal(image.sourceType, 'linked');
+  assert.equal(envelope.assets.filmstrips.knob.frameCount, 31);
+});
+
+test('the manifest describes what is in the file, not what was left behind', () => {
+  const embedded = createCustomComponentExportEnvelope(withArtwork(true)).assetManifest;
+  const linked = createCustomComponentExportEnvelope(withArtwork(false)).assetManifest;
+  // Both list the same two assets — the strip removes bytes, never references.
+  assert.deepEqual([linked.counts.images, linked.counts.filmstrips], [1, 1]);
+  assert.deepEqual([embedded.counts.images, embedded.counts.filmstrips], [1, 1]);
+  // And the stripped one says so rather than claiming bytes it does not carry. A manifest reading
+  // `hasSource: true` beside no source would be a lie in the file, which is worse than saying less.
+  assert.deepEqual([linked.images[0].hasSource, linked.images[0].sourceType, linked.images[0].bytes],
+    [false, 'linked', 0]);
+  assert.deepEqual([embedded.images[0].hasSource, embedded.images[0].sourceType],
+    [true, 'embedded']);
+  assert.ok(embedded.images[0].bytes > 0);
+  // What a recipient needs to go and find the file survives either way.
+  assert.deepEqual([linked.images[0].name, linked.images[0].width, linked.images[0].sourceFileName],
+    ['face', 64, 'face.png']);
+});
+
+test('a package made without its artwork still opens, and reports the assets as not carried', () => {
+  const opened = normalizeCustomComponentEnvelope(createCustomComponentExportEnvelope(withArtwork(false)));
+  assert.ok(opened);
+  // The manifest is re-derived from what actually arrived, which is where a recipient looks.
+  assert.equal(opened.assetManifest.images[0].hasSource, false);
+  assert.equal(opened.assetManifest.images[0].bytes, 0);
+  assert.equal(opened.assetManifest.images[0].name, 'face');
+});
+
+// ---------------------------------------------------------------------------------------------
+// The Assets tab's Fonts toggle — "Warn when downloaded components reference missing fonts". It
+// had neither a trigger nor a source: nothing collected the families a component asks for, and
+// `Assets.fonts`, the map it would have checked against, had no writer and no reader either.
+// ---------------------------------------------------------------------------------------------
+
+function withText(family, extra = {}) {
+  return makeCustomComponent({
+    Parts: {
+      _children: {
+        label: {
+          _type: 'Part', name: 'label',
+          _children: { Text: { _children: { Font: { family, size: 12 } } } },
+        },
+      },
+    },
+    Assets: { filmstrips: {}, ...extra },
+  });
+}
+
+test('the families a component asks for are collected from its parts', () => {
+  assert.deepEqual(listCustomComponentFontFamilies(withText('Inter')), ['Inter']);
+});
+
+test('the default family is not collected, so a component with no typography asks for nothing', () => {
+  // The renderer falls back to Arial when a part names no family. Collecting it would make every
+  // plain component arrive warning about a font it never chose.
+  assert.deepEqual(listCustomComponentFontFamilies(withText('Arial')), []);
+  assert.deepEqual(listCustomComponentFontFamilies(makeCustomComponent()), []);
+});
+
+test('a declared Assets.fonts entry is collected too, and merges with what the parts ask for', () => {
+  const control = withText('Inter', { fonts: { 'JetBrains Mono': { } } });
+  assert.deepEqual(listCustomComponentFontFamilies(control), ['Inter', 'JetBrains Mono']);
+});
+
+test('missing fonts are the ones this machine does not have, compared case-insensitively', () => {
+  const control = withText('Inter');
+  assert.deepEqual(missingCustomComponentFonts(control, [{ value: 'Roboto' }]), ['Inter']);
+  assert.deepEqual(missingCustomComponentFonts(control, [{ value: 'inter' }]), []);
+  // The caller's list is whatever `availableFonts` yields; plain strings work as well as rows.
+  assert.deepEqual(missingCustomComponentFonts(control, ['Inter']), []);
+});
+
+test('warnMissingFonts off silences the warning without changing what the component asks for', () => {
+  const control = withText('Inter', { packagePolicy: { warnMissingFonts: false } });
+  assert.deepEqual(missingCustomComponentFonts(control, []), []);
+  // The families are still collected — the toggle suppresses the warning, it does not erase the
+  // requirement, so the package still declares what it wants.
+  assert.deepEqual(listCustomComponentFontFamilies(control), ['Inter']);
+  assert.deepEqual(createCustomComponentExportEnvelope(control).fontManifest,
+    { families: ['Inter'], warnMissing: false });
+});
+
+test('the package carries the font list, so the receiving machine can compare before opening it', () => {
+  const envelope = createCustomComponentExportEnvelope(withText('Inter'));
+  assert.deepEqual(envelope.fontManifest, { families: ['Inter'], warnMissing: true });
+  assert.deepEqual(missingCustomComponentFonts(envelope.component, [{ value: 'Roboto' }]), ['Inter']);
 });

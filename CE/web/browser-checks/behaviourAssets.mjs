@@ -37,6 +37,17 @@ const packaged = (id) => kit.page.evaluate(async ({ id }) => {
     policy: assets?.packagePolicy ?? null,
     /** The data URL itself, which is what "embed" is about — bytes, not names. */
     carriesBytes: json.includes('data:image/'),
+    // The PROBE'S OWN bytes, which is a sharper question than the line above: an envelope also
+    // carries a generated thumbnail, and that is a data:image/ URL too — so `carriesBytes` cannot
+    // tell "the artwork travelled" from "the package has a preview picture".
+    carriesTheArtwork: json.includes(String(control?._children?.Assets?.images?.probeArt?.source ?? '\u0000').slice(0, 64)),
+    // Both copies of the section: the envelope holds Assets on its own AND inside `component`, so
+    // a strip that misses either leaves the bytes in the file by the other route.
+    sourceInAssets: !!envelope?.assets?.images?.probeArt?.source,
+    sourceInComponent: !!assets?.images?.probeArt?.source,
+    assetsEmbedded: envelope?.assetsEmbedded,
+    manifest: envelope?.assetManifest?.images?.[0] ?? null,
+    fontManifest: envelope?.fontManifest ?? null,
     bytes: json.length,
   };
 }, { id });
@@ -73,12 +84,85 @@ try {
     await kit.set(id, { 'Assets.packagePolicy.embedAssets': false });
     await kit.settle(600);
     const refusing = await packaged(id);
-    led.inert(A, 'packagePolicy.embedAssets',
-      'package images and filmstrips with saved components',
-      `USER-VISIBLE AND NOT CONNECTED. It is a toggle in the Assets tab whose hint is "Package images and filmstrips with saved components", and the packager does not consult it: with it switched OFF, \`createCustomComponentExportEnvelope\` still returns the image by name (${JSON.stringify(refusing.images)}) and still carries its bytes (${refusing.carriesBytes}), in an envelope the same size to within a few characters (${embedding.bytes} on, ${refusing.bytes} off — the difference is the policy flag itself). \`customComponentPackage.js\` mentions \`Assets.images\` and \`Assets.filmstrips\` only to VALIDATE that a part's target exists, and never reads \`packagePolicy\`. What the switch does do is get written and saved, which assetsTab.mjs already checks — so the setting round-trips perfectly and means nothing. Smallest honest release treatment: the toggle promises a smaller package, so either implement the strip in the packager or take the cell out; leaving it is the one option that misleads.`);
-    led.inert(A, 'packagePolicy.warnMissingFonts',
-      'warn when a downloaded component references a font that is not installed',
-      'the same, and with less behind it: no reader anywhere, and no font-checking step exists in the import path for it to gate. `Assets.fonts` — the map it would check against — is declared and read by nothing either, so the warning has neither a trigger nor a source. Smallest honest release treatment: take the cell out until the check exists.');
+    led.check(A, 'packagePolicy.embedAssets',
+      'switching it off leaves the artwork OUT of the package — and out of both copies of the Assets section, because the envelope carries one on its own and another inside `component`, so a strip that missed either would leave the bytes in the file by the other route and the toggle would appear to do nothing for the one reason nobody checks',
+      { carriesTheArtwork: false, sourceInAssets: false, sourceInComponent: false, assetsEmbedded: false, smaller: true },
+      { carriesTheArtwork: refusing.carriesTheArtwork, sourceInAssets: refusing.sourceInAssets,
+        sourceInComponent: refusing.sourceInComponent, assetsEmbedded: refusing.assetsEmbedded,
+        smaller: refusing.bytes < embedding.bytes });
+    led.check(A, 'packagePolicy.embedAssets (the reference survives the strip)',
+      'the asset is still there by name and at its real size, and the manifest says plainly that the bytes are not — `linked`, not `embedded`, and `hasSource: false`. That is the difference between a package that deliberately omits its artwork and one that is simply broken, and it is said in the file rather than inferred from an absence',
+      { named: ['probeArt'], sourceType: 'linked', width: 24, hasSource: false },
+      { named: refusing.images, sourceType: refusing.manifest?.sourceType,
+        width: refusing.manifest?.width, hasSource: refusing.manifest?.hasSource });
+
+    await kit.set(id, { 'Assets.packagePolicy.embedAssets': true });
+    await kit.settle(600);
+    const embeddingAgain = await packaged(id);
+    led.check(A, 'packagePolicy.embedAssets (and back on again)',
+      'turning it back on restores the bytes, so the setting is a switch rather than a one-way door — and this is the measurement that says the row above is the toggle and not the fixture, since one field changes between the two',
+      { carriesTheArtwork: true, assetsEmbedded: true },
+      { carriesTheArtwork: embeddingAgain.carriesTheArtwork, assetsEmbedded: embeddingAgain.assetsEmbedded });
+
+    // ---------------------------------------------------------------------------------------
+    // The Fonts toggle. A font is the one asset a package cannot carry: images travel as bytes,
+    // a typeface is a NAME, and whether it resolves depends on the machine it is opened on. So
+    // the promise is a warning, and a warning needs two things this had neither of — a list of
+    // what the component asks for, and something to compare it against.
+    // ---------------------------------------------------------------------------------------
+    await kit.page.evaluate(async (id) => {
+      const { applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+      applyControlPatch(id, { 'Parts.caption': { _type: 'Part', name: 'caption',
+        x: 10, y: 10, width: 60, height: 20,
+        _children: { Text: { _type: 'Text', content: 'Hz',
+          _children: { Font: { _type: 'Font', family: 'Nonexistent Sans', size: 12 } } } } } });
+    }, id);
+    await kit.settle(500);
+
+    const fonts = await kit.page.evaluate(async ({ id }) => {
+      const { listCustomComponentFontFamilies, missingCustomComponentFonts } =
+        await import('/src/CE_Application/utils/customComponentPackage.js');
+      const { availableFonts } = await import('/src/CE_Application/stores/appSettings.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const control = (live?.controls ?? []).find((c) => c._children.Core.id === id);
+      const installed = get(availableFonts) ?? [];
+      return {
+        asks: listCustomComponentFontFamilies(control),
+        missing: missingCustomComponentFonts(control, installed),
+        // Against a machine that HAS it, so the row proves a comparison rather than a constant.
+        missingWhenInstalled: missingCustomComponentFonts(control, [...installed, { value: 'Nonexistent Sans' }]),
+        installedCount: installed.length,
+      };
+    }, { id });
+
+    led.check(A, 'packagePolicy.warnMissingFonts',
+      'a component whose text names a font this machine does not have is reported as wanting it — collected from the parts as they will actually render, and compared against `availableFonts`, which is the built-in faces plus whatever the user has imported. Told to the user in the import preview, where it is still a decision, rather than after the package is already in the library',
+      { asks: ['Nonexistent Sans'], missing: ['Nonexistent Sans'], missingWhenInstalled: [], hasFontsToCompareAgainst: true },
+      { asks: fonts.asks, missing: fonts.missing, missingWhenInstalled: fonts.missingWhenInstalled,
+        hasFontsToCompareAgainst: fonts.installedCount > 0 });
+
+    const quieted = await kit.page.evaluate(async ({ id }) => {
+      const { applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+      applyControlPatch(id, { 'Assets.packagePolicy.warnMissingFonts': false });
+      const { missingCustomComponentFonts, listCustomComponentFontFamilies, createCustomComponentExportEnvelope } =
+        await import('/src/CE_Application/utils/customComponentPackage.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const control = (live?.controls ?? []).find((c) => c._children.Core.id === id);
+      return {
+        missing: missingCustomComponentFonts(control, []),
+        stillAsks: listCustomComponentFontFamilies(control),
+        manifest: createCustomComponentExportEnvelope(control, { name: 'Probe' }).fontManifest,
+      };
+    }, { id });
+
+    led.check(A, 'packagePolicy.warnMissingFonts (off silences the warning without erasing the need)',
+      'switched off, nothing is reported even against a machine with no fonts at all — and the component still DECLARES what it wants, in the package, so turning the warning off hides the message rather than the requirement. An author who knows their audience has the typeface should not be told twice; a recipient should still be able to find out',
+      { missing: [], stillAsks: ['Nonexistent Sans'], manifest: { families: ['Nonexistent Sans'], warnMissing: false } },
+      { missing: quieted.missing, stillAsks: quieted.stillAsks, manifest: quieted.manifest });
 
     led.unsupported(A, 'fonts',
       'the fonts this component carries with it',

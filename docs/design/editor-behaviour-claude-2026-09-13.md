@@ -106,12 +106,18 @@ the tab strip and the page it marks, the scrollbar and where the view is parked.
 tail on Macro, Crossfader, Joystick and Meter.
 `behaviourLists.mjs` — 16 verified, 3 inert, **0 unverified**, 0 open defects. Listbox, Icon and
 the `Value` tail — and `Icon.tint`, a colour field two editors point at that paints nothing.
-`behaviourShared.mjs` — 4 verified, 5 inert, **0 unverified**, 4 not a property, 3 closed
-elsewhere, 0 open defects. `ExternalAPI`, `Core`, `Transform` and `Grid`, and the containment
-contract on a custom component that the link engine does not consult.
-`behaviourAssets.mjs` — 1 verified, 2 inert, **0 unverified**, 2 not a property, 1 closed
-elsewhere, 0 open defects. What a packaged component actually carries, and the packaging toggle
-that changes nothing.
+`behaviourShared.mjs` — **10 verified, 3 inert**, **0 unverified**, 4 not a property, 3 closed
+elsewhere, 0 open defects. `ExternalAPI`, `Core`, `Transform` and `Grid`. The containment contract
+the link engine did not consult is now consulted: re-run 14 Sep after the owner ruled that the two
+External switches and all three `linkPolicy` options should work, the six ExternalAPI rows measure
+three distinct endpoint lists for the three policies, both switches in both directions, and — the
+row that makes them switches rather than picker filters — a link already authored stopping and
+restarting as one field changes.
+`behaviourAssets.mjs` — **6 verified, 0 inert**, **0 unverified**, 2 not a property, 1 closed
+elsewhere, 0 open defects. What a packaged component actually carries. The packaging toggle that
+changed nothing now strips the artwork from both copies of the Assets section and keeps every
+reference, and the Fonts toggle — which had neither a trigger nor a source — collects the families
+a component's parts render with and compares them against `availableFonts`.
 `behaviourCombined.mjs` — 29 verified, **0 unverified**, 0 open defects. Priority 3: all 58
 registered types and 125 controls on one panel, opened from `CE/qa/QA-01-components.cepanel`
 through the app's own `deserializePanel`, then operated — mounting, drawing, independence of
