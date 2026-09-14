@@ -140,6 +140,18 @@ export function looperLoopSeconds(control) {
   return Math.max(0.05, num(looperConfig(control).loopSeconds, 4));
 }
 
+// Free-running loops normally honour their authored duration exactly. With
+// quantizeLoop on, that duration lands on the nearest whole beat at the panel's
+// current tempo. Keep the authored seconds untouched: scripts can turn
+// quantisation back off, and save/reopen must not bake one tempo into the file.
+export function looperPlaybackSeconds(control, bpm = 120) {
+  const seconds = looperLoopSeconds(control);
+  if (looperConfig(control).quantizeLoop !== true) return seconds;
+  const tempo = Math.max(1, num(bpm, 120));
+  const beatSeconds = 60 / tempo;
+  return Math.max(beatSeconds, Math.round(seconds / beatSeconds) * beatSeconds);
+}
+
 // Tempo sync. A gesture take is a LOOP, so its musical unit is bars, not a note
 // division — you record a shape over two bars and want it back over two bars.
 // The phase comes from the transport's position, so the loop point is the bar

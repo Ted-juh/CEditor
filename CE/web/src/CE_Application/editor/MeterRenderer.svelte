@@ -6,7 +6,7 @@
   // preview surface onto the Meter section (Meter.__value / Meter.__peak).
   import {
     meterConfig, meterPosition, meterZones, meterFillColourAt,
-    meterSegmentsLit, meterSegmentCenter, meterTicks,
+    meterSegmentsLit, meterSegmentCenter, meterTicks, meterTickLabel,
     meterArcPath, meterArcAngle, meterPolar,
   } from '../utils/meterLayout.js';
 
@@ -67,7 +67,8 @@
     const p = Math.min(6, Math.max(0, Math.round(num(cfg.valuePrecision, 0))));
     return `${cfg.valuePrefix ?? ''}${num(value, 0).toFixed(p)}${cfg.valueSuffix ?? ''}`;
   });
-  let ticks = $derived(cfg.showTicks === true ? meterTicks(cfg, cfg.tickCount) : []);
+  let ticks = $derived(cfg.showTicks === true || cfg.showScaleLabels === true
+    ? meterTicks(cfg, cfg.tickCount) : []);
 
   // Arc geometry (viewBox-local).
   let arcGeo = $derived.by(() => {
@@ -119,12 +120,22 @@
           {@const p2 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r + arcGeo.stroke / 2, pa)}
           <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={peakCss} stroke-width="2" />
         {/if}
-        {#each ticks as t (t.pos)}
-          {@const angle = meterArcAngle(t.pos, cfg.arcStart, cfg.arcSweep)}
-          {@const p1 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r - arcGeo.stroke / 2, angle)}
-          {@const p2 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r + arcGeo.stroke / 2, angle)}
-          <line class="meter-tick" x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="rgba(255,255,255,0.4)" stroke-width="1" />
-        {/each}
+        {#if cfg.showTicks === true}
+          {#each ticks as t (t.pos)}
+            {@const angle = meterArcAngle(t.pos, cfg.arcStart, cfg.arcSweep)}
+            {@const p1 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r - arcGeo.stroke / 2, angle)}
+            {@const p2 = meterPolar(arcGeo.cx, arcGeo.cy, arcGeo.r + arcGeo.stroke / 2, angle)}
+            <line class="meter-tick" x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="rgba(255,255,255,0.4)" stroke-width="1" />
+          {/each}
+        {/if}
+        {#if cfg.showScaleLabels === true}
+          {#each ticks as t (t.pos)}
+            {@const angle = meterArcAngle(t.pos, cfg.arcStart, cfg.arcSweep)}
+            {@const p = meterPolar(arcGeo.cx, arcGeo.cy, Math.max(0, arcGeo.r - arcGeo.stroke / 2 - fontSize), angle)}
+            <text class="meter-scale-label arc-scale-label" x={p.x} y={p.y} fill={textCss}
+                  font-size={Math.max(7, fontSize * 0.72)} text-anchor="middle" dominant-baseline="middle">{meterTickLabel(t, cfg)}</text>
+          {/each}
+        {/if}
       </svg>
       {#if readout}<div class="meter-readout arc-readout">{readout}</div>{/if}
     {:else if segments > 0}
@@ -138,9 +149,11 @@
                class:peak={idx === peakSeg - 1 && idx >= lit}
                style={`background:${idx < lit ? css(meterFillColourAt(meterSegmentCenter(idx, segments), cfg)) : trackCss}; border-radius:${num(cfg.rounded, 3)}px; --peak-colour:${peakCss};`}></div>
         {/each}
-        {#each ticks as t (t.pos)}
-          <div class="meter-tick" style={vertical ? `bottom:${t.pos * 100}%;` : `left:${t.pos * 100}%;`}></div>
-        {/each}
+        {#if cfg.showTicks === true}
+          {#each ticks as t (t.pos)}
+            <div class="meter-tick" style={vertical ? `bottom:${t.pos * 100}%;` : `left:${t.pos * 100}%;`}></div>
+          {/each}
+        {/if}
       </div>
     {:else}
       <div class="meter-track" style={`${barStyle} background:${trackCss}; border-radius:${num(cfg.rounded, 3)}px;`}>
@@ -150,11 +163,18 @@
         {#if cfg.peakHold === true && peak !== undefined && peak > 0}
           <div class="meter-peak" style={vertical ? `bottom:${peak * 100}%; background:${peakCss};` : `left:${peak * 100}%; background:${peakCss};`}></div>
         {/if}
-        {#if ticks.length}
+        {#if cfg.showTicks === true}
           {#each ticks as t (t.pos)}
             <div class="meter-tick" style={vertical ? `bottom:${t.pos * 100}%;` : `left:${t.pos * 100}%;`}></div>
           {/each}
         {/if}
+      </div>
+    {/if}
+    {#if !arc && cfg.showScaleLabels === true}
+      <div class="meter-scale-labels" class:vert={vertical}>
+        {#each ticks as t (t.pos)}
+          <span class="meter-scale-label" style={vertical ? `bottom:${t.pos * 100}%;` : `left:${t.pos * 100}%;`}>{meterTickLabel(t, cfg)}</span>
+        {/each}
       </div>
     {/if}
     {#if !arc && readout}<div class="meter-readout" class:vert={vertical}>{readout}</div>{/if}
@@ -182,6 +202,18 @@
   .meter-tick { position: absolute; background: rgba(255,255,255,0.18); }
   .meter:not(.vertical) .meter-tick { top: 0; bottom: 0; width: 1px; }
   .meter.vertical .meter-tick { left: 0; right: 0; height: 1px; }
+  .meter-scale-labels { position: absolute; inset: 0; pointer-events: none; }
+  .meter-scale-labels .meter-scale-label {
+    position: absolute; font-size: 0.7em; line-height: 1; opacity: 0.78;
+    white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  }
+  .meter-scale-labels:not(.vert) .meter-scale-label { bottom: 2px; transform: translateX(-50%); }
+  .meter-scale-labels:not(.vert) .meter-scale-label:first-child { transform: none; }
+  .meter-scale-labels:not(.vert) .meter-scale-label:last-child { transform: translateX(-100%); }
+  .meter-scale-labels.vert .meter-scale-label { left: 2px; transform: translateY(50%); }
+  .meter-scale-labels.vert .meter-scale-label:first-child { transform: none; }
+  .meter-scale-labels.vert .meter-scale-label:last-child { transform: translateY(100%); }
+  .arc-scale-label { opacity: 0.78; paint-order: stroke; stroke: rgba(0,0,0,0.75); stroke-width: 2px; }
 
   .meter-segments { position: relative; flex: 1 1 auto; align-self: stretch; display: flex; }
   .meter:not(.vertical) .meter-segments { flex-direction: row; }

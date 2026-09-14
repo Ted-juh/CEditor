@@ -4,6 +4,7 @@ import {
   looperLanes, looperPhase, normalizeGesture, laneValueAt, recordAppend,
   looperGeometry, laneRect, laneToPx, pxToLane, laneAtPoint,
   looperLanePortId, parseLooperLanePort, looperPorts, looperPortValues, looperLoopSeconds,
+  looperPlaybackSeconds,
   looperSynced, looperLoopBars, looperLoopSecondsAt, looperGridLines,
 } from '../src/CE_Application/utils/looperLayout.js';
 
@@ -84,6 +85,15 @@ test('loop seconds guarded', () => {
   assert.ok(near(looperLoopSeconds(lp({ loopSeconds: 2 })), 2));
   assert.ok(near(looperLoopSeconds(lp({ loopSeconds: 0 })), 0.05));
   assert.ok(near(looperLoopSeconds(lp({})), 4));
+});
+
+test('quantized free-running playback lands on the nearest whole beat without rewriting the duration', () => {
+  const plain = lp({ loopSeconds: 1.26, quantizeLoop: false });
+  const snapped = lp({ loopSeconds: 1.26, quantizeLoop: true });
+  assert.ok(near(looperPlaybackSeconds(plain, 120), 1.26));
+  assert.ok(near(looperPlaybackSeconds(snapped, 120), 1.5));       // 2.52 beats -> 3 beats
+  assert.ok(near(looperPlaybackSeconds(snapped, 100), 1.2));       // 2.1 beats -> 2 beats
+  assert.equal(snapped._children.Looper.loopSeconds, 1.26);        // authored state is preserved
 });
 
 test('synced loop length is bars at a tempo', () => {

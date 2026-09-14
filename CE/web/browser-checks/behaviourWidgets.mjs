@@ -207,6 +207,7 @@ try {
   {
     const id = await kit.make('Meter', { 'Transform.x': 70, 'Transform.y': 110,
       'Transform.width': 240, 'Transform.height': 70,
+      'Core.name': 'ScriptMeter',
       'Meter.valueMin': 0, 'Meter.valueMax': 1, 'Meter.value': 0.5 });
     await kit.preview(true);
     await kit.settle(800);
@@ -257,12 +258,30 @@ try {
         const loose = await styleOf(id, '.meter-segments', 'gap');
         return parseFloat(tight) === 2 && parseFloat(loose) === 9;
       })());
+
+    await kit.set(id, { 'Meter.scale': 'linear', 'Meter.valueMin': 0, 'Meter.valueMax': 1,
+      'Meter.tickCount': 4, 'Meter.showTicks': false });
+    const accepted = await kit.page.evaluate(async () => {
+      const { panels, activePanelId, updatePanel } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const panel = get(panels).find((p) => p.id === get(activePanelId));
+      updatePanel(panel.id, { scripting: { ...(panel.scripting ?? {}), modules: ['ce.components.meter'] } });
+      const api = (await import('/src/CE_Application/scripting/panelRuntime.js')).scriptApiForTesting('', 'meter-option');
+      return api.meterShowScaleLabels('ScriptMeter', true);
+    });
+    const labels = await kit.dom(id, '.meter-scale-label');
+    led.check('Meter', 'showScaleLabels / meter.showScaleLabels',
+      'the published script command writes the scale values even when tick lines are off, preserving useful fractional divisions',
+      { accepted: true, labels: ['0', '0.25', '0.5', '0.75', '1'] },
+      { accepted, labels: labels.map((n) => n.text) });
+
+    const again = await kit.reopen(id);
+    const reopenedLabels = await kit.dom(again, '.meter-scale-label');
+    led.check('Meter', 'save/reopen (scripted scale labels)',
+      'a fresh renderer paints the same five scale values from the reopened document',
+      ['0', '0.25', '0.5', '0.75', '1'], reopenedLabels.map((n) => n.text));
   }
   await kit.preview(false);
-
-  led.inert('Meter', 'showScaleLabels',
-    'write the value scale beside the meter',
-    'no reader anywhere in src/ — MeterRenderer draws ticks (`showTicks` and `tickCount` are both read) and has never labelled them, under a comment that says "Scale ticks + labels". It is published as a script verb all the same, because `derivedFlagVerbs` mints one for every `show*` boolean in a section whether or not anything reads it, so `meter.showScaleLabels` succeeds and does nothing. Already on the residual list from the derived sweep; recorded here too because this is the suite that covers the section.');
 
   // =============================================================================================
   // save/reopen — appearance is authored state.

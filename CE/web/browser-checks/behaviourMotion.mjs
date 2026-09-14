@@ -587,6 +587,7 @@ try {
       { id: 's1', label: 'High', x: 0.9, y: 0.9, colour: 'FFF2994A', values: { cutoff: 1, reso: 0.5 } },
     ];
     let id = await kit.make(K, { 'Transform.width': 340, 'Transform.height': 300,
+      'Core.name': 'ScriptConstellation',
       'Constellation.targets': targets, 'Constellation.presets': presets,
       'Constellation.running': false, 'Constellation.mode': 'blend', 'Constellation.blendPower': 2 });
     const outs = async () => {
@@ -650,19 +651,24 @@ try {
       await kit.set(id, { 'Constellation.presets': presets, 'Constellation.showLinks': true, 'Constellation.linkCount': 2 });
     }
     {
-      // MEASURED, then recorded rather than fixed. `Constellation.showField` is read by nothing:
-      // the only `showField` reader in src/ is TimbreRenderer, where it gates a per-anchor heat
-      // overlay drawn over the base field rect. The Constellation draws the base rect and has no
-      // overlay at all, so there is nothing for the flag to turn off — and giving it one would be
-      // building a visual feature, not fixing a defect. It IS published as a scripting verb
-      // (`constellationShowField`) in all seven engines, so a script can call it and get nothing.
-      const before = (await kit.geo(id)).length;
-      await kit.set(id, { 'Constellation.showField': false });
-      const after = (await kit.geo(id)).length;
-      await kit.set(id, { 'Constellation.showField': true });
-      led.inert(K, 'showField', 'heat field behind the stars',
-        `no reader in src/ (only TimbreRenderer reads showField); ${before} shapes drawn either way, `
-        + 'and the scripting verb constellationShowField therefore does nothing');
+      const call = (on) => kit.page.evaluate(async ({ on }) => {
+        const { panels, activePanelId, updatePanel } = await import('/src/CE_Application/stores/panels.js');
+        const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+        const panel = get(panels).find((p) => p.id === get(activePanelId));
+        updatePanel(panel.id, { scripting: { ...(panel.scripting ?? {}), modules: ['ce.components.constellation'] } });
+        const api = (await import('/src/CE_Application/scripting/panelRuntime.js')).scriptApiForTesting('', 'constellation-option');
+        return api.constellationShowField('ScriptConstellation', on);
+      }, { on });
+      await call(false);
+      const hidden = (await kit.geo(id)).filter((n) => n.cls === 'constellation-field').length;
+      const flatPixel = await kit.pixel(id, 0.18, 0.82);
+      const accepted = await call(true);
+      const shown = (await kit.geo(id)).filter((n) => n.cls === 'constellation-field').length;
+      const fieldPixel = await kit.pixel(id, 0.18, 0.82);
+      led.check(K, 'showField / constellation.showField',
+        'the published script command adds one soft colour field per preset behind the stars, and the rasterised map changes with it',
+        true, accepted === true && hidden === 0 && shown === presets.length
+          && JSON.stringify(flatPixel) !== JSON.stringify(fieldPixel));
     }
 
     // --- running + wanderRate: the probe drifts on its own ------------------------------------------------
@@ -737,6 +743,9 @@ try {
         JSON.stringify(beforeGeo), JSON.stringify(await kit.geo(again)));
       id = again;
       led.check(K, 'save/reopen (outbound)', 'and the targets still receive the same patch', beforeOuts, await outs());
+      led.check(K, 'save/reopen (scripted field)',
+        'the field enabled by the script command is painted again by a fresh renderer',
+        presets.length, (await kit.geo(id)).filter((n) => n.cls === 'constellation-field').length);
     }
   }
 

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   meterLinearFraction, meterPosition, meterZones, meterZoneColourAt, meterFillColourAt,
-  meterSegmentsLit, meterSegmentCenter, meterPeak, meterTicks, meterArcAngle,
+  meterSegmentsLit, meterSegmentCenter, meterPeak, meterTicks, meterTickLabel, meterArcAngle,
 } from '../src/CE_Application/utils/meterLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -89,6 +89,13 @@ test('ticks span the scale with count+1 marks', () => {
   assert.deepEqual(lin.map((t) => t.value), [0, 25, 50, 75, 100]);
   const db = meterTicks({ scale: 'db', dbFloor: -60, dbCeil: 0 }, 3);
   assert.deepEqual(db.map((t) => t.value), [-60, -40, -20, 0]);
+});
+
+test('scale labels describe linear units and decibels without rounding useful divisions away', () => {
+  const lin = meterTicks({ valueMin: 0, valueMax: 1 }, 4);
+  assert.deepEqual(lin.map((t) => meterTickLabel(t, {})), ['0', '0.25', '0.5', '0.75', '1']);
+  assert.equal(meterTickLabel({ value: 25 }, { valuePrefix: '~', valueSuffix: '%' }), '~25%');
+  assert.equal(meterTickLabel({ value: -12.5 }, { scale: 'db' }), '-12.5 dB');
 });
 
 test('arc angle maps position across the sweep', () => {

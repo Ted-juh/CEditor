@@ -61,6 +61,16 @@
 
 <svg class="constellation" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx="8" fill={fieldCss} stroke="rgba(36,36,48,1)" />
+  {#if cfg.showField !== false}
+    <svg class="constellation-field-layer" x={geom.x0} y={geom.y0} width={geom.w} height={geom.h}
+         viewBox={`${geom.x0} ${geom.y0} ${geom.w} ${geom.h}`} overflow="hidden" preserveAspectRatio="none">
+      {#each starPx as s (s.i)}
+        <circle class="constellation-field" cx={s.q.px} cy={s.q.py}
+                r={Math.max(20, Math.min(geom.w, geom.h) * 0.28)} fill={s.colour} opacity="0.14"
+                style={`filter:blur(${Math.max(6, Math.min(geom.w, geom.h) * 0.035)}px)`} />
+      {/each}
+    </svg>
+  {/if}
 
   <!-- constellation links (sonic neighbours) -->
   {#each links as l (`${l.a}_${l.b}`)}

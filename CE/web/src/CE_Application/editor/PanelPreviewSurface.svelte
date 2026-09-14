@@ -81,7 +81,7 @@
   } from '../utils/orbitLayout.js';
   import {
     looperConfig, looperLanes, looperGeometry, laneRect, laneAtPoint, pxToLane,
-    recordAppend, normalizeGesture, looperLoopSeconds,
+    recordAppend, normalizeGesture, looperPlaybackSeconds,
     looperSynced, looperLoopBars,
   } from '../utils/looperLayout.js';
   import {
@@ -2224,7 +2224,7 @@
           continue;
         }
         const prev = looperPhaseState[id] ?? looperPhaseFor(c);
-        looperPhaseState[id] = (prev + dt / looperLoopSeconds(c)) % 1;
+        looperPhaseState[id] = (prev + dt / looperPlaybackSeconds(c, transportBpmNow())) % 1;
         raiseComponentCycle(c, looperPhaseState[id], prev);
         // Don't fight a recording in progress on this control's lane.
         if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');

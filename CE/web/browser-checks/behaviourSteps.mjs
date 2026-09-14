@@ -403,6 +403,7 @@ try {
       { id: 'g1', label: 'Reso', points: [], rest: 0.75, enabled: true, colour: 'FF5B9BD5', ...over[1] }];
     let lid = await kit.make(L, { 'Transform.x': 40, 'Transform.y': 120,
       'Transform.width': LW, 'Transform.height': LH,
+      'Core.name': 'QuantizedLooper',
       'Looper.running': false, 'Looper.phase': 0, 'Looper.loopSeconds': 4,
       'Looper.syncToTransport': false, 'Looper.loopBars': 2, 'Looper.editable': true,
       'Looper.showPlayhead': true, 'Looper.showGrid': true, 'Looper.showDivisions': false,
@@ -473,11 +474,24 @@ try {
       await kit.set(lid, { 'Looper.showPlayhead': true, 'Looper.running': true });
       const one = await lapInterval(1, 3400);
       const two = await lapInterval(2, 5200);
+      const commandAccepted = await kit.page.evaluate(async () => {
+        const { panels, activePanelId, updatePanel } = await import('/src/CE_Application/stores/panels.js');
+        const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+        const panel = get(panels).find((p) => p.id === get(activePanelId));
+        updatePanel(panel.id, { scripting: { ...(panel.scripting ?? {}), modules: ['ce.components.looper'] } });
+        const api = (await import('/src/CE_Application/scripting/panelRuntime.js')).scriptApiForTesting('', 'looper-option');
+        return api.looperQuantize('QuantizedLooper', true);
+      });
+      const snapped = await lapInterval(1.26, 4800);
       await kit.set(lid, { 'Looper.running': false });
       led.check(L, 'loopSeconds (1s)', 'a one-second loop comes round once a second',
         true, one !== null && Math.abs(one - 1000) < 220);
       led.check(L, 'loopSeconds (2s)', 'and a two-second loop takes twice as long to come round',
         true, two !== null && Math.abs(two - 2000) < 380);
+      led.check(L, 'quantizeLoop / looper.quantize',
+        'the published script command makes a 1.26-second free loop run for three whole beats at 120 BPM, without rewriting its authored seconds',
+        true, commandAccepted === true && snapped !== null && Math.abs(snapped - 1500) < 260
+          && Math.abs((await kit.read(lid, 'Looper.loopSeconds')) - 1.26) < 0.001);
     }
 
     // --- the head dot is ON the curve ---------------------------------------------------------------------------
@@ -638,14 +652,6 @@ try {
         true, g.some((n) => n.tag === 'path' && n.stroke === rgba('FF39D98A')));
     }
 
-    // --- quantizeLoop --------------------------------------------------------------------------------------------------
-    led.inert(L, 'quantizeLoop',
-      'snap the loop length to whole beats',
-      'declared in sectionDefaults and exposed to scripts as the `quantize` verb, and read by NOTHING in src/: '
-      + 'not the renderer, not looperLayout, not the Looper editor (which does not offer it). A script that '
-      + 'toggles it changes a field nobody consults, which is worse than the unreachable inert rows — this one '
-      + 'has a caller.');
-
     // --- save and reopen -------------------------------------------------------------------------------------------------
     {
       await kit.set(lid, { 'Looper.phase': 0.4, 'Looper.loopSeconds': 2.5,
@@ -678,6 +684,10 @@ try {
         beforePorts, await kit.ports(lid), samePorts);
       led.check(L, 'save/reopen (the V is the recorded one)', 'the curve really is the V that was saved: 0.4 of the way down the first limb is 0.2',
         true, Math.abs(beforePorts.lane_0 - 0.2) < 0.01);
+      led.check(L, 'save/reopen (quantize command)',
+        'the command remains active in the reopened document, while the authored loop duration remains the number the script did not rewrite',
+        { quantized: true, seconds: 2.5 },
+        { quantized: await kit.read(lid, 'Looper.quantizeLoop'), seconds: await kit.read(lid, 'Looper.loopSeconds') });
     }
   }
   await kit.preview(false);

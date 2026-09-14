@@ -140,6 +140,20 @@ export function meterTicks(cfg = {}, count = 4) {
   return out;
 }
 
+// Human-readable text for one scale mark. Linear scales keep only the decimal
+// places their division needs; dB scales say which unit they are displaying.
+// Prefix/suffix mirror the numeric readout so a meter authored in %, Hz, etc.
+// labels its scale in the same vocabulary.
+export function meterTickLabel(tick, cfg = {}) {
+  const value = num(tick?.value, 0);
+  const rounded = Math.round(value);
+  const body = Math.abs(value - rounded) < 1e-9
+    ? String(rounded)
+    : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  if (String(cfg.scale) === 'db') return `${body} dB`;
+  return `${cfg.valuePrefix ?? ''}${body}${cfg.valueSuffix ?? ''}`;
+}
+
 // Map a fill position 0..1 to an angle (degrees) along an arc that starts at
 // `startDeg` and sweeps `sweepDeg` (clockwise-positive in SVG screen space).
 export function meterArcAngle(pos, startDeg = 135, sweepDeg = 270) {

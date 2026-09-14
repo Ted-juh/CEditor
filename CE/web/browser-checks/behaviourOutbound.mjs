@@ -661,19 +661,12 @@ try {
   await kit.fresh();
   {
     // --- published as a scripting verb, and read by nothing: a caller exists and gets silence ------
-    led.inert('Meter', 'showScaleLabels', 'value-scale labels beside the meter',
-      'NOT PREVIOUSLY CATALOGUED. No reader anywhere in src/ — MeterRenderer draws no scale labels at '
-      + 'all — and yet it is published: derivedFlagVerbs() in componentVerbs.js turns every `show*` '
-      + 'boolean in a section into a verb automatically, so `meter.showScaleLabels` reaches all seven '
-      + 'engines by derivation rather than by anyone writing it down. Same shape as '
-      + 'Constellation.showField and found the same way, by the sweep rather than by use.');
-    led.inert('Constellation', 'showField', 'a heat field behind the stars',
-      'still inert, and still derived into `constellation.showField` by the same rule. Only '
-      + 'TimbreRenderer reads a showField, and that is the Timbre\'s own.');
-    led.inert('Looper', 'quantizeLoop', 'snap the loop length to whole beats',
-      'still inert, and the only one of the three written by hand: componentVerbs.js line 292 maps '
-      + '`looper.quantize` to it. Nothing in src/ reads it — not the renderer, not looperLayout, not '
-      + 'the Looper editor, which does not offer it.');
+    led.closed('Meter', 'showScaleLabels', 'value-scale labels beside the meter',
+      'behaviourWidgets.mjs invokes meter.showScaleLabels, measures all rendered scale values with tick lines off, and reopens them');
+    led.closed('Constellation', 'showField', 'a heat field behind the stars',
+      'behaviourMotion.mjs invokes constellation.showField, measures the rasterised field and its layers, and reopens them');
+    led.closed('Looper', 'quantizeLoop', 'snap the loop length to whole beats',
+      'behaviourSteps.mjs invokes looper.quantize and measures the actual free-running lap duration at the transport tempo, then reopens it');
 
     // --- reachable from nowhere: declared, and that is all ------------------------------------------
     led.inert('Core', 'alwaysOnTop', 'keep this control above the others',
