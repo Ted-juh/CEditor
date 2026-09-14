@@ -26,35 +26,44 @@ is to close the map, not to grow a total.
 
 ---
 
-## 1. The property gaps, by section
+## 1. The property gaps — DONE, and not yours to repeat
 
-From `node tools/scripts/qa/coverage-matrix.mjs` — a live figure, not a table to be trusted after it
-drifts. 241 of 1,046 declared properties are named by no check; **112 of them are in your half.**
-Read `docs/design/coverage-matrix-2026-09-14.md` for the method and, importantly, for what the
-method cannot see.
+**This section is closed. It was assigned to you and I did it, because the same pass kept finding
+defects and it was faster to keep going than to hand over mid-block.** Read it for what it found,
+not as work to start.
 
-| Section | Unreached / total | Notes |
-| --- | --- | --- |
-| `Behavior` | 48 / 94 | The biggest single block in the catalogue |
-| `Display` | 24 / 64 | LCD sources, palette, glass, spacing |
-| `Pixel` | 14 / 44 | Same families on the pixel screen |
-| `Mouse` | 10 / 13 | Nothing in this section is reached at all |
-| `ContentLayout` | 8 / 15 | Icon/text offsets and z-order |
-| `Listbox` | 8 / 29 | Density, zebra, card rows, scrollbar, selection animation |
-| `TabContainer` | 8 / 10 | `pageIndex`, `edge`, `showStrip`, five colours |
+Nine suites: `behaviourMouse`, `behaviourTrack`, `behaviourButtons`, `behaviourScreens`,
+`behaviourLayout`, `behaviourWidgets`, `behaviourLists`, `behaviourShared`, `behaviourAssets`.
+The matrix went **241 → 66 of 1,046**, and most of the 66 is a row that already has an answer the
+matrix cannot see — see `coverage-matrix-2026-09-14.md` for the breakdown.
 
-**Where to start, and why.** `Behavior` is the largest and also the one whose failures are least
-visible: the four `emit*` flags decide whether a script or a binding hears anything at all, and
-`arrowKeyAdjust` / `pageKeyAdjust` / `homeEndAdjust` are the keyboard path, which no pointer test
-touches. `Mouse` is small enough to finish in one pass and is at zero.
+**Four defects, D-16 to D-19, each with a regression that fails on revert**, all recorded in full in
+`editor-behaviour-claude-2026-09-13.md`. All four are one shape — a setting that is published,
+edited and saved, and that nothing downstream can act on — and two of them are the same mistake
+twice: **a default that happens to agree with a hard-coded value hides the fact that the field is
+not read at all.**
 
-**Two cautions from doing the same work on the other half:**
+- **D-16** `Mouse.dragSensitivity` did nothing on a slider in relative drag mode.
+- **D-17** pressing a relative-mode slider snapped it to its minimum, on every press.
+- **D-18** the Focusable switch did nothing on any of the five types that offer it.
+- **D-19** both Slider label Gap cells did nothing until the dropdown beside them was moved.
+
+**What is left of this section for you is not testing — it is the rulings in section 4**, which
+now runs to about twenty user-visible options with nothing behind them, grouped in
+`residual-issues-2026-09-14.md` §1a–1d by what each fix would cost. Three of them are a single
+filter or strip away from being true; two become true by deleting an unimplemented option from a
+dropdown, with no behaviour change at all.
+
+**The two cautions from that work still stand, because they will catch the next person:**
 
 - `Behavior.showTicks` and `Meter.showTicks` are different properties with the same name. The
   matrix is per-section for that reason; do not let a check on one count for the other.
-- `Meter.showScaleLabels` is **inert** — no reader anywhere, and published to all seven script
-  engines by `derivedFlagVerbs` regardless. Do not write a check that passes by asserting nothing
-  changed. It needs the release decision in section 4 instead.
+- A null result is a LEAD, not a verdict. Across the nine suites, more rows first measured nothing
+  for a reason that was the fixture's than for a reason that was the product's. Every one of those
+  is written into the suite header where it was met — the editor chrome below `Transform.y` 240,
+  the session override that `defaultValue` does not clear, the slider Parts that make a Behavior
+  fallback unreachable, the meter's clip rather than its fill, the joystick trail that is cleared
+  on release, and zone rows and columns being 1-based.
 
 ## 2. The authoring stages
 
