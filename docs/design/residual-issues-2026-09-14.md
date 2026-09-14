@@ -139,7 +139,7 @@ out to be a property that was never declared.
   refreshing before any acceptance is quoted against it.
 - **Preview is a rehearsal, not the player.** Runtime movement in preview is not an authored value
   saved in the document, and several checks exist only to keep that distinction honest.
-- **Assertion rows are not unique properties.** Twelve suites report a few hundred rows between them;
+- **Assertion rows are not unique properties.** Fifteen suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
   more useful one — **204** of 1,046 declared properties are named by no check at all, down from 241
   when this list was written. The Mouse section accounts for the latest eleven; its remaining two
