@@ -95,6 +95,10 @@ and the two-handle track click.
 `behaviourButtons.mjs` — 22 verified, 7 inert, **0 unverified**, 3 not a property, 0 open defects.
 The button half: what a control announces itself to be, what a press means, and the ten settings
 in the section that are declared and not connected.
+`behaviourScreens.mjs` — 46 verified, 0 inert, **0 unverified**, 3 closed elsewhere, 0 open defects.
+The LCD's `Display` section and the pixel panel's `Pixel`: substrate, backlight, glass, scanlines,
+the character grid, the value tokens, scrolling, the dot grid and its image and animation, both
+live sources, the page transitions, and the `@active` scope.
 
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite

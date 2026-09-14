@@ -194,10 +194,11 @@ out to be a property that was never declared.
   saved in the document, and several checks exist only to keep that distinction honest.
 - **Assertion rows are not unique properties.** Fifteen suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
-  more useful one — **166** of 1,046 declared properties are named by no check at all, down from 241
-  when this list was written. `Mouse` and the 48-property `Behavior` block are both closed; what
-  each leaves behind is recorded above with its reason rather than papered over with a row that
-  names the property and proves nothing. `Display` (24) and `Pixel` (14) are the largest left.
+  more useful one — **132** of 1,046 declared properties are named by no check at all, down from 241
+  when this list was written. `Mouse`, the 48-property `Behavior` block and both screen sections
+  (`Display` and `Pixel`) are closed; what each leaves behind is recorded above with its reason
+  rather than papered over with a row that names the property and proves nothing. `ContentLayout`,
+  `Listbox` and `TabContainer` (8 each) are the largest left.
 
 ## 4. Defects found and fixed in this pass
 

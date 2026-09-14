@@ -38,7 +38,7 @@ environment at all.
 | --- | --- | --- |
 | B1. Property-by-property coverage matrix exists and is reproducible | **MET** | `tools/scripts/qa/coverage-matrix.mjs`, documented in `coverage-matrix-2026-09-14.md` |
 | B2. Every registered type reached by at least one half | **MET** | 58/58; `TestBox` is internal and not user-reachable |
-| B3. The 241 unreached properties closed or consciously deferred | **OPEN** | **166** now: `behaviourMouse.mjs` closed the Mouse section and `behaviourTrack.mjs` + `behaviourButtons.mjs` closed the 48-property `Behavior` block. What each leaves behind is recorded with its reason in `residual-issues-2026-09-14.md` §1a–1c. `Display` (24) and `Pixel` (14) are the largest left |
+| B3. The 241 unreached properties closed or consciously deferred | **OPEN** | **132** now: `behaviourMouse.mjs` closed the Mouse section, `behaviourTrack.mjs` + `behaviourButtons.mjs` the 48-property `Behavior` block, and `behaviourScreens.mjs` both screen sections. What each leaves behind is recorded with its reason in `residual-issues-2026-09-14.md` §1a–1c. `ContentLayout`, `Listbox` and `TabContainer` (8 each) are the largest left |
 | B4. Authoring stages driven, not just renderers | **OPEN** | Panel editor, Custom designer, Screen Builder, Sequencer/Envelope designers, scripting/routing, Player/export. `designerTab.mjs` already covers the Sequencer designer writing a pattern |
 | B5. A decision on `Designer` and `Assets` — session state, not behaviour | **MET** | Ruled 14 Sep. `Designer` (13 keys) struck as authoring-surface state; `Assets` (5) **kept** — `images`/`filmstrips`/`thumbnails` have 95/58/11 readers and `packagePolicy` decides whether a shared panel carries its artwork. See the matrix document |
 
