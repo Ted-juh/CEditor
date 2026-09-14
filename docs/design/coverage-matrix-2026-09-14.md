@@ -188,6 +188,42 @@ covers all seven and asserts the count of followers moved by one call.
 
 ---
 
+## The editor half is closed
+
+**66 of 1,046 (6%)**, down from 241 when this document was written and 212 when the music half
+closed. Nine suites did it, in this order: `behaviourMouse`, `behaviourTrack`, `behaviourButtons`,
+`behaviourScreens`, `behaviourLayout`, `behaviourWidgets`, `behaviourLists`, `behaviourShared`,
+`behaviourAssets`.
+
+**The remaining 66 is not 66 gaps.** The matrix counts a property as reached only when a check
+names it in a dotted path, a bare key or a UI label — it cannot see a `Ledger.inert` or
+`Ledger.closed` note, which is where most of the remainder now lives:
+
+| What | Count | Where the answer is |
+| --- | --- | --- |
+| `Behavior`'s inert group | 10 | `residual-issues-2026-09-14.md` §1c |
+| `Designer` session state | 10 | ruled out of the denominator earlier in this document |
+| Inert or closed-elsewhere rows from the nine suites | most of the rest | §1a–1d, and the suites' own ledgers |
+| Genuinely unreached | a handful of two-property tails | — |
+
+**Four defects came out of it — D-16 to D-19 — and all four are one shape:** a setting that is
+published, edited and saved, and that nothing downstream can act on. Two of the four are the same
+mistake twice: *a default that happens to agree with a hard-coded value hides the fact that the
+field is not read at all.* D-18's five type templates pinned `tabIndex: 0`, which is what the code
+would have done anyway; D-19's `auto` branches inlined 22 and 14, the declared defaults of the two
+gaps they were standing in for. In both, the cell showed the right number and moved nothing.
+
+**What the fixtures cost is the other half of the lesson**, and it is written into each suite's
+header rather than here. The recurring ones, in the order they were met: a control below about
+`Transform.y` 240 takes its press on the editor chrome (five suites); neither `defaultValue` nor
+`defaultCurrentValue` clears a preview session's value override, so "reset and try again" measures
+the previous answer; a renderer that merges a default set back in (slider Parts) makes a Behavior
+fallback unreachable; the thing that moves is often not the thing that is named (a meter's clip,
+not its fill; the tabs' fill, not their size); and a runtime path is sometimes a gesture rather
+than a record (the joystick's trail is cleared on release).
+
+---
+
 ## Suggested allocation
 
 Unchanged from the handoff's own split, with the matrix attached to it:
