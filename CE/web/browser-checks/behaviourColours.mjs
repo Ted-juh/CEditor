@@ -448,6 +448,134 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // CHORD PAD, RIBBON and MATRIX — the last three, and the Matrix is not SVG at all.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const P = 'ChordPad';
+    // minorColour paints the accent on the MINOR ring, which only exists in the wheel layout — the
+    // grid layout has no rings at all, so a grid fixture shows the property doing nothing.
+    const pid = await kit.make(P, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 360, 'Transform.height': 360, 'ChordPad.layout': 'wheel',
+      'ChordPad.key': 0, 'ChordPad.scale': 'major',
+      'ChordPad.minorColour': C.minor, 'ChordPad.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(400);
+    {
+      const minors = await kit.shapes(pid, 'circle',
+        (n) => n.fill === rgba(C.minor) || n.stroke === rgba(C.minor));
+      led.check(P, 'minorColour', 'the slots on the inner minor ring take the minor colour, and the majors on the outer ring do not',
+        true, minors.length >= 1);
+    }
+    {
+      const texts = await kit.shapes(pid, 'text', (n) => n.fill === rgba(C.label));
+      led.check(P, 'labelColour', 'the scale caption in the hub and the roman numerals take the label colour',
+        true, texts.length >= 1);
+    }
+    // The grid layout is the negative: no rings, so nothing wears the minor colour. Without this a
+    // renderer that painted every slot the minor colour would still have passed above.
+    {
+      await kit.set(pid, { 'ChordPad.layout': 'grid' });
+      await kit.settle(380);
+      const minors = await kit.shapes(pid, 'circle',
+        (n) => n.fill === rgba(C.minor) || n.stroke === rgba(C.minor));
+      led.check(P, 'minorColour (a layout with no rings)',
+        'the grid layout has no minor ring, so nothing in it wears the colour at all',
+        0, minors.length);
+    }
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const B = 'Ribbon';
+    // THE NAME IS THE CLUE AND THE DEFAULT IS NOT IT. `wheelColour` paints the body of the 3-D
+    // WHEEL, and `style` defaults to 'ribbon' — a flat strip that draws no wheel at all. Authored
+    // the default way the property is invisible and the row reports a working colour as dead.
+    const bid = await kit.make(B, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 120, 'Transform.height': 320, 'Ribbon.orientation': 'vertical',
+      'Ribbon.style': 'wheel', 'Ribbon.label': 'Mod', 'Ribbon.indicatorSize': 3,
+      'Ribbon.wheelColour': C.wheel, 'Ribbon.labelColour': C.label });
+    await kit.preview(true);
+    await kit.settle(400);
+    {
+      const track = await kit.shapes(bid, 'rect', (n) => n.fill === rgba(C.wheel));
+      led.check(B, 'wheelColour', 'the wheel body takes the wheel colour',
+        true, track.length >= 1);
+    }
+    {
+      const texts = await kit.shapes(bid, 'text', (n) => n.fill === rgba(C.label));
+      led.check(B, 'labelColour', 'and the name under it takes the label colour',
+        true, texts.length >= 1);
+    }
+    // indicatorSize is a LENGTH rather than a colour, and it is the half-thickness: the indicator is
+    // drawn indSize either side of the axis, so the bar is twice the number. Measured on the
+    // drawing rather than read back from the document, which is the whole point.
+    {
+      // A VERTICAL RIBBON'S INDICATOR IS A HORIZONTAL BAR. It runs the full width of the track and
+      // is `indicatorSize` tall either side of the axis, so the dimension that carries the property
+      // is the HEIGHT — reading the width measures the track instead and finds nothing under 40px.
+      // The corner radius is the size itself, which is what identifies the bar among the rects.
+      const bar = async (size) => {
+        const bars = await kit.shapes(bid, 'rect', (n) => n.rx === size);
+        return bars.length ? bars[0].height : null;
+      };
+      const thin = await bar(3);
+      await kit.set(bid, { 'Ribbon.indicatorSize': 9 });
+      await kit.settle(350);
+      const thick = await bar(9);
+      led.check(B, 'indicatorSize', 'the indicator is drawn that many units EITHER SIDE of its axis, so the bar is twice the number — three gives six across, and nine gives eighteen',
+        { thin: 6, thick: 18 }, { thin, thick });
+    }
+    // And the negative that makes the first row mean something: the flat ribbon style has no wheel,
+    // so nothing in it wears the wheel colour however the property is set.
+    {
+      await kit.set(bid, { 'Ribbon.style': 'ribbon' });
+      await kit.settle(380);
+      led.check(B, 'wheelColour (the flat ribbon style)',
+        'switched to the flat strip there is no wheel to paint, and nothing wears the colour',
+        0, (await kit.shapes(bid, 'rect', (n) => n.fill === rgba(C.wheel))).length);
+    }
+  }
+  await kit.preview(false);
+
+  await kit.fresh();
+  {
+    const M = 'Matrix';
+    /**
+     * THE MATRIX IS NOT SVG. It draws with positioned divs, so `shapes()` — which reads the
+     * control's `<svg>` — sees nothing at all and every colour row here would report zero and look
+     * like a dead property. `dom()` is the instrument: it returns the same comparable shape with
+     * the resolved paint, including `box-shadow`, which is where the grid colour actually lands.
+     */
+    const mid = await kit.make(M, { 'Transform.x': 40, 'Transform.y': 60,
+      'Transform.width': 400, 'Transform.height': 300, 'Matrix.gridColour': C.grid });
+    await kit.preview(true);
+    await kit.settle(400);
+    /**
+     * AND THE COLOUR IS SPELLED DIFFERENTLY HERE TOO. `getComputedStyle` serialises an opaque colour
+     * as `rgb(0, 170, 255)` — three channels, no alpha, and SPACES after the commas — where the SVG
+     * rows above compare against the `rgba(0,170,255,1)` the renderer's own css() helper produces.
+     * Comparing the two spellings directly finds nothing and reads as a dead property, so both
+     * sides are stripped of spaces and the alpha is allowed to be absent.
+     */
+    const norm = (v) => String(v).replace(/\s/g, '');
+    const want = norm(rgba(C.grid));                       // rgba(0,170,255,1)
+    const wantOpaque = want.replace('rgba(', 'rgb(').replace(',1)', ')');
+    const wears = (v) => norm(v).includes(want) || norm(v).includes(wantOpaque);
+    const nodes = await kit.dom(mid) ?? [];
+    const inShadow = nodes.filter((n) => n.shadow && n.shadow !== 'none' && wears(n.shadow));
+    const inBg = nodes.filter((n) => wears(n.bg));
+    led.check(M, 'gridColour', 'the cell outlines take the grid colour — drawn as an inset box-shadow on positioned divs rather than as SVG strokes, which is why an svg-only reader finds nothing here',
+      true, inShadow.length + inBg.length >= 1);
+    led.check(M, 'gridColour (the reader has to match the drawing)',
+      'and the control really does draw with divs rather than svg shapes, which is the reason this row uses dom() and not shapes()',
+      { divs: true, svgRects: 0 },
+      { divs: nodes.length > 0, svgRects: (await kit.shapes(mid, 'rect')).length });
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
