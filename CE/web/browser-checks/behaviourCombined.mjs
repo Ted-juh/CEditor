@@ -401,6 +401,131 @@ try {
   }
   await kit.preview(false);
 
+  // =============================================================================================
+  // Undo and redo, on a panel with a hundred and thirty-nine controls in it.
+  //
+  // History is a SNAPSHOT of the whole panel, not a per-control diff, so a big panel is where it
+  // matters: a snapshot that is taken late, restored partially, or shared between contexts shows
+  // up as a neighbour moving when it should not have. The fixture therefore changes one control
+  // and watches two.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const { panelId } = await openPanel(json, 'QA-01 undo');
+    await kit.settle(1500);
+    const picked = await kit.page.evaluate(async () => {
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const live = get(panels).find((p) => p.id === get(activePanelId));
+      const of = (type) => {
+        const hit = (live?.controls ?? [])
+          .find((c) => String(c?._children?.Core?.controlType ?? '') === type);
+        return hit ? String(hit._children.Core.id) : '';
+      };
+      return { moved: of('Slider'), witness: of('Knob') };
+    });
+    const xOf = async (id) => Number(await kit.read(id, 'Transform.x'));
+    const history = (fn) => kit.page.evaluate(async ({ fn }) => {
+      const h = await import('/src/CE_Application/stores/history.js');
+      h.flushHistory();
+      if (fn === 'undo') h.undo();
+      if (fn === 'redo') h.redo();
+      return { canUndo: h.canUndo(), canRedo: h.canRedo() };
+    }, { fn });
+
+    const startX = await xOf(picked.moved);
+    const witnessX = await xOf(picked.witness);
+    await kit.set(picked.moved, { 'Transform.x': startX + 90 });
+    await kit.settle(500);
+    const movedX = await xOf(picked.moved);
+    led.check(P, 'a change on the big panel takes',
+      'moving one control of a hundred and twenty-five is the change undo has to be able to take back',
+      { moved: true, witnessStill: true },
+      { moved: movedX === startX + 90, witnessStill: (await xOf(picked.witness)) === witnessX });
+
+    const afterUndo = await history('undo');
+    await kit.settle(700);
+    led.check(P, 'undo takes it back, and takes back only it',
+      'the control returns to where it was and the one beside it has not moved — on a panel this size a snapshot restored wholesale would be indistinguishable from a correct undo unless something else was watched',
+      { x: startX, witness: witnessX },
+      { x: await xOf(picked.moved), witness: await xOf(picked.witness) });
+
+    await history('redo');
+    await kit.settle(700);
+    led.check(P, 'and redo puts it back again',
+      'the change returns, which is what makes undo a step rather than a discard',
+      startX + 90, await xOf(picked.moved));
+    led.check(P, 'the history reports itself honestly',
+      'undo was available after the change and redo after the undo, so the buttons a user sees match what the stack can actually do',
+      true, afterUndo.canRedo === true);
+    led.check(P, 'and none of it raises',
+      'a hundred and thirty-nine controls through a snapshot restore and back raises nothing',
+      [], kit.failures.slice(0, 4));
+  }
+
+  // =============================================================================================
+  // Linked outputs — one component driving another across the panel.
+  //
+  // The other half of the interference question, and the one the per-component suites cannot ask:
+  // a panel link lives on the SOURCE control as `Links.<name>` and is applied by
+  // `applyPanelCustomLinkRoutes`, which walks the whole panel every time a session changes. So it
+  // needs two custom components and a value moved on one of them.
+  // =============================================================================================
+  await kit.fresh();
+  {
+    const wired = await kit.page.evaluate(async () => {
+      const { addControl, applyControlPatch } = await import('/src/CE_Application/stores/controls.js');
+      const {
+        listPanelCustomRouteCandidates, createPanelCustomRouteLink,
+      } = await import('/src/CE_Application/utils/panelCustomComponentLinks.js');
+      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+
+      const a = addControl('CustomComponent')._children.Core.id;
+      const b = addControl('CustomComponent')._children.Core.id;
+      const live = () => get(panels).find((p) => p.id === get(activePanelId));
+      const candidates = listPanelCustomRouteCandidates(live()?.controls ?? [], a);
+      const candidate = candidates.find((c) => c.source.controlId === a && c.target.controlId === b);
+      if (!candidate) return { a, b, linked: false, candidates: candidates.length };
+      const link = createPanelCustomRouteLink(candidate.source, candidate.target);
+      applyControlPatch(a, { [`Links.${link.name}`]: link });
+      return {
+        a, b, linked: true, name: link.name,
+        sourceChannel: candidate.source.channel, targetChannel: candidate.target.channel,
+      };
+    });
+    led.check(P, 'a link can be made between two components',
+      'the engine offers a route from one custom component to another, and the link it builds is written onto the SOURCE control — which is where `applyPanelCustomLinkRoutes` looks for it',
+      true, wired.linked === true);
+
+    await kit.preview(true);
+    await kit.settle(1200);
+    const targetValue = async () => {
+      const session = await kit.session(wired.b);
+      return session?.customValues?.[wired.targetChannel];
+    };
+    const before = await targetValue();
+    await kit.page.evaluate(async ({ id, channel }) => {
+      const { updatePanelPreviewSession, panelPreviewSessions } =
+        await import('/src/CE_Application/stores/interactionPreview.js');
+      const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
+      const current = get(panelPreviewSessions)?.[id] ?? {};
+      updatePanelPreviewSession(id, {
+        customValues: { ...(current.customValues ?? {}), [channel]: 0.87 },
+      });
+    }, { id: wired.a, channel: wired.sourceChannel });
+    await kit.settle(900);
+    const after = await targetValue();
+    led.check(P, 'and a value moved on the source arrives at the target',
+      'driving the linked channel on one component changes the linked channel on the other — the route is applied by the panel rather than by either component, which is why it only exists when both are on one surface',
+      { changed: true, arrived: 0.87 },
+      { changed: after !== before, arrived: Number(after) });
+    led.check(P, 'with nothing raised on the way',
+      'a panel route walked on every session change raises nothing',
+      [], kit.failures.slice(0, 4));
+  }
+  await kit.preview(false);
+
   led.report();
   assert.deepEqual(kit.failures, [], 'page errors during the pass');
   assert.deepEqual(led.failures, [], 'defects');
