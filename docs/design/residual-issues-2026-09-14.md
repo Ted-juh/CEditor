@@ -84,6 +84,59 @@ because it is a product decision, not a defect fix**:
 Not done here, deliberately. The behaviour pass records what is true; adding a section to four types
 on my own initiative is the kind of change the handoff asks to be proposed rather than taken.
 
+### 1c. The `Behavior` section's ten — three model-only, two dock-only, five emit flags
+
+From `behaviourButtons.mjs` and `behaviourTrack.mjs`. Each was checked three ways before being
+written down — a repo-wide search for the key name, a search for computed access to `behavior`
+(there is **none anywhere in src/**, so the drum-pad trap cannot apply here), and the scripting and
+export tables — because "no reader" has been wrong in this repository before.
+
+**Three have zero mentions outside the model defaults.** No cell, no reader, no verb:
+
+| Option | Note |
+| --- | --- |
+| `Behavior.pressMode` | The idea is real and is spelled elsewhere twice — `momentaryButtonPreview` decides press-versus-release for the momentary family, and the timed family has subtypes. A third spelling, not a missing feature |
+| `Behavior.toggleOn` | Declared beside it, same in every respect |
+| `Behavior.activationKeys` | Defaults to `['Enter', 'Space']`. The keyboard path that exists reads `keyboardEnabled`, `arrowKeyAdjust`, `pageKeyAdjust` and `homeEndAdjust` — all four verified — and hard-codes which keys do what. A description of the behaviour, not a setting that shapes it |
+
+**Two reach only the editor's Interaction Preview dock**, not the panel surface and not the player:
+
+| Option | Note |
+| --- | --- |
+| `Behavior.uncheckOnClick` | The panel spells the same idea `allowUncheck`, which is read and has a cell. One concept, two names; the fix worth doing later is deleting one, not implementing the second |
+| `Behavior.allowMixed` | **User-visible**: a chip in the Behavior tab, "Mixed — allow a mixed state where the design calls for it". On a real panel a toggle has two states whatever the chip says |
+
+**The five emit flags**, which the handoff asked to be inspected by name:
+
+| Option | Where it is offered | What reads it |
+| --- | --- | --- |
+| `emitClick` | chip, Behavior tab | nothing. Its own tooltip says "expose click events to the **future** scripting/runtime layer" |
+| `emitStateChange` | chip, Behavior tab | nothing. Same tooltip wording |
+| `emitValueChange` | toggle, Behavior tab | nothing |
+| `emitValueCommit` | chip, Slider tab | one line — `InteractiveTestSurface.svelte:173`, a 180ms `executed` pulse in the editor dock. The only one of the five with real behaviour behind it, in the place a user is least likely to look |
+| `emitActiveHandleChange` | chip, Slider tab | nothing, not even the test surface. The active handle itself is live and verified |
+
+**Smallest honest release treatment.** The three model-only fields need nothing: no UI promises
+them. The two dock-only ones and the five flags are a single decision — either drop the six chips
+and the toggle until there is something behind them, or keep them and say in the release note that
+the emit flags and the mixed state are design-time only. Three of the seven already carry the
+caveat in their own tooltip.
+
+**Two more, from the slider half, that are not options but are worth the same paragraph:**
+
+- `Behavior.majorTickLength` / `minorTickLength` — no editor cell, and structurally unreachable on
+  the renderer: the tick length is the `tickMajor`/`tickMinor` **part's** height, every slider and
+  knob is created with those parts, and `resolveSliderSemanticParts` merges the full default set
+  back in even if the Parts block is emptied. The second term of that fallback chain is dead code.
+  There is a divergence behind it worth a look before the next release, though it needs a document
+  state the editor does not produce: `PanelPreviewSurface.sliderPartsFor` reads `Parts` **raw**,
+  with no merge, so for a parts-less slider the drawn tick length and the one the hit geometry
+  computes from come from different places — and on a circular slider that feeds the radius.
+- `Behavior.dragEnabled` — no editor cell; both readers exclude the slider role by name in the same
+  expression that reads it; and the only role left, the spinbox, never delivers the press, because
+  the zone a scrub would start in is an `<input>` whose focus handler opens text editing and stops
+  propagation first. Measured, not read off the source.
+
 ### 1b. The Mouse tab reaches five of fifty-eight types — worth knowing, probably correct
 
 Not a defect and not on anybody's list, but it surprised this pass and it belongs where somebody
@@ -141,14 +194,14 @@ out to be a property that was never declared.
   saved in the document, and several checks exist only to keep that distinction honest.
 - **Assertion rows are not unique properties.** Fifteen suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
-  more useful one — **204** of 1,046 declared properties are named by no check at all, down from 241
-  when this list was written. The Mouse section accounts for the latest eleven; its remaining two
-  are `interceptChildClicks` and `draggable`, both recorded above rather than papered over with a
-  row that names them and proves nothing.
+  more useful one — **166** of 1,046 declared properties are named by no check at all, down from 241
+  when this list was written. `Mouse` and the 48-property `Behavior` block are both closed; what
+  each leaves behind is recorded above with its reason rather than papered over with a row that
+  names the property and proves nothing. `Display` (24) and `Pixel` (14) are the largest left.
 
 ## 4. Defects found and fixed in this pass
 
-D-1 through D-18, each with a regression that fails on revert. Recorded in full in
+D-1 through D-19, each with a regression that fails on revert. Recorded in full in
 `editor-behaviour-claude-2026-09-13.md`; the shape is worth carrying into the next pass, because
 fourteen of the first fifteen are two mistakes rather than fifteen:
 
@@ -159,8 +212,13 @@ fourteen of the first fifteen are two mistakes rather than fifteen:
   the note-firing path read the document — so the grid and the sound disagreed for as long as the
   song ran, with every pixel correct.
 
-- **D-16 to D-18** are the first three of the editor-and-shared half, and they are a third shape
+- **D-16 to D-19** are the first four of the editor-and-shared half, and they are a third shape
   again: **a setting that is published, edited and saved, and that nothing downstream can act on.**
+  Two of the four are one mistake seen twice — a default that happens to agree with a hard-coded
+  value, hiding the fact that the field is not read at all. D-18's five type templates pinned
+  `tabIndex: 0`, which is what the code would have done anyway; D-19's `auto` branches inlined 22
+  and 14, which are the declared defaults of the two gaps they were standing in for. In both the
+  cell showed the right number and moved nothing.
   A drag sensitivity with no number to multiply, a relative drag seeded at zero because the path was
   written when only an absolute one existed, and a Focusable switch outranked by an index its own
   type template had already set. None of them throws, none of them looks wrong, and all three

@@ -26,7 +26,7 @@ environment at all.
 | Gate | State | Evidence |
 | --- | --- | --- |
 | A1. Every component family measured against its promised effect, not its property value | **MET** | Twelve suites, all re-run 14 Sep: curves 146, notes 204, motion 113, clock 81, harmony 82, steps 71, phrase 50, recorder 42, outbound 53, links 33, inbound 19, custom 32 / export 51. Zero open defects |
-| A2. Every defect found carries a regression that fails on revert | **MET** | D-1 … D-18. D-15's revert was run explicitly and fails as predicted; so were all three of D-16, D-17 and D-18, each one reverted on its own so the failing row names the fix it belongs to |
+| A2. Every defect found carries a regression that fails on revert | **MET** | D-1 … D-19. D-15's revert was run explicitly and fails as predicted; so were all three of D-16, D-17 and D-18, each one reverted on its own so the failing row names the fix it belongs to |
 | A3. Remaining unverified rows are honest and individually reasoned | **MET** | Six rows. Four are inspector actions the rendered control never performs; one is a runtime conditional; one is a statement of fact |
 | A4. No declared option silently does nothing | **OPEN** | Nine inert options. Three are live script verbs giving callers silence — see section E |
 | A5. Save/reopen in a fresh runtime for every family | **MET** | `kit.reopen()` clears storage, reloads the page and imports the document; every suite carries reopen rows |
@@ -38,7 +38,7 @@ environment at all.
 | --- | --- | --- |
 | B1. Property-by-property coverage matrix exists and is reproducible | **MET** | `tools/scripts/qa/coverage-matrix.mjs`, documented in `coverage-matrix-2026-09-14.md` |
 | B2. Every registered type reached by at least one half | **MET** | 58/58; `TestBox` is internal and not user-reachable |
-| B3. The 241 unreached properties closed or consciously deferred | **OPEN** | **204** now, after `behaviourMouse.mjs` closed the Mouse section (11 of 13; the two left are recorded with reasons in `residual-issues-2026-09-14.md` §1a). `Behavior`, at 48, is the largest block left — see `assignment-codex-2026-09-14.md` |
+| B3. The 241 unreached properties closed or consciously deferred | **OPEN** | **166** now: `behaviourMouse.mjs` closed the Mouse section and `behaviourTrack.mjs` + `behaviourButtons.mjs` closed the 48-property `Behavior` block. What each leaves behind is recorded with its reason in `residual-issues-2026-09-14.md` §1a–1c. `Display` (24) and `Pixel` (14) are the largest left |
 | B4. Authoring stages driven, not just renderers | **OPEN** | Panel editor, Custom designer, Screen Builder, Sequencer/Envelope designers, scripting/routing, Player/export. `designerTab.mjs` already covers the Sequencer designer writing a pattern |
 | B5. A decision on `Designer` and `Assets` — session state, not behaviour | **MET** | Ruled 14 Sep. `Designer` (13 keys) struck as authoring-surface state; `Assets` (5) **kept** — `images`/`filmstrips`/`thumbnails` have 95/58/11 readers and `packagePolicy` decides whether a shared panel carries its artwork. See the matrix document |
 
@@ -49,14 +49,14 @@ environment at all.
 | C1. A panel carrying every built-in | **MET** | `CE/qa/QA-01-components.cepanel`, all 58 types over 125 controls, regenerated and server-rendered by `qaPanels.test.js` |
 | C2. …carrying all 14 custom starters | **OPEN** | It carries one `CustomComponent`. Extend `tools/scripts/qa/make-qa-panels.mjs`; **do not hand-edit the `.cepanel`**, it is generated |
 | C3. Interaction on that panel: independent gestures, linked outputs, several clocks at once, undo/redo, save/reopen, responsiveness | **OPEN** | QA-01 is a render sheet. Nothing on it is touched |
-| C4. A real create → configure → bind → preview → save/share → export walkthrough | **STALE** | Walked on Windows 13 Sep; predates D-1…D-18 |
+| C4. A real create → configure → bind → preview → save/share → export walkthrough | **STALE** | Walked on Windows 13 Sep; predates D-1…D-19 |
 
 ## D. Native, packaging and the candidate itself
 
 | Gate | State | Note |
 | --- | --- | --- |
 | D1. Windows Release build and native tests | **STALE** | 34 native tests passed; predates the later frontend fixes |
-| D2. The installed bundle carries the current frontend | **OPEN** | RC3 is older than every fix from D-1 to D-18. Refresh before quoting any acceptance against it |
+| D2. The installed bundle carries the current frontend | **OPEN** | RC3 is older than every fix from D-1 to D-19. Refresh before quoting any acceptance against it |
 | D3. Native save / open / share / recovery | **STALE** | Walked 13 Sep, including malformed-package refusal |
 | D4. Exported Player behaviour | **STALE** | VST3 export and the isolated native host passed 13 Sep |
 | D5. Physical instrument MIDI, session restore, host performance | **OFF-SITE** | Every inbound check here injects at `latestMidiInputMessage`. That is the right seam for panel behaviour and says nothing about drivers, ports or timing |
