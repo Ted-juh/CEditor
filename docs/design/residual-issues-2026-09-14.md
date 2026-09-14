@@ -137,6 +137,48 @@ caveat in their own tooltip.
   the zone a scrub would start in is an `<input>` whose focus handler opens text editing and stops
   propagation first. Measured, not read off the source.
 
+### 1d. Seven more user-visible options with nothing behind them, from the rest of priority 2
+
+All found the same way and each checked the same three ways before being written down — the key
+name repo-wide, computed access to the section object, and the scripting and export tables. They
+are grouped by what it would take to make the promise true, because that is the decision each one
+needs.
+
+**A small fix, not a feature — the code is one filter away:**
+
+| Option | Where it is offered | What was measured |
+| --- | --- | --- |
+| `ExternalAPI.acceptsExternalLinks` | chip, Published Properties tab: "allow other components to drive published inputs" | With both switches OFF on a panel of two custom components, `listPanelCustomApiEndpoints` offers the same endpoints and the same routes as with them on. The engine filters on `PublishedProperties.inputs`/`outputs` and their `enabled` flag and reads neither key |
+| `ExternalAPI.emitsExternalLinks` | chip, same tab: "allow this component to drive other components" | as above — the two are one measurement |
+| `Assets.packagePolicy.embedAssets` | toggle, Assets tab: "Package images and filmstrips with saved components" | With it OFF, `createCustomComponentExportEnvelope` still returns the image by name and still carries its bytes, in an envelope the same size to within the policy flag itself. The packager reads `Assets.images` only to validate that a part's target exists |
+
+**Remove the unimplemented options and the promise becomes true, with no behaviour change:**
+
+| Option | Note |
+| --- | --- |
+| `ExternalAPI.linkPolicy` | Three options — `publishedOnly`, `advancedOptIn`, `allInternals`. The engine implements the first and reads the field nowhere; widening both components to `allInternals` leaves the endpoint list identical. The safe default is what the product does, and the two wider options promise access it cannot give |
+| `Assets.packagePolicy.warnMissingFonts` | No reader, and no font-checking step in the import path for it to gate. `Assets.fonts`, the map it would check against, is declared and read by nothing either — so the warning has neither a trigger nor a source |
+
+**A feature, so say so in the release note or drop the cell:**
+
+| Option | Note |
+| --- | --- |
+| `Icon.tint` | **Two places in the UI say it exists**: a colour field in the Icon tab ("Primary tint applied to the imported icon") and the Effects tab's own help text pointing at it ("Primary icon tint still lives in Icon"). `CanvasControl` draws the icon as a plain `<img src={dataUrl}>`, and the style it builds carries object-fit, opacity, both flips, the rotation and the effect filters — with no colour step anywhere. Recolouring an arbitrary image needs a mask or an SVG rewrite |
+| `Core.tooltip` | A text field in the Core tab. The element carries no `title` and no `aria-describedby` after it is set. The one a user is most likely to try, because every other editor on the panel has working hints |
+| `Core.screenReaderText` | The same shape and worse in kind, because it is an **accessibility** promise. The element's measured `aria-label` is the surface's own "<name> preview" — exactly the value this field should be overriding |
+
+**And four that are correctly editor-only or export-only, recorded so the matrix row has an
+answer rather than looking like a gap:** `Value.showMapping` (opens the mapping section of the
+inspector), `Value.storeByValue` (read by `exportParameters.js`, so the export suite owns it),
+`Grid.lineWidth` (the design grid is not painted in preview or in the player), and
+`Transform.affectsFit` (`sceneryCompile.js`, the Screen Builder's compile step).
+
+**Two that the product already documents as dead:** `Core.stylePreset`, which CoreEditor renders
+as a chip titled *"Left over from a field that was never read by anything. Safe to clear."*, and
+`ContentLayout.textAboveIcon`, whose idea is spelled twice more in its own section —
+`ContentLayout.mode` offers `text_above_icon_below`, and the stacking order is
+`textZIndex`/`iconZIndex`.
+
 ### 1b. The Mouse tab reaches five of fifty-eight types — worth knowing, probably correct
 
 Not a defect and not on anybody's list, but it surprised this pass and it belongs where somebody
@@ -194,11 +236,13 @@ out to be a property that was never declared.
   saved in the document, and several checks exist only to keep that distinction honest.
 - **Assertion rows are not unique properties.** Fifteen suites report a few hundred rows between them;
   `tools/scripts/qa/coverage-matrix.mjs` reports the property-level figure, which is the smaller and
-  more useful one — **132** of 1,046 declared properties are named by no check at all, down from 241
-  when this list was written. `Mouse`, the 48-property `Behavior` block and both screen sections
-  (`Display` and `Pixel`) are closed; what each leaves behind is recorded above with its reason
-  rather than papered over with a row that names the property and proves nothing. `ContentLayout`,
-  `Listbox` and `TabContainer` (8 each) are the largest left.
+  more useful one — **66** of 1,046 declared properties are named by no check at all, down from 241
+  when this list was written. **The editor-and-shared half is closed.** What each section leaves
+  behind is recorded above with its reason rather than papered over with a row that names the
+  property and proves nothing, and the matrix cannot see those notes: of the 66, ten are the
+  `Behavior` group in §1c, ten are the `Designer` session-state block already ruled out of the
+  denominator, and most of the rest are the inert and closed-elsewhere rows listed here. The
+  genuine remainder is a handful of two-property tails.
 
 ## 4. Defects found and fixed in this pass
 
@@ -213,7 +257,7 @@ fourteen of the first fifteen are two mistakes rather than fifteen:
   the note-firing path read the document — so the grid and the sound disagreed for as long as the
   song ran, with every pixel correct.
 
-- **D-16 to D-19** are the first four of the editor-and-shared half, and they are a third shape
+- **D-16 to D-19** are the four of the editor-and-shared half, and they are a third shape
   again: **a setting that is published, edited and saved, and that nothing downstream can act on.**
   Two of the four are one mistake seen twice — a default that happens to agree with a hard-coded
   value, hiding the fact that the field is not read at all. D-18's five type templates pinned
