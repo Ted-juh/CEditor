@@ -31,7 +31,8 @@ await toggle('Ticks');
 
 — so the key `strokeWidth` never appears as text anywhere in a test that exercises it thoroughly
 through the actual authoring surface. Counting only keys reported **386 properties (37%) unreached**.
-Counting labels as well reports **241 (23%)** at the time of writing. The first number was wrong, and
+Counting labels as well reported **241 (23%)** when this was written, and **212 (20%)** after the
+colour tail was closed. The first number was wrong, and
 wrong in the worst direction: it called the editor half untested where it is strongest.
 
 The figure is **live, not a snapshot**: the script is committed as `tools/scripts/qa/coverage-matrix.mjs`
@@ -97,6 +98,31 @@ rather than quietly removed, because deciding what does not need testing is a de
 should make deliberately.
 
 ---
+
+## The music half is closed
+
+Re-run after `behaviourColours.mjs`: **212 of 1,046 (20%)**, down from 241. Of the thirteen music
+components that carried unreached properties, **twelve now carry none**, and the thirteenth is one
+key — `ChordPad.fieldColour`, which is on the inert list because nothing reads it. It is correctly
+still unreached: there is nothing to check.
+
+Everything left in the count is in the editor/properties half or is the `Designer`/`Assets`
+session-state question below.
+
+**What closing it cost is worth reading before starting the other half.** Thirty-six rows over
+thirteen components, and four of them initially found nothing — **not one a product bug**. Wrong
+fixture (the Arp's grid is as long as the sequence, not `euclidSteps`), wrong layout
+(`ChordPad.minorColour` exists only in the wheel), wrong axis (a vertical ribbon's indicator is a
+horizontal bar, so its height carries `indicatorSize`), and wrong colour spelling (the Matrix draws
+with divs, where `getComputedStyle` gives `rgb(0, 170, 255)` against the `rgba(0,170,255,1)` every
+SVG row compares with).
+
+And **nine of the thirty-odd properties only exist under a condition a fixture has to arrange**: a
+running sequence, a held note, gravity above zero, a finger on the strip, a key with naturals
+outside it, a pad held rather than clicked. A generic "set the colour, look for the colour" sweep
+would have reported all nine as inert — and inert findings lead to deletions. That is the same trap
+as the `cornerField` false positives in the sweep above, met from the other direction, and it is why
+every row names the element it expects and carries a negative case beside it.
 
 ## What this already found
 
