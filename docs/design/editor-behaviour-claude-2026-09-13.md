@@ -70,7 +70,7 @@ renderer ever reading it.
 found are fixed).
 `behaviourCustom.mjs` — 32 verified, 0 inert, 1 unverified, 0 open defects (the one found is fixed).
 `behaviourInbound.mjs` — 19 verified, 0 inert, **0 unverified**, 0 open defects.
-`behaviourCustomExport.mjs` — 24 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
+`behaviourCustomExport.mjs` — 51 verified, 0 inert, 0 unverified, 0 open defects (seven found, all fixed).
 `behaviourClock.mjs` — 81 verified, 0 inert, **0 unverified**, 0 open defects (three found, all fixed).
 `behaviourSteps.mjs` — 71 verified, 2 inert, **0 unverified**, 1 not a property, 0 open defects.
 `behaviourHarmony.mjs` — 82 verified, 0 inert, 2 unverified, 3 closed elsewhere, 0 open defects (the one
