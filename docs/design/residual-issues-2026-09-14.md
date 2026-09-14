@@ -20,6 +20,13 @@ against the renderer, the editor and the script verb tables. Four candidates fro
 were thrown out as false positives — the Drum Pads' corner actions are read through a key built by
 concatenation, which no literal search can see.
 
+**Reproducible, not a snapshot.** `node tools/scripts/qa/published-verbs-without-readers.mjs`
+derives this list. A hand-made list goes stale the moment somebody adds a verb — which is exactly
+what happened to the custom-export count in the behaviour ledger — and the mechanism below means new
+ones arrive without anybody writing a verb-table line. The script reports two buckets: verbs with no
+reader at all, and verbs whose key name is shared across sections so a reader cannot be attributed
+(`Constellation.showField` lands there, because the Timbre reads a `showField` of its own).
+
 **These three have a caller and give it silence. Worst of the group.**
 
 | Option | Published as | What a script author gets |
