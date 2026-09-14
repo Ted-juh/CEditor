@@ -122,6 +122,32 @@ one control moved back, its neighbour untouched — and a panel link carrying a 
 component to another through the Links editor's own two functions. Measured on this machine:
 **opening 2,346ms, entering preview 3,183ms.**
 
+`behaviourWalkthrough.mjs` — 17 verified, 1 unverified, 2 closed elsewhere, 0 open defects.
+Priority 4's C4: one panel walked create → configure → bind → preview → export → save/share, each
+step reading the output of the one before it rather than re-authoring. It also settles where the
+line falls off Windows, which the row had been carrying as "stale" in whole: everything up to the
+compiler runs here — the parameters a DAW is offered are derived in the browser by the same
+`deriveExportParameters` the exporter calls — and the VST3 binary does not, so that row is stated
+`unverified` with the reason rather than implied by the rest being green.
+
+Three things it had to be written around, each of which would otherwise have passed for the
+fixture's reason:
+
+- **The two leaks are stripped one layer above the packager.** `documentToShare` in
+  `panelSharingActions.js` deletes `filePath` and `deviceSession`; `packagePanelForSharing` strips
+  nothing and deep-clones the whole document. A check that calls the packager directly, on a panel
+  that was never saved and never bound to hardware, finds neither and reports a pass it did not
+  earn — which is what the first version did. The suite now PUTS both on the panel and goes through
+  `sharePanelToFile`, reading the bytes off the bridge as the user's disk would receive them.
+- **A control's id is `_children.Core.id`.** A deserialised control has no top-level `id`, so the
+  obvious reader returns `''` and the renderer check keyed on it quietly measures nothing.
+- **`int` is not a host parameter kind, and that is correct.** `PanelParameters.h` turns `valueKind`
+  into an AudioParameterChoice, an AudioParameterBool or an AudioParameterFloat and has no fourth
+  branch, so an int range exports as a float lane over its own min..max. The step is applied at the
+  other end — `getCurrentRangeValue` runs every incoming value through `snapRangeValue` — so the
+  suite measures the whole number on the wire instead of asserting the type in the lane.
+
+
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
 that observed it — and a reader had no way to tell a real gap from a stale sentence. `Ledger.closed`
