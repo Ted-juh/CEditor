@@ -48,7 +48,7 @@ environment at all.
 | --- | --- | --- |
 | C1. A panel carrying every built-in | **MET** | `CE/qa/QA-01-components.cepanel`, all 58 types over 125 controls, regenerated and server-rendered by `qaPanels.test.js` |
 | C2. …carrying all 14 custom starters | **OPEN** | It carries one `CustomComponent`. Extend `tools/scripts/qa/make-qa-panels.mjs`; **do not hand-edit the `.cepanel`**, it is generated |
-| C3. Interaction on that panel: independent gestures, linked outputs, several clocks at once, undo/redo, save/reopen, responsiveness | **OPEN** | QA-01 is a render sheet. Nothing on it is touched |
+| C3. Interaction on that panel: independent gestures, linked outputs, several clocks at once, undo/redo, save/reopen, responsiveness | **MOSTLY MET** | `browser-checks/behaviourCombined.mjs` — 15 verified, 0 defects. All 125 controls mount, draw and keep a box; dragging one moves one; the clock-driven components run together under one transport with no page error; the whole panel serialises and reopens with the same 125 controls and 58 types still drawing. Measured on the Linux container: opening 2,357ms, entering preview 3,031ms — reported rather than asserted, because the threshold is the owner's call. **Undo/redo and linked outputs are the two parts not covered**, and C2 is still open, so the panel has one CustomComponent rather than fourteen |
 | C4. A real create → configure → bind → preview → save/share → export walkthrough | **STALE** | Walked on Windows 13 Sep; predates D-1…D-19 |
 
 ## D. Native, packaging and the candidate itself
