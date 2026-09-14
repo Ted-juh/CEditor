@@ -99,6 +99,16 @@ in the section that are declared and not connected.
 The LCD's `Display` section and the pixel panel's `Pixel`: substrate, backlight, glass, scanlines,
 the character grid, the value tokens, scrolling, the dot grid and its image and animation, both
 live sources, the page transitions, and the `@active` scope.
+`behaviourLayout.mjs` — 15 verified, **0 unverified**, 1 not a property, 0 open defects.
+`ContentLayout`, `TabContainer` and `ScrollArea`: where a label and an icon sit inside a control,
+the tab strip and the page it marks, the scrollbar and where the view is parked.
+`behaviourWidgets.mjs` — 16 verified, 1 inert, **0 unverified**, 0 open defects. The appearance
+tail on Macro, Crossfader, Joystick and Meter.
+`behaviourLists.mjs` — 16 verified, 3 inert, **0 unverified**, 0 open defects. Listbox, Icon and
+the `Value` tail — and `Icon.tint`, a colour field two editors point at that paints nothing.
+`behaviourShared.mjs` — 4 verified, 5 inert, **0 unverified**, 4 not a property, 3 closed
+elsewhere, 0 open defects. `ExternalAPI`, `Core`, `Transform` and `Grid`, and the containment
+contract on a custom component that the link engine does not consult.
 
 **"closed elsewhere" is a status, not a rounding.** A suite that does not measure a property because
 another one does used to say "nothing here can observe it", which sat one file away from the suite
