@@ -204,12 +204,42 @@ try {
       { wasFirst: authoredOrder.indexOf(low) === 0,
         nowLast: raisedOrder.indexOf(low) === raisedOrder.length - 1 });
 
-    led.inert(C, 'tooltip',
-      'the hover text for this control',
-      `USER-VISIBLE AND NOT CONNECTED. The Core tab offers a text field for it, and nothing renders it: the control's element carries no title attribute and no aria-describedby after the field is set (measured: title=${JSON.stringify(await (async () => { await kit.set(low, { 'Core.tooltip': 'Cutoff frequency' }); await kit.settle(500); return await attrOf(low, 'title'); })())}), and a repo-wide search for the key finds the CoreEditor that writes it and nothing else. Of the inert options found in this half it is the one a user is most likely to try, because every other editor on the panel has working hints.`);
-    led.inert(C, 'screenReaderText',
-      'the label a screen reader announces for this control',
-      `the same shape as tooltip and worse in kind, because it is an ACCESSIBILITY promise: a text field in the Core tab, read by nothing. The element carries no aria-label after it is set (measured: aria-label=${JSON.stringify(await (async () => { await kit.set(low, { 'Core.screenReaderText': 'Filter cutoff' }); await kit.settle(500); return await attrOf(low, 'aria-label'); })())}). The surface does set an aria-label of its own in preview — "<name> preview" — which is why the attribute is not simply absent, and which is exactly the value this field should be overriding.`);
+    // A LABEL IS NOT RENDERED THE WAY A BUTTON IS, and it is the type somebody most wants to
+    // annotate. Label, Background, Image and TestBox are FOLDED: `SceneryGround` bakes them to
+    // frozen markup once and reuses it, so they never go through the per-control preview props the
+    // rest of the panel does. Both surfaces bake from the same controls and only one of them
+    // annotates, so the flag is part of the bake's cache key as well as its props — without that,
+    // whichever surface rendered first would decide what the other got. Measured here rather than
+    // reasoned about, because the first implementation read the control directly instead of taking
+    // a prop and gave the folded copy a role with no name on it.
+    const scenery = await kit.make('Label', { 'Transform.x': 150, 'Transform.y': 230,
+      'Transform.width': 180, 'Transform.height': 40, 'Core.name': 'Heading' });
+    await kit.set(low, { 'Core.tooltip': 'Cutoff frequency', 'Core.screenReaderText': 'Filter cutoff' });
+    await kit.set(scenery, { 'Core.tooltip': 'What this section does', 'Core.screenReaderText': 'Section heading' });
+    await kit.settle(800);
+
+    led.check(C, 'tooltip',
+      'the hover text reaches the control as a `title`, which is what a hover text IS — on a Button that takes the pointer and on a folded Label that does not, the two rendering paths a panel actually has',
+      { button: 'Cutoff frequency', label: 'What this section does' },
+      { button: await attrOf(low, 'title'), label: await attrOf(scenery, 'title') });
+
+    led.check(C, 'screenReaderText',
+      'the author\'s label is what a screen reader is given, replacing the "<name> preview" the surface generates — the promise here is not that an attribute appears but that the AUTHOR\'S text wins, because the generated one was already there and was covering it',
+      { button: 'Filter cutoff', label: 'Section heading' },
+      { button: await attrOf(low, 'aria-label'), label: await attrOf(scenery, 'aria-label') });
+
+    led.check(C, 'screenReaderText (a name needs a role to be announced at all)',
+      'the folded Label is given `role="img"` so its name is actually spoken. `aria-label` on a plain div is ignored — a generic element has no name to give — so without this the text would be in the DOM, visible in the inspector, and reach nobody: the same failure one layer down. Only ever applied where the author wrote a label AND the surface has no role of its own, so it can never displace a Button\'s',
+      { label: 'img', buttonKeepsItsOwn: 'button' },
+      { label: await attrOf(scenery, 'role'), buttonKeepsItsOwn: await attrOf(low, 'role') });
+
+    await kit.set(low, { 'Core.tooltip': '', 'Core.screenReaderText': '' });
+    await kit.settle(700);
+    led.check(C, 'tooltip + screenReaderText (empty means absent, not empty)',
+      'clearing both writes no `title` at all rather than an empty one — an empty title is a tooltip that flashes a blank box — and hands the accessible name back to the surface\'s generated default rather than leaving the control nameless',
+      { title: null, aria: 'Low preview' },
+      { title: await attrOf(low, 'title'), aria: await attrOf(low, 'aria-label') });
+
   }
   await kit.preview(false);
 

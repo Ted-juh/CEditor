@@ -186,8 +186,40 @@ Evidence: `panelCustomComponentLinks.test.js` (+7), `customComponentPackage.test
 | Option | Note |
 | --- | --- |
 | `Icon.tint` | **Two places in the UI say it exists**: a colour field in the Icon tab ("Primary tint applied to the imported icon") and the Effects tab's own help text pointing at it ("Primary icon tint still lives in Icon"). `CanvasControl` draws the icon as a plain `<img src={dataUrl}>`, and the style it builds carries object-fit, opacity, both flips, the rotation and the effect filters — with no colour step anywhere. Recolouring an arbitrary image needs a mask or an SVG rewrite |
-| `Core.tooltip` | A text field in the Core tab. The element carries no `title` and no `aria-describedby` after it is set. The one a user is most likely to try, because every other editor on the panel has working hints |
-| `Core.screenReaderText` | The same shape and worse in kind, because it is an **accessibility** promise. The element's measured `aria-label` is the surface's own "<name> preview" — exactly the value this field should be overriding |
+| ~~`Core.tooltip`~~ | **DONE, 14 September 2026.** Rendered as a `title` on the control, in preview and in the player — which are the same surface, so there is one implementation rather than two free to drift |
+| ~~`Core.screenReaderText`~~ | **DONE, same change.** The author's text is now what a screen reader is given, replacing the generated "<name> preview" that was covering it |
+
+**What `Core.tooltip` and `Core.screenReaderText` took, since "a text field to an attribute" was the
+estimate and it was wrong by one rendering path.**
+
+The gate is preview-and-player, which is what the Core tab's own hint promises and is right: a
+tooltip popping up over the control you are dragging is the thing that promise avoids. The editor
+preview and the player are the same component, so that half was one resolver and two attributes.
+
+**A Label is not rendered the way a Button is, and a Label is what somebody most wants to annotate.**
+Label, Background, Image and TestBox are *folded*: `SceneryGround` bakes them into frozen markup
+once and reuses it, so they never pass through the per-control preview props the rest of the panel
+does. Both surfaces bake from the same controls and only one of them annotates, so the flag had to
+go into the bake's **cache key** as well as its props — without that, whichever surface rendered
+first would decide what the other got, and the tooltip would appear on the editing canvas or fail
+to appear in preview depending on where the author had been.
+
+**A name with no role reaches nobody.** `aria-label` on a plain `<div>` is ignored by screen readers,
+and a folded Label has no role — so the author's text would have been in the DOM, visible in the
+inspector, and silent. Such a control now gets `role="img"`, the conventional way to say "this
+graphic carries this meaning", applied only where the author wrote a label **and** the surface has
+no role of its own, so it can never displace a slider's or a button's semantics.
+
+**One thing the first attempt got wrong, kept because it is the general lesson.** The role was
+computed inside `CanvasControl` from the control, while the label arrived as a prop. That looks
+equivalent and is not: a CanvasControl rendered *without* preview props still has the control, so
+the role fired where the label could not, and folded scenery grew `role="img"` with no name on it —
+worse than the field doing nothing. Both are props now. One source per attribute is what stops the
+two halves of a pair disagreeing.
+
+Evidence: `coreAccessibility.test.js` (6 tests) and four rows in `browser-checks/behaviourShared.mjs`
+measuring the rendered attributes on a Button (live path) and a Label (folded path), in the editor
+and in preview, set and cleared.
 
 **And four that are correctly editor-only or export-only, recorded so the matrix row has an
 answer rather than looking like a gap:** `Value.showMapping` (opens the mapping section of the

@@ -80,13 +80,23 @@
      * instead, leaving the live copy as the only one visible.
      */
     hiddenIds = new Set(),
+    /**
+     * Carry each control's Core tooltip and screen-reader label into the baked markup.
+     *
+     * Part of the CACHE KEY below, not just of the props. The editing canvas and the preview render
+     * the same scenery from the same controls, and only one of them annotates it — so a single key
+     * would hand whichever baked first to both, and the tooltip would appear on the canvas or fail
+     * to appear in preview depending on which surface the author opened first. Neither is a bug
+     * anybody would reproduce on purpose.
+     */
+    annotate = false,
   } = $props();
 
   let groundEl = $state(null);
 
-  const layerProps = () => ({ controls, allControls, panelControls, panelWidth, panelHeight, scale });
+  const layerProps = () => ({ controls, allControls, panelControls, panelWidth, panelHeight, scale, annotate });
 
-  let fingerprint = $derived(sceneryFingerprint(controls));
+  let fingerprint = $derived(`${annotate ? 'a' : 'p'}:${sceneryFingerprint(controls)}`);
   let baked = $state(null);
 
   // Server-side there is no DOM to bake into and no second render to save, so the scenery is drawn

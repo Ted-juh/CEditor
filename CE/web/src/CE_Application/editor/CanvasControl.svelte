@@ -153,6 +153,8 @@
     onDragEnd = null,
     previewRole = '',
     previewTabIndex = undefined,
+    previewTooltip = '',
+    previewImageRole = false,
     previewAriaLabel = '',
     previewAriaDisabled = undefined,
     previewAriaChecked = undefined,
@@ -501,6 +503,18 @@
   $effect(() => {
     if (!mouseAppliesToSurface && raisedInPreview) raisedInPreview = false;
   });
+
+  // The tooltip and a display's accessible name belong to the panel being USED, not authored — the
+  // Core tab says "in preview and in the player" and they are the same surface. Deliberately a
+  // wider gate than `previewInteractive` below: a meter and a label have no role and take no focus,
+  // and they are exactly the controls somebody wants to annotate.
+  //
+  // BOTH ARRIVE AS PROPS, like every other preview attribute, and that is not tidiness. Reading the
+  // control directly here looks equivalent and is not: a CanvasControl rendered WITHOUT preview
+  // props still has the control, so the role fired while the label — a prop — stayed empty, and
+  // folded scenery grew `role="img"` with no name on it. Worse than the field doing nothing. One
+  // source per attribute is what stops the two halves of a pair disagreeing.
+  let inPreview = $derived(editorInteractionEnabled === false);
 
   let previewInteractive = $derived(
     editorInteractionEnabled === false
@@ -3209,10 +3223,12 @@
   onblur={previewInteractive ? onpreviewblur : undefined}
   onkeydown={previewInteractive ? onpreviewkeydown : undefined}
   onkeyup={previewInteractive ? onpreviewkeyup : undefined}
-  role={previewInteractive && previewRole ? previewRole : undefined}
+  title={inPreview && previewTooltip ? previewTooltip : undefined}
+  role={previewInteractive && previewRole ? previewRole
+    : (inPreview && previewImageRole ? 'img' : undefined)}
   data-preview-role={previewInteractive ? (previewRole || '') : undefined}
   tabindex={previewInteractive ? effectiveTabIndex : undefined}
-  aria-label={previewInteractive ? previewAriaLabel : undefined}
+  aria-label={previewInteractive || (inPreview && previewImageRole) ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
   aria-expanded={previewInteractive ? previewAriaExpanded : undefined}

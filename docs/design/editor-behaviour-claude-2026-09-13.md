@@ -106,13 +106,19 @@ the tab strip and the page it marks, the scrollbar and where the view is parked.
 tail on Macro, Crossfader, Joystick and Meter.
 `behaviourLists.mjs` — 16 verified, 3 inert, **0 unverified**, 0 open defects. Listbox, Icon and
 the `Value` tail — and `Icon.tint`, a colour field two editors point at that paints nothing.
-`behaviourShared.mjs` — **10 verified, 3 inert**, **0 unverified**, 4 not a property, 3 closed
+`behaviourShared.mjs` — **14 verified, 1 inert**, **0 unverified**, 4 not a property, 3 closed
 elsewhere, 0 open defects. `ExternalAPI`, `Core`, `Transform` and `Grid`. The containment contract
 the link engine did not consult is now consulted: re-run 14 Sep after the owner ruled that the two
 External switches and all three `linkPolicy` options should work, the six ExternalAPI rows measure
 three distinct endpoint lists for the three policies, both switches in both directions, and — the
 row that makes them switches rather than picker filters — a link already authored stopping and
-restarting as one field changes.
+restarting as one field changes. Four more rows cover `Core.tooltip` and `Core.screenReaderText`,
+implemented the same day: the hover text reaches the control as a `title` and the author's
+screen-reader label replaces the generated "<name> preview" that was covering it — measured on a
+Button, which renders live, and on a Label, which does not. Label, Background, Image and TestBox are
+folded into baked markup by `SceneryGround`, so they never pass through the per-control preview
+props, and the annotate flag had to reach the bake's cache key as well as its props: both surfaces
+bake from the same controls and only one of them annotates.
 `behaviourAssets.mjs` — **6 verified, 0 inert**, **0 unverified**, 2 not a property, 1 closed
 elsewhere, 0 open defects. What a packaged component actually carries. The packaging toggle that
 changed nothing now strips the artwork from both copies of the Assets section and keeps every

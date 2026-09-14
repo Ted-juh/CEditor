@@ -10,6 +10,7 @@
    * control it replaced.
    */
   import CanvasControl from './CanvasControl.svelte';
+  import { needsImageRole, resolveAriaLabel, resolveTooltip } from '../utils/coreAccessibility.js';
 
   let {
     controls = [],
@@ -18,6 +19,16 @@
     panelWidth = 0,
     panelHeight = 0,
     scale = 1,
+    /**
+     * Whether these controls should carry their Core tooltip and screen-reader label.
+     *
+     * Off on the editing canvas and on for the panel being used, because that is what the Core tab
+     * promises — "in preview and in the player" — and a tooltip popping up over the control you are
+     * dragging is exactly the thing that promise is avoiding. Scenery is the one kind of control
+     * that cannot read the answer from its own render: the ground is BAKED, and the same bake is
+     * used by both surfaces, so the flag has to travel with the request and go into the cache key.
+     */
+    annotate = false,
   } = $props();
 </script>
 
@@ -31,5 +42,8 @@
     {panelWidth}
     {panelHeight}
     editorInteractionEnabled={false}
+    previewTooltip={annotate ? resolveTooltip(control) : ''}
+    previewAriaLabel={annotate ? resolveAriaLabel(control, '') : ''}
+    previewImageRole={annotate ? needsImageRole(control, '') : false}
   />
 {/each}

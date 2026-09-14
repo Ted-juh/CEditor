@@ -4,6 +4,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
+  import { needsImageRole, resolveAriaLabel, resolveTooltip } from '../utils/coreAccessibility.js';
   import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
   import {
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
@@ -8060,7 +8061,12 @@
       renderIdNamespace: previewRenderIdNamespace,
       previewRole: previewRoleFor(control),
       previewTabIndex: previewTabIndexFor(control),
-      previewAriaLabel: `${coreName} preview`,
+      previewTooltip: resolveTooltip(control),
+      previewImageRole: needsImageRole(control, previewRoleFor(control)),
+      // The author's screen-reader text wins over the generated "<name> preview". That generated
+      // string was being written over the top of whatever they had typed, which is the same defect
+      // as a field nothing reads and takes longer to find.
+      previewAriaLabel: resolveAriaLabel(control, `${coreName} preview`),
       previewAriaDisabled: isDisabled(control),
       previewAriaChecked: previewAriaCheckedFor(control),
       previewAriaExpanded: isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined,
@@ -8077,7 +8083,7 @@
         disabled: isDisabled(control),
         readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
         inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
-        ariaLabel: `${coreName} value`,
+        ariaLabel: resolveAriaLabel(control, `${coreName} value`),
         tabIndex: -1,
       } : null,
       previewEditableFields: spinnerEditableFields(control),
@@ -8149,6 +8155,7 @@
       <img class="scenery-layer" src={item.url} width={panel.width} height={panel.height} alt="" />
     {:else if item.type === 'ground'}
       <SceneryGround
+        annotate
         controls={item.controls}
         allControls={orderedControls}
         panelControls={panel.controls}
