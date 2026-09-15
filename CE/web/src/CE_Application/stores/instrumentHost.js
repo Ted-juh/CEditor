@@ -562,6 +562,9 @@ export function emptyLibraryQuery() {
     // Zero is off. A record with no arrival time never matches a live filter — see
     // recordAddedWithin in CE/src/InstrumentHost/Library.cpp, which is the authority.
     addedWithinDays: 0,
+    // Folded duplicates are out of the browse until something asks for them. Off by default,
+    // because the point of folding is not to see them.
+    includeHidden: false,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
     // A measured range is inactive until somebody moves a handle, because a range that defaults
     // to "all of it" would still refuse every record the auditioner has not reached yet.
@@ -586,6 +589,7 @@ export function normalizeLibraryQuery(payload) {
     minRating: Math.min(5, Math.max(0, Number(p.minRating ?? 0))),
     availableOnly: p.availableOnly === true,
     addedWithinDays: Math.min(365, Math.max(0, Math.floor(Number(p.addedWithinDays ?? 0)) || 0)),
+    includeHidden: p.includeHidden === true,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, {
       include: strings(facets[f]?.include),
       exclude: strings(facets[f]?.exclude),
@@ -605,6 +609,7 @@ export function libraryQueryIsEmpty(query) {
   const q = normalizeLibraryQuery(query);
   return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
     && q.minRating === 0 && !q.availableOnly && !q.measuredOnly && q.addedWithinDays === 0
+    && !q.includeHidden
     && MEASURED_AXES.every((a) => !q.ranges[a].active)
     && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
 }
@@ -634,7 +639,7 @@ export function emptyHostLibrary() {
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
               measured: 0, measurable: 0, refused: 0, refusedByCause: refusedByCause(null),
-              addedRecently: 0,
+              addedRecently: 0, hidden: 0,
               snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
@@ -722,6 +727,9 @@ export function normalizeHostLibrary(payload) {
       // 0 for every record written before the field existed, which is the right answer: a
       // library that has always been there is not new.
       addedAtMs: Number(r?.addedAtMs ?? 0) || 0,
+      // Folded into another record. Only ever true when the query asked for hidden rows, so a
+      // row that says so is a row the page should offer to unfold rather than one to draw plain.
+      hidden: r?.hidden === true,
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -740,6 +748,9 @@ export function normalizeHostLibrary(payload) {
       // whatever the current query happens to match.
       refusedByCause: refusedByCause(p.counts?.refusedByCause),
       addedRecently: Number(p.counts?.addedRecently ?? 0),
+      // Folded away, counted over the whole library rather than over the query — `total` stays
+      // the whole library, so this is how the page says how many rows it is not showing.
+      hidden: Number(p.counts?.hidden ?? 0),
       snapshots: Number(p.counts?.snapshots ?? 0),
       snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
@@ -795,6 +806,7 @@ const admits = (selection, values) => {
 
 export function matchesLibraryQuery(record, query) {
   const q = normalizeLibraryQuery(query);
+  if (record.hidden === true && !q.includeHidden) return false;
   if (q.type && record.type !== q.type) return false;
   if (q.favouritesOnly && record.favourite !== true) return false;
   if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
@@ -921,14 +933,29 @@ let mockLibraryView = emptyLibraryQuery();
 let mockMeasuredEverything = false;
 let mockVersions = {};
 let mockBranches = [];
+// Which demo records have been folded away, and the curation each fold gathered onto its
+// survivor. Module state rather than store state, because every rail click re-asks for the
+// library — a fold that the next answer undid would be a fold nobody could demonstrate.
+let mockHiddenRecords = new Set();
+let mockMergedCuration = {};
 
-export function mockHostLibrary(query = '', type = '') {
+/** The demo library, before any query is applied. Its own function because folding needs the
+    whole of it — the members of a set are the records being folded, and most of them are not
+    in whatever the current query happens to match. */
+function mockLibraryRecords() {
   const all = [
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
       tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10),
-      addedAtMs: Date.now() - 3 * 86400000 },
+      addedAtMs: Date.now() - 3 * 86400000, mockFingerprint: 'fp-warm' },
+    // The same bytes in a second folder — what anybody who has ever backed a preset folder up
+    // already has. It carries a tag of its own so folding it visibly moves something rather
+    // than just making a row disappear.
+    { recordId: 'lib-11', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad (backup)',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', factory: true, available: true, tags: ['backup'],
+      sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10), mockFingerprint: 'fp-warm' },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'],
@@ -943,7 +970,7 @@ export function mockHostLibrary(query = '', type = '') {
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', category: 'Pad', factory: true,
       available: true, tags: ['choir'], sonic: null,
       sonicRefusal: 'The plug-in crashed while playing this sound.', mockRefusalCause: 'crashed' },
-    { recordId: 'lib-7', type: 'preset', sourceType: 'userState', name: 'Half a Save',
+    { recordId: 'lib-10', type: 'preset', sourceType: 'userState', name: 'Half a Save',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, tags: ['broken'], sonic: null,
       sonicRefusal: 'That saved state could not be read back.', mockRefusalCause: 'unreadable',
@@ -967,9 +994,6 @@ export function mockHostLibrary(query = '', type = '') {
       rating: 3, tags: ['bright', 'wide'], collections: ['Friday'] },
   ];
 
-  // Both call shapes: the older (text, type) pair and the whole query object.
-  const request = normalizeLibraryQuery(
-    typeof query === 'object' && query !== null ? query : { text: query, type });
   all.push(...mockBranches.map((b) => ({ ...b, sonic: mockSonic(0.45, 0.30, 0.50, 0.20, 0.12) })));
 
   // In the demo a measured sound is an instant one, which is what the native side arranges too:
@@ -977,7 +1001,83 @@ export function mockHostLibrary(query = '', type = '') {
   for (const record of all) {
     record.instant = Boolean(record.sonic) && record.sonic.silent !== true;
     record.versions = record.versions ?? mockVersions[record.recordId] ?? [];
+    record.hidden = mockHiddenRecords.has(record.recordId);
+    if (mockMergedCuration[record.recordId])
+      Object.assign(record, mockMergedCuration[record.recordId]);
   }
+
+  return all;
+}
+
+/** Whichever member of a set carries the most user metadata is the one to keep. The weights
+    mirror libraryDuplicates in CE/src/InstrumentHost/Library.cpp, which is the authority. */
+const mockCurationWeight = (r) =>
+  (r.favourite ? 4 : 0) + (Number(r.rating ?? 0) > 0 ? 3 : 0)
+  + (String(r.notes ?? '') !== '' ? 2 : 0) + ((r.tags ?? []).length ? 2 : 0)
+  + ((r.collections ?? []).length ? 1 : 0) + (r.factory ? 0 : 1);
+
+/** The demo's duplicate sets, over whatever is not already folded. The native side measures as
+    well as fingerprints; the demo only has the fingerprints, so every set it finds is identical
+    and the non-identical case is exercised by the C++ tests rather than here. */
+function mockLibraryDuplicates(all) {
+  const byFingerprint = new Map();
+  for (const record of all) {
+    if (!record.mockFingerprint || record.hidden) continue;
+    byFingerprint.set(record.mockFingerprint,
+                      [...(byFingerprint.get(record.mockFingerprint) ?? []), record]);
+  }
+
+  const sets = [];
+  for (const members of byFingerprint.values()) {
+    if (members.length < 2) continue;
+    // Stable sort, so a tie goes to the first — which is library order, as it is in C++.
+    const key = [...members].sort((a, b) => mockCurationWeight(b) - mockCurationWeight(a))[0];
+    sets.push({ keyRecordId: key.recordId, name: key.name, identical: true,
+                recordIds: members.map((r) => r.recordId) });
+  }
+  return sets;
+}
+
+/** What folding a set would put on its survivor: tags and collections unioned, the highest
+    rating, favourite if any member is, and the notes kept with the name of the sound each came
+    from. Mirrors mergedDuplicateMetadata in CE/src/InstrumentHost/Library.cpp. Pure and
+    exported, because the rule is worth testing without a store to mutate. */
+export function mergedDuplicateCuration(records, set) {
+  const byId = new Map(records.map((r) => [r.recordId, r]));
+  const key = byId.get(set.keyRecordId);
+  if (!key) return null;
+
+  const merged = {
+    favourite: key.favourite === true,
+    rating: Number(key.rating ?? 0),
+    tags: [...(key.tags ?? [])],
+    collections: [...(key.collections ?? [])],
+    notes: String(key.notes ?? ''),
+  };
+  const noteParts = merged.notes ? [merged.notes] : [];
+
+  for (const id of set.recordIds) {
+    if (id === set.keyRecordId) continue;
+    const other = byId.get(id);
+    if (!other) continue;
+    merged.favourite = merged.favourite || other.favourite === true;
+    merged.rating = Math.max(merged.rating, Number(other.rating ?? 0));
+    for (const tag of other.tags ?? []) if (!merged.tags.includes(tag)) merged.tags.push(tag);
+    for (const c of other.collections ?? [])
+      if (!merged.collections.includes(c)) merged.collections.push(c);
+    if (String(other.notes ?? '') !== '') noteParts.push(`${other.name}: ${other.notes}`);
+  }
+
+  merged.notes = noteParts.join('\n');
+  return merged;
+}
+
+export function mockHostLibrary(query = '', type = '') {
+  const all = mockLibraryRecords();
+
+  // Both call shapes: the older (text, type) pair and the whole query object.
+  const request = normalizeLibraryQuery(
+    typeof query === 'object' && query !== null ? query : { text: query, type });
 
   const records = all.filter((r) => matchesLibraryQuery(r, request));
 
@@ -1004,10 +1104,12 @@ export function mockHostLibrary(query = '', type = '') {
               addedRecently: all.filter((r) =>
                 Number(r.addedAtMs ?? 0) > 0
                   && Date.now() - Number(r.addedAtMs) <= 14 * 86400000).length,
+              hidden: all.filter((r) => r.hidden).length,
               refusedByCause: all.reduce((acc, r) => {
                 if (!r.sonic && r.sonicRefusal) acc[r.mockRefusalCause ?? 'other'] += 1;
                 return acc;
               }, refusedByCause(null)) },
+    duplicates: mockLibraryDuplicates(all),
     facets: computeLibraryFacets(all, request),
     smartCollections: mockSmartCollections.map((c) => ({
       ...c, count: all.filter((r) => matchesLibraryQuery(r, c.query)).length })),
@@ -1038,6 +1140,8 @@ export function resetMockLibraryState() {
   mockMeasuredEverything = false;
   mockVersions = {};
   mockBranches = [];
+  mockHiddenRecords = new Set();
+  mockMergedCuration = {};
   hostVersionDiff.set(null);
   mockLibraryView = emptyLibraryQuery();
   hostAudition.set({ recordId: '', stage: '', detail: '', phrase: 'recent', bars: 4 });
@@ -7140,6 +7244,33 @@ function send(payload) {
       }));
       return;
     }
+    if (payload?.cmd === 'mergeDuplicateSet') {
+      // The set is re-derived here rather than taken from the payload, as the native side does
+      // it: the page's copy of the sets is as old as its last answer, and folding a stale one
+      // would hide sounds that are no longer duplicates of anything.
+      const all = mockLibraryRecords();
+      const set = mockLibraryDuplicates(all).find((d) => d.keyRecordId === payload.keyRecordId);
+      if (!set) { hostLastError.set('Those sounds are no longer a duplicate set.'); return; }
+      if (!set.identical) {
+        hostLastError.set('Only sounds that are byte-for-byte identical can be folded.');
+        return;
+      }
+
+      mockMergedCuration = { ...mockMergedCuration,
+                             [set.keyRecordId]: mergedDuplicateCuration(all, set) };
+      mockHiddenRecords = new Set([...mockHiddenRecords,
+                                   ...set.recordIds.filter((id) => id !== set.keyRecordId)]);
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'setLibraryRecordHidden') {
+      const next = new Set(mockHiddenRecords);
+      if (payload.hidden === false) next.delete(payload.recordId);
+      else next.add(payload.recordId);
+      mockHiddenRecords = next;
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
     if (payload?.cmd === 'removeLibraryRecord') {
       hostLibrary.update((lib) => ({
         ...lib,
@@ -7603,6 +7734,15 @@ export const diffVersions = (recordId, versionIdA, versionIdB) =>
 export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
 export const recordFamily = (recordId) => send({ cmd: 'recordFamily', recordId });
+
+/** Folds a duplicate set onto its survivor: the curation of every member is gathered there and
+    the rest go quiet. Nothing is deleted — see setLibraryRecordHidden for the way back. */
+export const mergeDuplicateSet = (keyRecordId) => send({ cmd: 'mergeDuplicateSet', keyRecordId });
+
+/** Folds one record away, or brings it back. The way back matters: a fold nobody can undo is a
+    delete with better manners. */
+export const setLibraryRecordHidden = (recordId, hidden) =>
+  send({ cmd: 'setLibraryRecordHidden', recordId, hidden: hidden !== false });
 /** What a captured rack needs before it can play here, and the nearest things you do own. */
 export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
 /** Chooses (or with an empty recordId, un-chooses) the substitute for one wanted sound. The

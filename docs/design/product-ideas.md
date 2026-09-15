@@ -1999,6 +1999,39 @@ discarding the rest.
 
 **Cost:** low, and it is the difference between a dedupe people run and one they are afraid of.
 
+> **Built, 2026-09-15 — and the design changed, because a probe said it had to.**
+>
+> The obvious shape was: merge the curation onto the survivor, delete the rest. A probe over
+> `Library` says that shape does not work. Two vendor records, remove one, rescan the folder:
+> there are two again. `mergeVendorScan` is doing exactly its job — the file is still on disk and
+> finding it is what a scan is for — so a fold by deletion silently undoes itself the next time
+> anybody points the scanner at the folder. That is worse than not folding, because the rating and
+> the tags that were gathered onto the survivor have already moved and the copy comes back bare.
+>
+> So **a fold hides rather than deletes**: `hidden` on `LibraryRecord`, and — the load-bearing
+> line — `hidden` in `mergeVendorScan`'s keep-list, beside `user`, `sonic` and `addedAtMs`.
+> `matchesQuery` drops hidden records unless the query's new `includeHidden` asks for them, and
+> `libraryDuplicates` skips them on both loops so a folded set stops being offered. Nothing is
+> deleted, the row keeps its id, and `setLibraryRecordHidden` is the way back.
+>
+> The curation rule is `mergedDuplicateMetadata` in `Library.cpp`, pure so it can be tested
+> without a library to mutate: tags and collections unioned, the highest rating, favourite if any
+> member is, and the notes kept with the name of the sound each came from — except the survivor's
+> own, which is already on the record being looked at. `mergeDuplicateSet` over the bridge
+> re-derives the set rather than trusting the payload, because the page's copy is as old as its
+> last answer and folding a stale list would hide sounds that are no longer duplicates of
+> anything.
+>
+> **Only identical sets can be folded.** `libraryDuplicates` finds two kinds — the same bytes, and
+> the same name and plug-in measuring within a tolerance — and the second is the auditioner's
+> opinion. The difference between two patches that merely sound alike is somebody's edit, and
+> folding those would be the program deciding it did not count. The button does not offer it and
+> the command refuses it.
+>
+> The browser gets a **Fold** button per identical set, a *Folded away* rail row carrying
+> `counts.hidden` (a fold nobody can count is a fold nobody can undo), a `FOLDED` badge on any
+> hidden row that is asked for, and **Unfold** on the row itself.
+
 ## Curation does not travel
 
 `favourite`, `rating`, `notes`, `tags`, `collections` are per-record and personal. Share a rack or a

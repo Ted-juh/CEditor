@@ -142,6 +142,16 @@ struct LibraryRecord
     bool factory = false;         // vendor-derived (true) vs CEditor-captured (false)
     bool missing = false;         // the source vanished; the record and its metadata stay
 
+    // Folded into another record as a duplicate. NOT deleted, because deleting is not durable:
+    // a vendor record whose file is still on disk is minted again by the very next scan, so a
+    // fold that removed the row would silently undo itself. Hiding survives because this field
+    // is in mergeVendorScan's keep-list, beside the ratings — the same mechanism that lets a
+    // rescan refresh what the vendor says without destroying what the user did.
+    //
+    // Nothing is destroyed and nothing is unreachable: a hidden record keeps its file, its
+    // measurements and its own metadata, and can be shown again.
+    bool hidden = false;
+
     // When this record FIRST entered the library — not when its file was written, and not when
     // it was last saved (a version carries that). Zero means "before anyone was counting", which
     // is every record that predates the field and is the right answer for them: a library that
@@ -238,6 +248,10 @@ struct LibraryQuery
     int  minRating = 0;         // 0 = unrated included
     bool availableOnly = false; // see the availability hook below
 
+    // Folded duplicates are out of the way, not gone. Off by default, because the point of
+    // folding is not seeing them; on when somebody goes looking, so nothing is unreachable.
+    bool includeHidden = false;
+
     // "What arrived lately." Zero is off. A record with no `addedAtMs` never matches, because
     // an unknown arrival is not a recent one — the same rule the measured ranges follow, where
     // an unknown brightness is not a dark one.
@@ -312,6 +326,11 @@ public:
 
     /** Updates only the user block of a record. */
     bool setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user);
+
+    /** Folds a record out of sight, or brings it back. Not a delete: the row stays, keeps its
+        id and its curation, and survives the next vendor scan (see `mergeVendorScan`). That is
+        the whole point — deleting a vendor record only lasts until the file is found again. */
+    bool setRecordHidden (const juce::String& recordId, bool hidden);
 
     const juce::Array<SmartCollection>& allSmartCollections() const { return smartCollections; }
 
@@ -420,6 +439,20 @@ struct LibraryDuplicateSet
 
 juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library,
                                                     float tolerance = 0.04f);
+
+/** What folding a duplicate set would do, worked out without doing it.
+
+    The curation of every member gathered onto one record: tags and collections unioned, the
+    highest rating taken, favourite if ANY member is, and notes concatenated with the name of the
+    sound each came from — because a note is somebody's sentence and losing whose it was makes it
+    useless.
+
+    `keyRecordId` decides the survivor and `libraryDuplicates` has already chosen it by how much
+    metadata each member carries, so this does not second-guess it.
+
+    Pure, so the rule can be tested without a library to mutate. */
+LibraryRecord::UserMetadata mergedDuplicateMetadata (const Library& library,
+                                                     const LibraryDuplicateSet& set);
 
 /** One candidate, and how close it is. */
 struct SoundMatch

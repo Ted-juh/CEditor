@@ -32,9 +32,9 @@
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase, auditionLibraryRecord,
     hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
     setMorph, clearMorph, setParameter,
-    hostSimilar,
-  hostRecordFamily,
-  recordFamily, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
+    hostSimilar, hostRecordFamily, recordFamily,
+    similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
+    mergeDuplicateSet, setLibraryRecordHidden,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
@@ -453,13 +453,37 @@
           </span>
         </div>
         {#each $hostLibrary.duplicates.slice(0, 6) as set (set.keyRecordId)}
-          <button type="button" class="rail-item" data-testid="duplicate-set"
-                  title={set.identical ? 'The same bytes, filed more than once'
-                                       : 'The same name, plug-in and measurement'}
-                  onclick={() => ask({ ...emptyLibraryQuery(), text: set.name })}>
-            <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
-          </button>
+          <div class="rail-pair">
+            <button type="button" class="rail-item" data-testid="duplicate-set"
+                    title={set.identical ? 'The same bytes, filed more than once'
+                                         : 'The same name, plug-in and measurement'}
+                    onclick={() => ask({ ...emptyLibraryQuery(), text: set.name })}>
+              <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
+            </button>
+            <!-- Only the same bytes can be folded. A measured resemblance is the auditioner's
+                 opinion, and the difference between two patches that merely sound alike is
+                 somebody's edit — folding those would be the program deciding it did not count.
+                 The native side refuses it too; this only stops the button offering it. -->
+            <button type="button" class="rail-fold" data-testid="fold-duplicates"
+                    disabled={!set.identical}
+                    title={set.identical
+                             ? 'Gather their tags, rating and notes onto one and fold the rest away. Nothing is deleted.'
+                             : 'These only sound alike. Folding is for files that are the same bytes.'}
+                    onclick={() => mergeDuplicateSet(set.keyRecordId)}>Fold</button>
+          </div>
         {/each}
+      {/if}
+
+      <!-- What the browse is not showing. A fold nobody can count is a fold nobody can undo,
+           so the number is here whether or not there is a set left to fold. -->
+      {#if $hostLibrary.counts.hidden > 0}
+        {#if $hostLibrary.duplicates.length === 0}<div class="rail-head">Housekeeping</div>{/if}
+        <button type="button" class="rail-item" class:on={query.includeHidden}
+                data-testid="folded-away"
+                title="Folded duplicates. They were never deleted — show them and any one can be put back."
+                onclick={() => ask({ ...query, includeHidden: !query.includeHidden })}>
+          <span>Folded away</span><span class="n">{$hostLibrary.counts.hidden}</span>
+        </button>
       {/if}
 
       <div class="rail-head">Capture</div>
@@ -749,7 +773,13 @@
                   {#if record.sourceType === 'hardwarePatch'}<span class="badge hw">HW</span>{/if}
                   {#if record.sourceType === 'userState'}<span class="badge mine">MINE</span>{/if}
                   {#if !record.available}<span class="badge miss">NEEDS</span>{/if}
+                  {#if record.hidden}<span class="badge folded">FOLDED</span>{/if}
                 </span>
+                {#if record.hidden}
+                  <button type="button" data-testid="unfold-record"
+                          title="Put this back in the browse"
+                          onclick={() => setLibraryRecordHidden(record.recordId, false)}>Unfold</button>
+                {/if}
                 {#if record.type === 'rack'}
                   <button type="button" disabled={!record.available}
                           onclick={() => loadLibraryRecord(record.recordId)}>Restore</button>
@@ -1267,6 +1297,9 @@
   .rail-item .n { margin-left: auto; color: #7d8894; font-size: 10px; }
   .rail-row { display: flex; align-items: center; gap: 2px; }
   .rail-row .rail-item { flex: 1; min-width: 0; }
+  .rail-pair { display: flex; align-items: center; gap: 2px; }
+  .rail-pair .rail-item { flex: 1; min-width: 0; }
+  button.rail-fold { padding: 3px 7px; font-size: 10.5px; }
   button.rail-action { width: 100%; text-align: left; font-size: 11px; padding: 4px 7px; }
   .path {
     flex: 1; min-width: 0; color: #7d8894; font-size: 10px;
@@ -1416,6 +1449,9 @@
   .badge.chain { color: #a98bd6; border-color: #a98bd666; }
   .badge.rack { color: #35c46f; border-color: #35c46f66; }
   .badge.miss { color: #e05656; border-color: #e0565666; }
+  /* Amber, the colour this view already uses for housekeeping — a folded row is tidied away,
+     not broken, and it must not read like the red one that says a plug-in is missing. */
+  .badge.folded { color: #d9a13c; border-color: #d9a13c66; }
   button.star { color: #566372; font-size: 13px; padding: 1px 3px; }
   button.star.on { color: #d9a13c; }
 

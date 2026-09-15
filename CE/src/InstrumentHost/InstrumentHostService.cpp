@@ -6637,6 +6637,76 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "mergeDuplicateSet")
+    {
+        ensureLibrary();
+        const auto keyRecordId = payload.getProperty ("keyRecordId", {}).toString();
+
+        // The set is re-derived here rather than trusted from the payload. The browser's copy is
+        // as old as its last answer, and by now a measurement or a rescan may have dissolved the
+        // set — folding on a stale list would hide sounds that are no longer duplicates of
+        // anything, and that is unrecoverable by anyone who does not know to look for hidden rows.
+        LibraryDuplicateSet set;
+        bool found = false;
+        for (const auto& candidate : libraryDuplicates (library))
+            if (candidate.keyRecordId == keyRecordId)
+            {
+                set = candidate;
+                found = true;
+                break;
+            }
+
+        if (! found)
+        {
+            emitError ("Those sounds are no longer a duplicate set.");
+            return;
+        }
+
+        // Only the same bytes. A near match is the measurement's opinion, and the measurement is
+        // a tolerance away from being wrong — two patches that merely sound alike are two patches,
+        // and folding them would be the program quietly deciding somebody's edit did not count.
+        if (! set.identical)
+        {
+            emitError ("Only sounds that are byte-for-byte identical can be folded.");
+            return;
+        }
+
+        library.setUserMetadata (set.keyRecordId, mergedDuplicateMetadata (library, set));
+
+        int folded = 0;
+        for (const auto& id : set.recordIds)
+            if (id != set.keyRecordId && library.setRecordHidden (id, true))
+                ++folded;
+
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("keyRecordId", set.keyRecordId);
+        answer->setProperty ("folded",      folded);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostDuplicatesMerged", juce::var (answer));
+        return;
+    }
+
+    if (cmd == "setLibraryRecordHidden")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Both directions on one command, because a fold nobody can undo is a delete with better
+        // manners. The browse query's `includeHidden` is how somebody finds the row again.
+        library.setRecordHidden (record->recordId, (bool) payload.getProperty ("hidden", true));
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+        return;
+    }
+
     if (cmd == "removeLibraryRecord")
     {
         ensureLibrary();
@@ -10229,6 +10299,9 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("category",     record->category);
         r->setProperty ("factory",      record->factory);
         r->setProperty ("missing",      record->missing);
+        // Only ever true when the query asked for hidden rows, so the page can mark the folded
+        // ones and offer to unfold them rather than showing them as ordinary sounds.
+        r->setProperty ("hidden",       record->hidden);
         r->setProperty ("available",    reason.isEmpty());
         r->setProperty ("reason",       reason);
         r->setProperty ("favourite",    record->user.favourite);
@@ -10356,6 +10429,13 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                        if (recordAddedWithin (r, 14, now))
                                                            ++n;
                                                    return n; }());
+    // Folded away. Counted separately from `total` — which stays the whole library, because
+    // that is what it has always meant — so the page can say how many rows the default browse
+    // is not showing. A fold nobody can count is a fold nobody can undo.
+    counts->setProperty ("hidden", [this] { int n = 0;
+                                            for (const auto& r : library.allRecords())
+                                                if (r.hidden) ++n;
+                                            return n; }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 

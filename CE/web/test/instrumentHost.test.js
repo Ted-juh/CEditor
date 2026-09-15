@@ -72,6 +72,9 @@ import {
   similarSounds,
   recordFamily,
   hostRecordFamily,
+  mergedDuplicateCuration,
+  mergeDuplicateSet,
+  setLibraryRecordHidden,
   rackSubstitutes,
   rememberSubstitute,
   mockSonicDistance,
@@ -596,17 +599,17 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 10);
+  assert.equal(get(hostLibrary).records.length, 11);
 
   requestLibrary('warm', '');
-  assert.equal(get(hostLibrary).records.length, 3,
-    'search narrows — to Warm Pad and the two sounds branched from it');
+  assert.equal(get(hostLibrary).records.length, 4,
+    'search narrows — to Warm Pad, its copy and the two sounds branched from it');
   requestLibrary('', 'rack');
   assert.equal(get(hostLibrary).records[0].type, 'rack', 'the type filter holds');
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 11, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 12, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -723,7 +726,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 10);
+  assert.equal(get(hostLibrary).counts.matched, 11);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -738,13 +741,13 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   const saved = get(hostLibrary).smartCollections;
   assert.equal(saved.length, 1);
   assert.equal(saved[0].name, 'Not mine');
-  assert.equal(saved[0].count, 6, 'a saved search reports its own count, run fresh');
+  assert.equal(saved[0].count, 7, 'a saved search reports its own count, run fresh');
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 10);
+  assert.equal(get(hostLibrary).records.length, 11);
   requestLibrary(saved[0].query);
-  assert.equal(get(hostLibrary).records.length, 6, 'and re-running it restores the view');
+  assert.equal(get(hostLibrary).records.length, 7, 'and re-running it restores the view');
 
   removeSmartCollection(saved[0].collectionId);
   assert.equal(get(hostLibrary).smartCollections.length, 0);
@@ -755,10 +758,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 8);
+  assert.equal(get(hostLibrary).records.length, 9);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 8,
+  assert.equal(get(hostLibrary).records.length, 9,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -857,6 +860,118 @@ test('a record answers with its whole line, root first', () => {
   // A sound nobody branched is a family of one, not an error.
   recordFamily('lib-4');
   assert.equal(get(hostRecordFamily).nodes.length, 1);
+
+  resetMockLibraryState();
+});
+
+// FOLDING A DUPLICATE. The rule that makes this worth having is that folding is not deleting:
+// the row stays, its curation is gathered onto the survivor first, and anyone can put it back.
+// The C++ tests pin the part the browser cannot see — that a rescan does not undo the fold —
+// because a rescan is what undid deleting.
+
+test('what folding a set would gather onto its survivor', () => {
+  const records = [
+    { recordId: 'a', name: 'Warm Pad', favourite: true, rating: 5, notes: 'Best pad I have',
+      tags: ['pad'], collections: ['Live set'] },
+    { recordId: 'b', name: 'Warm Pad (backup)', favourite: false, rating: 3,
+      notes: 'Came off the old drive', tags: ['warm', 'pad'], collections: ['Archive'] },
+  ];
+  const merged = mergedDuplicateCuration(records, { keyRecordId: 'a', recordIds: ['a', 'b'] });
+
+  assert.equal(merged.favourite, true, 'favourite if either member was');
+  assert.equal(merged.rating, 5, 'the higher rating, never the survivor\'s by default');
+  assert.deepEqual(merged.tags, ['pad', 'warm'], 'tags unioned, and a shared one not doubled');
+  assert.deepEqual(merged.collections, ['Live set', 'Archive']);
+  assert.equal(merged.notes, 'Best pad I have\nWarm Pad (backup): Came off the old drive',
+    'both notes kept, each labelled with the sound it came from');
+
+  // The survivor's own note is already on the record being looked at; labelling it with its own
+  // name would read as though it arrived from somewhere else.
+  assert.ok(!merged.notes.startsWith('Warm Pad:'));
+
+  // A member the library no longer has is skipped rather than crashing the fold.
+  const partial = mergedDuplicateCuration(records, { keyRecordId: 'a', recordIds: ['a', 'gone'] });
+  assert.equal(partial.rating, 5);
+  assert.equal(mergedDuplicateCuration(records, { keyRecordId: 'gone', recordIds: ['gone'] }), null,
+    'and a set whose survivor is gone is no set at all');
+});
+
+test('mock reducer: folding hides the copy, keeps its curation, and can be undone', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const before = get(hostLibrary);
+  assert.equal(before.duplicates.length, 1, 'the demo ships one duplicate set');
+  const set = before.duplicates[0];
+  assert.equal(set.identical, true, 'and it is the same bytes, not a resemblance');
+  assert.equal(set.keyRecordId, 'lib-1', 'the member carrying the curation is the one to keep');
+  assert.equal(before.counts.hidden, 0);
+
+  mergeDuplicateSet('lib-1');
+  const after = get(hostLibrary);
+
+  assert.equal(after.records.length, before.records.length - 1, 'the browse is one row shorter');
+  assert.equal(after.counts.total, before.counts.total,
+    'the library is not — nothing was deleted');
+  assert.equal(after.counts.hidden, 1, 'and the page is told how many rows it is not showing');
+  assert.equal(after.duplicates.length, 0, 'the set is no longer offered');
+
+  const survivor = after.records.find((r) => r.recordId === 'lib-1');
+  assert.ok(survivor.tags.includes('backup'),
+    'the folded copy\'s tag arrived on the survivor rather than going quiet with it');
+  assert.equal(survivor.rating, 5, 'and the survivor kept its own rating');
+
+  // The way back. A fold nobody can undo is a delete with better manners.
+  requestLibrary({ ...emptyLibraryQuery(), includeHidden: true });
+  const shown = get(hostLibrary);
+  assert.equal(shown.records.length, before.records.length, 'hidden rows can be asked for');
+  assert.equal(shown.records.find((r) => r.recordId === 'lib-11').hidden, true,
+    'and each says it is folded, so the page can offer to unfold it');
+
+  setLibraryRecordHidden('lib-11', false);
+  requestLibrary(emptyLibraryQuery());
+  assert.equal(get(hostLibrary).records.length, before.records.length, 'unfolding puts it back');
+  assert.equal(get(hostLibrary).counts.hidden, 0);
+  assert.equal(get(hostLibrary).duplicates.length, 1, 'and it is a set again');
+
+  resetMockLibraryState();
+});
+
+test('mock reducer: a stale duplicate set is refused rather than guessed at', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+  const before = get(hostLibrary).records.length;
+
+  hostLastError.set('');
+  mergeDuplicateSet('lib-11');   // a member, not the key of any current set
+  assert.ok(get(hostLastError).includes('no longer a duplicate set'),
+    'the page\'s copy of the sets is as old as its last answer, so the key is re-checked');
+  assert.equal(get(hostLibrary).records.length, before, 'and the refusal changed nothing');
+  assert.equal(get(hostLibrary).counts.hidden, 0);
+
+  hostLastError.set('');
+  resetMockLibraryState();
+});
+
+test('a folded record is out of every view that did not ask for it', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+  mergeDuplicateSet('lib-1');
+
+  // Not just the record list: the facet counts predict the click, so a chip that promises a
+  // folded row is a chip that lies.
+  const sources = get(hostLibrary).facets.sources.find((v) => v.value === 'vstpreset');
+  requestLibrary({ ...emptyLibraryQuery(), includeHidden: true });
+  const withHidden = get(hostLibrary).facets.sources.find((v) => v.value === 'vstpreset');
+  assert.equal(withHidden.count, sources.count + 1,
+    'the folded row is counted only in the view that asked for it');
+
+  // And it is a query field like any other, so "Clear" is offered when it is on.
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), includeHidden: true }), false);
+  assert.equal(libraryQueryIsEmpty(emptyLibraryQuery()), true);
 
   resetMockLibraryState();
 });

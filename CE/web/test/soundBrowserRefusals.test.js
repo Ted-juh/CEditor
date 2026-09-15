@@ -19,6 +19,7 @@ import SoundBrowser from '../src/CE_Application/sections/SoundBrowser.svelte';
 import {
   hostLibrary, hostState, mockHostState, requestLibrary, emptyLibraryQuery,
   normalizeHostLibrary, hostRecordFamily, normalizeRecordFamily,
+  mergeDuplicateSet, resetMockLibraryState,
 } from '../src/CE_Application/stores/instrumentHost.js';
 
 /** The panel reads its library from the store, so a test drives it by putting one there. */
@@ -177,4 +178,68 @@ test('a family too big to show says so rather than implying it ended', () => {
   assert.match(html, /data-testid="family-truncated"/,
     'a capped family must not read as a complete one');
   assert.match(html, /and more than fits here/);
+});
+
+// --- folding a duplicate -------------------------------------------------------------------
+//
+// The rail is where folding is offered and the tile is where it is undone, so both have to be
+// drawn. What is pinned here is the pair of things that would turn folding into deleting if they
+// went missing: the count of what is hidden, and the way back to it.
+
+/** One button as rendered, sliced by its test id — the same technique the rows above use, and
+    for the same reason: Svelte's scoped class hash changes whenever the stylesheet does. */
+const buttonFor = (html, testid) => {
+  const at = html.indexOf(`data-testid="${testid}"`);
+  if (at < 0) return null;
+  return html.slice(html.lastIndexOf('<button', at), html.indexOf('</button>', at));
+};
+
+test('a duplicate set is offered a fold, and says what folding does', () => {
+  const html = renderWith(null);
+
+  assert.ok(buttonFor(html, 'duplicate-set'), 'the set is listed');
+  const fold = buttonFor(html, 'fold-duplicates');
+  assert.ok(fold, 'and folding it is offered');
+  assert.ok(!/disabled/.test(fold), 'an identical set can be folded');
+  assert.match(fold, /Nothing is deleted/,
+    'the button says what it does, because a fold that reads as a delete will not be clicked');
+});
+
+test('a set that only sounds alike is offered nothing', () => {
+  // The native side refuses it as well; this is the button not offering it in the first place.
+  const html = renderWith({
+    records: [],
+    counts: { total: 2, hidden: 0 },
+    duplicates: [{ keyRecordId: 'a', name: 'Init', identical: false, recordIds: ['a', 'b'] }],
+  });
+
+  const fold = buttonFor(html, 'fold-duplicates');
+  assert.ok(fold, 'the row is still drawn');
+  assert.match(fold, /disabled/, 'but folding it is not on offer');
+  assert.match(fold, /only sound alike/);
+});
+
+test('folding leaves a counted way back', () => {
+  hostState.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  assert.equal(buttonFor(render(SoundBrowser, { props: {} }).body, 'folded-away'), null,
+    'with nothing folded there is nothing to offer');
+
+  mergeDuplicateSet('lib-1');
+  const html = render(SoundBrowser, { props: {} }).body;
+
+  const row = buttonFor(html, 'folded-away');
+  assert.ok(row, 'a fold leaves a row saying so — a fold nobody can count is one nobody can undo');
+  assert.match(row, />1</, 'and it carries the count');
+  assert.match(row, /never deleted/);
+
+  // Showing them marks each folded row and offers it back.
+  requestLibrary({ ...emptyLibraryQuery(), includeHidden: true });
+  const shown = render(SoundBrowser, { props: {} }).body;
+  assert.match(shown, /FOLDED/, 'a folded row is drawn as folded rather than as an ordinary sound');
+  assert.ok(buttonFor(shown, 'unfold-record'), 'and can be put back from where it is');
+
+  resetMockLibraryState();
 });

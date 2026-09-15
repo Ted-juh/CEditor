@@ -3421,6 +3421,258 @@ void testMovedLibraryRelinks()
     }
 }
 
+// FOLDING A DUPLICATE. Deleting the extra row does not work, and the probe said so plainly: two
+// vendor records, delete one, rescan, and there are two again — because the file is still on disk
+// and finding it is what a scan is for. So a fold hides rather than deletes, and the hiding has to
+// survive the very rescan that undid the deletion. That is the assertion this test exists for.
+//
+// The other half is that folding must never be the thing that loses somebody's work: the curation
+// of every member arrives on the survivor before the rest go quiet.
+
+void testDuplicateFold()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::libraryDuplicates;
+    using ceditor::host::mergedDuplicateMetadata;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nfolding a duplicate" << std::endl;
+
+    // One preset copied into a second folder: the same bytes at two paths, which is what anybody
+    // who has ever backed a preset folder up already has.
+    const auto twin = [] (const juce::String& path, const juce::String& name)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = name;
+        r.targetCeId = "VST3-good-synth";
+        r.fingerprint = "fp-same";
+        r.factory = true;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", { twin ("/presets/warm.vstpreset", "Warm Pad"),
+                                            twin ("/backup/warm.vstpreset", "Warm Pad copy") });
+    const auto aId = library.allRecords().getReference (0).recordId;
+    const auto bId = library.allRecords().getReference (1).recordId;
+
+    {
+        auto* a = library.find (aId);
+        a->user.favourite = true;
+        a->user.rating = 5;
+        a->user.notes = "Best pad I have";
+        a->user.tags = { "pad" };
+        a->user.collections = { "Live set" };
+
+        auto* b = library.find (bId);
+        b->user.rating = 3;
+        b->user.notes = "Came off the old drive";
+        b->user.tags = { "warm", "pad" };
+        b->user.collections = { "Archive" };
+    }
+
+    const auto sets = libraryDuplicates (library);
+    check (sets.size() == 1 && sets.getReference (0).identical,
+           "the same bytes at two paths are one duplicate set, matched on fingerprint");
+    check (sets.getReference (0).keyRecordId == aId,
+           "and the member carrying the most curation is the one to keep");
+
+    // -- what folding would do, worked out before anything is folded ----------------------
+    const auto merged = mergedDuplicateMetadata (library, sets.getReference (0));
+    check (merged.favourite && merged.rating == 5,
+           "the survivor takes the higher rating, and is a favourite if either member was");
+    check (merged.tags.size() == 2 && merged.tags.contains ("pad") && merged.tags.contains ("warm"),
+           "tags are unioned rather than replaced, and a tag both carried is not doubled");
+    check (merged.collections.size() == 2 && merged.collections.contains ("Live set")
+             && merged.collections.contains ("Archive"),
+           "so are collections");
+    check (merged.notes == "Best pad I have\nWarm Pad copy: Came off the old drive",
+           "and both notes survive, each labelled with the sound it came from");
+    // The survivor's own note is not prefixed: it is already on the record being looked at, and
+    // labelling it with its own name reads as though it arrived from somewhere else.
+    check (! merged.notes.startsWith ("Warm Pad:"), "except the survivor's own, which is already home");
+
+    // -- and then the fold itself ---------------------------------------------------------
+    library.setUserMetadata (aId, merged);
+    library.setRecordHidden (bId, true);
+
+    check (library.allRecords().size() == 2,
+           "nothing is deleted — the folded record is still there, id and all");
+    check (searchLibrary (library, LibraryQuery{}).size() == 1, "but a browse no longer shows it");
+
+    LibraryQuery withHidden;
+    withHidden.includeHidden = true;
+    check (searchLibrary (library, withHidden).size() == 2,
+           "and asking for hidden rows brings it back, which is what makes this undoable");
+
+    check (libraryDuplicates (library).isEmpty(),
+           "the set stops being offered, because it has been dealt with");
+
+    // -- the load-bearing part -------------------------------------------------------------
+    // Both files are still on disk, so the next scan finds both. This is the exact sequence that
+    // undid deleting the row; if it undoes hiding as well then the feature is a lie.
+    library.mergeVendorScan ("vstpreset", { twin ("/presets/warm.vstpreset", "Warm Pad"),
+                                            twin ("/backup/warm.vstpreset", "Warm Pad copy") });
+    check (library.allRecords().size() == 2, "a rescan finds both files, as it always did");
+    check (library.find (bId) != nullptr && library.find (bId)->hidden,
+           "and the fold survives it — which deleting the row never did");
+    check (library.find (aId) != nullptr && library.find (aId)->user.rating == 5
+             && library.find (aId)->user.tags.contains ("warm"),
+           "with the merged curation still on the survivor");
+
+    // Written down and read back, because a fold that lives only in memory lasts until the
+    // program closes.
+    const auto reloaded = Library::fromVar (library.toVar());
+    check (reloaded.find (bId) != nullptr && reloaded.find (bId)->hidden,
+           "hidden is serialised, so the fold outlives the session");
+
+    // Undoing it is the same switch the other way, and the offer comes back with the row.
+    library.setRecordHidden (bId, false);
+    check (searchLibrary (library, LibraryQuery{}).size() == 2
+             && libraryDuplicates (library).size() == 1,
+           "unfolding restores the row, and the set is a set again");
+}
+
+// The same rule over the bridge: what the browser may ask for, and the two things it may not.
+
+void testDuplicateFoldCommands()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::libraryDuplicates;
+
+    std::cout << "\nfolding a duplicate, over the bridge" << std::endl;
+
+    const auto dir = freshDataDir ("duplicate-fold");
+    seedCatalog (dir);
+
+    const auto vendorPreset = [] (const juce::String& path, const juce::String& name,
+                                  const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = name;
+        r.targetCeId = "VST3-good-synth";
+        r.fingerprint = fingerprint;
+        r.factory = true;
+        return r;
+    };
+
+    juce::String keyId, foldedId;
+    {
+        Library seeded;
+        seeded.mergeVendorScan ("vstpreset",
+                                { vendorPreset ("/presets/warm.vstpreset", "Warm Pad", "fp-same"),
+                                  vendorPreset ("/backup/warm.vstpreset", "Warm Pad copy", "fp-same"),
+                                  vendorPreset ("/presets/lead.vstpreset", "Bright Lead", "fp-lead") });
+        keyId = seeded.allRecords().getReference (0).recordId;
+        foldedId = seeded.allRecords().getReference (1).recordId;
+        seeded.find (keyId)->user.rating = 4;
+        seeded.find (foldedId)->user.tags = { "warm" };
+        seeded.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    Harness h (dir);
+    const auto library = [&h] { return h.emits.last ("instrumentHostLibrary"); };
+    const auto counts = [&library] (const juce::String& name)
+    {
+        return (int) library()->getProperty ("counts", {}).getProperty (name, -1);
+    };
+    const auto rowFor = [&library] (const juce::String& recordId)
+    {
+        juce::var found;
+        for (const auto& r : *library()->getProperty ("records", {}).getArray())
+            if (r.getProperty ("recordId", {}).toString() == recordId)
+                found = r;
+        return found;
+    };
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("duplicates", {}).size() == 1, "the browser is offered the one set");
+    check (counts ("hidden") == 0, "and nothing is folded yet");
+
+    // The browser's copy of the sets is as old as its last answer, so a key that is not the key of
+    // any set the library currently has is refused rather than guessed at. Folding a stale list
+    // would hide sounds that are no longer duplicates of anything.
+    h.emits.clear();
+    h.cmd ("mergeDuplicateSet", { { "keyRecordId", foldedId } });
+    check (h.emits.lastError().contains ("no longer a duplicate set"),
+           "folding a set the library does not currently have is refused");
+    check (h.emits.last ("instrumentHostDuplicatesMerged") == nullptr, "and nothing is folded");
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (counts ("hidden") == 0, "the refusal changed nothing");
+
+    h.emits.clear();
+    h.cmd ("mergeDuplicateSet", { { "keyRecordId", keyId } });
+    const auto* done = h.emits.last ("instrumentHostDuplicatesMerged");
+    check (done != nullptr && (int) done->getProperty ("folded", 0) == 1,
+           "folding the set says how many rows went quiet");
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("records", {}).size() == 2, "the browse is one row shorter");
+    check (counts ("total") == 3 && counts ("hidden") == 1,
+           "the library is not — the row is hidden, and counted, so it can be found again");
+    check (library()->getProperty ("duplicates", {}).size() == 0, "and the set is no longer offered");
+    check (rowFor (keyId).getProperty ("tags", {}).size() == 1
+             && rowFor (keyId).getProperty ("tags", {})[0].toString() == "warm",
+           "the folded member's tag arrived on the survivor rather than going quiet with it");
+
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "includeHidden", true } });
+    check (library()->getProperty ("records", {}).size() == 3, "hidden rows can be asked for");
+    check ((bool) rowFor (foldedId).getProperty ("hidden", false),
+           "and each says that it is folded, so the page can offer to unfold it");
+
+    h.emits.clear();
+    h.cmd ("setLibraryRecordHidden", { { "recordId", foldedId }, { "hidden", false } });
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("records", {}).size() == 3 && counts ("hidden") == 0,
+           "unfolding puts it back in the browse");
+    check (library()->getProperty ("duplicates", {}).size() == 1,
+           "and the set is offered again, because it is a set again");
+
+    // A measured resemblance is not the same bytes, and the difference between them is somebody's
+    // edit. Folding on measurement would be the program deciding that edit did not count.
+    juce::String nearId;
+    {
+        Library nearby;
+        nearby.mergeVendorScan ("vstpreset", { vendorPreset ("/a.vstpreset", "Init", "fp-a"),
+                                               vendorPreset ("/b.vstpreset", "Init", "fp-b") });
+        for (int i = 0; i < 2; ++i)
+        {
+            auto* record = nearby.find (nearby.allRecords().getReference (i).recordId);
+            record->sonic.measured = true;
+            record->sonic.brightness = 0.5f;
+        }
+        const auto near = libraryDuplicates (nearby);
+        check (near.size() == 1 && ! near.getReference (0).identical,
+               "two presets of one plug-in that measure alike are a set, but not an identical one");
+        nearId = near.getReference (0).keyRecordId;
+        nearby.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    Harness h2 (dir);
+    h2.emits.clear();
+    h2.cmd ("mergeDuplicateSet", { { "keyRecordId", nearId } });
+    check (h2.emits.lastError().contains ("byte-for-byte"),
+           "and a set that is only a resemblance cannot be folded at all");
+    h2.emits.clear();
+    h2.cmd ("getLibrary");
+    check ((int) h2.emits.last ("instrumentHostLibrary")->getProperty ("counts", {})
+                   .getProperty ("hidden", -1) == 0,
+           "nothing was hidden on the way to refusing");
+}
+
 void testRecordFamily()
 {
     using ceditor::host::Library;
@@ -11011,6 +11263,8 @@ int main (int argc, char* argv[])
     testRecordRecency();
     testRecordFamily();
     testMovedLibraryRelinks();
+    testDuplicateFold();
+    testDuplicateFoldCommands();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

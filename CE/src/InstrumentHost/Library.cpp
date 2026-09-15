@@ -125,6 +125,9 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             // somebody pointed the scanner at it again, which is the opposite of what an
             // arrival time is for.
             const auto keepAddedAtMs = record.addedAtMs;
+            // Folded stays folded. Without this the next scan un-hides every duplicate somebody
+            // tidied away, which is exactly how deleting them failed.
+            const auto keepHidden = record.hidden;
             const auto keepUser = record.user;
             const auto keepSonic = record.sonic;
             const auto keepSonicFingerprint = record.sonicFingerprint;
@@ -135,6 +138,7 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             record = incoming;
             record.recordId = keepId;
             record.addedAtMs = keepAddedAtMs;
+            record.hidden = keepHidden;
             record.user = keepUser;
             record.sonic = keepSonic;
             record.sonicFingerprint = keepSonicFingerprint;
@@ -204,6 +208,16 @@ bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord
     return false;
 }
 
+bool Library::setRecordHidden (const juce::String& recordId, bool hidden)
+{
+    if (auto* record = find (recordId))
+    {
+        record->hidden = hidden;
+        return true;
+    }
+    return false;
+}
+
 juce::var Library::toVar() const
 {
     juce::Array<juce::var> recordVars;
@@ -224,6 +238,8 @@ juce::var Library::toVar() const
         r->setProperty ("recordId",        record.recordId);
         if (record.addedAtMs > 0)
             r->setProperty ("addedAtMs",   (double) record.addedAtMs);
+        if (record.hidden)
+            r->setProperty ("hidden",      true);
         r->setProperty ("type",            record.type);
         r->setProperty ("sourceType",      record.sourceType);
         r->setProperty ("sourceLocator",   record.sourceLocator);
@@ -359,6 +375,7 @@ Library Library::fromVar (const juce::var& stored)
         // Absent on every record written before the field existed, and zero is right for them:
         // a library that has always been there is not new.
         record.addedAtMs = (juce::int64) (double) r.getProperty ("addedAtMs", 0.0);
+        record.hidden = (bool) r.getProperty ("hidden", false);
         if (record.recordId.isEmpty())
             continue;   // damaged row; keep loading the rest
 
@@ -648,6 +665,44 @@ bool LibraryFacetSelection::admits (const juce::StringArray& values) const
     return false;
 }
 
+LibraryRecord::UserMetadata mergedDuplicateMetadata (const Library& library,
+                                                     const LibraryDuplicateSet& set)
+{
+    LibraryRecord::UserMetadata merged;
+    const auto* key = library.find (set.keyRecordId);
+    if (key != nullptr)
+        merged = key->user;
+
+    juce::StringArray noteParts;
+    if (key != nullptr && key->user.notes.isNotEmpty())
+        noteParts.add (key->user.notes);
+
+    for (const auto& id : set.recordIds)
+    {
+        if (id == set.keyRecordId)
+            continue;
+        const auto* other = library.find (id);
+        if (other == nullptr)
+            continue;
+
+        merged.favourite = merged.favourite || other->user.favourite;
+        merged.rating = juce::jmax (merged.rating, other->user.rating);
+
+        for (const auto& tag : other->user.tags)
+            merged.tags.addIfNotAlreadyThere (tag);
+        for (const auto& collection : other->user.collections)
+            merged.collections.addIfNotAlreadyThere (collection);
+
+        // A note is a sentence somebody wrote. Merging them without saying which sound each came
+        // from turns two useful notes into one confusing one, so the source is named.
+        if (other->user.notes.isNotEmpty())
+            noteParts.add (other->name + ": " + other->user.notes);
+    }
+
+    merged.notes = noteParts.joinIntoString ("\n");
+    return merged;
+}
+
 RecordFamily recordFamily (const Library& library, const juce::String& recordId,
                            int maxNodes, int maxDepth)
 {
@@ -788,6 +843,9 @@ bool matchesText (const LibraryRecord& record, const juce::String& lowered)
 bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
                    const juce::String& lowered, const LibraryAvailability& isAvailable)
 {
+    if (record.hidden && ! query.includeHidden)
+        return false;
+
     if (query.type.isNotEmpty() && record.type != query.type)
         return false;
 
@@ -997,6 +1055,7 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("favouritesOnly", query.favouritesOnly);
     o->setProperty ("minRating",      query.minRating);
     o->setProperty ("addedWithinDays", query.addedWithinDays);
+    o->setProperty ("includeHidden",  query.includeHidden);
     o->setProperty ("availableOnly",  query.availableOnly);
     o->setProperty ("measuredOnly",   query.measuredOnly);
     o->setProperty ("facets",         juce::var (facets));
@@ -1033,6 +1092,7 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     // Capped at a year: beyond that "recently" has stopped meaning anything and the filter is
     // just a slower way of showing everything.
     query.addedWithinDays = juce::jlimit (0, 365, (int) stored.getProperty ("addedWithinDays", 0));
+    query.includeHidden = (bool) stored.getProperty ("includeHidden", false);
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
     query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
 
@@ -1078,7 +1138,10 @@ juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library, floa
     for (int i = 0; i < records.size(); ++i)
     {
         const auto& a = records.getReference (i);
-        if (claimed.contains (a.recordId))
+        // A folded member is not a duplicate any more — it is the fold. Counting it would leave
+        // the set on screen after somebody tidied it, which is the one outcome that would make
+        // folding feel broken.
+        if (a.hidden || claimed.contains (a.recordId))
             continue;
 
         LibraryDuplicateSet set;
@@ -1088,7 +1151,7 @@ juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library, floa
         for (int j = i + 1; j < records.size(); ++j)
         {
             const auto& b = records.getReference (j);
-            if (claimed.contains (b.recordId))
+            if (b.hidden || claimed.contains (b.recordId))
                 continue;
 
             const auto sameBytes = a.fingerprint.isNotEmpty() && a.fingerprint == b.fingerprint;
