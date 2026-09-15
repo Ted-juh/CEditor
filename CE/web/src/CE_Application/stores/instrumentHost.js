@@ -1751,6 +1751,53 @@ export function applyGrooveToPattern(pattern, template, amount = 1, applyVelocit
   return target;
 }
 
+/** Read a feel back out of a lane — the mirror of `applyGrooveToPattern`, and of
+    `grooveFromLane` in CE/src/Performance/PatternModel.cpp, which is the authority. The rules
+    that matter are the same ones the C++ header states:
+
+      - the template takes the LANE'S own stepsPerBeat, which is what makes timing exact on the
+        way back in (the laneRate/grooveRate scale becomes 1);
+      - velocity is a MULTIPLIER over the mean of the active steps and therefore does not round
+        trip, because applying multiplies rather than sets;
+      - fewer than two active steps yields no multipliers, which means "keep dynamics";
+      - 64 offsets is the cap the service stores, so stop there rather than be truncated later.
+
+    Returns empty timingOffsets when there is nothing to read, so the caller refuses. */
+export function grooveFromPatternLane(pattern, laneId = '', name = '') {
+  const lanes = pattern?.lanes ?? [];
+  const source = laneId
+    ? lanes.find((lane) => lane.laneId === laneId)
+    : lanes.find((lane) => ['note', 'chord', 'drum'].includes(lane.type));
+
+  const groove = {
+    grooveId: '',
+    name: String(name ?? '').trim().slice(0, 80)
+      || `${String(pattern?.name ?? 'Pattern')} feel`.slice(0, 80),
+    source: 'imported',
+    stepsPerBeat: Math.max(1, Math.min(16, Number(source?.stepsPerBeat) || 4)),
+    timingOffsets: [],
+    velocityMultipliers: [],
+  };
+
+  const steps = (source?.steps ?? []).slice(0, 64);
+  if (!steps.length) return groove;
+
+  groove.timingOffsets = steps.map((step) =>
+    Math.max(-.5, Math.min(.5, Number(step.microtiming) || 0)));
+
+  const active = steps.filter((step) => step.active);
+  if (active.length < 2) return groove;
+  const mean = active.reduce((sum, step) => sum + (Number(step.velocity) || 0), 0) / active.length;
+  if (!(mean > 0)) return groove;
+
+  // An inactive step keeps 1.0: it has no velocity of its own, and a zero would silence
+  // whatever step it later lands on.
+  groove.velocityMultipliers = steps.map((step) =>
+    Math.max(.25, Math.min(2, step.active ? (Number(step.velocity) || 0) / mean : 1)));
+
+  return groove;
+}
+
 const normalizeFollowAction = (clip) => {
   const action = String(clip?.followAction ?? '');
   if (['none', 'clip', 'next', 'random', 'stop'].includes(action)) return action;
@@ -5139,6 +5186,15 @@ export function applyMockCommand(state, payload) {
     if (imported.timingOffsets.length >= 2) perf.grooves.push(imported);
     return next;
   }
+  if (cmd === 'extractGrooveTemplate') {
+    if (perf.grooves.length >= 32) return next;
+    const target = pattern(payload.patternId);
+    if (!target) return next;
+    const read = grooveFromPatternLane(target, payload.laneId, payload.name);
+    if (read.timingOffsets.length < 2) return next;
+    perf.grooves.push(normalizeGrooveTemplate({ ...read, grooveId: nextMockId('mock-groove') }));
+    return next;
+  }
   if (cmd === 'removeGrooveTemplate') {
     perf.grooves = perf.grooves.filter((groove) =>
       groove.grooveId !== payload.grooveId || groove.source === 'factory');
@@ -7526,6 +7582,8 @@ export const createPatternVariations = (patternId, amount = 0.55) =>
   send({ cmd: 'createPatternVariations', patternId, amount });
 export const importGrooveTemplate = (fields) => send({ cmd: 'importGrooveTemplate', ...fields });
 export const removeGrooveTemplate = (grooveId) => send({ cmd: 'removeGrooveTemplate', grooveId });
+export const extractGrooveTemplate = (patternId, laneId = '', name = '') =>
+  send({ cmd: 'extractGrooveTemplate', patternId, ...(laneId ? { laneId } : {}), ...(name ? { name } : {}) });
 export const applyGrooveTemplate = (patternId, grooveId, amount = 1, applyVelocity = true) =>
   send({ cmd: 'applyGrooveTemplate', patternId, grooveId, amount, applyVelocity });
 export const addLane = (patternId, fields = {}) => send({ cmd: 'addLane', patternId, ...fields });

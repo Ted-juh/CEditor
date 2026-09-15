@@ -1724,6 +1724,115 @@ void testScalesAndSerialization()
              && std::abs (grooved.appliedGrooveAmount - 0.5f) < 1.0e-6f,
            "a groove commits scaled timing and accents into editable pattern steps");
 
+    // -- reading a feel back out ----------------------------------------------------------
+    //
+    // The property that makes extraction trustworthy: a groove read from a lane at that lane's
+    // own rate scales by laneRate/grooveRate == 1 on the way back in, so the timing that comes
+    // out is the timing that went in. Everything else here is a guard on the edges.
+    {
+        auto worn = Pattern::create ("Worn");
+        auto wornLane = makeNoteLane ("worn-lane", "p1", 16, 4, 4, 60);
+        for (auto& step : wornLane.steps)
+            step.active = true;
+        worn.lanes.add (wornLane);
+        applyGrooveTemplate (worn, factoryGrooves[0], 1.0f, false);
+
+        const auto stolen = grooveFromLane (worn, {}, "Stolen");
+        check (stolen.timingOffsets.size() == 16 && stolen.stepsPerBeat == 4,
+               "a feel reads back as one offset per step, at the lane's own rate");
+
+        bool timingMatches = stolen.timingOffsets.size() == factoryGrooves[0].timingOffsets.size();
+        for (int i = 0; timingMatches && i < stolen.timingOffsets.size(); ++i)
+            timingMatches = std::abs (stolen.timingOffsets[i]
+                                        - factoryGrooves[0].timingOffsets[i]) < 1.0e-6f;
+        check (timingMatches, "and it is the same timing that was applied — the round trip is exact");
+
+        // Applying what came out reproduces the steps it came from, which is the whole claim.
+        auto again = Pattern::create ("Again");
+        auto againLane = makeNoteLane ("again-lane", "p1", 16, 4, 4, 60);
+        for (auto& step : againLane.steps)
+            step.active = true;
+        again.lanes.add (againLane);
+        applyGrooveTemplate (again, stolen, 1.0f, false);
+        bool sameSteps = true;
+        for (int i = 0; sameSteps && i < 16; ++i)
+            sameSteps = std::abs (again.lanes[0].steps[i].microtiming
+                                    - worn.lanes[0].steps[i].microtiming) < 1.0e-6f;
+        check (sameSteps, "so wearing the stolen feel lands every step where the original sat");
+
+        check (stolen.grooveId.isEmpty(), "the id is the caller's to mint, not the reader's");
+        check (stolen.source == "imported", "and a read groove is never marked factory");
+    }
+
+    // Velocity is a MULTIPLIER, so it is read relative to the mean of the active steps and does
+    // NOT round trip — applyGrooveTemplate multiplies, so feeding it back would square each
+    // velocity about that mean. Asserted rather than left to be discovered.
+    {
+        auto dynamics = Pattern::create ("Dynamics");
+        Lane lane;
+        lane.laneId = "dyn";
+        lane.type = LaneType::note;
+        lane.stepCount = 4;
+        lane.stepsPerBeat = 4;
+        lane.resizeSteps();
+        const int velocities[] { 50, 150, 100, 100 };   // mean of the active pair is 100
+        for (int i = 0; i < 4; ++i)
+        {
+            auto& step = lane.steps.getReference (i);
+            step.active = i < 2;
+            step.velocity = velocities[i];
+        }
+        dynamics.lanes.add (lane);
+
+        const auto read = grooveFromLane (dynamics);
+        check (read.velocityMultipliers.size() == 4
+                 && std::abs (read.velocityMultipliers[0] - 0.5f) < 1.0e-6f
+                 && std::abs (read.velocityMultipliers[1] - 1.5f) < 1.0e-6f,
+               "velocity reads as each active step over the mean of the active steps");
+        check (std::abs (read.velocityMultipliers[2] - 1.0f) < 1.0e-6f,
+               "and a step that never sounds keeps 1.0 rather than silencing what lands on it");
+    }
+
+    {
+        auto quiet = Pattern::create ("Quiet");
+        auto oneHit = makeNoteLane ("one", "p1", 8, 4, 8, 60);   // a single active step
+        quiet.lanes.add (oneHit);
+        const auto read = grooveFromLane (quiet);
+        check (read.timingOffsets.size() == 8 && read.velocityMultipliers.isEmpty(),
+               "one active step has no dynamics to describe, so no multipliers are invented");
+    }
+
+    {
+        // A cc lane has microtiming and nobody means it when they say groove, so an unnamed
+        // read skips it and takes the notes.
+        auto mixed = Pattern::create ("Mixed");
+        Lane cc;
+        cc.laneId = "cc";
+        cc.type = LaneType::cc;
+        cc.stepCount = 4;
+        cc.stepsPerBeat = 2;
+        cc.resizeSteps();
+        mixed.lanes.add (cc);
+        mixed.lanes.add (makeNoteLane ("notes-after", "p1", 16, 4, 4, 60));
+        check (grooveFromLane (mixed).stepsPerBeat == 4,
+               "an unnamed read takes the first note lane, not a cc lane that happens to be first");
+        check (grooveFromLane (mixed, "cc").stepsPerBeat == 2,
+               "but a named lane is taken as asked, cc or not");
+
+        check (grooveFromLane (Pattern::create ("Bare")).timingOffsets.isEmpty(),
+               "a pattern with no lanes reads as nothing, for the caller to refuse");
+        check (grooveFromLane (mixed, "no-such-lane").timingOffsets.isEmpty(),
+               "and so does a lane id that is not there");
+    }
+
+    {
+        // The service stores at most 64 offsets; reading more would be silently truncated.
+        auto longPattern = Pattern::create ("Long");
+        longPattern.lanes.add (makeNoteLane ("long", "p1", 96, 4, 4, 60));
+        check (grooveFromLane (longPattern).timingOffsets.size() == 64,
+               "a lane longer than the stored cap stops at the cap rather than being truncated later");
+    }
+
     Pattern source = Pattern::create ("Pulse");
     source.seed = 12345;
     source.variationGroupId = "variation-group";

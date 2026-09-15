@@ -15,7 +15,7 @@
   import {
     hostState, hostParameters, hostLibrary, requestParameters, requestLibrary,
     addPattern, removePattern, renamePattern, setPatternOptions, createPatternVariations,
-    importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate,
+    importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate, extractGrooveTemplate,
     addLane, removeLane, setLaneOptions, clearLane, euclidFill,
     setStep, toggleStep, setStepParameterLock, setStepCcLock,
     removeStepLock, clearStepLocks,
@@ -1013,6 +1013,14 @@
                                                        selectedGroove.grooveId,
                                                        Number(grooveAmount), grooveVelocity)}>
               Apply
+            </button>
+            <button type="button" data-testid="steal-groove"
+                    disabled={!selectedPattern || grooves.length >= 32}
+                    title={grooves.length >= 32
+                      ? 'Remove a groove before keeping another one'
+                      : "Read this pattern's own feel into a groove you can wear on other patterns. Timing comes back exactly; velocity is kept as a multiplier, so it shapes another pattern's dynamics rather than reproducing these."}
+                    onclick={() => extractGrooveTemplate(selectedPattern.patternId)}>
+              Steal this feel
             </button>
             <label class="groove-picker">
               <span>Import JSON…</span>

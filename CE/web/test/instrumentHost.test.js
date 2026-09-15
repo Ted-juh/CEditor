@@ -2877,6 +2877,43 @@ test('mock reducer: patterns, lanes and steps', () => {
   state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, swing: 0.5 });
   assert.equal(state.performance.patterns[1].seed, 7, 'setting swing leaves the seed alone');
 
+  // Reading a feel back out. The property that matters is the one the C++ header states and
+  // PerformanceEngineTests pins: applying a groove and then reading it returns the same timing,
+  // because the template takes the lane's own rate and the scale on the way back in is 1.
+  const feelLane = state.performance.patterns[1].lanes[0];
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId, laneId: feelLane.laneId, stepCount: 16 });
+  for (let i = 0; i < 16; i += 1)
+    state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId: feelLane.laneId, index: i,
+                                      active: true, velocity: 100 });
+  const factory = state.performance.grooves.find((g) => g.source === 'factory');
+  state = applyMockCommand(state, { cmd: 'applyGrooveTemplate', patternId,
+                                    grooveId: factory.grooveId, amount: 1, applyVelocity: false });
+
+  const before = state.performance.grooves.length;
+  state = applyMockCommand(state, { cmd: 'extractGrooveTemplate', patternId, name: 'Stolen' });
+  assert.equal(state.performance.grooves.length, before + 1, 'a stolen feel is kept as a groove');
+
+  const stolen = state.performance.grooves[state.performance.grooves.length - 1];
+  assert.equal(stolen.source, 'imported', 'and is never marked factory');
+  assert.equal(stolen.stepsPerBeat, factory.stepsPerBeat, "at the lane's own rate");
+  assert.deepEqual(stolen.timingOffsets.map((v) => Math.round(v * 1e6) / 1e6),
+                   factory.timingOffsets.map((v) => Math.round(v * 1e6) / 1e6),
+                   'and carries back exactly the timing that was applied');
+
+  // A pattern with nothing worth reading is refused rather than stored empty.
+  state = applyMockCommand(state, { cmd: 'addPattern', name: 'Bare' });
+  const bareId = state.performance.patterns[state.performance.patterns.length - 1].patternId;
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId: bareId,
+                                    laneId: state.performance.patterns.at(-1).lanes[0].laneId, stepCount: 1 });
+  const kept = state.performance.grooves.length;
+  state = applyMockCommand(state, { cmd: 'extractGrooveTemplate', patternId: bareId });
+  assert.equal(state.performance.grooves.length, kept,
+    'one step is not a feel, so nothing is stored');
+
+  // Put the fixture back as it was found: the assertion below counts what is left, and a
+  // scratch pattern from this block is not something the tests after it should have to know.
+  state = applyMockCommand(state, { cmd: 'removePattern', patternId: bareId });
+
   state = applyMockCommand(state, { cmd: 'removePattern', patternId });
   assert.equal(state.performance.patterns.length, 1);
 });

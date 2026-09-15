@@ -350,6 +350,75 @@ juce::Array<GrooveTemplate> GrooveTemplate::factoryTemplates()
     };
 }
 
+GrooveTemplate grooveFromLane (const Pattern& pattern,
+                               const juce::String& laneId,
+                               const juce::String& name)
+{
+    GrooveTemplate groove;
+    groove.source = "imported";
+    groove.name = name.trim().isNotEmpty() ? name.trim().substring (0, 80)
+                                           : (pattern.name + " feel").substring (0, 80);
+
+    const Lane* source = nullptr;
+    for (const auto& lane : pattern.lanes)
+    {
+        if (laneId.isNotEmpty())
+        {
+            if (lane.laneId == laneId)
+                source = &lane;
+        }
+        else if (lane.type == LaneType::note || lane.type == LaneType::chord
+                   || lane.type == LaneType::drum)
+        {
+            source = &lane;
+        }
+
+        if (source != nullptr)
+            break;
+    }
+
+    if (source == nullptr || source->steps.isEmpty())
+        return groove;   // empty timingOffsets: nothing to read, and the caller can say so
+
+    groove.stepsPerBeat = juce::jlimit (1, 16, source->stepsPerBeat);
+
+    // The service caps a stored groove at 64 offsets, so stop there rather than build something
+    // that would be silently truncated on the way in.
+    const auto count = juce::jmin (64, source->steps.size());
+    for (int i = 0; i < count; ++i)
+        groove.timingOffsets.add (juce::jlimit (-0.5f, 0.5f, source->steps[i].microtiming));
+
+    // Velocity is only meaningful where notes actually sound, and only relative to something.
+    // One active step has no dynamics to describe — its own velocity IS the mean — so two is
+    // the floor.
+    int activeCount = 0;
+    double velocitySum = 0.0;
+    for (int i = 0; i < count; ++i)
+        if (source->steps[i].active)
+        {
+            ++activeCount;
+            velocitySum += (double) source->steps[i].velocity;
+        }
+
+    if (activeCount < 2)
+        return groove;
+
+    const auto mean = velocitySum / (double) activeCount;
+    if (mean <= 0.0)
+        return groove;
+
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& step = source->steps[i];
+        // An inactive step keeps 1.0: it has no velocity of its own, and a zero here would
+        // silence whatever step it later lands on.
+        const auto multiplier = step.active ? (double) step.velocity / mean : 1.0;
+        groove.velocityMultipliers.add (juce::jlimit (0.25f, 2.0f, (float) multiplier));
+    }
+
+    return groove;
+}
+
 void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
                           float amount, bool applyVelocity)
 {

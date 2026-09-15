@@ -1998,6 +1998,24 @@ file, rather than choosing from the factory set.
 The journal already holds sample positions; the target type already exists and is already applied
 and serialised. This is a measurement and a constructor.
 
+> **Built for patterns, 2026-09-15.** `grooveFromLane` in `CE/src/Performance/PatternModel.cpp`
+> reads a feel out of a lane, `extractGrooveTemplate` keeps it in `performance.grooves` under the
+> same caps an imported groove gets, and a "Steal this feel" button sits beside Apply and Import.
+> The property that makes it trustworthy is pinned by a test: reading at the lane's own
+> `stepsPerBeat` makes the scale on the way back in exactly 1, so applying a groove and reading it
+> returns the same timing, and wearing the result lands every step where the original sat.
+>
+> **Velocity is not symmetric and cannot be.** `applyGrooveTemplate` *multiplies*, so multipliers
+> read as each active step over the mean of the active steps would square the velocities if fed
+> straight back. That is correct for what a groove is for — wearing one pattern's feel on a
+> different pattern — and it is asserted in the tests and stated in the header rather than left to
+> be discovered. Fewer than two active steps yields no multipliers at all, which the struct already
+> defines as "keep dynamics".
+>
+> **Still not built: extraction from captured MIDI.** A clip references a pattern, so clips are
+> covered; free-timed input needs tempo, a grid and quantisation inference, which is a different
+> and much larger problem than reading numbers out of steps that already sit on a grid.
+
 **Cost:** low.
 
 ## Seeds should be something you can hold

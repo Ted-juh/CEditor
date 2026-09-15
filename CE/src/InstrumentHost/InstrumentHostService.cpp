@@ -3830,6 +3830,44 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     // -- Stage 6: patterns, lanes and steps -------------------------------------------------
 
+    if (cmd == "extractGrooveTemplate")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (performance.grooves.size() >= 32)
+        {
+            emitError ("Remove a groove before keeping another one.");
+            return;
+        }
+
+        const auto* pattern = performance.findPattern (
+            payload.getProperty ("patternId", {}).toString());
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        auto groove = perf::grooveFromLane (*pattern,
+                                            payload.getProperty ("laneId", {}).toString(),
+                                            payload.getProperty ("name", {}).toString());
+        // Same floor as an imported groove: two offsets is the least that can describe a feel,
+        // and grooveFromLane answers with none when there was nothing to read.
+        if (groove.timingOffsets.size() < 2)
+        {
+            emitError ("That lane has no feel to read — it needs at least two steps.");
+            return;
+        }
+
+        groove.grooveId = juce::Uuid().toDashedString();
+        performance.grooves.add (std::move (groove));
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "importGrooveTemplate" || cmd == "removeGrooveTemplate"
         || cmd == "applyGrooveTemplate")
     {

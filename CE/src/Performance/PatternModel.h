@@ -141,6 +141,30 @@ Pattern makePatternVariation (const Pattern& source, char label, float amount = 
 void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
                           float amount = 1.0f, bool applyVelocity = true);
 
+/** The other direction: read the feel back OUT of a lane that already has one.
+
+    `laneId` empty takes the first note, chord or drum lane, because those are the lanes a feel
+    is heard in; a cc or parameter lane has microtiming but nobody means it when they say groove.
+
+    The template takes the LANE'S OWN `stepsPerBeat`, which is what makes it exact: applying the
+    result to a lane at that rate scales by laneRate/grooveRate == 1, so the microtiming that
+    comes back is the microtiming that went in.
+
+    VELOCITY IS NOT SYMMETRIC and cannot be. Multipliers are read as each active step's velocity
+    over the mean of the active steps, because that is what a multiplier means — but
+    `applyGrooveTemplate` MULTIPLIES, so feeding this straight back into the same pattern squares
+    each velocity about that mean rather than reproducing it. That is correct for what a groove
+    is for (wearing one pattern's feel on a different pattern) and wrong for anything that
+    expects a round trip, so it is stated here rather than discovered. Fewer than two active
+    steps yields no multipliers at all, which the struct already defines as "keep dynamics".
+
+    Returns a template with empty `timingOffsets` when there is nothing to read — no such lane,
+    or a lane with no steps — so a caller can refuse instead of storing a groove that does
+    nothing. `grooveId` is left empty for the caller to mint. */
+GrooveTemplate grooveFromLane (const Pattern& pattern,
+                               const juce::String& laneId = {},
+                               const juce::String& name = {});
+
 /** A clip is a launchable reference to a pattern (§18.8.8): what plays, when it may start,
     whether it loops, and what follows it. */
 struct Clip

@@ -643,6 +643,11 @@ the right thing to reach for when no groove is wanted.)
 
 **Cost.** Low — and lower than this entry first claimed.
 
+> **Built for patterns, 2026-09-15** — see
+> [`product-ideas.md`](product-ideas.md) §29. Reading a feel out of a pattern lane is done and
+> tested; the half this entry is really about, stealing a groove from *played* input, still needs
+> tempo and a grid inferred from free timing and is untouched.
+
 ## 5.4 Follow the band — key and chord detection driving the note players
 
 Listen to whatever arrives on an input, detect the key and the current chord, and feed that to the
