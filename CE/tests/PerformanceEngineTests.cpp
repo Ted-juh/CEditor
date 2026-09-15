@@ -906,6 +906,204 @@ void testFollowActions()
            "Stop ends the clip after its loop count without launching another");
 }
 
+// A VARIATION OF THE THING YOU ARE PLAYING. makePatternVariation does one pattern; what a
+// performer wants on stage is a B version of the whole scene. A scene is heterogeneous, so
+// "forty per cent different" has to mean something different per kind — and the kinds where it
+// means NOTHING are the ones worth pinning, because inventing a midpoint that does not exist is
+// silent and wrong.
+
+void testSceneVariations()
+{
+    std::cout << "\nscenes: a B version of the thing you are playing" << std::endl;
+
+    auto pattern = Pattern::create ("Beat");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 4));
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+
+    juce::Array<Clip> clips;
+    Clip clip; clip.clipId = "clip-a"; clip.name = "Riff"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::bar; clip.loop = true;
+    clip.followAction = "clip"; clip.followClipId = "clip-b"; clip.followAfterLoops = 2;
+    clips.add (clip);
+    Clip other; other.clipId = "clip-b"; other.patternId = pattern.patternId;
+    clips.add (other);
+
+    Scene source;
+    source.sceneId = "scene-1";
+    source.name = "Verse";
+    source.clipIds.add ("clip-a");
+    source.tempo = 124.0;
+    source.morphBeats = 4.0;
+    source.launchQuantize = Quantize::bar;
+
+    SceneSlot slot;
+    slot.partId = "p1";
+    slot.volume = 1.0f;  slot.applyVolume = true;
+    slot.pan = 0.0f;     slot.applyPan = true;
+    slot.mute = true;    slot.enabled = false;
+    source.slots.add (slot);
+
+    SceneMacroValue macro; macro.macroId = "m1"; macro.value = 0.5f;
+    source.macros.add (macro);
+
+    SceneParameterValue cutoff;  cutoff.targetId = "p1";  cutoff.parameterId = "cutoff";
+    cutoff.value = 0.5f;
+    SceneParameterValue wave;    wave.targetId = "p1";    wave.parameterId = "wave";
+    wave.value = 0.25f;
+    source.parameters.add (cutoff);
+    source.parameters.add (wave);
+
+    // Only `cutoff` has a midpoint. A five-way waveform selector does not, and the caller is the
+    // only thing that knows — a SceneParameterValue is a bare float with no kind beside it.
+    const SceneParameterIsContinuous isContinuous =
+        [] (const juce::String&, const juce::String& parameterId) { return parameterId == "cutoff"; };
+
+    Scene b;
+    makeSceneVariation (source, 'B', 0.5f, patterns, clips, b, isContinuous);
+
+    check (b.sceneId != source.sceneId && b.name == "Verse B",
+           "a variation is a new scene, named after the one it came from");
+    check (b.variationLabel == "B" && b.variationGroupId == "scene-1"
+             && b.variationSourceSceneId == "scene-1",
+           "and the family is traceable after somebody renames all four");
+
+    // -- the clips ------------------------------------------------------------------------
+    check (b.clipIds.size() == 1 && b.clipIds[0] != "clip-a",
+           "the variation launches its own clip, not the source's");
+    check (clips.size() == 3, "which was appended rather than moved out from under the source");
+    check (source.clipIds.size() == 1 && source.clipIds[0] == "clip-a",
+           "and the source scene is untouched — nothing is taken from a set that is playing");
+
+    const Clip* made = nullptr;
+    for (const auto& candidate : clips)
+        if (candidate.clipId == b.clipIds[0])
+            made = &candidate;
+    check (made != nullptr && made->name == "Riff B", "the new clip says which variation it is");
+    check (made != nullptr && made->patternId != pattern.patternId,
+           "and plays the varied pattern rather than the original");
+    check (made != nullptr && made->launchQuantize == Quantize::bar && made->loop,
+           "launch behaviour is inherited: the B section starts the way the A section does");
+    // A follow names a clip in the SOURCE scene. Carrying it over would make the variation hand
+    // off into the section it is a variation of, which is never what was meant.
+    check (made != nullptr && made->followAction == "none" && made->followClipId.isEmpty()
+             && made->followAfterLoops == 0,
+           "but the follow does not come with it");
+
+    const Pattern* varied = nullptr;
+    for (const auto& candidate : patterns)
+        if (made != nullptr && candidate.patternId == made->patternId)
+            varied = &candidate;
+    check (varied != nullptr && varied->variationLabel == "B"
+             && varied->variationGroupId == pattern.patternId,
+           "the pattern it plays is that pattern's own B, in the same variation group");
+
+    // -- what a percentage means, per kind ---------------------------------------------------
+    check (! b.slots.isEmpty() && b.slots.getReference (0).volume != slot.volume,
+           "a level moves, because a level has a midpoint");
+    check (b.slots.getReference (0).pan != slot.pan, "so does pan");
+    check (b.slots.getReference (0).mute == true && b.slots.getReference (0).enabled == false,
+           "a mute does NOT — there is no such thing as forty per cent muted, and flipping it "
+           "would be the program overruling a decision somebody made");
+    check (b.macros.getReference (0).value != macro.value, "a macro value moves");
+    check (b.parameters.getReference (0).value != cutoff.value, "a continuous parameter moves");
+    check (b.parameters.getReference (1).value == wave.value,
+           "and a stepped one is held: a waveform four tenths of the way to somewhere is a byte "
+           "the synth cannot read");
+
+    check (b.tempo == 124.0 && b.morphBeats == 4.0 && b.launchQuantize == Quantize::bar,
+           "structure is copied, not varied — a variation is of the sound, not of the set");
+
+    // Levels stay inside their scales however hard it is pushed.
+    {
+        Scene extreme;
+        Scene loud = source;
+        loud.slots.getReference (0).volume = 2.0f;
+        loud.slots.getReference (0).pan = 1.0f;
+        loud.macros.getReference (0).value = 1.0f;
+        juce::Array<Pattern> p2 = patterns; juce::Array<Clip> c2 = clips;
+        makeSceneVariation (loud, 'D', 1.0f, p2, c2, extreme, isContinuous);
+        check (extreme.slots.getReference (0).volume <= 2.0f
+                 && extreme.slots.getReference (0).volume >= 0.0f,
+               "a nudge cannot push a level off its own scale");
+        check (std::abs (extreme.slots.getReference (0).pan) <= 1.0f, "nor pan off its");
+        check (extreme.macros.getReference (0).value <= 1.0f
+                 && extreme.macros.getReference (0).value >= 0.0f, "nor a macro off its");
+    }
+
+    // -- deterministic, because a variation you cannot rehearse is not a variation ----------
+    {
+        juce::Array<Pattern> p3 = patterns; juce::Array<Clip> c3 = clips;
+        Scene again;
+        makeSceneVariation (source, 'B', 0.5f, p3, c3, again, isContinuous);
+        check (std::abs (again.slots.getReference (0).volume - b.slots.getReference (0).volume) < 1.0e-6f
+                 && std::abs (again.macros.getReference (0).value - b.macros.getReference (0).value) < 1.0e-6f,
+               "asking twice gives the same scene");
+
+        Scene c;
+        juce::Array<Pattern> p4 = patterns; juce::Array<Clip> c4 = clips;
+        makeSceneVariation (source, 'C', 0.5f, p4, c4, c, isContinuous);
+        check (std::abs (c.macros.getReference (0).value - b.macros.getReference (0).value) > 1.0e-6f,
+               "and B and C are different scenes rather than the same one twice");
+    }
+
+    // -- agreeing with createPatternVariations ----------------------------------------------
+    // Both address a variation by its group and its label, so B is B whichever made it. Minting
+    // a rival B would leave two patterns claiming the same slot in one family.
+    {
+        juce::Array<Pattern> p5 = patterns;
+        juce::Array<Clip> c5 = clips;
+        const auto before = p5.size();
+        Scene second;
+        makeSceneVariation (source, 'B', 0.5f, p5, c5, second, isContinuous);
+        check (p5.size() == before,
+               "a pattern variation that already exists is reused, not generated again");
+        check (second.clipIds[0] != b.clipIds[0],
+               "though the clip that launches it is this scene's own");
+    }
+
+    // A scene naming a clip that has since been removed varies what it actually launches now.
+    {
+        Scene stale = source;
+        stale.clipIds.add ("clip-gone");
+        juce::Array<Pattern> p6 = patterns; juce::Array<Clip> c6 = clips;
+        Scene out;
+        makeSceneVariation (stale, 'B', 0.5f, p6, c6, out, isContinuous);
+        check (! out.clipIds.contains ("clip-gone") && out.clipIds.size() == 1,
+               "a clip the performance no longer has is skipped rather than carried");
+    }
+
+    // With no classifier at all, every plug-in parameter is held. Unknown means hold, and
+    // holding is always safe.
+    {
+        juce::Array<Pattern> p7 = patterns; juce::Array<Clip> c7 = clips;
+        Scene cautious;
+        makeSceneVariation (source, 'B', 0.5f, p7, c7, cautious, {});
+        check (cautious.parameters.getReference (0).value == cutoff.value
+                 && cautious.parameters.getReference (1).value == wave.value,
+               "without a way to tell continuous from stepped, nothing is moved");
+        check (cautious.macros.getReference (0).value != macro.value,
+               "but a macro is continuous by construction and still moves");
+    }
+
+    // Written down and read back.
+    {
+        Scene restored;
+        check (sceneFromVar (sceneToVar (b), restored), "a varied scene serialises");
+        check (restored.variationLabel == "B" && restored.variationGroupId == "scene-1"
+                 && restored.variationSourceSceneId == "scene-1"
+                 && std::abs (restored.variationAmount - 0.5f) < 1.0e-6f,
+               "with its family intact");
+
+        auto damaged = sceneToVar (b);
+        damaged.getDynamicObject()->setProperty ("variationLabel", "Q");
+        Scene odd;
+        sceneFromVar (damaged, odd);
+        check (odd.variationLabel.isEmpty(),
+               "and a label outside A-D reads as a plain scene rather than a family nobody can "
+               "find the rest of");
+    }
+}
+
 void testSongSwapWhilePlaying()
 {
     std::cout << "\nedits: a new song swaps without corrupting the old one" << std::endl;
@@ -3016,6 +3214,7 @@ int main()
     testFrozenMidiUsesPostFxStaging();
     testParameterLanesAndGlide();
     testFollowActions();
+    testSceneVariations();
     testSongSwapWhilePlaying();
     testArpeggiator();
     testMidiFxChain();

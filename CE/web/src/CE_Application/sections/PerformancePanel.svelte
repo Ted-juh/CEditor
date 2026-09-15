@@ -35,6 +35,7 @@
     importScalaTuning, parseScalaTuning, resetMicrotuning, setMicrotuning,
     setPartMicrotuning, sendMicrotuning,
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
+    createSceneVariations,
     addSetlistItem, removeSetlistItem, moveSetlistItem, setSetlistItem, setSetlistOptions,
     setlistGo, setlistNext, setlistPrev,
     addArrangementItem, removeArrangementItem, setArrangementItem, moveArrangementItem,
@@ -2751,6 +2752,14 @@
             <input type="text" class="clip-name scene-name-input" value={scene.name}
                    aria-label="Scene name" title="Rename scene"
                    onchange={(e) => renameScene(scene.sceneId, e.currentTarget.value)} />
+            {#if scene.variationLabel}
+              <span class="variation-badge" data-testid="scene-variation-label"
+                    title={scene.variationLabel === 'A'
+                      ? 'Authored source scene'
+                      : `Generated from scene A at ${Math.round(scene.variationAmount * 100)}%`}>
+                {scene.variationLabel}
+              </span>
+            {/if}
             <span class="scene-detail">{scene.clipIds.length} clips · {scene.numSlots} slots · {scene.numMacros} macros · {scene.numParameters} mapped</span>
             <select value={scene.launchQuantize} aria-label={`${scene.name} launch quantization`}
                     onchange={(e) => setSceneOptions(scene.sceneId, { launchQuantize: e.currentTarget.value })}>
@@ -2781,6 +2790,14 @@
             </label>
             <button type="button" class="ghost" title="Replace this scene's contents with the rig as it stands"
                     onclick={() => captureScene(scene.sceneId)}>Capture</button>
+            <!-- A variation of the thing you are PLAYING, not of one lane of it. Each clip gets
+                 its pattern's B/C/D (reusing one that already exists), levels and macros move,
+                 and a mute does not — there is no such thing as forty per cent muted. -->
+            <button type="button" class="ghost" data-testid="scene-variations"
+                    title="Make B, C and D versions of this whole scene: varied patterns with clips of their own, nudged levels and macros, and mutes left alone"
+                    onclick={() => createSceneVariations(scene.sceneId, variationAmount)}>
+              {scene.variationLabel ? 'Regen B/C/D' : 'B/C/D'}
+            </button>
             <button type="button" class="ghost" title="Add to the setlist"
                     onclick={() => addSetlistItem(scene.sceneId)}>+ Set</button>
             <button type="button" class="ghost" title="Add a four-bar block to the song arranger"

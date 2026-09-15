@@ -677,6 +677,159 @@ Pattern makePatternVariation (const Pattern& source, char label, float amount)
     return variation;
 }
 
+namespace
+{
+    /** A deterministic signed nudge in -1..+1 for one named thing in one scene variation.
+        Seeded from the scene, the label and the name, so asking for "B at 40%" twice gives the
+        same scene — which is what makes a variation something you can rehearse. */
+    float sceneNudge (const juce::String& sceneId, char label, const juce::String& key,
+                      juce::uint32 salt) noexcept
+    {
+        const auto seed = (juce::uint32) juce::jmax (1, std::abs (sceneId.hashCode()))
+                          ^ ((juce::uint32) label << 24);
+        const auto mixed = variationHash (seed ^ salt
+                                          ^ (juce::uint32) juce::jmax (1, std::abs (key.hashCode())));
+        return 2.0f * ((float) (mixed & 0x00ffffffu) / (float) 0x01000000u) - 1.0f;
+    }
+}
+
+void makeSceneVariation (const Scene& source, char label, float amount,
+                         juce::Array<Pattern>& patterns, juce::Array<Clip>& clips,
+                         Scene& out,
+                         const SceneParameterIsContinuous& isContinuous)
+{
+    const auto normalizedLabel = label == 'B' || label == 'C' || label == 'D' ? label : 'B';
+    const auto intensity = juce::jlimit (0.0f, 1.0f, amount);
+    const auto labelText = juce::String::charToString ((juce::juce_wchar) normalizedLabel);
+
+    out = source;
+    out.sceneId = juce::Uuid().toDashedString();
+    out.name = source.name + " " + labelText;
+    out.variationGroupId = source.variationGroupId.isNotEmpty() ? source.variationGroupId
+                                                                : source.sceneId;
+    out.variationLabel = labelText;
+    out.variationSourceSceneId = source.variationSourceSceneId.isNotEmpty()
+                                   ? source.variationSourceSceneId : source.sceneId;
+    out.variationAmount = intensity;
+    out.clipIds.clear();
+
+    // -- the clips ------------------------------------------------------------------------
+    for (const auto& clipId : source.clipIds)
+    {
+        const Clip* sourceClip = nullptr;
+        for (const auto& candidate : clips)
+            if (candidate.clipId == clipId)
+            {
+                sourceClip = &candidate;
+                break;
+            }
+
+        // A scene can name a clip that has since been removed. Skipping it is right: the
+        // variation is of what the scene actually launches now.
+        if (sourceClip == nullptr)
+            continue;
+
+        const Pattern* sourcePattern = nullptr;
+        for (const auto& candidate : patterns)
+            if (candidate.patternId == sourceClip->patternId)
+            {
+                sourcePattern = &candidate;
+                break;
+            }
+
+        // A clip with no pattern still belongs to the scene — it is launchable and it plays
+        // nothing — so it is carried across rather than dropped.
+        if (sourcePattern == nullptr)
+        {
+            out.clipIds.add (clipId);
+            continue;
+        }
+
+        // Reuse the pattern variation that already exists rather than minting a rival. This is
+        // what makes a scene variation and createPatternVariations agree: both address a
+        // variation by its group and its label, so B is B whichever of them made it.
+        const auto groupId = sourcePattern->variationGroupId.isNotEmpty()
+                               ? sourcePattern->variationGroupId : sourcePattern->patternId;
+        juce::String variationPatternId;
+        for (const auto& candidate : patterns)
+            if (candidate.variationGroupId == groupId && candidate.variationLabel == labelText)
+            {
+                variationPatternId = candidate.patternId;
+                break;
+            }
+
+        if (variationPatternId.isEmpty())
+        {
+            auto minted = makePatternVariation (*sourcePattern, normalizedLabel, intensity);
+            minted.variationGroupId = groupId;
+            minted.variationSourcePatternId = sourcePattern->patternId;
+            variationPatternId = minted.patternId;
+            patterns.add (std::move (minted));
+        }
+
+        // A clip is how a pattern is launched, so a varied pattern needs one of its own. It
+        // inherits the source clip's launch behaviour — quantization, looping, fill — because
+        // the B section of a set should start the way the A section does.
+        Clip variationClip = *sourceClip;
+        variationClip.clipId = juce::Uuid().toDashedString();
+        variationClip.name = sourceClip->name + " " + labelText;
+        variationClip.patternId = variationPatternId;
+        // Follow actions name clips by id, and the source's target is a clip in the SOURCE
+        // scene. Carrying it over would make the variation hand off into the section it is a
+        // variation of, which is never what was meant.
+        variationClip.followClipId.clear();
+        variationClip.followAction = "none";
+        variationClip.followAfterLoops = 0;
+        // Freeze is a rendering of the source clip's output, so it does not describe this one.
+        variationClip.frozenMidi = false;
+        variationClip.frozenFromClipId.clear();
+        variationClip.frozenNoteCount = 0;
+
+        out.clipIds.add (variationClip.clipId);
+        clips.add (std::move (variationClip));
+    }
+
+    // -- the continuous half --------------------------------------------------------------
+    // Levels move by up to a quarter of the scale at full intensity. A variation that swung a
+    // fader end to end would not be a variation of the thing you are playing, it would be a
+    // different mix.
+    for (auto& slot : out.slots)
+    {
+        if (slot.applyVolume)
+            slot.volume = juce::jlimit (0.0f, 2.0f,
+                                        slot.volume + 0.5f * intensity
+                                          * sceneNudge (source.sceneId, normalizedLabel,
+                                                        slot.partId + "/vol", 0x51ed270bu));
+        if (slot.applyPan)
+            slot.pan = juce::jlimit (-1.0f, 1.0f,
+                                     slot.pan + 0.35f * intensity
+                                       * sceneNudge (source.sceneId, normalizedLabel,
+                                                     slot.partId + "/pan", 0x2545f491u));
+        // slot.mute and slot.enabled are deliberately untouched: there is no such thing as
+        // forty per cent muted, and flipping one would be the program overruling a decision.
+    }
+
+    for (auto& macro : out.macros)
+        macro.value = juce::jlimit (0.0f, 1.0f,
+                                    macro.value + 0.4f * intensity
+                                      * sceneNudge (source.sceneId, normalizedLabel,
+                                                    macro.macroId, 0x9e3779b9u));
+
+    for (auto& parameter : out.parameters)
+    {
+        // Unknown means hold. A parameter left where it was is never wrong; a five-way waveform
+        // selector moved four tenths of the way to somewhere is a byte the synth cannot read.
+        if (! isContinuous || ! isContinuous (parameter.targetId, parameter.parameterId))
+            continue;
+
+        parameter.value = juce::jlimit (0.0f, 1.0f,
+                                        parameter.value + 0.4f * intensity
+                                          * sceneNudge (source.sceneId, normalizedLabel,
+                                                        parameter.targetId + "/" + parameter.parameterId,
+                                                        0x85ebca6bu));
+    }
+}
+
 // -- serialization ---------------------------------------------------------------------------
 
 static juce::var stepToVar (const PatternStep& step)
@@ -993,6 +1146,10 @@ juce::var sceneToVar (const Scene& scene)
     s->setProperty ("stopOtherClips", scene.stopOtherClips);
     s->setProperty ("tempo",          scene.tempo);
     s->setProperty ("morphBeats",     scene.morphBeats);
+    s->setProperty ("variationGroupId",       scene.variationGroupId);
+    s->setProperty ("variationLabel",         scene.variationLabel);
+    s->setProperty ("variationSourceSceneId", scene.variationSourceSceneId);
+    s->setProperty ("variationAmount",        scene.variationAmount);
     return juce::var (s);
 }
 
@@ -1010,6 +1167,14 @@ bool sceneFromVar (const juce::var& stored, Scene& out)
     out.stopOtherClips = (bool) stored.getProperty ("stopOtherClips", true);
     out.tempo          = juce::jlimit (0.0, 300.0, (double) stored.getProperty ("tempo", 0.0));
     out.morphBeats     = juce::jlimit (0.0, 32.0, (double) stored.getProperty ("morphBeats", 0.0));
+    out.variationGroupId       = stored.getProperty ("variationGroupId", {}).toString();
+    out.variationSourceSceneId = stored.getProperty ("variationSourceSceneId", {}).toString();
+    out.variationAmount        = floatOf (stored, "variationAmount", 0.0f, 0.0f, 1.0f);
+    // Only the four labels exist; anything else read back is a plain scene rather than a member
+    // of a family nobody can find the rest of.
+    out.variationLabel = stored.getProperty ("variationLabel", {}).toString().toUpperCase();
+    if (! juce::StringArray { "A", "B", "C", "D" }.contains (out.variationLabel))
+        out.variationLabel.clear();
 
     if (const auto* clips = stored.getProperty ("clipIds", {}).getArray())
         for (const auto& clipId : *clips)

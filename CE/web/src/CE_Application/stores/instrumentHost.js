@@ -2662,6 +2662,13 @@ export function normalizePerformance(payload) {
       numMacros: Number(s?.numMacros ?? (Array.isArray(s?.macros) ? s.macros.length : 0)),
       numParameters: Number(s?.numParameters
         ?? (Array.isArray(s?.parameters) ? s.parameters.length : 0)),
+      // Scene Variations, the same bookkeeping a pattern carries. Only the four labels exist;
+      // anything else reads as a plain scene rather than a family nobody can find the rest of.
+      variationGroupId: String(s?.variationGroupId ?? ''),
+      variationLabel: ['A', 'B', 'C', 'D'].includes(String(s?.variationLabel ?? '').toUpperCase())
+        ? String(s.variationLabel).toUpperCase() : '',
+      variationSourceSceneId: String(s?.variationSourceSceneId ?? ''),
+      variationAmount: Math.max(0, Math.min(1, Number(s?.variationAmount ?? 0))),
     })),
     snapshotMorph: {
       active: snapshotMorph.active === true,
@@ -2774,6 +2781,115 @@ export function normalizePerformance(payload) {
     },
     scales: (Array.isArray(p.scales) ? p.scales : []).map(String),
   };
+}
+
+/** A deterministic signed nudge in -1..+1, mirroring sceneNudge in
+    CE/src/Performance/PatternModel.cpp. Seeded from the scene, the label and the name, so asking
+    for "B at 40%" twice gives the same scene — which is what makes a variation rehearsable. */
+function sceneNudge(sceneId, label, key, salt) {
+  const hash = (text) => {
+    let value = 0x811c9dc5;
+    for (const character of String(text)) {
+      value ^= character.charCodeAt(0);
+      value = Math.imul(value, 0x01000193) >>> 0;
+    }
+    return value || 1;
+  };
+  let mixed = (hash(sceneId) ^ (label.charCodeAt(0) << 24) ^ salt ^ hash(key)) >>> 0;
+  mixed ^= mixed >>> 16; mixed = Math.imul(mixed, 0x7feb352d) >>> 0;
+  mixed ^= mixed >>> 15; mixed = Math.imul(mixed, 0x846ca68b) >>> 0;
+  mixed = (mixed ^ (mixed >>> 16)) >>> 0;
+  return 2 * ((mixed & 0x00ffffff) / 0x01000000) - 1;
+}
+
+/** A B / C / D version of a whole SCENE, mirroring makeSceneVariation in
+    CE/src/Performance/PatternModel.cpp, which is the authority.
+
+    A scene is heterogeneous — clips, mixer levels, macro values, plug-in parameters — so "forty
+    per cent different" means something different per kind:
+
+      - clips get the matching variation of their pattern, reusing one that already exists in
+        that pattern's variation group rather than minting a rival;
+      - continuous values (volume, pan, macros) are nudged deterministically;
+      - **booleans are not touched at all** — there is no such thing as forty per cent muted,
+        and flipping one would be the program overruling a decision somebody made;
+      - plug-in parameters move only where `isContinuous` says they have a midpoint, and
+        anything it cannot classify is held, because holding is never wrong.
+
+    Mutates `patterns` and `clips` by appending what it had to mint, as the native side does, and
+    leaves the source scene alone: nothing is taken from a set that is playing. */
+export function makeSceneVariation(source, label, amount, patterns, clips,
+                                   isContinuous = null, mintId = null) {
+  const normalizedLabel = ['B', 'C', 'D'].includes(label) ? label : 'B';
+  const intensity = Math.max(0, Math.min(1, Number(amount ?? 0.55)));
+  const id = mintId ?? ((prefix) => nextMockId(prefix));
+
+  const out = JSON.parse(JSON.stringify(source));
+  out.sceneId = id(`mock-scene-variation-${source.sceneId}-${normalizedLabel}`);
+  out.name = `${source.name} ${normalizedLabel}`;
+  out.variationGroupId = source.variationGroupId || source.sceneId;
+  out.variationLabel = normalizedLabel;
+  out.variationSourceSceneId = source.variationSourceSceneId || source.sceneId;
+  out.variationAmount = intensity;
+  out.clipIds = [];
+
+  for (const clipId of source.clipIds ?? []) {
+    const sourceClip = clips.find((c) => c.clipId === clipId);
+    // A scene can name a clip that has since been removed; the variation is of what it launches
+    // NOW. A clip with no pattern is launchable and plays nothing, so it comes across as it is.
+    if (!sourceClip) continue;
+    const sourcePattern = patterns.find((p) => p.patternId === sourceClip.patternId);
+    if (!sourcePattern) { out.clipIds.push(clipId); continue; }
+
+    const groupId = sourcePattern.variationGroupId || sourcePattern.patternId;
+    let variation = patterns.find((p) => p.variationGroupId === groupId
+                                         && p.variationLabel === normalizedLabel);
+    if (!variation) {
+      variation = makePatternVariation(sourcePattern, normalizedLabel, intensity,
+        id(`mock-variation-${sourcePattern.patternId}-${normalizedLabel}`));
+      variation.variationGroupId = groupId;
+      variation.variationSourcePatternId = sourcePattern.patternId;
+      patterns.push(variation);
+    }
+
+    const madeClip = {
+      ...JSON.parse(JSON.stringify(sourceClip)),
+      clipId: id(`mock-clip-variation-${sourceClip.clipId}-${normalizedLabel}`),
+      name: `${sourceClip.name} ${normalizedLabel}`,
+      patternId: variation.patternId,
+      // A follow names a clip in the SOURCE scene; carrying it over would make the variation
+      // hand off into the section it is a variation of, which is never what was meant.
+      followClipId: '', followAction: 'none', followAfterLoops: 0,
+      // A freeze is a rendering of the source clip's output, so it does not describe this one.
+      frozenMidi: false, frozenFromClipId: '', frozenNoteCount: 0,
+      active: false, pending: false, phase: 0,
+    };
+    out.clipIds.push(madeClip.clipId);
+    clips.push(madeClip);
+  }
+
+  for (const slot of out.slots ?? []) {
+    if (slot.applyVolume)
+      slot.volume = Math.max(0, Math.min(2, slot.volume + 0.5 * intensity
+        * sceneNudge(source.sceneId, normalizedLabel, `${slot.partId}/vol`, 0x51ed270b)));
+    if (slot.applyPan)
+      slot.pan = Math.max(-1, Math.min(1, slot.pan + 0.35 * intensity
+        * sceneNudge(source.sceneId, normalizedLabel, `${slot.partId}/pan`, 0x2545f491)));
+    // slot.mute and slot.enabled are deliberately untouched.
+  }
+
+  for (const macro of out.macros ?? [])
+    macro.value = Math.max(0, Math.min(1, macro.value + 0.4 * intensity
+      * sceneNudge(source.sceneId, normalizedLabel, macro.macroId, 0x9e3779b9)));
+
+  for (const parameter of out.parameters ?? []) {
+    if (!isContinuous || !isContinuous(parameter.targetId, parameter.parameterId)) continue;
+    parameter.value = Math.max(0, Math.min(1, parameter.value + 0.4 * intensity
+      * sceneNudge(source.sceneId, normalizedLabel,
+                   `${parameter.targetId}/${parameter.parameterId}`, 0x85ebca6b)));
+  }
+
+  return out;
 }
 
 const variationPatternSeed = (pattern) => {
@@ -5681,6 +5797,44 @@ export function applyMockCommand(state, payload) {
         clip.fillPatternId = defaultFill?.patternId ?? '';
     return next;
   }
+  if (cmd === 'createSceneVariations') {
+    const source = perf.scenes.find((scene) => scene.sceneId === payload.sceneId);
+    if (!source) return next;
+
+    const amount = Math.max(0, Math.min(1, Number(payload.amount ?? 0.55)));
+    const groupId = source.variationGroupId || source.sceneId;
+    source.variationGroupId = groupId;
+    source.variationLabel = 'A';
+    source.variationSourceSceneId = groupId;
+    source.variationAmount = amount;
+    const authored = JSON.parse(JSON.stringify(source));
+
+    // Whether a plug-in parameter has a midpoint, from whatever inventory the browser is
+    // currently holding. Everything else is held — a parameter left where it was is never wrong.
+    const inventory = get(hostParameters);
+    const isContinuous = (targetId, parameterId) => {
+      if (targetId !== inventory.partId) return false;
+      const descriptor = inventory.parameters.find((d) => d.id === parameterId);
+      return Boolean(descriptor) && !descriptor.discrete && !descriptor.boolean;
+    };
+
+    for (const label of ['B', 'C', 'D']) {
+      const existingIndex = perf.scenes.findIndex((scene) =>
+        scene.variationGroupId === groupId && scene.variationLabel === label);
+      const variation = makeSceneVariation(authored, label, amount,
+        perf.patterns, perf.clips, isContinuous);
+      variation.variationGroupId = groupId;
+      variation.variationSourceSceneId = groupId;
+      if (existingIndex >= 0) {
+        // Keep the id, so a setlist item or an arranger block naming this scene still names it.
+        variation.sceneId = perf.scenes[existingIndex].sceneId;
+        perf.scenes[existingIndex] = variation;
+      } else {
+        perf.scenes.push(variation);
+      }
+    }
+    return next;
+  }
   if (cmd === 'removePattern') {
     perf.patterns = perf.patterns.filter((p) => p.patternId !== payload.patternId);
     perf.clips = perf.clips.filter((c) => c.patternId !== payload.patternId);
@@ -8042,6 +8196,11 @@ export const recordFamily = (recordId) => send({ cmd: 'recordFamily', recordId }
 
 /** Asks for sounds you own and have never opened, nearest first to what you keep loading. */
 export const unplayedLikeHabits = (count = 20) => send({ cmd: 'unplayedLikeHabits', count });
+
+/** A B / C / D version of a whole scene at a given intensity. The pattern half reuses whatever
+    createPatternVariations already made, so the two agree rather than minting rival patterns. */
+export const createSceneVariations = (sceneId, amount = 0.55) =>
+  send({ cmd: 'createSceneVariations', sceneId, amount });
 
 /** Folds a duplicate set onto its survivor: the curation of every member is gathered there and
     the rest go quiet. Nothing is deleted — see setLibraryRecordHidden for the way back. */

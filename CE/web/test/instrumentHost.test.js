@@ -73,6 +73,8 @@ import {
   recordFamily,
   hostRecordFamily,
   clipFollowGraph,
+  makeSceneVariation,
+  createSceneVariations,
   mockHabitualProfile,
   mockUnplayedLikeHabits,
   hostUnplayed,
@@ -1284,6 +1286,147 @@ test('an empty history is told, not guessed at', () => {
   ]);
   assert.equal(withFold.enough, true);
   assert.deepEqual(withFold.matches, [], 'a folded copy is not a discovery');
+});
+
+// A VARIATION OF THE THING YOU ARE PLAYING. A scene is heterogeneous, so "forty per cent
+// different" has to mean something different per kind — and the kinds where it means NOTHING are
+// the ones worth pinning, because inventing a midpoint that does not exist is silent and wrong.
+
+test('mock reducer: B, C and D versions of a whole scene', () => {
+  let state = mockHostState();
+  const patternId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state, { cmd: 'addScene', name: 'Verse' });
+  const sceneId = state.performance.scenes[0].sceneId;
+  const scenesBefore = state.performance.scenes.length;
+
+  state = applyMockCommand(state, { cmd: 'createSceneVariations', sceneId, amount: 0.5 });
+  const perf = state.performance;
+
+  assert.equal(perf.scenes.length, scenesBefore + 3, 'three variations, not one');
+  assert.equal(perf.scenes[0].variationLabel, 'A', 'the source becomes the authored A');
+
+  const family = perf.scenes.filter((s) => s.variationGroupId === sceneId);
+  assert.deepEqual(family.map((s) => s.variationLabel), ['A', 'B', 'C', 'D']);
+  assert.ok(family.slice(1).every((s) => s.variationSourceSceneId === sceneId),
+    'and every one of them can be traced back after somebody renames all four');
+
+  // The pattern half agrees with createPatternVariations: both address a variation by its group
+  // and its label, so B is B whichever of them made it.
+  const b = family[1];
+  assert.ok(b.clipIds.length > 0 || perf.scenes[0].clipIds.length === 0);
+  const madeClips = perf.clips.filter((c) => b.clipIds.includes(c.clipId));
+  for (const clip of madeClips) {
+    assert.notEqual(clip.patternId, patternId, 'a variation clip plays a varied pattern');
+    const played = perf.patterns.find((p) => p.patternId === clip.patternId);
+    assert.equal(played.variationLabel, 'B');
+    // A follow names a clip in the SOURCE scene, so it must not come across.
+    assert.equal(clip.followAction, 'none');
+    assert.equal(clip.followClipId, '');
+  }
+
+  // Regenerating replaces rather than adding a second B, because a set that already launches B
+  // must keep launching the same thing.
+  const bId = b.sceneId;
+  const after = applyMockCommand(state, { cmd: 'createSceneVariations', sceneId, amount: 0.8 });
+  assert.equal(after.performance.scenes.length, perf.scenes.length, 'no rival B appears');
+  assert.equal(after.performance.scenes.find((s) => s.variationGroupId === sceneId
+                                                    && s.variationLabel === 'B').sceneId, bId,
+    'and it keeps its id, so a setlist item naming it still names it');
+});
+
+test('what a percentage means depends on the kind, and for some kinds it means nothing', () => {
+  const patterns = [{ patternId: 'p1', name: 'Beat', seed: 7, lanes: [] }];
+  const clips = [{ clipId: 'c1', name: 'Riff', patternId: 'p1', loop: true,
+                   launchQuantize: 'bar', followAction: 'clip', followClipId: 'c2',
+                   followAfterLoops: 2 }];
+  const source = {
+    sceneId: 's1', name: 'Verse', clipIds: ['c1'], tempo: 124, morphBeats: 4,
+    launchQuantize: 'bar', stopOtherClips: true, focusPartId: 'p1', pageId: '',
+    slots: [{ partId: 'p1', enabled: false, mute: true, volume: 1, applyVolume: true,
+              pan: 0, applyPan: true }],
+    macros: [{ macroId: 'm1', value: 0.5 }],
+    parameters: [{ targetId: 'p1', parameterId: 'cutoff', value: 0.5 },
+                 { targetId: 'p1', parameterId: 'wave', value: 0.25 }],
+  };
+
+  let n = 0;
+  const mint = (prefix) => `${prefix}-${++n}`;
+  const isContinuous = (_target, parameterId) => parameterId === 'cutoff';
+  const b = makeSceneVariation(source, 'B', 0.5, patterns, clips, isContinuous, mint);
+
+  assert.notEqual(b.slots[0].volume, 1, 'a level moves, because a level has a midpoint');
+  assert.notEqual(b.slots[0].pan, 0, 'so does pan');
+  assert.equal(b.slots[0].mute, true,
+    'a mute does NOT — there is no such thing as forty per cent muted');
+  assert.equal(b.slots[0].enabled, false, 'and nor does enabled');
+  assert.notEqual(b.macros[0].value, 0.5, 'a macro value moves');
+  assert.notEqual(b.parameters[0].value, 0.5, 'a continuous parameter moves');
+  assert.equal(b.parameters[1].value, 0.25,
+    'a stepped one is held: a waveform four tenths of the way to somewhere is not a waveform');
+
+  assert.equal(b.tempo, 124, 'structure is copied, not varied');
+  assert.equal(b.morphBeats, 4);
+  assert.equal(b.launchQuantize, 'bar');
+
+  // Nothing is taken from a set that is playing.
+  assert.deepEqual(source.clipIds, ['c1']);
+  assert.equal(source.slots[0].volume, 1);
+
+  // With no way to tell continuous from stepped, nothing is moved. Holding is never wrong.
+  const cautious = makeSceneVariation(source, 'C', 0.5, patterns, clips, null, mint);
+  assert.equal(cautious.parameters[0].value, 0.5);
+  assert.equal(cautious.parameters[1].value, 0.25);
+  assert.notEqual(cautious.macros[0].value, 0.5, 'but a macro is continuous by construction');
+});
+
+test('a scene variation is deterministic, and stays on its own scales', () => {
+  const source = {
+    sceneId: 's1', name: 'Verse', clipIds: [],
+    slots: [{ partId: 'p1', volume: 2, applyVolume: true, pan: 1, applyPan: true,
+              mute: false, enabled: true }],
+    macros: [{ macroId: 'm1', value: 1 }],
+    parameters: [],
+  };
+  let n = 0;
+  const mint = (prefix) => `${prefix}-${++n}`;
+
+  const first = makeSceneVariation(source, 'B', 0.5, [], [], null, mint);
+  const again = makeSceneVariation(source, 'B', 0.5, [], [], null, mint);
+  assert.equal(first.slots[0].volume, again.slots[0].volume,
+    'asking twice gives the same scene — a variation you cannot rehearse is not a variation');
+  assert.equal(first.macros[0].value, again.macros[0].value);
+
+  const c = makeSceneVariation(source, 'C', 0.5, [], [], null, mint);
+  assert.notEqual(c.macros[0].value, first.macros[0].value,
+    'and B and C are different scenes rather than the same one twice');
+
+  // Pushed as hard as it goes, from the top of every scale.
+  const hard = makeSceneVariation(source, 'D', 1, [], [], null, mint);
+  assert.ok(hard.slots[0].volume >= 0 && hard.slots[0].volume <= 2);
+  assert.ok(Math.abs(hard.slots[0].pan) <= 1);
+  assert.ok(hard.macros[0].value >= 0 && hard.macros[0].value <= 1);
+});
+
+test('a scene naming a clip that is gone varies what it actually launches', () => {
+  const patterns = [{ patternId: 'p1', name: 'Beat', seed: 7, lanes: [] }];
+  const clips = [{ clipId: 'c1', name: 'Riff', patternId: 'p1', loop: true }];
+  const source = { sceneId: 's1', name: 'Verse', clipIds: ['c1', 'gone'],
+                   slots: [], macros: [], parameters: [] };
+  let n = 0;
+  const b = makeSceneVariation(source, 'B', 0.5, patterns, clips, null,
+                               (prefix) => `${prefix}-${++n}`);
+
+  assert.equal(b.clipIds.length, 1, 'a clip the performance no longer has is skipped');
+  assert.ok(!b.clipIds.includes('gone'));
+
+  // A clip with no pattern is launchable and plays nothing, so it comes across as it is rather
+  // than being dropped from the scene.
+  const orphan = { sceneId: 's2', name: 'Bare', clipIds: ['c2'],
+                   slots: [], macros: [], parameters: [] };
+  const withOrphan = makeSceneVariation(orphan, 'B', 0.5, patterns,
+    [...clips, { clipId: 'c2', name: 'Empty', patternId: 'missing' }], null,
+    (prefix) => `${prefix}-${++n}`);
+  assert.deepEqual(withOrphan.clipIds, ['c2']);
 });
 
 test('a recency filter refuses what the library has always had', () => {

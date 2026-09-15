@@ -2267,6 +2267,31 @@ has to mean something different per kind — which is exactly the per-parameter-
 
 **Cost:** medium.
 
+> **Built, 2026-09-15.** `makeSceneVariation` in `CE/src/Performance/PatternModel.cpp`, with the
+> `createSceneVariations` command and a B/C/D button on every scene row.
+>
+> **The "already solved once" was half right, and the half that was wrong is the interesting
+> one.** `morphPolicyFor` derives its policy from `valueKind`, which panel parameters carry. A
+> `SceneParameterValue` is a bare normalized float with no kind beside it at all. The kind does
+> exist — `discrete`, `boolean` and `numSteps` on a `ParameterDescriptor` — but only in the
+> inventory the service holds per loaded target, not in the scene. So the rule is pure and takes
+> a `SceneParameterIsContinuous` callback; the service supplies it from `partParameters`, and
+> **anything it cannot classify is held**. Holding is never wrong; moving a five-way waveform
+> selector four tenths of the way to somewhere is a byte the synth cannot read.
+>
+> What a percentage means, per kind:
+>
+> | | |
+> |---|---|
+> | Clips | The matching variation of their pattern, **reusing an existing B/C/D in that pattern's variation group** rather than minting a rival, so a scene variation and `createPatternVariations` agree. A varied pattern needs a clip to launch it, so one is minted per clip, inheriting the source's launch behaviour but **not its follow** — a follow names a clip in the source scene, and carrying it over would make the variation hand off into the section it is a variation of. |
+> | Levels and macros | Nudged deterministically, seeded from the scene and the label, and clamped to their own scales. |
+> | **Mutes and enables** | **Untouched.** There is no such thing as forty per cent muted, and flipping one would be the program overruling a decision somebody made. This is the same rule `snapshotModel.js` states for a stepped parameter: a midpoint that does not exist must not be invented. |
+> | Tempo, quantization, focus, page | Copied. A variation is of the sound, not of the set. |
+>
+> The source scene is never touched — nothing is taken out from under a set that is playing —
+> and regenerating replaces the scene carrying that label rather than adding a second B, keeping
+> its id so a setlist item or an arranger block naming it still names it.
+
 ## A gesture library
 
 Gesture clips are recorded automation performances — `gestureClip`, `gesturePasses` — a human hand

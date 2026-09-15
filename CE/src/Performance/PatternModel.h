@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <functional>
 #include "Transport.h"
 
 // PatternModel — the editable half of the Stage 6 event engine (baseline §18.8.4, §18.8.6).
@@ -242,7 +243,56 @@ struct Scene
     bool stopOtherClips = true;     // a scene is a state, so by default it silences what it omits
     double tempo = 0.0;             // 0 = keep the current tempo
     double morphBeats = 0.0;        // 0 = cut; continuous values may morph for up to 32 beats
+
+    // Scene Variations, the same bookkeeping Pattern carries: A is the authored source, B/C/D
+    // are generated and then editable, and the group is what makes the family traceable after
+    // somebody has renamed all four.
+    juce::String variationGroupId;
+    juce::String variationLabel;         // "A" | "B" | "C" | "D"; empty on a plain scene
+    juce::String variationSourceSceneId;
+    float variationAmount = 0.0f;
 };
+
+/** Whether a scene parameter's value has a midpoint at all — the question `morphPolicyFor` in
+    `CE/web/src/CE_Application/utils/snapshotModel.js` answers for panel parameters, asked here
+    for a plug-in's own. A `SceneParameterValue` is a bare normalized float with no kind beside
+    it, so only the caller (which can reach the parameter inventory) knows.
+
+    Returning false is always safe: a parameter left where it was is never wrong, and a
+    five-way waveform selector moved four tenths of the way to somewhere is a byte the synth
+    does not recognise. So an unknown parameter is held, not nudged. */
+using SceneParameterIsContinuous = std::function<bool (const juce::String& targetId,
+                                                       const juce::String& parameterId)>;
+
+/** A B / C / D version of a whole scene, at a given intensity.
+
+    `makePatternVariation` does this for one pattern; what a performer wants on stage is a
+    variation of the THING THEY ARE PLAYING, which is heterogeneous — clips, mixer levels, macro
+    values and plug-in parameters — so "forty per cent different" has to mean something
+    different per kind, and does:
+
+      - **Clips** get the matching variation of their pattern. An existing B/C/D in the
+        pattern's own variation group is reused rather than regenerated, so a scene variation
+        and `createPatternVariations` agree instead of minting rival patterns; the new clips are
+        appended to `clips`, since a clip is how a pattern is launched.
+      - **Continuous values** — macro values, slot volume and pan — are nudged deterministically,
+        seeded from the scene and the label so the same request twice is the same scene.
+      - **Booleans are not touched at all.** There is no such thing as forty per cent muted. A
+        mute is a decision somebody made and a variation that silently flipped it would be the
+        program overruling them, which is the same rule `snapshotModel.js` states for a stepped
+        parameter: a midpoint that does not exist must not be invented.
+      - **Plug-in parameters** are nudged only where `isContinuous` says they have a midpoint.
+        Anything it cannot classify is held.
+      - **Tempo, quantization, focus and the page** are the scene's structure, not its sound,
+        and are copied unchanged.
+
+    The source scene keeps its clips; nothing is moved out from under a set that is playing.
+    `out` receives the new scene, and any patterns and clips it had to mint are appended to
+    `patterns` and `clips`. */
+void makeSceneVariation (const Scene& source, char label, float amount,
+                         juce::Array<Pattern>& patterns, juce::Array<Clip>& clips,
+                         Scene& out,
+                         const SceneParameterIsContinuous& isContinuous = {});
 
 struct SetlistItem
 {

@@ -4838,6 +4838,97 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     // -- Stage 6: scenes ---------------------------------------------------------------------
 
+    if (cmd == "createSceneVariations")
+    {
+        if (! requireFeature (licensing::Feature::scenesAndSetlists))
+            return;
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto sceneId = payload.getProperty ("sceneId", {}).toString();
+        perf::Scene* source = nullptr;
+        for (auto& candidate : performance.scenes)
+            if (candidate.sceneId == sceneId)
+            {
+                source = &candidate;
+                break;
+            }
+
+        if (source == nullptr)
+        {
+            emitError ("Unknown scene.");
+            return;
+        }
+
+        const auto amount = juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("amount", 0.55));
+        const auto groupId = source->variationGroupId.isNotEmpty() ? source->variationGroupId
+                                                                   : source->sceneId;
+        source->variationGroupId = groupId;
+        source->variationLabel = "A";
+        source->variationSourceSceneId = groupId;
+        source->variationAmount = amount;
+        const auto authored = *source;
+
+        // Whether a plug-in parameter has a midpoint at all, answered from the inventory the
+        // service already holds for each loaded target. Everything it cannot classify — an
+        // effect that is not loaded, an address that is not a plug-in parameter — is held, and
+        // holding is always safe: a parameter left where it was is never wrong.
+        const perf::SceneParameterIsContinuous isContinuous =
+            [this] (const juce::String& targetId, const juce::String& parameterId)
+            {
+                const auto found = partParameters.find (targetId);
+                if (found == partParameters.end())
+                    return false;
+                const auto* descriptor = found->second.inventory.find (parameterId);
+                return descriptor != nullptr && ! descriptor->discrete && ! descriptor->boolean;
+            };
+
+        juce::StringArray made;
+        for (const auto label : { 'B', 'C', 'D' })
+        {
+            const auto labelText = juce::String::charToString ((juce::juce_wchar) label);
+
+            // Regenerating replaces the scene that already carries this label rather than
+            // adding a second B — the same rule createPatternVariations follows, and for the
+            // same reason: a set that already launches B must keep launching the same thing.
+            int existingIndex = -1;
+            for (int i = 0; i < performance.scenes.size(); ++i)
+                if (performance.scenes.getReference (i).variationGroupId == groupId
+                    && performance.scenes.getReference (i).variationLabel == labelText)
+                {
+                    existingIndex = i;
+                    break;
+                }
+
+            perf::Scene variation;
+            perf::makeSceneVariation (authored, label, amount,
+                                      performance.patterns, performance.clips, variation,
+                                      isContinuous);
+            variation.variationGroupId = groupId;
+            variation.variationSourceSceneId = groupId;
+
+            if (existingIndex >= 0)
+            {
+                // Keep the id so anything naming this scene — a setlist item, the arranger —
+                // still names it after a regeneration.
+                const auto keptId = performance.scenes.getReference (existingIndex).sceneId;
+                variation.sceneId = keptId;
+                performance.scenes.getReference (existingIndex) = std::move (variation);
+            }
+            else
+            {
+                made.add (variation.sceneId);
+                performance.scenes.add (std::move (variation));
+            }
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "addScene")
     {
         if (! requireFeature (licensing::Feature::scenesAndSetlists))
