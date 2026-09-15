@@ -3351,6 +3351,76 @@ void testRefusalCauses()
            "every cause has its stable wire name");
 }
 
+// A LIBRARY THAT MOVED. The three-pass identity match in mergeVendorScan was written to keep a
+// renamed file's record; these are the two shapes a user actually meets, and neither was pinned.
+//
+// It matters that this is automatic. There is no relink button and there does not need to be:
+// the scan that finds the files at their new home is the repair. What a user must still do is
+// add the new folder as a scan root — configuration, not a missing feature — and if these ever
+// stop holding, "my ratings vanished when I reorganised my presets" is the bug report.
+
+void testMovedLibraryRelinks()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    std::cout << "\na library that moved" << std::endl;
+
+    const auto preset = [] (const juce::String& path, const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = juce::File (path).getFileNameWithoutExtension();
+        r.fingerprint = fingerprint;
+        return r;
+    };
+
+    // The whole folder moves and the next scan finds everything somewhere else.
+    {
+        Library library;
+        library.mergeVendorScan ("vstpreset", { preset ("/old/a.vstpreset", "fp-a"),
+                                                preset ("/old/b.vstpreset", "fp-b") });
+        const auto keptId = library.allRecords().getReference (0).recordId;
+        library.find (keptId)->user.rating = 5;
+
+        library.mergeVendorScan ("vstpreset", { preset ("/new/a.vstpreset", "fp-a"),
+                                                preset ("/new/b.vstpreset", "fp-b") });
+
+        check (library.allRecords().size() == 2,
+               "a moved folder relinks rather than doubling the library");
+        const auto* moved = library.find (keptId);
+        check (moved != nullptr && moved->sourceLocator == "/new/a.vstpreset",
+               "the record follows its file to the new path");
+        check (moved != nullptr && ! moved->missing, "and is not left marked missing");
+        check (moved != nullptr && moved->user.rating == 5,
+               "with the rating intact, which is the whole reason identity follows content");
+    }
+
+    // The sequence somebody actually lives through: the folder vanishes, a scan marks everything
+    // missing, and only later does the new location get scanned. A long-missing record is the
+    // rename candidate of last resort — it still has to be one.
+    {
+        Library library;
+        library.mergeVendorScan ("vstpreset", { preset ("/old/c.vstpreset", "fp-c") });
+        const auto cId = library.allRecords().getReference (0).recordId;
+        library.find (cId)->user.rating = 4;
+
+        library.mergeVendorScan ("vstpreset", {});
+        check (library.find (cId) != nullptr && library.find (cId)->missing,
+               "a scan that cannot find the file marks the record missing and keeps it");
+
+        library.mergeVendorScan ("vstpreset", { preset ("/new/c.vstpreset", "fp-c") });
+        check (library.allRecords().size() == 1,
+               "and finding it again elsewhere heals that record rather than minting a second");
+        const auto* healed = library.find (cId);
+        check (healed != nullptr && healed->sourceLocator == "/new/c.vstpreset"
+                 && ! healed->missing && healed->user.rating == 4,
+               "path updated, missing cleared, rating kept");
+    }
+}
+
 void testRecordFamily()
 {
     using ceditor::host::Library;
@@ -10940,6 +11010,7 @@ int main (int argc, char* argv[])
     testRefusalCauses();
     testRecordRecency();
     testRecordFamily();
+    testMovedLibraryRelinks();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

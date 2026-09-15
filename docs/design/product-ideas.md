@@ -1889,17 +1889,26 @@ because the edges are already recorded.
 **stay**. That is exactly the right design — losing somebody's ratings because a drive letter
 changed would be unforgivable.
 
-What is absent is the repair. Somebody who reorganises a preset folder gets four hundred records
-marked missing and no way to say *they are all over here now.*
+**This entry was wrong, and the correction is the finding. Checked 2026-09-15 by driving
+`mergeVendorScan` directly rather than by reading it: the repair already exists, and it is better
+than the button proposed here because nobody has to know about it.**
 
-**The feature.** Point at a folder. Match the missing records against what is in it — by
-`fingerprint` first, then `classIdHex`, then name and manufacturer — and relink in one pass,
-reporting what matched, what matched ambiguously, and what genuinely is not there.
+`scanVstPresets` walks every configured root into one array and calls `mergeVendorScan` with **no
+locator scope**, so every existing record is a match candidate whatever its path. Pass 2 of the
+three-pass identity match — *same content elsewhere* — then claims a moved file for the record it
+already had. Two scenarios, both now pinned by `testMovedLibraryRelinks`:
 
-**Stands on:** the fingerprint is already content identity *"for change detection and matching"*,
-which is this feature's own description.
+| What happens | What the library does |
+|---|---|
+| A folder moves; the next scan finds everything at the new path | Both records relink. No duplicates, paths updated, ratings kept. |
+| The folder vanishes, a scan marks everything missing, and only later is the new location scanned | The missing record is healed rather than a second one minted — a long-missing record is the rename candidate of last resort, and it is still a candidate. |
 
-**Cost:** low.
+**The one real gap is configuration, not repair:** the new folder has to be a scan root, or nothing
+looks there. That is worth a sentence in the UI, and it is not the feature this entry described.
+
+**Cost:** nil — it is built. What was added is the regression test, because a relink that silently
+stopped working would surface as "my ratings vanished when I reorganised my presets", which is the
+kind of report nobody traces back to a scan.
 
 ## Smart collections that notice
 
