@@ -628,6 +628,24 @@
     setRandomModulator(random.randomId, { seed });
   }
 
+  // A pattern's seed decides how every probability rolls, on every loop, for ever — same seed,
+  // same performance, across runs and machines (deterministicRoll in CompiledPattern.h). Minted
+  // in the same range the native side uses, and never zero: setPatternOptions clamps to 1 and a
+  // field that silently corrects what you typed is worse than one that will not take it.
+  const newPatternSeed = () =>
+    (Math.floor(Date.now() + Math.random() * 0x3fffffff) % 0x7ffffffe) + 1;
+
+  function setPatternSeed(pattern, value) {
+    const seed = Math.max(1, Math.floor(Number(value)) || 1);
+    if (seed !== pattern.seed) setPatternOptions(pattern.patternId, { seed });
+  }
+
+  // It only does anything where a step's probability is between 1 and 99: a condition is loop
+  // arithmetic rather than a roll, and 0 or 100 answers before the dice are reached. Saying so
+  // is the difference between "this control is broken" and "nothing in here rolls yet".
+  const patternRolls = (pattern) => (pattern?.lanes ?? []).some(
+    (lane) => (lane.steps ?? []).some((step) => step.probability > 0 && step.probability < 100));
+
   const msegDisplayPoints = (mseg) => msegDrag?.msegId === mseg.msegId
     ? msegDrag.points : mseg.points;
 
@@ -952,6 +970,21 @@
               <input type="range" min="0" max="0.75" step="0.01" value={selectedPattern.swing}
                      onchange={(e) => setPatternOptions(selectedPattern.patternId,
                                                        { swing: Number(e.currentTarget.value) })} />
+            </label>
+            <label class="mini-field seed-field"
+                   title={patternRolls(selectedPattern)
+                     ? 'Which way every probability rolls. The same seed plays the same performance, every run and every machine — write it down and you can rehearse it.'
+                     : 'Which way every probability rolls — but no step in this pattern has a probability between 1 and 99, so nothing here rolls yet and the seed changes nothing.'}>
+              Seed
+              <span class="seed-row">
+                <input type="number" min="1" max="2147483646" step="1" data-testid="pattern-seed"
+                       class:inert={!patternRolls(selectedPattern)}
+                       value={selectedPattern.seed}
+                       onchange={(e) => setPatternSeed(selectedPattern, e.currentTarget.value)} />
+                <button type="button" class="ghost" data-testid="pattern-reseed"
+                        title="Roll a different performance out of the same steps"
+                        onclick={() => setPatternSeed(selectedPattern, newPatternSeed())}>NEW</button>
+              </span>
             </label>
             <select value="" aria-label="Add a lane"
                     onchange={(e) => { if (e.currentTarget.value) addLane(selectedPattern.patternId, { type: e.currentTarget.value }); e.currentTarget.value = ''; }}>
@@ -3676,6 +3709,11 @@
     padding-top: 6px;
   }
   .mini-field { display: flex; flex-direction: column; gap: 4px; color: #aab4bd; font-size: 12px; }
+  .seed-field .seed-row { display: flex; align-items: center; gap: 4px; }
+  .seed-field input { width: 96px; font-variant-numeric: tabular-nums; }
+  /* Dimmed, not disabled: the seed is still real and still saved, it simply has nothing to
+     decide until a step carries a probability. Disabling it would hide a number worth keeping. */
+  .seed-field input.inert { opacity: 0.55; }
   .mini-field input[type='number'] { width: 62px; }
   .mini-field input[type='range'] { width: 90px; }
 

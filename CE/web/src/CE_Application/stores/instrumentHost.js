@@ -3280,6 +3280,18 @@ export function filterEffects(effects, query) {
 }
 
 /** The browser-only demo catalogue and rack. */
+/** A stable, non-zero seed derived from a pattern id, mirroring how the native side mints one.
+    The value is not expected to equal native's — nothing compares them — but the properties are
+    the ones that matter: distinct per pattern, the same on every reload, and never zero. */
+function mockPatternSeed(patternId) {
+  let h = 2166136261;
+  for (let i = 0; i < patternId.length; i += 1) {
+    h ^= patternId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (Math.abs(h) % 0x7ffffffe) + 1;
+}
+
 export function mockHostState() {
   return normalizeHostState({
     instruments: [
@@ -3392,6 +3404,7 @@ export function mockHostState() {
       grooves: factoryGrooveTemplates,
       patterns: [{
         patternId: 'mock-pattern-1',
+        seed: mockPatternSeed('mock-pattern-1'),
         name: 'Riff',
         lanes: [{
           laneId: 'mock-lane-1',
@@ -5090,6 +5103,7 @@ export function applyMockCommand(state, payload) {
     ...next.rack.buses.flatMap((candidate) => candidate.effects)]
     .find((candidate) => candidate.effectId === id);
 
+
   if (cmd === 'transportPlay' || cmd === 'transportStop' || cmd === 'transportContinue') {
     perf.transport.playing = cmd !== 'transportStop';
     if (cmd === 'transportPlay') { perf.transport.positionPpq = 0; perf.transport.bar = 1; perf.transport.beat = 1; }
@@ -5141,6 +5155,7 @@ export function applyMockCommand(state, payload) {
     const patternId = nextMockId('mock-pattern');
     perf.patterns.push(normalizePerformance({ patterns: [{
       patternId,
+      seed: mockPatternSeed(patternId),
       name: payload.name || `Pattern ${perf.patterns.length + 1}`,
       lanes: [{ laneId: `${patternId}-lane-1`, type: 'note', name: 'Notes',
                 targetPartId: next.rack.focusedPartId, resolved: true,
@@ -5201,6 +5216,11 @@ export function applyMockCommand(state, payload) {
     const target = pattern(payload.patternId);
     if (target && payload.swing !== undefined)
       target.swing = Math.min(0.75, Math.max(0, Number(payload.swing)));
+    // Clamped exactly as the native side does (jmax (1, ...) in setPatternOptions): a seed of
+    // zero would roll every event the same way, so the two must agree or the browser build
+    // rehearses a performance the app will not reproduce.
+    if (target && payload.seed !== undefined)
+      target.seed = Math.max(1, Math.floor(Number(payload.seed)) || 1);
     return next;
   }
   if (cmd === 'addLane') {

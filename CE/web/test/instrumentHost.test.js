@@ -2859,6 +2859,24 @@ test('mock reducer: patterns, lanes and steps', () => {
   state = applyMockCommand(state, { cmd: 'clearLane', patternId, laneId });
   assert.equal(state.performance.patterns[1].lanes[0].steps.some((s) => s.active), false);
 
+  // The seed decides how every probability rolls, and the browser build has to agree with the
+  // native clamp (jmax (1, ...) in setPatternOptions) or a performance rehearsed in the preview
+  // would not reproduce in the app.
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 42 });
+  assert.equal(state.performance.patterns[1].seed, 42, 'a seed can be typed in');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 0 });
+  assert.equal(state.performance.patterns[1].seed, 1, 'zero clamps to one, as the native side does');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: -5 });
+  assert.equal(state.performance.patterns[1].seed, 1, 'so does a negative');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 7.9 });
+  assert.equal(state.performance.patterns[1].seed, 7, 'and a fraction is floored rather than refused');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, swing: 0.5 });
+  assert.equal(state.performance.patterns[1].seed, 7, 'setting swing leaves the seed alone');
+
   state = applyMockCommand(state, { cmd: 'removePattern', patternId });
   assert.equal(state.performance.patterns.length, 1);
 });

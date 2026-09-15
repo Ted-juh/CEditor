@@ -2013,6 +2013,19 @@ or come back to in a year.
 deterministic, inspectable, and shareable without a server. A pattern becomes a seed plus a rule,
 which is a few bytes.
 
+> **Built, 2026-09-15**, and it needed no C++ at all — which is worth recording, because the first
+> estimate assumed some. `setPatternOptions` already accepted and clamped a seed, the JS sender
+> already existed, and the store already normalised the field in. The entire gap was that nothing
+> showed it. There is now a Seed field beside Swing with a NEW button that rolls one.
+>
+> Two things the implementation had to get right that the idea did not mention. The seed governs
+> **probability only** — a condition (`every`/`offset`) is loop arithmetic, and probability 0 or
+> 100 answers before the dice are reached (`CompiledPattern.h:155-168`) — so the field dims and
+> says so when no step in the pattern carries a probability between 1 and 99, rather than letting
+> somebody change the number, hear nothing, and conclude it is broken. And the mock library never
+> minted a seed, so every pattern in the browser build read 1; mock patterns now get a distinct
+> stable one, because a preview where the feature looks broken is worse than no preview.
+
 **Cost:** very low. The seed exists and is already stored.
 
 ## Draw the follow graph
