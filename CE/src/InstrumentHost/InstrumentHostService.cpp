@@ -1907,6 +1907,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             for (const auto* key : { "includeStandalone", "includeVst3" })
                 if (fields->hasProperty (key))
                     project->setProperty (key, (bool) payload.getProperty (key, true));
+            // Its default is the opposite of the two above, so it is read with a false fallback.
+            if (fields->hasProperty ("includeStageNotes"))
+                project->setProperty ("includeStageNotes",
+                                      (bool) payload.getProperty ("includeStageNotes", false));
         }
 
         hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
@@ -8082,6 +8086,13 @@ void InstrumentHostService::ensureHostProject()
     }
     for (const auto* key : { "includeStandalone", "includeVst3" })
         if (! project->hasProperty (key))         { project->setProperty (key, true);                 changed = true; }
+
+    // A setlist item's notes are "what the player needs to read on stage" — somebody's own
+    // words, and the only personal free text anywhere in a Performance. The authored rack ships
+    // inside every built product, so without this they would go to whoever gets the installer.
+    // Defaulted OFF, because a surprise is worse than a missing option: a build that quietly
+    // published your notes cannot be taken back, and one that left them out can be rebuilt.
+    if (! project->hasProperty ("includeStageNotes")) { project->setProperty ("includeStageNotes", false); changed = true; }
 
     if (changed)
         hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));

@@ -2048,6 +2048,41 @@ twice rather than differently.
 
 **Cost:** low.
 
+> **Corrected and partly built, 2026-09-15. The premise was wrong, and the real problem is the
+> other way round.**
+>
+> *"Share a rack or a chain and every one of them is lost"* describes a loss that cannot happen,
+> because the sharing cannot happen. Three probes, not a reading:
+>
+> - There is **no export or import of a library record at all**. No command, nothing under
+>   `tools/`, nothing in the bridge. Grepping for one finds the support bundle and nothing else.
+> - The **support bundle is an allowlist** and `library.json` is not on it — `SupportBundle.cpp`
+>   names every file that travels, and says so in the manifest it writes.
+> - A **built product ships `session-performance.json` as `factory-performance.json`** — the rack
+>   manifest, not the library.
+>
+> So `favourite`, `rating`, `notes`, `tags` and `collections` never leave the machine. Declaring
+> which of them are descriptive would have been half a feature whose other half does not exist.
+>
+> **What the probes found instead is the same concern pointing the other way.** The one thing
+> that does travel is the authored rack, and a `SetlistItem` carries `notes` — documented in
+> `PatternModel.h` as *"what the player needs to read on stage"*. That is the only personal prose
+> anywhere in a `Performance`: a cue, a key change, a reminder about the second verse. Hand a
+> colleague your VST3 and you handed them that.
+>
+> So the split was made, once, in the only place anything about a rack leaves the machine.
+> `factoryPerformance` in `tools/scripts/build-host-product.mjs` strips setlist notes from the
+> rack a product ships; the item keeps its name, scene, rack and tempo, because the set is what
+> it plays and that half is not a confidence. `includeStageNotes` on the Host Project turns it
+> back on, **defaulting to off, and the asymmetry is the decision**: a build that quietly
+> published somebody's notes cannot be taken back, and one that left them out can be run again.
+> The build stages the stripped content as a written file rather than copying the author's own
+> session across, which is exactly how the strip would otherwise be bypassed, and a session file
+> it cannot parse ships as no rack rather than as unread bytes.
+>
+> **What remains genuinely absent** is the sharing itself. When a record can be exported, the
+> rule to honour is the one this entry proposed — and the build's split is the precedent for how.
+
 ## What you own versus what you play
 
 The library knows what has been auditioned, rated, loaded and captured. Nobody has ever told the

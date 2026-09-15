@@ -43,6 +43,10 @@ export function normalizeProject(raw) {
     appId: String(raw?.appId ?? '').trim(),
     includeStandalone: raw?.includeStandalone !== false,
     includeVst3: raw?.includeVst3 !== false,
+    // Opposite default to the two above, and deliberately: see factoryPerformance below. An
+    // absent field means "do not publish my stage notes", which is what every project written
+    // before this existed meant whether or not it knew it.
+    includeStageNotes: raw?.includeStageNotes === true,
   };
 
   const errors = [];
@@ -51,6 +55,45 @@ export function normalizeProject(raw) {
   if (!/^[0-9A-Fa-f-]{36}$/.test(project.appId)) errors.push('appId is missing or not a GUID (the editor mints it — build from a saved Host Project)');
   if (!project.includeStandalone && !project.includeVst3) errors.push('no targets enabled');
   return { project, errors };
+}
+
+/**
+ * The authored rack as it should ship inside a built product.
+ *
+ * WHY THIS EXISTS. The editor's live session IS the product's factory rack — it is copied into
+ * every standalone and every VST3 bundle as factory-performance.json. Almost all of a
+ * Performance is descriptive: patterns, clips, scenes, routing, mixer, the names of songs. One
+ * field is not. A setlist item's `notes` is documented in PatternModel.h as "what the player
+ * needs to read on stage", which is somebody's own words about their own gig — a cue, a key
+ * change, a reminder about the second verse. Handing a colleague your VST3 handed them that too.
+ *
+ * So this is the descriptive/personal split, made once, in the only place anything about a rack
+ * leaves the machine: notes are stripped unless the project explicitly asks for them. Nothing
+ * else is touched, because nothing else is personal.
+ *
+ * `includeStageNotes` defaults to false and the asymmetry is the point. A build that quietly
+ * published somebody's notes cannot be taken back; a build that left them out can be run again.
+ */
+export function factoryPerformance(raw, { includeStageNotes = false } = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (includeStageNotes) return raw;
+
+  const setlist = raw.setlist;
+  if (!setlist || !Array.isArray(setlist.items)) return raw;
+
+  // The item keeps its name, its scene, its rack and its tempo — the set is what it plays, and
+  // that half is not a confidence. Only the prose goes.
+  return {
+    ...raw,
+    setlist: {
+      ...setlist,
+      items: setlist.items.map((item) => {
+        if (!item || typeof item !== 'object') return item;
+        const { notes, ...rest } = item;
+        return notes === undefined ? item : { ...rest, notes: '' };
+      }),
+    },
+  };
 }
 
 /** The installer's OutputBaseFilename half: the product name with everything hostile to a
@@ -123,7 +166,7 @@ export function resolveArtifacts({ candidateDirs, listDir }) {
 
     Pure: returns operations, executes nothing. Only the targets the manifest enables appear,
     and each op names the artifact it needs so a missing one refuses with its own name. */
-export function stagePlan({ project, artifacts, stageDir, performanceFile = null }) {
+export function stagePlan({ project, artifacts, stageDir, performanceJson = null }) {
   const ops = [];
   const missing = [];
 
@@ -135,8 +178,10 @@ export function stagePlan({ project, artifacts, stageDir, performanceFile = null
         ops.push({ kind: 'copyFile', from: artifacts.scannerExe, to: path.join(stageDir, 'Standalone', 'CEditorPluginScanner.exe') });
       if (artifacts.liveWorkerExe)
         ops.push({ kind: 'copyFile', from: artifacts.liveWorkerExe, to: path.join(stageDir, 'Standalone', 'CEditorPluginWorker.exe') });
-      if (performanceFile)
-        ops.push({ kind: 'copyFile', from: performanceFile, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
+      // WRITTEN, not copied: what ships is the stripped rack from factoryPerformance, and
+      // copying the author's own file would put their stage notes back.
+      if (performanceJson)
+        ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'Standalone', 'factory-performance.json') });
     }
   }
 
@@ -159,10 +204,10 @@ export function stagePlan({ project, artifacts, stageDir, performanceFile = null
           from: artifacts.liveWorkerExe,
           to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'x86_64-win', 'CEditorPluginWorker.exe'),
         });
-      if (performanceFile)
+      if (performanceJson)
         // Contents/Resources is the bundle's place for non-binary assets, and where the
         // runtime's factory-rack search looks from the module directory.
-        ops.push({ kind: 'copyFile', from: performanceFile, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'factory-performance.json') });
+        ops.push({ kind: 'writeFile', contents: performanceJson, to: path.join(stageDir, 'VST3', bundleName, 'Contents', 'Resources', 'factory-performance.json') });
     }
   }
 
@@ -307,11 +352,33 @@ async function main() {
   // The authored rack ships as the product's factory state; a project built without one
   // starts empty, and the summary says which happened rather than leaving it to guesswork.
   const performanceFile = args.performance && existsSync(args.performance) ? args.performance : null;
-  console.log(performanceFile ? `  factory rack: ${performanceFile}`
-                              : '  factory rack: none — the product starts with an empty rack');
+  let performanceJson = null;
+  if (performanceFile) {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(readFileSync(performanceFile, 'utf8'));
+    } catch {
+      parsed = null;
+    }
+    // A rack that cannot be read ships as no rack. Copying the bytes across unread would be the
+    // one path that bypasses the strip below, and "the product starts empty" is already a
+    // documented outcome — quietly publishing an unreadable file is not.
+    if (parsed === null) {
+      console.log('  factory rack: unreadable — the product starts with an empty rack');
+    } else {
+      const shipped = factoryPerformance(parsed, { includeStageNotes: project.includeStageNotes });
+      performanceJson = `${JSON.stringify(shipped, null, 2)}\n`;
+      console.log(`  factory rack: ${performanceFile}`);
+      console.log(project.includeStageNotes
+        ? '  stage notes: INCLUDED — the setlist prose ships to whoever gets this product'
+        : '  stage notes: stripped from the shipped rack');
+    }
+  } else {
+    console.log('  factory rack: none — the product starts with an empty rack');
+  }
 
   const stageDir = path.join(args.out, 'stage');
-  const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceFile });
+  const { ops, missing } = stagePlan({ project, artifacts, stageDir, performanceJson });
   const symbolsRoot = path.join(args.out, 'private-symbols');
   const workerExeSha256 = artifacts.liveWorkerExe
     ? await sha256File(artifacts.liveWorkerExe) : null;
@@ -330,6 +397,7 @@ async function main() {
   for (const op of ops) {
     mkdirSync(path.dirname(op.to), { recursive: true });
     if (op.kind === 'copyDir') cpSync(op.from, op.to, { recursive: true });
+    else if (op.kind === 'writeFile') writeFileSync(op.to, op.contents);
     else cpSync(op.from, op.to);
     console.log(`  staged ${path.relative(args.out, op.to)}`);
   }

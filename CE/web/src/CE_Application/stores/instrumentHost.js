@@ -1261,6 +1261,10 @@ export function emptyHostProject() {
     appId: '',
     includeStandalone: true,
     includeVst3: true,
+    // A setlist item's notes are somebody's own words about their own gig, and the authored rack
+    // ships inside every built product. Off by default: a build that quietly published them
+    // cannot be taken back, and one that left them out can be run again.
+    includeStageNotes: false,
   };
 }
 
@@ -1273,6 +1277,9 @@ export function normalizeHostProject(payload) {
     appId: String(p.appId ?? ''),
     includeStandalone: p.includeStandalone !== false,
     includeVst3: p.includeVst3 !== false,
+    // Opposite default to the two above: an absent field means "do not publish my notes", which
+    // is what every project written before the field existed meant whether it knew it or not.
+    includeStageNotes: p.includeStageNotes === true,
   };
 }
 
@@ -6950,7 +6957,7 @@ function send(payload) {
         const next = { ...project };
         for (const key of ['productName', 'version', 'publisher'])
           if (payload[key] !== undefined) next[key] = String(payload[key]).trim();
-        for (const key of ['includeStandalone', 'includeVst3'])
+        for (const key of ['includeStandalone', 'includeVst3', 'includeStageNotes'])
           if (payload[key] !== undefined) next[key] = payload[key] === true;
         return next;
       });
