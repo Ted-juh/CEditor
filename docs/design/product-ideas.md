@@ -1821,6 +1821,14 @@ Either raise the cap, or compose the remainder into a flattened backdrop rather 
 
 # 28. The sound library
 
+> **Verified 2026-09-15.** Every claim of absence in this section and the next was re-checked
+> against the code after the first draft. Three were wrong and are corrected in place with the
+> evidence: the parent's name *is* shown, `sonicRefusal` *is* surfaced with an aggregate count, and
+> duplicate sets *are* listed. The method that produced those errors is worth naming — confirming a
+> data structure exists, grepping narrowly for one UI term, and concluding absence. In a 900-line
+> browser that is not enough, and an idea record whose value is knowing what is already built cannot
+> afford it.
+
 The library is one of the better-built things here — records for presets, racks and chains, versions
 with a retention rule, measured sonic profiles, facets, ranges, duplicate detection, smart
 collections, and per-record curation. Most of what follows is a field that exists and is never spent.
@@ -1831,9 +1839,13 @@ Every record carries `branchedFromRecordId` (`CE/src/InstrumentHost/Library.h:12
 Browser shows a **version rail** — a linear list of saves, newest first, each restorable, with a
 "WHAT CHANGED?" diff between the first and now. That part is good.
 
-But `branchedFrom` is used for exactly one thing: as a condition on whether the diff button appears.
-Nothing lets you walk **up** to a sound's parent, **sideways** to its siblings, or **down** to what
-descended from it.
+**Correction to an earlier draft of this section**, which said `branchedFrom` was used for exactly
+one thing — gating that button. It is used for two: the inspector also prints *"branched from
+&lt;name&gt;"* (`SoundBrowser.svelte:954`). So the parent is named.
+
+What is still absent is **navigation and shape**. The parent's name is text, not a link. Nothing
+walks **up** to it, **sideways** to siblings, or **down** to what descended from this sound, and
+there is no view of the family as a whole.
 
 **The feature.** The tree, drawn. *This pad came from that pad, which came from the factory preset.
 Six sounds descend from this one, and here is what each changed.*
@@ -1884,20 +1896,32 @@ nags. Counted quietly, shown where the collection is listed.
 
 ## `sonicRefusal` is a worklist nobody sees
 
-When the probe cannot measure a sound it records **why** — `sonicRefusal` on the record, beside
-`sonicFingerprint`. That is a considerate design and the answer goes nowhere.
+**This entry originally claimed the answer goes nowhere. That was wrong**, and the correction
+shrinks the idea to something much smaller.
 
-Collected, it is a to-do list for finishing the measurement of a library: *forty sounds could not be
-measured — thirty-one because the plug-in is missing, six because they were silent, three because
-the worker crashed on them.* Each of those has a different fix and two of them are one click.
+`sonicRefusal` is surfaced in three places already: a refused tile carries it as its tooltip
+(`SoundBrowser.svelte:664`), the inspector shows it when a sound has no profile, and there is an
+**aggregate count** — *"N could not be heard"* — with a re-analyse action beside it (`:375`). The
+code even explains itself: a refusal is remembered precisely so the auditioner will not ask again
+on its own, and that count is the only way back to one.
 
-**Cost:** very low. It is a group-by over a field.
+So what is missing is not visibility. It is the **breakdown by cause**: *thirty-one because the
+plug-in is missing, six because they were silent, three because the worker crashed.* Those have
+three different fixes and one list treats them as one problem.
+
+**Cost:** very low, and the value is correspondingly smaller than this entry first claimed — a
+group-by on a field that is already counted and already shown.
 
 ## Dedupe should merge curation, not bury it
 
-`LibraryDuplicateSet` exists and duplicates can be folded. The thing that must not be lost when
-folding is the **curation**: one copy is rated four stars, another sits in two collections, a third
-carries the note explaining what the sound is for.
+**Correction:** an earlier draft implied duplicates were merely detected. They are detected *and
+surfaced* — the browser has a Housekeeping rail showing the number of duplicate sets and total
+copies, and lists the first six (`SoundBrowser.svelte:393-403`).
+
+What does not exist is a **merge**. Grepping for one finds nothing. And a merge is where the care is
+needed, because the thing that must not be lost when folding is the **curation**: one copy is rated
+four stars, another sits in two collections, a third carries the note explaining what the sound is
+for.
 
 Merge them into the survivor — union the tags and collections, keep the highest rating, concatenate
 the notes with their sources named — rather than keeping whichever record won and silently
