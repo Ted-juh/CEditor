@@ -1905,12 +1905,30 @@ shrinks the idea to something much smaller.
 code even explains itself: a refusal is remembered precisely so the auditioner will not ask again
 on its own, and that count is the only way back to one.
 
-So what is missing is not visibility. It is the **breakdown by cause**: *thirty-one because the
-plug-in is missing, six because they were silent, three because the worker crashed.* Those have
-three different fixes and one list treats them as one problem.
+So what was missing is not visibility. It was the **breakdown by cause** — and a second correction
+is due here, because the example this entry first gave was also wrong. *"Thirty-one because the
+plug-in is missing"* is not a refusal at all: `measurable` already excludes `available === false`,
+so a record whose plug-in is gone is never tried and never refuses. Nor is "silent" one — a silent
+sound is a successful measurement that found nothing.
 
-**Cost:** very low, and the value is correspondingly smaller than this entry first claimed — a
-group-by on a field that is already counted and already shown.
+The real causes are eight sentences from four producers, and they fall into four classes that take
+**different actions**: a crash or a hang may well pass on a re-run; a damaged or undecodable state
+will fail identically for ever; a preset the plug-in will not take needs the plug-in to change, not
+another attempt; and a build limitation is nobody's to fix. One "measure everything again" button
+was offered for all of them.
+
+> **Built, 2026-09-15.** `refusalCause` / `refusalCauseId` in `CE/src/InstrumentHost/Library.h`
+> classify a refusal sentence into `crashed` / `unreadable` / `mismatch` / `unsupported` / `other`;
+> `emitLibrary` counts them beside the `refused` total it already computed, over every record
+> rather than over the query's matches so the rows add up to the number above them; and the browser
+> draws a row per non-zero cause saying whether asking again may work. Thirteen assertions in
+> `InstrumentHostServiceTests.cpp` pin every producing sentence, so a moved string fails a test
+> rather than silently dropping its sounds into `other`.
+>
+> **Two things deliberately not built**, because each needs more C++ than the change was worth:
+> clicking a row to filter the browser to those records (`LibraryQuery` has no refused-by-cause
+> field), and a retry scoped to the retry-worthy ones (`analyseLibrary(all)` is all-or-nothing).
+> The button keeps its existing wording and meaning; the rows now say what it can and cannot fix.
 
 ## Dedupe should merge curation, not bury it
 

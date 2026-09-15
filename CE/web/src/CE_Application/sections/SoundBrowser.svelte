@@ -72,6 +72,17 @@
 
   // Source types are the library's own vocabulary and they are not words anybody says out
   // loud. The chips read as what the sound IS; the value underneath stays what the record says.
+  // The refusal causes C++ reports (RefusalCause in Library.h), in the order somebody would act
+  // on them: the one a re-run can fix, then the ones it cannot, then anything unrecognised —
+  // which appears only when a refusal string has moved and nothing classifies it any more.
+  const REFUSAL_ROWS = [
+    { cause: 'crashed',     retryable: true,  label: 'the plug-in crashed or stopped responding' },
+    { cause: 'unreadable',  retryable: false, label: 'the saved state is damaged or unreadable' },
+    { cause: 'mismatch',    retryable: false, label: 'the plug-in no longer accepts this preset' },
+    { cause: 'unsupported', retryable: false, label: 'this build cannot load that kind of preset' },
+    { cause: 'other',       retryable: false, label: 'for a reason this build does not recognise' },
+  ];
+
   const SOURCE_LABELS = {
     vstpreset: 'Vendor preset',
     programList: "Plug-in's own programs",
@@ -378,6 +389,23 @@
             <button type="button" class="ghost more" data-testid="host-analyse-all"
                     title="Ask every sound again, including the ones that refused"
                     onclick={() => analyseLibrary(true)}>MEASURE EVERYTHING AGAIN</button>
+          </div>
+          <!-- Split by what could be done about it, because the button above cannot help all of
+               them: a crash may well pass on a second run, and a damaged state will fail the same
+               way for ever. Without the split one number invites the same fruitless re-run. -->
+          <div class="refusal-causes" data-testid="refusal-causes">
+            {#each REFUSAL_ROWS as row (row.cause)}
+              {@const n = $hostLibrary.counts.refusedByCause?.[row.cause] ?? 0}
+              {#if n > 0}
+                <div class="refusal-row" data-testid={`refusal-${row.cause}`}>
+                  <span class="rn">{n}</span>
+                  <span class="rt">{row.label}</span>
+                  <span class="rf" class:worth={row.retryable}>
+                    {row.retryable ? 'asking again may work' : 'asking again will not help'}
+                  </span>
+                </div>
+              {/if}
+            {/each}
           </div>
         {/if}
         {#if $hostAnalysis.what}
@@ -1253,6 +1281,12 @@
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     color: #b08a3d; font-size: 10px; padding: 2px 0;
   }
+  .refusal-causes { display: flex; flex-direction: column; gap: 2px; padding: 0 0 2px 10px; }
+  .refusal-row { display: flex; align-items: baseline; gap: 6px; font-size: 10px; }
+  .refusal-row .rn { color: #b08a3d; min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+  .refusal-row .rt { color: #8b949e; }
+  .refusal-row .rf { color: #66707b; font-style: italic; margin-left: auto; }
+  .refusal-row .rf.worth { color: #7f9d6a; }
   .dup-note { color: #d9a13c; font-size: 10.5px; padding: 2px 0; }
   .hint { color: #66707b; font-size: 10.5px; margin-right: auto; }
   .flabel {

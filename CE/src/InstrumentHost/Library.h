@@ -394,4 +394,40 @@ struct VstPresetHeader
 
 VstPresetHeader parseVstPresetHeader (const void* data, size_t size);
 
+
+// -- why a sound could not be heard ------------------------------------------------------------
+//
+// `sonicRefusal` above is a sentence written for a person, and three of the sentences that reach
+// it end with the record's own name, so the strings cannot be grouped as they stand. They still
+// fall into four classes, and the classes matter because they take DIFFERENT ACTIONS:
+//
+//   crashed      the plug-in died or hung while playing this one. Transient; asking again is
+//                exactly the right thing to do, and is the only way back to a sound the
+//                auditioner has stopped offering.
+//   unreadable   the state could not be decoded or is damaged. Asking again fails identically,
+//                every time, because nothing about the bytes will have changed.
+//   mismatch     the plug-in would not take this preset, or no longer has that program. The
+//                preset does not fit this build of this plug-in; retrying changes nothing until
+//                the plug-in does.
+//   unsupported  this build cannot load that kind of preset at all. Nothing the user can do.
+//
+// Without the split, one "measure everything again" button is offered for all of them and
+// re-runs hundreds of sounds that cannot possibly succeed.
+//
+// THE MATCHING IS BY PREFIX and that is a deliberate, stated weakness: the producing strings
+// live in InstrumentHostService::applyStateBlob and ::applyRecordState, ScannerWorkerMain's
+// applyState, and SonicAnalysisWorker's timeout/crash branch. Edit one of those without editing
+// the table below and its sounds become `other` — visible as a row rather than silently
+// miscounted, which is why `other` exists instead of a fallback into one of the four. The
+// alternative is a cause code carried from each site through the finding, the worker's
+// marshalling and the record; worth doing if these strings ever start moving.
+
+enum class RefusalCause { crashed, unreadable, mismatch, unsupported, other };
+
+/** Classify one `sonicRefusal` sentence. Empty is `other`, as is anything unrecognised. */
+RefusalCause refusalCause (const juce::String& refusal);
+
+/** The stable wire name for a cause — what the browser receives and groups on. */
+juce::String refusalCauseId (RefusalCause cause);
+
 } // namespace ceditor::host

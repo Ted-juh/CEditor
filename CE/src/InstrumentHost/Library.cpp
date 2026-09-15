@@ -1027,4 +1027,47 @@ VstPresetHeader parseVstPresetHeader (const void* data, size_t size)
     return header;
 }
 
+// -- why a sound could not be heard --------------------------------------------------------------
+
+RefusalCause refusalCause (const juce::String& refusal)
+{
+    const auto text = refusal.trim();
+    if (text.isEmpty())
+        return RefusalCause::other;
+
+    // Whole sentences first, then the three that append ": <name>" and must match on their stem.
+    // Order matters only in that a stem must not be a prefix of another entry's stem; none is.
+    struct Entry { const char* stem; RefusalCause cause; };
+    static constexpr Entry table[]
+    {
+        { "The plug-in crashed while playing this sound.",        RefusalCause::crashed },
+        { "The plug-in stopped responding while playing this sound.", RefusalCause::crashed },
+        { "That saved state could not be read back.",             RefusalCause::unreadable },
+        { "The captured state for",                               RefusalCause::unreadable },
+        { "The vendor preset could not be read:",                 RefusalCause::unreadable },
+        { "The plug-in refused this preset:",                     RefusalCause::mismatch },
+        { "The plug-in no longer has this program:",              RefusalCause::mismatch },
+        { "Vendor preset loading is not available in this build.", RefusalCause::unsupported },
+    };
+
+    for (const auto& entry : table)
+        if (text.startsWith (entry.stem))
+            return entry.cause;
+
+    return RefusalCause::other;
+}
+
+juce::String refusalCauseId (RefusalCause cause)
+{
+    switch (cause)
+    {
+        case RefusalCause::crashed:     return "crashed";
+        case RefusalCause::unreadable:  return "unreadable";
+        case RefusalCause::mismatch:    return "mismatch";
+        case RefusalCause::unsupported: return "unsupported";
+        case RefusalCause::other:       break;
+    }
+    return "other";
+}
+
 } // namespace ceditor::host

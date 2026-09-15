@@ -10260,6 +10260,21 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                  if (! r.sonic.measured && r.sonicRefusal.isNotEmpty())
                                                      ++n;
                                              return n; }());
+    // The same refusals split by what could be done about them (see RefusalCause in Library.h).
+    // Counted over every record rather than over the query's matches, because this sits beside
+    // `refused` above and has to add up to it — a breakdown of whatever happens to be filtered
+    // would be a different number under the same heading.
+    counts->setProperty ("refusedByCause", [this]
+    {
+        auto* byCause = new juce::DynamicObject();
+        for (const auto& r : library.allRecords())
+            if (! r.sonic.measured && r.sonicRefusal.isNotEmpty())
+            {
+                const auto id = refusalCauseId (refusalCause (r.sonicRefusal));
+                byCause->setProperty (id, (int) byCause->getProperty (id) + 1);
+            }
+        return juce::var (byCause);
+    }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 

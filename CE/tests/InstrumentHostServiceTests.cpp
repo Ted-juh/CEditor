@@ -3302,6 +3302,55 @@ void testAuditioner()
 // could say "pads" and never "pads, but nothing distorted" — plus the two things that make a
 // faceted browser trustworthy rather than merely present: a chip's count says what clicking it
 // would give you, and a chip you have already used never disappears from the list.
+void testRefusalCauses()
+{
+    using ceditor::host::RefusalCause;
+    using ceditor::host::refusalCause;
+    using ceditor::host::refusalCauseId;
+
+    // Every sentence that can reach `sonicRefusal`, copied from its producer. If one of these
+    // fails, the producing string has moved and the browser's breakdown has quietly lost a row
+    // to `other` — which is the failure this test exists to make loud. Producers:
+    //   InstrumentHostService::applyStateBlob / ::applyRecordState
+    //   ScannerWorkerMain's applyState lambda
+    //   SonicAnalysisWorker's timeout/crash branch
+    check (refusalCause ("The plug-in crashed while playing this sound.") == RefusalCause::crashed,
+           "a crash is retry-worthy");
+    check (refusalCause ("The plug-in stopped responding while playing this sound.") == RefusalCause::crashed,
+           "a hang is retry-worthy");
+    check (refusalCause ("That saved state could not be read back.") == RefusalCause::unreadable,
+           "an undecodable state is unreadable");
+    check (refusalCause ("The captured state for Big Pad is damaged.") == RefusalCause::unreadable,
+           "a damaged capture is unreadable, name and all");
+    check (refusalCause ("The vendor preset could not be read: Big Pad") == RefusalCause::unreadable,
+           "an unreadable vendor file is unreadable, name and all");
+    check (refusalCause ("The plug-in refused this preset: Big Pad") == RefusalCause::mismatch,
+           "a refused preset is a mismatch, name and all");
+    check (refusalCause ("The plug-in no longer has this program: Big Pad") == RefusalCause::mismatch,
+           "a vanished program is a mismatch, name and all");
+    check (refusalCause ("Vendor preset loading is not available in this build.") == RefusalCause::unsupported,
+           "a build limitation is unsupported");
+
+    // Nothing is forced into one of the four. An unknown sentence gets its own row rather than
+    // being miscounted as retry-worthy, which would put it behind a button that cannot help it.
+    check (refusalCause ("Something nobody has written yet.") == RefusalCause::other,
+           "an unrecognised sentence is other, not a guess");
+    check (refusalCause ({}) == RefusalCause::other, "an empty refusal is other");
+    check (refusalCause ("   ") == RefusalCause::other, "whitespace is other");
+
+    // A stem must not swallow a longer sentence that means something else.
+    check (refusalCause ("The plug-in refused this preset: The plug-in crashed while playing this sound.")
+             == RefusalCause::mismatch,
+           "a preset named after another message still matches its own stem");
+
+    check (refusalCauseId (RefusalCause::crashed) == "crashed"
+             && refusalCauseId (RefusalCause::unreadable) == "unreadable"
+             && refusalCauseId (RefusalCause::mismatch) == "mismatch"
+             && refusalCauseId (RefusalCause::unsupported) == "unsupported"
+             && refusalCauseId (RefusalCause::other) == "other",
+           "every cause has its stable wire name");
+}
+
 void testLibraryBrowsing()
 {
     std::cout << "\nfacets, exclusion and counts that predict the click" << std::endl;
@@ -10706,6 +10755,7 @@ int main (int argc, char* argv[])
     testProgramListPlaceholdersAndLateNames();
     testSubstitutes();
     testBrowseOnSurface();
+    testRefusalCauses();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

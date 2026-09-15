@@ -594,7 +594,7 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 7);
+  assert.equal(get(hostLibrary).records.length, 8);
 
   requestLibrary('warm', '');
   assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
@@ -603,7 +603,7 @@ test('mock reducer: the library round trip — search, capture, favourite, load-
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 8, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 9, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -720,7 +720,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 7);
+  assert.equal(get(hostLibrary).counts.matched, 8);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -739,7 +739,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 7);
+  assert.equal(get(hostLibrary).records.length, 8);
   requestLibrary(saved[0].query);
   assert.equal(get(hostLibrary).records.length, 6, 'and re-running it restores the view');
 
@@ -752,10 +752,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 5);
+  assert.equal(get(hostLibrary).records.length, 6);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 5,
+  assert.equal(get(hostLibrary).records.length, 6,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -829,10 +829,19 @@ test('mock reducer: a sound that refused is counted apart from one nobody has go
   requestLibrary(emptyLibraryQuery());
 
   const counts = get(hostLibrary).counts;
-  assert.equal(counts.refused, 1, 'a refused sound has its own count');
+  assert.equal(counts.refused, 2, 'refused sounds have their own count');
   assert.ok(counts.measurable > 0, 'and there is still something left to measure');
 
-  const refused = get(hostLibrary).records.find((r) => r.sonicRefusal);
+  // Split by what could be done about it. The total above cannot say that one of these two will
+  // pass on a re-run and the other will fail the same way for ever, and that is the difference
+  // between a useful button and a fruitless one.
+  assert.deepEqual(counts.refusedByCause,
+    { crashed: 1, unreadable: 1, mismatch: 0, unsupported: 0, other: 0 },
+    'and are split by what could be done about them');
+  assert.equal(Object.values(counts.refusedByCause).reduce((a, b) => a + b, 0), counts.refused,
+    'the split adds up to the total it sits under');
+
+  const refused = get(hostLibrary).records.find((r) => /crashed/.test(r.sonicRefusal ?? ''));
   assert.equal(refused.sonic, null, 'it carries no measurement');
   assert.match(refused.sonicRefusal, /crashed/, 'and says why');
 
