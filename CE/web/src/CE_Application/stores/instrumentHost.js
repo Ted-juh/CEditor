@@ -1901,6 +1901,7 @@ export function emptyPerformance() {
       defaultQuantize: 'bar',
     },
     grooves: [],
+    gestureShapes: [],
     patterns: [],
     clips: [],
     scenes: [],
@@ -1971,6 +1972,129 @@ export const factoryGrooveTemplates = [
     velocityMultipliers: [1.12, .91, .98, .87, 1.07, .92, 1, .88, 1.10, .90, .97, .86, 1.06, .91, .99, .87],
   },
 ];
+
+/** How many points a stored gesture shape carries. Fixed, mirroring gestureShapePoints in
+    CE/src/Performance/PatternModel.h: a shape read off a sixteen-step lane has to land on a
+    thirty-two-step one, so it is stored over normalised time rather than as steps. */
+export const GESTURE_SHAPE_POINTS = 32;
+
+/** The four movements a hand actually makes. Somebody with an empty library still has something
+    to put on a filter and hear what this does, which is the same reason the grooves ship. */
+export const factoryGestureShapes = (() => {
+  const build = (gestureId, name, curve) => ({
+    gestureId, name, source: 'factory',
+    points: Array.from({ length: GESTURE_SHAPE_POINTS },
+      (_unused, i) => Math.max(0, Math.min(1, curve(i / GESTURE_SHAPE_POINTS)))),
+  });
+  return [
+    build('@hostage-rise', 'Rise', (t) => t),
+    build('@hostage-fall', 'Fall', (t) => 1 - t),
+    // Up and back down inside one pass — the build-and-release every filter sweep is.
+    build('@hostage-swell', 'Swell', (t) => (t < 0.5 ? t * 2 : (1 - t) * 2)),
+    // Four cycles around the middle: deep enough to hear, not so deep it flattens at both ends.
+    build('@hostage-wobble', 'Wobble', (t) => 0.5 + 0.45 * Math.sin(t * 4 * 2 * Math.PI)),
+  ];
+})();
+
+export const normalizeGestureShape = (shape) => ({
+  gestureId: String(shape?.gestureId ?? ''),
+  name: String(shape?.name ?? 'Imported gesture').trim().slice(0, 80) || 'Imported gesture',
+  source: shape?.source === 'factory' ? 'factory' : 'imported',
+  points: (Array.isArray(shape?.points) ? shape.points : [])
+    .slice(0, GESTURE_SHAPE_POINTS).map((value) => clampNumber(value, 0, 1, 0)),
+});
+
+/** The value a shape has at `phase` (0..1 of one pass). Wrapped, not clamped: a shape put on a
+    lane longer than itself repeats, because running out and holding would turn a wobble into a
+    wobble followed by silence. */
+export function gestureValueAt(shape, phase) {
+  const points = shape?.points ?? [];
+  if (points.length === 0) return 0;
+  if (points.length === 1) return points[0];
+  let wrapped = Number(phase) % 1;
+  if (wrapped < 0) wrapped += 1;
+  const scaled = wrapped * points.length;
+  const lower = Math.floor(scaled);
+  const fraction = scaled - lower;
+  const a = points[lower % points.length];
+  const b = points[(lower + 1) % points.length];
+  return a + (b - a) * fraction;
+}
+
+/** Reads the shape of a hand movement out of a lane — the browser mirror of gestureFromLane in
+    CE/src/Performance/PatternModel.cpp, which is the authority.
+
+    Answers with NO points when there was nothing to read: a lane that is not a parameter or cc
+    lane (a note lane has velocities, not a curve), or one with fewer than two active steps,
+    because a single value is a position and not a movement. Only active steps carry a value;
+    the rest are what the lane's glide passes through. */
+export function gestureFromPatternLane(pattern, laneId = '', name = '') {
+  const shape = {
+    gestureId: '',
+    source: 'imported',
+    name: String(name ?? '').trim().slice(0, 80)
+          || `${String(pattern?.name ?? '')} move`.trim().slice(0, 80),
+    points: [],
+  };
+
+  const carriesACurve = (lane) => lane?.type === 'parameter' || lane?.type === 'cc';
+  const lanes = pattern?.lanes ?? [];
+  const source = laneId
+    ? lanes.find((lane) => lane.laneId === laneId && carriesACurve(lane))
+    : lanes.find((lane) => carriesACurve(lane) && !lane.lockSourceLaneId);
+  if (!source || !(source.steps?.length > 0)) return shape;
+
+  const active = source.steps
+    .map((step, index) => ({ step, index }))
+    .filter(({ step }) => step.active);
+  if (active.length < 2) return shape;
+
+  const steps = source.steps.length;
+  for (let i = 0; i < GESTURE_SHAPE_POINTS; i += 1) {
+    const position = (i / GESTURE_SHAPE_POINTS) * steps;
+    // Before the first active step and after the last, hold the nearest: the lane had no
+    // movement out there to describe.
+    let before = active[0];
+    let after = active[active.length - 1];
+    for (const candidate of active) {
+      if (candidate.index <= position) before = candidate;
+      if (candidate.index >= position) { after = candidate; break; }
+    }
+    const span = after.index - before.index;
+    const fraction = span > 0
+      ? Math.max(0, Math.min(1, (position - before.index) / span)) : 0;
+    const a = Number(before.step.value ?? 0);
+    const b = Number(after.step.value ?? 0);
+    shape.points.push(Math.max(0, Math.min(1, a + (b - a) * fraction)));
+  }
+
+  return shape;
+}
+
+/** Writes a gesture onto one parameter or cc lane, at any length. Mirrors applyGestureShape.
+
+    `amount` scales the shape's deviation from ITS OWN MEAN rather than blending with whatever
+    the lane held: a gesture at half depth is the same movement, half as deep, centred where the
+    movement was centred. Every step it writes becomes active and the lane is set to glide,
+    because a gesture left stepping is a staircase rather than a sweep. */
+export function applyGestureToLane(pattern, shape, laneId, amount = 1) {
+  if (!(shape?.points?.length > 0)) return false;
+  const lane = (pattern?.lanes ?? []).find((candidate) => candidate.laneId === laneId
+    && (candidate.type === 'parameter' || candidate.type === 'cc'));
+  if (!lane || !(lane.steps?.length > 0)) return false;
+
+  const depth = Math.max(0, Math.min(1, Number(amount ?? 1)));
+  const mean = shape.points.reduce((sum, value) => sum + value, 0) / shape.points.length;
+
+  const steps = lane.steps.length;
+  for (let i = 0; i < steps; i += 1) {
+    const sampled = gestureValueAt(shape, i / steps);
+    lane.steps[i].value = Math.max(0, Math.min(1, mean + (sampled - mean) * depth));
+    lane.steps[i].active = true;
+  }
+  lane.glide = true;
+  return true;
+}
 
 export const normalizeGrooveTemplate = (groove) => ({
   grooveId: String(groove?.grooveId ?? ''),
@@ -2568,6 +2692,10 @@ export function normalizePerformance(payload) {
     },
     grooves: (Array.isArray(p.grooves) ? p.grooves : [])
       .map(normalizeGrooveTemplate).filter((groove) => groove.grooveId && groove.timingOffsets.length >= 2),
+    // Named apart from the recorder's own `gestures` on purpose: two different things under one
+    // key on one object is a bug waiting to be found by somebody else.
+    gestureShapes: (Array.isArray(p.gestureShapes) ? p.gestureShapes : [])
+      .map(normalizeGestureShape).filter((shape) => shape.gestureId && shape.points.length >= 2),
     patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((pattern) => ({
       patternId: String(pattern?.patternId ?? ''),
       name: String(pattern?.name ?? ''),
@@ -3979,6 +4107,7 @@ export function mockHostState() {
     performance: {
       transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
       grooves: factoryGrooveTemplates,
+      gestureShapes: factoryGestureShapes,
       patterns: [{
         patternId: 'mock-pattern-1',
         seed: mockPatternSeed('mock-pattern-1'),
@@ -5749,6 +5878,39 @@ export function applyMockCommand(state, payload) {
     const groove = perf.grooves.find((candidate) => candidate.grooveId === payload.grooveId);
     if (target && groove)
       applyGrooveToPattern(target, groove, payload.amount, payload.applyVelocity !== false);
+    return next;
+  }
+  if (cmd === 'importGestureShape') {
+    if (perf.gestureShapes.length >= 32) return next;
+    const imported = normalizeGestureShape({
+      gestureId: nextMockId('mock-gesture'),
+      name: payload.name,
+      source: 'imported',
+      points: payload.points,
+    });
+    if (imported.points.length >= 2) perf.gestureShapes.push(imported);
+    return next;
+  }
+  if (cmd === 'extractGestureShape') {
+    if (perf.gestureShapes.length >= 32) return next;
+    const target = pattern(payload.patternId);
+    if (!target) return next;
+    const read = gestureFromPatternLane(target, payload.laneId, payload.name);
+    if (read.points.length < 2) return next;
+    perf.gestureShapes.push(normalizeGestureShape({ ...read, gestureId: nextMockId('mock-gesture') }));
+    return next;
+  }
+  if (cmd === 'removeGestureShape') {
+    perf.gestureShapes = perf.gestureShapes.filter((shape) =>
+      shape.gestureId !== payload.gestureId || shape.source === 'factory');
+    return next;
+  }
+  if (cmd === 'applyGestureShape') {
+    const target = pattern(payload.patternId);
+    const shape = perf.gestureShapes.find((candidate) => candidate.gestureId === payload.gestureId);
+    // A gesture goes on ONE named lane, unlike a groove, which is the timing of a whole pattern:
+    // a filter sweep is a movement of one thing.
+    if (target && shape) applyGestureToLane(target, shape, payload.laneId, payload.amount);
     return next;
   }
   if (cmd === 'addPattern') {
@@ -8201,6 +8363,19 @@ export const unplayedLikeHabits = (count = 20) => send({ cmd: 'unplayedLikeHabit
     createPatternVariations already made, so the two agree rather than minting rival patterns. */
 export const createSceneVariations = (sceneId, amount = 0.55) =>
   send({ cmd: 'createSceneVariations', sceneId, amount });
+
+/** The gesture library: the same idea for the shape of a hand movement that the groove library
+    is for the timing of notes. */
+export const importGestureShape = (name, points) =>
+  send({ cmd: 'importGestureShape', name, points });
+export const removeGestureShape = (gestureId) => send({ cmd: 'removeGestureShape', gestureId });
+/** Reads a movement out of one lane so it can be kept and put somewhere else. */
+export const extractGestureShape = (patternId, laneId, name) =>
+  send({ cmd: 'extractGestureShape', patternId, ...(laneId ? { laneId } : {}),
+         ...(name ? { name } : {}) });
+/** Writes one onto a parameter or cc lane at any length; `amount` is its depth. */
+export const applyGestureShape = (patternId, gestureId, laneId, amount = 1) =>
+  send({ cmd: 'applyGestureShape', patternId, gestureId, laneId, amount });
 
 /** Folds a duplicate set onto its survivor: the curation of every member is gathered there and
     the rest go quiet. Nothing is deleted — see setLibraryRecordHidden for the way back. */

@@ -2303,6 +2303,40 @@ build, the wobble you always put on the filter.
 
 Factory ones, saved ones, applied to any parameter at any length.
 
+> **Built, 2026-09-15.** `GestureShape` in `CE/src/Performance/PatternModel.h`, sitting beside
+> `GrooveTemplate` and seeded with factory shapes by `Performance::create()` exactly as the
+> grooves are, with `gestureFromLane` / `applyGestureShape` mirroring
+> `grooveFromLane` / `applyGrooveTemplate`, four commands, and a library block in the Gestures
+> tab.
+>
+> **A shape is stored against normalised time, not steps**, and that is what makes a library
+> possible at all: a wobble read off a sixteen-step lane has to land on a thirty-two-step one
+> meaning the same thing. Thirty-two points over one pass, sampled at each target step's
+> position, wrapping rather than running out — a shape on a lane longer than itself repeats,
+> because holding its last value would turn a wobble into a wobble followed by silence. It is
+> point-sampled rather than averaged, which is right for a hand movement and means a
+> deliberately jagged shape on a coarse lane loses the detail between its steps.
+>
+> **What has nothing to read says so.** A note lane carries velocities, not a curve. A lane with
+> fewer than two active steps carries a position, not a movement. Only active steps carry a
+> value — the rest are what the lane's glide passes through — so reading them would read zeroes
+> nobody ever heard. In each case `gestureFromLane` answers with an empty shape and the command
+> refuses, the same contract `grooveFromLane` already had.
+>
+> **Depth is not a blend.** `amount` scales the shape's deviation from ITS OWN MEAN, so a gesture
+> at half depth is the same movement, half as deep, centred where the movement was centred.
+> Blending toward whatever the lane held would make the result depend on history nobody can see,
+> and an inactive step's value is not a value.
+>
+> Applying sets every written step active and turns the lane's glide on: a gesture left stepping
+> is a staircase rather than a sweep, which is the same thing the gesture recorder does to the
+> lanes it writes. And unlike a groove — which is the timing of a whole pattern — a gesture goes
+> on **one named lane**, because a filter sweep is a movement of one thing.
+>
+> One naming note worth keeping: the field is `gestureShapes`, not `gestures`, because the
+> emitted state already has a `gestures` — the recorder's own status — and two different things
+> under one key on one object is a bug waiting to be found by somebody else.
+
 **Cost:** low-to-medium. The recording exists; the library is storage, naming and retargeting.
 
 # The shortlist

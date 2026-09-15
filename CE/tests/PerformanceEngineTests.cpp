@@ -912,6 +912,207 @@ void testFollowActions()
 // means NOTHING are the ones worth pinning, because inventing a midpoint that does not exist is
 // silent and wrong.
 
+// A GESTURE LIBRARY. There was a groove library for the timing of notes and no equivalent for the
+// shape of a movement, though they are the same kind of reusable human artefact. What makes one
+// possible is that a shape is stored against NORMALISED TIME rather than steps: read a wobble off
+// a sixteen-step lane and it has to land on a thirty-two-step one meaning the same thing.
+
+void testGestureLibrary()
+{
+    std::cout << "\ngestures: a movement you can keep and put somewhere else" << std::endl;
+
+    const auto parameterLane = [] (const juce::String& laneId, int stepCount,
+                                   std::initializer_list<std::pair<int, float>> values)
+    {
+        Lane lane;
+        lane.laneId = laneId;
+        lane.type = LaneType::parameter;
+        lane.name = "Cutoff";
+        lane.targetId = "p1";
+        lane.parameterId = "cutoff";
+        lane.stepCount = stepCount;
+        lane.stepsPerBeat = 4;
+        lane.resizeSteps();
+        for (const auto& [index, value] : values)
+        {
+            auto& step = lane.steps.getReference (index);
+            step.active = true;
+            step.value = value;
+        }
+        return lane;
+    };
+
+    // -- reading one out --------------------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Sweep");
+        pattern.lanes.add (parameterLane ("l1", 16, { { 0, 0.0f }, { 8, 1.0f }, { 15, 0.0f } }));
+
+        const auto shape = gestureFromLane (pattern, "l1", "My sweep");
+        check (shape.points.size() == gestureShapePoints,
+               "a shape is a fixed curve over normalised time, whatever the lane's length");
+        check (shape.name == "My sweep" && shape.source == "imported", "named as asked, and its own");
+        check (shape.points.getFirst() < 0.1f, "it starts where the movement started");
+        check (shape.points[gestureShapePoints / 2] > 0.8f, "peaks where the movement peaked");
+        check (shape.points.getLast() < 0.4f, "and comes back down");
+
+        // Only ACTIVE steps carry a value; the rest are what the lane's glide passes through.
+        // Reading them would read zeroes nobody ever heard.
+        auto sparse = Pattern::create ("Two");
+        sparse.lanes.add (parameterLane ("l1", 16, { { 0, 0.2f }, { 15, 0.9f } }));
+        const auto rising = gestureFromLane (sparse, "l1");
+        check (rising.points.getFirst() < rising.points.getLast(),
+               "two active steps twelve apart still describe going somewhere");
+    }
+
+    // -- and what has nothing to read ---------------------------------------------------------
+    {
+        // FOUR active steps, deliberately: with only one, this would pass because a single
+        // value is not a movement, and the assertion would be testing the wrong rule while
+        // reading as though it tested this one.
+        auto notes = Pattern::create ("Beat");
+        notes.lanes.add (makeNoteLane ("n1", "p1", 8, 4, 2));
+        check (gestureFromLane (notes, "n1").points.isEmpty(),
+               "a note lane has velocities, not a curve, and answers with nothing");
+        check (gestureFromLane (notes).points.isEmpty(),
+               "and asking a pattern with no curve lane at all is the same answer");
+
+        auto single = Pattern::create ("One");
+        single.lanes.add (parameterLane ("l1", 16, { { 4, 0.7f } }));
+        check (gestureFromLane (single, "l1").points.isEmpty(),
+               "one value is a position, not a movement — so there is nothing to keep");
+
+        auto none = Pattern::create ("Empty");
+        none.lanes.add (parameterLane ("l1", 16, {}));
+        check (gestureFromLane (none, "l1").points.isEmpty(), "and a lane nothing moved on is empty");
+    }
+
+    // -- putting one on ------------------------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Target");
+        pattern.lanes.add (parameterLane ("l1", 32, {}));
+        pattern.lanes.add (makeNoteLane ("n1", "p1", 4, 4, 4));
+
+        GestureShape rise;
+        rise.gestureId = "g1";
+        rise.name = "Rise";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            rise.points.add ((float) i / (float) gestureShapePoints);
+
+        check (applyGestureShape (pattern, rise, "l1", 1.0f), "a curve lane takes a gesture");
+        const auto& lane = pattern.lanes.getReference (0);
+        check (lane.glide, "and glides, because a gesture left stepping is a staircase");
+        check (lane.steps.getFirst().value < 0.1f && lane.steps.getLast().value > 0.9f,
+               "the shape is stretched across the lane's own length, not truncated to its own");
+        bool allActive = true;
+        for (const auto& step : lane.steps)
+            allActive = allActive && step.active;
+        check (allActive, "every step it writes sounds — a curve in inactive steps plays nothing");
+
+        // A note lane is not somewhere a gesture can live, and saying so beats writing values
+        // into a lane that has no use for them.
+        check (! applyGestureShape (pattern, rise, "n1", 1.0f), "a note lane refuses");
+        check (! applyGestureShape (pattern, rise, "nope", 1.0f), "so does a lane that is not there");
+        check (! applyGestureShape (pattern, GestureShape{}, "l1", 1.0f), "and an empty shape does nothing");
+    }
+
+    // -- depth, which is not a blend -------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Depth");
+        pattern.lanes.add (parameterLane ("l1", 16, {}));
+        for (auto& step : pattern.lanes.getReference (0).steps)
+            step.value = 0.9f;   // whatever happened to be in the lane
+
+        // Low for the first half of the pass, high for the second: mean 0.5, and a period the
+        // lane's sixteen steps can actually see. A shape that alternated every point would be
+        // sampled only on the even ones here, which is aliasing rather than a depth bug.
+        GestureShape wobble;
+        wobble.gestureId = "g2";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            wobble.points.add (i < gestureShapePoints / 2 ? 0.2f : 0.8f);
+
+        applyGestureShape (pattern, wobble, "l1", 0.5f);
+        const auto& lane = pattern.lanes.getReference (0);
+
+        float low = 1.0f, high = 0.0f;
+        for (const auto& step : lane.steps)
+        {
+            low = juce::jmin (low, step.value);
+            high = juce::jmax (high, step.value);
+        }
+        // Half depth around the shape's OWN mean of 0.5, so 0.35..0.65 — not dragged toward the
+        // 0.9 that happened to be in the lane, which would make the result depend on history.
+        check (low > 0.3f && low < 0.4f && high > 0.6f && high < 0.7f,
+               "depth scales the movement around its own centre, not toward what the lane held");
+
+        // Zero depth is the movement flattened to its own centre, which is what "no movement"
+        // means for a shape — and every value lands there rather than wherever it was.
+        auto flatPattern = Pattern::create ("Flat");
+        flatPattern.lanes.add (parameterLane ("l1", 16, {}));
+        applyGestureShape (flatPattern, wobble, "l1", 0.0f);
+        for (const auto& step : flatPattern.lanes.getReference (0).steps)
+            check (std::abs (step.value - 0.5f) < 1.0e-5f, "no depth is flat at the centre");
+    }
+
+    // -- a shape repeats rather than running out ---------------------------------------------
+    {
+        GestureShape shape;
+        for (int i = 0; i < gestureShapePoints; ++i)
+            shape.points.add ((float) i / (float) gestureShapePoints);
+
+        check (std::abs (shape.at (0.0f) - shape.at (1.0f)) < 1.0e-5f,
+               "one full pass wraps to the start, so a shape on a longer lane repeats");
+        check (shape.at (1.25f) > shape.at (1.0f), "and keeps going round rather than holding");
+        check (shape.at (-0.25f) > 0.5f, "a negative phase wraps too rather than clamping to zero");
+    }
+
+    // -- the round trip, which is the whole promise ------------------------------------------
+    {
+        auto source = Pattern::create ("Source");
+        source.lanes.add (parameterLane ("l1", 16, { { 0, 0.1f }, { 8, 0.9f }, { 15, 0.3f } }));
+        const auto read = gestureFromLane (source, "l1");
+
+        // Onto a lane of a DIFFERENT length: the point of storing against normalised time.
+        auto longer = Pattern::create ("Longer");
+        longer.lanes.add (parameterLane ("l2", 32, {}));
+        check (applyGestureShape (longer, read, "l2", 1.0f), "a sixteen-step move lands on thirty-two");
+
+        const auto& written = longer.lanes.getReference (0);
+        check (written.steps.getFirst().value < 0.3f, "starting where it started");
+        check (written.steps[16].value > 0.7f, "peaking half way through, not a quarter of the way");
+        check (written.steps.getLast().value < 0.6f, "and ending where it ended");
+    }
+
+    // -- factory shapes, and what survives being written down ---------------------------------
+    {
+        const auto factory = GestureShape::factoryShapes();
+        check (factory.size() == 4, "somebody with an empty library still has something to try");
+        for (const auto& shape : factory)
+        {
+            check (shape.source == "factory" && shape.gestureId.isNotEmpty(), "each is a factory shape");
+            check (shape.points.size() == gestureShapePoints, "at the stored resolution");
+            for (const auto point : shape.points)
+                check (point >= 0.0f && point <= 1.0f, "inside the scale it will be written to");
+        }
+
+        GestureShape restored;
+        check (gestureShapeFromVar (gestureShapeToVar (factory.getFirst()), restored),
+               "a shape serialises");
+        check (restored.gestureId == factory.getFirst().gestureId
+                 && restored.source == "factory"
+                 && restored.points.size() == factory.getFirst().points.size(),
+               "with its identity and its curve");
+
+        GestureShape refused;
+        check (! gestureShapeFromVar (gestureShapeToVar (GestureShape{}), refused),
+               "and a shape with no id is refused rather than loaded as a nameless row");
+
+        auto tooShort = gestureShapeToVar (factory.getFirst());
+        tooShort.getDynamicObject()->setProperty ("points", juce::Array<juce::var> { 0.5 });
+        check (! gestureShapeFromVar (tooShort, refused),
+               "so is one point, which is a position and not a movement");
+    }
+}
+
 void testSceneVariations()
 {
     std::cout << "\nscenes: a B version of the thing you are playing" << std::endl;
@@ -3215,6 +3416,7 @@ int main()
     testParameterLanesAndGlide();
     testFollowActions();
     testSceneVariations();
+    testGestureLibrary();
     testSongSwapWhilePlaying();
     testArpeggiator();
     testMidiFxChain();

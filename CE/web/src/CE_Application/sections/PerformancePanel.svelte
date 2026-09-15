@@ -16,6 +16,7 @@
     hostState, hostParameters, hostLibrary, requestParameters, requestLibrary,
     addPattern, removePattern, renamePattern, setPatternOptions, createPatternVariations,
     importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate, extractGrooveTemplate,
+    removeGestureShape, applyGestureShape, extractGestureShape, importGestureShape,
     addLane, removeLane, setLaneOptions, clearLane, euclidFill,
     setStep, toggleStep, setStepParameterLock, setStepCcLock,
     removeStepLock, clearStepLocks,
@@ -319,6 +320,28 @@
   const followTargetsFor = (clip) => performance.clips.filter((candidate) =>
     candidate.clipId !== clip.clipId);
   const beatLabel = (beats) => `${Number(beats || 0).toFixed(Number.isInteger(beats) ? 0 : 2)} beats`;
+  // Every lane a gesture can live on: a parameter or cc lane carries a value per step, and a
+  // note lane carries velocities, which are not a curve. One picker drives both directions —
+  // reading a movement out of a lane and putting one back on it — so there is never a question
+  // of which lane a button meant.
+  let gestureLanes = $derived(patterns.flatMap((p) =>
+    (p.lanes ?? [])
+      .filter((lane) => (lane.type === 'parameter' || lane.type === 'cc')
+                        && !lane.lockSourceLaneId)
+      .map((lane) => ({ patternId: p.patternId, laneId: lane.laneId,
+                        label: `${p.name} · ${lane.name || lane.parameterId || 'lane'}` }))));
+  let gestureLaneKey = $state('');
+  let gestureDepth = $state(1);
+  let gestureTarget = $derived(gestureLanes.find((l) => `${l.patternId}/${l.laneId}` === gestureLaneKey)
+                               ?? gestureLanes[0] ?? null);
+
+  /** A shape drawn small enough to recognise at a glance, which is the whole reason to keep a
+      library rather than a list of names. */
+  const gesturePath = (points) => (points ?? [])
+    .map((value, i, all) =>
+      `${i === 0 ? 'M' : 'L'} ${(i / Math.max(1, all.length - 1) * 100).toFixed(2)} ${((1 - value) * 20).toFixed(2)}`)
+    .join(' ');
+
   const gestureLaneCount = (clip) =>
     patternForClip(clip)?.lanes.filter((lane) => lane.type === 'parameter'
       && !lane.lockSourceLaneId).length ?? 0;
@@ -1566,6 +1589,81 @@
           {/each}
         </div>
       {/if}
+
+      <!-- THE GESTURE LIBRARY. There was a groove library for the timing of notes and no
+           equivalent for the shape of a movement, though they are the same kind of reusable
+           human artefact: the sweep you do at the end of a build, the wobble you always put on
+           the filter. A recorded gesture was a performance of one lane and nothing more. -->
+      <div class="gesture-library" data-testid="gesture-library">
+        <div class="looper-toolbar">
+          <div>
+            <strong>Gesture library</strong>
+            <div class="looper-hint">
+              Shapes you can put on any parameter or CC lane, at any length.
+            </div>
+          </div>
+          <span class="perf-spacer"></span>
+          <label class="mini-field" title="Which lane a shape is read from, and put onto">
+            Lane
+            <select value={gestureLaneKey} aria-label="Gesture lane"
+                    disabled={gestureLanes.length === 0}
+                    onchange={(e) => (gestureLaneKey = e.currentTarget.value)}>
+              {#each gestureLanes as lane (`${lane.patternId}/${lane.laneId}`)}
+                <option value={`${lane.patternId}/${lane.laneId}`}>{lane.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="mini-field" title="How deep the movement goes. The same shape, gentler — not a blend with whatever the lane held.">
+            Depth
+            <select value={String(gestureDepth)} aria-label="Gesture depth"
+                    onchange={(e) => (gestureDepth = Number(e.currentTarget.value))}>
+              <option value="1">Full</option>
+              <option value="0.6">Gentle</option>
+              <option value="0.3">Barely</option>
+            </select>
+          </label>
+          <button type="button" class="ghost" data-testid="keep-gesture"
+                  disabled={!gestureTarget}
+                  title="Read the movement out of this lane and keep it. Needs at least two steps that moved something — one value is a position, not a movement."
+                  onclick={() => extractGestureShape(gestureTarget.patternId, gestureTarget.laneId)}>
+            Keep this movement
+          </button>
+        </div>
+
+        {#if gestureLanes.length === 0}
+          <div class="looper-empty">
+            No parameter or CC lanes yet. Record a gesture, or add a parameter lane to a pattern —
+            a note lane carries velocities, which are not a curve.
+          </div>
+        {/if}
+
+        <div class="gesture-shapes">
+          {#each performance.gestureShapes as shape (shape.gestureId)}
+            <div class="gesture-shape" data-testid="gesture-shape">
+              <svg class="shape-thumb" viewBox="0 0 100 20" preserveAspectRatio="none"
+                   aria-hidden="true" data-testid="gesture-thumb">
+                <path d={gesturePath(shape.points)} />
+              </svg>
+              <span class="shape-name">{shape.name}</span>
+              {#if shape.source === 'factory'}<span class="badge">FACTORY</span>{/if}
+              <button type="button" class="ghost" data-testid="apply-gesture"
+                      disabled={!gestureTarget}
+                      title={gestureTarget
+                        ? `Write ${shape.name} onto ${gestureTarget.label}, stretched to its length`
+                        : 'Pick a parameter or CC lane first'}
+                      onclick={() => applyGestureShape(gestureTarget.patternId, shape.gestureId,
+                                                      gestureTarget.laneId, gestureDepth)}>
+                Put on lane
+              </button>
+              {#if shape.source !== 'factory'}
+                <button type="button" class="ghost danger" data-testid="remove-gesture"
+                        title="Remove this gesture"
+                        onclick={() => removeGestureShape(shape.gestureId)}>×</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -3794,6 +3892,24 @@
   .freeze-cycles { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 11px; }
   .freeze-cycles select { width: auto; min-width: 46px; }
   .freeze-button { white-space: nowrap; border-color: #456579; color: #a9ccdf; }
+  /* --- the gesture library --------------------------------------------------------------- */
+  .gesture-library { margin-top: 14px; border-top: 1px solid #262c33; padding-top: 10px; }
+  .gesture-shapes { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .gesture-shape {
+    display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 12px;
+    padding: 2px 4px; border-radius: 4px;
+  }
+  .gesture-shape:hover { background: #1c2126; }
+  .shape-thumb { width: 84px; height: 20px; flex: none; background: #12161a; border-radius: 2px; }
+  .shape-thumb path { fill: none; stroke: #7fb4e0; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+  .shape-name { color: #d6dbe0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gesture-shape .badge {
+    font-size: 8.5px; letter-spacing: 0.06em; padding: 2px 4px; border-radius: 2px;
+    border: 1px solid #3b4652; color: #7d8894;
+  }
+  .gesture-shape .ghost { margin-left: auto; }
+  .gesture-shape .ghost + .ghost { margin-left: 0; }
+
   .clip-row, .scene-row { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 12px; }
   .clip-launch { padding: 2px 8px; }
   .clip-row.active .clip-launch { color: #9fd6a3; border-color: #4a7a52; }

@@ -105,6 +105,36 @@ struct GrooveTemplate
     static juce::Array<GrooveTemplate> factoryTemplates();
 };
 
+/** How many points a stored gesture shape carries. Fixed, and that is the point: a shape read
+    off a sixteen-step lane has to land on a thirty-two-step one, so it is stored as a curve over
+    normalised time rather than as steps. */
+constexpr int gestureShapePoints = 32;
+
+/** A reusable hand movement, the way a GrooveTemplate is a reusable feel.
+
+    The two are the same kind of artefact and the product only had one of them: a groove library
+    for the timing of notes, and nothing for the shape of a gesture — the sweep you do at the end
+    of a build, the wobble you always put on the filter. A gesture clip records one; this is what
+    makes it something you can keep and put somewhere else.
+
+    `points` are values 0..1, evenly spaced across ONE pass of whatever the shape is applied to.
+    Storing it against normalised time rather than steps is what lets a gesture read off a
+    one-bar lane land on a four-bar one without meaning something different. */
+struct GestureShape
+{
+    juce::String gestureId;
+    juce::String name;
+    juce::String source { "imported" };   // factory | imported
+    juce::Array<float> points;            // gestureShapePoints values, 0..1
+
+    /** The value this shape has at `phase` (0..1 of one pass), interpolated between points.
+        Out-of-range phases wrap, because a shape applied to a longer lane repeats rather than
+        running out. */
+    float at (float phase) const;
+
+    static juce::Array<GestureShape> factoryShapes();
+};
+
 struct Pattern
 {
     juce::String patternId;
@@ -165,6 +195,41 @@ void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
 GrooveTemplate grooveFromLane (const Pattern& pattern,
                                const juce::String& laneId = {},
                                const juce::String& name = {});
+
+/** Reads the shape of a hand movement out of a lane, so a gesture becomes something reusable.
+
+    The counterpart of `grooveFromLane`, and it answers the same way: with an EMPTY shape when
+    there was nothing to read, so a caller can refuse rather than store a gesture that does
+    nothing. Nothing to read means a lane that is not a parameter or cc lane — a note lane has
+    velocities, not a curve — or one with fewer than two active steps, because a single value is
+    a position and not a movement.
+
+    Only ACTIVE steps carry a value; the rest are what the lane's glide passes through. So the
+    curve is built by interpolating between the active steps and sampling that at
+    `gestureShapePoints` even positions. */
+GestureShape gestureFromLane (const Pattern& pattern,
+                              const juce::String& laneId = {},
+                              const juce::String& name = {});
+
+/** Writes a gesture shape onto one parameter or cc lane, at any length.
+
+    The lane's own step count decides the resolution: the shape is sampled at each step's
+    position, so a one-bar wobble put on a four-bar lane is one wobble across four bars rather
+    than a wobble that stops after a quarter of it. Point-sampled rather than averaged over each
+    step's span, which is right for a hand movement — they are smooth — and means a deliberately
+    jagged shape on a coarse lane loses the detail between its steps.
+
+    `amount` scales the shape's deviation from ITS OWN MEAN, not a blend with whatever the lane
+    held. A gesture at half depth is the same movement, half as deep, centred where the movement
+    was centred — which is what "the same wobble but gentler" means. Blending toward the lane's
+    existing values would make the result depend on what happened to be there, and an inactive
+    step's value is not a value at all.
+
+    Every step it writes becomes active and the lane is set to glide, because a gesture is a
+    continuous movement: left stepping, it is a staircase rather than a sweep. Returns false when
+    the lane is not one a gesture can live on, or the shape is empty. */
+bool applyGestureShape (Pattern& pattern, const GestureShape& shape,
+                        const juce::String& laneId, float amount = 1.0f);
 
 /** A clip is a launchable reference to a pattern (§18.8.8): what plays, when it may start,
     whether it loops, and what follows it. */
@@ -590,6 +655,9 @@ bool patternFromVar (const juce::var& stored, Pattern& out);
 
 juce::var grooveTemplateToVar (const GrooveTemplate& groove);
 bool grooveTemplateFromVar (const juce::var& stored, GrooveTemplate& out);
+
+juce::var gestureShapeToVar (const GestureShape& shape);
+bool gestureShapeFromVar (const juce::var& stored, GestureShape& out);
 
 juce::var clipToVar (const Clip& clip);
 bool clipFromVar (const juce::var& stored, Clip& out);

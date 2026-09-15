@@ -419,6 +419,181 @@ GrooveTemplate grooveFromLane (const Pattern& pattern,
     return groove;
 }
 
+float GestureShape::at (float phase) const
+{
+    if (points.isEmpty())
+        return 0.0f;
+    if (points.size() == 1)
+        return points[0];
+
+    // Wrapped, not clamped: a shape put on a lane longer than itself repeats. Running out and
+    // holding the last value would turn a wobble into a wobble followed by silence.
+    auto wrapped = std::fmod ((double) phase, 1.0);
+    if (wrapped < 0.0)
+        wrapped += 1.0;
+
+    const auto scaled = wrapped * (double) points.size();
+    const auto lower = (int) std::floor (scaled);
+    const auto fraction = (float) (scaled - (double) lower);
+    const auto a = points[lower % points.size()];
+    const auto b = points[(lower + 1) % points.size()];
+    return a + (b - a) * fraction;
+}
+
+juce::Array<GestureShape> GestureShape::factoryShapes()
+{
+    const auto make = [] (const juce::String& id, const juce::String& name,
+                          const std::function<float (float)>& curve)
+    {
+        GestureShape shape;
+        shape.gestureId = id;
+        shape.name = name;
+        shape.source = "factory";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            shape.points.add (juce::jlimit (0.0f, 1.0f,
+                                            curve ((float) i / (float) gestureShapePoints)));
+        return shape;
+    };
+
+    // The four movements a hand actually makes, which is the point of shipping any: somebody
+    // with an empty library still has something to put on a filter and hear what this does.
+    return {
+        make ("@hostage-rise", "Rise",   [] (float t) { return t; }),
+        make ("@hostage-fall", "Fall",   [] (float t) { return 1.0f - t; }),
+        // Up and back down inside one pass — the build-and-release every filter sweep is.
+        make ("@hostage-swell", "Swell", [] (float t)
+              { return t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f; }),
+        // Four cycles around the middle: the wobble, deep enough to hear and not so deep that
+        // it hits both ends and flattens there.
+        make ("@hostage-wobble", "Wobble", [] (float t)
+              { return 0.5f + 0.45f * std::sin (t * 4.0f * juce::MathConstants<float>::twoPi); }),
+    };
+}
+
+GestureShape gestureFromLane (const Pattern& pattern,
+                              const juce::String& laneId,
+                              const juce::String& name)
+{
+    GestureShape shape;
+    shape.source = "imported";
+    shape.name = name.trim().isNotEmpty() ? name.trim().substring (0, 80)
+                                          : (pattern.name + " move").substring (0, 80);
+
+    const auto carriesACurve = [] (const Lane& lane)
+    {
+        // A note lane has velocities, not a curve. Only these two have a value per step.
+        return lane.type == LaneType::parameter || lane.type == LaneType::cc;
+    };
+
+    const Lane* source = nullptr;
+    for (const auto& lane : pattern.lanes)
+    {
+        if (laneId.isNotEmpty())
+        {
+            if (lane.laneId == laneId && carriesACurve (lane))
+                source = &lane;
+        }
+        else if (carriesACurve (lane) && lane.lockSourceLaneId.isEmpty())
+        {
+            source = &lane;
+        }
+
+        if (source != nullptr)
+            break;
+    }
+
+    if (source == nullptr || source->steps.isEmpty())
+        return shape;   // empty points: nothing to read, and the caller can say so
+
+    // Only active steps carry a value. The rest are what the lane's glide passes through, so
+    // reading them would read zeroes that nobody ever heard.
+    juce::Array<int> activeIndices;
+    for (int i = 0; i < source->steps.size(); ++i)
+        if (source->steps[i].active)
+            activeIndices.add (i);
+
+    // One value is a position, not a movement. Two is the least that can describe going
+    // somewhere, which is the same floor grooveFromLane puts on dynamics.
+    if (activeIndices.size() < 2)
+        return shape;
+
+    const auto steps = (double) source->steps.size();
+    for (int i = 0; i < gestureShapePoints; ++i)
+    {
+        const auto position = ((double) i / (double) gestureShapePoints) * steps;
+
+        // Between which two active steps does this position fall? Before the first and after
+        // the last, hold the nearest — the lane had no movement out there to describe.
+        int before = activeIndices.getFirst();
+        int after = activeIndices.getLast();
+        for (int k = 0; k < activeIndices.size(); ++k)
+        {
+            if ((double) activeIndices[k] <= position)
+                before = activeIndices[k];
+            if ((double) activeIndices[k] >= position)
+            {
+                after = activeIndices[k];
+                break;
+            }
+        }
+
+        const auto a = source->steps[before].value;
+        const auto b = source->steps[after].value;
+        const auto span = (double) (after - before);
+        const auto fraction = span > 0.0 ? juce::jlimit (0.0, 1.0, (position - (double) before) / span)
+                                         : 0.0;
+        shape.points.add (juce::jlimit (0.0f, 1.0f, a + (b - a) * (float) fraction));
+    }
+
+    return shape;
+}
+
+bool applyGestureShape (Pattern& pattern, const GestureShape& shape,
+                        const juce::String& laneId, float amount)
+{
+    if (shape.points.isEmpty())
+        return false;
+
+    Lane* target = nullptr;
+    for (auto& lane : pattern.lanes)
+        if (lane.laneId == laneId
+            && (lane.type == LaneType::parameter || lane.type == LaneType::cc))
+        {
+            target = &lane;
+            break;
+        }
+
+    if (target == nullptr || target->steps.isEmpty())
+        return false;
+
+    const auto depth = juce::jlimit (0.0f, 1.0f, amount);
+
+    // The shape's own mean is its neutral. Scaling toward it keeps "the same wobble, gentler"
+    // centred where the wobble was, instead of dragging it toward whatever the lane held — an
+    // inactive step's value is not a value, and blending with it would make the result depend
+    // on history nobody can see.
+    double sum = 0.0;
+    for (const auto point : shape.points)
+        sum += (double) point;
+    const auto mean = (float) (sum / (double) shape.points.size());
+
+    const auto steps = target->steps.size();
+    for (int i = 0; i < steps; ++i)
+    {
+        auto& step = target->steps.getReference (i);
+        const auto sampled = shape.at ((float) i / (float) steps);
+        step.value = juce::jlimit (0.0f, 1.0f, mean + (sampled - mean) * depth);
+        // A gesture is a movement, so every step it writes sounds. A curve written into
+        // inactive steps is a curve nothing plays.
+        step.active = true;
+    }
+
+    // Without glide the lane steps between values, which is a staircase rather than a sweep —
+    // and the gesture recorder sets it for the same reason on the lanes it writes.
+    target->glide = true;
+    return true;
+}
+
 void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
                           float amount, bool applyVelocity)
 {
@@ -1001,6 +1176,44 @@ juce::var grooveTemplateToVar (const GrooveTemplate& groove)
     g->setProperty ("timingOffsets", timing);
     g->setProperty ("velocityMultipliers", velocity);
     return juce::var (g);
+}
+
+juce::var gestureShapeToVar (const GestureShape& shape)
+{
+    juce::Array<juce::var> points;
+    for (const auto value : shape.points)
+        points.add (value);
+
+    auto* g = new juce::DynamicObject();
+    g->setProperty ("gestureId", shape.gestureId);
+    g->setProperty ("name",      shape.name);
+    g->setProperty ("source",    shape.source);
+    g->setProperty ("points",    points);
+    return juce::var (g);
+}
+
+bool gestureShapeFromVar (const juce::var& stored, GestureShape& out)
+{
+    out = GestureShape();
+    out.gestureId = stored.getProperty ("gestureId", {}).toString();
+    out.name = stored.getProperty ("name", {}).toString().trim().substring (0, 80);
+    if (out.gestureId.isEmpty())
+        return false;
+
+    out.source = stored.getProperty ("source", "imported").toString() == "factory" ? "factory"
+                                                                                   : "imported";
+    if (const auto* points = stored.getProperty ("points", {}).getArray())
+        for (const auto& value : *points)
+        {
+            // A shape longer than the fixed table is truncated rather than refused: a file from
+            // a build with more resolution should still be playable here, just coarser.
+            if (out.points.size() >= gestureShapePoints)
+                break;
+            out.points.add (juce::jlimit (0.0f, 1.0f, (float) (double) value));
+        }
+
+    // One point is a position, not a movement — the same floor gestureFromLane applies.
+    return out.points.size() >= 2;
 }
 
 bool grooveTemplateFromVar (const juce::var& stored, GrooveTemplate& out)

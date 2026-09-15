@@ -3966,6 +3966,136 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "extractGestureShape")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (performance.gestureShapes.size() >= 32)
+        {
+            emitError ("Remove a gesture before keeping another one.");
+            return;
+        }
+
+        const auto* pattern = performance.findPattern (
+            payload.getProperty ("patternId", {}).toString());
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        auto shape = perf::gestureFromLane (*pattern,
+                                            payload.getProperty ("laneId", {}).toString(),
+                                            payload.getProperty ("name", {}).toString());
+        // gestureFromLane answers with nothing when there was nothing to read: a lane that is
+        // not a parameter or cc lane, or one with fewer than two moves in it.
+        if (shape.points.size() < 2)
+        {
+            emitError ("That lane has no movement to read — it needs at least two steps that "
+                       "moved something.");
+            return;
+        }
+
+        shape.gestureId = juce::Uuid().toDashedString();
+        performance.gestureShapes.add (std::move (shape));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "importGestureShape" || cmd == "removeGestureShape"
+        || cmd == "applyGestureShape")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (cmd == "importGestureShape")
+        {
+            if (performance.gestureShapes.size() >= 32)
+            {
+                emitError ("Remove a gesture before importing another one.");
+                return;
+            }
+
+            perf::GestureShape shape;
+            shape.gestureId = juce::Uuid().toDashedString();
+            shape.name = payload.getProperty ("name", "Imported gesture").toString()
+                             .trim().substring (0, 80);
+            if (shape.name.isEmpty())
+                shape.name = "Imported gesture";
+            shape.source = "imported";
+            if (const auto* values = payload.getProperty ("points", {}).getArray())
+                for (const auto& value : *values)
+                {
+                    if (shape.points.size() >= perf::gestureShapePoints)
+                        break;
+                    shape.points.add (juce::jlimit (0.0f, 1.0f, (float) (double) value));
+                }
+            if (shape.points.size() < 2)
+            {
+                emitError ("A gesture needs at least two points — one value is a position, "
+                           "not a movement.");
+                return;
+            }
+            performance.gestureShapes.add (std::move (shape));
+        }
+        else
+        {
+            const auto gestureId = payload.getProperty ("gestureId", {}).toString();
+            int gestureIndex = -1;
+            for (int i = 0; i < performance.gestureShapes.size(); ++i)
+                if (performance.gestureShapes.getReference (i).gestureId == gestureId)
+                {
+                    gestureIndex = i;
+                    break;
+                }
+            if (gestureIndex < 0)
+            {
+                emitError ("Unknown gesture shape.");
+                return;
+            }
+
+            if (cmd == "removeGestureShape")
+            {
+                if (performance.gestureShapes.getReference (gestureIndex).source == "factory")
+                {
+                    emitError ("Factory gestures cannot be removed.");
+                    return;
+                }
+                performance.gestureShapes.remove (gestureIndex);
+            }
+            else
+            {
+                auto* pattern = performance.findPattern (
+                    payload.getProperty ("patternId", {}).toString());
+                if (pattern == nullptr)
+                {
+                    emitError ("Unknown pattern.");
+                    return;
+                }
+                // A gesture goes on ONE named lane, unlike a groove, which is the timing of a
+                // whole pattern. A filter sweep is a movement of one thing.
+                if (! perf::applyGestureShape (*pattern,
+                                               performance.gestureShapes.getReference (gestureIndex),
+                                               payload.getProperty ("laneId", {}).toString(),
+                                               juce::jlimit (0.0f, 1.0f,
+                                                   (float) (double) payload.getProperty ("amount", 1.0))))
+                {
+                    emitError ("A gesture goes on a parameter or CC lane — pick one of those.");
+                    return;
+                }
+                recompilePerformance();
+            }
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "addPattern")
     {
         if (! requireFeature (licensing::Feature::patternEngine))
@@ -17387,6 +17517,10 @@ juce::var InstrumentHostService::performancePayload() const
     for (const auto& groove : performance.grooves)
         grooves.add (perf::grooveTemplateToVar (groove));
 
+    juce::Array<juce::var> gestureShapes;
+    for (const auto& gesture : performance.gestureShapes)
+        gestureShapes.add (perf::gestureShapeToVar (gesture));
+
     juce::Array<juce::var> clips;
     for (int i = 0; i < performance.clips.size(); ++i)
     {
@@ -17631,6 +17765,7 @@ juce::var InstrumentHostService::performancePayload() const
     auto* root = new juce::DynamicObject();
     root->setProperty ("transport", juce::var (transportObj));
     root->setProperty ("grooves",    grooves);
+    root->setProperty ("gestureShapes", gestureShapes);
     root->setProperty ("patterns",  patterns);
     root->setProperty ("clips",     clips);
     root->setProperty ("scenes",    scenes);

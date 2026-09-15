@@ -73,6 +73,14 @@ import {
   recordFamily,
   hostRecordFamily,
   clipFollowGraph,
+  gestureFromPatternLane,
+  applyGestureToLane,
+  gestureValueAt,
+  factoryGestureShapes,
+  GESTURE_SHAPE_POINTS,
+  extractGestureShape,
+  applyGestureShape,
+  removeGestureShape,
   makeSceneVariation,
   createSceneVariations,
   mockHabitualProfile,
@@ -1427,6 +1435,177 @@ test('a scene naming a clip that is gone varies what it actually launches', () =
     [...clips, { clipId: 'c2', name: 'Empty', patternId: 'missing' }], null,
     (prefix) => `${prefix}-${++n}`);
   assert.deepEqual(withOrphan.clipIds, ['c2']);
+});
+
+// A GESTURE LIBRARY. The groove library keeps the timing of notes; there was nothing keeping the
+// shape of a movement, though they are the same kind of reusable human artefact. What makes one
+// possible is storing a shape against NORMALISED TIME rather than steps — a wobble read off a
+// sixteen-step lane has to land on a thirty-two-step one meaning the same thing.
+
+const curveLane = (laneId, stepCount, values) => ({
+  laneId, type: 'parameter', name: 'Cutoff', targetId: 'p1', parameterId: 'cutoff',
+  stepCount, stepsPerBeat: 4, glide: false,
+  steps: Array.from({ length: stepCount }, (_unused, i) => ({
+    active: values[i] !== undefined, value: values[i] ?? 0,
+  })),
+});
+
+test('a movement can be read out of a lane', () => {
+  const pattern = { patternId: 'p', name: 'Sweep',
+                    lanes: [curveLane('l1', 16, { 0: 0, 8: 1, 15: 0 })] };
+  const shape = gestureFromPatternLane(pattern, 'l1', 'My sweep');
+
+  assert.equal(shape.points.length, GESTURE_SHAPE_POINTS,
+    'a shape is a fixed curve over normalised time, whatever the lane length was');
+  assert.equal(shape.name, 'My sweep');
+  assert.ok(shape.points[0] < 0.1, 'it starts where the movement started');
+  assert.ok(shape.points[GESTURE_SHAPE_POINTS / 2] > 0.8, 'peaks where it peaked');
+  assert.ok(shape.points.at(-1) < 0.4, 'and comes back down');
+});
+
+test('what has nothing to read says so rather than keeping an empty gesture', () => {
+  // FOUR active steps, deliberately: with one, this would pass because a single value is not a
+  // movement, and the assertion would be testing the wrong rule while reading as though it
+  // tested this one.
+  const notes = { patternId: 'p', name: 'Beat',
+                  lanes: [{ laneId: 'n1', type: 'note',
+                            steps: Array.from({ length: 4 },
+                                              () => ({ active: true, velocity: 100 })) }] };
+  assert.deepEqual(gestureFromPatternLane(notes, 'n1').points, [],
+    'a note lane has velocities, not a curve');
+  assert.deepEqual(gestureFromPatternLane(notes).points, [],
+    'and a pattern with no curve lane at all is the same answer');
+
+  const single = { patternId: 'p', name: 'One', lanes: [curveLane('l1', 16, { 4: 0.7 })] };
+  assert.deepEqual(gestureFromPatternLane(single, 'l1').points, [],
+    'one value is a position, not a movement');
+
+  const nothing = { patternId: 'p', name: 'Empty', lanes: [curveLane('l1', 16, {})] };
+  assert.deepEqual(gestureFromPatternLane(nothing, 'l1').points, []);
+});
+
+test('a movement can be put on any lane, at any length', () => {
+  const rise = { gestureId: 'g1', name: 'Rise',
+                 points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                    (_unused, i) => i / GESTURE_SHAPE_POINTS) };
+  const pattern = { patternId: 'p', name: 'Target',
+                    lanes: [curveLane('l1', 32, {}),
+                            { laneId: 'n1', type: 'note', steps: [{ active: true }] }] };
+
+  assert.equal(applyGestureToLane(pattern, rise, 'l1', 1), true);
+  const lane = pattern.lanes[0];
+  assert.equal(lane.glide, true, 'a gesture left stepping is a staircase, not a sweep');
+  assert.ok(lane.steps[0].value < 0.1);
+  assert.ok(lane.steps.at(-1).value > 0.9,
+    'the shape is stretched across the lane, not truncated to its own length');
+  assert.ok(lane.steps.every((step) => step.active),
+    'every step it writes sounds — a curve in inactive steps plays nothing');
+
+  assert.equal(applyGestureToLane(pattern, rise, 'n1', 1), false, 'a note lane refuses');
+  assert.equal(applyGestureToLane(pattern, rise, 'nope', 1), false);
+  assert.equal(applyGestureToLane(pattern, { points: [] }, 'l1', 1), false);
+});
+
+test('depth scales the movement around its own centre, not toward what the lane held', () => {
+  // Low for the first half of the pass, high for the second: mean 0.5, and a period sixteen
+  // steps can see. A shape alternating every point would be sampled only on the even ones, which
+  // is aliasing rather than anything about depth.
+  const wobble = { gestureId: 'g2',
+                   points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                      (_unused, i) => (i < GESTURE_SHAPE_POINTS / 2 ? 0.2 : 0.8)) };
+  const pattern = { patternId: 'p', name: 'Depth', lanes: [curveLane('l1', 16, {})] };
+  for (const step of pattern.lanes[0].steps) step.value = 0.9;   // whatever was there
+
+  applyGestureToLane(pattern, wobble, 'l1', 0.5);
+  const values = pattern.lanes[0].steps.map((step) => step.value);
+  assert.ok(Math.min(...values) > 0.3 && Math.min(...values) < 0.4);
+  assert.ok(Math.max(...values) > 0.6 && Math.max(...values) < 0.7,
+    'half depth around the shape\'s own mean of 0.5, not dragged toward the 0.9 in the lane');
+
+  // Zero depth is the movement flattened to its own centre, which is what no movement means for
+  // a shape — every value lands there rather than wherever it happened to be.
+  const flat = { patternId: 'p', name: 'Flat', lanes: [curveLane('l1', 16, {})] };
+  applyGestureToLane(flat, wobble, 'l1', 0);
+  assert.ok(flat.lanes[0].steps.every((step) => Math.abs(step.value - 0.5) < 1e-6));
+});
+
+test('a shape repeats rather than running out', () => {
+  const shape = { points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                     (_unused, i) => i / GESTURE_SHAPE_POINTS) };
+  assert.ok(Math.abs(gestureValueAt(shape, 0) - gestureValueAt(shape, 1)) < 1e-9,
+    'one full pass wraps to the start');
+  assert.ok(gestureValueAt(shape, 1.25) > gestureValueAt(shape, 1),
+    'and keeps going round rather than holding its last value');
+  assert.ok(gestureValueAt(shape, -0.25) > 0.5, 'a negative phase wraps too');
+});
+
+test('the round trip: read off sixteen steps, land on thirty-two', () => {
+  const source = { patternId: 'p', name: 'Source',
+                   lanes: [curveLane('l1', 16, { 0: 0.1, 8: 0.9, 15: 0.3 })] };
+  const read = gestureFromPatternLane(source, 'l1');
+
+  const longer = { patternId: 'q', name: 'Longer', lanes: [curveLane('l2', 32, {})] };
+  assert.equal(applyGestureToLane(longer, read, 'l2', 1), true);
+
+  const written = longer.lanes[0].steps.map((step) => step.value);
+  assert.ok(written[0] < 0.3, 'starting where it started');
+  assert.ok(written[16] > 0.7, 'peaking half way through, not a quarter of the way');
+  assert.ok(written.at(-1) < 0.6, 'and ending where it ended');
+});
+
+test('mock reducer: keeping a movement, putting it on a lane, and throwing it away', () => {
+  let state = mockHostState();
+  assert.equal(state.performance.gestureShapes.length, factoryGestureShapes.length,
+    'somebody with an empty library still has something to try');
+  assert.ok(state.performance.gestureShapes.every((s) => s.source === 'factory'));
+
+  // Give the demo pattern a curve lane with a movement on it.
+  const patternId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state, { cmd: 'addLane', patternId, type: 'parameter' });
+  const lane = state.performance.patterns[0].lanes.at(-1);
+  for (const [index, value] of [[0, 0.1], [4, 0.9], [8, 0.2]])
+    state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId: lane.laneId,
+                                      index, active: true, value });
+
+  const before = state.performance.gestureShapes.length;
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId,
+                                    laneId: lane.laneId, name: 'My move' });
+  assert.equal(state.performance.gestureShapes.length, before + 1);
+  const kept = state.performance.gestureShapes.at(-1);
+  assert.equal(kept.name, 'My move');
+  assert.equal(kept.source, 'imported');
+  assert.equal(kept.points.length, GESTURE_SHAPE_POINTS);
+
+  // Put a factory shape onto that same lane.
+  const rise = state.performance.gestureShapes.find((s) => s.gestureId === '@hostage-rise');
+  state = applyMockCommand(state, { cmd: 'applyGestureShape', patternId,
+                                    gestureId: rise.gestureId, laneId: lane.laneId, amount: 1 });
+  const written = state.performance.patterns[0].lanes.find((l) => l.laneId === lane.laneId);
+  assert.equal(written.glide, true);
+  assert.ok(written.steps[0].value < written.steps.at(-1).value, 'it rises');
+  assert.ok(written.steps.every((step) => step.active));
+
+  // A factory shape is not somebody's to delete; an imported one is.
+  state = applyMockCommand(state, { cmd: 'removeGestureShape', gestureId: '@hostage-rise' });
+  assert.ok(state.performance.gestureShapes.some((s) => s.gestureId === '@hostage-rise'),
+    'factory shapes stay');
+  state = applyMockCommand(state, { cmd: 'removeGestureShape', gestureId: kept.gestureId });
+  assert.ok(!state.performance.gestureShapes.some((s) => s.gestureId === kept.gestureId),
+    'and one you kept can be thrown away');
+});
+
+test('mock reducer: a lane with nothing to read keeps nothing', () => {
+  let state = mockHostState();
+  const patternId = state.performance.patterns[0].patternId;
+  const noteLaneId = state.performance.patterns[0].lanes[0].laneId;
+  const before = state.performance.gestureShapes.length;
+
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId, laneId: noteLaneId });
+  assert.equal(state.performance.gestureShapes.length, before,
+    'a note lane has velocities, not a curve, and nothing is kept');
+
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId: 'nope' });
+  assert.equal(state.performance.gestureShapes.length, before);
 });
 
 test('a recency filter refuses what the library has always had', () => {

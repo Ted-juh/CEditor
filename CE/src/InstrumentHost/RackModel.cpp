@@ -114,6 +114,7 @@ Performance Performance::create()
     Performance p;
     p.performanceId = juce::Uuid().toDashedString();
     p.grooves = perf::GrooveTemplate::factoryTemplates();
+    p.gestureShapes = perf::GestureShape::factoryShapes();
     return p;
 }
 
@@ -776,6 +777,10 @@ juce::var Performance::toVar() const
     for (const auto& groove : grooves)
         grooveVars.add (perf::grooveTemplateToVar (groove));
 
+    juce::Array<juce::var> gestureVars;
+    for (const auto& gesture : gestureShapes)
+        gestureVars.add (perf::gestureShapeToVar (gesture));
+
     juce::Array<juce::var> clipVars;
     for (const auto& clip : clips)
         clipVars.add (perf::clipToVar (clip));
@@ -865,6 +870,7 @@ juce::var Performance::toVar() const
     root->setProperty ("pages",         pageVars);
     root->setProperty ("transport",     perf::transportSettingsToVar (transport));
     root->setProperty ("grooves",       grooveVars);
+    root->setProperty ("gestureShapes", gestureVars);
     root->setProperty ("patterns",      patternVars);
     root->setProperty ("clips",         clipVars);
     root->setProperty ("scenes",        sceneVars);
@@ -1586,6 +1592,23 @@ bool Performance::fromVar (const juce::var& stored, Performance& out)
                 return false;
             seenGrooveIds.add (groove.grooveId);
             parsed.grooves.add (std::move (groove));
+        }
+    }
+
+    // Absent on every document written before the gesture library existed, and those keep the
+    // factory shapes `create()` seeded rather than opening with an empty drawer.
+    if (const auto* gestureArray = stored.getProperty ("gestureShapes", {}).getArray())
+    {
+        parsed.gestureShapes.clearQuick();
+        juce::StringArray seenGestureIds;
+        for (const auto& g : *gestureArray)
+        {
+            perf::GestureShape gesture;
+            if (! perf::gestureShapeFromVar (g, gesture)
+                || seenGestureIds.contains (gesture.gestureId))
+                return false;
+            seenGestureIds.add (gesture.gestureId);
+            parsed.gestureShapes.add (std::move (gesture));
         }
     }
 
