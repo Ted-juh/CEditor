@@ -543,6 +543,9 @@ export function emptyLibraryQuery() {
     favouritesOnly: false,
     minRating: 0,
     availableOnly: false,
+    // Zero is off. A record with no arrival time never matches a live filter — see
+    // recordAddedWithin in CE/src/InstrumentHost/Library.cpp, which is the authority.
+    addedWithinDays: 0,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
     // A measured range is inactive until somebody moves a handle, because a range that defaults
     // to "all of it" would still refuse every record the auditioner has not reached yet.
@@ -566,6 +569,7 @@ export function normalizeLibraryQuery(payload) {
     favouritesOnly: p.favouritesOnly === true,
     minRating: Math.min(5, Math.max(0, Number(p.minRating ?? 0))),
     availableOnly: p.availableOnly === true,
+    addedWithinDays: Math.min(365, Math.max(0, Math.floor(Number(p.addedWithinDays ?? 0)) || 0)),
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, {
       include: strings(facets[f]?.include),
       exclude: strings(facets[f]?.exclude),
@@ -584,7 +588,7 @@ export function normalizeLibraryQuery(payload) {
 export function libraryQueryIsEmpty(query) {
   const q = normalizeLibraryQuery(query);
   return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
-    && q.minRating === 0 && !q.availableOnly && !q.measuredOnly
+    && q.minRating === 0 && !q.availableOnly && !q.measuredOnly && q.addedWithinDays === 0
     && MEASURED_AXES.every((a) => !q.ranges[a].active)
     && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
 }
@@ -614,6 +618,7 @@ export function emptyHostLibrary() {
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
               measured: 0, measurable: 0, refused: 0, refusedByCause: refusedByCause(null),
+              addedRecently: 0,
               snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
@@ -698,6 +703,9 @@ export function normalizeHostLibrary(payload) {
       // Why there is no measurement, when the auditioner tried and got none. A crashing preset
       // is not a preset nobody has got to yet, and the browser says which it is looking at.
       sonicRefusal: String(r?.sonicRefusal ?? ''),
+      // 0 for every record written before the field existed, which is the right answer: a
+      // library that has always been there is not new.
+      addedAtMs: Number(r?.addedAtMs ?? 0) || 0,
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -715,6 +723,7 @@ export function normalizeHostLibrary(payload) {
       // count above (RefusalCause in Library.h), so the rows add up to `refused` rather than to
       // whatever the current query happens to match.
       refusedByCause: refusedByCause(p.counts?.refusedByCause),
+      addedRecently: Number(p.counts?.addedRecently ?? 0),
       snapshots: Number(p.counts?.snapshots ?? 0),
       snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
@@ -773,6 +782,13 @@ export function matchesLibraryQuery(record, query) {
   if (q.type && record.type !== q.type) return false;
   if (q.favouritesOnly && record.favourite !== true) return false;
   if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
+  if (q.addedWithinDays > 0) {
+    // The same three rules as recordAddedWithin: never-counted does not pass, the boundary is
+    // inclusive, and a future stamp stays visible rather than falling out of every view.
+    const addedAtMs = Number(record.addedAtMs ?? 0);
+    if (!(addedAtMs > 0)) return false;
+    if (Date.now() - addedAtMs > q.addedWithinDays * 86400000) return false;
+  }
   if (q.collection && !(record.collections ?? []).includes(q.collection)) return false;
   if (q.availableOnly && record.available !== true) return false;
 
@@ -895,7 +911,8 @@ export function mockHostLibrary(query = '', type = '') {
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
-      tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10) },
+      tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10),
+      addedAtMs: Date.now() - 3 * 86400000 },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'],
@@ -913,7 +930,8 @@ export function mockHostLibrary(query = '', type = '') {
     { recordId: 'lib-7', type: 'preset', sourceType: 'userState', name: 'Half a Save',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, tags: ['broken'], sonic: null,
-      sonicRefusal: 'That saved state could not be read back.', mockRefusalCause: 'unreadable' },
+      sonicRefusal: 'That saved state could not be read back.', mockRefusalCause: 'unreadable',
+      addedAtMs: Date.now() - 2 * 86400000 },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -959,6 +977,9 @@ export function mockHostLibrary(query = '', type = '') {
                                               && r.available !== false
                                               && !r.sonicRefusal).length,
               refused: all.filter((r) => !r.sonic && r.sonicRefusal).length,
+              addedRecently: all.filter((r) =>
+                Number(r.addedAtMs ?? 0) > 0
+                  && Date.now() - Number(r.addedAtMs) <= 14 * 86400000).length,
               refusedByCause: all.reduce((acc, r) => {
                 if (!r.sonic && r.sonicRefusal) acc[r.mockRefusalCause ?? 'other'] += 1;
                 return acc;

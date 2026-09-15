@@ -142,6 +142,17 @@ struct LibraryRecord
     bool factory = false;         // vendor-derived (true) vs CEditor-captured (false)
     bool missing = false;         // the source vanished; the record and its metadata stay
 
+    // When this record FIRST entered the library — not when its file was written, and not when
+    // it was last saved (a version carries that). Zero means "before anyone was counting", which
+    // is every record that predates the field and is the right answer for them: a library that
+    // has always been there is not new.
+    //
+    // Only two places can mint a record — addCapturedRecord and mergeVendorScan's fresh pass —
+    // so only two places stamp it. A rescan that MOVES a file keeps the existing record by
+    // design (the three-pass identity match exists so a rename cannot destroy somebody's
+    // ratings), which means a moved preset is correctly not new.
+    juce::int64 addedAtMs = 0;
+
     // What it sounded like when the auditioner last played it. Keyed to `fingerprint` by
     // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
     SonicProfile sonic;
@@ -227,6 +238,11 @@ struct LibraryQuery
     int  minRating = 0;         // 0 = unrated included
     bool availableOnly = false; // see the availability hook below
 
+    // "What arrived lately." Zero is off. A record with no `addedAtMs` never matches, because
+    // an unknown arrival is not a recent one — the same rule the measured ranges follow, where
+    // an unknown brightness is not a dark one.
+    int addedWithinDays = 0;
+
     // The measured half. A range that is active refuses anything unmeasured, because an unknown
     // brightness is not a dark one — the browser says how many records that is rather than
     // quietly dropping them.
@@ -246,6 +262,16 @@ struct LibraryQuery
     vanished (`missing`); whether the plug-in a preset targets is installed is the catalogue's
     business and the service's to answer, so `availableOnly` asks through this rather than
     guessing. Defaults to "the source is still there", which is all a pure test can know. */
+/** Is this record recent, as of `nowMs`? Pure and total, the way `pruneLibraryVersions` is pure,
+    because "recent" is a rule worth testing without owning a clock.
+
+    `withinDays` of zero is off and everything passes. A record with no `addedAtMs` never passes a
+    live filter: an unknown arrival is not a recent one, which is the same rule the measured ranges
+    already follow where an unknown brightness is not a dark one. A record stamped in the future —
+    a clock that moved, a file copied from a machine set wrong — counts as recent rather than
+    being hidden, since the alternative is a sound that has silently fallen out of every view. */
+bool recordAddedWithin (const LibraryRecord& record, int withinDays, juce::int64 nowMs);
+
 using LibraryAvailability = std::function<bool (const LibraryRecord&)>;
 
 /** A saved query — the browser's "smart collection". The rail runs it fresh every time, so a

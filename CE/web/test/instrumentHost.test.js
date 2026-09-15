@@ -823,6 +823,43 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
   assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
 });
 
+test('a recency filter refuses what the library has always had', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+
+  requestLibrary(emptyLibraryQuery());
+  const everything = get(hostLibrary).records.length;
+  const recentCount = get(hostLibrary).counts.addedRecently;
+  assert.ok(recentCount > 0, 'the preview ships something that arrived lately');
+  assert.ok(recentCount < everything, 'and something that has always been there');
+
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 14 });
+  const recent = get(hostLibrary).records;
+  assert.equal(recent.length, recentCount, 'the row and the filter agree on the number');
+  assert.ok(recent.every((r) => r.addedAtMs > 0),
+    'a record with no arrival time is not recent — an unknown arrival is not a recent one');
+
+  // The window is a window, not a synonym for "has a timestamp".
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 1 });
+  assert.equal(get(hostLibrary).records.length, 0,
+    'nothing in the preview arrived in the last day');
+
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 0 });
+  assert.equal(get(hostLibrary).records.length, everything, 'and zero days is the filter off');
+
+  resetMockLibraryState();
+});
+
+test('a recency filter is a filter, so an empty query is not empty with one set', () => {
+  // libraryQueryIsEmpty decides whether the browser thinks you are filtering at all; missing the
+  // clause here would show "no filters" over a filtered list.
+  assert.equal(libraryQueryIsEmpty(emptyLibraryQuery()), true);
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), addedWithinDays: 14 }), false);
+  assert.equal(normalizeLibraryQuery({ addedWithinDays: 9000 }).addedWithinDays, 365,
+    'and a year is the cap, past which "recently" has stopped meaning anything');
+  assert.equal(normalizeLibraryQuery({ addedWithinDays: -5 }).addedWithinDays, 0);
+});
+
 test('mock reducer: a sound that refused is counted apart from one nobody has got to', () => {
   hostStateStore.set(mockHostState());
   resetMockLibraryState();

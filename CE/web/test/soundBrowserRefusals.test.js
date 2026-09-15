@@ -106,3 +106,21 @@ test('an unrecognised cause is a visible row rather than a silent loss', () => {
   assert.equal(rowCount(html, 'other'), 3, 'an unclassified refusal is still counted on screen');
   assert.match(html, /for a reason this build does not recognise/);
 });
+
+test('the Added recently row shows what arrived, and toggles the filter', () => {
+  const html = renderWith(null);
+  const counts = get(hostLibrary).counts;
+
+  const start = html.indexOf('data-testid="added-recently"');
+  assert.ok(start > 0, 'the row is drawn');
+  const row = html.slice(html.lastIndexOf('<button', start), html.indexOf('</button>', start));
+
+  assert.ok(counts.addedRecently > 0, 'the preview ships something that arrived lately');
+  assert.match(row, new RegExp(`>${counts.addedRecently}</span>`),
+    'and the row shows that count, not the whole library');
+  assert.match(row, /Added recently/);
+
+  // The tooltip carries the two things somebody would otherwise report as bugs.
+  assert.match(row, /has no arrival time and is not recent/);
+  assert.match(row, /moved keeps the record it already had/);
+});

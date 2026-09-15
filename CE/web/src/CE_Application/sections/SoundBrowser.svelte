@@ -417,6 +417,12 @@
               onclick={() => ask({ ...query, measuredOnly: !query.measuredOnly })}>
         <span>Measured</span><span class="n">{$hostLibrary.counts.measured}</span>
       </button>
+      <button type="button" class="rail-item" class:on={query.addedWithinDays > 0}
+              data-testid="added-recently"
+              title="Only what arrived in the last fortnight. A sound the library has always had has no arrival time and is not recent; a file that merely moved keeps the record it already had, so it is not new either."
+              onclick={() => ask({ ...query, addedWithinDays: query.addedWithinDays > 0 ? 0 : 14 })}>
+        <span>Added recently</span><span class="n">{$hostLibrary.counts.addedRecently}</span>
+      </button>
 
       {#if $hostLibrary.duplicates.length > 0}
         <div class="rail-head">Housekeeping</div>

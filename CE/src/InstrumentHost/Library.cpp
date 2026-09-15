@@ -27,6 +27,8 @@ juce::String Library::addCapturedRecord (LibraryRecord record)
     record.recordId = juce::Uuid().toDashedString();
     record.factory = false;
     record.missing = false;
+    if (record.addedAtMs <= 0)
+        record.addedAtMs = juce::Time::currentTimeMillis();
     const auto id = record.recordId;
     records.add (std::move (record));
     return id;
@@ -117,6 +119,11 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             // from; all three used to go silently when a plug-in was simply loaded again.
             auto& record = *existing[i];
             const auto keepId = record.recordId;
+            // When it first arrived is a fact about this record, not about the vendor's file —
+            // and a rescan that restamped it would make the whole library look new every time
+            // somebody pointed the scanner at it again, which is the opposite of what an
+            // arrival time is for.
+            const auto keepAddedAtMs = record.addedAtMs;
             const auto keepUser = record.user;
             const auto keepSonic = record.sonic;
             const auto keepSonicFingerprint = record.sonicFingerprint;
@@ -126,6 +133,7 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             const auto keepParts = record.parts;
             record = incoming;
             record.recordId = keepId;
+            record.addedAtMs = keepAddedAtMs;
             record.user = keepUser;
             record.sonic = keepSonic;
             record.sonicFingerprint = keepSonicFingerprint;
@@ -174,8 +182,15 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
         if (! matched[i])
             existing[i]->missing = true;
 
+    // `fresh` is what survived all three identity passes unclaimed, which the comment at the
+    // top of this function calls genuinely new — so this is the one moment a scanned preset
+    // has ever been new, and the only place to say when.
+    const auto arrivedAtMs = juce::Time::currentTimeMillis();
     for (auto& record : fresh)
+    {
+        record.addedAtMs = arrivedAtMs;
         records.add (std::move (record));
+    }
 }
 
 bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user)
@@ -206,6 +221,8 @@ juce::var Library::toVar() const
 
         auto* r = new juce::DynamicObject();
         r->setProperty ("recordId",        record.recordId);
+        if (record.addedAtMs > 0)
+            r->setProperty ("addedAtMs",   (double) record.addedAtMs);
         r->setProperty ("type",            record.type);
         r->setProperty ("sourceType",      record.sourceType);
         r->setProperty ("sourceLocator",   record.sourceLocator);
@@ -338,6 +355,9 @@ Library Library::fromVar (const juce::var& stored)
     {
         LibraryRecord record;
         record.recordId = r.getProperty ("recordId", {}).toString();
+        // Absent on every record written before the field existed, and zero is right for them:
+        // a library that has always been there is not new.
+        record.addedAtMs = (juce::int64) (double) r.getProperty ("addedAtMs", 0.0);
         if (record.recordId.isEmpty())
             continue;   // damaged row; keep loading the rest
 
@@ -627,6 +647,18 @@ bool LibraryFacetSelection::admits (const juce::StringArray& values) const
     return false;
 }
 
+bool recordAddedWithin (const LibraryRecord& record, int withinDays, juce::int64 nowMs)
+{
+    if (withinDays <= 0)
+        return true;                       // the filter is off
+    if (record.addedAtMs <= 0)
+        return false;                      // never counted: not new, not a guess
+
+    const auto window = (juce::int64) withinDays * 24LL * 60LL * 60LL * 1000LL;
+    const auto age = nowMs - record.addedAtMs;
+    return age <= window;                  // a negative age is a future stamp, and still recent
+}
+
 namespace
 {
 
@@ -680,6 +712,12 @@ bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
         return false;
 
     if (query.collection.isNotEmpty() && ! record.user.collections.contains (query.collection, true))
+        return false;
+
+    // Read the clock here rather than threading it through every caller: the RULE is pure and
+    // tested (recordAddedWithin), and this is the one place that has to say what "now" is.
+    if (query.addedWithinDays > 0
+        && ! recordAddedWithin (record, query.addedWithinDays, juce::Time::currentTimeMillis()))
         return false;
 
     if (query.availableOnly)
@@ -872,6 +910,7 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("collection",     query.collection);
     o->setProperty ("favouritesOnly", query.favouritesOnly);
     o->setProperty ("minRating",      query.minRating);
+    o->setProperty ("addedWithinDays", query.addedWithinDays);
     o->setProperty ("availableOnly",  query.availableOnly);
     o->setProperty ("measuredOnly",   query.measuredOnly);
     o->setProperty ("facets",         juce::var (facets));
@@ -905,6 +944,9 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     query.collection = stored.getProperty ("collection", {}).toString();
     query.favouritesOnly = (bool) stored.getProperty ("favouritesOnly", false);
     query.minRating = juce::jlimit (0, 5, (int) stored.getProperty ("minRating", 0));
+    // Capped at a year: beyond that "recently" has stopped meaning anything and the filter is
+    // just a slower way of showing everything.
+    query.addedWithinDays = juce::jlimit (0, 365, (int) stored.getProperty ("addedWithinDays", 0));
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
     query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
 

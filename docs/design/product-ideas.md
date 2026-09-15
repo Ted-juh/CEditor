@@ -1892,7 +1892,29 @@ collection.
 **Awkward:** it needs a per-collection "last seen" marker and it must never become a badge that
 nags. Counted quietly, shown where the collection is listed.
 
-**Cost:** low.
+> **Built as something smaller and more useful, 2026-09-15 — and the idea above was not buildable
+> as written.** `LibraryRecord` had no timestamp of any kind: only `LibraryVersion` carries
+> `savedAtMs`, and a scanned vendor preset has no versions. "New since you looked" had nothing to
+> stand on.
+>
+> What was built instead is the field that was actually missing, plus a filter: `addedAtMs` on the
+> record, `addedWithinDays` on the query, and an "Added recently" row beside Measured. A smart
+> collection is a saved query, so it gets recency **for free** — "bright, plucky, added this week"
+> needs no per-collection state at all, and none of the "what counts as looking?" lifecycle the
+> badge would have needed.
+>
+> Three rules, each tested: an unknown arrival is not a recent one (the same rule the measured
+> ranges follow, where an unknown brightness is not a dark one); the boundary is inclusive; and a
+> record stamped in the future — a clock that ran fast — stays visible rather than falling out of
+> every view.
+>
+> **The bug the tests caught is the one worth recording.** Records enter through exactly two places,
+> which made stamping cheap — but `mergeVendorScan` replaces a matched record's vendor fields
+> wholesale, and `addedAtMs` was not in the keep-list beside the ratings and measurements. Every
+> rescan would have restamped the whole library as new. It is in the keep-list now, with a test that
+> rescans and one that moves a file.
+>
+> Per-collection badges remain possible on top of this, and now have a timestamp to stand on.
 
 ## `sonicRefusal` is a worklist nobody sees
 

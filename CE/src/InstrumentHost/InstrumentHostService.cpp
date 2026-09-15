@@ -10313,6 +10313,14 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
             }
         return juce::var (byCause);
     }());
+    // What arrived in the same fortnight the rail's own row offers, so the number on the row is
+    // the number of records that row would show.
+    counts->setProperty ("addedRecently", [this] { int n = 0;
+                                                   const auto now = juce::Time::currentTimeMillis();
+                                                   for (const auto& r : library.allRecords())
+                                                       if (recordAddedWithin (r, 14, now))
+                                                           ++n;
+                                                   return n; }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 

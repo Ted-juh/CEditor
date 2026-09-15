@@ -3351,6 +3351,77 @@ void testRefusalCauses()
            "every cause has its stable wire name");
 }
 
+void testRecordRecency()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::recordAddedWithin;
+
+    const juce::int64 now = 1'700'000'000'000LL;
+    const juce::int64 day = 24LL * 60LL * 60LL * 1000LL;
+
+    LibraryRecord record;
+    record.addedAtMs = now - 3 * day;
+
+    check (recordAddedWithin (record, 0, now), "a filter of zero days is off and passes everything");
+    check (recordAddedWithin (record, 7, now), "three days ago is inside a week");
+    check (! recordAddedWithin (record, 2, now), "and outside two days");
+    check (recordAddedWithin (record, 3, now), "the boundary is inclusive — exactly N days still counts");
+
+    LibraryRecord never;
+    check (never.addedAtMs == 0, "a record defaults to never having been counted");
+    check (! recordAddedWithin (never, 7, now),
+           "an unknown arrival is not a recent one, the way an unknown brightness is not a dark one");
+    check (recordAddedWithin (never, 0, now),
+           "but it is not hidden when the filter is off");
+
+    LibraryRecord future;
+    future.addedAtMs = now + 5 * day;
+    check (recordAddedWithin (future, 1, now),
+           "a clock that ran fast leaves a sound visible rather than hiding it from every view");
+
+    // The two ways in, and the stamps that separate them from everything already there.
+    {
+        Library library;
+        LibraryRecord scanned;
+        scanned.type = "preset";
+        scanned.sourceType = "vstpreset";
+        scanned.sourceLocator = "/presets/one.vstpreset";
+        scanned.name = "One";
+        scanned.fingerprint = "fp-one";
+        library.mergeVendorScan ("vstpreset", { scanned });
+
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs > 0,
+               "a genuinely new scanned preset is stamped when it arrives");
+        const auto firstStamp = library.allRecords().getReference (0).addedAtMs;
+
+        // A second scan of the same file is the same record, not a new arrival — which is what
+        // stops a rescan making the whole library look new every time.
+        library.mergeVendorScan ("vstpreset", { scanned });
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs == firstStamp,
+               "and a rescan of the same file does not restamp it");
+
+        // A move keeps the record by design (the three-pass match protects ratings), so the
+        // preset is correctly not new at its new path.
+        auto moved = scanned;
+        moved.sourceLocator = "/elsewhere/one.vstpreset";
+        library.mergeVendorScan ("vstpreset", { moved });
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs == firstStamp,
+               "nor does moving the file, because the record it keeps is the one it already had");
+
+        LibraryRecord captured;
+        captured.type = "preset";
+        captured.sourceType = "userState";
+        captured.name = "Mine";
+        const auto capturedId = library.addCapturedRecord (captured);
+        const auto* mine = library.find (capturedId);
+        check (mine != nullptr && mine->addedAtMs > 0, "a captured sound is stamped too");
+    }
+}
+
 void testLibraryBrowsing()
 {
     std::cout << "\nfacets, exclusion and counts that predict the click" << std::endl;
@@ -10756,6 +10827,7 @@ int main (int argc, char* argv[])
     testSubstitutes();
     testBrowseOnSurface();
     testRefusalCauses();
+    testRecordRecency();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();
