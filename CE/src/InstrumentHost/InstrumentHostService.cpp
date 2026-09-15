@@ -5668,6 +5668,41 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "recordFamily")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Answered on demand for the ONE record somebody is looking at, the way similarSounds
+        // is, rather than carried on every row of a browse: a family is read when a family is
+        // asked about, and most rows are never asked.
+        const auto family = ceditor::host::recordFamily (library, record->recordId);
+        juce::Array<juce::var> nodeVars;
+        for (const auto& node : family.nodes)
+        {
+            auto* n = new juce::DynamicObject();
+            n->setProperty ("recordId", node.recordId);
+            n->setProperty ("name",     node.name);
+            n->setProperty ("parentRecordId", node.parentRecordId);
+            n->setProperty ("depth",    node.depth);
+            nodeVars.add (juce::var (n));
+        }
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("recordId",      record->recordId);
+        answer->setProperty ("rootRecordId",  family.rootRecordId);
+        answer->setProperty ("truncated",     family.truncated);
+        answer->setProperty ("nodes",         nodeVars);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostRecordFamily", juce::var (answer));
+        return;
+    }
+
     if (cmd == "rackSubstitutes")
     {
         ensureLibrary();

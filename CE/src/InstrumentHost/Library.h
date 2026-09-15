@@ -345,6 +345,40 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const LibraryQuery& query,
                                                  const LibraryAvailability& isAvailable = {});
 
+/** One sound in a family, as `recordFamily` found it. */
+struct FamilyNode
+{
+    juce::String recordId;
+    juce::String name;
+    juce::String parentRecordId;   // empty at the root of what could be found
+    int depth = 0;                 // 0 at that root
+};
+
+/** Everything that descends from a record's topmost findable ancestor, the record included. */
+struct RecordFamily
+{
+    juce::String rootRecordId;
+    juce::Array<FamilyNode> nodes; // root first, then breadth-first: a parent always precedes
+                                   // its children, so a tree can be drawn in one pass
+    bool truncated = false;        // a cap was hit and the family is larger than this
+};
+
+/** Walk a record's ancestry to its root, then everything descending from that root.
+
+    THE CAPS ARE NOT DECORATION. `branchedFromRecordId` cannot cycle by any path the program
+    offers — a branch always points at a record that already exists — but a library file is a
+    file, and a hand-edited or half-written one can say anything. A walk that trusted the data
+    would hang the message thread. So both directions carry a visited set, and both are bounded.
+
+    A parent id naming a record that is no longer there stops the climb: that record is the root
+    of what can be FOUND, which is the honest answer, and the UI shows it as the top rather than
+    claiming an ancestor it cannot name.
+
+    `truncated` says a cap was reached, so a caller can say "and more" instead of implying the
+    family ends where the list does. */
+RecordFamily recordFamily (const Library& library, const juce::String& recordId,
+                           int maxNodes = 200, int maxDepth = 64);
+
 struct LibraryFacetValue
 {
     juce::String value;

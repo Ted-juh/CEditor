@@ -70,6 +70,8 @@ import {
   clearMorph,
   normalizeSubstitutes,
   similarSounds,
+  recordFamily,
+  hostRecordFamily,
   rackSubstitutes,
   rememberSubstitute,
   mockSonicDistance,
@@ -594,16 +596,17 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 8);
+  assert.equal(get(hostLibrary).records.length, 10);
 
   requestLibrary('warm', '');
-  assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
+  assert.equal(get(hostLibrary).records.length, 3,
+    'search narrows — to Warm Pad and the two sounds branched from it');
   requestLibrary('', 'rack');
   assert.equal(get(hostLibrary).records[0].type, 'rack', 'the type filter holds');
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 9, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 11, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -720,7 +723,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 8);
+  assert.equal(get(hostLibrary).counts.matched, 10);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -739,7 +742,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 8);
+  assert.equal(get(hostLibrary).records.length, 10);
   requestLibrary(saved[0].query);
   assert.equal(get(hostLibrary).records.length, 6, 'and re-running it restores the view');
 
@@ -752,10 +755,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 6);
+  assert.equal(get(hostLibrary).records.length, 8);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 6,
+  assert.equal(get(hostLibrary).records.length, 8,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -821,6 +824,41 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
   assert.equal(shaped.counts.measured, 1);
   assert.equal(shaped.counts.measurable, 4);
   assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
+});
+
+test('a record answers with its whole line, root first', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  // Asked from the DEEPEST of the three, so the answer has to climb before it descends.
+  recordFamily('lib-9');
+  const family = get(hostRecordFamily);
+
+  assert.equal(family.recordId, 'lib-9');
+  assert.equal(family.rootRecordId, 'lib-1', 'a leaf finds the top of its line');
+  assert.deepEqual(family.nodes.map((n) => n.recordId), ['lib-1', 'lib-8', 'lib-9'],
+    'and the whole line comes back, root first');
+  assert.deepEqual(family.nodes.map((n) => n.depth), [0, 1, 2]);
+  assert.equal(family.truncated, false);
+
+  // A parent always precedes its children, which is what lets the tree draw in one pass.
+  const placed = new Set();
+  for (const node of family.nodes) {
+    if (node.parentRecordId) assert.ok(placed.has(node.parentRecordId),
+      `${node.name} arrived before its parent`);
+    placed.add(node.recordId);
+  }
+
+  // Asking from the root gives the same family, not just the root.
+  recordFamily('lib-1');
+  assert.equal(get(hostRecordFamily).nodes.length, 3, 'the family is the same from either end');
+
+  // A sound nobody branched is a family of one, not an error.
+  recordFamily('lib-4');
+  assert.equal(get(hostRecordFamily).nodes.length, 1);
+
+  resetMockLibraryState();
 });
 
 test('a recency filter refuses what the library has always had', () => {

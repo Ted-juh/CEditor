@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <map>
 #include <utility>
@@ -645,6 +646,91 @@ bool LibraryFacetSelection::admits (const juce::StringArray& values) const
             return true;
 
     return false;
+}
+
+RecordFamily recordFamily (const Library& library, const juce::String& recordId,
+                           int maxNodes, int maxDepth)
+{
+    RecordFamily family;
+    const auto* start = library.find (recordId);
+    if (start == nullptr)
+        return family;
+
+    maxNodes = juce::jmax (1, maxNodes);
+    maxDepth = juce::jmax (0, maxDepth);
+
+    // Climb. `seen` is what makes a malformed file a truncated answer instead of a hang.
+    juce::StringArray seen { start->recordId };
+    const LibraryRecord* root = start;
+    for (int step = 0; step < maxDepth; ++step)
+    {
+        if (root->branchedFromRecordId.isEmpty())
+            break;
+        const auto* parent = library.find (root->branchedFromRecordId);
+        if (parent == nullptr)
+            break;                       // a parent that is gone: this is the root we can name
+        if (seen.contains (parent->recordId))
+        {
+            family.truncated = true;     // a cycle, which only a hand-edited file can produce
+            break;
+        }
+        seen.add (parent->recordId);
+        root = parent;
+    }
+    // The climb running out of steps is truncation too, and saying so is the whole point of the
+    // flag: a family that still has ancestors above the one shown must not read as complete.
+    if (root->branchedFromRecordId.isNotEmpty()
+        && library.find (root->branchedFromRecordId) != nullptr
+        && ! seen.contains (root->branchedFromRecordId))
+        family.truncated = true;
+    family.rootRecordId = root->recordId;
+
+    // One pass to index children by parent, rather than rescanning the library per node.
+    std::map<juce::String, juce::Array<const LibraryRecord*>> childrenOf;
+    for (const auto& record : library.allRecords())
+        if (record.branchedFromRecordId.isNotEmpty())
+            childrenOf[record.branchedFromRecordId].add (&record);
+
+    // Descend breadth-first so a parent always precedes its children in `nodes`.
+    struct Pending { const LibraryRecord* record; juce::String parentId; int depth; };
+    std::deque<Pending> queue { { root, {}, 0 } };
+    juce::StringArray placed;
+
+    while (! queue.empty())
+    {
+        const auto pending = queue.front();
+        queue.pop_front();
+
+        if (placed.contains (pending.record->recordId))
+        {
+            family.truncated = true;     // reachable twice: malformed, and reported as such
+            continue;
+        }
+        if (family.nodes.size() >= maxNodes)
+        {
+            family.truncated = true;
+            break;
+        }
+
+        placed.add (pending.record->recordId);
+        family.nodes.add ({ pending.record->recordId, pending.record->name,
+                            pending.parentId, pending.depth });
+
+        if (pending.depth >= maxDepth)
+        {
+            if (childrenOf.count (pending.record->recordId) != 0)
+                family.truncated = true;
+            continue;
+        }
+
+        const auto found = childrenOf.find (pending.record->recordId);
+        if (found == childrenOf.end())
+            continue;
+        for (const auto* child : found->second)
+            queue.push_back ({ child, pending.record->recordId, pending.depth + 1 });
+    }
+
+    return family;
 }
 
 bool recordAddedWithin (const LibraryRecord& record, int withinDays, juce::int64 nowMs)

@@ -3351,6 +3351,117 @@ void testRefusalCauses()
            "every cause has its stable wire name");
 }
 
+void testRecordFamily()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::recordFamily;
+
+    // A small dynasty: root -> a, b;  a -> a1.  Plus an unrelated record that must stay out.
+    Library library;
+    const auto add = [&library] (const juce::String& name, const juce::String& parentId)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "userState";
+        record.name = name;
+        record.branchedFromRecordId = parentId;
+        return library.addCapturedRecord (record);
+    };
+
+    const auto rootId = add ("Root", {});
+    const auto aId    = add ("A", rootId);
+    const auto bId    = add ("B", rootId);
+    const auto a1Id   = add ("A1", aId);
+    add ("Stranger", {});
+
+    const auto names = [] (const ceditor::host::RecordFamily& family)
+    {
+        juce::StringArray out;
+        for (const auto& node : family.nodes) out.add (node.name);
+        return out.joinIntoString (", ");
+    };
+
+    // Asked from a LEAF, the answer is still the whole family: climb to the root, then descend.
+    const auto fromLeaf = recordFamily (library, a1Id);
+    check (fromLeaf.rootRecordId == rootId, "a leaf finds the top of its line");
+    check (names (fromLeaf) == "Root, A, B, A1",
+           "and the whole family comes back, root first and breadth-first after");
+    check (! fromLeaf.truncated, "with nothing left out");
+
+    // Breadth-first is the contract the UI draws on: a parent always precedes its children.
+    bool parentsFirst = true;
+    juce::StringArray placed;
+    for (const auto& node : fromLeaf.nodes)
+    {
+        if (node.parentRecordId.isNotEmpty() && ! placed.contains (node.parentRecordId))
+            parentsFirst = false;
+        placed.add (node.recordId);
+    }
+    check (parentsFirst, "every node arrives after its parent, so a tree draws in one pass");
+
+    check (recordFamily (library, rootId).nodes.size() == 4,
+           "asking from the root gives the same family");
+    check (recordFamily (library, "no-such-record").nodes.isEmpty(),
+           "and an unknown record has no family rather than a made-up one");
+
+    // A lone record is its own family of one, not an error.
+    const auto alone = recordFamily (library, library.allRecords().getReference (4).recordId);
+    check (alone.nodes.size() == 1 && alone.nodes[0].depth == 0,
+           "a sound nobody branched is a family of one");
+
+    // A parent id pointing at a record that is gone: the climb stops at what can be NAMED.
+    {
+        Library orphaned;
+        LibraryRecord child;
+        child.type = "preset";
+        child.name = "Orphan";
+        child.branchedFromRecordId = "a-record-that-was-deleted";
+        const auto childId = orphaned.addCapturedRecord (child);
+
+        const auto family = recordFamily (orphaned, childId);
+        check (family.rootRecordId == childId && family.nodes.size() == 1,
+               "a parent that is gone leaves the child as the root of what can be found");
+    }
+
+    // THE CASES THE CAPS EXIST FOR. Nothing the program offers can produce these — a branch
+    // always points at a record that already exists — but a library file is a file, and a walk
+    // that trusted it would hang the message thread rather than answer.
+    {
+        Library looped;
+        LibraryRecord one, two;
+        one.type = two.type = "preset";
+        one.name = "One"; two.name = "Two";
+        const auto oneId = looped.addCapturedRecord (one);
+        const auto twoId = looped.addCapturedRecord (two);
+        looped.find (oneId)->branchedFromRecordId = twoId;
+        looped.find (twoId)->branchedFromRecordId = oneId;   // only a hand-edited file says this
+
+        const auto family = recordFamily (looped, oneId);
+        check (family.truncated, "a cycle is reported as truncated rather than followed");
+        check (family.nodes.size() <= 2, "and answers with what it could place, not for ever");
+    }
+
+    {
+        // A chain longer than the depth cap answers with the cap's worth and says so.
+        Library deep;
+        juce::String previous;
+        for (int i = 0; i < 40; ++i)
+            previous = [&] { LibraryRecord r; r.type = "preset";
+                             r.name = "Gen" + juce::String (i);
+                             r.branchedFromRecordId = previous;
+                             return deep.addCapturedRecord (r); }();
+
+        const auto shallow = recordFamily (deep, previous, 200, 5);
+        check (shallow.truncated, "a family deeper than the cap says it was cut short");
+        check (shallow.nodes.size() <= 6, "and stops at the depth it was given");
+
+        const auto narrow = recordFamily (deep, previous, 3, 64);
+        check (narrow.truncated && narrow.nodes.size() == 3,
+               "a node cap is obeyed exactly, and reported");
+    }
+}
+
 void testRecordRecency()
 {
     using ceditor::host::Library;
@@ -10828,6 +10939,7 @@ int main (int argc, char* argv[])
     testBrowseOnSurface();
     testRefusalCauses();
     testRecordRecency();
+    testRecordFamily();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

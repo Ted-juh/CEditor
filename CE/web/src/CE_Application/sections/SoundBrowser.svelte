@@ -32,7 +32,9 @@
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase, auditionLibraryRecord,
     hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
     setMorph, clearMorph, setParameter,
-    hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
+    hostSimilar,
+  hostRecordFamily,
+  recordFamily, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
@@ -216,7 +218,24 @@
     if (recordId && recordId !== lastAskedSimilar) {
       lastAskedSimilar = recordId;
       similarSounds(recordId);
+      recordFamily(recordId);
     }
+  }
+
+  // Walking to a relative must LAND on it. `selected` falls back to records[0] when the id is
+  // not in the current result, so a click on an ancestor that the filter happens to exclude
+  // would quietly select something else — worse than no link at all. So: if it is not in view,
+  // clear the filter to reveal it, and say so rather than changing the view behind their back.
+  let revealedNote = $state('');
+  function revealRecord(recordId) {
+    if (!recordId || recordId === selectedId) return;
+    if (!records.some((r) => r.recordId === recordId)) {
+      revealedNote = 'Filters cleared to show it.';
+      ask(emptyLibraryQuery());
+    } else {
+      revealedNote = '';
+    }
+    selectRecord(recordId);
   }
 
   // Two sounds of the focused part's plug-in become the ends of its morph: the selected one
@@ -985,8 +1004,36 @@
             </div>
           {/if}
 
-          {#if selected.branchedFromName}
+          {#if selected.branchedFromName && $hostRecordFamily.nodes.length < 2}
+            <!-- The family has not answered yet (or this record stands alone in it). Name the
+                 parent rather than showing nothing, which is what this line always did. -->
             <div class="branched">branched from <b>{selected.branchedFromName}</b></div>
+          {/if}
+          {#if $hostRecordFamily.recordId === selected.recordId && $hostRecordFamily.nodes.length > 1}
+            <div class="family" data-testid="record-family">
+              <div class="insp-head">
+                Its line
+                {#if $hostRecordFamily.truncated}
+                  <span class="fmore" data-testid="family-truncated">and more than fits here</span>
+                {/if}
+              </div>
+              {#each $hostRecordFamily.nodes as node (node.recordId)}
+                <button type="button"
+                        class="fnode"
+                        class:here={node.recordId === selected.recordId}
+                        data-testid={node.recordId === selected.recordId ? 'family-here' : 'family-node'}
+                        style={`padding-left:${6 + node.depth * 12}px`}
+                        title={node.recordId === selected.recordId
+                          ? 'The sound you are looking at'
+                          : 'Show this one'}
+                        onclick={() => revealRecord(node.recordId)}>
+                  {node.name || 'an unnamed sound'}
+                </button>
+              {/each}
+              {#if revealedNote}
+                <div class="fnote" data-testid="family-note">{revealedNote}</div>
+              {/if}
+            </div>
           {/if}
 
           <div class="vsave">
@@ -1287,6 +1334,17 @@
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     color: #b08a3d; font-size: 10px; padding: 2px 0;
   }
+  .family { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
+  .family .fmore { color: #b08a3d; font-size: 9.5px; margin-left: 6px; font-style: italic; }
+  .fnode {
+    text-align: left; background: none; border: 0; color: #8b949e; font-size: 10.5px;
+    padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  }
+  .fnode:hover { background: #22272d; color: #cdd5dd; }
+  /* The one you are on is marked, not made unclickable: clicking it is simply a no-op, and a
+     disabled row in a list of links reads as broken rather than as "you are here". */
+  .fnode.here { color: #eaf0f6; background: #2a3138; }
+  .fnote { color: #66707b; font-size: 9.5px; font-style: italic; padding: 2px 6px; }
   .refusal-causes { display: flex; flex-direction: column; gap: 2px; padding: 0 0 2px 10px; }
   .refusal-row { display: flex; align-items: baseline; gap: 6px; font-size: 10px; }
   .refusal-row .rn { color: #b08a3d; min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }

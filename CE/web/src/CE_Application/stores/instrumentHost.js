@@ -45,6 +45,7 @@ import {
   onInstrumentHostAudition,
   onInstrumentHostVersionDiff,
   onInstrumentHostSimilar,
+  onInstrumentHostRecordFamily,
   onInstrumentHostSubstitutes,
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
@@ -86,6 +87,21 @@ export const hostAudition = writable({ recordId: '', stage: '', detail: '',
 export const hostVersionDiff = writable(null);
 /** The closest measured sounds to whatever last asked. */
 export const hostSimilar = writable({ recordId: '', measured: false, matches: [] });
+/** The selected record's whole line, root first and breadth-first after, so a parent always
+    precedes its children and the tree draws in one pass. */
+export const hostRecordFamily = writable({ recordId: '', rootRecordId: '', truncated: false, nodes: [] });
+
+export const normalizeRecordFamily = (p) => ({
+  recordId: String(p?.recordId ?? ''),
+  rootRecordId: String(p?.rootRecordId ?? ''),
+  truncated: p?.truncated === true,
+  nodes: (Array.isArray(p?.nodes) ? p.nodes : []).map((n) => ({
+    recordId: String(n?.recordId ?? ''),
+    name: String(n?.name ?? ''),
+    parentRecordId: String(n?.parentRecordId ?? ''),
+    depth: Math.max(0, Number(n?.depth ?? 0) || 0),
+  })).filter((n) => n.recordId),
+});
 /** What a captured rack needs before it can play on this machine. null until asked. */
 export const hostSubstitutes = writable(null);
 
@@ -932,6 +948,14 @@ export function mockHostLibrary(query = '', type = '') {
       category: 'Bass', available: true, tags: ['broken'], sonic: null,
       sonicRefusal: 'That saved state could not be read back.', mockRefusalCause: 'unreadable',
       addedAtMs: Date.now() - 2 * 86400000 },
+    { recordId: 'lib-8', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-1',
+      branchedFromName: 'Warm Pad', sonic: mockSonic(0.18, 0.74, 0.70, 0.80, 0.09) },
+    { recordId: 'lib-9', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker, Longer',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-8',
+      branchedFromName: 'Warm Pad Darker', sonic: mockSonic(0.17, 0.75, 0.92, 0.81, 0.08) },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -6221,6 +6245,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
+  onInstrumentHostRecordFamily((payload) => hostRecordFamily.set(normalizeRecordFamily(payload)));
   onInstrumentHostSubstitutes((payload) => hostSubstitutes.set(normalizeSubstitutes(payload)));
   onInstrumentHostSurfaceBrowse((payload) => hostSurfaceBrowse.set(normalizeSurfaceBrowse(payload)));
   onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
@@ -6784,6 +6809,55 @@ function send(payload) {
           name: r.name.length > 12 ? `${r.name.slice(0, 11)}.` : r.name, available: r.available })),
         surface: caps,
       }));
+      return;
+    }
+    if (payload?.cmd === 'recordFamily') {
+      const all = get(hostLibrary).records;
+      const start = all.find((r) => r.recordId === payload.recordId);
+      if (!start) { hostLastError.set('Unknown library record.'); return; }
+
+      // Mirrors recordFamily in CE/src/InstrumentHost/Library.cpp, which is the authority —
+      // including the guards, because the browser build reads the same kind of file the app
+      // does and a malformed one must truncate here too rather than hang the tab.
+      const byId = new Map(all.map((r) => [r.recordId, r]));
+      let truncated = false;
+
+      let root = start;
+      const seen = new Set([root.recordId]);
+      for (let step = 0; step < 64; step += 1) {
+        const parent = root.branchedFrom && byId.get(root.branchedFrom);
+        if (!parent) break;
+        if (seen.has(parent.recordId)) { truncated = true; break; }
+        seen.add(parent.recordId);
+        root = parent;
+      }
+      if (root.branchedFrom && byId.get(root.branchedFrom) && !seen.has(root.branchedFrom))
+        truncated = true;
+
+      const childrenOf = new Map();
+      for (const r of all)
+        if (r.branchedFrom)
+          childrenOf.set(r.branchedFrom, [...(childrenOf.get(r.branchedFrom) ?? []), r]);
+
+      const nodes = [];
+      const placed = new Set();
+      const queue = [{ record: root, parentRecordId: '', depth: 0 }];
+      while (queue.length) {
+        const { record, parentRecordId, depth } = queue.shift();
+        if (placed.has(record.recordId)) { truncated = true; continue; }
+        if (nodes.length >= 200) { truncated = true; break; }
+        placed.add(record.recordId);
+        nodes.push({ recordId: record.recordId, name: record.name, parentRecordId, depth });
+        if (depth >= 64) {
+          if (childrenOf.has(record.recordId)) truncated = true;
+          continue;
+        }
+        for (const child of childrenOf.get(record.recordId) ?? [])
+          queue.push({ record: child, parentRecordId: record.recordId, depth: depth + 1 });
+      }
+
+      hostRecordFamily.set(normalizeRecordFamily({
+        recordId: start.recordId, rootRecordId: root.recordId, truncated, nodes }));
       return;
     }
     if (payload?.cmd === 'similarSounds') {
@@ -7528,6 +7602,7 @@ export const diffVersions = (recordId, versionIdA, versionIdB) =>
 /** The closest measured sounds to this one. */
 export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
+export const recordFamily = (recordId) => send({ cmd: 'recordFamily', recordId });
 /** What a captured rack needs before it can play here, and the nearest things you do own. */
 export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
 /** Chooses (or with an empty recordId, un-chooses) the substitute for one wanted sound. The

@@ -18,7 +18,7 @@ import { get } from 'svelte/store';
 import SoundBrowser from '../src/CE_Application/sections/SoundBrowser.svelte';
 import {
   hostLibrary, hostState, mockHostState, requestLibrary, emptyLibraryQuery,
-  normalizeHostLibrary,
+  normalizeHostLibrary, hostRecordFamily, normalizeRecordFamily,
 } from '../src/CE_Application/stores/instrumentHost.js';
 
 /** The panel reads its library from the store, so a test drives it by putting one there. */
@@ -123,4 +123,58 @@ test('the Added recently row shows what arrived, and toggles the filter', () => 
   // The tooltip carries the two things somebody would otherwise report as bugs.
   assert.match(row, /has no arrival time and is not recent/);
   assert.match(row, /moved keeps the record it already had/);
+});
+
+test('a record with a line draws it as a tree, marking where you are', () => {
+  hostState.set(mockHostState());
+  // The panel draws a family only for the record it is SHOWING, and with nothing clicked that is
+  // the first row. So narrow the view until the middle of the three-generation family is first,
+  // which is also the interesting case: one above it and one below.
+  requestLibrary({ ...emptyLibraryQuery(), text: 'darker' });
+  hostRecordFamily.set(normalizeRecordFamily({
+    recordId: 'lib-8',
+    rootRecordId: 'lib-1',
+    truncated: false,
+    nodes: [
+      { recordId: 'lib-1', name: 'Warm Pad', parentRecordId: '', depth: 0 },
+      { recordId: 'lib-8', name: 'Warm Pad Darker', parentRecordId: 'lib-1', depth: 1 },
+      { recordId: 'lib-9', name: 'Warm Pad Darker, Longer', parentRecordId: 'lib-8', depth: 2 },
+    ],
+  }));
+
+  const html = render(SoundBrowser, { props: {} }).body;
+  assert.match(html, /data-testid="record-family"/, 'the line is drawn');
+  const block = html.slice(html.indexOf('data-testid="record-family"'));
+
+  assert.match(block, /Warm Pad</, 'the ancestor is there');
+  assert.match(block, /Warm Pad Darker, Longer</, 'and so is the descendant');
+
+  // Depth is drawn as indentation, so a tree reads as a tree rather than a flat list.
+  assert.match(block, /padding-left:6px/);
+  assert.match(block, /padding-left:18px/);
+  assert.match(block, /padding-left:30px/);
+
+  // Exactly one node is "you are here", and it is the selected one.
+  const here = block.match(/data-testid="family-here"/g) ?? [];
+  assert.equal(here.length, 1, 'one node is marked as where you are, not none and not several');
+  const hereRow = block.slice(block.indexOf('data-testid="family-here"'));
+  assert.match(hereRow.slice(0, 200), /Warm Pad Darker</,
+    'and it is the record being looked at, not the root');
+});
+
+test('a family too big to show says so rather than implying it ended', () => {
+  hostState.set(mockHostState());
+  requestLibrary({ ...emptyLibraryQuery(), text: 'Warm Pad' });
+  hostRecordFamily.set(normalizeRecordFamily({
+    recordId: 'lib-1', rootRecordId: 'lib-1', truncated: true,
+    nodes: [
+      { recordId: 'lib-1', name: 'Warm Pad', parentRecordId: '', depth: 0 },
+      { recordId: 'lib-8', name: 'Warm Pad Darker', parentRecordId: 'lib-1', depth: 1 },
+    ],
+  }));
+
+  const html = render(SoundBrowser, { props: {} }).body;
+  assert.match(html, /data-testid="family-truncated"/,
+    'a capped family must not read as a complete one');
+  assert.match(html, /and more than fits here/);
 });

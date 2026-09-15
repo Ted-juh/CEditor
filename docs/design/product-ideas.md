@@ -1859,6 +1859,27 @@ It is also the library-side half of the version-control idea in
 [`midi-frontier.md`](midi-frontier.md) §1.4, arriving from the other direction and much cheaper,
 because the edges are already recorded.
 
+> **Built, 2026-09-15.** `recordFamily` in `CE/src/InstrumentHost/Library.cpp` climbs to a
+> record's topmost findable ancestor and then descends from it breadth-first, so a parent always
+> precedes its children and the browser draws the tree in one pass. A `recordFamily` command
+> answers on demand for the one record being looked at — the shape `similarSounds` already
+> established — and the inspector draws the line, indented by depth, with the record you are on
+> marked and every other node a link.
+>
+> **Two things the idea did not see, both found by reading rather than by building.** Descendants
+> cannot be computed in the browser: `p.records` is the filtered result, so scanning it would find
+> only the relatives that happen to match the current query — the same trap as the refusal counts
+> in §28. And navigation had to be made to *land*: `selected` falls back to `records[0]` when an id
+> is not in view, so clicking an ancestor the filter excludes would have quietly selected something
+> else. It now clears the filter to reveal the sound and says that it did.
+>
+> **The caps are the part worth keeping.** `branchedFromRecordId` cannot cycle by any path the
+> program offers — a branch always points at a record that already exists — but a library file is a
+> file, and a hand-edited one can say anything. Both directions carry a visited set and a bound, a
+> cycle comes back as `truncated` rather than as a hung message thread, and the climb hitting its
+> depth cap counts as truncation too. That last one was a real bug the tests caught: a family with
+> ancestors above the one shown was reading as complete.
+
 **Cost:** low-to-medium. The data exists and is already in the browser's record shape
 (`branchedFrom`, `branchedFromName` in `stores/instrumentHost.js`); this is a view and a walk.
 

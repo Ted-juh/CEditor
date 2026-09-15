@@ -993,6 +993,13 @@ export function onInstrumentHostSimilar(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** A record's whole line ({ recordId, rootRecordId, nodes, truncated }). */
+export function onInstrumentHostRecordFamily(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostRecordFamily', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** What a captured rack needs before it can play here ({ recordId, parts, needing }). */
 export function onInstrumentHostSubstitutes(callback) {
   if (!isJuceAvailable()) return () => {};
