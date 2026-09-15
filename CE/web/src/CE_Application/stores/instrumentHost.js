@@ -1954,6 +1954,159 @@ const normalizeFollowAction = (clip) => {
   return Number(clip?.followAfterLoops ?? 0) > 0 ? 'stop' : 'none';
 };
 
+/** THE FOLLOW GRAPH. A clip's `followAction` is a song form expressed as five dropdowns, which
+    means the shape of a set exists only in the user's head. This turns the clip list into nodes
+    and edges so it can be drawn — and, more to the point, so the arrows that will never fire can
+    be named before a gig rather than during one.
+
+    Every rule below was established by driving PerformanceEngine rather than by reading it, and
+    the engine (PerformanceEngine.cpp, the `doneLooping || doneFollowing` block) is the authority:
+
+      - A follow needs `followAfterLoops > 0`. With zero the action is set and never comes round.
+      - A clip that does not loop ends at its first pass, so it only ever reaches loop 1 — a
+        non-looping clip with a follow count above 1 stops instead of following.
+      - `clip` with no target chosen does not carry on; it STOPS. The dropdown reads
+        "Choose clip…" and the behaviour is Stop, which is the one that surprises people.
+      - `next` is the next clip in DOCUMENT ORDER and wraps from the last to the first, so the
+        order of the list is part of the meaning and this graph must not reorder it.
+      - `random` chooses among every other clip, not a designated set. It is reproducible from
+        the clip's id and its loop count, but it is not predictable to somebody reading the
+        screen, so it is drawn as a fan rather than as one arrow.
+      - With only one clip in the song, `next` and `random` have nothing to choose and stop.
+
+    Pure, and it takes the clip array rather than the store, so the rules can be tested without
+    a performance to mutate. */
+export function clipFollowGraph(clips) {
+  const list = (Array.isArray(clips) ? clips : []).filter((c) => c && c.clipId);
+  const indexOf = new Map(list.map((c, i) => [c.clipId, i]));
+
+  const nodes = list.map((clip, index) => {
+    const action = normalizeFollowAction(clip);
+    const afterLoops = Math.max(0, Math.floor(Number(clip.followAfterLoops ?? 0)) || 0);
+    const loops = clip.loop !== false;
+
+    // Whether the configured action can ever fire at all. Both boundaries are decided at the
+    // same moment in the engine, so a one-shot only ever satisfies a follow count of exactly 1.
+    let deadReason = '';
+    if (action !== 'none') {
+      if (afterLoops <= 0)
+        deadReason = 'the loop count is zero, so this never comes round';
+      else if (!loops && afterLoops > 1)
+        deadReason = `Loop is off, so this clip ends after one pass and never reaches loop ${afterLoops}`;
+    }
+    const live = action !== 'none' && deadReason === '';
+
+    return { clipId: clip.clipId, name: String(clip.name ?? ''), index,
+             action, afterLoops, loop: loops, live, deadReason,
+             // Filled in below, once every node exists.
+             kind: 'open', target: '', fanOut: 0, stopNote: '',
+             reachable: false, reachesRest: false };
+  });
+
+  const edges = [];
+  for (const node of nodes) {
+    if (!node.live) {
+      // A clip with no live follow either loops until something stops it, or plays once.
+      node.kind = node.loop ? 'open' : 'terminal';
+      if (node.kind === 'terminal') node.stopNote = 'plays once and stops';
+      continue;
+    }
+
+    if (node.action === 'stop') {
+      node.kind = 'terminal';
+      node.stopNote = `stops after ${node.afterLoops} loop${node.afterLoops === 1 ? '' : 's'}`;
+      continue;
+    }
+
+    if (node.action === 'clip') {
+      const target = String(list[node.index].followClipId ?? '');
+      // No target, or one the performance no longer has: the engine finds nothing to launch and
+      // the clip simply stops. Drawn as an end, because that is what it is.
+      if (!target || !indexOf.has(target)) {
+        node.kind = 'terminal';
+        node.stopNote = target ? 'stops — the clip it names is gone' : 'stops — no clip chosen';
+        continue;
+      }
+      node.kind = 'follow';
+      node.target = target;
+      edges.push({ fromClipId: node.clipId, toClipId: target, kind: 'clip' });
+      continue;
+    }
+
+    if (nodes.length < 2) {
+      // Nothing to move to. The engine leaves the clip stopped at its boundary.
+      node.kind = 'terminal';
+      node.stopNote = 'stops — there is no other clip to go to';
+      continue;
+    }
+
+    if (node.action === 'next') {
+      const target = nodes[(node.index + 1) % nodes.length].clipId;
+      node.kind = 'follow';
+      node.target = target;
+      edges.push({ fromClipId: node.clipId, toClipId: target, kind: 'next' });
+      continue;
+    }
+
+    // random
+    node.kind = 'fan';
+    node.fanOut = nodes.length - 1;
+    for (const other of nodes)
+      if (other.clipId !== node.clipId)
+        edges.push({ fromClipId: node.clipId, toClipId: other.clipId, kind: 'random' });
+  }
+
+  const byId = new Map(nodes.map((n) => [n.clipId, n]));
+  for (const edge of edges) byId.get(edge.toClipId).reachable = true;
+
+  // Does this clip ever come to rest? Worked backwards from every resting place over the live
+  // edges — one pass instead of a search per clip.
+  //
+  // A rest is a clip that STOPS or one that simply loops with no follow, and counting the second
+  // one matters: almost every real set ends on a clip looping until the player stops it, and
+  // warning about that would put a complaint on the screen the moment anybody made two clips.
+  // What is worth saying is the ring — clips that only ever hand on to each other, so the set
+  // arrives nowhere and never lands.
+  const into = new Map(nodes.map((n) => [n.clipId, []]));
+  for (const edge of edges) into.get(edge.toClipId).push(edge.fromClipId);
+
+  const queue = nodes.filter((n) => n.kind === 'terminal' || n.kind === 'open');
+  for (const node of queue) node.reachesRest = true;
+  while (queue.length) {
+    const node = queue.shift();
+    for (const fromId of into.get(node.clipId)) {
+      const from = byId.get(fromId);
+      if (from.reachesRest) continue;
+      from.reachesRest = true;
+      queue.push(from);
+    }
+  }
+
+  const warnings = [];
+  for (const node of nodes) {
+    if (node.deadReason)
+      warnings.push({ code: 'dead-follow', clipId: node.clipId, name: node.name,
+                      text: `${node.name} is set to follow, but ${node.deadReason}.` });
+    else if (node.kind === 'terminal' && node.action === 'clip')
+      warnings.push({ code: 'silent-stop', clipId: node.clipId, name: node.name,
+                      text: node.stopNote === 'stops — no clip chosen'
+                              ? `${node.name} is set to "Target clip" with nothing chosen, which ends the set rather than carrying on.`
+                              : `${node.name} names a clip the performance no longer has, so it ends the set.` });
+  }
+
+  // One warning for the whole knot, not one per clip in it: a three-clip ring that never lands
+  // is a single mistake, and three copies of the same sentence reads like three of them.
+  const stranded = nodes.filter((n) => n.live && !n.reachesRest);
+  if (stranded.length > 0)
+    warnings.push({ code: 'no-way-out', clipId: stranded[0].clipId, name: stranded[0].name,
+                    clipIds: stranded.map((n) => n.clipId),
+                    text: stranded.length === 1
+                            ? `${stranded[0].name} hands back to itself for ever — the set never lands.`
+                            : `${stranded.map((n) => n.name).join(' → ')} only ever hand on to each other, so the set never lands.` });
+
+  return { nodes, edges, warnings };
+}
+
 const normalizeArp = (a) => ({
   enabled: a?.enabled === true,
   mode: String(a?.mode ?? 'up'),
@@ -3616,8 +3769,22 @@ export function mockHostState() {
           })),
         }],
       }],
-      clips: [{ clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
-                 launchQuantize: 'bar', loop: true }],
+      // A small song form rather than a single clip, so the follow graph has something to draw
+      // and every edge kind is in the preview: a named target, a Next that walks document
+      // order, a Random fan, and an end. It is deliberately a CORRECT form — the graph's
+      // warnings are exercised by tests with fixtures of their own, not by shipping a broken
+      // demo for people to copy.
+      clips: [
+        { clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true,
+          followAction: 'clip', followClipId: 'mock-clip-2', followAfterLoops: 2 },
+        { clipId: 'mock-clip-2', name: 'Verse', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'next', followAfterLoops: 4 },
+        { clipId: 'mock-clip-3', name: 'Chorus', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'random', followAfterLoops: 2 },
+        { clipId: 'mock-clip-4', name: 'Outro', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'stop', followAfterLoops: 1 },
+      ],
       scenes: [],
       setlist: { items: [], currentIndex: -1 },
       arrangement: {

@@ -41,6 +41,7 @@
     setArrangementOptions, startArrangement, stopArrangement,
   } from '../stores/instrumentHost.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import FollowGraph from './FollowGraph.svelte';
 
   let tab = $state('patterns');
   let selectedPatternId = $state('');
@@ -2587,6 +2588,12 @@
         {#if performance.clips.length === 0}
           <div class="empty-hint">No clips yet — make one from a pattern.</div>
         {/if}
+
+        <!-- The song form as a map. The rows below stay the editor; a follow action is five
+             dropdowns, and on a row of dropdowns an arrow that will never fire looks exactly
+             like one that will. -->
+        <FollowGraph clips={performance.clips} />
+
         {#each performance.clips as clip (clip.clipId)}
           <div class="clip-row" class:active={clip.active} class:pending={clip.pending}
                data-testid="perf-clip">

@@ -2147,6 +2147,47 @@ the document is already a graph and the interface is a list of text rows.
 
 **Cost:** low-to-medium. The edges are all in the model.
 
+> **Built, 2026-09-15 — and "the edges are all in the model" was wrong**, which turned out to be
+> the interesting part. Six probes were run against `PerformanceEngine` rather than reading it,
+> and three of them contradicted what the dropdowns imply:
+>
+> | | |
+> |---|---|
+> | A clip with **Loop off** and *follow after 4* | Stops after one pass. **The follow never fires.** Both boundaries are decided at the same moment in the engine, so a one-shot only ever satisfies a count of exactly 1. |
+> | `followAction: clip` with *after 0 loops* | Never fires. The clip loops for ever with its action set. |
+> | `followAction: clip` with **no target chosen** | The clip **stops**. The dropdown reads "Choose clip…" and the behaviour is Stop. |
+> | `next` on the last clip | **Wraps to the first.** Three clips on Next is a ring nobody meant to build. |
+> | `random` | Chooses among *every* other clip — reproducible from the clip's id and its loop count, but not predictable to a reader. |
+> | One clip in the song | `next` and `random` have nothing to choose, and stop. |
+>
+> So only one of the five actions stores its edge. `next` is derived from position in the list,
+> `random` is "all others", `stop` is a terminal, and there are three separate ways to configure
+> an arrow that will never fire.
+>
+> `clipFollowGraph` in `stores/instrumentHost.js` is the engine's arithmetic as a pure function —
+> nodes, edges and warnings from the clip array. It is in the store rather than in the component
+> because it is the engine's rules and had to be testable against them; `FollowGraph.svelte`
+> holds the geometry and nothing else. **No C++ and no model change**: unlike the library's
+> family tree, the browser already has the whole clip list on every state push, so there is
+> nothing to ask the native side for.
+>
+> Drawn as a column in **document order**, which is deliberate — Next *means* the next row, so
+> reordering the boxes into a prettier graph would hide the thing being drawn. Arrows curve
+> through a left gutter, bulging further the further they travel. A Random follow gets one stub
+> and a count rather than N−1 arrows, because a hairball says less than the number does. A
+> terminal gets an end bar; a clip nothing leads to is labelled *by hand* rather than warned
+> about, since that is how a set starts.
+>
+> **The warnings are the reason to build it**, and each is one of the measurements above: a
+> follow that can never fire, a "Target clip" that is really a Stop, and a ring of clips that
+> only ever hand on to each other so the set never lands. That last one is deliberately **one**
+> warning for the whole ring, and a clip that simply loops with no follow counts as a resting
+> place — otherwise every performance with two clips in it would open with a complaint, and a
+> panel that cries wolf is a panel nobody reads.
+>
+> **Not built:** editing by dragging arrows (the dropdowns stay the editor) and the scene graph,
+> which is a different picture of a different relation.
+
 ## Variations above the pattern
 
 `makePatternVariation (source, label, amount)` generates an A / B / C / D variant of a pattern at a

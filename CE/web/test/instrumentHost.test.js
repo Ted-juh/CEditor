@@ -72,6 +72,7 @@ import {
   similarSounds,
   recordFamily,
   hostRecordFamily,
+  clipFollowGraph,
   mergedDuplicateCuration,
   mergeDuplicateSet,
   setLibraryRecordHidden,
@@ -974,6 +975,183 @@ test('a folded record is out of every view that did not ask for it', () => {
   assert.equal(libraryQueryIsEmpty(emptyLibraryQuery()), true);
 
   resetMockLibraryState();
+});
+
+// THE FOLLOW GRAPH. Every rule below was established by driving PerformanceEngine rather than by
+// reading it — six probes, and three of them contradicted what the dropdowns imply. The engine is
+// the authority and this function is the browser's copy of its arithmetic, so if the two ever
+// disagree these assertions are the record of what was measured.
+
+const clip = (clipId, fields = {}) => ({ clipId, name: clipId, loop: true, ...fields });
+
+test('a well-formed song is nodes, edges and an end', () => {
+  const graph = clipFollowGraph([
+    clip('a', { name: 'Riff', followAction: 'clip', followClipId: 'b', followAfterLoops: 2 }),
+    clip('b', { name: 'Verse', followAction: 'next', followAfterLoops: 4 }),
+    clip('c', { name: 'Outro', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+
+  assert.deepEqual(graph.edges, [
+    { fromClipId: 'a', toClipId: 'b', kind: 'clip' },
+    { fromClipId: 'b', toClipId: 'c', kind: 'next' },
+  ], 'a named target is one edge, and Next is the edge document order implies');
+  assert.equal(graph.nodes[2].kind, 'terminal');
+  assert.equal(graph.nodes[2].stopNote, 'stops after 1 loop');
+  assert.deepEqual(graph.warnings, [], 'and a form that works is not warned about');
+
+  // Nothing leads to the first clip, which is not a mistake — it is how a set starts.
+  assert.equal(graph.nodes[0].reachable, false, 'the entry is marked as hand-launched');
+  assert.equal(graph.nodes[1].reachable, true);
+});
+
+test('Next walks document order and wraps from the last clip to the first', () => {
+  const graph = clipFollowGraph([
+    clip('a', { followAction: 'next', followAfterLoops: 1 }),
+    clip('b'),
+    clip('c', { followAction: 'next', followAfterLoops: 1 }),
+  ]);
+
+  assert.equal(graph.edges.find((e) => e.fromClipId === 'a').toClipId, 'b');
+  assert.equal(graph.edges.find((e) => e.fromClipId === 'c').toClipId, 'a',
+    'the last clip wraps to the first, which is how a ring gets built by accident');
+});
+
+test('Random fans to every other clip, which is what makes it reachability and not an arrow', () => {
+  const graph = clipFollowGraph([
+    clip('a', { followAction: 'random', followAfterLoops: 1 }),
+    clip('b'), clip('c'), clip('d'),
+  ]);
+
+  assert.equal(graph.nodes[0].kind, 'fan');
+  assert.equal(graph.nodes[0].fanOut, 3, 'every clip except itself');
+  assert.deepEqual(graph.edges.map((e) => e.toClipId), ['b', 'c', 'd']);
+  assert.ok(graph.edges.every((e) => e.kind === 'random'));
+
+  // The edges are returned even though the view draws a stub instead of four arrows: they are
+  // what makes the reachability true, and a fan that reached nothing would be a different claim.
+  assert.ok(graph.nodes.slice(1).every((n) => n.reachable));
+});
+
+test('a follow that can never fire is named, not drawn as though it works', () => {
+  // Loop off. Both boundaries are decided at the same moment in the engine, so a one-shot only
+  // ever reaches loop 1 — measured, not assumed (probe Q1).
+  const oneShot = clipFollowGraph([
+    clip('a', { name: 'Hit', loop: false, followAction: 'clip', followClipId: 'b',
+                followAfterLoops: 4 }),
+    clip('b'),
+  ]);
+  assert.equal(oneShot.edges.length, 0, 'no edge, because no hand-off happens');
+  assert.equal(oneShot.nodes[0].kind, 'terminal', 'the clip just ends');
+  assert.equal(oneShot.warnings[0].code, 'dead-follow');
+  assert.match(oneShot.warnings[0].text, /Loop is off/);
+  assert.match(oneShot.warnings[0].text, /never reaches loop 4/);
+
+  // The same clip at a count of 1 does follow — the two boundaries agree there (probe Q2).
+  const atOne = clipFollowGraph([
+    clip('a', { loop: false, followAction: 'clip', followClipId: 'b', followAfterLoops: 1 }),
+    clip('b'),
+  ]);
+  assert.deepEqual(atOne.warnings, []);
+  assert.equal(atOne.edges.length, 1, 'a one-shot following after exactly one loop works');
+
+  // A follow count of zero never comes round (probe Q3). The panel cannot produce this, but a
+  // saved file or a script can, and it reads as configured.
+  const never = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: 'b', followAfterLoops: 0 }),
+    clip('b'),
+  ]);
+  assert.equal(never.edges.length, 0);
+  assert.equal(never.nodes[0].kind, 'open', 'it simply loops for ever');
+  assert.match(never.warnings[0].text, /loop count is zero/);
+});
+
+test('"Target clip" with nothing to go to is a Stop, and says so', () => {
+  // Probe Q4: the engine finds nothing to launch and the clip stops at its boundary. The
+  // dropdown reads "Choose clip…", which is the one that surprises people.
+  const empty = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: '', followAfterLoops: 2 }),
+    clip('b'),
+  ]);
+  assert.equal(empty.nodes[0].kind, 'terminal');
+  assert.equal(empty.nodes[0].stopNote, 'stops — no clip chosen');
+  assert.equal(empty.warnings[0].code, 'silent-stop');
+  assert.match(empty.warnings[0].text, /ends the set rather than carrying on/);
+
+  // A target the performance no longer has behaves identically and is a different sentence,
+  // because the two have different fixes.
+  const gone = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: 'deleted', followAfterLoops: 2 }),
+    clip('b'),
+  ]);
+  assert.equal(gone.nodes[0].kind, 'terminal');
+  assert.match(gone.warnings[0].text, /no longer has/);
+});
+
+test('a set that never ends is one warning, not one per clip in the ring', () => {
+  const ring = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'next', followAfterLoops: 1 }),
+    clip('b', { name: 'B', followAction: 'next', followAfterLoops: 1 }),
+    clip('c', { name: 'C', followAction: 'next', followAfterLoops: 1 }),
+  ]);
+
+  assert.equal(ring.warnings.length, 1, 'three copies of one sentence reads like three mistakes');
+  assert.equal(ring.warnings[0].code, 'no-way-out');
+  assert.deepEqual(ring.warnings[0].clipIds, ['a', 'b', 'c']);
+  assert.match(ring.warnings[0].text, /A → B → C/);
+  assert.ok(ring.nodes.every((n) => !n.reachesRest));
+
+  // One clip pointed at a stop is enough to clear the whole ring, which is the fix somebody
+  // would make and must be reflected immediately.
+  const fixed = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'next', followAfterLoops: 1 }),
+    clip('b', { name: 'B', followAction: 'next', followAfterLoops: 1 }),
+    clip('c', { name: 'C', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+  assert.deepEqual(fixed.warnings, []);
+  assert.ok(fixed.nodes.every((n) => n.reachesRest));
+});
+
+test('a set that lands on a looping clip is not a mistake', () => {
+  // The ordinary ending: the last clip has no follow and loops until the player stops it. If
+  // that counted as "never lands", every performance with two clips in it would open with a
+  // complaint, and a panel that cries wolf is a panel nobody reads.
+  const graph = clipFollowGraph([
+    clip('a', { name: 'Intro', loop: false, followAction: 'clip', followClipId: 'b',
+                followAfterLoops: 1 }),
+    clip('b', { name: 'Groove' }),
+  ]);
+
+  assert.deepEqual(graph.warnings, []);
+  assert.equal(graph.nodes[1].kind, 'open');
+  assert.ok(graph.nodes.every((n) => n.reachesRest), 'a clip that just loops is a resting place');
+});
+
+test('a clip that follows itself is a ring of one', () => {
+  const graph = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'clip', followClipId: 'a', followAfterLoops: 2 }),
+    clip('b', { name: 'B', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+
+  assert.deepEqual(graph.edges, [{ fromClipId: 'a', toClipId: 'a', kind: 'clip' }]);
+  assert.equal(graph.warnings.length, 1);
+  assert.match(graph.warnings[0].text, /hands back to itself for ever/);
+  assert.equal(graph.nodes[0].reachable, true, 'it reaches itself, so it is not an entry');
+});
+
+test('the shapes with nothing to say say nothing', () => {
+  assert.deepEqual(clipFollowGraph([]), { nodes: [], edges: [], warnings: [] });
+  assert.deepEqual(clipFollowGraph(null).nodes, [], 'an absent clip list is not a crash');
+
+  // A clip with no follow at all loops until something stops it. That is the normal case and
+  // must not be warned about, or every new performance opens with a complaint.
+  const plain = clipFollowGraph([clip('a'), clip('b')]);
+  assert.deepEqual(plain.warnings, []);
+  assert.ok(plain.nodes.every((n) => n.kind === 'open'));
+
+  // With nothing to move to, Next and Random have no choice and the engine stops the clip.
+  const alone = clipFollowGraph([clip('a', { followAction: 'next', followAfterLoops: 1 })]);
+  assert.equal(alone.nodes[0].kind, 'terminal');
+  assert.equal(alone.nodes[0].stopNote, 'stops — there is no other clip to go to');
 });
 
 test('a recency filter refuses what the library has always had', () => {
@@ -3289,12 +3467,15 @@ test('mock reducer: parameter locks stay linked to their source step', () => {
 test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   let state = mockHostState();
   const patternId = state.performance.patterns[0].patternId;
+  const before = state.performance.clips.length;
   state = applyMockCommand(state, { cmd: 'addClip', patternId, name: 'Second' });
-  assert.equal(state.performance.clips.length, 2);
+  assert.equal(state.performance.clips.length, before + 1);
 
-  const clipId = state.performance.clips[1].clipId;
+  // The new clip is the last one, whatever the demo song already had in it.
+  const added = state.performance.clips.length - 1;
+  const clipId = state.performance.clips[added].clipId;
   state = applyMockCommand(state, { cmd: 'launchClip', clipId });
-  assert.equal(state.performance.clips[1].active, true);
+  assert.equal(state.performance.clips[added].active, true);
 
   state = applyMockCommand(state, { cmd: 'setPartMixer', partId: 'mock-part-1',
                                     mute: true, volume: 1.4, pan: -0.35 });
@@ -3317,7 +3498,7 @@ test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.1 });
   state = applyMockCommand(state, { cmd: 'setSceneOptions', sceneId, morphBeats: 4 });
   state = applyMockCommand(state, { cmd: 'launchScene', sceneId });
-  assert.equal(state.performance.clips[1].active, true, 'recalling the scene starts its clips');
+  assert.equal(state.performance.clips[added].active, true, 'recalling the scene starts its clips');
   assert.equal(state.performance.clips[0].active, false, 'and stops the ones it omits');
   assert.equal(state.rack.parts[0].mute, true, 'the scene restores discrete mixer state');
   assert.equal(state.rack.parts[0].volume, 1.4, 'and its captured continuous level');
