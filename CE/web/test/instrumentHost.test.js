@@ -73,6 +73,10 @@ import {
   recordFamily,
   hostRecordFamily,
   clipFollowGraph,
+  mockHabitualProfile,
+  mockUnplayedLikeHabits,
+  hostUnplayed,
+  unplayedLikeHabits,
   mergedDuplicateCuration,
   mergeDuplicateSet,
   setLibraryRecordHidden,
@@ -600,17 +604,17 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 11);
+  assert.equal(get(hostLibrary).records.length, 12);
 
   requestLibrary('warm', '');
-  assert.equal(get(hostLibrary).records.length, 4,
-    'search narrows — to Warm Pad, its copy and the two sounds branched from it');
+  assert.equal(get(hostLibrary).records.length, 5,
+    'search narrows — to Warm Pad, its copy, the two branched from it and one tagged warm');
   requestLibrary('', 'rack');
   assert.equal(get(hostLibrary).records[0].type, 'rack', 'the type filter holds');
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 12, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 13, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -727,7 +731,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 11);
+  assert.equal(get(hostLibrary).counts.matched, 12);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -742,13 +746,13 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   const saved = get(hostLibrary).smartCollections;
   assert.equal(saved.length, 1);
   assert.equal(saved[0].name, 'Not mine');
-  assert.equal(saved[0].count, 7, 'a saved search reports its own count, run fresh');
+  assert.equal(saved[0].count, 8, 'a saved search reports its own count, run fresh');
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 11);
+  assert.equal(get(hostLibrary).records.length, 12);
   requestLibrary(saved[0].query);
-  assert.equal(get(hostLibrary).records.length, 7, 'and re-running it restores the view');
+  assert.equal(get(hostLibrary).records.length, 8, 'and re-running it restores the view');
 
   removeSmartCollection(saved[0].collectionId);
   assert.equal(get(hostLibrary).smartCollections.length, 0);
@@ -759,10 +763,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 9);
+  assert.equal(get(hostLibrary).records.length, 10);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 9,
+  assert.equal(get(hostLibrary).records.length, 10,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -1152,6 +1156,134 @@ test('the shapes with nothing to say say nothing', () => {
   const alone = clipFollowGraph([clip('a', { followAction: 'next', followAfterLoops: 1 })]);
   assert.equal(alone.nodes[0].kind, 'terminal');
   assert.equal(alone.nodes[0].stopNote, 'stops — there is no other clip to go to');
+});
+
+// WHAT YOU OWN VERSUS WHAT YOU PLAY. The statistic is easy; the recommendation built from it is
+// the feature, and it has exactly one way of being worthless — a centre averaged from too little
+// to mean anything, stated with the same confidence as a real one. That refusal is pinned first.
+
+test('mock reducer: loading counts, and auditioning is counted apart', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const before = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(before.loadCount, 0, 'the demo ships one measured sound nobody has opened');
+
+  auditionLibraryRecord('lib-6');
+  requestLibrary(emptyLibraryQuery());
+  const heard = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(heard.auditionCount, 1, 'browsing is counted');
+  assert.equal(heard.loadCount, 0, 'and does not make the record look played');
+  assert.equal(heard.lastLoadedAtMs, 0, 'nor claim a load time');
+
+  loadLibraryRecord('lib-6', 'add');
+  requestLibrary(emptyLibraryQuery());
+  const played = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(played.loadCount, 1, 'loading counts');
+  assert.ok(played.lastLoadedAtMs > 0, 'with when');
+
+  resetMockLibraryState();
+});
+
+test('never loaded is a filter over what you own', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const everything = get(hostLibrary).records.length;
+  const { everLoaded, neverLoaded, total } = get(hostLibrary).counts;
+  assert.ok(everLoaded > 0 && neverLoaded > 0, 'the demo ships some of each');
+  assert.equal(everLoaded + neverLoaded, total,
+    'the two halves are the whole library — a statistic that does not add up is two questions');
+
+  requestLibrary({ ...emptyLibraryQuery(), neverLoadedOnly: true });
+  const unplayed = get(hostLibrary).records;
+  assert.equal(unplayed.length, neverLoaded);
+  assert.ok(unplayed.every((r) => r.loadCount === 0));
+  assert.ok(unplayed.length < everything, 'it is a filter, not the whole list');
+
+  // A query field like any other, so "Clear" is offered while it is on.
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), neverLoadedOnly: true }), false);
+
+  resetMockLibraryState();
+});
+
+test('a taste needs more than one sound to be a taste', () => {
+  const sound = (recordId, brightness, tail, loadCount = 0) => ({
+    recordId, name: recordId, available: true, loadCount,
+    sonic: { brightness, tail, attack: 0.5, width: 0.3, noisiness: 0.1, dynamics: 0.4,
+             centroidHz: 0, attackSeconds: 0, tailSeconds: 0, cost: 0, silent: false },
+  });
+
+  assert.equal(mockHabitualProfile([]), null, 'nothing played is no taste at all');
+
+  const four = [sound('a', 0.2, 0.8, 1), sound('b', 0.21, 0.8, 1),
+                sound('c', 0.22, 0.8, 1), sound('d', 0.23, 0.8, 1)];
+  assert.equal(mockHabitualProfile(four), null,
+    'four distinct records is under the bar, and the bar is refused rather than bent');
+
+  // Fifty loads of ONE sound is one data point repeated. It may weigh a centre — that is what a
+  // habit is — but it must not on its own be enough to have one.
+  assert.equal(mockHabitualProfile([sound('a', 0.9, 0.1, 50)]), null,
+    'one sound opened fifty times is still one sound');
+
+  const five = [...four, sound('e', 0.24, 0.8, 1)];
+  const centre = mockHabitualProfile(five);
+  assert.ok(centre, 'five distinct played records is enough');
+  assert.ok(centre.brightness > 0.19 && centre.brightness < 0.25,
+    'and the centre sits among what was played');
+
+  // Weighted: a sound loaded many times pulls the centre toward itself.
+  const weighted = mockHabitualProfile([...four, sound('bright', 0.9, 0.1, 40)]);
+  assert.ok(weighted.brightness > 0.6,
+    'a sound played forty times says more about a habit than one played once');
+});
+
+test('mock reducer: what you own, have never opened, and would probably like', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  unplayedLikeHabits(20);
+  const answer = get(hostUnplayed);
+
+  assert.equal(answer.enough, true, 'the demo has enough of a history to have an opinion');
+  assert.ok(answer.from >= 5, 'and says how many sounds that opinion came from');
+  assert.ok(answer.matches.length > 0);
+  assert.equal(answer.matches[0].recordId, 'lib-12',
+    'the nearest never-opened sound to what you keep loading comes first');
+
+  const shown = new Set(get(hostLibrary).records.map((r) => r.recordId));
+  for (const match of answer.matches) {
+    const record = get(hostLibrary).records.find((r) => r.recordId === match.recordId);
+    assert.equal(record.loadCount, 0, 'nothing already played is offered as a discovery');
+    assert.ok(shown.has(match.recordId));
+  }
+
+  resetMockLibraryState();
+});
+
+test('an empty history is told, not guessed at', () => {
+  // The whole risk of this feature in one assertion: a recommendation from nothing, stated as
+  // confidently as a real one, is how it stops being believed.
+  const bare = mockUnplayedLikeHabits([
+    { recordId: 'a', available: true, loadCount: 0, sonic: { brightness: 0.5, silent: false } },
+  ]);
+  assert.deepEqual(bare, { enough: false, from: 0, matches: [] });
+
+  // And a folded duplicate is a sound you already own under another name, on both sides of it.
+  const played = (recordId, loadCount, hidden = false) => ({
+    recordId, name: recordId, available: true, loadCount, hidden,
+    sonic: { brightness: 0.2, tail: 0.8, attack: 0.5, width: 0.3, noisiness: 0.1,
+             dynamics: 0.4, silent: false },
+  });
+  const withFold = mockUnplayedLikeHabits([
+    played('a', 1), played('b', 1), played('c', 1), played('d', 1), played('e', 1),
+    played('copy', 0, true),
+  ]);
+  assert.equal(withFold.enough, true);
+  assert.deepEqual(withFold.matches, [], 'a folded copy is not a discovery');
 });
 
 test('a recency filter refuses what the library has always had', () => {

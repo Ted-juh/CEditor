@@ -163,6 +163,20 @@ struct LibraryRecord
     // ratings), which means a moved preset is correctly not new.
     juce::int64 addedAtMs = 0;
 
+    // WHAT YOU OWN VERSUS WHAT YOU PLAY. A twelve-thousand-preset library is mostly a library
+    // nobody has opened, and until now nothing counted which part.
+    //
+    // Counted when the load is ACCEPTED, not when the plug-in finishes instantiating: choosing
+    // a sound is the signal this is for, and a plug-in that then fails to start does not mean
+    // you did not reach for it.
+    int loadCount = 0;
+    juce::int64 lastLoadedAtMs = 0;
+
+    // Heard while browsing, counted separately on purpose. Auditioning forty pads to pick one
+    // is not using forty pads, and one number for both would let somebody who has only ever
+    // scrolled the library read as somebody who plays all of it.
+    int auditionCount = 0;
+
     // What it sounded like when the auditioner last played it. Keyed to `fingerprint` by
     // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
     SonicProfile sonic;
@@ -252,6 +266,10 @@ struct LibraryQuery
     // folding is not seeing them; on when somebody goes looking, so nothing is unreachable.
     bool includeHidden = false;
 
+    // Only what has never been loaded. The point of the whole usage feature: a library you
+    // cannot filter down to the part you have never opened is a library you cannot explore.
+    bool neverLoadedOnly = false;
+
     // "What arrived lately." Zero is off. A record with no `addedAtMs` never matches, because
     // an unknown arrival is not a recent one — the same rule the measured ranges follow, where
     // an unknown brightness is not a dark one.
@@ -326,6 +344,11 @@ public:
 
     /** Updates only the user block of a record. */
     bool setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user);
+
+    /** Records that a record was reached for. `audition` counts a browse rather than a use —
+        see the counters on LibraryRecord for why the two are never one number. Returns false
+        for an unknown record, so a caller can tell a miss from a count. */
+    bool noteRecordUsed (const juce::String& recordId, bool audition, juce::int64 nowMs);
 
     /** Folds a record out of sight, or brings it back. Not a delete: the row stays, keeps its
         id and its curation, and survives the next vendor scan (see `mergeVendorScan`). That is
@@ -471,6 +494,30 @@ struct SoundMatch
 juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfile& to, int count,
                                        const LibraryAvailability& isAvailable = {},
                                        const juce::String& excludeRecordId = {});
+
+/** The average of what has actually been reached for — the shape of somebody's taste, as far as
+    the library can see it.
+
+    Weighted by how often each record was loaded, because a sound played fifty times says more
+    about a habit than one played once. Only measured records with a load on them count; an
+    unmeasured one has no profile to average.
+
+    Returns an UNMEASURED profile when there are fewer than `minimumRecords` to go on, and the
+    caller must treat that as "not enough yet" rather than as a centre. Three loads of one pad is
+    not a taste, and a recommendation built on it would be confident nonsense — which is the one
+    outcome that would make people stop trusting the feature. */
+SonicProfile habitualProfile (const Library& library, int minimumRecords = 5);
+
+/** What you own and have never played, nearest first to what you actually reach for.
+
+    The whole point of the second half: "you have 12,000 presets and have played 40" is a
+    statistic somebody feels bad about and does nothing with. "Here are twenty you have never
+    opened that sound like the ones you keep loading" is a recommendation.
+
+    Empty when `habitualProfile` has nothing to go on, and empty is the honest answer then. */
+juce::Array<SoundMatch> unplayedLikeHabits (const Library& library, int count,
+                                            const LibraryAvailability& isAvailable = {},
+                                            int minimumRecords = 5);
 
 
 // -- the .vstpreset container ------------------------------------------------------------------

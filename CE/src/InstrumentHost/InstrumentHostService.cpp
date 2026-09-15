@@ -5668,6 +5668,31 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "unplayedLikeHabits")
+    {
+        ensureLibrary();
+        const auto count = juce::jlimit (1, 200, (int) payload.getProperty ("count", 20));
+
+        // The centre is answered too, and not only as a curiosity: "here are twenty you have
+        // never opened" is a recommendation somebody has to be able to disagree with, and the
+        // only way to disagree is to be told what it thinks you like.
+        const auto centre = habitualProfile (library);
+        const auto matches = unplayedLikeHabits (library, count, libraryAvailability());
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("enough",  centre.measured);
+        answer->setProperty ("matches", matchesToVar (matches, centre));
+        answer->setProperty ("from",    [this] { int n = 0;
+                                                 for (const auto& r : library.allRecords())
+                                                     if (! r.hidden && r.loadCount > 0
+                                                         && r.sonic.measured && ! r.sonic.silent)
+                                                         ++n;
+                                                 return n; }());
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostUnplayed", juce::var (answer));
+        return;
+    }
+
     if (cmd == "recordFamily")
     {
         ensureLibrary();
@@ -6819,6 +6844,16 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // Counted here, where the load is ACCEPTED, rather than when the plug-in finishes
+        // instantiating. Reaching for a sound is the signal this records; a plug-in that then
+        // fails to start does not mean it was not wanted, and counting on success would make a
+        // flaky plug-in's presets look unloved.
+        const auto noteUsed = [this, recordId = record->recordId, shouldAudition]
+        {
+            library.noteRecordUsed (recordId, shouldAudition, juce::Time::currentTimeMillis());
+            library.saveTo (libraryFile());
+        };
+
         if (record->type == "rack")
         {
             if (shouldAudition)
@@ -6826,6 +6861,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 emitError ("Preset audition plays presets, not whole racks.");
                 return;
             }
+            noteUsed();
             loadRackRecord (*record);
             return;
         }
@@ -6857,6 +6893,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 emitError ("Preset audition plays presets; load a chain normally.");
                 return;
             }
+            noteUsed();
             loadChainRecord (*record, partId);
         }
         else
@@ -6864,6 +6901,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             std::function<void()> afterLoaded;
             if (shouldAudition)
                 afterLoaded = [this, partId] { startPresetAudition (partId); };
+            noteUsed();
             loadPresetRecord (*record, partId, std::move (afterLoaded));
         }
         return;
@@ -10302,6 +10340,9 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         // Only ever true when the query asked for hidden rows, so the page can mark the folded
         // ones and offer to unfold them rather than showing them as ordinary sounds.
         r->setProperty ("hidden",       record->hidden);
+        r->setProperty ("loadCount",    record->loadCount);
+        r->setProperty ("lastLoadedAtMs", (double) record->lastLoadedAtMs);
+        r->setProperty ("auditionCount", record->auditionCount);
         r->setProperty ("available",    reason.isEmpty());
         r->setProperty ("reason",       reason);
         r->setProperty ("favourite",    record->user.favourite);
@@ -10436,6 +10477,16 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                             for (const auto& r : library.allRecords())
                                                 if (r.hidden) ++n;
                                             return n; }());
+    // WHAT YOU OWN VERSUS WHAT YOU PLAY. Two numbers rather than one, because "you own 12,000
+    // and have played 40" is the whole sentence, and either half alone is not worth saying.
+    counts->setProperty ("everLoaded", [this] { int n = 0;
+                                                for (const auto& r : library.allRecords())
+                                                    if (! r.hidden && r.loadCount > 0) ++n;
+                                                return n; }());
+    counts->setProperty ("neverLoaded", [this] { int n = 0;
+                                                 for (const auto& r : library.allRecords())
+                                                     if (! r.hidden && r.loadCount <= 0) ++n;
+                                                 return n; }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 

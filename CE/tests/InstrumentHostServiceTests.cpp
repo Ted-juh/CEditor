@@ -3673,6 +3673,189 @@ void testDuplicateFoldCommands()
            "nothing was hidden on the way to refusing");
 }
 
+// WHAT YOU OWN VERSUS WHAT YOU PLAY. A twelve-thousand-preset library is mostly a library nobody
+// has opened. The statistic on its own is something to feel bad about; the recommendation built
+// from it is the feature. Both halves have a way of being confidently wrong, and both are pinned
+// here: a count that a rescan resets, and a centre averaged from too little to mean anything.
+
+void testUsageCounters()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nwhat you own versus what you play" << std::endl;
+
+    const auto preset = [] (const juce::String& path, const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = juce::File (path).getFileNameWithoutExtension();
+        r.fingerprint = fingerprint;
+        r.factory = true;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", { preset ("/p/a.vstpreset", "fp-a"),
+                                            preset ("/p/b.vstpreset", "fp-b") });
+    const auto aId = library.allRecords().getReference (0).recordId;
+    const auto bId = library.allRecords().getReference (1).recordId;
+
+    check (library.find (aId)->loadCount == 0 && library.find (aId)->lastLoadedAtMs == 0,
+           "a library nobody has opened counts nothing, which is the honest starting point");
+
+    library.noteRecordUsed (aId, false, 1000);
+    library.noteRecordUsed (aId, false, 2000);
+    check (library.find (aId)->loadCount == 2 && library.find (aId)->lastLoadedAtMs == 2000,
+           "loading counts, and the last time is the last one");
+
+    // Browsing is not playing. Auditioning forty pads to pick one is not using forty pads, and
+    // one number for both would let somebody who only ever scrolled read as somebody who plays.
+    library.noteRecordUsed (bId, true, 3000);
+    check (library.find (bId)->auditionCount == 1 && library.find (bId)->loadCount == 0,
+           "an audition is counted apart, and does not make a record look played");
+    check (library.find (bId)->lastLoadedAtMs == 0, "nor does it claim a load time");
+
+    check (! library.noteRecordUsed ("nope", false, 4000),
+           "an unknown record is a miss a caller can see, not a silent no-op");
+
+    // The filter the whole feature exists for.
+    LibraryQuery unplayed;
+    unplayed.neverLoadedOnly = true;
+    const auto never = searchLibrary (library, unplayed);
+    check (never.size() == 1 && never.getFirst()->recordId == bId,
+           "never loaded keeps exactly what has never been loaded");
+    check (searchLibrary (library, LibraryQuery{}).size() == 2, "and is a filter, not a deletion");
+
+    // The load-bearing part, and the same trap as the ratings: a rescan must not reset it.
+    library.mergeVendorScan ("vstpreset", { preset ("/p/a.vstpreset", "fp-a"),
+                                            preset ("/p/b.vstpreset", "fp-b") });
+    check (library.find (aId) != nullptr && library.find (aId)->loadCount == 2
+             && library.find (aId)->lastLoadedAtMs == 2000,
+           "a rescan keeps the count — how often you reached for a sound is a fact about you");
+    check (library.find (bId) != nullptr && library.find (bId)->auditionCount == 1,
+           "auditions survive it too");
+
+    const auto reloaded = Library::fromVar (library.toVar());
+    check (reloaded.find (aId) != nullptr && reloaded.find (aId)->loadCount == 2
+             && reloaded.find (aId)->lastLoadedAtMs == 2000
+             && reloaded.find (bId)->auditionCount == 1,
+           "and it is written down, so a session is not the unit of memory");
+
+    // Nothing to write is nothing written: a library of twelve thousand untouched records must
+    // not grow three zeroes per row on disk.
+    Library plain;
+    plain.mergeVendorScan ("vstpreset", { preset ("/p/c.vstpreset", "fp-c") });
+    check (! juce::JSON::toString (plain.toVar()).contains ("loadCount"),
+           "an unplayed record carries no usage fields at all");
+}
+
+void testHabitualProfile()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::habitualProfile;
+    using ceditor::host::unplayedLikeHabits;
+
+    std::cout << "\nwhat you reach for, and what you have never opened" << std::endl;
+
+    const auto measured = [] (const juce::String& name, float brightness, float tail)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = "/p/" + name + ".vstpreset";
+        r.name = name;
+        r.fingerprint = "fp-" + name;
+        r.factory = true;
+        r.sonic.measured = true;
+        r.sonic.brightness = brightness;
+        r.sonic.tail = tail;
+        return r;
+    };
+
+    Library library;
+    juce::Array<LibraryRecord> scanned;
+    // Five dark, long sounds to be played, and two bright short ones that never are.
+    for (int i = 0; i < 5; ++i)
+        scanned.add (measured ("dark" + juce::String (i), 0.20f + 0.01f * (float) i, 0.80f));
+    scanned.add (measured ("bright-unplayed", 0.90f, 0.10f));
+    scanned.add (measured ("dark-unplayed", 0.22f, 0.78f));
+    library.mergeVendorScan ("vstpreset", scanned);
+
+    // Nothing played yet: there is no centre, and saying so is the answer.
+    check (! habitualProfile (library).measured,
+           "an untouched library has no taste to report, and does not invent one");
+    check (unplayedLikeHabits (library, 5).isEmpty(),
+           "so there is nothing to recommend from, and nothing is recommended");
+
+    juce::StringArray played;
+    for (const auto& record : library.allRecords())
+        if (record.name.startsWith ("dark") && record.name != "dark-unplayed")
+            played.add (record.recordId);
+
+    // Four of the five: one short of the bar, deliberately.
+    for (int i = 0; i < 4; ++i)
+        library.noteRecordUsed (played[i], false, 1000);
+    check (! habitualProfile (library).measured,
+           "four records is not a taste — the minimum is distinct records, so a centre built on "
+           "too little is refused rather than guessed at");
+
+    library.noteRecordUsed (played[4], false, 1000);
+    const auto centre = habitualProfile (library);
+    check (centre.measured, "five distinct played records is enough to go on");
+    check (centre.brightness > 0.15f && centre.brightness < 0.30f,
+           "and the centre sits among the dark sounds that were actually played");
+    check (centre.tail > 0.70f, "long, like the things being reached for");
+
+    // Fifty loads of one record is one data point repeated, not fifty. It may weigh the centre
+    // — that is what a habit is — but it must not on its own clear the bar for having one.
+    {
+        Library one;
+        one.mergeVendorScan ("vstpreset", { measured ("only", 0.9f, 0.1f) });
+        const auto onlyId = one.allRecords().getReference (0).recordId;
+        for (int i = 0; i < 50; ++i)
+            one.noteRecordUsed (onlyId, false, 1000);
+        check (! habitualProfile (one).measured,
+               "one sound opened fifty times is still one sound, and is not a recommendation");
+    }
+
+    const auto offered = unplayedLikeHabits (library, 5);
+    check (offered.size() == 2, "only what has never been opened is offered");
+    check (offered.getReference (0).record->name == "dark-unplayed",
+           "nearest to what you reach for comes first, which is the recommendation");
+    check (offered.getReference (1).record->name == "bright-unplayed",
+           "and the one that sounds nothing like it comes last, rather than not at all");
+
+    for (const auto& match : offered)
+        check (match.record->loadCount == 0, "nothing already played is offered as a discovery");
+
+    // A folded duplicate is a sound you already have under another name, on both sides.
+    {
+        Library folded;
+        juce::Array<LibraryRecord> twins;
+        for (int i = 0; i < 5; ++i)
+            twins.add (measured ("dark" + juce::String (i), 0.20f, 0.80f));
+        twins.add (measured ("copy", 0.20f, 0.80f));
+        folded.mergeVendorScan ("vstpreset", twins);
+
+        juce::String copyId;
+        for (const auto& record : folded.allRecords())
+        {
+            if (record.name == "copy") copyId = record.recordId;
+            else folded.noteRecordUsed (record.recordId, false, 1000);
+        }
+        check (habitualProfile (folded).measured, "five played records is still five");
+        folded.setRecordHidden (copyId, true);
+        check (unplayedLikeHabits (folded, 5).isEmpty(),
+               "a folded copy is not a discovery — you already own that sound");
+    }
+}
+
 void testRecordFamily()
 {
     using ceditor::host::Library;
@@ -11265,6 +11448,8 @@ int main (int argc, char* argv[])
     testMovedLibraryRelinks();
     testDuplicateFold();
     testDuplicateFoldCommands();
+    testUsageCounters();
+    testHabitualProfile();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

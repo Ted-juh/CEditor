@@ -35,6 +35,7 @@
     hostSimilar, hostRecordFamily, recordFamily,
     similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
     mergeDuplicateSet, setLibraryRecordHidden,
+    hostUnplayed, unplayedLikeHabits,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
@@ -472,6 +473,50 @@
                     onclick={() => mergeDuplicateSet(set.keyRecordId)}>Fold</button>
           </div>
         {/each}
+      {/if}
+
+      <!-- WHAT YOU OWN VERSUS WHAT YOU PLAY. The statistic on its own is something to feel bad
+           about; it earns its place because the row beside it is a way in. Nothing else in the
+           product has ever told you which part of your library you have never opened. -->
+      {#if $hostLibrary.counts.total > 0}
+        <div class="rail-head">What you play</div>
+        <div class="rail-row">
+          <span class="play-note" data-testid="play-note">
+            {$hostLibrary.counts.everLoaded} of {$hostLibrary.counts.total} ever loaded
+          </span>
+        </div>
+        <button type="button" class="rail-item" class:on={query.neverLoadedOnly}
+                data-testid="never-loaded"
+                title="Sounds you own and have never once loaded. Auditioning one while browsing does not count as playing it."
+                onclick={() => ask({ ...query, neverLoadedOnly: !query.neverLoadedOnly })}>
+          <span>Never loaded</span><span class="n">{$hostLibrary.counts.neverLoaded}</span>
+        </button>
+        <button type="button" class="rail-action" data-testid="suggest-unplayed"
+                title="Measure what you keep reaching for, then find what you own that sounds like it and have never opened"
+                onclick={() => unplayedLikeHabits(20)}>Find what I'd like</button>
+
+        {#if $hostUnplayed.matches.length > 0}
+          <div class="rail-row">
+            <span class="play-note" data-testid="unplayed-from">
+              from the {$hostUnplayed.from} you keep loading
+            </span>
+          </div>
+          {#each $hostUnplayed.matches.slice(0, 8) as match (match.recordId)}
+            <button type="button" class="rail-item" data-testid="unplayed-match"
+                    title={`${match.percent}% like what you reach for, and you have never opened it`}
+                    onclick={() => revealRecord(match.recordId)}>
+              <span>{match.name}</span><span class="n">{match.percent}%</span>
+            </button>
+          {/each}
+        {:else if !$hostUnplayed.enough}
+          <!-- Refused rather than guessed. A centre averaged from one or two sounds is confident
+               nonsense, and one wrong recommendation is all it takes to stop being believed. -->
+          <div class="rail-row">
+            <span class="play-note dim" data-testid="unplayed-not-enough">
+              Load a few more and this can tell you what you'd like.
+            </span>
+          </div>
+        {/if}
       {/if}
 
       <!-- What the browse is not showing. A fold nobody can count is a fold nobody can undo,
@@ -1385,6 +1430,8 @@
   .refusal-row .rf { color: #66707b; font-style: italic; margin-left: auto; }
   .refusal-row .rf.worth { color: #7f9d6a; }
   .dup-note { color: #d9a13c; font-size: 10.5px; padding: 2px 0; }
+  .play-note { color: #9aa5b1; font-size: 10.5px; padding: 2px 0; }
+  .play-note.dim { color: #7d8894; }
   .hint { color: #66707b; font-size: 10.5px; margin-right: auto; }
   .flabel {
     color: #7d8894; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;

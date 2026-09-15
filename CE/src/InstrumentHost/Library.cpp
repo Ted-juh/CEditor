@@ -128,6 +128,12 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             // Folded stays folded. Without this the next scan un-hides every duplicate somebody
             // tidied away, which is exactly how deleting them failed.
             const auto keepHidden = record.hidden;
+            // How often somebody reached for this sound is a fact about them, not about the
+            // vendor's file. A rescan that reset it would quietly make a well-played library
+            // look untouched — the same class of loss the ratings are kept for.
+            const auto keepLoadCount = record.loadCount;
+            const auto keepLastLoadedAtMs = record.lastLoadedAtMs;
+            const auto keepAuditionCount = record.auditionCount;
             const auto keepUser = record.user;
             const auto keepSonic = record.sonic;
             const auto keepSonicFingerprint = record.sonicFingerprint;
@@ -139,6 +145,9 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             record.recordId = keepId;
             record.addedAtMs = keepAddedAtMs;
             record.hidden = keepHidden;
+            record.loadCount = keepLoadCount;
+            record.lastLoadedAtMs = keepLastLoadedAtMs;
+            record.auditionCount = keepAuditionCount;
             record.user = keepUser;
             record.sonic = keepSonic;
             record.sonicFingerprint = keepSonicFingerprint;
@@ -208,6 +217,23 @@ bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord
     return false;
 }
 
+bool Library::noteRecordUsed (const juce::String& recordId, bool audition, juce::int64 nowMs)
+{
+    auto* record = find (recordId);
+    if (record == nullptr)
+        return false;
+
+    if (audition)
+    {
+        ++record->auditionCount;
+        return true;
+    }
+
+    ++record->loadCount;
+    record->lastLoadedAtMs = nowMs;
+    return true;
+}
+
 bool Library::setRecordHidden (const juce::String& recordId, bool hidden)
 {
     if (auto* record = find (recordId))
@@ -240,6 +266,14 @@ juce::var Library::toVar() const
             r->setProperty ("addedAtMs",   (double) record.addedAtMs);
         if (record.hidden)
             r->setProperty ("hidden",      true);
+        // Written only when there is something to write: a library of twelve thousand records
+        // that has never been played should not grow three zeroes per row on disk.
+        if (record.loadCount > 0)
+            r->setProperty ("loadCount",   record.loadCount);
+        if (record.lastLoadedAtMs > 0)
+            r->setProperty ("lastLoadedAtMs", (double) record.lastLoadedAtMs);
+        if (record.auditionCount > 0)
+            r->setProperty ("auditionCount", record.auditionCount);
         r->setProperty ("type",            record.type);
         r->setProperty ("sourceType",      record.sourceType);
         r->setProperty ("sourceLocator",   record.sourceLocator);
@@ -376,6 +410,9 @@ Library Library::fromVar (const juce::var& stored)
         // a library that has always been there is not new.
         record.addedAtMs = (juce::int64) (double) r.getProperty ("addedAtMs", 0.0);
         record.hidden = (bool) r.getProperty ("hidden", false);
+        record.loadCount = juce::jmax (0, (int) r.getProperty ("loadCount", 0));
+        record.lastLoadedAtMs = (juce::int64) (double) r.getProperty ("lastLoadedAtMs", 0.0);
+        record.auditionCount = juce::jmax (0, (int) r.getProperty ("auditionCount", 0));
         if (record.recordId.isEmpty())
             continue;   // damaged row; keep loading the rest
 
@@ -618,6 +655,99 @@ juce::Array<SonicAxisDelta> sonicDifferences (const SonicProfile& a, const Sonic
     return out;
 }
 
+SonicProfile habitualProfile (const Library& library, int minimumRecords)
+{
+    SonicProfile centre;
+
+    double weight = 0.0;
+    int contributors = 0;
+    double brightness = 0, attack = 0, tail = 0, width = 0, noisiness = 0, dynamics = 0;
+    double centroidHz = 0, attackSeconds = 0, tailSeconds = 0, peak = 0, cost = 0;
+
+    for (const auto& record : library.allRecords())
+    {
+        // Hidden records are folded duplicates of something still here, so counting them would
+        // weigh one sound twice. A silent measurement is a measurement of nothing and says
+        // nothing about taste.
+        if (record.hidden || record.loadCount <= 0 || ! record.sonic.measured || record.sonic.silent)
+            continue;
+
+        // Weighted by how often it was reached for: a pad loaded fifty times says more about a
+        // habit than one loaded once, and an unweighted mean would let a single curious click
+        // count as much as a year of playing.
+        const auto w = (double) record.loadCount;
+        weight += w;
+        ++contributors;
+
+        brightness    += w * record.sonic.brightness;
+        centroidHz    += w * record.sonic.centroidHz;
+        attack        += w * record.sonic.attack;
+        attackSeconds += w * record.sonic.attackSeconds;
+        tail          += w * record.sonic.tail;
+        tailSeconds   += w * record.sonic.tailSeconds;
+        width         += w * record.sonic.width;
+        noisiness     += w * record.sonic.noisiness;
+        dynamics      += w * record.sonic.dynamics;
+        peak          += w * record.sonic.peak;
+        cost          += w * record.sonic.cost;
+    }
+
+    // DISTINCT RECORDS, not total loads. One pad opened fifty times is one data point about
+    // taste repeated, and letting it clear the bar on its own would build a recommendation out
+    // of a single sound — confident nonsense, which is the one result that stops anybody
+    // trusting this again.
+    if (contributors < juce::jmax (1, minimumRecords) || weight <= 0.0)
+        return centre;   // unmeasured: "not enough to go on", which the caller must respect
+
+    centre.measured = true;
+    centre.brightness    = (float) (brightness / weight);
+    centre.centroidHz    = (float) (centroidHz / weight);
+    centre.attack        = (float) (attack / weight);
+    centre.attackSeconds = (float) (attackSeconds / weight);
+    centre.tail          = (float) (tail / weight);
+    centre.tailSeconds   = (float) (tailSeconds / weight);
+    centre.width         = (float) (width / weight);
+    centre.noisiness     = (float) (noisiness / weight);
+    centre.dynamics      = (float) (dynamics / weight);
+    centre.peak          = (float) (peak / weight);
+    centre.cost          = (float) (cost / weight);
+    return centre;
+}
+
+juce::Array<SoundMatch> unplayedLikeHabits (const Library& library, int count,
+                                            const LibraryAvailability& isAvailable,
+                                            int minimumRecords)
+{
+    juce::Array<SoundMatch> matches;
+    const auto centre = habitualProfile (library, minimumRecords);
+    if (! centre.measured || count <= 0)
+        return matches;
+
+    for (const auto& record : library.allRecords())
+    {
+        // Never opened is the whole question. A record that has been loaded once is not a
+        // discovery, and a folded duplicate is a sound you already have under another name.
+        if (record.loadCount > 0 || record.hidden)
+            continue;
+        if (! record.sonic.measured || record.sonic.silent)
+            continue;
+
+        const auto available = isAvailable ? isAvailable (record) : ! record.missing;
+        if (! available)
+            continue;
+
+        matches.add ({ &record, sonicDistance (centre, record.sonic) });
+    }
+
+    std::stable_sort (matches.begin(), matches.end(),
+                      [] (const SoundMatch& x, const SoundMatch& y)
+                      { return x.distance < y.distance; });
+
+    if (matches.size() > count)
+        matches.removeRange (count, matches.size() - count);
+    return matches;
+}
+
 juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfile& to, int count,
                                        const LibraryAvailability& isAvailable,
                                        const juce::String& excludeRecordId)
@@ -846,6 +976,9 @@ bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
     if (record.hidden && ! query.includeHidden)
         return false;
 
+    if (query.neverLoadedOnly && record.loadCount > 0)
+        return false;
+
     if (query.type.isNotEmpty() && record.type != query.type)
         return false;
 
@@ -1056,6 +1189,7 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("minRating",      query.minRating);
     o->setProperty ("addedWithinDays", query.addedWithinDays);
     o->setProperty ("includeHidden",  query.includeHidden);
+    o->setProperty ("neverLoadedOnly", query.neverLoadedOnly);
     o->setProperty ("availableOnly",  query.availableOnly);
     o->setProperty ("measuredOnly",   query.measuredOnly);
     o->setProperty ("facets",         juce::var (facets));
@@ -1093,6 +1227,7 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     // just a slower way of showing everything.
     query.addedWithinDays = juce::jlimit (0, 365, (int) stored.getProperty ("addedWithinDays", 0));
     query.includeHidden = (bool) stored.getProperty ("includeHidden", false);
+    query.neverLoadedOnly = (bool) stored.getProperty ("neverLoadedOnly", false);
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
     query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
 

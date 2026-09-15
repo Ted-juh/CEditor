@@ -2060,6 +2060,34 @@ shipping for "sounds like".
 
 **Cost:** low, given the measurements.
 
+> **Built, 2026-09-15.** `loadCount` / `lastLoadedAtMs` / `auditionCount` on `LibraryRecord`,
+> counted where a load is ACCEPTED rather than where a plug-in finishes instantiating —
+> reaching for a sound is the signal, and a plug-in that then fails to start does not mean it
+> was not wanted. All three are in `mergeVendorScan`'s keep-list, beside the ratings: a rescan
+> that reset them would quietly make a well-played library read as untouched.
+>
+> **An audition is counted apart from a load, and that is the design.** Browsing forty pads to
+> pick one is not using forty pads, and one number for both would let somebody who has only ever
+> scrolled the library read as somebody who plays all of it.
+>
+> The recommendation is `habitualProfile` — the average of what has been reached for, weighted
+> by how often — and `unplayedLikeHabits`, which ranks what you own and have never opened
+> against that centre. **The refusal is the load-bearing part.** Below five DISTINCT played
+> records it returns an unmeasured profile, and the caller must treat that as "not enough yet".
+> Distinct, not total: one pad opened fifty times is one data point repeated, and a
+> recommendation built on it is confident nonsense — which is the single outcome that would stop
+> anyone believing the feature again. The browser says *"Load a few more and this can tell you
+> what you'd like"* rather than guessing.
+>
+> The browser gets the sentence (`N of M ever loaded`), a **Never loaded** rail row over the new
+> `neverLoadedOnly` query flag, and **Find what I'd like**, which lists what it found with a
+> percentage and how many sounds that opinion came from — because a recommendation you cannot
+> disagree with is one you cannot trust.
+>
+> **One thing deliberately not done:** loading a sound does not re-emit the library. Recomputing
+> every facet of a twelve-thousand-record library on each preset load is work nobody wants
+> during a gig, so the count arrives with the next browse.
+
 ---
 
 # 29. The pattern engine

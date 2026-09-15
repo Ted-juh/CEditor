@@ -993,6 +993,14 @@ export function onInstrumentHostSimilar(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** What you own and have never played, nearest first to what you reach for
+    ({ enough, from, matches }). */
+export function onInstrumentHostUnplayed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('instrumentHostUnplayed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** A record's whole line ({ recordId, rootRecordId, nodes, truncated }). */
 export function onInstrumentHostRecordFamily(callback) {
   if (!isJuceAvailable()) return () => {};

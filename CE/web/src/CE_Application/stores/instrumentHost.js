@@ -45,6 +45,7 @@ import {
   onInstrumentHostAudition,
   onInstrumentHostVersionDiff,
   onInstrumentHostSimilar,
+  onInstrumentHostUnplayed,
   onInstrumentHostRecordFamily,
   onInstrumentHostSubstitutes,
   onInstrumentHostSurfaceBrowse,
@@ -87,6 +88,11 @@ export const hostAudition = writable({ recordId: '', stage: '', detail: '',
 export const hostVersionDiff = writable(null);
 /** The closest measured sounds to whatever last asked. */
 export const hostSimilar = writable({ recordId: '', measured: false, matches: [] });
+
+/** What you own and have never played, nearest first to what you actually reach for. `enough`
+    is false when there is not yet a habit to recommend from, and that is an answer rather than
+    an empty list to be drawn as "nothing matches". */
+export const hostUnplayed = writable({ enough: false, from: 0, matches: [] });
 /** The selected record's whole line, root first and breadth-first after, so a parent always
     precedes its children and the tree draws in one pass. */
 export const hostRecordFamily = writable({ recordId: '', rootRecordId: '', truncated: false, nodes: [] });
@@ -171,6 +177,18 @@ export function normalizeSimilar(payload) {
   return {
     recordId: String(p.recordId ?? ''),
     measured: p.measured === true,
+    matches: (Array.isArray(p.matches) ? p.matches : []).map(normalizeMatch)
+               .filter((m) => m.recordId !== ''),
+  };
+}
+
+export function normalizeUnplayed(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    // Whether there was enough played to have an opinion at all. Distinct from an empty match
+    // list, which means "you have opened everything that sounds like this".
+    enough: p.enough === true,
+    from: Number(p.from ?? 0),
     matches: (Array.isArray(p.matches) ? p.matches : []).map(normalizeMatch)
                .filter((m) => m.recordId !== ''),
   };
@@ -565,6 +583,9 @@ export function emptyLibraryQuery() {
     // Folded duplicates are out of the browse until something asks for them. Off by default,
     // because the point of folding is not to see them.
     includeHidden: false,
+    // Only what has never been loaded. A library you cannot filter down to the part you have
+    // never opened is a library you cannot explore.
+    neverLoadedOnly: false,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
     // A measured range is inactive until somebody moves a handle, because a range that defaults
     // to "all of it" would still refuse every record the auditioner has not reached yet.
@@ -590,6 +611,7 @@ export function normalizeLibraryQuery(payload) {
     availableOnly: p.availableOnly === true,
     addedWithinDays: Math.min(365, Math.max(0, Math.floor(Number(p.addedWithinDays ?? 0)) || 0)),
     includeHidden: p.includeHidden === true,
+    neverLoadedOnly: p.neverLoadedOnly === true,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, {
       include: strings(facets[f]?.include),
       exclude: strings(facets[f]?.exclude),
@@ -609,7 +631,7 @@ export function libraryQueryIsEmpty(query) {
   const q = normalizeLibraryQuery(query);
   return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
     && q.minRating === 0 && !q.availableOnly && !q.measuredOnly && q.addedWithinDays === 0
-    && !q.includeHidden
+    && !q.includeHidden && !q.neverLoadedOnly
     && MEASURED_AXES.every((a) => !q.ranges[a].active)
     && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
 }
@@ -639,7 +661,7 @@ export function emptyHostLibrary() {
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
               measured: 0, measurable: 0, refused: 0, refusedByCause: refusedByCause(null),
-              addedRecently: 0, hidden: 0,
+              addedRecently: 0, hidden: 0, everLoaded: 0, neverLoaded: 0,
               snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
@@ -730,6 +752,11 @@ export function normalizeHostLibrary(payload) {
       // Folded into another record. Only ever true when the query asked for hidden rows, so a
       // row that says so is a row the page should offer to unfold rather than one to draw plain.
       hidden: r?.hidden === true,
+      // How often this sound has been reached for, and when last. Auditions are counted apart:
+      // browsing forty pads to pick one is not using forty pads.
+      loadCount: Number(r?.loadCount ?? 0) || 0,
+      lastLoadedAtMs: Number(r?.lastLoadedAtMs ?? 0) || 0,
+      auditionCount: Number(r?.auditionCount ?? 0) || 0,
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -751,6 +778,10 @@ export function normalizeHostLibrary(payload) {
       // Folded away, counted over the whole library rather than over the query — `total` stays
       // the whole library, so this is how the page says how many rows it is not showing.
       hidden: Number(p.counts?.hidden ?? 0),
+      // What you own versus what you play. Two numbers, because "you own 12,000 and have played
+      // 40" is the whole sentence and neither half is worth saying alone.
+      everLoaded: Number(p.counts?.everLoaded ?? 0),
+      neverLoaded: Number(p.counts?.neverLoaded ?? 0),
       snapshots: Number(p.counts?.snapshots ?? 0),
       snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
@@ -807,6 +838,7 @@ const admits = (selection, values) => {
 export function matchesLibraryQuery(record, query) {
   const q = normalizeLibraryQuery(query);
   if (record.hidden === true && !q.includeHidden) return false;
+  if (q.neverLoadedOnly && Number(record.loadCount ?? 0) > 0) return false;
   if (q.type && record.type !== q.type) return false;
   if (q.favouritesOnly && record.favourite !== true) return false;
   if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
@@ -938,6 +970,10 @@ let mockBranches = [];
 // library — a fold that the next answer undid would be a fold nobody could demonstrate.
 let mockHiddenRecords = new Set();
 let mockMergedCuration = {};
+// How often the demo has reached for each record. Module state for the same reason the folds
+// are: the browse re-asks for the library on every click, and a count the next answer forgot
+// would be a count nobody could demonstrate.
+let mockUsage = {};
 
 /** The demo library, before any query is applied. Its own function because folding needs the
     whole of it — the members of a set are the records being folded, and most of them are not
@@ -948,18 +984,29 @@ function mockLibraryRecords() {
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
       tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10),
-      addedAtMs: Date.now() - 3 * 86400000, mockFingerprint: 'fp-warm' },
+      addedAtMs: Date.now() - 3 * 86400000, mockFingerprint: 'fp-warm',
+      loadCount: 9, lastLoadedAtMs: Date.now() - 86400000 },
     // The same bytes in a second folder — what anybody who has ever backed a preset folder up
     // already has. It carries a tag of its own so folding it visibly moves something rather
     // than just making a row disappear.
     { recordId: 'lib-11', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad (backup)',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, tags: ['backup'],
-      sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10), mockFingerprint: 'fp-warm' },
+      sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10), mockFingerprint: 'fp-warm',
+      loadCount: 2, lastLoadedAtMs: Date.now() - 20 * 86400000 },
+    // Measured, playable and never once opened — the record the recommendation exists to find.
+    // Five distinct records have been loaded above, which is the minimum for having a habit at
+    // all, so the preview shows the working answer rather than the honest refusal. The refusal
+    // has fixtures of its own in the tests.
+    { recordId: 'lib-12', type: 'preset', sourceType: 'vstpreset', name: 'Deep Hall',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', factory: true, available: true, tags: ['warm', 'wide'],
+      sonic: mockSonic(0.26, 0.70, 0.71, 0.82, 0.11) },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'],
-      sonic: mockSonic(0.62, 0.08, 0.24, 0.05, 0.35) },
+      sonic: mockSonic(0.62, 0.08, 0.24, 0.05, 0.35),
+      loadCount: 4, lastLoadedAtMs: Date.now() - 5 * 86400000 },
     { recordId: 'lib-6', type: 'preset', sourceType: 'vstpreset', name: 'Never Heard',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Keys', factory: true, available: true, tags: ['glassy'],
@@ -978,11 +1025,13 @@ function mockLibraryRecords() {
     { recordId: 'lib-8', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-1',
-      branchedFromName: 'Warm Pad', sonic: mockSonic(0.18, 0.74, 0.70, 0.80, 0.09) },
+      branchedFromName: 'Warm Pad', sonic: mockSonic(0.18, 0.74, 0.70, 0.80, 0.09),
+      loadCount: 3, lastLoadedAtMs: Date.now() - 2 * 86400000 },
     { recordId: 'lib-9', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker, Longer',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-8',
-      branchedFromName: 'Warm Pad Darker', sonic: mockSonic(0.17, 0.75, 0.92, 0.81, 0.08) },
+      branchedFromName: 'Warm Pad Darker', sonic: mockSonic(0.17, 0.75, 0.92, 0.81, 0.08),
+      loadCount: 1, lastLoadedAtMs: Date.now() - 9 * 86400000 },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -1002,6 +1051,10 @@ function mockLibraryRecords() {
     record.instant = Boolean(record.sonic) && record.sonic.silent !== true;
     record.versions = record.versions ?? mockVersions[record.recordId] ?? [];
     record.hidden = mockHiddenRecords.has(record.recordId);
+    const usage = mockUsage[record.recordId];
+    record.loadCount = (record.loadCount ?? 0) + (usage?.loadCount ?? 0);
+    record.auditionCount = (record.auditionCount ?? 0) + (usage?.auditionCount ?? 0);
+    if (usage?.lastLoadedAtMs) record.lastLoadedAtMs = usage.lastLoadedAtMs;
     if (mockMergedCuration[record.recordId])
       Object.assign(record, mockMergedCuration[record.recordId]);
   }
@@ -1072,6 +1125,55 @@ export function mergedDuplicateCuration(records, set) {
   return merged;
 }
 
+/** The average of what has actually been reached for — the demo's mirror of habitualProfile in
+    CE/src/InstrumentHost/Library.cpp, which is the authority.
+
+    Weighted by how often each record was loaded, because a sound played fifty times says more
+    about a habit than one played once. Returns null when there are fewer than `minimumRecords`
+    DISTINCT records to go on: one pad opened fifty times is one data point repeated, and a
+    recommendation built on it is confident nonsense — the one outcome that stops anybody
+    trusting the feature again. */
+export function mockHabitualProfile(records, minimumRecords = 5) {
+  const axes = ['brightness', 'centroidHz', 'attack', 'attackSeconds', 'tail', 'tailSeconds',
+                'width', 'noisiness', 'dynamics', 'cost'];
+  const centre = Object.fromEntries(axes.map((a) => [a, 0]));
+  let weight = 0;
+  let contributors = 0;
+
+  for (const record of records ?? []) {
+    // A folded duplicate is the same sound under another name, so counting it weighs one sound
+    // twice. A silent measurement is a measurement of nothing.
+    if (record.hidden || !(Number(record.loadCount ?? 0) > 0)) continue;
+    if (!record.sonic || record.sonic.silent) continue;
+
+    const w = Number(record.loadCount);
+    weight += w;
+    contributors += 1;
+    for (const axis of axes) centre[axis] += w * Number(record.sonic[axis] ?? 0);
+  }
+
+  if (contributors < Math.max(1, minimumRecords) || !(weight > 0)) return null;
+  for (const axis of axes) centre[axis] /= weight;
+  return centre;
+}
+
+/** What you own and have never played, nearest first to what you actually reach for. */
+export function mockUnplayedLikeHabits(records, count = 20, minimumRecords = 5) {
+  const centre = mockHabitualProfile(records, minimumRecords);
+  if (!centre || count <= 0) return { enough: false, from: 0, matches: [] };
+
+  const from = (records ?? []).filter((r) => !r.hidden && Number(r.loadCount ?? 0) > 0
+                                             && r.sonic && !r.sonic.silent).length;
+  const matches = (records ?? [])
+    .filter((r) => !(Number(r.loadCount ?? 0) > 0) && !r.hidden
+                   && r.sonic && !r.sonic.silent && r.available !== false)
+    .map((r) => ({ record: r, distance: mockSonicDistance(centre, r.sonic) }))
+    .sort((x, y) => x.distance - y.distance)
+    .slice(0, count);
+
+  return { enough: true, from, matches };
+}
+
 export function mockHostLibrary(query = '', type = '') {
   const all = mockLibraryRecords();
 
@@ -1105,6 +1207,8 @@ export function mockHostLibrary(query = '', type = '') {
                 Number(r.addedAtMs ?? 0) > 0
                   && Date.now() - Number(r.addedAtMs) <= 14 * 86400000).length,
               hidden: all.filter((r) => r.hidden).length,
+              everLoaded: all.filter((r) => !r.hidden && Number(r.loadCount ?? 0) > 0).length,
+              neverLoaded: all.filter((r) => !r.hidden && !(Number(r.loadCount ?? 0) > 0)).length,
               refusedByCause: all.reduce((acc, r) => {
                 if (!r.sonic && r.sonicRefusal) acc[r.mockRefusalCause ?? 'other'] += 1;
                 return acc;
@@ -1142,6 +1246,7 @@ export function resetMockLibraryState() {
   mockBranches = [];
   mockHiddenRecords = new Set();
   mockMergedCuration = {};
+  mockUsage = {};
   hostVersionDiff.set(null);
   mockLibraryView = emptyLibraryQuery();
   hostAudition.set({ recordId: '', stage: '', detail: '', phrase: 'recent', bars: 4 });
@@ -6516,6 +6621,7 @@ export function initInstrumentHostBridge() {
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
+  onInstrumentHostUnplayed((payload) => hostUnplayed.set(normalizeUnplayed(payload)));
   onInstrumentHostRecordFamily((payload) => hostRecordFamily.set(normalizeRecordFamily(payload)));
   onInstrumentHostSubstitutes((payload) => hostSubstitutes.set(normalizeSubstitutes(payload)));
   onInstrumentHostSurfaceBrowse((payload) => hostSurfaceBrowse.set(normalizeSurfaceBrowse(payload)));
@@ -7411,6 +7517,19 @@ function send(payload) {
       }));
       return;
     }
+    if (payload?.cmd === 'unplayedLikeHabits') {
+      const all = mockLibraryRecords();
+      const { enough, from, matches } = mockUnplayedLikeHabits(all, payload.count ?? 20);
+      hostUnplayed.set(normalizeUnplayed({
+        enough,
+        from,
+        matches: matches.map(({ record, distance }) => ({
+          recordId: record.recordId, name: record.name, instrument: record.instrument,
+          sourceType: record.sourceType, distance, percent: Math.round(100 * (1 - distance)),
+        })),
+      }));
+      return;
+    }
     if (payload?.cmd === 'mergeDuplicateSet') {
       // The set is re-derived here rather than taken from the payload, as the native side does
       // it: the page's copy of the sets is as old as its last answer, and folding a stale one
@@ -7526,6 +7645,18 @@ function send(payload) {
       // Mirrors the visible half: an added part appears; a focused load leaves structure alone.
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record?.available) return;
+
+      // Counted where the load is accepted, as the native side counts it: reaching for a sound
+      // is the signal, and an audition is counted apart because browsing is not playing.
+      const audition = payload.cmd === 'auditionLibraryRecord';
+      const seen = mockUsage[record.recordId] ?? { loadCount: 0, auditionCount: 0, lastLoadedAtMs: 0 };
+      mockUsage = { ...mockUsage, [record.recordId]: audition
+        ? { ...seen, auditionCount: seen.auditionCount + 1 }
+        : { ...seen, loadCount: seen.loadCount + 1, lastLoadedAtMs: Date.now() } };
+      // The rows on screen are NOT refreshed here, and the native side does not refresh them
+      // either: loading a sound emits state, not the library. Recomputing every facet of a
+      // twelve-thousand-record library on each preset load is work nobody wants during a gig,
+      // so the count arrives with the next browse.
       if ((record.type === 'preset' || record.type === 'chain') && payload.action === 'add') {
         const next = applyMockCommand(get(hostState), { cmd: 'addPart' });
         const added = next.rack.parts.at(-1);
@@ -7901,6 +8032,9 @@ export const diffVersions = (recordId, versionIdA, versionIdB) =>
 export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
 export const recordFamily = (recordId) => send({ cmd: 'recordFamily', recordId });
+
+/** Asks for sounds you own and have never opened, nearest first to what you keep loading. */
+export const unplayedLikeHabits = (count = 20) => send({ cmd: 'unplayedLikeHabits', count });
 
 /** Folds a duplicate set onto its survivor: the curation of every member is gathered there and
     the rest go quiet. Nothing is deleted — see setLibraryRecordHidden for the way back. */
