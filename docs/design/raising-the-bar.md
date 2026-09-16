@@ -507,7 +507,12 @@ re-checking the framework.
   local patches this tree carries — the runtime VST3 identity hook that lets one prebuilt binary
   export per-panel FUIDs, the Windows named-pipe cancellation fix, and the Linux webview bridge
   byte-framing fix — each of which dies silently in a vendored tree the day somebody drops in a new
-  JUCE, which is why `CE/web/test/vendoredJucePatches.test.js` exists. JUCE 9 also moves the
+  JUCE, which is why `CE/web/test/vendoredJucePatches.test.js` exists. One of the three looks
+  recoverable: upstream `CommandReceiver::sendCommand` now computes its length with
+  `getNumBytesAsUTF8()`, which is the check `VENDORED.md` already tells an upgrader to make. Read
+  the file at the chosen tag before dropping the patch rather than trusting this sentence — the
+  *second* half of that patch, looping the write until the whole message has gone, is a separate
+  claim and upstream's loop appears to retry only on `EINTR`. JUCE 9 also moves the
   WebBrowserComponent native-integration package, which this program is built on top of. None of
   that is hard; all of it is work that belongs in C's estimate rather than being discovered during
   it.
