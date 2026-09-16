@@ -458,53 +458,66 @@ program allocates them across channels or voices on a multitimbral machine. That
 `midi-frontier.md` §5.2 (MPE on a multitimbral rack) reached through the protocol instead of
 through a panel, and the two want the same allocator.
 
-## The limits — and a correction, made the same day this was written
+## The limits — and two corrections, both made within a day of writing this
 
-**The first draft of this section was wrong, and the way it was wrong is worth keeping.** It said
-Windows has no virtual MIDI ports, that JUCE cannot make one, and that C.1 therefore needed a
-third-party virtual cable or a signed kernel driver of our own — "the single biggest obstacle in
-this document". Half of that is still true and the conclusion is not.
+**This section has been wrong twice, and both versions are kept because the way they were wrong is
+the useful part.**
 
-The true half was checked properly: `MidiOutput::createNewDevice` and `MidiInput::createNewDevice`
-are implemented in `juce_Midi_linux.cpp:589,686` and are **absent entirely** from
-`juce_Midi_windows.cpp`. JUCE genuinely cannot create a virtual port on Windows.
+**Draft one** said Windows has no virtual MIDI ports, that JUCE cannot make one, and that C.1
+therefore needed a third-party virtual cable (loopMIDI, teVirtualMIDI) or a signed kernel driver of
+our own — "the single biggest obstacle in this document".
 
-What was not checked is whether it has to. **Windows MIDI Services reached general availability on
-Windows 11 in February 2026** — a complete rewrite of the MIDI stack, with MIDI 2.0, UMP,
-multi-client ports, and **built-in loopback endpoints** that need no third-party driver. The part
-that decides this entry: those loopback endpoint pairs are usable by **WinMM** clients, not only by
-the new SDK. JUCE's bytestream `MidiInput`/`MidiOutput` are WinMM clients. And MIDI-CI rides on
-ordinary MIDI 1.0 Universal SysEx, which is bytes.
+**Draft two** corrected the conclusion and kept the premise. It found that **Windows MIDI Services
+reached general availability on Windows 11 in February 2026** — a rewritten MIDI stack with MIDI
+2.0, UMP, multi-client ports and built-in loopback endpoints — and that those loopbacks are visible
+to WinMM clients, so JUCE's bytestream ports could open one. C.1 became "a documented setup step".
 
-So C.1 — the responder, the valuable half of this thesis — needs **no new transport, no driver and
-no third-party dependency**. It is JUCE as vendored, opening a loopback endpoint, answering
-Discovery and Property Exchange with SysEx bytes. The obstacle that was named as the largest in the
-document is a documented setup step.
+**Draft three, which is this one, found that the premise itself expired eight months before the
+document was written.** The thing every draft kept asserting — `MidiOutput::createNewDevice` is
+absent from `juce_Midi_windows.cpp` — is still literally true, and it is now the wrong function to
+be looking at. **JUCE 8.0.11 (December 2025) added a UMP device layer**, and it carries
+`juce::universal_midi_packets::Session`, whose `createVirtualEndpoint()` creates an app-owned
+virtual MIDI endpoint **on Windows, backed by Windows MIDI Services**. On that platform Windows
+MIDI Services only permits UMP endpoints, so JUCE creates one carrying a single MIDI 1.0 Block —
+which is exactly what a responder standing in front of a 1983 synth wants.
 
-The lesson is the one `CLAUDE.md` records about the CI-minutes section: the premise was never
-written down, only the conclusion. "Windows has no virtual MIDI" was true for twenty years and
-stopped being true seven months before this document was written.
+Checked against the 8.0.11 tag rather than inferred: `juce_MidiDevices.h` at that tag declares
+`ump::EndpointId getEndpointId()` on both `MidiInput` and `MidiOutput` and holds a
+`std::shared_ptr<ump::Session>`; the legacy `createNewDevice` is still documented Linux/macOS/iOS
+only, which is why three drafts in a row read the old function and concluded the old thing.
+
+**So the obstacle is gone entirely, and the shape of the thesis changes with it.** There is no
+third-party cable, no driver, no WinRT code of our own and no user setup step: CEditor creates its
+own endpoint named `Juno-106 (CEditor)` through JUCE. And C.2–C.3, which draft two called "a
+Windows SDK project", are not one either — the UMP transport is in the framework now, so 32-bit
+controllers and per-note messages can leave the program through JUCE like anything else.
+
+**The whole of thesis C is now gated on one thing: a JUCE upgrade.** This tree vendors 8.0.7.
+
+The lesson is the one `CLAUDE.md` records about the CI-minutes section, and it is worth the
+repetition because this document reproduced the failure twice while quoting the file that warns
+about it: **the premise was never written down, only the conclusion.** "Windows has no virtual
+MIDI" was true for twenty years. "JUCE cannot make one on Windows" was true until December 2025.
+Both were inherited rather than re-checked, and the second draft re-checked the platform without
+re-checking the framework.
 
 **What is actually left, stated as limits:**
 
+- **The JUCE upgrade is the real cost now, and it is not free.** `JUCE/VENDORED.md` records the
+  local patches this tree carries — the runtime VST3 identity hook that lets one prebuilt binary
+  export per-panel FUIDs, the Windows named-pipe cancellation fix, and the Linux webview bridge
+  byte-framing fix — each of which dies silently in a vendored tree the day somebody drops in a new
+  JUCE, which is why `CE/web/test/vendoredJucePatches.test.js` exists. JUCE 9 also moves the
+  WebBrowserComponent native-integration package, which this program is built on top of. None of
+  that is hard; all of it is work that belongs in C's estimate rather than being discovered during
+  it.
 - **Windows 11 only.** Windows MIDI Services ships to in-support retail releases of Windows 11.
   Windows 10 users get nothing here, and the feature must degrade to absent rather than to broken.
-- **Somebody has to create the endpoint pair.** Transient pairs come from the MIDI Console,
-  persistent ones from the MIDI Settings app or the service's JSON configuration, and programmatic
-  ones from the Windows MIDI Services SDK Runtime, where an app can offer *itself* as a device for
-  its own lifetime — which is exactly the right shape for `Juno-106 (CEditor)`. The SDK route is
-  WinRT and is the only Windows-specific new code in C.1; shipping v1 with "create a loopback pair
-  in MIDI Settings" as a documented step avoids even that.
-- **None of this has been tested on a real Windows 11 box by this document.** It is read off
-  Microsoft's documentation and the GA announcements. Before C.1 is scheduled, open a loopback
-  endpoint with plain JUCE on a real machine and send one SysEx through it. That is an hour, and it
-  is the difference between this paragraph and the one it replaced.
-- **C.2 and C.3 still need the SDK, and that gate is real.** JUCE 8.0.7 has UMP as *data* —
-  `juce_audio_basics/midi/ump/` has the packet types, the factories and the MIDI-1⇄UMP
-  translators — and no UMP *transport*: `juce_MidiDevices.h` exposes bytestream `MidiMessage` and
-  nothing else. Actual MIDI 2.0 channel-voice messages, 32-bit values and per-note controllers
-  therefore cannot leave the program through JUCE at all. That is the real dividing line in this
-  thesis: **C.1 is free and C.2–C.3 are a Windows SDK project.**
+- **Nothing here has been tested on a real Windows 11 box by this document.** It is read off
+  Microsoft's documentation, the GA announcements and the JUCE source at the 8.0.11 tag. Before C
+  is scheduled: upgrade JUCE on a branch, call `createVirtualEndpoint`, and send one SysEx through
+  it from another application. That is an afternoon, and it is the difference between this section
+  and the two it replaced.
 - **Host support for MIDI-CI Property Exchange is thin today** and will stay thin for a few years.
   The feature is partly a bet on the ecosystem, and its value grows with somebody else's roadmap,
   which is the least comfortable kind of value. The counter is that the Property Exchange payload
@@ -868,7 +881,7 @@ unlimited engineers, which for most of these is *impossible without rebuilding t
 | A.0 | **Measure the measurement** | — | **Yes — six entries need it** | **Trivial** | Ten probes and twenty lines. Nothing else in Thesis A or G is honest without it. Build it first whatever else happens. |
 | A.2 | **Panel rearranges itself around the patch** | **Very high** | **Yes — A.1, A.3, G.1 all read its output** | Low–med | The best ratio in the document. Two and a half minutes of measurement, and a screenshot nobody else can take. |
 | G.1–G.2 | **Contracts and the conformance run** | High | **Yes — makes every other claim checkable** | Low–med | Testable in CI against `fakeSynth.js`. The trust story the whole category lacks. |
-| C.1 | **The MIDI-CI responder** | **Very high** | **Yes — makes profiles useful outside this program** | **Low–med** | Strategy, not spectacle. Re-costed after the correction in C's limits: Windows MIDI Services' loopback endpoints are WinMM-visible and MIDI-CI is MIDI 1.0 SysEx, so this is JUCE as vendored. Verify on a real Windows 11 box first — one hour. |
+| C.1 | **The MIDI-CI responder** | **Very high** | **Yes — makes profiles useful outside this program** | **Low–med**, plus a JUCE upgrade | Strategy, not spectacle. Re-costed twice; see C's limits. JUCE 8.0.11's `ump::Session::createVirtualEndpoint()` makes the port a framework call on Windows, so the feature cost is low and the *dependency* is upgrading off 8.0.7 with this tree's three vendored patches carried forward. |
 | B.1 | **Per-voice calibration** | **Very high** | Yes — feeds B.3 | Medium | The best demo in the document and the only music software that emits a repair document. Clustering is CI-testable against a simulated allocator. |
 | F.1–F.2 | **Your feel, measured** | High | Yes — lands in a built subsystem | **Low** | The most *audible* item here, and the smallest diff: a distribution swapped into a shipped module. |
 | A.1 | **Find that sound on your hardware** | **Very high** | No | Medium | The video. Twelve minutes is the honest number and it is fine. |
@@ -879,7 +892,7 @@ unlimited engineers, which for most of these is *impossible without rebuilding t
 | B.2 | **Warm-up curve** | High | Yes — feeds B.3 | **Low** | Sixty unattended probes, once. |
 | A.3 | **Automation that outlives the instrument** | **Very high** | Yes — shares the vocabulary | Med–high | Gated hard on A.2 and on the canonical vocabulary. |
 | E.1–E.3 | **The constraint sequencer** | **Very high** | Yes — determinism makes generative parts exportable | **High** | The solving is easy; the interaction design is the whole job. Spike it on paper first. |
-| C.2–C.3 | **High resolution, profiles on the machine's behalf** | High | No | Medium | Gated on C.1 and on the bandwidth governor. |
+| C.2–C.3 | **High resolution, profiles on the machine's behalf** | High | No | Medium | Gated on C.1 and on the bandwidth governor — no longer on a Windows SDK project, since the UMP transport arrived in the framework. |
 | B.3 | **The medical record** | **Very high** | Yes | Low | Worth nothing on day one, a great deal in year two. Build it early *because* of that. |
 | H.4 | **The patch that describes itself** | Medium | Yes — makes the library searchable in words | **Low** | Given A.2, it is a sentence template over numbers. |
 | H.2 | **The double-blind test** | Low | No | **Low** | Reputation, and the answer to a thirty-year argument. |
@@ -971,11 +984,12 @@ and "adjacent" is how a document like this quietly repeats itself.
 - **Anything requiring the hardware to be more cooperative than it is.** Every entry works on a
   machine that transmits nothing and answers only a dump request, or says clearly which mode it is
   in when it cannot — B.1's diagnosis-versus-compensation split is the model for how to write that.
-- **A kernel driver.** The first draft put C.1 behind one. It is not: Windows MIDI Services
-  provides the loopback, and C's limits carry the correction and the verification step it still
-  owes. What stays out is writing a MIDI driver of our own, which nothing here needs. The cheap
-  version of C's value — writing `.midnam` and Cubase maps, which `product-ideas.md` §23 already
-  proposes — works today on every Windows version and is the sensible thing to ship first.
+- **A kernel driver, or any transport code of our own.** The first draft put C.1 behind a driver
+  and the second behind a WinRT setup step. It needs neither: `ump::Session::createVirtualEndpoint()`
+  is a framework call. What stays out is writing a MIDI driver or a UMP transport of our own, which
+  nothing here needs now. The cheap version of C's value — writing `.midnam` and Cubase maps, which
+  `product-ideas.md` §23 already proposes — still works on every Windows version with no upgrade at
+  all, and is the sensible thing to ship first.
 
 ## The categories that were rejected
 
