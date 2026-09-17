@@ -1,4 +1,4 @@
-# Mining other people's synth knowledge — a survey of four public corpora
+# Mining other people's synth knowledge — a survey of six public corpora
 
 > Status: **assessment, 2026-09-17.** Nothing built. Every corpus below was cloned and read,
 > not described from its README, and every count in this document came out of the working tree.
@@ -286,37 +286,135 @@ clear.
 
 ---
 
-# Assessed as existing, not yet read
+# JSynthLib — both halves in one corpus, and the address is in the widget
 
-[`jpcaruana/jsynthlib`](https://github.com/jpcaruana/jsynthlib) and its forks — another universal
-librarian/editor with a driver per synth, Java, long-running. The repository exists and was
-verified reachable; its contents were not measured, so nothing is claimed about them here. It is
-the next one to read, after Edisyn is actually mined.
+[`jpcaruana/jsynthlib`](https://github.com/jpcaruana/jsynthlib), **GPLv2-or-later**, Java. Recorded
+in an earlier draft as existing-but-unread; read now, and it is the corpus that breaks the
+librarian/editor split this document was built around, because it is both.
 
-**One candidate was dropped rather than passed on.** A search result described a
-`midi-device-maps` repository holding "1,260 documents converted from Ardour's binding maps,
-Mixxx's controller mappings … and manufacturers' own MIDI implementation charts". No owner was
-given, and no such repository could be found. It is recorded here as *not verified* rather than
-repeated, because a corpus that would be excellent if it existed is exactly the kind of thing that
-gets cited once and then believed.
+| | Count |
+|---|---|
+| Manufacturer directories | 22 |
+| Driver `.java` files | **532** |
+| `Driver` classes — the librarian half | 234 |
+| `Editor` classes — the parameter half | **71** |
+| `ComboBoxWidget` (enums) | **813** |
+| `ScrollBarWidget` (ranged) | **775** |
+| `KnobWidget` (ranged) | **399** |
+| `CheckBoxWidget` (booleans) | 297 |
+| `SpinnerWidget`, `PatchNameWidget` | 32, 39 |
+
+Roughly **2,355 parameter widgets** alongside 234 dump drivers, covering Access, Alesis, Behringer,
+Boss, Casio, Clavia, E-mu, Ensoniq, Kawai, Korg, Line 6, MIDIbox, Novation, Oberheim, Peavey,
+Quasimidi, Roland, SCI, TC Electronic, Waldorf and Yamaha.
+
+**And the widget constructor carries the address**, which Edisyn's does not:
+
+```java
+new KnobWidget("Algorithm", patch, 0, 87, 1, new FS1RModel(patch, 0x2C), new FS1RSender(0x2C), mAlgoImages)
+new ComboBoxWidget("Wave", patch, new FS1RModel(patch, 0x10), new FS1RSender(0x10),
+                   new String[]{"Triangle", "Saw down", "Saw up", …})
+```
+
+Label, minimum, maximum, **and the SysEx offset**, in one expression. Edisyn hands over the same
+information split across two places — an `allParameters` array for the address and a
+`LabelledDial` for the range — so a JSynthLib widget is a complete parameter tuple on one line and
+an Edisyn one needs a join. For a mechanical importer that difference matters more than the raw
+counts do.
+
+**The licence was checked rather than assumed**, because it decides whether this corpus is usable
+at all: 864 GPL notices across the drivers, and **every** GPL-headered file carries "or (at your
+option) any later version" — zero exceptions. GPLv2-or-later upgrades to GPLv3, which is compatible
+with this repository's AGPLv3. It carries the same relicensing entanglement as KnobKraft, and the
+same facts-versus-expression distinction applies.
 
 ---
 
-# The four together
+# Beyond librarians — three other kinds of corpus
 
-| Layer a profile needs | KnobKraft (AGPL) | Edisyn (Apache-2.0) | PyMidiDefs (MIT) | `.midnam` (no licence) |
-|---|---|---|---|---|
-| Device identity | **yes, 68** | yes | yes | partly |
-| Bank / program layout | **yes, 43** | partly | — | **yes** |
-| Dump request & reply shapes | **yes, 56** | yes | — | — |
-| Real dump fixtures | **yes, 107** | 78 init patches | — | — |
-| Parameter address map | — | **yes, 35** | **yes, 14** | — |
-| Ranges | — | **yes, 3,516** | **yes** | — |
-| Enum labels | — | **yes, 949** | **yes** | — |
-| Patch / controller names | yes, 63 | yes | yes | **yes, 237** |
-| Licence risk | real | **none** | **none** | **unresolved** |
+Every corpus above answers the same question: *what does this synth's data look like?* Three
+different kinds of resource answer questions this project also asks and that no patch librarian
+touches.
 
-No single corpus gives a whole profile. KnobKraft and Edisyn between them very nearly do, and they
+## Control surfaces, which is a different subsystem entirely
+
+`CE/src/ControlSurface/SurfaceProfile.h` states the rule for new hardware as a process — capture
+the protocol, define a profile and a page renderer, run conformance, map the existing neutral
+pages — and `product-ideas.md` §8 wants that generalised beyond the CTRL49. That needs a corpus of
+*controllers*, not synths, and one exists.
+
+[`mixxxdj/mixxx`](https://github.com/mixxxdj/mixxx) ships **328 files under `res/controllers`,
+144 of them `.midi.xml` mappings**. Each describes a physical controller: its name, its author, and
+the status bytes its pads, knobs and faders send, often with the physical layout drawn in a
+comment.
+
+```xml
+<controller id="DJTechTools MIDIFighter" port="">
+  <!--  Top Row
+        0x30, 0x31, 0x32, 0x33
+        0x2C, 0x2D, 0x2E, 0x2F  … -->
+```
+
+That is `SurfaceProfile`'s input: what the surface has, and what each control transmits. It is DJ
+gear rather than keyboard controllers, so the overlap with a studio rig is partial — but the
+*shape* is exactly right, and Ardour's binding maps and Bitwig's controller scripts are two more
+corpora of the same kind, unassessed here.
+
+**Licence caution.** Mixxx is GPL version 2; the `COPYING` line read does not itself say "or
+later", and that was not chased further. GPLv2-**only** would be incompatible with AGPLv3, so this
+one needs settling before any code is taken. The facts — which byte a pad sends — remain facts.
+
+## Open-source emulations, which are implementations rather than transcriptions
+
+Every corpus above is somebody reading a manual. An emulation is somebody who got a machine's
+behaviour *right enough that it sounds like the machine*, with tests and users complaining when it
+does not. For the machines they cover, that is a stronger source than a transcription.
+
+[`asb2m10/dexed`](https://github.com/asb2m10/dexed) is the obvious one: a DX7 emulation carrying a
+complete cartridge and SysEx implementation for a machine whose format is famously fiddly.
+[`surge-synthesizer/surge`](https://github.com/surge-synthesizer/surge) and
+[`reales/OB-Xd`](https://github.com/reales/OB-Xd) are others. All three were verified to exist and
+**none was measured**; nothing is claimed here about how mineable they are. They are named because
+"read the emulation" is a category this document would otherwise have missed, not because anybody
+has checked what it yields.
+
+## A library for a feature already planned, and one to refuse
+
+`product-ideas.md` §12 proposes a Lua block editor and records that its round-trip was already
+spiked against this repo's own `.lua` files. The canvas half is the deferrable, expensive part —
+and [`google/blockly`](https://github.com/google/blockly) is Apache-2.0 and is that canvas. The
+document's own argument, that the palette should generate itself from the API declaration a test
+already guards, is unaffected by where the blocks are drawn.
+
+**The one to refuse: a third-party code editor.** `CodeEditor.svelte` is deliberately
+dependency-free and already does line numbers, syntax highlighting, smart indent, bracket and quote
+closing, comment toggling, find and replace, folding and column editing — over a `languageService`
+supplying completions, hover, go-to-definition and signature help across seven languages. Dropping
+CodeMirror or Monaco in would not add capability; it would cost the language-service integration
+that is the actual work. Recorded so the suggestion can be turned down on purpose the next time
+somebody makes it.
+
+---
+
+# The corpora together
+
+| Layer a profile needs | KnobKraft (AGPL) | Edisyn (Apache-2.0) | JSynthLib (GPLv2+) | PyMidiDefs (MIT) | `.midnam` (none) |
+|---|---|---|---|---|---|
+| Device identity | **yes, 68** | yes | yes | yes | partly |
+| Bank / program layout | **yes, 43** | partly | yes | — | **yes** |
+| Dump request & reply shapes | **yes, 56** | yes | **yes, 234** | — | — |
+| Real dump fixtures | **yes, 107** | 78 init patches | — | — | — |
+| Parameter address map | — | **yes, 35** | **inline in 2,355 widgets** | **yes, 14** | — |
+| Ranges | — | **yes, 3,516** | **yes, ~1,200** | **yes** | — |
+| Enum labels | — | **yes, 949** | **yes, 813** | **yes** | — |
+| Patch / controller names | yes, 63 | yes | yes, 39 | yes | **yes, 237** |
+| Licence risk | real | **none** | real, but compatible | **none** | **unresolved** |
+
+Separately, and not a profile layer at all: **Mixxx's 144 controller mappings** feed
+`SurfaceProfile` rather than the device profile, and open-source emulations are a source of
+*verified behaviour* for the handful of machines they cover.
+
+No single corpus gives a whole profile. KnobKraft, Edisyn and JSynthLib between them very nearly do, and they
 overlap on enough machines — Kawai K4, Korg microKORG, DSI Prophet 08 and 12, Casio CZ, E-mu
 Morpheus, Yamaha DX7 and more — that the same synth can be assembled from both halves and the
 overlap used to check the join.
