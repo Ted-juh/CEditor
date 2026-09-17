@@ -1,4 +1,4 @@
-# Mining other people's synth knowledge — a survey of six public corpora
+# Mining other people's synth knowledge — a survey of eight public corpora
 
 > Status: **assessment, 2026-09-17.** Nothing built. Every corpus below was cloned and read,
 > not described from its README, and every count in this document came out of the working tree.
@@ -279,7 +279,15 @@ Two things make it interesting anyway:
   text format, and this repo is evidence the conversion is mechanical — somebody did 237 of them
   with a TCL script.
 
-**The problem: there is no LICENSE file in that repository at all.** No licence means no grant of
+**Corrected after reading Ardour.** That repository's licensing problem does not need solving,
+because a bigger and cleanly licensed collection exists: **Ardour itself ships 475 `.midnam`
+patchfiles** under `share/patchfiles`, and its `COPYING` says "either of that version or of any
+later version", so GPLv2-**or-later**, which upgrades to GPLv3 and is compatible here. Twice the
+files, a real licence, and provenance you can follow. Use Ardour's collection; the standalone one
+is now only of interest as evidence that converting Cakewalk `.ins` in bulk is mechanical.
+
+**The original problem, kept because it is the general lesson: there is no LICENSE file in that
+repository at all.** No licence means no grant of
 rights, not "public domain". Use it to *learn the format* and to test a parser locally; do not ship
 anything derived from it without resolving that, and prefer `.midnam` files whose own licensing is
 clear.
@@ -360,23 +368,61 @@ gear rather than keyboard controllers, so the overlap with a studio rig is parti
 *shape* is exactly right, and Ardour's binding maps and Bitwig's controller scripts are two more
 corpora of the same kind, unassessed here.
 
-**Licence caution.** Mixxx is GPL version 2; the `COPYING` line read does not itself say "or
-later", and that was not chased further. GPLv2-**only** would be incompatible with AGPLv3, so this
-one needs settling before any code is taken. The facts — which byte a pad sends — remain facts.
+**Ardour's binding maps are the same idea with the licence already settled.**
+`share/midi_maps` holds **58 `.map` files** — Akai, Alesis, Behringer, Novation, Korg and the rest —
+as flat XML that needs no interpretation at all:
 
-## Open-source emulations, which are implementations rather than transcriptions
+```xml
+<ArdourMIDIBindings version="1.0.0" name="MPK249" manufacturer="Akai">
+  <Binding channel="1" ctl="18" uri="/route/gain 1"/>
+  <Binding sysex="f0 7f 7f 06 06 f7" action="Transport/Record" momentary="yes"/>
+```
 
-Every corpus above is somebody reading a manual. An emulation is somebody who got a machine's
-behaviour *right enough that it sounds like the machine*, with tests and users complaining when it
-does not. For the machines they cover, that is a stronger source than a transcription.
+Manufacturer, model, and for every control its channel and its CC, note or SysEx bytes. The action
+half is Ardour's business and useless here; the **control inventory** is exactly what a
+`SurfaceProfile` needs, and it is one XML pass away. Ardour's `COPYING` says "either of that version
+or of any later version" — GPLv2-**or-later**, so compatible.
 
-[`asb2m10/dexed`](https://github.com/asb2m10/dexed) is the obvious one: a DX7 emulation carrying a
-complete cartridge and SysEx implementation for a machine whose format is famously fiddly.
-[`surge-synthesizer/surge`](https://github.com/surge-synthesizer/surge) and
-[`reales/OB-Xd`](https://github.com/reales/OB-Xd) are others. All three were verified to exist and
-**none was measured**; nothing is claimed here about how mineable they are. They are named because
-"read the emulation" is a category this document would otherwise have missed, not because anybody
-has checked what it yields.
+**Licence caution, Mixxx only.** Mixxx's `COPYING` line reads "General Public License version 2"
+and the "or later" wording was not found; GPLv2-**only** would be incompatible with AGPLv3. Since
+Ardour's collection is settled and similar in shape, there is no reason to take the risk — read
+Ardour first, and treat Mixxx as extra coverage to chase only if a specific controller is missing.
+The facts — which byte a pad sends — remain facts either way.
+
+## Open-source emulations — measured, and worth less than the last draft implied
+
+The earlier draft named this category, named three repositories and measured none of them, on the
+argument that an emulation is somebody who got a machine's behaviour right rather than somebody
+transcribing a manual. [`asb2m10/dexed`](https://github.com/asb2m10/dexed) (**GPLv3**) has now been
+read, and the argument survives while the *value* does not.
+
+Dexed does carry parameter descriptors of exactly the right shape, in `Source/PluginParam.cpp`:
+
+```cpp
+new CtrlDX("ALGORITHM",   31, 134, 1)   // name, maximum, byte offset in the voice data
+new CtrlDX("LFO PM DEPTH", 99, 139)
+```
+
+Name, range and address, as literals — the same tuple JSynthLib's widgets carry. But there are
+only **20 literal `CtrlDX` declarations in the file**, because the DX7's operator parameters are
+built in loops:
+
+```cpp
+new CtrlDX(rate,   99, 126 + i)
+new CtrlDX(opRate, 99, opTarget + j)
+```
+
+So the 155-parameter map is *generated*, not written out, and a regex gets a fifth of it. Extracting
+the rest means understanding the loop structure or running the code — which for **one synth** is
+more work than reading the DX7's well-documented table directly.
+
+**The conclusion, which corrects the earlier framing:** emulations are not a bulk source. One
+repository is one machine, and its parameter table is as likely to be computed as declared. What
+Dexed is instead is a **correctness oracle**: `Source/PluginData.cpp` is 562 lines of cartridge and
+SysEx handling that thousands of users have run against real DX7 files and complained about when it
+was wrong. That is worth reaching for when a *specific* format fights back — not as a corpus, but
+as the second opinion that says whose reading of the manual is correct. Filed accordingly, and
+demoted from the list of things to mine.
 
 ## A library for a feature already planned, and one to refuse
 
@@ -410,9 +456,10 @@ somebody makes it.
 | Patch / controller names | yes, 63 | yes | yes, 39 | yes | **yes, 237** |
 | Licence risk | real | **none** | real, but compatible | **none** | **unresolved** |
 
-Separately, and not a profile layer at all: **Mixxx's 144 controller mappings** feed
-`SurfaceProfile` rather than the device profile, and open-source emulations are a source of
-*verified behaviour* for the handful of machines they cover.
+Separately, and not a profile layer at all: **Ardour's 58 binding maps and Mixxx's 144 controller
+mappings** feed `SurfaceProfile` rather than the device profile, **Ardour's 475 `.midnam`
+patchfiles** are the cleanly licensed version of the naming layer, and an emulation such as Dexed
+is a correctness oracle for one format rather than a corpus of any size.
 
 No single corpus gives a whole profile. KnobKraft, Edisyn and JSynthLib between them very nearly do, and they
 overlap on enough machines — Kawai K4, Korg microKORG, DSI Prophet 08 and 12, Casio CZ, E-mu
