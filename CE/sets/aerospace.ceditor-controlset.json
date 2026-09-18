@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3da34ae1",
+  "fingerprint": "c645c680",
   "set": {
     "id": "aerospace",
     "name": "Aerospace",
@@ -93,6 +93,31 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 14,
+            "Layout.height": 30,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 90,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100,
+            "kind": "bar"
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 4,
@@ -123,7 +148,30 @@
           "Background.Effects.Material.kind": "blast",
           "Background.Effects.Material.strength": 70,
           "Background.Effects.Material.shine": 40,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 8,
+          "ContentLayout.lampSide": "left",
+          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampBezelColour": "{border.surface}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {

@@ -1820,8 +1820,43 @@
   let textEffects = $derived(text?._children?.Effects ?? null);
   let textPosition = $derived(text?._children?.Position ?? null);
   let contentLayoutMode = $derived(String(contentLayout?.mode ?? 'text_only'));
-  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4));
-  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4));
+  // The lamp beside the legend (sectionDefaults ContentLayout `lamp`): an LED, a jewel or a lit
+  // window, lit while the runtime says the control is checked. It takes its room from the
+  // padding on its side, so the text and icon move over rather than sit on it.
+  let lampKind = $derived(String(contentLayout?.lamp ?? 'none').toLowerCase());
+  let hasLamp = $derived(['led', 'jewel', 'window'].includes(lampKind) && !isRadioGroupControl);
+  let lampSize = $derived(Math.max(3, numberOr(contentLayout?.lampSize, 9)));
+  let lampGap = $derived(Math.max(0, numberOr(contentLayout?.lampGap, 8)));
+  let lampOnRight = $derived(String(contentLayout?.lampSide ?? 'left') === 'right');
+  let lampWidth = $derived(lampKind === 'window' ? lampSize * 2 : lampSize);
+  let lampLit = $derived(interactionRuntime?.signals?.checked === true || interactionRuntime?.signals?.selectionActive === true);
+  function lampCss(value, fallback) {
+    const raw = String(value ?? '').replace(/^#/, '').trim();
+    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw)) return fallback;
+    if (raw.length === 6) return `#${raw}`;
+    return `rgba(${parseInt(raw.slice(2, 4), 16)}, ${parseInt(raw.slice(4, 6), 16)}, ${parseInt(raw.slice(6, 8), 16)}, ${(parseInt(raw.slice(0, 2), 16) / 255).toFixed(3)})`;
+  }
+  let lampStyle = $derived.by(() => {
+    if (!hasLamp) return '';
+    const lit = lampCss(contentLayout?.lampColour, '#5B9BD5');
+    const off = lampCss(contentLayout?.lampOffColour, '#2C2C2C');
+    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
+    const inset = numberOr(contentLayout?.[lampOnRight ? 'paddingRight' : 'paddingLeft'], 8);
+    const left = lampOnRight ? displayW - inset - lampWidth : inset;
+    const top = (displayH - lampSize) / 2;
+    const colour = lampLit ? lit : off;
+    const face = lampKind === 'jewel'
+      ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,${lampLit ? 0.75 : 0.35}) 0%, rgba(255,255,255,0) 45%), ${colour}`
+      : colour;
+    const glow = lampLit ? `0 0 ${Math.max(4, lampSize * 0.8)}px ${lit}, 0 0 ${Math.max(2, lampSize * 0.25)}px ${lit}` : 'inset 0 1px 2px rgba(0,0,0,0.6)';
+    return [
+      `left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampSize}px`,
+      `background:${face}`, `border:1px solid ${bezel}`, `box-shadow:${glow}`,
+      `border-radius:${lampKind === 'window' ? '2px' : '50%'}`,
+    ].join('; ');
+  });
+  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4) + (hasLamp && !lampOnRight ? lampWidth + lampGap : 0));
+  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4) + (hasLamp && lampOnRight ? lampWidth + lampGap : 0));
   let layoutPaddingTop = $derived(numberOr(contentLayout?.paddingTop, 0));
   let layoutPaddingBottom = $derived(numberOr(contentLayout?.paddingBottom, 0));
   let layoutGap = $derived(Math.max(0, numberOr(contentLayout?.gap, 8)));
@@ -3555,6 +3590,10 @@
       <div class="combobox-arrow" aria-hidden="true"></div>
     {/if}
 
+    {#if hasLamp}
+      <div class="lamp-indicator" class:lit={lampLit} style={lampStyle} aria-hidden="true"></div>
+    {/if}
+
     {#if hasIcon}
       <div class="icon-content" style={iconContainerStyle}>
         {#if iconIsTinted}
@@ -4468,6 +4507,14 @@
     position: absolute;
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  .lamp-indicator {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 1;
+    transition: background 120ms ease-out, box-shadow 120ms ease-out;
   }
 
   .icon-image {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c5fad6c0",
+  "fingerprint": "5e0ab2df",
   "set": {
     "id": "console",
     "name": "Console",
@@ -93,6 +93,26 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 14,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console"
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 3,
@@ -123,7 +143,30 @@
           "Background.Effects.Material.kind": "brushed",
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 60,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 7,
+          "ContentLayout.lampSide": "left",
+          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampBezelColour": "{border.surface}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {

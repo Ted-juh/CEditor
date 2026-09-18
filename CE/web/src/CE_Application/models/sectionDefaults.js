@@ -494,6 +494,17 @@ export const SECTION_DEFAULTS = {
     textAboveIcon: true,
     textZIndex: 2,
     iconZIndex: 1,
+    // A lamp beside the legend, lit while the control is checked: an LED, a jewel lens, or a
+    // small lit window. What a toggle IS on an amp or a desk, as opposed to a button that changes
+    // colour. 'none' draws nothing and every existing control is on 'none'. The text and icon
+    // move over by the lamp's width plus the gap so the legend never sits on it.
+    lamp: 'none',            // none / led / jewel / window
+    lampSide: 'left',        // left / right
+    lampSize: 9,
+    lampGap: 8,
+    lampColour: '{accent}',
+    lampOffColour: '{control.track}',
+    lampBezelColour: '{border.surface}',
   },
 
   /** Effects — shadows, bevel/emboss, CSS filters, blend mode. */

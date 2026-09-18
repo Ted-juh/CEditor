@@ -259,6 +259,37 @@
     return geometry === 'circular' && (kind === 'line' || kind === 'chicken') ? kind : 'dot';
   });
   let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
+  // On a linear track the current-value cap can be the original dot, a fader cap ('bar'), a
+  // console cap with a groove, a ring, or a line. For those the pointer's Layout.width is its
+  // size ALONG the travel and Layout.height ACROSS the track, whatever the orientation.
+  let linearCapKind = $derived.by(() => {
+    const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
+    return geometry === 'linear' && ['bar', 'console', 'ring', 'line'].includes(kind) ? kind : 'dot';
+  });
+  function linearCapShape(point) {
+    const along = Math.max(2, numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
+    const across = Math.max(2, numberOr(pointerCurrentPart?._children?.Layout?.height, 20));
+    const vertical = orientation === 'vertical';
+    const w = vertical ? across : along;
+    const h = vertical ? along : across;
+    const x = point.x - (w / 2);
+    const y = point.y - (h / 2);
+    const stroke = Math.max(1.5, Math.min(w, h) * 0.18);
+    if (linearCapKind === 'ring') {
+      const ring = Math.max(2, across / 4);
+      return { r: Math.max(2, (along / 2) - (ring / 2)), stroke: ring };
+    }
+    if (linearCapKind === 'line') {
+      return vertical
+        ? { x1: x, y1: point.y, x2: x + w, y2: point.y, stroke: along }
+        : { x1: point.x, y1: y, x2: point.x, y2: y + h, stroke: along };
+    }
+    const rx = Math.min(w, h) * 0.18;
+    const groove = vertical
+      ? { x1: x + 3, y1: point.y, x2: x + w - 3, y2: point.y }
+      : { x1: point.x, y1: y + 3, x2: point.x, y2: y + h - 3 };
+    return { x, y, w, h, rx, stroke, groove };
+  }
   function radialPointerShape(kind) {
     const angle = (sliderNormalizedToAngle(behavior, normalizedValues.current) * Math.PI) / 180;
     const ux = Math.cos(angle);
@@ -645,26 +676,89 @@
 
       {#if valueMode === 'single' || valueMode === 'band'}
         {@const currentPointerPoint = linearPointerPoint('current')}
-        <SliderShapeFill
-          background={pointerCurrentPart?._children?.Background ?? null}
-          bounds={circleBounds(currentPointerPoint.x, currentPointerPoint.y, pointerCurrentSize / 2)}
-          shape={{ kind: 'circle', cx: currentPointerPoint.x, cy: currentPointerPoint.y, r: pointerCurrentSize / 2 }}
-          maskId={maskIdFor('pointerCurrent')}
-          svgWidth={width}
-          svgHeight={height}
-          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-          style={pointerStyleFor('pointerCurrent')}
-        />
-        <circle
-          cx={currentPointerPoint.x}
-          cy={currentPointerPoint.y}
-          r={pointerCurrentSize / 2}
-          fill="none"
-          stroke={partBorderColour(pointerCurrentPart, '#333333')}
-          stroke-width={partBorderWidth(pointerCurrentPart, 1)}
-          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-          style={pointerStyleFor('pointerCurrent')}
-        />
+        {#if linearCapKind === 'dot'}
+          <SliderShapeFill
+            background={pointerCurrentPart?._children?.Background ?? null}
+            bounds={circleBounds(currentPointerPoint.x, currentPointerPoint.y, pointerCurrentSize / 2)}
+            shape={{ kind: 'circle', cx: currentPointerPoint.x, cy: currentPointerPoint.y, r: pointerCurrentSize / 2 }}
+            maskId={maskIdFor('pointerCurrent')}
+            svgWidth={width}
+            svgHeight={height}
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent')}
+          />
+          <circle
+            cx={currentPointerPoint.x}
+            cy={currentPointerPoint.y}
+            r={pointerCurrentSize / 2}
+            fill="none"
+            stroke={partBorderColour(pointerCurrentPart, '#333333')}
+            stroke-width={partBorderWidth(pointerCurrentPart, 1)}
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent')}
+          />
+        {:else}
+          {@const cap = linearCapShape(currentPointerPoint)}
+          {#if linearCapKind === 'ring'}
+            <SliderShapeFill
+              background={pointerCurrentPart?._children?.Background ?? null}
+              bounds={circleBounds(currentPointerPoint.x, currentPointerPoint.y, cap.r, cap.stroke)}
+              shape={{ kind: 'circle-stroke', cx: currentPointerPoint.x, cy: currentPointerPoint.y, r: cap.r, strokeWidth: cap.stroke }}
+              maskId={maskIdFor('pointerCurrentRing')}
+              svgWidth={width}
+              svgHeight={height}
+              opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+              style={pointerStyleFor('pointerCurrent')}
+            />
+          {:else if linearCapKind === 'line'}
+            <line
+              x1={cap.x1}
+              y1={cap.y1}
+              x2={cap.x2}
+              y2={cap.y2}
+              stroke={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
+              stroke-width={cap.stroke}
+              stroke-linecap="round"
+              opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+              style={pointerStyleFor('pointerCurrent')}
+            />
+          {:else}
+            <SliderShapeFill
+              background={pointerCurrentPart?._children?.Background ?? null}
+              bounds={{ x: cap.x, y: cap.y, width: cap.w, height: cap.h }}
+              shape={{ kind: 'rect', x: cap.x, y: cap.y, width: cap.w, height: cap.h, rx: cap.rx }}
+              maskId={maskIdFor('pointerCurrentBar')}
+              svgWidth={width}
+              svgHeight={height}
+              opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+              style={pointerStyleFor('pointerCurrent')}
+            />
+            <rect
+              x={cap.x}
+              y={cap.y}
+              width={cap.w}
+              height={cap.h}
+              rx={cap.rx}
+              fill="none"
+              stroke={partBorderColour(pointerCurrentPart, '#333333')}
+              stroke-width={partBorderWidth(pointerCurrentPart, 1)}
+              opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+              style={pointerStyleFor('pointerCurrent')}
+            />
+            {#if linearCapKind === 'console'}
+              <line
+                x1={cap.groove.x1}
+                y1={cap.groove.y1}
+                x2={cap.groove.x2}
+                y2={cap.groove.y2}
+                stroke={partBorderColour(pointerCurrentPart, '#333333')}
+                stroke-width={Math.max(1, cap.stroke)}
+                stroke-linecap="round"
+                opacity={numberOr(pointerCurrentPart?.opacity, 1) * 0.8}
+              />
+            {/if}
+          {/if}
+        {/if}
       {/if}
 
       {#if valueMode !== 'single'}

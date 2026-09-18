@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a7d7a3aa",
+  "fingerprint": "844b3483",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -109,6 +109,28 @@
           "Background.Effects.Material.shine": 60
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "kind": "bar",
+            "Layout.width": 14,
+            "Layout.height": 30,
+            "Background.Border.thickness": 1.5,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 90,
+            "Background.Effects.Material.shine": 60
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "ToggleButton": {
         "component": {
           "Background.Corners.radius": 4,
@@ -116,7 +138,43 @@
           "Background.Effects.Material.enabled": true,
           "Background.Effects.Material.kind": "blast",
           "Background.Effects.Material.strength": 90,
-          "Background.Effects.Material.shine": 60
+          "Background.Effects.Material.shine": 60,
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "highField": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
         }
       },
       "Combobox": {

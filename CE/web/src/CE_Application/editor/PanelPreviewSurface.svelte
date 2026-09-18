@@ -1,6 +1,7 @@
 <script>
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { resolveControlFamily } from '../models/controlSetFamilies.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
@@ -581,7 +582,11 @@
     // as they always do. It has to happen before the chain rather than inside it: several of those
     // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
     // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
-    const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
+    // The control set's family patch comes first of all (models/controlSetFamilies.js): a set may
+    // replace a State — a toggle with a lamp keeps its body when checked — and a state that was
+    // already applied to the document's control is a state the set can no longer change. Tokens
+    // are resolved later, in CanvasControl, as they are for every control.
+    const control = applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel)), previewOverrides?.sectionValues);
     const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }

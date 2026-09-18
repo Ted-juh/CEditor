@@ -17,7 +17,8 @@ function specimenPanel(setId) {
     place('Slider', 420, 40, 240, 48, { Behavior: { defaultCurrentValue: 0.7 } }),
     place('Slider', 420, 100, 240, 48, { Behavior: { defaultCurrentValue: 0.3 } }),
     place('Button', 690, 40, 132, 40, { Text: { content: 'PANIC' } }),
-    place('ToggleButton', 690, 92, 136, 40, { Text: { content: 'LEGATO' } }),
+    // On, so a set's lamp shows lit.
+    place('ToggleButton', 690, 92, 136, 40, { Text: { content: 'LEGATO' }, Behavior: { defaultValue: true } }),
     place('Combobox', 690, 144, 200, 36),
     place('Number', 420, 160, 160, 36),
   ];

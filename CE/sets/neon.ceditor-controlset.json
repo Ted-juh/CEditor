@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a9c2a852",
+  "fingerprint": "22bee0db",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -84,6 +84,28 @@
             "Layout.height": 84,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 140,
+            "Background.Effects.Material.grain": 100
           },
           "bodyTrackBase": {
             "Layout.height": 6

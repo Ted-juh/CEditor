@@ -77,15 +77,18 @@ export function knobFamily({
  * thickness, an optional finish, and an optional legend colour for a set whose buttons are a
  * different tone from its panel (a cream key on black tolex takes `{text.inverse}`).
  */
-export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, comboMaterial = null, text = null, fieldText = null } = {}) {
+export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, comboMaterial = null, text = null, fieldText = null, comboText = null } = {}) {
   const component = {
     'Background.Corners.radius': radius,
     'Background.Border.thickness': border,
-    ...(text ? { 'Text.Fill.colour': text } : {}),
   };
   const out = {};
-  for (const type of BUTTON_TYPES) out[type] = { component: { ...component, ...material(...(buttonMaterial ?? [null])) } };
-  out.Combobox = { component: { ...component, ...material(...(comboMaterial ?? buttonMaterial ?? [null])) } };
+  for (const type of BUTTON_TYPES) {
+    out[type] = { component: { ...component, ...(text ? { 'Text.Fill.colour': text } : {}), ...material(...(buttonMaterial ?? [null])) } };
+  }
+  // A combobox body is `control.select`, not `surface`, so it may need its own ink.
+  const comboInk = comboText ?? text;
+  out.Combobox = { component: { ...component, ...(comboInk ? { 'Text.Fill.colour': comboInk } : {}), ...material(...(comboMaterial ?? buttonMaterial ?? [null])) } };
   // The value fields (Number, Range) are a different surface from the buttons beside them — a
   // paper window in a dark stepper, or the reverse — so they take their own ink.
   if (fieldText || text) {
@@ -95,6 +98,75 @@ export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, co
     out.Range = { parts: { lowField: field, highField: field, decrement: stepper, increment: stepper } };
   }
   return out;
+}
+
+/**
+ * A linear slider family: the cap that rides the track and the track itself.
+ *   cap        — 'dot' (the original circle) | 'bar' | 'console' (a bar with a groove) | 'ring' | 'line'
+ *   capAlong / capAcross — the cap's size in px along the travel and across the track
+ *   capMaterial — [kind, strength, shine, grain]
+ *   track / trackRadius — the track's thickness and corner radius (999 is a pill)
+ */
+export function sliderFamily({
+  cap = 'dot', capAlong = 20, capAcross = 20, capFill = '{control.cap}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
+  track = 0, trackRadius = null,
+} = {}) {
+  const parts = {};
+  const pointer = {
+    'Layout.width': capAlong,
+    'Layout.height': capAcross,
+    'Background.Fill.colour': capFill,
+    'Background.Border.colour': capEdge,
+    'Background.Border.thickness': capEdgeWidth,
+    ...material(...(capMaterial ?? [null])),
+  };
+  if (cap !== 'dot') pointer.kind = cap;
+  parts.pointerCurrent = pointer;
+  if (track > 0 || trackRadius != null) {
+    const patch = {};
+    if (track > 0) patch['Layout.height'] = track;
+    if (trackRadius != null) patch['Background.Corners.radius'] = trackRadius;
+    parts.bodyTrackBase = { ...patch };
+    parts.bodyTrackFill = { ...patch };
+  }
+  return { Slider: { parts } };
+}
+
+/**
+ * A lamp on the toggle (sectionDefaults ContentLayout): 'led', 'jewel' or 'window', its size and
+ * side, and its lit and unlit colours. Radio groups draw their own selection and are left alone.
+ */
+export function lampFamily({ lamp = 'led', size = 9, side = 'left', gap = 8, colour = '{accent.hot}', offColour = '{control.track}', bezel = '{border.surface}', keepBody = true } = {}) {
+  const component = {
+    'ContentLayout.lamp': lamp,
+    'ContentLayout.lampSize': size,
+    'ContentLayout.lampSide': side,
+    'ContentLayout.lampGap': gap,
+    'ContentLayout.lampColour': colour,
+    'ContentLayout.lampOffColour': offColour,
+    'ContentLayout.lampBezelColour': bezel,
+  };
+  // With a lamp, the lamp is the indicator: the body keeps its colour and legend when checked
+  // and only the hairline lights. Without this the checked body would swamp the lamp.
+  if (keepBody) component['States.Selected'] = lampSelectedState();
+  return { ToggleButton: { component } };
+}
+
+/**
+ * A toggle's Selected state for a toggle that has a lamp: the body and the legend stay as they
+ * are, the hairline takes the hot accent, the lamp does the talking. The same shape
+ * componentTypes' createButtonStates makes, so the runtime treats it as any other state.
+ */
+export function lampSelectedState() {
+  return {
+    _type: 'State',
+    name: 'Selected',
+    group: 'interaction',
+    description: '',
+    enabled: true,
+    when: { checked: true },
+    patches: { component: { 'Background.Border.colour': '{accent.hot}' }, parts: {} },
+  };
 }
 
 /** A panel: its colour while the author has not chosen one, and its material. */

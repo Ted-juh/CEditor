@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "465ea574",
+  "fingerprint": "e7a330fe",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -72,6 +72,26 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "ring"
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 2,
@@ -87,7 +107,30 @@
       "ToggleButton": {
         "component": {
           "Background.Corners.radius": 2,
-          "Background.Border.thickness": 1
+          "Background.Border.thickness": 1,
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 7,
+          "ContentLayout.lampSide": "left",
+          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampBezelColour": "{border.surface}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {

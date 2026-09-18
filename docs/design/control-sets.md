@@ -367,3 +367,30 @@ legend and a value field's digits each take whichever ink reads on *that* surfac
 palette rather than assumed from the panel; and a knob with a cap moves its value readout to the
 pointer's ink when that reads better on the cap than the label colour does — a cream cap under a
 cream readout was the first thing the contact sheet showed.
+
+## Fader caps and lamps
+
+Two more things a set can now change, because the boards showed them on almost every set.
+
+**The fader cap.** A linear slider's `pointerCurrent` takes the same `kind` the knob's does, with
+its own vocabulary: `dot` (the original), `bar` (a fader cap), `console` (a bar with a groove),
+`ring`, `line`. For those the part's width is its size *along* the travel and its height *across*
+the track, whatever the orientation, so one set fits horizontal and vertical faders alike. The bar
+draws through the same masked fill as the dot, so a set's material lights it. `sliderFamily` in the
+recipes says it in a line, with the track's thickness and corner radius beside it.
+
+**The lamp.** A toggle on an amp or a desk does not change colour when it is on; a lamp beside its
+legend lights. `ContentLayout` gained `lamp` (`none` / `led` / `jewel` / `window`), a size, a side,
+a gap and three colours, all tokens; `CanvasControl` draws it beside the legend and moves the text
+and icon over by its width, and it lights while the runtime says the control is checked. Every
+existing control is on `none`. `lampFamily` also replaces the toggle's *Selected* state with one
+that keeps the body and lights only the hairline — with a lamp, the lamp is the indicator, and a
+body that also floods with the accent swamped it (and on Obsidian drowned the legend). That
+replacement is a whole State node written through the family patch at `States.Selected`, which the
+rule handles like any other property: an author who edited the state keeps their edit.
+
+One thing this found: the Player's surface resolved a control's interaction state *before* the set
+was applied, so a state the document held had already painted the body by the time the set's
+Selected state arrived. The family patch now runs first there, as it does on the canvas; tokens
+still resolve once, in `CanvasControl`. The combobox also takes its own ink, because its body is
+`control.select`, not `surface`, and on two sets those are opposite tones.

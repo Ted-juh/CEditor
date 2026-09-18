@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "64bdd88e",
+  "fingerprint": "69ac3655",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -93,6 +93,28 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 160,
+            "Background.Effects.Material.grain": 100
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 3,
@@ -123,13 +145,37 @@
           "Background.Effects.Material.kind": "blast",
           "Background.Effects.Material.strength": 60,
           "Background.Effects.Material.shine": 60,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "ContentLayout.lamp": "window",
+          "ContentLayout.lampSize": 8,
+          "ContentLayout.lampSide": "left",
+          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampBezelColour": "{border.surface}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {
         "component": {
           "Background.Corners.radius": 3,
           "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFFFFFFF",
           "Background.Effects.Material.enabled": true,
           "Background.Effects.Material.kind": "blast",
           "Background.Effects.Material.strength": 60,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b48e89a3",
+  "fingerprint": "53923aa1",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -96,6 +96,30 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 70,
+            "Background.Effects.Material.shine": 160,
+            "Background.Effects.Material.grain": 100
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 7,
@@ -126,7 +150,30 @@
           "Background.Effects.Material.kind": "glass",
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 120,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "ContentLayout.lamp": "window",
+          "ContentLayout.lampSize": 8,
+          "ContentLayout.lampSide": "left",
+          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampBezelColour": "{border.surface}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {

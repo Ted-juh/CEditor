@@ -8,7 +8,7 @@
 // Ember and Ivory are in models/controlSets.js, and CATALOG_SET_EXTRAS gives the last two the
 // families and panels their boards showed.
 
-import { buttonFamily, knobFamily, mergeFamilies, panelSpec } from './controlSetRecipes.js';
+import { buttonFamily, knobFamily, lampFamily, mergeFamilies, panelSpec, sliderFamily } from './controlSetRecipes.js';
 
 const LAMP = { azimuth: 225, elevation: 48 };
 
@@ -18,7 +18,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Console",
     description: "Brushed aluminium desk. Black skirted knobs, long-throw faders with a grooved cap, LED toggles.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 64, pointer: "line", pointerWidth: 3, pointerLength: 82, track: 8, capMaterial: ["brushed", 60, 80] }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 50, 60] })),
+    families: mergeFamilies(knobFamily({ cap: 64, pointer: "line", pointerWidth: 3, pointerLength: 82, track: 8, capMaterial: ["brushed", 60, 80] }), sliderFamily({ cap: "console", capAlong: 14, capAcross: 32, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 50, 60] }), lampFamily({ lamp: "led", size: 7 })),
     panel: panelSpec("FF5E6166", "brushed", 70, 50),
     tokens: {
       "surface": "FF3B3D42",
@@ -67,7 +67,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Neon",
     description: "Dark glass and light. Arcs glow, caps glow, the accent is the whole personality. The modern plug-in look.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6, capMaterial: ["glass", 60, 140] }), buttonFamily({ radius: 10 })),
+    families: mergeFamilies(knobFamily({ cap: 70, pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6, capMaterial: ["glass", 60, 140] }), sliderFamily({ cap: "dot", capMaterial: ["glass", 50, 140], track: 6 }), buttonFamily({ radius: 10 })),
     panel: panelSpec("FF0E1116"),
     tokens: {
       "surface": "FF1B222B",
@@ -116,7 +116,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Blueprint",
     description: "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, capEdgeWidth: 1.5, pointer: "line", pointerWidth: 1.5, pointerLength: 90, track: 2 }), buttonFamily({ radius: 2, border: 1 })),
+    families: mergeFamilies(knobFamily({ cap: 70, capEdgeWidth: 1.5, pointer: "line", pointerWidth: 1.5, pointerLength: 90, track: 2 }), sliderFamily({ cap: "ring", capAlong: 20, capAcross: 20, track: 4, trackRadius: 2 }), buttonFamily({ radius: 2, border: 1 })),
     panel: panelSpec("FF14243A"),
     tokens: {
       "surface": "FF14243A",
@@ -165,7 +165,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Walnut",
     description: "Hi-fi from the seventies. Walnut panel, brass bezels, cream dials with a black hairline. Quiet, expensive.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capEdgeWidth: 2.5, pointer: "line", pointerWidth: 1.5, pointerLength: 84, track: 3, readoutFill: "{control.marker}" }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 40, 60] })),
+    families: mergeFamilies(knobFamily({ cap: 72, capEdgeWidth: 2.5, pointer: "line", pointerWidth: 1.5, pointerLength: 84, track: 3, readoutFill: "{control.marker}" }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, track: 6 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 40, 60] })),
     panel: panelSpec("FF4A3226", "brushed", 50, 30, 60),
     tokens: {
       "surface": "FF5C4033",
@@ -214,7 +214,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Soft",
     description: "Pale, raised and quiet. Everything sits a few pixels off a light grey panel with a soft shadow; one violet accent.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 76, capEdgeWidth: 0.5, pointer: "line", pointerWidth: 3, pointerLength: 70, track: 5 }), buttonFamily({ radius: 12, border: 1 })),
+    families: mergeFamilies(knobFamily({ cap: 76, capEdgeWidth: 0.5, pointer: "line", pointerWidth: 3, pointerLength: 70, track: 5 }), sliderFamily({ cap: "dot", track: 8 }), buttonFamily({ radius: 12, border: 1 })),
     panel: panelSpec("FFE8EAEE"),
     tokens: {
       "surface": "FFF7F8FA",
@@ -263,7 +263,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Phosphor",
     description: "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 0, pointer: "dot", track: 6 }), buttonFamily({ radius: 2 })),
+    families: mergeFamilies(knobFamily({ cap: 0, pointer: "dot", track: 6 }), sliderFamily({ cap: "ring", capAlong: 20, capAcross: 20, track: 6, trackRadius: 2 }), buttonFamily({ radius: 2 }), lampFamily({ lamp: "led", size: 7 })),
     panel: panelSpec("FF0B0D0B"),
     tokens: {
       "surface": "FF151815",
@@ -312,7 +312,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Pop",
     description: "Thick black outlines, saturated fills, big round caps. A toy synth's confidence \u2014 readable from across the room.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 78, capEdge: "{control.marker}", capEdgeWidth: 3, pointer: "dot", dotSize: 24, track: 7 }), buttonFamily({ radius: 10, border: 3 })),
+    families: mergeFamilies(knobFamily({ cap: 78, capEdge: "{control.marker}", capEdgeWidth: 3, pointer: "dot", dotSize: 24, track: 7 }), sliderFamily({ cap: "dot", track: 12 }), buttonFamily({ radius: 10, border: 3 })),
     panel: panelSpec("FFF6D96B"),
     tokens: {
       "surface": "FFFFFFFF",
@@ -361,7 +361,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Carbon",
     description: "Pro gear. Carbon-weave panel, rubberised black knobs with a grip ring and a single orange dot. Chamfered, dense, serious.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["rubber", 80, 0], pointer: "line", pointerWidth: 3, pointerLength: 80, track: 3 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 50, 40] })),
+    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["rubber", 80, 0], pointer: "line", pointerWidth: 3, pointerLength: 80, track: 3 }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 50, 40] })),
     panel: panelSpec("FF1C1E21", "leather", 60, 20, 140),
     tokens: {
       "surface": "FF2A2D32",
@@ -410,7 +410,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Atelier",
     description: "Rams. Warm light-grey aluminium, flat pale knobs with one coloured dot, ticks but no arcs, tiny accents of orange and green. Less than you expect.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, pointer: "line", pointerWidth: 3, pointerLength: 80, track: 4, trackOpacity: 0.35 }), buttonFamily({ radius: 4 })),
+    families: mergeFamilies(knobFamily({ cap: 74, pointer: "line", pointerWidth: 3, pointerLength: 80, track: 4, trackOpacity: 0.35 }), sliderFamily({ cap: "dot", track: 4 }), buttonFamily({ radius: 4 })),
     panel: panelSpec("FFD9D9D4"),
     tokens: {
       "surface": "FFEDEDEA",
@@ -459,7 +459,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Chrome",
     description: "The 2000s plug-in, unashamed. Mirror-polished knobs, glassy buttons with a highlight, a deep blue-black panel. Skeuomorphic and proud of it.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["glass", 50, 180], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, readoutFill: "{control.marker}" }), buttonFamily({ radius: 6, border: 1, buttonMaterial: ["glass", 40, 120] })),
+    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["glass", 50, 180], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, readoutFill: "{control.marker}" }), sliderFamily({ cap: "console", capAlong: 14, capAcross: 32, track: 8 }), buttonFamily({ radius: 6, border: 1, buttonMaterial: ["glass", 40, 120] })),
     panel: panelSpec("FF10151F"),
     tokens: {
       "surface": "FF2A3544",
@@ -508,7 +508,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Frost",
     description: "Frosted glass over a colour field. Translucent white controls, thin bright edges, a violet-to-teal panel behind. Light, airy, current.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, capFill: "66FFFFFF", capEdge: "AAFFFFFF", pointer: "line", pointerWidth: 3, pointerLength: 80, track: 5 }), buttonFamily({ radius: 14, border: 1, text: "{text.inverse}", fieldText: "{text.inverse}" })),
+    families: mergeFamilies(knobFamily({ cap: 74, capFill: "66FFFFFF", capEdge: "AAFFFFFF", pointer: "line", pointerWidth: 3, pointerLength: 80, track: 5 }), sliderFamily({ cap: "dot", capMaterial: ["glass", 40, 100], track: 8 }), buttonFamily({ radius: 14, border: 1, text: "{text.inverse}", comboText: "{text.inverse}", fieldText: "{text.inverse}" })),
     panel: panelSpec("FF6A5BD6"),
     tokens: {
       "surface": "38FFFFFF",
@@ -557,7 +557,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Rackmount",
     description: "One rack unit of outboard. Silver faceplate with rack ears and screws, black knobs on silver bevels, illuminated square pushbuttons, a needle VU.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, capEdgeWidth: 2, pointer: "line", pointerWidth: 3, pointerLength: 80, track: 6, readoutFill: "{control.marker}" }), buttonFamily({ radius: 2, border: 1, buttonMaterial: ["brushed", 50, 60], text: "FFFFFFFF", fieldText: "FFFFFFFF" })),
+    families: mergeFamilies(knobFamily({ cap: 70, capEdgeWidth: 2, pointer: "line", pointerWidth: 3, pointerLength: 80, track: 6, readoutFill: "{control.marker}" }), sliderFamily({ cap: "console", capAlong: 14, capAcross: 32, track: 6, trackRadius: 2 }), buttonFamily({ radius: 2, border: 1, buttonMaterial: ["brushed", 50, 60], text: "FFFFFFFF", comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FFA9ADB2", "brushed", 60, 50),
     tokens: {
       "surface": "FF3B3D42",
@@ -606,7 +606,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Reel",
     description: "A seventies tape machine. Grey-green hammertone, big bakelite knobs with a numbered skirt, bat-handle toggle switches, needle meters.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 78, capMaterial: ["rubber", 60, 0], pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 40] })),
+    families: mergeFamilies(knobFamily({ cap: 78, capMaterial: ["rubber", 60, 0], pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6 }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 40] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF5E6A5E", "hammer", 80, 40),
     tokens: {
       "surface": "FF3A4038",
@@ -655,7 +655,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Valve",
     description: "A valve radio. Bakelite brown with a gold ring on every knob, a lacquered wood surround, cream dial text and a nixie-tube readout glowing orange.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, capEdgeWidth: 2.5, capMaterial: ["rubber", 40, 20], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), buttonFamily({ radius: 8, border: 1, buttonMaterial: ["glass", 40, 80] })),
+    families: mergeFamilies(knobFamily({ cap: 74, capEdgeWidth: 2.5, capMaterial: ["rubber", 40, 20], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), sliderFamily({ cap: "dot", track: 6 }), buttonFamily({ radius: 8, border: 1, buttonMaterial: ["glass", 40, 80] }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FF6B4A2E", "brushed", 50, 30, 60),
     tokens: {
       "surface": "FF4A3A30",
@@ -704,7 +704,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Anodised",
     description: "Photographed, not drawn. Machined aluminium knobs with real knurling and a domed cap, engraved legends, slot faders with a 3D cap, buttons that sit proud of the panel.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["brushed", 80, 90], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 80, 60], fieldText: "FFFFFFFF" })),
+    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["brushed", 80, 90], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 80, 60], track: 8 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 80, 60], comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF9DA3AA", "blast", 90, 40),
     tokens: {
       "surface": "FFB8BDC3",
@@ -753,7 +753,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Ladder",
     description: "Black panel between real walnut cheeks. Big fluted Davies-style knobs with a deep shadow, cream silkscreen, bat-handle toggles in the round, a needle in a lit window.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 78, capMaterial: ["rubber", 70, 10], pointer: "line", pointerWidth: 3, pointerLength: 86, track: 6 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["rubber", 50, 10] })),
+    families: mergeFamilies(knobFamily({ cap: 78, capMaterial: ["rubber", 70, 10], pointer: "line", pointerWidth: 3, pointerLength: 86, track: 6 }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 80, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["rubber", 50, 10] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF1B1B1D", "rubber", 40, 0),
     tokens: {
       "surface": "FF2A2A2D",
@@ -802,7 +802,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Eurorack",
     description: "A module in a case. Aluminium faceplate between the rails, chrome domed knobs with a knurled rim, 3.5 mm sockets with hex nuts, LEDs with a lens and bloom, lens-capped sliders.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 66, capMaterial: ["glass", 60, 200], pointer: "line", pointerWidth: 2.5, pointerLength: 80, track: 5 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 60, 60], fieldText: "FFFFFFFF" })),
+    families: mergeFamilies(knobFamily({ cap: 66, capMaterial: ["glass", 60, 200], pointer: "line", pointerWidth: 2.5, pointerLength: 80, track: 5 }), sliderFamily({ cap: "dot", capMaterial: ["glass", 60, 160], track: 6 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 60, 60], comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FFC4C8CC", "brushed", 60, 50),
     tokens: {
       "surface": "FFD5D9DD",
@@ -851,7 +851,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Backlit",
     description: "A dark instrument in a dark room. Every legend is backlit, every knob sits on an underlit ring, rubber keys bleed light at the edges, an OLED readout glows through glass.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6 }), buttonFamily({ radius: 6, border: 1 })),
+    families: mergeFamilies(knobFamily({ cap: 70, pointer: "line", pointerWidth: 3, pointerLength: 84, track: 6 }), sliderFamily({ cap: "dot", capMaterial: ["glass", 60, 160], track: 6 }), buttonFamily({ radius: 6, border: 1 }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF121316"),
     tokens: {
       "surface": "FF1F2126",
@@ -900,7 +900,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Saddle & Brass",
     description: "Saddle-stitched leather over a case; a brushed-brass escutcheon plate carries the controls. Cream enamel dials in brass bezels, red jewel lamps, a mirror-scale VU.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 5 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 60, 80], fieldText: "FFFFFFFF" })),
+    families: mergeFamilies(knobFamily({ cap: 74, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["brushed", 60, 80], track: 6, trackRadius: 2 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 60, 80], fieldText: "FFFFFFFF" }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FFB3873A", "brushed", 60, 70),
     tokens: {
       "surface": "FFD9B45B",
@@ -949,7 +949,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Obsidian",
     description: "A slab of black glass in a dark room. Cut-glass pucks on illuminated rings, light-guide pointers, keys that glow through frosted glass, an OLED behind the same pane.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["glass", 80, 160], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, readoutFill: "{control.marker}" }), buttonFamily({ radius: 7, border: 1, buttonMaterial: ["glass", 50, 120] })),
+    families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["glass", 80, 160], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, readoutFill: "{control.marker}" }), sliderFamily({ cap: "dot", capMaterial: ["glass", 70, 160], track: 6, trackRadius: 2 }), buttonFamily({ radius: 7, border: 1, buttonMaterial: ["glass", 50, 120] }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF0B0D11", "glass", 40, 120),
     tokens: {
       "surface": "FF161A21",
@@ -998,7 +998,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Laboratory",
     description: "A 1950s bench instrument. Hammertone grey-green steel with rivets and a folded top edge, bakelite knobs with fluted skirts, ceramic rockers, an engraved brass nameplate.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["rubber", 50, 30], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["glass", 30, 60] })),
+    families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["rubber", 50, 30], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["rubber", 50, 20], track: 6, trackRadius: 2 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["glass", 30, 60] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF5F6B5E", "hammer", 80, 40),
     tokens: {
       "surface": "FF4A5548",
@@ -1047,7 +1047,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Aerospace",
     description: "A module bolted between titanium rails on a woven-carbon plate. Dull titanium knobs, guarded switches, backlit legends, an OLED. Nothing shines that is not meant to.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["brushed", 70, 50], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 70, 40] })),
+    families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["brushed", 70, 50], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 90, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 70, 40] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF1A1C20", "blast", 60, 20, 120),
     tokens: {
       "surface": "FF3A3F46",
@@ -1096,7 +1096,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Ceramic & Oak",
     description: "White glazed ceramic knobs and keys on a tiled field set into oak. Rockers in porcelain, an e-ink readout. The quiet one.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["glass", 40, 120], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["glass", 30, 100] })),
+    families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["glass", 40, 120], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["rubber", 50, 20], track: 6, trackRadius: 2 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["glass", 30, 100] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FFF2EFE7", "glass", 30, 60),
     tokens: {
       "surface": "FFF7F4EE",
@@ -1145,7 +1145,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Field",
     description: "Olive-drab crinkle paint over a stiffened steel box. Black phenolic knobs with a white line, guarded bat switches, stencilled legends, a red LED readout. Built to be dropped.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["rubber", 60, 20], pointer: "line", pointerWidth: 3, pointerLength: 84, track: 5 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 30] })),
+    families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["rubber", 60, 20], pointer: "line", pointerWidth: 3, pointerLength: 84, track: 5 }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 90, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 30] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF4F5A3C", "leather", 90, 20, 150),
     tokens: {
       "surface": "FF3A4230",
@@ -1194,7 +1194,7 @@ export const CATALOG_CONTROL_SETS = [
     name: "Receiver",
     description: "A seventies stereo receiver: walnut case, brushed-aluminium faceplate, black dials with white scales in silver bezels, blue lamps, a blue fluorescent readout.",
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 4, readoutFill: "{control.marker}" }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 60, 70], fieldText: "FFFFFFFF" })),
+    families: mergeFamilies(knobFamily({ cap: 72, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 4, readoutFill: "{control.marker}" }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["brushed", 60, 80], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 60, 70], fieldText: "FFFFFFFF" }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FFC9CED3", "brushed", 70, 60),
     tokens: {
       "surface": "FFB9BEC3",
@@ -1244,13 +1244,13 @@ export const CATALOG_CONTROL_SETS = [
 export const CATALOG_SET_EXTRAS = {
   "ember": {
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 72, pointer: "chicken", pointerWidth: 9, pointerLength: 118, track: 4, readoutFill: "{control.marker}" }), buttonFamily({ radius: 6 })),
+    families: mergeFamilies(knobFamily({ cap: 72, pointer: "chicken", pointerWidth: 9, pointerLength: 118, track: 4, readoutFill: "{control.marker}" }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, track: 8 }), buttonFamily({ radius: 6 })),
     panel: panelSpec("FF2A2320", "rubber", 40, 0),
     tokens: { "control.marker": "FF3B2A1E" },
   },
   "ivory": {
     lamp: LAMP,
-    families: mergeFamilies(knobFamily({ cap: 68, pointer: "line", pointerWidth: 3, pointerLength: 72, track: 4 }), buttonFamily({ radius: 4 })),
+    families: mergeFamilies(knobFamily({ cap: 68, pointer: "line", pointerWidth: 3, pointerLength: 72, track: 4 }), sliderFamily({ cap: "ring", capAlong: 20, capAcross: 20, track: 6 }), buttonFamily({ radius: 4 })),
     panel: panelSpec("FFEFEAE0"),
     tokens: { "control.marker": "FF22201C" },
   },

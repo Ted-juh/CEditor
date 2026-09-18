@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e8eebd5f",
+  "fingerprint": "31977d13",
   "set": {
     "id": "chrome",
     "name": "Chrome",
@@ -93,6 +93,24 @@
           },
           "bodyTrackFill": {
             "Layout.height": 5
+          }
+        }
+      },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 14,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console"
+          },
+          "bodyTrackBase": {
+            "Layout.height": 8
+          },
+          "bodyTrackFill": {
+            "Layout.height": 8
           }
         }
       },

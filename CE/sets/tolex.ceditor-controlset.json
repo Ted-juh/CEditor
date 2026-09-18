@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f6578012",
+  "fingerprint": "57686a35",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -93,6 +93,24 @@
           }
         }
       },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 28,
+            "Background.Border.thickness": 1.5
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 2
+          }
+        }
+      },
       "Button": {
         "component": {
           "Background.Corners.radius": 5,
@@ -111,7 +129,28 @@
         "component": {
           "Background.Corners.radius": 5,
           "Background.Border.thickness": 1.5,
-          "Text.Fill.colour": "{text.inverse}"
+          "Text.Fill.colour": "{text.inverse}",
+          "ContentLayout.lamp": "jewel",
+          "ContentLayout.lampSize": 12,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lampOffColour": "FF4A1210",
+          "ContentLayout.lampBezelColour": "{control.cap.edge}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
         }
       },
       "Combobox": {

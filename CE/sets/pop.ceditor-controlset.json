@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bd8e7621",
+  "fingerprint": "8a4a44f8",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -82,6 +82,23 @@
           },
           "bodyTrackFill": {
             "Layout.height": 7
+          }
+        }
+      },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackBase": {
+            "Layout.height": 12
+          },
+          "bodyTrackFill": {
+            "Layout.height": 12
           }
         }
       },

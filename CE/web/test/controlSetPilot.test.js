@@ -40,6 +40,7 @@ import {
   writeControlPath,
 } from '../src/CE_Application/models/controlSetFamilies.js';
 import { DEFAULT_LAMP, MATERIAL_KINDS, materialActive, materialPrimitives, resolveMaterialLamp } from '../src/CE_Application/utils/materialFilter.js';
+import { buttonFamily, lampFamily, mergeFamilies, sliderFamily } from '../src/CE_Application/models/controlSetRecipes.js';
 import { hasSurfaceEffects } from '../src/CE_Application/utils/surfaceEffects.js';
 import { COMPONENT_GROUPS } from '../src/CE_Application/utils/effectStack.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
@@ -408,6 +409,40 @@ test('Machined lights the knob cap and the button face, and the build bakes both
   // A saved document, by contrast, keeps the factory knob: the set is applied at draw time.
   const saved = JSON.parse(serializePanel(panel));
   assert.equal(saved.controls[0]._children?.Parts?._children?.bodyCap, undefined, 'nothing the set did is in the file');
+});
+
+test('the recipes: a fader cap, a toggle lamp that keeps the body, and inks per surface', () => {
+  const slider = sliderFamily({ cap: 'bar', capAlong: 12, capAcross: 28, track: 6, trackRadius: 2, capMaterial: ['blast', 80, 60] });
+  assert.equal(slider.Slider.parts.pointerCurrent.kind, 'bar');
+  assert.equal(slider.Slider.parts.pointerCurrent['Layout.width'], 12);
+  assert.equal(slider.Slider.parts.pointerCurrent['Background.Effects.Material.kind'], 'blast');
+  assert.equal(slider.Slider.parts.bodyTrackBase['Background.Corners.radius'], 2);
+  assert.equal(sliderFamily({ cap: 'dot' }).Slider.parts.pointerCurrent.kind, undefined, 'the dot is the default and says nothing');
+
+  const lamp = lampFamily({ lamp: 'jewel', size: 12 });
+  assert.equal(lamp.ToggleButton.component['ContentLayout.lamp'], 'jewel');
+  assert.equal(lamp.ToggleButton.component['ContentLayout.lampColour'], '{accent.hot}');
+  assert.equal(lamp.ToggleButton.component['States.Selected'].when.checked, true);
+  assert.equal(lamp.ToggleButton.component['States.Selected'].patches.component['Background.Fill.colour'], undefined, 'the body keeps its colour: the lamp is the indicator');
+
+  // Applied to a factory toggle: the lamp lands, and the Selected state is replaced whole.
+  const toggle = createControl('ToggleButton');
+  const set = { ...tolex, id: 'lamped', families: mergeFamilies(lamp, buttonFamily({ radius: 3, text: '{text.inverse}', comboText: 'FF112233' })) };
+  const styled = resolveControlForSet(toggle, set);
+  assert.equal(readControlPath(styled, 'ContentLayout.lamp'), 'jewel');
+  assert.equal(readControlPath(styled, 'States.Selected').patches.component['Background.Border.colour'], resolveToken('accent.hot', tolex));
+  assert.equal(readControlPath(styled, 'ContentLayout.lampColour'), resolveToken('accent.hot', tolex), 'the lamp colour is a token, resolved like any other');
+  // An author who edited the Selected state keeps it.
+  toggle._children.States._children.Selected.patches.component['Background.Fill.colour'] = 'FF00FF00';
+  assert.equal(readControlPath(resolveControlForSet(toggle, set), 'States.Selected').patches.component['Background.Fill.colour'], 'FF00FF00');
+  // The combobox takes its own ink; the buttons theirs.
+  const combo = resolveControlForSet(createControl('Combobox'), set);
+  assert.equal(readControlPath(combo, 'Text.Fill.colour'), 'FF112233');
+  assert.equal(readControlPath(resolveControlForSet(createControl('Button'), set), 'Text.Fill.colour'), resolveToken('text.inverse', tolex));
+
+  // Every control with a ContentLayout starts with no lamp, so nothing that exists changes.
+  assert.equal(SECTION_DEFAULTS.ContentLayout.lamp, 'none');
+  assert.equal(createControl('Button')._children.ContentLayout.lamp, 'none');
 });
 
 test('the panel follows the set\'s colour only while it wears the default one', () => {

@@ -7,6 +7,8 @@
 // track and fill are the arc around the cap. Percent sizes are of the track's diameter (cap) or
 // the cap's radius (pointer length), so one set fits a 60 px knob and a 140 px one alike.
 
+import { lampSelectedState } from './controlSetRecipes.js';
+
 // The lamp both sets share: upper left, fairly high — the light on every mockup board.
 const LAMP = { azimuth: 225, elevation: 48 };
 
@@ -93,10 +95,26 @@ export const TOLEX_CONTROL_SET = {
         },
       },
     },
+    // A cream fader cap with a black stripe, on a gold track with square ends.
+    Slider: {
+      parts: {
+        pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 28, 'Background.Border.thickness': 1.5 },
+        bodyTrackBase: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
+        bodyTrackFill: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
+      },
+    },
     // Cream pushbuttons: squarer than Graphite's, a dark hairline, dark legends on the cream.
     Button: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
     MomentaryButton: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
-    ToggleButton: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
+    // The toggle carries a red jewel lamp: lit while it is on, a dark lens while it is not. The
+    // lamp is the indicator, so the cream body stays cream when checked (lampSelectedState).
+    ToggleButton: {
+      component: {
+        'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}',
+        'ContentLayout.lamp': 'jewel', 'ContentLayout.lampSize': 12, 'ContentLayout.lampColour': '{accent.hot}', 'ContentLayout.lampOffColour': 'FF4A1210', 'ContentLayout.lampBezelColour': '{control.cap.edge}',
+        'States.Selected': lampSelectedState(),
+      },
+    },
     Combobox: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
     // Paper value fields and cream steppers: the same dark ink.
     Number: { parts: { valueField: { 'Text.Fill.colour': '{text.inverse}' }, decrement: { 'Text.Fill.colour': '{text.inverse}' }, increment: { 'Text.Fill.colour': '{text.inverse}' } } },
@@ -207,6 +225,19 @@ export const MACHINED_CONTROL_SET = {
         'Background.Effects.Material.shine': 60,
       },
     },
+    // A machined fader cap, bead-blasted like the knobs, in a dark slot.
+    Slider: {
+      parts: {
+        pointerCurrent: {
+          kind: 'bar', 'Layout.width': 14, 'Layout.height': 30, 'Background.Border.thickness': 1.5,
+          'Background.Effects.Material.enabled': true, 'Background.Effects.Material.kind': 'blast',
+          'Background.Effects.Material.strength': 90, 'Background.Effects.Material.shine': 60,
+        },
+        bodyTrackBase: { 'Layout.height': 5, 'Background.Corners.radius': 2 },
+        bodyTrackFill: { 'Layout.height': 5, 'Background.Corners.radius': 2 },
+      },
+    },
+    // The toggle has an LED set into the plate beside its legend.
     ToggleButton: {
       component: {
         'Background.Corners.radius': 4,
@@ -215,8 +246,15 @@ export const MACHINED_CONTROL_SET = {
         'Background.Effects.Material.kind': 'blast',
         'Background.Effects.Material.strength': 90,
         'Background.Effects.Material.shine': 60,
+        'ContentLayout.lamp': 'led',
+        'ContentLayout.lampSize': 8,
+        'ContentLayout.lampColour': '{accent.hot}',
+        'States.Selected': lampSelectedState(),
       },
     },
+    // Dark readout windows on a light plate: the digits take the light ink.
+    Number: { parts: { valueField: { 'Text.Fill.colour': '{text.inverse}' } } },
+    Range: { parts: { lowField: { 'Text.Fill.colour': '{text.inverse}' }, highField: { 'Text.Fill.colour': '{text.inverse}' } } },
     Combobox: {
       component: {
         'Background.Corners.radius': 4,

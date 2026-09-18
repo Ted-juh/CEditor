@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "04aae2c5",
+  "fingerprint": "fba93326",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -87,6 +87,23 @@
           "bodyTrackFill": {
             "Layout.height": 4,
             "opacity": 0.35
+          }
+        }
+      },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4
           }
         }
       },

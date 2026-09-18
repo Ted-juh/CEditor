@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8240b443",
+  "fingerprint": "7b27de56",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -88,6 +88,24 @@
           },
           "bodyTrackFill": {
             "Layout.height": 3
+          }
+        }
+      },
+      "Slider": {
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 12,
+            "Layout.height": 28,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar"
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
           }
         }
       },
