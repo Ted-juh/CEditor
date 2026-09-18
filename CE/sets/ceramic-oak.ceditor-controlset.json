@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "ceramic",
+    "name": "Ceramic & Oak",
+    "description": "White glazed ceramic knobs and keys on a tiled field set into oak. Rockers in porcelain, an e-ink readout. The quiet one.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "ed5bd345",
+  "set": {
+    "id": "ceramic",
+    "name": "Ceramic & Oak",
+    "description": "White glazed ceramic knobs and keys on a tiled field set into oak. Rockers in porcelain, an e-ink readout. The quiet one.",
+    "tokens": {
+      "surface": "FFF7F4EE",
+      "surface.hover": "FFFFFFFF",
+      "surface.pressed": "FFD9D4C8",
+      "surface.checked": "FF2F6F9A",
+      "surface.mixed": "FFD99A1E",
+      "control.button": "FFF7F4EE",
+      "control.button.hover": "FFFFFFFF",
+      "control.button.pressed": "FFD9D4C8",
+      "control.field": "FFE9E6DC",
+      "control.field.hover": "FFEAE8DE",
+      "control.field.active": "FFB1C2C8",
+      "control.select": "FFF7F4EE",
+      "control.select.hover": "FFFFFFFF",
+      "control.select.pressed": "FFD9D4C8",
+      "control.track": "FFB9B2A2",
+      "control.track.edge": "55827D71",
+      "control.fill": "FF2F6F9A",
+      "control.fill.hot": "FF3E8FD0",
+      "control.range": "FFD99A1E",
+      "control.range.hot": "FFE1AE4B",
+      "control.cap": "FFF7F4EE",
+      "control.cap.hot": "FFF8F5F0",
+      "control.cap.edge": "997C7A77",
+      "control.cap.start": "FFD99A1E",
+      "control.cap.end": "FF2E9E6E",
+      "control.marker": "FF2B2A26",
+      "control.tick": "CC2B2A26",
+      "control.tick.minor": "882B2A26",
+      "accent": "FF2F6F9A",
+      "accent.hot": "FF3E8FD0",
+      "text.primary": "FF2B2A26",
+      "text.label": "FF2B2A26",
+      "text.muted": "FF5E5A52",
+      "text.focus": "FF2F6F9A",
+      "text.inverse": "FF2B2A26",
+      "border": "6694928F",
+      "border.surface": "AA7C7A77",
+      "border.field": "6694928F",
+      "border.mixed": "FFD99A1E"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 74,
+            "Layout.height": 74,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 40,
+            "Background.Effects.Material.shine": 120,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 100,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 100,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 100,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.shine": 100,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFF2EFE7",
+      "material": {
+        "enabled": true,
+        "kind": "glass",
+        "strength": 30,
+        "shine": 60,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

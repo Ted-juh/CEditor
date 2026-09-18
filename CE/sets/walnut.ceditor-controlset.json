@@ -1,0 +1,151 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "walnut",
+    "name": "Walnut",
+    "description": "Hi-fi from the seventies. Walnut panel, brass bezels, cream dials with a black hairline. Quiet, expensive.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "8240b443",
+  "set": {
+    "id": "walnut",
+    "name": "Walnut",
+    "description": "Hi-fi from the seventies. Walnut panel, brass bezels, cream dials with a black hairline. Quiet, expensive.",
+    "tokens": {
+      "surface": "FF5C4033",
+      "surface.hover": "FF6B4B3C",
+      "surface.pressed": "FF3F2B21",
+      "surface.checked": "FFB08D3C",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FF5C4033",
+      "control.button.hover": "FF694F43",
+      "control.button.pressed": "FF533A2E",
+      "control.field": "FF1E140F",
+      "control.field.hover": "FF29201B",
+      "control.field.active": "FF564426",
+      "control.select": "FF3F2B21",
+      "control.select.hover": "FF4E3C33",
+      "control.select.pressed": "FF3A281E",
+      "control.track": "FF2B1E17",
+      "control.track.edge": "551A110C",
+      "control.fill": "FFD9B45B",
+      "control.fill.hot": "FFF2D07A",
+      "control.range": "FFB08D3C",
+      "control.range.hot": "FFBC9E59",
+      "control.cap": "FFFFF7E6",
+      "control.cap.hot": "FFFFF8E8",
+      "control.cap.edge": "996B5A2E",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF8FB07A",
+      "control.marker": "FF3A2A10",
+      "control.tick": "CCF3E7CF",
+      "control.tick.minor": "88F3E7CF",
+      "accent": "FFD9B45B",
+      "accent.hot": "FFF2D07A",
+      "text.primary": "FFF6ECD8",
+      "text.label": "FFF6ECD8",
+      "text.muted": "FFCDB99A",
+      "text.focus": "FFFFF3D6",
+      "text.inverse": "FF2B1E17",
+      "border": "662B1E17",
+      "border.surface": "662B1E17",
+      "border.field": "662B1E17",
+      "border.mixed": "FFE0A43A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 2.5
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 1.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 3
+          },
+          "bodyTrackFill": {
+            "Layout.height": 3
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF4A3226",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 50,
+        "shine": 30,
+        "grain": 60,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "anodised",
+    "name": "Anodised",
+    "description": "Photographed, not drawn. Machined aluminium knobs with real knurling and a domed cap, engraved legends, slot faders with a 3D cap, buttons that sit proud of the panel.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "48df0341",
+  "set": {
+    "id": "anodised",
+    "name": "Anodised",
+    "description": "Photographed, not drawn. Machined aluminium knobs with real knurling and a domed cap, engraved legends, slot faders with a 3D cap, buttons that sit proud of the panel.",
+    "tokens": {
+      "surface": "FFB8BDC3",
+      "surface.hover": "FFCDD2D7",
+      "surface.pressed": "FF8E949B",
+      "surface.checked": "FFB8BDC3",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FFB8BDC3",
+      "control.button.hover": "FFBEC2C8",
+      "control.button.pressed": "FFA6AAB0",
+      "control.field": "FF1B1D20",
+      "control.field.hover": "FF26282B",
+      "control.field.active": "FF582F1A",
+      "control.select": "FF2B2E32",
+      "control.select.hover": "FF3C3F42",
+      "control.select.pressed": "FF282A2E",
+      "control.track": "FF2B2E32",
+      "control.track.edge": "55141618",
+      "control.fill": "FFE8590C",
+      "control.fill.hot": "FFFF7A1A",
+      "control.range": "FF8A5A3A",
+      "control.range.hot": "FF9C7358",
+      "control.cap": "FFC9CED3",
+      "control.cap.hot": "FFCED3D7",
+      "control.cap.edge": "992A2D31",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FF1B1D20",
+      "control.tick": "CC1B1D20",
+      "control.tick.minor": "881B1D20",
+      "accent": "FFE8590C",
+      "accent.hot": "FF7CFF6B",
+      "text.primary": "FF1B1D20",
+      "text.label": "FF1B1D20",
+      "text.muted": "FF2E3238",
+      "text.focus": "FF000000",
+      "text.inverse": "FF1B1D20",
+      "border": "663A3F45",
+      "border.surface": "663A3F45",
+      "border.field": "663A3F45",
+      "border.mixed": "FFE0A43A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "brushed",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 90,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 80,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 80,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 80,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 80,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "highField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF9DA3AA",
+      "material": {
+        "enabled": true,
+        "kind": "blast",
+        "strength": 90,
+        "shine": 40,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

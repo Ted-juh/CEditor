@@ -81,6 +81,8 @@ export const TOLEX_CONTROL_SET = {
           'Background.Effects.Material.strength': 60,
           'Background.Effects.Material.shine': 45,
         },
+        // The readout sits on the cream cap, so it takes the chicken-head's ink.
+        labelValue: { 'Text.Fill.colour': '{control.marker}' },
         // A black chicken-head, 9 px across at its base, reaching past the cap's edge.
         pointerCurrent: {
           kind: 'chicken',

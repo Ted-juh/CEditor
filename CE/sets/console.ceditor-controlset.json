@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "console",
+    "name": "Console",
+    "description": "Brushed aluminium desk. Black skirted knobs, long-throw faders with a grooved cap, LED toggles.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "c5fad6c0",
+  "set": {
+    "id": "console",
+    "name": "Console",
+    "description": "Brushed aluminium desk. Black skirted knobs, long-throw faders with a grooved cap, LED toggles.",
+    "tokens": {
+      "surface": "FF3B3D42",
+      "surface.hover": "FF4A4D53",
+      "surface.pressed": "FF2A2C30",
+      "surface.checked": "FF2F3136",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FF3B3D42",
+      "control.button.hover": "FF4B4D51",
+      "control.button.pressed": "FF35373B",
+      "control.field": "FF1F2023",
+      "control.field.hover": "FF2A2B2E",
+      "control.field.active": "FF56585B",
+      "control.select": "FF2F3136",
+      "control.select.hover": "FF404146",
+      "control.select.pressed": "FF2B2D32",
+      "control.track": "FF2A2C30",
+      "control.track.edge": "551A1B1E",
+      "control.fill": "FFD8DADF",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FF9BA1A8",
+      "control.range.hot": "FFAAAFB5",
+      "control.cap": "FF5B5E63",
+      "control.cap.hot": "FF6B6E73",
+      "control.cap.edge": "992A2A2A",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FFF2F2F2",
+      "control.tick": "CCF4F4F4",
+      "control.tick.minor": "88F4F4F4",
+      "accent": "FFD8DADF",
+      "accent.hot": "FFFF3B30",
+      "text.primary": "FFF4F4F4",
+      "text.label": "FFF4F4F4",
+      "text.muted": "FFD7D9DD",
+      "text.focus": "FFFFFFFF",
+      "text.inverse": "FFFFFFFF",
+      "border": "661E1F22",
+      "border.surface": "661E1F22",
+      "border.field": "661E1F22",
+      "border.mixed": "FFE0A43A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 64,
+            "Layout.height": 64,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "brushed",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 80,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 82,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 8
+          },
+          "bodyTrackFill": {
+            "Layout.height": 8
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF5E6166",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 70,
+        "shine": 50,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "pop",
+    "name": "Pop",
+    "description": "Thick black outlines, saturated fills, big round caps. A toy synth's confidence — readable from across the room.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "bd8e7621",
+  "set": {
+    "id": "pop",
+    "name": "Pop",
+    "description": "Thick black outlines, saturated fills, big round caps. A toy synth's confidence — readable from across the room.",
+    "tokens": {
+      "surface": "FFFFFFFF",
+      "surface.hover": "FFFFF3E0",
+      "surface.pressed": "FFFFD9C9",
+      "surface.checked": "FFFF6B5B",
+      "surface.mixed": "FFCC8D1A",
+      "control.button": "FFFFFFFF",
+      "control.button.hover": "FFFFFFFF",
+      "control.button.pressed": "FFE6E6E6",
+      "control.field": "FFFFFFFF",
+      "control.field.hover": "FFFFFFFF",
+      "control.field.active": "FFFFD3CE",
+      "control.select": "FFFFFFFF",
+      "control.select.hover": "FFFFFFFF",
+      "control.select.pressed": "FFEBEBEB",
+      "control.track": "FFFFFFFF",
+      "control.track.edge": "551B1B1B",
+      "control.fill": "FFFF6B5B",
+      "control.fill.hot": "FFFF8A7D",
+      "control.range": "FF5BC8FF",
+      "control.range.hot": "FF74D0FF",
+      "control.cap": "FFFFFFFF",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "991B1B1B",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF3BC46E",
+      "control.marker": "FF1B1B1B",
+      "control.tick": "CC1B1B1B",
+      "control.tick.minor": "881B1B1B",
+      "accent": "FFFF6B5B",
+      "accent.hot": "FF1B1B1B",
+      "text.primary": "FF1B1B1B",
+      "text.label": "FF1B1B1B",
+      "text.muted": "FF5A4A1E",
+      "text.focus": "FF1B1B1B",
+      "text.inverse": "FFFFFFFF",
+      "border": "661B1B1B",
+      "border.surface": "661B1B1B",
+      "border.field": "661B1B1B",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 78,
+            "Layout.height": 78,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.marker}",
+            "Background.Border.thickness": 3
+          },
+          "pointerCurrent": {
+            "Layout.width": 24,
+            "Layout.height": 24
+          },
+          "bodyTrackBase": {
+            "Layout.height": 7
+          },
+          "bodyTrackFill": {
+            "Layout.height": 7
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 10,
+          "Background.Border.thickness": 3
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 10,
+          "Background.Border.thickness": 3
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 10,
+          "Background.Border.thickness": 3
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 10,
+          "Background.Border.thickness": 3
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFF6D96B"
+    }
+  }
+}

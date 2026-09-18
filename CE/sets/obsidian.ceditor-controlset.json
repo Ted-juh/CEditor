@@ -1,0 +1,156 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "obsidian",
+    "name": "Obsidian",
+    "description": "A slab of black glass in a dark room. Cut-glass pucks on illuminated rings, light-guide pointers, keys that glow through frosted glass, an OLED behind the same pane.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "b48e89a3",
+  "set": {
+    "id": "obsidian",
+    "name": "Obsidian",
+    "description": "A slab of black glass in a dark room. Cut-glass pucks on illuminated rings, light-guide pointers, keys that glow through frosted glass, an OLED behind the same pane.",
+    "tokens": {
+      "surface": "FF161A21",
+      "surface.hover": "FF1E232B",
+      "surface.pressed": "FF0B0D11",
+      "surface.checked": "FF5FE3FF",
+      "surface.mixed": "FFC98A2A",
+      "control.button": "FF161A21",
+      "control.button.hover": "FF1E232B",
+      "control.button.pressed": "FF0B0D11",
+      "control.field": "FF03040A",
+      "control.field.hover": "FF121319",
+      "control.field.active": "FF1F4754",
+      "control.select": "FF161A21",
+      "control.select.hover": "FF1E232B",
+      "control.select.pressed": "FF0B0D11",
+      "control.track": "FF030406",
+      "control.track.edge": "55020304",
+      "control.fill": "FF5FE3FF",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FFB58CFF",
+      "control.range.hot": "FFC4A3FF",
+      "control.cap": "FF161A21",
+      "control.cap.hot": "FF2D3137",
+      "control.cap.edge": "990B0D10",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FFFFFFFF",
+      "control.tick": "CC5A6270",
+      "control.tick.minor": "885A6270",
+      "accent": "FF5FE3FF",
+      "accent.hot": "FFFFFFFF",
+      "text.primary": "FFE6F0FA",
+      "text.label": "FFE6F0FA",
+      "text.muted": "FF7FDCF2",
+      "text.focus": "FFFFFFFF",
+      "text.inverse": "FF9FE9FF",
+      "border": "660D1014",
+      "border.surface": "AA0B0D10",
+      "border.field": "660D1014",
+      "border.mixed": "FFC98A2A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 70,
+            "Layout.height": 70,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 160,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 7,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 7,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 7,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 7,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF0B0D11",
+      "material": {
+        "enabled": true,
+        "kind": "glass",
+        "strength": 40,
+        "shine": 120,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8cca4f98",
+  "fingerprint": "f6578012",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -80,6 +80,9 @@
             "Background.Effects.Material.kind": "glass",
             "Background.Effects.Material.strength": 60,
             "Background.Effects.Material.shine": 45
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
           },
           "pointerCurrent": {
             "kind": "chicken",

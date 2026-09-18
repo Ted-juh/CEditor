@@ -1,0 +1,148 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "chrome",
+    "name": "Chrome",
+    "description": "The 2000s plug-in, unashamed. Mirror-polished knobs, glassy buttons with a highlight, a deep blue-black panel. Skeuomorphic and proud of it.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "e8eebd5f",
+  "set": {
+    "id": "chrome",
+    "name": "Chrome",
+    "description": "The 2000s plug-in, unashamed. Mirror-polished knobs, glassy buttons with a highlight, a deep blue-black panel. Skeuomorphic and proud of it.",
+    "tokens": {
+      "surface": "FF2A3544",
+      "surface.hover": "FF34425A",
+      "surface.pressed": "FF1A2230",
+      "surface.checked": "FF1E5F86",
+      "surface.mixed": "FFCC8D1A",
+      "control.button": "FF2A3544",
+      "control.button.hover": "FF3B4553",
+      "control.button.pressed": "FF26303D",
+      "control.field": "FF0A0E14",
+      "control.field.hover": "FF161A20",
+      "control.field.active": "FF15455A",
+      "control.select": "FF1E2733",
+      "control.select.hover": "FF303843",
+      "control.select.pressed": "FF1C242F",
+      "control.track": "FF1E2733",
+      "control.track.edge": "550A0E14",
+      "control.fill": "FF2FC4FF",
+      "control.fill.hot": "FF8EE0FF",
+      "control.range": "FF7FA6FF",
+      "control.range.hot": "FF92B3FF",
+      "control.cap": "FFB8C0C8",
+      "control.cap.hot": "FFBFC6CE",
+      "control.cap.edge": "993A424B",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF4CD98A",
+      "control.marker": "FF2B2F33",
+      "control.tick": "CC9AA6B4",
+      "control.tick.minor": "889AA6B4",
+      "accent": "FF2FC4FF",
+      "accent.hot": "FF8EE0FF",
+      "text.primary": "FFEEF3F8",
+      "text.label": "FFEEF3F8",
+      "text.muted": "FF9AA6B4",
+      "text.focus": "FF8EE0FF",
+      "text.inverse": "FF0E1B2E",
+      "border": "660A0E14",
+      "border.surface": "660A0E14",
+      "border.field": "660A0E14",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 180,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 120,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF10151F"
+    }
+  }
+}

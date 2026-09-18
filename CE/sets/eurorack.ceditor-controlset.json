@@ -1,0 +1,182 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "eurorack",
+    "name": "Eurorack",
+    "description": "A module in a case. Aluminium faceplate between the rails, chrome domed knobs with a knurled rim, 3.5 mm sockets with hex nuts, LEDs with a lens and bloom, lens-capped sliders.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "64bdd88e",
+  "set": {
+    "id": "eurorack",
+    "name": "Eurorack",
+    "description": "A module in a case. Aluminium faceplate between the rails, chrome domed knobs with a knurled rim, 3.5 mm sockets with hex nuts, LEDs with a lens and bloom, lens-capped sliders.",
+    "tokens": {
+      "surface": "FFD5D9DD",
+      "surface.hover": "FFE6E9EC",
+      "surface.pressed": "FFA6ABB0",
+      "surface.checked": "FFD5D9DD",
+      "surface.mixed": "FFCC8D1A",
+      "control.button": "FFD5D9DD",
+      "control.button.hover": "FFD8DCE0",
+      "control.button.pressed": "FFC0C3C7",
+      "control.field": "FF1B1D20",
+      "control.field.hover": "FF26282B",
+      "control.field.active": "FF24613B",
+      "control.select": "FF2B2E32",
+      "control.select.hover": "FF3C3F42",
+      "control.select.pressed": "FF282A2E",
+      "control.track": "FF2B2E32",
+      "control.track.edge": "55141618",
+      "control.fill": "FF39FF7A",
+      "control.fill.hot": "FFB8FFD2",
+      "control.range": "FF6EA6FF",
+      "control.range.hot": "FF84B3FF",
+      "control.cap": "FFE2E5E8",
+      "control.cap.hot": "FFE5E8EA",
+      "control.cap.edge": "992A2D31",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF39FF7A",
+      "control.marker": "FF1B1D20",
+      "control.tick": "CC1B1D20",
+      "control.tick.minor": "881B1D20",
+      "accent": "FF39FF7A",
+      "accent.hot": "FF39FF7A",
+      "text.primary": "FF1B1D20",
+      "text.label": "FF1B1D20",
+      "text.muted": "FF2E3238",
+      "text.focus": "FF000000",
+      "text.inverse": "FF1B1D20",
+      "border": "662A2D31",
+      "border.surface": "662A2D31",
+      "border.field": "662A2D31",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 66,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 200,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 80,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "highField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFC4C8CC",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 60,
+        "shine": 50,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

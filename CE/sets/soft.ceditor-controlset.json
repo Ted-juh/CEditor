@@ -1,0 +1,120 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "soft",
+    "name": "Soft",
+    "description": "Pale, raised and quiet. Everything sits a few pixels off a light grey panel with a soft shadow; one violet accent.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "b9394374",
+  "set": {
+    "id": "soft",
+    "name": "Soft",
+    "description": "Pale, raised and quiet. Everything sits a few pixels off a light grey panel with a soft shadow; one violet accent.",
+    "tokens": {
+      "surface": "FFF7F8FA",
+      "surface.hover": "FFFFFFFF",
+      "surface.pressed": "FFE3E6EB",
+      "surface.checked": "FF5B5BD6",
+      "surface.mixed": "FFB67B25",
+      "control.button": "FFF7F8FA",
+      "control.button.hover": "FFF8F9FA",
+      "control.button.pressed": "FFDEDFE1",
+      "control.field": "FFFFFFFF",
+      "control.field.hover": "FFFFFFFF",
+      "control.field.active": "FFCECEF3",
+      "control.select": "FFFFFFFF",
+      "control.select.hover": "FFFFFFFF",
+      "control.select.pressed": "FFEBEBEB",
+      "control.track": "FFD3D7DE",
+      "control.track.edge": "55D3D7DE",
+      "control.fill": "FF5B5BD6",
+      "control.fill.hot": "FF7B7BEC",
+      "control.range": "FFA9A9F0",
+      "control.range.hot": "FFB6B6F2",
+      "control.cap": "FFF4F5F7",
+      "control.cap.hot": "FFF5F6F8",
+      "control.cap.edge": "99FFFFFF",
+      "control.cap.start": "FFE39A2E",
+      "control.cap.end": "FF3BAF7E",
+      "control.marker": "FF5B5BD6",
+      "control.tick": "CC7C8290",
+      "control.tick.minor": "887C8290",
+      "accent": "FF5B5BD6",
+      "accent.hot": "FF3E3EC4",
+      "text.primary": "FF262A33",
+      "text.label": "FF262A33",
+      "text.muted": "FF6E7482",
+      "text.focus": "FF3E3EC4",
+      "text.inverse": "FFFFFFFF",
+      "border": "66DFE2E8",
+      "border.surface": "66DFE2E8",
+      "border.field": "66DFE2E8",
+      "border.mixed": "FFE39A2E"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 76,
+            "Layout.height": 76,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 0.5
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 70,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 12,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 12,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 12,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 12,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFE8EAEE"
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "aerospace",
+    "name": "Aerospace",
+    "description": "A module bolted between titanium rails on a woven-carbon plate. Dull titanium knobs, guarded switches, backlit legends, an OLED. Nothing shines that is not meant to.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "3da34ae1",
+  "set": {
+    "id": "aerospace",
+    "name": "Aerospace",
+    "description": "A module bolted between titanium rails on a woven-carbon plate. Dull titanium knobs, guarded switches, backlit legends, an OLED. Nothing shines that is not meant to.",
+    "tokens": {
+      "surface": "FF3A3F46",
+      "surface.hover": "FF4A5058",
+      "surface.pressed": "FF25282D",
+      "surface.checked": "FF5FE3FF",
+      "surface.mixed": "FFFFB020",
+      "control.button": "FF3A3F46",
+      "control.button.hover": "FF4A5058",
+      "control.button.pressed": "FF25282D",
+      "control.field": "FF03040A",
+      "control.field.hover": "FF121319",
+      "control.field.active": "FF1F4754",
+      "control.select": "FF3A3F46",
+      "control.select.hover": "FF4A5058",
+      "control.select.pressed": "FF25282D",
+      "control.track": "FF0A0B0D",
+      "control.track.edge": "55070809",
+      "control.fill": "FF5FE3FF",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FFFF7A1A",
+      "control.range.hot": "FFFF9548",
+      "control.cap": "FF5B6068",
+      "control.cap.hot": "FF6B7077",
+      "control.cap.edge": "992E3034",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF5FE3FF",
+      "control.marker": "FF5FE3FF",
+      "control.tick": "CC9AA0A8",
+      "control.tick.minor": "889AA0A8",
+      "accent": "FF5FE3FF",
+      "accent.hot": "FFFFFFFF",
+      "text.primary": "FFE6EBF0",
+      "text.label": "FFE6EBF0",
+      "text.muted": "FF7FDCF2",
+      "text.focus": "FFB6F0FF",
+      "text.inverse": "FFB6F0FF",
+      "border": "6623262A",
+      "border.surface": "AA1D2023",
+      "border.field": "6623262A",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 70,
+            "Layout.height": 70,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "brushed",
+            "Background.Effects.Material.strength": 70,
+            "Background.Effects.Material.shine": 50,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2.5,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 70,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 70,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 70,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 70,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF1A1C20",
+      "material": {
+        "enabled": true,
+        "kind": "blast",
+        "strength": 60,
+        "shine": 20,
+        "grain": 120,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

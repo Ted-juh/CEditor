@@ -170,6 +170,7 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   trackThickness = 10,
   pointerSize = 18,
   majorTickLength = 12,
+  hasTicks = true,
   hasReadout = false,
   circularDiameter = 0,
   labelMetrics = {},
@@ -180,7 +181,16 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   const handleSize = Math.max(0, numberOr(labelMetrics?.handleSize, 11));
   const labelAllowance = Math.max(minMaxSize, handleSize, titleSize, hasReadout ? readoutSize : 0);
   const topInset = hasReadout ? Math.max(12, readoutSize * 0.5) : 0;
-  const outerPadding = 14 + majorTickLength + (pointerSize / 2) + (labelAllowance * 0.5);
+  // What actually sits outside the arc, measured rather than summed. The ticks and the pointer
+  // both reach outward from the track, into the SAME ring, so the room they need is the larger of
+  // the two and not both added together — and a knob with its ticks off needs none for them. The
+  // old padding added the tick length, the whole pointer half-size and a 14 px slack on top of
+  // each other, which for a 100 px knob left an arc 16 px in radius (the floor below) in a box
+  // that could hold one twice that; the min/max labels, which hang 24 px past the arc's ends at
+  // the bottom corners, are what the label allowance is still reserving for.
+  const tickRoom = hasTicks ? Math.max(0, majorTickLength) + 2 : 0;
+  const pointerRoom = Math.max(0, (pointerSize - trackThickness) / 2) + 2;
+  const outerPadding = 6 + Math.max(tickRoom, pointerRoom) + (labelAllowance * 0.4);
   const center = resolveCircularCenter(width, height, { hasReadout });
   const autoRadius = Math.max(
     16,
@@ -305,6 +315,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       trackThickness,
       pointerSize,
       majorTickLength: numberOr(behavior?.majorTickLength, 12),
+      hasTicks: behavior?.showTicks !== false,
       hasReadout,
       circularDiameter: behavior?.circularDiameter,
       labelMetrics,

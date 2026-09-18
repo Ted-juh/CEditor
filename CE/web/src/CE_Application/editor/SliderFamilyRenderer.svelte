@@ -304,6 +304,7 @@
     trackThickness,
     pointerSize: maxPointerSize,
     majorTickLength,
+    hasTicks: showTicks,
     hasReadout: showReadout,
     circularDiameter: behavior?.circularDiameter,
     labelMetrics,

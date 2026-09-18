@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1c35521d",
+  "fingerprint": "29ebe468",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -42,7 +42,7 @@
       "control.cap.edge": "99555555",
       "control.cap.start": "FFD99A1E",
       "control.cap.end": "FF2E9E6E",
-      "control.marker": "99333333",
+      "control.marker": "FF22201C",
       "control.tick": "CC333333",
       "control.tick.minor": "99333333",
       "accent": "FF2F6F9A",
@@ -56,6 +56,65 @@
       "border.surface": "66403A30",
       "border.field": "66807A6E",
       "border.mixed": "FFB98A00"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 68,
+            "Layout.height": 68,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFEFEAE0"
     }
   }
 }

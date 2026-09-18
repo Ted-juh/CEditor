@@ -1,0 +1,120 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "blueprint",
+    "name": "Blueprint",
+    "description": "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "1bae6eb7",
+  "set": {
+    "id": "blueprint",
+    "name": "Blueprint",
+    "description": "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
+    "tokens": {
+      "surface": "FF14243A",
+      "surface.hover": "FF1D3252",
+      "surface.pressed": "FF0E1A2C",
+      "surface.checked": "FFDCE8F5",
+      "surface.mixed": "FFC29D4E",
+      "control.button": "FF14243A",
+      "control.button.hover": "FF27364A",
+      "control.button.pressed": "FF122034",
+      "control.field": "FF0E1A2C",
+      "control.field.hover": "FF1A2537",
+      "control.field.active": "FF4C5868",
+      "control.select": "FF14243A",
+      "control.select.hover": "FF27364A",
+      "control.select.pressed": "FF122135",
+      "control.track": "FF22375A",
+      "control.track.edge": "55DCE8F5",
+      "control.fill": "FFDCE8F5",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FF7FA6D6",
+      "control.range.hot": "FF92B3DC",
+      "control.cap": "FF14243A",
+      "control.cap.hot": "FF2C3A4E",
+      "control.cap.edge": "99DCE8F5",
+      "control.cap.start": "FFF2C462",
+      "control.cap.end": "FF8FE3B0",
+      "control.marker": "FFDCE8F5",
+      "control.tick": "CCDCE8F5",
+      "control.tick.minor": "88DCE8F5",
+      "accent": "FFDCE8F5",
+      "accent.hot": "FFFFD166",
+      "text.primary": "FFDCE8F5",
+      "text.label": "FFDCE8F5",
+      "text.muted": "FF9DB4CF",
+      "text.focus": "FFFFD166",
+      "text.inverse": "FF14243A",
+      "border": "66DCE8F5",
+      "border.surface": "66DCE8F5",
+      "border.field": "669DB4CF",
+      "border.mixed": "FFF2C462"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 70,
+            "Layout.height": 70,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1.5
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 1.5,
+            "Layout.height": 90,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF14243A"
+    }
+  }
+}

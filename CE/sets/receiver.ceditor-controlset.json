@@ -1,0 +1,185 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "receiver",
+    "name": "Receiver",
+    "description": "A seventies stereo receiver: walnut case, brushed-aluminium faceplate, black dials with white scales in silver bezels, blue lamps, a blue fluorescent readout.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "3dd88b69",
+  "set": {
+    "id": "receiver",
+    "name": "Receiver",
+    "description": "A seventies stereo receiver: walnut case, brushed-aluminium faceplate, black dials with white scales in silver bezels, blue lamps, a blue fluorescent readout.",
+    "tokens": {
+      "surface": "FFB9BEC3",
+      "surface.hover": "FFCDD2D7",
+      "surface.pressed": "FF8E949B",
+      "surface.checked": "FF4DA3FF",
+      "surface.mixed": "FFFFB020",
+      "control.button": "FFB9BEC3",
+      "control.button.hover": "FFCDD2D7",
+      "control.button.pressed": "FF8E949B",
+      "control.field": "FF0A1020",
+      "control.field.hover": "FF191E2D",
+      "control.field.active": "FF1E3C63",
+      "control.select": "FFB9BEC3",
+      "control.select.hover": "FFCDD2D7",
+      "control.select.pressed": "FF8E949B",
+      "control.track": "FF1E2124",
+      "control.track.edge": "55151719",
+      "control.fill": "FFE8E8E8",
+      "control.fill.hot": "FF8EC5FF",
+      "control.range": "FF8A6320",
+      "control.range.hot": "FFA1824D",
+      "control.cap": "FF151517",
+      "control.cap.hot": "FF2C2C2E",
+      "control.cap.edge": "FFC9CED3",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FFE8E8E8",
+      "control.tick": "CC1B1D20",
+      "control.tick.minor": "881B1D20",
+      "accent": "FF4DA3FF",
+      "accent.hot": "FF8EC5FF",
+      "text.primary": "FF1B1D20",
+      "text.label": "FF1B1D20",
+      "text.muted": "FF3E4247",
+      "text.focus": "FF1F5C88",
+      "text.inverse": "FF1B1D20",
+      "border": "666F7275",
+      "border.surface": "AA5C5F62",
+      "border.field": "666F7275",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 3,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 70,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 70,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 70,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 70,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "highField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFC9CED3",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 70,
+        "shine": 60,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

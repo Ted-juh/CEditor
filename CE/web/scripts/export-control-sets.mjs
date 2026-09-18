@@ -11,13 +11,13 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getControlSet } from '../src/CE_Application/models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { controlSetFileName, createControlSetEnvelope } from '../src/CE_Application/models/controlSetPackage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const SETS_DIR = join(HERE, '../../sets');
-// The pilot: one colour-only set, one that changes the knob's parts, one with a lit material.
-export const SHIPPED_SET_IDS = ['ivory', 'tolex', 'machined'];
+// Every built-in set ships as a file too: the file is the form a set is shared and edited in.
+export const SHIPPED_SET_IDS = BUILT_IN_CONTROL_SETS.map((set) => set.id);
 // A fixed stamp, so the committed files change only when a set does.
 const EXPORTED_AT = '2026-09-18T00:00:00.000Z';
 

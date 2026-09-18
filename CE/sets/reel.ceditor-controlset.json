@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "reel",
+    "name": "Reel",
+    "description": "A seventies tape machine. Grey-green hammertone, big bakelite knobs with a numbered skirt, bat-handle toggle switches, needle meters.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "a59c1b1b",
+  "set": {
+    "id": "reel",
+    "name": "Reel",
+    "description": "A seventies tape machine. Grey-green hammertone, big bakelite knobs with a numbered skirt, bat-handle toggle switches, needle meters.",
+    "tokens": {
+      "surface": "FF3A4038",
+      "surface.hover": "FF454C43",
+      "surface.pressed": "FF2B302A",
+      "surface.checked": "FF3A4038",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FF3A4038",
+      "control.button.hover": "FF4A4F48",
+      "control.button.pressed": "FF343A32",
+      "control.field": "FF1E2420",
+      "control.field.hover": "FF292F2B",
+      "control.field.active": "FF5B5D54",
+      "control.select": "FF2E3530",
+      "control.select.hover": "FF3F4541",
+      "control.select.pressed": "FF2A312C",
+      "control.track": "FF2E3530",
+      "control.track.edge": "55141814",
+      "control.fill": "FFE9E2CC",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FFA6AE9E",
+      "control.range.hot": "FFB3BAAD",
+      "control.cap": "FF1E1B18",
+      "control.cap.hot": "FF34322F",
+      "control.cap.edge": "998A8F94",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF8FB07A",
+      "control.marker": "FFF3EEDD",
+      "control.tick": "CC1E1B18",
+      "control.tick.minor": "881E1B18",
+      "accent": "FFE9E2CC",
+      "accent.hot": "FFF2C462",
+      "text.primary": "FFF3EEDD",
+      "text.label": "FFF3EEDD",
+      "text.muted": "FFC9CEC2",
+      "text.focus": "FFFFF3D6",
+      "text.inverse": "FF1E1B18",
+      "border": "66141814",
+      "border.surface": "66141814",
+      "border.field": "66141814",
+      "border.mixed": "FFE0A43A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 78,
+            "Layout.height": 78,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 0,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 40,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF5E6A5E",
+      "material": {
+        "enabled": true,
+        "kind": "hammer",
+        "strength": 80,
+        "shine": 40,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

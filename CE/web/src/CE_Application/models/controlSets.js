@@ -24,6 +24,7 @@
 // `colour`, `underlineColour`, `'Background.Fill.colour'` — and never at anything else.
 
 import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
+import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
@@ -98,7 +99,7 @@ export const CONTROL_SET_TOKEN_NAMES = CONTROL_SET_TOKEN_ROLES.map((role) => rol
  * A token's value is an AARRGGBB literal or an alias to another token in the same set
  * (`'{accent}'`), resolved through `resolveToken`.
  */
-export const BUILT_IN_CONTROL_SETS = [
+const BASE_BUILT_IN_SETS = [
   {
     id: 'graphite',
     name: 'Graphite',
@@ -237,9 +238,21 @@ export const BUILT_IN_CONTROL_SETS = [
       'border.mixed': 'FFB98A00',
     },
   },
+];
+
+// Ember and Ivory began as colour-only sets; their mockup boards showed a chicken-head and a
+// black-bodied knob, and models/catalogControlSets.js carries those as extras. Graphite stays
+// exactly what it was: it is the look every existing document has.
+export const BUILT_IN_CONTROL_SETS = [
+  ...BASE_BUILT_IN_SETS.map((set) => {
+    const extras = CATALOG_SET_EXTRAS[set.id];
+    return extras ? { ...set, ...extras, tokens: { ...set.tokens, ...(extras.tokens ?? {}) } } : set;
+  }),
   // Tolex and Machined: the pilot sets that reach beyond colour — a family patch each, a lamp, a
   // panel material. Defined in their own module because they are mostly data.
   ...PILOT_CONTROL_SETS,
+  // And the rest of the boards.
+  ...CATALOG_CONTROL_SETS,
 ];
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';

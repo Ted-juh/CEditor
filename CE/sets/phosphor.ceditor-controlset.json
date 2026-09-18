@@ -1,0 +1,104 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "phosphor",
+    "name": "Phosphor",
+    "description": "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "465ea574",
+  "set": {
+    "id": "phosphor",
+    "name": "Phosphor",
+    "description": "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
+    "tokens": {
+      "surface": "FF151815",
+      "surface.hover": "FF1F241F",
+      "surface.pressed": "FF0F110F",
+      "surface.checked": "FF123D22",
+      "surface.mixed": "FFCC8D1A",
+      "control.button": "FF151815",
+      "control.button.hover": "FF282A28",
+      "control.button.pressed": "FF131613",
+      "control.field": "FF0B0D0B",
+      "control.field.hover": "FF171917",
+      "control.field.active": "FF19562C",
+      "control.select": "FF111311",
+      "control.select.hover": "FF242624",
+      "control.select.pressed": "FF101110",
+      "control.track": "FF1F241F",
+      "control.track.edge": "552C312C",
+      "control.fill": "FF39FF7A",
+      "control.fill.hot": "FFB8FFD2",
+      "control.range": "FF1FA35A",
+      "control.range.hot": "FF41B173",
+      "control.cap": "FF39FF7A",
+      "control.cap.hot": "FF4DFF87",
+      "control.cap.edge": "990B0D0B",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF39FF7A",
+      "control.marker": "FF5A6A5A",
+      "control.tick": "CC5A6A5A",
+      "control.tick.minor": "885A6A5A",
+      "accent": "FF39FF7A",
+      "accent.hot": "FF39FF7A",
+      "text.primary": "FFD6FFE3",
+      "text.label": "FFD6FFE3",
+      "text.muted": "FF7FA88C",
+      "text.focus": "FFB8FFD2",
+      "text.inverse": "FF0B0D0B",
+      "border": "662C312C",
+      "border.surface": "662C312C",
+      "border.field": "662C312C",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF0B0D0B"
+    }
+  }
+}

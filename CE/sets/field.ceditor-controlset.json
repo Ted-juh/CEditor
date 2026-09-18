@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "field",
+    "name": "Field",
+    "description": "Olive-drab crinkle paint over a stiffened steel box. Black phenolic knobs with a white line, guarded bat switches, stencilled legends, a red LED readout. Built to be dropped.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "cf4a8009",
+  "set": {
+    "id": "field",
+    "name": "Field",
+    "description": "Olive-drab crinkle paint over a stiffened steel box. Black phenolic knobs with a white line, guarded bat switches, stencilled legends, a red LED readout. Built to be dropped.",
+    "tokens": {
+      "surface": "FF3A4230",
+      "surface.hover": "FF4A5340",
+      "surface.pressed": "FF2A3024",
+      "surface.checked": "FFFF3B30",
+      "surface.mixed": "FFFFB020",
+      "control.button": "FF3A4230",
+      "control.button.hover": "FF4A5340",
+      "control.button.pressed": "FF2A3024",
+      "control.field": "FF140505",
+      "control.field.hover": "FF221414",
+      "control.field.active": "FF5A1512",
+      "control.select": "FF3A4230",
+      "control.select.hover": "FF4A5340",
+      "control.select.pressed": "FF2A3024",
+      "control.track": "FF1F241C",
+      "control.track.edge": "55161914",
+      "control.fill": "FFF1EBDC",
+      "control.fill.hot": "FFFF7A70",
+      "control.range": "FFC9A227",
+      "control.range.hot": "FFD4B552",
+      "control.cap": "FF2A2A26",
+      "control.cap.hot": "FF3F3F3C",
+      "control.cap.edge": "99151513",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF8FB07A",
+      "control.marker": "FFF1EBDC",
+      "control.tick": "CCF1EBDC",
+      "control.tick.minor": "88F1EBDC",
+      "accent": "FFFF3B30",
+      "accent.hot": "FFFF7A70",
+      "text.primary": "FFF1EBDC",
+      "text.label": "FFF1EBDC",
+      "text.muted": "FFD8DDCF",
+      "text.focus": "FFFFB020",
+      "text.inverse": "FFF1EBDC",
+      "border": "6623281D",
+      "border.surface": "AA1D2118",
+      "border.field": "6623281D",
+      "border.mixed": "FFFFB020"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 20,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 30,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 30,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 30,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 3,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "hammer",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 30,
+          "Background.Effects.Material.grain": 100
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF4F5A3C",
+      "material": {
+        "enabled": true,
+        "kind": "leather",
+        "strength": 90,
+        "shine": 20,
+        "grain": 150,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

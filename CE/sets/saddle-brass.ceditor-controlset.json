@@ -1,0 +1,182 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "saddle",
+    "name": "Saddle & Brass",
+    "description": "Saddle-stitched leather over a case; a brushed-brass escutcheon plate carries the controls. Cream enamel dials in brass bezels, red jewel lamps, a mirror-scale VU.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "b364f073",
+  "set": {
+    "id": "saddle",
+    "name": "Saddle & Brass",
+    "description": "Saddle-stitched leather over a case; a brushed-brass escutcheon plate carries the controls. Cream enamel dials in brass bezels, red jewel lamps, a mirror-scale VU.",
+    "tokens": {
+      "surface": "FFD9B45B",
+      "surface.hover": "FFE6C77A",
+      "surface.pressed": "FF9A7530",
+      "surface.checked": "FFB8332A",
+      "surface.mixed": "FFFF2E1F",
+      "control.button": "FFD9B45B",
+      "control.button.hover": "FFE6C77A",
+      "control.button.pressed": "FF9A7530",
+      "control.field": "FF1A1208",
+      "control.field.hover": "FF282017",
+      "control.field.active": "FF491C12",
+      "control.select": "FFD9B45B",
+      "control.select.hover": "FFE6C77A",
+      "control.select.pressed": "FF9A7530",
+      "control.track": "FF241A12",
+      "control.track.edge": "5519120D",
+      "control.fill": "FFF3ECD9",
+      "control.fill.hot": "FFE85A4F",
+      "control.range": "FF8A6320",
+      "control.range.hot": "FFA1824D",
+      "control.cap": "FFF3ECD9",
+      "control.cap.hot": "FFF4EEDD",
+      "control.cap.edge": "FFC99A44",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FF2A211A",
+      "control.tick": "CC2A211A",
+      "control.tick.minor": "882A211A",
+      "accent": "FFB8332A",
+      "accent.hot": "FFE85A4F",
+      "text.primary": "FF2A211A",
+      "text.label": "FF2A211A",
+      "text.muted": "FF3E2E22",
+      "text.focus": "FFE85A4F",
+      "text.inverse": "FF2A211A",
+      "border": "66826C37",
+      "border.surface": "AA6C5A2E",
+      "border.field": "66826C37",
+      "border.mixed": "FFFF2E1F"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 74,
+            "Layout.height": 74,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 3,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2,
+            "Layout.height": 84,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 60,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "highField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFB3873A",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 60,
+        "shine": 70,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

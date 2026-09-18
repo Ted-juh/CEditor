@@ -1,0 +1,131 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "ember",
+    "name": "Ember",
+    "description": "Warm charcoal bodies, cream text and an amber accent.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "bfab4f38",
+  "set": {
+    "id": "ember",
+    "name": "Ember",
+    "description": "Warm charcoal bodies, cream text and an amber accent.",
+    "tokens": {
+      "surface": "FF3B3330",
+      "surface.hover": "FF4A403B",
+      "surface.pressed": "FF2C2624",
+      "surface.checked": "FF9A4A1C",
+      "surface.mixed": "FF6B5A1E",
+      "control.button": "FF352E2B",
+      "control.button.hover": "FF403734",
+      "control.button.pressed": "FF2A2422",
+      "control.field": "FF181412",
+      "control.field.hover": "FF1F1A17",
+      "control.field.active": "FF3A2A1C",
+      "control.select": "FF2E2825",
+      "control.select.hover": "FF3F3733",
+      "control.select.pressed": "FF282220",
+      "control.track": "FF2A2422",
+      "control.track.edge": "55160F0C",
+      "control.fill": "{accent}",
+      "control.fill.hot": "FFFFA352",
+      "control.range": "FFFFC078",
+      "control.range.hot": "FFFFD9A8",
+      "control.cap": "FFF3E9DC",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99332A22",
+      "control.cap.start": "FFE9B44C",
+      "control.cap.end": "FF7FCB9A",
+      "control.marker": "FF3B2A1E",
+      "control.tick": "CCFFF1DD",
+      "control.tick.minor": "99FFF1DD",
+      "accent": "FFF08A24",
+      "accent.hot": "FFFFB35C",
+      "text.primary": "FFFFF6EC",
+      "text.label": "FFF6EEE3",
+      "text.muted": "FFC8B6A2",
+      "text.focus": "FFFFE4C2",
+      "text.inverse": "FFFFFFFF",
+      "border": "665A4A40",
+      "border.surface": "66FFF1DD",
+      "border.field": "666A5A4C",
+      "border.mixed": "FFE6C15A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 72,
+            "Layout.height": 72,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "chicken",
+            "Layout.width": 9,
+            "Layout.height": 118,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 6,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF2A2320",
+      "material": {
+        "enabled": true,
+        "kind": "rubber",
+        "strength": 40,
+        "shine": 0,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

@@ -93,8 +93,39 @@ test('Tolex and Machined are built in, define every role, and carry what colour 
     assert.ok(familyPatchFor(set, 'Button'), `${set.id} says something about buttons`);
     assert.equal(set.panel.material.enabled, true);
   }
-  assert.equal(familyPatchFor(ivory, 'Knob'), null, 'Ivory is colour only');
+  assert.equal(familyPatchFor(getControlSet('graphite'), 'Knob'), null, 'Graphite is colour only: it is the look every existing document has');
   assert.equal(BUILT_IN_CONTROL_SETS.filter((set) => ['tolex', 'machined'].includes(set.id)).length, 2);
+});
+
+test('the catalogue: thirty built-in sets, each id once, every family patch landing on a real control', () => {
+  const ids = BUILT_IN_CONTROL_SETS.map((set) => set.id);
+  assert.equal(ids.length, 30);
+  assert.equal(new Set(ids).size, ids.length, 'ids are unique');
+  assert.equal(ids[0], 'graphite', 'the default set comes first');
+  for (const set of BUILT_IN_CONTROL_SETS) {
+    for (const [type, family] of Object.entries(set.families ?? {})) {
+      const control = createControl(type);
+      const styled = resolveControlForSet(control, set);
+      for (const path of Object.keys(family.component ?? {})) {
+        assert.notEqual(readControlPath(styled, path), undefined, `${set.id}/${type}: ${path} lands`);
+      }
+      for (const [partName, patch] of Object.entries(family.parts ?? {})) {
+        assert.ok(part(control, partName), `${set.id}/${type}: part ${partName} exists on a factory control`);
+        for (const path of Object.keys(patch)) {
+          assert.notEqual(readControlPath(part(styled, partName), path), undefined, `${set.id}/${type}/${partName}: ${path} lands`);
+        }
+      }
+    }
+    if (set.families?.Knob?.parts?.bodyCap) {
+      assert.equal(part(resolveControlForSet(createControl('Knob'), set), 'bodyCap').visible, true, `${set.id}: the cap is on`);
+    }
+    if (set.panel?.material) assert.ok(MATERIAL_KINDS.includes(set.panel.material.kind), `${set.id}: a known panel finish`);
+  }
+  // Ember's board showed a chicken-head; Ivory's a black-bodied knob with a coloured pointer.
+  assert.equal(getControlSet('ember').families.Knob.parts.pointerCurrent.kind, 'chicken');
+  assert.equal(getControlSet('ivory').families.Knob.parts.bodyCap.visible, true);
+  // And the sets actually differ where it shows.
+  assert.equal(new Set(BUILT_IN_CONTROL_SETS.map((set) => resolveToken('control.cap', set))).size > 20, true);
 });
 
 test('normalizeControlSetDefinition keeps a set, drops what is not one, and normalises the extras', () => {
@@ -280,7 +311,7 @@ test('the family patch stops where the author has been: an edited property keeps
   assert.equal(part(styled, 'pointerCurrent').kind, 'chicken');
 
   // Switching to a set with no knob opinion gives the author's knob back, edits and all.
-  const plain = resolveControlForSet(knob, ivory);
+  const plain = resolveControlForSet(knob, getControlSet('graphite'));
   assert.equal(part(plain, 'bodyCap').visible, true);
   assert.equal(part(plain, 'pointerCurrent').kind, undefined);
 });
@@ -291,8 +322,8 @@ test('a set with nothing to say returns the same object; a family patch copies o
   literal._children.Background._children.Border.colour = 'FF123456';
   literal._children.Text._children.Fill.colour = 'FF123456';
   const states = literal._children.States;
-  // Ivory: colour only, and this button has no references left to resolve — same object.
-  const tokensOnly = resolveControlFamily(literal, ivory);
+  // Graphite: colour only, and this button has no references left to resolve — same object.
+  const tokensOnly = resolveControlFamily(literal, getControlSet('graphite'));
   assert.equal(tokensOnly, literal);
   // Tolex: the corners change, the States subtree does not.
   const styled = resolveControlFamily(literal, tolex);
@@ -384,5 +415,5 @@ test('the panel follows the set\'s colour only while it wears the default one', 
   assert.match(buildSolidStyle(fresh), /#1C1A17/);
   const authored = { ...fresh, bgColour: 'FF0000FF' };
   assert.match(buildSolidStyle(authored), /#0000FF/);
-  assert.match(buildSolidStyle({ ...createPanel(), controlSet: { id: 'ivory' } }), /#333333/, 'a colour-only set leaves the panel alone');
+  assert.match(buildSolidStyle({ ...createPanel(), controlSet: { id: 'graphite' } }), /#333333/, 'a colour-only set leaves the panel alone');
 });

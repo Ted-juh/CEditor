@@ -1,0 +1,184 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "rackmount",
+    "name": "Rackmount",
+    "description": "One rack unit of outboard. Silver faceplate with rack ears and screws, black knobs on silver bevels, illuminated square pushbuttons, a needle VU.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "6032e4a1",
+  "set": {
+    "id": "rackmount",
+    "name": "Rackmount",
+    "description": "One rack unit of outboard. Silver faceplate with rack ears and screws, black knobs on silver bevels, illuminated square pushbuttons, a needle VU.",
+    "tokens": {
+      "surface": "FF3B3D42",
+      "surface.hover": "FF4A4D53",
+      "surface.pressed": "FF2A2C30",
+      "surface.checked": "FF3B3D42",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FF3B3D42",
+      "control.button.hover": "FF4B4D51",
+      "control.button.pressed": "FF35373B",
+      "control.field": "FF16171A",
+      "control.field.hover": "FF222325",
+      "control.field.active": "FF555659",
+      "control.select": "FF2F3136",
+      "control.select.hover": "FF404146",
+      "control.select.pressed": "FF2B2D32",
+      "control.track": "FF2A2C30",
+      "control.track.edge": "550F1012",
+      "control.fill": "FFE8EAED",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FF6E747A",
+      "control.range.hot": "FF84898E",
+      "control.cap": "FF16171A",
+      "control.cap.hot": "FF2D2E31",
+      "control.cap.edge": "992A2A2A",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FFF4F4F4",
+      "control.tick": "CC1B1B1D",
+      "control.tick.minor": "881B1B1D",
+      "accent": "FFE8EAED",
+      "accent.hot": "FF7CFF6B",
+      "text.primary": "FF1B1B1D",
+      "text.label": "FF1B1B1D",
+      "text.muted": "FF3F4247",
+      "text.focus": "FF000000",
+      "text.inverse": "FF0A0A0B",
+      "border": "660A0A0B",
+      "border.surface": "660A0A0B",
+      "border.field": "660A0A0B",
+      "border.mixed": "FFE0A43A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "labelValue": {
+            "Text.Fill.colour": "{control.marker}"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 70,
+            "Layout.height": 70,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 2
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 80,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFFFFFFF",
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFFFFFFF",
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFFFFFFF",
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFFFFFFF",
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 50,
+          "Background.Effects.Material.shine": 60,
+          "Background.Effects.Material.grain": 100
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "highField": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "decrement": {
+            "Text.Fill.colour": "FFFFFFFF"
+          },
+          "increment": {
+            "Text.Fill.colour": "FFFFFFFF"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFA9ADB2",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 60,
+        "shine": 50,
+        "grain": 100,
+        "lampFollowsSet": true
+      }
+    }
+  }
+}

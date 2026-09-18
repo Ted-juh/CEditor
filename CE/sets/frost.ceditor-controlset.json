@@ -1,0 +1,153 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "frost",
+    "name": "Frost",
+    "description": "Frosted glass over a colour field. Translucent white controls, thin bright edges, a violet-to-teal panel behind. Light, airy, current.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "f2eb5c4c",
+  "set": {
+    "id": "frost",
+    "name": "Frost",
+    "description": "Frosted glass over a colour field. Translucent white controls, thin bright edges, a violet-to-teal panel behind. Light, airy, current.",
+    "tokens": {
+      "surface": "38FFFFFF",
+      "surface.hover": "55FFFFFF",
+      "surface.pressed": "22FFFFFF",
+      "surface.checked": "FFFFFFFF",
+      "surface.mixed": "FFCCB562",
+      "control.button": "38FFFFFF",
+      "control.button.hover": "55FFFFFF",
+      "control.button.pressed": "22FFFFFF",
+      "control.field": "33FFFFFF",
+      "control.field.hover": "44FFFFFF",
+      "control.field.active": "55FFFFFF",
+      "control.select": "38FFFFFF",
+      "control.select.hover": "55FFFFFF",
+      "control.select.pressed": "22FFFFFF",
+      "control.track": "55FFFFFF",
+      "control.track.edge": "55FFFFFF",
+      "control.fill": "FFFFE27A",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FFFFB6E6",
+      "control.range.hot": "FFFFC1EA",
+      "control.cap": "CCFFFFFF",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99FFFFFF",
+      "control.cap.start": "FFFFE27A",
+      "control.cap.end": "FFB6FFE8",
+      "control.marker": "FFFFFFFF",
+      "control.tick": "CCFFFFFF",
+      "control.tick.minor": "88FFFFFF",
+      "accent": "FFFFE27A",
+      "accent.hot": "FFFFE27A",
+      "text.primary": "FFFFFFFF",
+      "text.label": "FFFFFFFF",
+      "text.muted": "FFEAE6FF",
+      "text.focus": "FFFFE27A",
+      "text.inverse": "FF2B2270",
+      "border": "88FFFFFF",
+      "border.surface": "AAFFFFFF",
+      "border.field": "88FFFFFF",
+      "border.mixed": "FFFFE27A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 74,
+            "Layout.height": 74,
+            "Background.Fill.colour": "66FFFFFF",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "AAFFFFFF",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 80,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 14,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 14,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 14,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 14,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "decrement": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "increment": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "highField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "decrement": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "increment": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF6A5BD6"
+    }
+  }
+}

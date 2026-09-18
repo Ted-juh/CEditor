@@ -339,5 +339,31 @@ which no structural check could have seen.
 
 What the pilot did *not* do: reset-to-set and detach on the inspector, the extractor, size classes,
 bitmap sets, a per-panel lamp or material override in the UI, a fader-cap shape for linear sliders,
-and any of the interaction-state boards (the physical Hover / Pressed / Dragging). The knob's arc is
-still small in its box — an existing floor in the circular metrics, not a set's doing.
+and any of the interaction-state boards (the physical Hover / Pressed / Dragging).
+
+## The knob's arc, and the other twenty-five
+
+**The arc.** Every knob drew its arc at a radius of 16 px whatever its box, because
+`resolveCircularTrackMetrics` reserved room outside the arc by *adding* the tick length, the whole
+pointer half-size and a 14 px slack — for a 100 px knob that was 42 px of padding on a 50 px
+half-width, and the 16 px floor caught it. The ticks and the pointer reach into the same ring, so the
+room is now the larger of the two, not their sum, a knob with its ticks off reserves none for them
+(`hasTicks`, passed by the renderer and both hit-test paths so the pointer lands where it is drawn),
+and the min/max labels keep the allowance they actually use. A 100 px knob's arc is now about twice
+the radius it was; the 16 px floor still holds a 60 px one. Every existing knob changes, deliberately.
+
+**The catalogue** (`models/catalogControlSets.js`) is the remaining twenty-five boards as sets,
+converted from the boards' own palettes and part choices by a one-off script and then kept as
+source. Each is what the pilot sets are: forty roles, a lamp, a family patch, a panel. The recurring
+shapes live in `models/controlSetRecipes.js` — `knobFamily` (a cap as a percentage of the track,
+its edge and finish, a pointer kind and size, the track's thickness), `buttonFamily` (corners, a
+hairline, a finish, and separate inks for the buttons and the value fields when the panel's text
+would not read on them), `panelSpec` — so a set says what it means in a line each. Ember and Ivory,
+colour-only in phase 1, take their boards' knob and panel through `CATALOG_SET_EXTRAS`; Graphite
+stays exactly what it was. Thirty built-in sets, every one also a file in `CE/sets/`.
+
+Two rules the conversion needed that a hand-written set would have found by looking: a button's
+legend and a value field's digits each take whichever ink reads on *that* surface, computed from the
+palette rather than assumed from the panel; and a knob with a cap moves its value readout to the
+pointer's ink when that reads better on the cap than the label colour does — a cream cap under a
+cream readout was the first thing the contact sheet showed.

@@ -1,0 +1,122 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "atelier",
+    "name": "Atelier",
+    "description": "Rams. Warm light-grey aluminium, flat pale knobs with one coloured dot, ticks but no arcs, tiny accents of orange and green. Less than you expect.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "04aae2c5",
+  "set": {
+    "id": "atelier",
+    "name": "Atelier",
+    "description": "Rams. Warm light-grey aluminium, flat pale knobs with one coloured dot, ticks but no arcs, tiny accents of orange and green. Less than you expect.",
+    "tokens": {
+      "surface": "FFEDEDEA",
+      "surface.hover": "FFF6F6F3",
+      "surface.pressed": "FFD0D0CB",
+      "surface.checked": "FF1C1C1A",
+      "surface.mixed": "FFBA470A",
+      "control.button": "FFEDEDEA",
+      "control.button.hover": "FFEEEEEC",
+      "control.button.pressed": "FFD5D5D3",
+      "control.field": "FFF6F6F3",
+      "control.field.hover": "FFF6F6F4",
+      "control.field.active": "FFB5B5B2",
+      "control.select": "FFF6F6F3",
+      "control.select.hover": "FFF7F7F4",
+      "control.select.pressed": "FFE2E2E0",
+      "control.track": "FFB9B9B3",
+      "control.track.edge": "55B9B9B3",
+      "control.fill": "FF1C1C1A",
+      "control.fill.hot": "FFE8590C",
+      "control.range": "FF8C8C86",
+      "control.range.hot": "FF9D9D98",
+      "control.cap": "FFEDEDEA",
+      "control.cap.hot": "FFEFEFEC",
+      "control.cap.edge": "99B9B9B3",
+      "control.cap.start": "FFE8590C",
+      "control.cap.end": "FF3E8E4E",
+      "control.marker": "FF1C1C1A",
+      "control.tick": "CC1C1C1A",
+      "control.tick.minor": "881C1C1A",
+      "accent": "FF1C1C1A",
+      "accent.hot": "FFE8590C",
+      "text.primary": "FF1C1C1A",
+      "text.label": "FF1C1C1A",
+      "text.muted": "FF5E5E5A",
+      "text.focus": "FFE8590C",
+      "text.inverse": "FFFFFFFF",
+      "border": "66B9B9B3",
+      "border.surface": "66B9B9B3",
+      "border.field": "66B9B9B3",
+      "border.mixed": "FFE8590C"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 74,
+            "Layout.height": 74,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 80,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4,
+            "opacity": 0.35
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4,
+            "opacity": 0.35
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFD9D9D4"
+    }
+  }
+}
