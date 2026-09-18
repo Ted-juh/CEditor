@@ -1,10 +1,18 @@
 <script>
   import { hasSurfaceEffects, surfaceShadows } from '../../CE_Application/utils/surfaceEffects.js';
   import { buildFilterCSS, buildBlendCSS } from '../../CE_Application/utils/effectsCSS.js';
+  import { materialActive } from '../../CE_Application/utils/materialFilter.js';
+  import MaterialFilter from './MaterialFilter.svelte';
   let { effects = null, width = 0, height = 0, shadowsOnly = false, target = '', children } = $props();
   const uid = $props.id();
   const id = `surface-effects-${uid}`;
+  const materialId = `surface-material-${uid}`;
   let shadows = $derived(surfaceShadows(effects));
+  // The material lights a SURFACE — a background, a fill layer, a border — never the whole
+  // component, whose wrapper carries only its shadows (`shadowsOnly`) so text is not lit as if
+  // it were embossed into the body. See utils/materialFilter.js.
+  let material = $derived(shadowsOnly ? null : effects?._children?.Material ?? null);
+  let lit = $derived(materialActive(material));
   let active = $derived(shadowsOnly ? shadows.length > 0 : hasSurfaceEffects(effects));
   let padding = $derived(Math.max(1, ...shadows.map((s) => Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.spread) + s.blur * 3)));
   let filterStyle = $derived(shadowsOnly ? '' : buildFilterCSS({ _children: {
@@ -13,6 +21,9 @@
 </script>
 
 {#if active}
+  {#if lit}
+    <MaterialFilter id={materialId} {material} />
+  {/if}
   {#if shadows.length}
     <svg class="effect-defs" width="0" height="0" aria-hidden="true">
       <defs>
@@ -37,8 +48,10 @@
       </defs>
     </svg>
   {/if}
+  <!-- Material first, so the shadows and bevel fall from the lit surface rather than the light
+       being painted over them. -->
   <div class="effect-surface" data-effect-surface={target}
-    style={`filter: ${[shadows.length ? `url(#${id})` : '', filterStyle].filter(Boolean).join(' ') || 'none'}; ${shadowsOnly ? '' : buildBlendCSS(effects)}`}>
+    style={`filter: ${[lit ? `url(#${materialId})` : '', shadows.length ? `url(#${id})` : '', filterStyle].filter(Boolean).join(' ') || 'none'}; ${shadowsOnly ? '' : buildBlendCSS(effects)}`}>
     {@render children()}
   </div>
 {:else}

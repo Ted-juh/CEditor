@@ -8,8 +8,12 @@
    * Extracted from EditorCanvas so the parent doesn't have to manage 50
    * lines of nested template for a single draggable rectangle.
    */
+  import { setContext } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
+  import { materialActive } from '../utils/materialFilter.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import SceneryGround from './SceneryGround.svelte';
   import SelectionBoundsOverlay from './SelectionBoundsOverlay.svelte';
   import { showGuides } from '../stores/editorView.js';
@@ -45,6 +49,16 @@
 
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
+
+  // The panel's control set: its lamp lights every material on the panel (context, read by
+  // MaterialFilter), and its own material, if it has one, lights the panel's solid colour.
+  // controlSetForPanel finds a chosen library set in the document, where choosing it put it.
+  setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSetForPanel(panel)?.lamp ?? null);
+  const surfaceUid = $props.id();
+  const panelMaterialId = `panel-material-${surfaceUid}`;
+  let panelControlSet = $derived(controlSetForPanel(panel));
+  let panelMaterial = $derived(panelControlSet?.panel?.material ?? null);
+  let panelLit = $derived(materialActive(panelMaterial));
   // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
   // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that
   // changes when you press Preview is worse than one that never compiles at all.
@@ -200,9 +214,12 @@
   ondragover={ondragover}
   ondrop={ondrop}
 >
+  {#if panelLit}
+    <MaterialFilter id={panelMaterialId} material={panelMaterial} lamp={panelControlSet?.lamp ?? null} />
+  {/if}
   {#each panel.bgLayerOrder ?? DEFAULT_LAYER_ORDER as layerId}
     {#if bgLayers[layerId]}
-      <div class="bg-layer" style={bgLayers[layerId]}></div>
+      <div class="bg-layer" style={`${bgLayers[layerId]}${layerId === 'solid' && panelLit ? ` filter: url(#${panelMaterialId});` : ''}`}></div>
     {/if}
   {/each}
 

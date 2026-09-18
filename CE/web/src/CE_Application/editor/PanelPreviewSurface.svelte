@@ -1,6 +1,8 @@
 <script>
   import { onDestroy, setContext, untrack } from 'svelte';
-  import { CONTROL_SET_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { materialActive } from '../utils/materialFilter.js';
+  import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
@@ -300,6 +302,14 @@
   // than the editor's store because the Player renders a document the editor's panel list has
   // never seen — CanvasControl prefers this when present (stores/controlSets.js).
   setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
+  // The set's lamp, for every material filter on this panel; and the set's own material for the
+  // panel behind the controls (a black tolex, a bead-blasted plate), lit by the same lamp.
+  setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSetForPanel(panel)?.lamp ?? null);
+  const surfaceUid = $props.id();
+  const panelMaterialId = `panel-material-${surfaceUid}`;
+  let panelControlSet = $derived(controlSetForPanel(panel));
+  let panelMaterial = $derived(panelControlSet?.panel?.material ?? null);
+  let panelLit = $derived(materialActive(panelMaterial));
 
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
@@ -8146,9 +8156,12 @@
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
   use:bindSurface
 >
+  {#if panelLit}
+    <MaterialFilter id={panelMaterialId} material={panelMaterial} lamp={panelControlSet?.lamp ?? null} />
+  {/if}
   {#each panel.bgLayerOrder ?? DEFAULT_LAYER_ORDER as layerId}
     {#if bgLayers[layerId]}
-      <div class="bg-layer" style={bgLayers[layerId]}></div>
+      <div class="bg-layer" style={`${bgLayers[layerId]}${layerId === 'solid' && panelLit ? ` filter: url(#${panelMaterialId});` : ''}`}></div>
     {/if}
   {/each}
 

@@ -1,0 +1,163 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "tolex",
+    "name": "Tolex",
+    "description": "The guitar amp: black tolex, cream chicken-head knobs on gold skirts, cream pushbuttons, a red jewel lamp.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "8cca4f98",
+  "set": {
+    "id": "tolex",
+    "name": "Tolex",
+    "description": "The guitar amp: black tolex, cream chicken-head knobs on gold skirts, cream pushbuttons, a red jewel lamp.",
+    "tokens": {
+      "surface": "FFEFE3C8",
+      "surface.hover": "FFF8EEDA",
+      "surface.pressed": "FFD9CBAE",
+      "surface.checked": "FFC8342B",
+      "surface.mixed": "FFC98A2A",
+      "control.button": "FFEFE3C8",
+      "control.button.hover": "FFF8EEDA",
+      "control.button.pressed": "FFD9CBAE",
+      "control.field": "FFF7EEDA",
+      "control.field.hover": "FFFFF8E8",
+      "control.field.active": "FFFFF3D8",
+      "control.select": "FFEFE3C8",
+      "control.select.hover": "FFF8EEDA",
+      "control.select.pressed": "FFD9CBAE",
+      "control.track": "FFB8892E",
+      "control.track.edge": "AA5A3F10",
+      "control.fill": "FFE2B24A",
+      "control.fill.hot": "FFF2C85E",
+      "control.range": "FFE2B24A",
+      "control.range.hot": "FFF2C85E",
+      "control.cap": "FFF1E6CC",
+      "control.cap.hot": "FFFFF6E2",
+      "control.cap.edge": "CC6B5A34",
+      "control.cap.start": "FFC8342B",
+      "control.cap.end": "FF3F7A4C",
+      "control.marker": "FF1C1A17",
+      "control.tick": "FFEFE3C8",
+      "control.tick.minor": "99EFE3C8",
+      "accent": "FFC8342B",
+      "accent.hot": "FFE85A4F",
+      "text.primary": "FFF1E6CC",
+      "text.label": "FFF1E6CC",
+      "text.muted": "FFCDBF9E",
+      "text.focus": "FF8A1F18",
+      "text.inverse": "FF1C1A17",
+      "border": "88F1E6CC",
+      "border.surface": "AA1C1A17",
+      "border.field": "CCB8892E",
+      "border.mixed": "FFC98A2A"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyTrackBase": {
+            "Layout.height": 8,
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackFill": {
+            "Layout.height": 8
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 74,
+            "Layout.height": 74,
+            "Background.Border.thickness": 2,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 60,
+            "Background.Effects.Material.shine": 45
+          },
+          "pointerCurrent": {
+            "kind": "chicken",
+            "Layout.width": 9,
+            "Layout.height": 118,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Text.Fill.colour": "{text.inverse}"
+        }
+      },
+      "Number": {
+        "parts": {
+          "valueField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "decrement": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "increment": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
+        }
+      },
+      "Range": {
+        "parts": {
+          "lowField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "highField": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "decrement": {
+            "Text.Fill.colour": "{text.inverse}"
+          },
+          "increment": {
+            "Text.Fill.colour": "{text.inverse}"
+          }
+        }
+      }
+    },
+    "panel": {
+      "material": {
+        "enabled": true,
+        "kind": "leather",
+        "strength": 55,
+        "shine": 30,
+        "grain": 130,
+        "lampFollowsSet": true
+      },
+      "colour": "FF1C1A17"
+    }
+  }
+}

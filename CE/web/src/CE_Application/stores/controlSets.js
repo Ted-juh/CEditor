@@ -11,18 +11,40 @@
 // set into Svelte context under CONTROL_SET_CONTEXT_KEY and CanvasControl prefers that when
 // present. One key, two providers, and the editor's canvas and the player agree on what a panel
 // looks like.
+//
+// Where the set comes from: the document's own sets first, then the user's library
+// (stores/controlSetLibrary.js), then the built-ins. Choosing a library set copies it into the
+// document, so the Player and the build — which have no library — find it there.
 
 import { derived, get } from 'svelte/store';
 import { activePanel, updatePanel } from './panels.js';
-import { controlSetForPanel, normalizeControlSet } from '../models/controlSets.js';
+import { controlSetLibrary, carryControlSetInDocument } from './controlSetLibrary.js';
+import { controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
 
-export { CONTROL_SET_CONTEXT_KEY } from '../models/controlSets.js';
+export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
 
-export const activeControlSet = derived(activePanel, ($panel) => controlSetForPanel($panel));
+export const activeControlSet = derived(
+  [activePanel, controlSetLibrary],
+  ([$panel, $library]) => controlSetForPanel($panel, $library),
+);
 
-/** Point the active panel at a set by id. An id this build does not know is kept as written. */
+/**
+ * Point the active panel at a set by id. A library set is copied into the document as it is
+ * chosen; a built-in is not (every build has it). An id this build does not know is kept as
+ * written, so a file that names a set the reader lacks still says which one it wanted.
+ */
 export function setActivePanelControlSet(id) {
   const panel = get(activePanel);
   if (!panel) return;
-  updatePanel(panel.id, { controlSet: normalizeControlSet(id) });
+  const normalized = normalizeControlSet(id);
+  const inDocument = getControlSet(normalized.id, { document: panel.controlSets });
+  if (!inDocument) {
+    const fromLibrary = getControlSet(normalized.id, { library: get(controlSetLibrary) });
+    // Only a library set needs carrying: getControlSet falls through to the built-ins, so a
+    // built-in id resolves here too and must not be copied into every file that picks it.
+    if (fromLibrary && get(controlSetLibrary).some((set) => set.id === fromLibrary.id)) {
+      carryControlSetInDocument(fromLibrary);
+    }
+  }
+  updatePanel(panel.id, { controlSet: normalized });
 }

@@ -534,6 +534,22 @@ export const SECTION_DEFAULTS = {
         _type: 'Blend',
         mode: 'normal',
       },
+      // A lit material: bump-mapped noise shaded by one distant lamp, multiplied onto whatever
+      // the surface already paints (utils/materialFilter.js). Bead-blast, brushed metal, leather,
+      // hammertone — the finishes that make a control read as a thing rather than a colour. The
+      // lamp normally comes from the panel's control set so every surface is lit from the same
+      // side; `lampFollowsSet: false` pins this surface's own azimuth and elevation.
+      Material: {
+        _type: 'Material',
+        enabled: false,
+        kind: 'blast',           // blast / brushed / leather / hammer / rubber / glass
+        strength: 100,           // relief depth, % of the kind's recipe
+        shine: 100,              // specular, % of the kind's recipe
+        grain: 100,              // noise frequency, % of the kind's recipe
+        lampFollowsSet: true,
+        lampAzimuth: 225,
+        lampElevation: 48,
+      },
     },
   },
 

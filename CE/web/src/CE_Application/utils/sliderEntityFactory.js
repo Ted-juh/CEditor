@@ -114,6 +114,24 @@ export function createSliderSemanticParts() {
           Background: backgroundFill('{control.range}', { radius: 999 }),
         },
       }),
+      // The knob's BODY — a disc under the pointer, drawn only when a set (or the author) turns
+      // it on. Off by default so every knob that exists keeps drawing the arc-and-dot it always
+      // did. Width and height are a percentage of the track's diameter, so one set fits every
+      // knob size; px works too. Circular geometry only — a linear slider ignores it.
+      bodyCap: createPartNode('bodyCap', {
+        role: 'bodyCap',
+        zIndex: 2,
+        visible: false,
+        layout: { width: 72, height: 72, widthUnit: 'percent', heightUnit: 'percent' },
+        sections: {
+          Background: backgroundFill('{control.cap}', {
+            borderEnabled: true,
+            borderColour: '{control.cap.edge}',
+            borderThickness: 1,
+            radius: 999,
+          }),
+        },
+      }),
       bodyCenterMarker: createPartNode('bodyCenterMarker', {
         role: 'bodyCenterMarker',
         zIndex: 2,
@@ -136,6 +154,11 @@ export function createSliderSemanticParts() {
           }),
         },
       }),
+      // `kind` is how the pointer is drawn on a circular track: 'dot' rides the arc (the original);
+      // 'line' and 'chicken' are drawn from the centre outward along the value angle, over the
+      // bodyCap — a painted line on a machined cap, a chicken-head on an amp knob. For those two,
+      // width is the pointer's thickness in px and height its length as a percentage of the cap's
+      // radius. Linear geometry draws the dot whatever the kind says.
       pointerCurrent: createPartNode('pointerCurrent', {
         role: 'pointerCurrent',
         zIndex: 4,

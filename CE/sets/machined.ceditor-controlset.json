@@ -1,0 +1,145 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "machined",
+    "name": "Machined",
+    "description": "Bead-blasted aluminium: turned caps with a painted pointer line, dark slots, buttons proud of the plate, a cyan accent.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "a7d7a3aa",
+  "set": {
+    "id": "machined",
+    "name": "Machined",
+    "description": "Bead-blasted aluminium: turned caps with a painted pointer line, dark slots, buttons proud of the plate, a cyan accent.",
+    "tokens": {
+      "surface": "FF8E939A",
+      "surface.hover": "FF9DA2A9",
+      "surface.pressed": "FF6E737A",
+      "surface.checked": "FF2C8DA8",
+      "surface.mixed": "FF9A7A2C",
+      "control.button": "FF8E939A",
+      "control.button.hover": "FF9DA2A9",
+      "control.button.pressed": "FF6E737A",
+      "control.field": "FF1A1C1F",
+      "control.field.hover": "FF202327",
+      "control.field.active": "FF1E3238",
+      "control.select": "FF8E939A",
+      "control.select.hover": "FF9DA2A9",
+      "control.select.pressed": "FF6E737A",
+      "control.track": "FF2A2D31",
+      "control.track.edge": "AA111214",
+      "control.fill": "{accent}",
+      "control.fill.hot": "FF8FE9FF",
+      "control.range": "FF5FD3F0",
+      "control.range.hot": "FF8FE9FF",
+      "control.cap": "FFA2A7AE",
+      "control.cap.hot": "FFB4B9C0",
+      "control.cap.edge": "CC3A3E43",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF5CC492",
+      "control.marker": "FFF4F6F8",
+      "control.tick": "CC1B1D20",
+      "control.tick.minor": "881B1D20",
+      "accent": "FF2CB8DA",
+      "accent.hot": "FF8FE9FF",
+      "text.primary": "FF1B1D20",
+      "text.label": "FF1B1D20",
+      "text.muted": "FF3E4247",
+      "text.focus": "FF0F5C70",
+      "text.inverse": "FFF4F6F8",
+      "border": "66303338",
+      "border.surface": "AA3A3E43",
+      "border.field": "66303338",
+      "border.mixed": "FFC9A227"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "parts": {
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 70,
+            "Layout.height": 70,
+            "Background.Border.thickness": 1.5,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 100,
+            "Background.Effects.Material.shine": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 2,
+            "Layout.height": 88,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 60
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 60
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "blast",
+          "Background.Effects.Material.strength": 90,
+          "Background.Effects.Material.shine": 60
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "brushed",
+          "Background.Effects.Material.strength": 80,
+          "Background.Effects.Material.shine": 70
+        }
+      }
+    },
+    "panel": {
+      "material": {
+        "enabled": true,
+        "kind": "blast",
+        "strength": 100,
+        "shine": 40,
+        "grain": 100,
+        "lampFollowsSet": true
+      },
+      "colour": "FF9A9FA6"
+    }
+  }
+}

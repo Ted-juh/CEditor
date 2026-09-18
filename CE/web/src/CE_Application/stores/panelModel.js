@@ -5,7 +5,8 @@ import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
-import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, resolveControlTokens, serializeControlSet } from '../models/controlSets.js';
+import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 let nextId = 1;
 
@@ -205,6 +206,10 @@ export function createPanel(name = null) {
     // (models/controlSets.js). Always present in the model so readers can index into it; written
     // to the file only when it is not the default — see serializePanel.
     controlSet: { id: DEFAULT_CONTROL_SET_ID },
+    // The sets this document carries with it (stores/controlSetLibrary.js): a set chosen from the
+    // user's library or imported from a file is copied here so a shared panel arrives with the set
+    // it was designed in. Built-ins are never copied. Written only when there is something in it.
+    controlSets: [],
     modified: false,
     controls: [],
     // Paint order, back to front. One layer to begin with, because a panel with none is a panel
@@ -303,7 +308,7 @@ export function serializePanel(panel, options = {}) {
   // resolve against. A saved .cepanel passes none and keeps its references and its `controlSet`,
   // which is what lets the set be switched later.
   const baked = options.bakeControlSet
-    ? controls.map((control) => resolveControlTokens(control, options.bakeControlSet))
+    ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
     : controls;
   data.controls = elide ? baked.map(toDocumentForm) : baked;
 
@@ -355,6 +360,11 @@ export function serializePanel(panel, options = {}) {
   const controlSet = serializeControlSet(data.controlSet);
   if (controlSet) data.controlSet = controlSet;
   else delete data.controlSet;
+
+  // The sets the document carries, same rule: present only when there is at least one.
+  const controlSets = normalizeControlSetList(data.controlSets);
+  if (controlSets.length) data.controlSets = controlSets;
+  else delete data.controlSets;
 
   // The program bank, on the same "right or absent" rule as `name` and `cardPresets`: a panel with
   // no bank writes no key, so every committed .cepanel does not grow a `"programBank": null` and
@@ -431,6 +441,7 @@ export function deserializePanel(json, filePath, name) {
     // itself against a string or a null.
     cardPresets: normalizeCardPresets(data.cardPresets),
     controlSet: normalizeControlSet(data.controlSet),
+    controlSets: normalizeControlSetList(data.controlSets),
     // Migration lives here rather than in a version bump: a document with no `layers` gets one
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.

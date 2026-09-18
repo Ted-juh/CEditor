@@ -131,9 +131,10 @@
     resizeHandleStyle,
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
-  import { getContext } from 'svelte';
+  import { getContext, setContext } from 'svelte';
   import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
-  import { resolveControlTokens } from '../models/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
+  import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
   let {
     control: documentControl,
@@ -220,7 +221,11 @@
   // the same object it always was.
   const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
   let controlSet = $derived(typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet);
-  let control = $derived(resolveControlTokens(documentControl, controlSet));
+  // The set's family patch first (a knob gets its cap, a button its finish), then the tokens —
+  // models/controlSetFamilies.js. The set's lamp goes into context for every material filter
+  // drawn under this control, so all of them are lit from the panel's one light.
+  let control = $derived(resolveControlForSet(documentControl, controlSet));
+  setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSet?.lamp ?? null);
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
   // role→descriptor map (used by the two-value Range spinner for lowField /
@@ -347,7 +352,7 @@
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(
-    (resolvedControlOverride ? resolveControlTokens(resolvedControlOverride, controlSet) : null)
+    (resolvedControlOverride ? resolveControlForSet(resolvedControlOverride, controlSet) : null)
       ?? (interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control)
   );
   let interactionRuntime = $derived(
@@ -413,7 +418,7 @@
       .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
   );
   const SLIDER_SEMANTIC_PARTS = new Set([
-    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker',
+    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
     'pointerStart', 'pointerCurrent', 'pointerEnd',
     'tickMajor', 'tickMinor', 'tickAccent',
     'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',

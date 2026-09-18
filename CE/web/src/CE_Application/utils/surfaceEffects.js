@@ -47,6 +47,7 @@ export function hasSurfaceEffects(effects) {
   const children = effects._children ?? {};
   if (children.Shadows?.items?.some((shadow) => shadow.enabled)) return true;
   if (children.Bevel?.enabled) return true;
+  if (children.Material?.enabled) return true;
   if (children.Blend?.mode && children.Blend.mode !== 'normal') return true;
   return Object.entries(children.Filters ?? {}).some(([key, value]) => !key.startsWith('_')
     && value !== SECTION_DEFAULTS.Effects._children.Filters[key]);

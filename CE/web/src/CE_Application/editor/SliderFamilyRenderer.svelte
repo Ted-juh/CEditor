@@ -242,6 +242,46 @@
   });
   let trackThickness = $derived(numberOr(trackBasePart?._children?.Layout?.height, 10));
   let pointerCurrentSize = $derived(numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
+  // The knob's body (utils/sliderEntityFactory.js `bodyCap`): a disc under the pointer, sized as a
+  // percentage of the track's diameter or in px, drawn only when the part is visible and the
+  // geometry is circular. A set turns it on; a document that never heard of it keeps its arc.
+  let bodyCapPart = $derived(parts?._children?.bodyCap ?? null);
+  let bodyCapRadius = $derived.by(() => {
+    if (geometry !== 'circular' || bodyCapPart?.visible !== true) return 0;
+    const layout = bodyCapPart?._children?.Layout ?? {};
+    const size = Math.max(0, numberOr(layout.width, 72));
+    return String(layout.widthUnit ?? 'percent') === 'px' ? size / 2 : circularMetrics.radius * (size / 100);
+  });
+  // How the current-value pointer is drawn on a circular track: the dot that rides the arc, or a
+  // line / chicken-head drawn from the centre out along the value angle, over the cap.
+  let pointerKind = $derived.by(() => {
+    const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
+    return geometry === 'circular' && (kind === 'line' || kind === 'chicken') ? kind : 'dot';
+  });
+  let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
+  function radialPointerShape(kind) {
+    const angle = (sliderNormalizedToAngle(behavior, normalizedValues.current) * Math.PI) / 180;
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    const cx = circularCenter.x;
+    const cy = circularCenter.y;
+    const tip = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.height, 88) / 100);
+    const thick = Math.max(1, pointerCurrentSize);
+    if (kind === 'line') {
+      const r0 = pointerReach * 0.3;
+      return { line: { x1: cx + ux * r0, y1: cy + uy * r0, x2: cx + ux * tip, y2: cy + uy * tip, width: thick } };
+    }
+    // A chicken-head: a blunt taper that starts behind the centre and reaches past the cap.
+    const px = -uy;
+    const py = ux;
+    const back = -pointerReach * 0.28;
+    const halfBase = thick / 2;
+    const halfTip = Math.max(1, thick * 0.22);
+    const points = [[back, -halfBase], [tip, -halfTip], [tip, halfTip], [back, halfBase]]
+      .map(([r, s]) => `${(cx + ux * r + px * s).toFixed(2)},${(cy + uy * r + py * s).toFixed(2)}`)
+      .join(' ');
+    return { polygon: { points, stroke: Math.max(1, thick * 0.35) } };
+  }
   let pointerStartSize = $derived(numberOr(pointerStartPart?._children?.Layout?.width, 18));
   let pointerEndSize = $derived(numberOr(pointerEndPart?._children?.Layout?.width, 18));
   let maxPointerSize = $derived(Math.max(pointerCurrentSize, pointerStartSize, pointerEndSize));
@@ -747,6 +787,28 @@
         {/each}
       {/if}
 
+      {#if bodyCapRadius > 0}
+        <SliderShapeFill
+          background={bodyCapPart?._children?.Background ?? null}
+          bounds={circleBounds(circularCenter.x, circularCenter.y, bodyCapRadius)}
+          shape={{ kind: 'circle', cx: circularCenter.x, cy: circularCenter.y, r: bodyCapRadius }}
+          maskId={maskIdFor('bodyCapCircle')}
+          svgWidth={width}
+          svgHeight={height}
+          opacity={numberOr(bodyCapPart?.opacity, 1)}
+          style={pointerStyleFor('bodyCap')}
+        />
+        <circle
+          cx={circularCenter.x}
+          cy={circularCenter.y}
+          r={bodyCapRadius}
+          fill="none"
+          stroke={partBorderColour(bodyCapPart, '#333333')}
+          stroke-width={partBorderWidth(bodyCapPart, 1)}
+          opacity={numberOr(bodyCapPart?.opacity, 1)}
+        />
+      {/if}
+
       {#if valueMode !== 'single'}
         {@const startPoint = circularPointerPoint('start')}
         <SliderShapeFill
@@ -771,7 +833,32 @@
         />
       {/if}
 
-      {#if valueMode === 'single' || valueMode === 'band'}
+      {#if (valueMode === 'single' || valueMode === 'band') && pointerKind !== 'dot'}
+        {@const radial = radialPointerShape(pointerKind)}
+        {#if radial.line}
+          <line
+            x1={radial.line.x1}
+            y1={radial.line.y1}
+            x2={radial.line.x2}
+            y2={radial.line.y2}
+            stroke={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
+            stroke-width={radial.line.width}
+            stroke-linecap="round"
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent')}
+          />
+        {:else}
+          <polygon
+            points={radial.polygon.points}
+            fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#1C1A17')}
+            stroke={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#1C1A17')}
+            stroke-width={radial.polygon.stroke}
+            stroke-linejoin="round"
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent')}
+          />
+        {/if}
+      {:else if valueMode === 'single' || valueMode === 'band'}
         {@const currentCircularPoint = circularPointerPoint('current')}
         <SliderShapeFill
           background={pointerCurrentPart?._children?.Background ?? null}

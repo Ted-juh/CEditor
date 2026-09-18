@@ -404,6 +404,21 @@ export const COMPONENT_GROUPS = [
     ],
   },
   {
+    key: 'material',
+    label: 'Material',
+    root: `${COMPONENT_ROOT}.Material`,
+    enabled: 'enabled',
+    fields: [
+      pick('kind', 'Finish', ['blast', 'brushed', 'leather', 'hammer', 'rubber', 'glass']),
+      num('strength', 'Relief', { min: 0, max: 400, step: 5 }),
+      num('shine', 'Shine', { min: 0, max: 400, step: 5 }),
+      num('grain', 'Grain', { min: 10, max: 400, step: 5 }),
+      flag('lampFollowsSet', 'Set lamp'),
+      num('lampAzimuth', 'Azimuth', { min: 0, max: 360, step: 1, angle: true, when: (fx) => fx?.lampFollowsSet === false }),
+      num('lampElevation', 'Elevation', { min: 0, max: 90, step: 1, when: (fx) => fx?.lampFollowsSet === false }),
+    ],
+  },
+  {
     key: 'filters',
     label: 'Filters',
     root: `${COMPONENT_ROOT}.Filters`,

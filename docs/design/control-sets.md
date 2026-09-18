@@ -276,3 +276,68 @@ Built the same day, on the plan above, with one deliberate departure.
 What phase 1 did *not* do, so nobody looks for it: the extractor (existing literal-colour panels do
 not join a set until phase 2), material / shape / typography / motion tokens (colour roles only), and
 per-panel token overrides. Every existing document renders exactly as before.
+
+## What the pilot shipped
+
+Three sets, one per tier of what a set can be, chosen from the thirty mockup boards to prove the
+whole path from a file to the picker to the redraw before the other twenty-seven follow:
+
+- **Ivory** — colour only. It was already built in; the pilot makes it a *file*.
+- **Tolex** — colour plus what a knob and a button *are*: a gold skirt, a cream cap with a black
+  chicken-head, cream pushbuttons with dark legends, paper value fields, black tolex behind it all.
+- **Machined** — colour, parts and a *lit material*: bead-blasted caps with a painted line, buttons
+  milled from the same billet, a brushed combobox, a bead-blasted plate, one lamp.
+
+**A set is a file.** `<name>.ceditor-controlset.json` (`models/controlSetPackage.js`): the same
+envelope idea as a custom-component package — format id and version, metadata a person reads
+(name, version, author, licence), a fingerprint of the set so "changed since import" is answerable,
+and the set. `CE/sets/` holds the three pilot files, generated from the definitions in `models/` by
+`scripts/export-control-sets.mjs`; the test suite reads them back and refuses a stale one. The panel
+card's *Control set* section gained *Import set…* (a browser file input, into the library and the
+open panel), *Export set*, and *Keep in library* for a set that arrived inside somebody's panel.
+
+**Where a set lives** is the card presets' answer (`stores/controlSetLibrary.js`): the user's
+library in localStorage, and the panel document (`panel.controlSets`) so a shared `.cepanel` arrives
+with the set it was designed in. Lookup is document, then library, then built-in — an imported set
+with a built-in's id wins over the built-in, which is what "I exported Ivory, changed it, imported it
+again" should mean. Choosing a library set copies it into the document at that moment, so the
+Player and the build, which have no library, still find it. Opening a file never grows the library.
+
+**Beyond colour: the family patch** (`models/controlSetFamilies.js`). `set.families[type]` names
+properties and values per control type — `component` paths from the control's sections, `parts`
+paths per part, `addParts` for whole parts the family adds. The binding rule is the one this record
+argued for and calls *"the set is the defaults the document diffs against"*: a patch value applies
+only where the control still holds its **factory default** for that property. An author who typed a
+radius or a colour keeps it; everything they left alone follows the set; a set switch redraws every
+control and keeps every deliberate edit; nothing is written into the document. It is the `.cepanel`
+diff-against-defaults idea applied at draw time, copy-on-write like the token resolver, and it runs
+before the token pass because a family patch may write references. The build bakes both.
+
+**What the knob gained** to have something to patch: a `bodyCap` semantic part — a disc under the
+pointer, invisible by default so every existing knob keeps drawing its arc-and-dot — sized as a
+percentage of the track's diameter so one set fits every knob size; and a `kind` on `pointerCurrent`
+(`dot`, the original; `line`; `chicken`), the last two drawn from the centre out along the value
+angle, over the cap. Circular geometry only.
+
+**The lit material** (`utils/materialFilter.js`, `CE_Panel/components/MaterialFilter.svelte`) is
+the mockup generator's filter, ported: fractal noise read as a height map by one distant lamp, the
+light multiplied onto whatever the surface paints, a specular pass for the finishes that shine,
+clipped to the surface's own alpha. Six recipes — blast, brushed, leather, hammer, rubber, glass —
+behind `Effects.Material` (finish, relief, shine, grain), on the Effects tab like Bevel. It lights a
+*surface*: a background, a fill layer, a border, a part; never the whole component, so text is not
+lit as if embossed. **One lamp:** a material normally follows the set's `lamp`, put in Svelte
+context by the surfaces that render a panel, so a knob, the button beside it and the panel behind
+both are lit from the same side; a surface can pin its own. The panel's solid colour takes the set's
+material and, while it still wears the default colour, the set's colour.
+
+**Verified** by `test/controlSetPilot.test.js` (the file round trip, the lookup order, the library
+and document stores, the patch rule against an edited knob, copy-on-write, the filter maths, the
+bake) and by a picture: `browser-checks/controlSetShot.mjs` renders one specimen panel under every
+set through the Player's own surface and writes a PNG per set. The picture is what caught the first
+real bug — the new cap part rendered twice, once by the generic part renderer on top of the knob —
+which no structural check could have seen.
+
+What the pilot did *not* do: reset-to-set and detach on the inspector, the extractor, size classes,
+bitmap sets, a per-panel lamp or material override in the UI, a fader-cap shape for linear sliders,
+and any of the interaction-state boards (the physical Hover / Pressed / Dragging). The knob's arc is
+still small in its box — an existing floor in the circular metrics, not a set's doing.

@@ -23,6 +23,8 @@
 // bindings use) must stay `{value}`. So the resolver only looks at keys that name a colour —
 // `colour`, `underlineColour`, `'Background.Fill.colour'` — and never at anything else.
 
+import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
+
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
 const MAX_ALIAS_DEPTH = 8;
@@ -235,6 +237,9 @@ export const BUILT_IN_CONTROL_SETS = [
       'border.mixed': 'FFB98A00',
     },
   },
+  // Tolex and Machined: the pilot sets that reach beyond colour — a family patch each, a lamp, a
+  // panel material. Defined in their own module because they are mostly data.
+  ...PILOT_CONTROL_SETS,
 ];
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
@@ -242,12 +247,71 @@ export const DEFAULT_CONTROL_SET_ID = 'graphite';
 // Svelte context key under which a surface that renders a panel of its own (the preview, the
 // Player) hands its controls the set to resolve against. A getter, so it follows the panel.
 export const CONTROL_SET_CONTEXT_KEY = 'ce.controlSet';
+// And the set's lamp, for the material filters (utils/materialFilter.js): CanvasControl and the
+// panel surfaces provide it, MaterialFilter reads it. A getter as well.
+export const CONTROL_SET_LAMP_CONTEXT_KEY = 'ce.controlSetLamp';
 export const BASE_CONTROL_SET = BUILT_IN_CONTROL_SETS.find((set) => set.id === DEFAULT_CONTROL_SET_ID);
 
 const SETS_BY_ID = new Map(BUILT_IN_CONTROL_SETS.map((set) => [set.id, set]));
 
-export function getControlSet(id) {
-  return SETS_BY_ID.get(String(id ?? '').trim()) ?? null;
+/**
+ * The set an id names. Three places can hold one, and the order is a rule, not an accident:
+ * the DOCUMENT's own sets first (a shared file must look the way its author saw it, whatever
+ * the reader has installed), then the reader's LIBRARY, then the sets built into this program.
+ * So an imported set with the same id as a built-in wins over the built-in — which is exactly
+ * what "I exported Ivory, changed it, and imported it again" should mean.
+ */
+export function getControlSet(id, { document = [], library = [] } = {}) {
+  const key = String(id ?? '').trim();
+  if (!key) return null;
+  for (const list of [document, library]) {
+    const found = (Array.isArray(list) ? list : []).find((set) => set?.id === key);
+    if (found) return found;
+  }
+  return SETS_BY_ID.get(key) ?? null;
+}
+
+/**
+ * The shape of one set, as the document and a set file carry it. Anything that is not a set
+ * comes back `null`; anything that is comes back with every optional part normalised, so every
+ * reader downstream can index into `tokens`, `families` and `lamp` without defending itself.
+ *
+ *   - `tokens`: the colour roles (required — a set with none is not a set).
+ *   - `lamp`: `{ azimuth, elevation }`, the light every material on the panel is lit by.
+ *   - `families`: per control type, what the set changes beyond colour — see
+ *     models/controlSetFamilies.js for the patch shape and the rule it is applied under.
+ *   - `panel`: what the set asks of the panel behind the controls (today: `material`).
+ */
+export function normalizeControlSetDefinition(value) {
+  if (!value || typeof value !== 'object') return null;
+  const id = String(value.id ?? '').trim();
+  const tokens = value.tokens;
+  if (!id || !tokens || typeof tokens !== 'object' || Array.isArray(tokens)) return null;
+  const out = {
+    id,
+    name: String(value.name ?? id).trim() || id,
+    description: String(value.description ?? ''),
+    tokens: Object.fromEntries(Object.entries(tokens).filter(([, v]) => typeof v === 'string').map(([k, v]) => [k, v.trim()])),
+  };
+  const azimuth = Number(value.lamp?.azimuth);
+  const elevation = Number(value.lamp?.elevation);
+  if (Number.isFinite(azimuth) && Number.isFinite(elevation)) out.lamp = { azimuth, elevation };
+  if (value.families && typeof value.families === 'object' && !Array.isArray(value.families)) out.families = value.families;
+  if (value.panel && typeof value.panel === 'object' && !Array.isArray(value.panel)) out.panel = value.panel;
+  return out;
+}
+
+/** A document's `controlSets` list: every entry that is a set, in order, each id once. */
+export function normalizeControlSetList(value) {
+  const out = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(value) ? value : []) {
+    const set = normalizeControlSetDefinition(entry);
+    if (!set || seen.has(set.id)) continue;
+    seen.add(set.id);
+    out.push(set);
+  }
+  return out;
 }
 
 /** `'{accent.hot}'` → `'accent.hot'`. Anything that is not a reference → `''`. */
@@ -409,7 +473,13 @@ export function serializeControlSet(value) {
   return { id: normalized.id };
 }
 
-/** The set a panel resolves against: the one it names, or the base set when it names none. */
-export function controlSetForPanel(panel) {
-  return getControlSet(panel?.controlSet?.id) ?? BASE_CONTROL_SET;
+/**
+ * The set a panel resolves against: the one it names, looked up in the document's own sets
+ * first, then `library` (the reader's, when the caller has it), then the built-ins — or the base
+ * set when it names none or names one nobody has. A chosen library set is copied into the
+ * document at the moment it is chosen (stores/controlSets.js), so the callers that have no
+ * library to offer — the Player, the build — still find it.
+ */
+export function controlSetForPanel(panel, library = []) {
+  return getControlSet(panel?.controlSet?.id, { document: panel?.controlSets, library }) ?? BASE_CONTROL_SET;
 }
