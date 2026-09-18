@@ -456,10 +456,158 @@ is a YIN pitch estimator as a JUCE module.
 9. **The licensed Ctrlr panels** (BSD, MIT, GPL ones first) for the importer.
 10. **Woyten/tune's MTS generator, Surge's tuning library and MTS-ESP** together, and **cyface/deluge-editor** as the reference before any Web MIDI SysEx is written for browser mode.
 
-### Still unchecked after two passes
+---
+
+## Third pass — the editor as a tool
+
+The first two passes were about the device layer, because that is where the gap was widest. This
+one is about the other half of the program: the thing a panel author sits in for hours. Method as
+before: the GitHub search API with explicit `repo:` lists so licences come back in one call, npm for
+the Svelte-shaped things, and the READMEs and helper scripts of the reference editors. The Theatre.js
+docs, the Open Stage Control docs and the VCV Rack manual are behind the proxy; where a reference
+below leans on those it says so.
+
+**What the editor already has,** so the entries land against real gaps rather than assumed ones:
+a DOM canvas (no `<canvas>` in `EditorCanvas.svelte`), rulers with live snap guides
+(`panelSnapGuides.js`, `EditorRuler.svelte`), an alignment panel, layer groups, a clipboard, a
+snapshot-based undo (`history.js` deep-clones per context), a hand-rolled code editor
+(`CodeEditor.svelte`: a transparent textarea over a highlight layer, with its own language service
+for completions, hover, go-to-definition, signature help and folding), its own colour chooser,
+gradient editor, swatch grid and recent-colours store, a typography tab with native font previews,
+animation and effects tabs with easing tables and a response-curve designer, an assets tab, a
+notepad, generated help docs, and a browser-check harness that already takes screenshots.
+
+### E1. Whole editors whose architecture is worth reading
+
+| Editor | Licence | Why it matters here |
+|---|---|---|
+| [GrapesJS](https://github.com/GrapesJS/grapesjs) | BSD-3 (verified) | A web-builder *framework* organised as named managers — Blocks, Layers, Style, Traits, Undo, Assets, Storage, Selectors, Canvas, Keymaps, Commands, Modal, Code, i18n, Parser. That list is almost exactly CEditor's dock tabs and stores, with the seams drawn by somebody who has maintained them for a decade. Read before the next round of editor restructuring. |
+| [Godot](https://github.com/godotengine/godot) | MIT (verified) | The best-documented open-source editor UX there is: an inspector with per-property revert-to-default and *keyframe dots* (the inspector and the animation timeline are one surface), an `UndoRedo` built from named do/undo action pairs rather than snapshots, docks, themes, and an editor-plugin system. Reference only. |
+| [Penpot](https://github.com/penpot/penpot) | MPL-2.0 (verified) | Figma-class design tool, Clojure/ClojureScript. Its component/variant model and its handling of "instance drifted from main" are the prior art `product-ideas.md` says the Custom Component designer lacks. |
+| [Excalidraw](https://github.com/excalidraw/excalidraw) | MIT (verified) | Element model, delta-based history, and *fractional indexing* for z-order (the `fractional-indexing` npm package, CC0, from memory) so reordering layers never renumbers everything. |
+| [Theatre.js](https://github.com/theatre-js/theatre) | core Apache 2.0, **studio AGPL-3.0** (verified) | A motion-design editor for the web: timeline, keyframes, easing editor, a sheet/object/prop model. The studio being AGPL means it is *linkable into this program*, not just a reference. The single most relevant find for the Animation tab. |
+| [Blockly](https://github.com/RaspberryPiFoundation/blockly) | Apache 2.0 (verified; now maintained under the Raspberry Pi Foundation) | Block-based programming with code generators for JavaScript, Python, Lua and others (from memory; the generator path in the repo was not fetched). The Lua block editor spike in `tools/scripts/spikes/lua-blocks/` is re-deriving what Blockly's Lua generator already does, minus the round-trip from text, which Blockly does not do either. |
+| [Puck](https://github.com/measuredco/puck) | MIT (verified) | A visual editor driven entirely by a *config of components with typed fields*, which is the `componentSchema.js` idea. React-only, so a reference. [Craft.js](https://github.com/prevwong/craft.js) (MIT) is the same idea one level lower. |
+| [VvvebJs](https://github.com/givanz/VvvebJs) | Apache 2.0 (verified) | Vanilla-JavaScript page builder: no framework to fight, and its component/property definition files are plain objects. |
+| [Webstudio](https://github.com/webstudio-is/webstudio) | AGPL-3.0 (verified) | A Webflow alternative with a serious CSS engine and data model; same licence as this repo. |
+| [draw.io](https://github.com/jgraph/drawio) | Apache 2.0 (verified) | Twenty years of diagram-editor interaction decisions (rubber-band selection, connection points, edge routing) in one place. |
+| [Open Stage Control](https://framagit.org/jean-emmanuel/open-stage-control) | GPLv3 (verified; moved to Framagit) | The nearest *product* cousin: a widget tree, an inspector with the same property groups on every widget, JSON sessions, JavaScript scripting on widgets. Its docs are behind the proxy from here. |
+| [Synth Panels Designer](https://github.com/concept10/synth-panels-designer) | AGPL-3.0 (verified; a fork of the Faselunare original on GitLab with Inkscape 1.3/1.4 fixes) | An Inkscape extension that draws synth front panels: Eurorack/1U/Moog/Buchla standards, 140-plus parameters, professional scales. Panel authors already own this tool. |
+| VCV Rack's panel pipeline ([`helper.py`](https://github.com/VCVRack/Rack/blob/v2/helper.py)) | Rack is GPLv3 with exceptions; the script's convention is the point | Draw the panel in Inkscape; a layer named `components` holds placeholder shapes whose *fill colour* says what they are (red = parameter, green = input, blue = output, magenta = light, yellow = custom widget) and whose name may carry `#ClassName`; the script emits positioned widgets. That is an **"import a panel from an SVG"** convention, documented, in use by hundreds of module authors, and one afternoon from a `.cepanel` importer. |
+| [tldraw](https://github.com/tldraw/tldraw) | **Not open source** (verified: production use needs a commercial licence, watermark enforced) | Listed so nobody takes it. |
+
+Also in this family, already in the record: HISE's interface designer, `foleys_gui_magic`, JIVE, Ctrlr's own editor, and [Chataigne](https://github.com/benkuper/Chataigne).
+
+### E2. Canvas, selection, snapping, layers
+
+- [moveable](https://github.com/daybrush/moveable), [selecto](https://github.com/daybrush/selecto) and [guides](https://github.com/daybrush/guides) — MIT (verified), one author. Transform handles with snapping and grouping; marquee selection by mouse or touch; rulers that *own* the guidelines. The canvas has its own versions of all three; the comparison to make is on snapping behaviour under rotation and on group resize.
+- [Fabric.js](https://github.com/fabricjs/fabric.js) MIT (verified), [Konva](https://github.com/konvajs/konva) and [Paper.js](https://github.com/paperjs/paper.js) (both MIT, from memory) — only if the DOM canvas ever hits its limit. Paper.js is also the boolean-path and path-simplification library for the custom-component designer whether or not the canvas moves.
+- Godot's and Penpot's *smart guides* (distance labels between siblings, equal-spacing hints) are the pattern the snap guides do not yet draw.
+
+### E3. The property inspector
+
+- [svelte-jsonschema-form](https://github.com/x0k/svelte-jsonschema-form) — MIT (verified), Svelte 5 native. Forms generated from JSON Schema. `appSettingsSchema.js` and `componentSchema.js` already carry schemas; this is what turns a schema into an inspector section without a hand-written `*Editor.svelte` per component, for the long tail of the 214 sections.
+- [svelte-jsoneditor](https://github.com/josdejong/svelte-jsoneditor) (`vanilla-jsoneditor`) — ISC (from memory): tree, text and table modes, JSON repair, queries. The raw-document view the API tab and the debug dock do not have.
+- [Tweakpane](https://github.com/cocopon/tweakpane) (MIT) and lil-gui — the compact-inspector *idiom* (folders, bindings, monitors) if a "tweak mode" for live values is ever wanted; not a replacement.
+- [Bits UI](https://github.com/huntabyte/bits-ui) — MIT (verified) — the accessible primitives (combobox, slider, popover, menu, tree) under whatever the inspector renders.
+- Godot's inspector (E1) for revert-to-default per property and the keyframe dot.
+
+### E4. Undo, history, diff, versions, two people
+
+`history.js` clones the whole document per step. Three libraries change what history *is*:
+
+- [immer](https://github.com/immerjs/immer) — MIT (verified). Produce the next state by mutating a draft; get back **JSON patches and inverse patches**. Undo becomes "apply the inverse patch", memory stops scaling with document size, and each history entry is a human-readable list of what changed.
+- [fast-json-patch](https://github.com/Starcounter-Jack/JSON-Patch) — MIT (verified), RFC 6902. The wire format for the tablet (send patches, not documents) and the storage format for history.
+- [jsondiffpatch](https://github.com/benjamine/jsondiffpatch) — MIT (verified). Diff two panel documents and render the diff as HTML. "What changed since I opened this", "what does this package update change" (the drift card that can say an instance drifted and do nothing about it), and the sixty-thing shortlist in `product-ideas.md` about history all sit on this.
+- [isomorphic-git](https://github.com/isomorphic-git/isomorphic-git) — MIT (verified). Git, in JavaScript, in the browser or in Node. A `.cepanel` with real commits, branches and a log, with no server and no shelling out; "panel history" and "back up the user's work quietly" become `git commit` on save.
+- [Yjs](https://github.com/yjs/yjs) (MIT, from memory) with its `UndoManager`, or [Automerge](https://github.com/automerge/automerge) (MIT, verified): two editors on one panel, one of them a tablet, without a merge step. Yjs is the faster and more widely bound; Automerge's undo model is the more principled. Either is a bigger decision than a library.
+
+### E5. Assets, images, colour
+
+- [culori](https://github.com/Evercoder/culori) — MIT (verified). Every colour space that matters now (OKLCH, OKLab, Display P3), gamut mapping, interpolation, contrast. [color.js](https://github.com/color-js/color.js) (MIT, verified) is the same by the CSS Color spec editors. The `ColorChooser` is 8-digit ARGB hex all the way down; this is what a perceptual palette generator or a "harmonies" tab stands on.
+- [@cantoo/color-blindness](https://github.com/cantoo-scribe/color-blindness) — MIT (verified), Brettel-Viénot-Mollon simulation. The "colour-blind check" in `product-ideas.md` §2 is this library plus a toggle on the preview.
+- [color-thief](https://github.com/lokesh/color-thief) — MIT (verified) — and [node-vibrant](https://github.com/Vibrant-Colors/node-vibrant) (MIT, from memory): "steal a colour scheme from a photo", literally.
+- Colour pickers: [svelte-awesome-color-picker](https://github.com/Ennoriel/svelte-awesome-color-picker) MIT (verified, Svelte), [iro.js](https://github.com/jaames/iro.js) MPL-2.0 (verified, wheel and box layouts), pickr (MIT, from memory). Gradient: GrapesJS's `grapick` (MIT, from memory).
+- Theme tokens: [Radix Colors](https://github.com/radix-ui/colors) MIT (verified; twelve-step scales with light and dark pairs designed to be swapped) and [Open Props](https://github.com/argyleink/open-props) MIT (verified). `docs/design/` has no theme system and the app has no light mode; these are the two ready-made ones.
+- Images: [pica](https://github.com/nodeca/pica) MIT (verified; high-quality resize in a worker, for filmstrip and asset import), [svgo](https://github.com/svg/svgo) MIT (verified), [gifenc](https://github.com/mattdesl/gifenc) MIT (verified; encoding, the other half of the `gifuct-js` already in the tree), [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) (MIT wrapper, verified; FFmpeg itself is LGPL/GPL), [miniPaint](https://github.com/viliusle/miniPaint) (MIT, from memory; a whole image editor that embeds in a page).
+- Vector and pixel editing inside the custom-component designer: [SVG-Edit](https://github.com/SVG-Edit/svgedit) MIT (verified, 7.8k stars) and [Method Draw](https://github.com/methodofaction/Method-Draw) MIT (verified) both embed; [Piskel](https://github.com/piskelapp/piskel) Apache 2.0 (verified) for pixel art and filmstrip frames; [pixel-font-editor](https://github.com/dkaraush/pixel-font-editor) (licence unstated) for CGRAM-style glyphs. [Pixelorama](https://github.com/Orama-Interactive/Pixelorama) MIT is desktop-only (Godot) and a reference.
+
+### E6. Typography and text on displays
+
+- [msdfgen](https://github.com/Chlumsky/msdfgen) — MIT (verified) — with `msdf-bmfont-xml` (MIT, from memory): multi-channel signed-distance-field fonts, which stay crisp at any zoom on a canvas. Relevant only if the LCD and pixel displays move to WebGL.
+- [fontkit](https://github.com/foliojs/fontkit) (MIT, from memory) alongside `opentype.js`: shaping, variable fonts, subsetting.
+- [Fontsource](https://fontsource.org/) — OFL fonts as npm packages. A font library inside the Typography tab that is legally clean by construction.
+- Web font editors as references for the glyph editor: [Glyphr Studio 2](https://github.com/glyphr-studio/Glyphr-Studio-2) (licence not on the API; GPL-3.0 from memory) and Google's Fontra (GPL-3.0, from memory; not found by the API under that name).
+
+### E7. Animation and effects
+
+- **Theatre.js** (E1) — the timeline, keyframe and easing UI as a linkable AGPL studio, with an Apache core that could run in the exported player.
+- [bezier-easing](https://github.com/gre/bezier-easing) MIT (verified) and [bezier-easing-editor](https://github.com/gre/bezier-easing-editor) MIT (verified; React and SVG — port the maths, not the component). `easingTables.js` is a table; this is a curve the user can drag.
+- Runtimes if CSS animation runs out: [anime.js](https://github.com/juliangarnier/anime) MIT (verified, v4), [motion](https://github.com/motiondivision/motion) MIT (verified). Imported vector animation for the scenery layer: [lottie-web](https://github.com/airbnb/lottie-web) MIT (verified) and the [Rive](https://github.com/rive-app/rive-wasm) runtime MIT (verified).
+- Effects: the Effects tab is CSS filters and shadows; `smooth-shadows` (npm) generates the layered shadow stacks designers actually use; PixiJS filters (MIT, from memory) if effects ever go to WebGL.
+
+### E8. The script editor
+
+The in-house editor is further along than a first look suggests: completions, hover, definition,
+signature help, folds, find and replace, column editing. What the open-source world adds is not
+the editor but the *tooling behind it*.
+
+- [CodeMirror 6](https://codemirror.net/) — MIT; first-party `lang-javascript` (with TypeScript), `lang-python`, `lang-cpp`, `lang-java`; Lua and C# via `@codemirror/legacy-modes`; `lint`, `autocomplete`, `search` extensions. The honest comparison: it would replace a working editor with a better-tested one and gain accessibility, bracket matching in every language, and an extension ecosystem, at the cost of re-plumbing the language service into its providers. Not urgent; keep the option.
+- [Monaco](https://github.com/microsoft/monaco-editor) — MIT (verified). Heavy, but it carries the **real TypeScript language service**, meaning type errors and inference for TypeScript panels for free. The one reason to consider it, and only for that language.
+- [ruff](https://github.com/astral-sh/ruff) — MIT (verified) — as `@astral-sh/ruff-wasm-web`: Python linting *and* formatting in the browser. `pythonService.js` has no linter behind it.
+- [StyLua](https://github.com/JohnnyMorganz/StyLua) — MPL-2.0 (verified) — as `@johnnymorganz/stylua` (WASM): Lua formatting in the browser.
+- [prettier](https://github.com/prettier/prettier) MIT (verified) standalone build for JavaScript and TypeScript formatting.
+- [Luau](https://github.com/luau-lang/luau) MIT (verified) has a gradual type checker; [lua-language-server](https://github.com/LuaLS/lua-language-server) MIT (verified) is the LSP everyone uses, in Lua, not trivially embeddable.
+- [tree-sitter](https://github.com/tree-sitter/tree-sitter) MIT (verified) via `web-tree-sitter`: one incremental parser per language, replacing `acorn` and `luaparse` and covering the five languages that have neither.
+- [fengari](https://github.com/fengari-lua/fengari) — MIT (verified) — Lua 5.3 in pure JavaScript, the alternative to `wasmoon` where WASM is awkward.
+- Visual scripting: **Blockly** (E1) for blocks; [Rete.js](https://github.com/retejs/rete) MIT (verified), [litegraph.js](https://github.com/jagenjo/litegraph.js) MIT (verified, the engine under ComfyUI) and [Svelte Flow](https://github.com/xyflow/xyflow) MIT (verified, `@xyflow/svelte`) for node graphs — which is also the natural UI for the modular MIDI chain.
+
+### E9. Search, shortcuts, panes, long lists
+
+- [minisearch](https://github.com/lucaong/minisearch) MIT (verified), [FlexSearch](https://github.com/nextapps-de/flexsearch) Apache 2.0 (verified), [Fuse](https://github.com/krisk/Fuse) Apache 2.0 (verified). `panel-search-index.md` designs an index; these are three ready ones, and the same one can back the help search.
+- [tinykeys](https://github.com/jamiebuilds/tinykeys) MIT (verified; 650 bytes) or `@svelte-put/shortcut` (MIT, verified as part of svelte-put) for chords; Bits UI's `Command` for the palette.
+- [PaneForge](https://github.com/svecosystem/paneforge) MIT (verified; Svelte 5, by the Bits UI author) or [svelte-splitpanes](https://github.com/orefalo/svelte-splitpanes) MIT (verified) for resizable panes; [golden-layout](https://github.com/golden-layout/golden-layout) MIT (verified) or dockview for pop-out docks.
+- [TanStack Virtual](https://github.com/TanStack/virtual) MIT (verified) for the property list, the library and the monitor.
+
+### E10. Help, onboarding, accessibility, translation
+
+- Tours: [driver.js](https://github.com/kamranahmedse/driver.js) and [Shepherd](https://github.com/shepherd-pro/shepherd) (both MIT, from memory); [intro.js](https://github.com/usablica/intro.js) is AGPL/commercial dual (verified as non-SPDX on the API), compatible here but worth knowing.
+- [focus-trap](https://github.com/focus-trap/focus-trap) MIT (verified) for modals and popovers; [axe-core](https://github.com/dequelabs/axe-core) MPL-2.0 (verified) in the Playwright runs.
+- [svelte-i18n](https://github.com/kaisermann/svelte-i18n) MIT (verified) or Paraglide from [opral](https://github.com/opral/monorepo) (MIT, from memory; compile-time, typed) for the translation system that `product-ideas.md` notes does not exist. Weblate (first pass) hosts the strings.
+- [Storybook](https://github.com/storybookjs/storybook) MIT (verified) or [Histoire](https://github.com/histoire-dev/histoire) MIT (verified; Vite-native, lighter) as the component catalogue for the 14 designers and their mockup HTML files.
+
+### E11. Testing the UI
+
+`browser-checks/` already screenshots. A diff step is one library away: [pixelmatch](https://github.com/mapbox/pixelmatch) ISC (verified), [odiff](https://github.com/dmtrKovalenko/odiff) MIT (verified; SIMD, the fast one), [BackstopJS](https://github.com/garris/BackstopJS) MIT (verified; scenarios and a report), [reg-suit](https://github.com/reg-viz/reg-suit) MIT (verified; the review workflow around the diffs).
+
+### E12. "Build the panel from a photo", without an AI service
+
+[tesseract.js](https://github.com/naptha/tesseract.js) Apache 2.0 (verified) reads the labels off a
+front-panel photo in the browser; [onnxruntime-web](https://github.com/microsoft/onnxruntime) MIT
+(verified) runs a small detector for knobs and sliders; OpenCV.js (Apache 2.0, from memory) does the
+edge and circle detection that finds knobs without a model at all. Ultralytics' YOLO is AGPL, so
+compatible, but heavy. The idea in `product-ideas.md` §2 is buildable from these three and a training
+afternoon.
+
+### The editor shortlist
+
+1. **Read GrapesJS's manager split and Godot's inspector and UndoRedo** before the next editor restructuring. Both map onto docks and stores that exist.
+2. **immer patches (or fast-json-patch) under `history.js`**, which also gives jsondiffpatch's visual diff and a wire format for the tablet.
+3. **isomorphic-git** for panel history and quiet backups.
+4. **culori plus @cantoo/color-blindness plus color-thief** under the colour chooser: perceptual palettes, the colour-blind check, and palettes from a photo.
+5. **Theatre.js studio** as the linkable reference for the Animation tab; **bezier-easing** for a draggable curve.
+6. **ruff-wasm and StyLua-wasm** behind the script editor now; **Monaco only for TypeScript type errors**, if at all; CodeMirror kept as an option, not a plan.
+7. **The VCV Rack SVG convention** (colour-coded placeholders on a named layer) plus the Synth Panels Designer extension as an "import from Inkscape" path.
+8. **SVG-Edit or Piskel** embedded in the custom-component designer rather than a third in-house editor.
+9. **minisearch** for the panel search index and the help.
+10. **odiff in `browser-checks/`**.
+
+### Still unchecked after three passes
 
 The licence of the JZZ-midi-Gear data files, of Nuked-SC55, of patch-base-synths and of
 midi-manufacturers; whether Gearmulator accepts each synth's native SysEx; the terms the Electra One
 community presets were shared under, which decides how much of the osc-bridge corpus can be
 redistributed rather than merely learned from; and everything on Codeberg, midi2.dev and the Linux
-Audio wiki, which the proxy would not fetch.
+Audio wiki, which the proxy would not fetch. From the third pass: Blockly's current generator layout (the Lua generator path was not fetched),
+Glyphr Studio's and Fontra's licences, Theatre.js's studio data format, and the Open Stage Control
+session format, all behind the proxy or unfetched.
