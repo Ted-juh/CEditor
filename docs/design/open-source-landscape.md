@@ -5,9 +5,10 @@
 > this program *could* do; this one says which of it somebody else has already written, under what
 > licence, and where it would land in the tree. Where a licence is marked **(verified)** it was read off
 > the project's own page during this pass; **(from memory)** means it was not, and should be checked
-> before anything is copied. The sweep ran out of search budget partway through a per-manufacturer pass,
-> so the device-profile section is thorough for the projects that came up and silent on the ones that
-> did not — an absence below is not evidence of absence.
+> before anything is copied. The first sweep ran out of search budget partway through a per-manufacturer
+> pass; a [second pass](#second-pass) the same day went through the GitHub search API, npm, crates.io,
+> GitLab and the curated lists instead, closed most of that gap, and read the licence files the first pass
+> had marked *check*. Where the two passes disagree, the second is right.
 
 ## How to read this
 
@@ -37,7 +38,7 @@ first two entries here would be the fourth and fifth.
 
 | Project | Licence | What it knows | Take it as |
 |---|---|---|---|
-| [Edisyn](https://github.com/eclab/edisyn) (Sean Luke) | Apache 2.0 (verified) | Sixty-plus synths, each a Java class that names every parameter, its range, its option labels, and the exact bytes that set it — DSI/Sequential, Kawai K1/K4/K5, E-mu Proteus and Morpheus, Yamaha FS1R, Waldorf Blofeld, Korg, Roland and more. Also patch *merging, morphing, nudging* between four patches, which `midi-frontier.md` §4.1 proposes as "patch algebra". | **Data.** The single richest source of complete, tested profiles. A converter from Edisyn's `Synth` subclasses to `.dpd.json` is a parsing job over structured Java, not a rewrite. |
+| [Edisyn](https://github.com/eclab/edisyn) (Sean Luke) | Apache 2.0 (verified) | A hundred-plus models (the README's own list, read on the second pass): Casio CZ family, DSI Prophet '08/Tetra/Mopho/Prophet 12, the whole E-mu Proteus and Morpheus line, Kawai K1/K4/K5/K5000, Korg Wavestation SR, microKorg, Microsampler and the volcas, Novation A/D Station and ReMOTE SL, Oberheim Matrix 6/1000, Roland D-110, JV-80/880, U-20/110/220, Sequential Rev2, Waldorf Blofeld/Kyra/M/Microwave II/XT/Pulse 2/Rocket, Yamaha DX7 family, 4-op FM, FB-01, FS1R, TG33/SY22/SY35, the ASM Hydrasynth, plus generic CC/NRPN/RPN and microtuning editors. Each a Java class that names every parameter, its range, its option labels, and the exact bytes that set it — DSI/Sequential, Kawai K1/K4/K5, E-mu Proteus and Morpheus, Yamaha FS1R, Waldorf Blofeld, Korg, Roland and more. Also patch *merging, morphing, nudging* between four patches, which `midi-frontier.md` §4.1 proposes as "patch algebra". | **Data.** The single richest source of complete, tested profiles. A converter from Edisyn's `Synth` subclasses to `.dpd.json` is a parsing job over structured Java, not a rewrite. |
 | [KnobKraft Orm](https://github.com/christofmuc/KnobKraft-orm) (Christof Ruch) | AGPLv3, MIT on request (verified) | Python "adaptations", one per synth: identity request and reply matching, bank/program dump requests, patch-name extraction from bytes, bank layout, `isEditBuffer`. The `MidiKraft-*` C++ libraries beneath it (Rev2, DW8000, and others) hold the same in C++. | **Data + reference.** Exactly the *dump layer* of a DPD profile — the part `import-midici.mjs` says MIDI-CI cannot supply. Same licence as this repo; the adaptations are small and readable. |
 | [Patch Base synths](https://github.com/coffeeshopped/patch-base-synths) (Coffeeshopped) | Unstated on the repo page; check | Spreadsheets transcribed from manuals — SysEx address tables for the JD-800 and others. Patch Base itself is commercial; this repo is the technical notes behind it. | **Data**, after a licence check. |
 | [midi.guide](https://midi.guide/) | CC BY-SA 4.0 (verified) | 124 manufacturers, 413 devices: every CC and NRPN with its name and range. No SysEx. | **Data.** Directly a `generic.cc.json`-shaped profile per device. CC BY-SA on data is fine for an AGPL program; attribute it in the profile. |
@@ -98,8 +99,9 @@ CEditor does not have. Listed by what turned up; the per-manufacturer sweep was 
 | 110+ vintage synths | [bipluk](https://github.com/maxcomperatore/bipluk) — a browser librarian whose `sysex_adapters/` carry manufacturer/model IDs and name-parsing offsets per synth | JS, check |
 | Many (Java) | [JSynthLib](https://github.com/jpcaruana/jsynthlib) — the old universal librarian; its drivers are a second, older corpus of dump layers | Java, check |
 
-Two things stand out. **Kurzweil never published its SysEx**, so nothing exists and nothing will;
-say so in the coverage view rather than listing an empty profile. And the [Electra One](https://docs.electra.one/developers/presetformat.html)
+Two things stand out. **Kurzweil is thin but not empty**: the first pass repeated a forum claim that
+nothing exists; the second found [psobot/k2000](https://github.com/psobot/k2000), an MIT Python package
+for the K2000/K2500/K2600, so the coverage view can say "partial" rather than "none". And the [Electra One](https://docs.electra.one/developers/presetformat.html)
 community library is a large JSON corpus of exactly this shape (controls, SysEx templates, parsers)
 with a public web app, but each preset's licence is its author's; it is a place to *ask*, not to
 scrape.
@@ -233,7 +235,7 @@ panel smaller or the editor's preview truer.
 
 - [free-audio/clap-wrapper](https://github.com/free-audio/clap-wrapper) — wraps a CLAP into VST3, AUv2, AUv3, AAX and standalone; MIT with Apache 2.0 for the AUv2 part (verified). The player already exports four formats through JUCE plus `clap-juce-extensions`; if the JUCE licence or an AU build ever becomes the obstacle, this is the other path: build CLAP once, wrap the rest.
 - [pluginval](https://github.com/Tracktion/pluginval) — GPLv3 (verified), headless, strictness 1–10, active in 2026. Run at level 5 on every exported format in CI; the `panel-export-pipeline-plan.md` has no validation step.
-- Steinberg's `validator` from the VST3 SDK — the search reported the SDK relicensed to MIT with VST 3.8.0 in October 2025; check before relying on it. Either way it is free to run in CI.
+- Steinberg's `validator` from the [VST3 SDK](https://github.com/steinbergmedia/vst3sdk) — the SDK's `LICENSE.txt` now reads MIT (verified on the second pass), so the validator and the SDK's own test host are free to run in CI and free to link.
 - [Pamplejuce](https://github.com/sudara/pamplejuce) — the reference CI for JUCE 8: Catch2, pluginval, Azure Trusted Signing, notarisation, three-platform matrix (verified). Not a dependency, a crib for `.github/workflows/`.
 - [Carla](https://github.com/falkTX/Carla) (GPLv2+) and [Element](https://github.com/kushview/element) (GPLv3) — plugin hosts with out-of-process bridges. `IsolatedPluginProxy` and `plugin-process-isolation.md` are solving Carla's `carla-bridge-*` problem; its bridge protocol is a second opinion. Ardour's [`vst3_scan.cc`](https://github.com/Ardour/ardour/blob/master/libs/ardour/vst3_scan.cc) is the reference for scanner timeouts and cancellation.
 - [melatonin_inspector](https://github.com/sudara/melatonin_inspector) and [melatonin_perfetto](https://github.com/sudara/melatonin_perfetto) — a component inspector and Perfetto tracing for JUCE. The UI here is a webview, so the inspector is for the native windows only; Perfetto traces across the audio thread, the message thread and the worker process are the thing.
@@ -277,10 +279,10 @@ small web server. The pieces:
 libraries that do more of that:
 
 - [Essentia](https://github.com/MTG/essentia) — the MTG's C++ MIR library: spectral, temporal, tonal and high-level descriptors, AGPLv3 (verified). Same licence as this repo, so it can be linked outright. Heavy; a build-time option, not a default.
-- [Gist](https://github.com/adamstark/Gist) — a small C++ real-time analysis library: centroid, flatness, crest, MFCC, onsets (licence: check; one fork shows GPL). Closer to `SonicProbe`'s size.
+- [Gist](https://github.com/adamstark/Gist) — a small C++ real-time analysis library: centroid, flatness, crest, MFCC, onsets. GPLv3 (verified). Closer to `SonicProbe`'s size.
 - [aubio](https://aubio.org/) — pitch, onset, tempo, MFCC in C, GPL (from memory). Pitch tracking is the piece `SonicProbe` lacks and "velocity calibration by playing" wants.
 - [Meyda](https://github.com/meyda/meyda) — the same features in JavaScript over Web Audio (MIT, from memory). For the browser-only mode.
-- [FluCoMa](https://www.flucoma.org/) — corpus manipulation: descriptors, dimensionality reduction, nearest-neighbour over sound banks, in C++ with Max/SC/Pd/CLI front ends. Its *pipeline* (analyse, reduce, neighbour, map) is Timbre Space; its algorithms are BSD-3 (from memory; check).
+- [FluCoMa](https://www.flucoma.org/) — corpus manipulation: descriptors, dimensionality reduction, nearest-neighbour over sound banks, in C++ with Max/SC/Pd/CLI front ends. Its *pipeline* (analyse, reduce, neighbour, map) is Timbre Space; `flucoma-core` is BSD-3 (verified).
 
 ---
 
@@ -292,25 +294,172 @@ libraries that do more of that:
 
 ---
 
-## The shortlist
+## The shortlist (first pass)
 
-Ranked by what it buys divided by what it costs, with the same honesty as the other two records.
+Kept as written, so the revision below can be argued with. The [second pass](#second-pass) changes
+the top of it.
 
-1. **Convert Edisyn and KnobKraft into DPD profiles.** Two importers, sixty-plus profiles, both licences compatible. Nothing else in this document moves the library from five to sixty.
-2. **Dexed as a CI device.** No ROMs, full SysEx, runs headless on the box `CLAUDE.md` already describes. The first end-to-end test of the SysEx path against something that talks back.
-3. **MIDI2.0Workbench as the MIDI-CI counterpart.** M1 gets exercised this week instead of when a Roland turns up.
-4. **DSEG and the public-domain u8g2 groups.** An afternoon, and every display component stops looking like a web page.
-5. **SignPath.** Removes "unsigned" from the release notes for the cost of a form.
-6. **regl-scatterplot plus umap-js under Constellation and Timbre Space.** The map stops being bounded by the DOM.
-7. **Real Ctrlr panels from the two archives, for the importer's first run** — with the authors asked before anything ships.
-8. **Surge tuning-library and MTS-ESP** in place of the hand-rolled tuning core.
+1. **Convert Edisyn and KnobKraft into DPD profiles.** Two importers, a hundred-plus profiles, both licences compatible.
+2. **Dexed as a CI device.** No ROMs, full SysEx, runs headless on the box `CLAUDE.md` already describes.
+3. **MIDI2.0Workbench as the MIDI-CI counterpart.**
+4. **DSEG and the public-domain u8g2 groups.**
+5. **SignPath.**
+6. **regl-scatterplot plus umap-js under Constellation and Timbre Space.**
+7. **Real Ctrlr panels for the importer's first run** — with the authors asked before anything ships.
+8. **Surge tuning-library and MTS-ESP.**
 9. **pluginval in the export pipeline.**
-10. **Strudel's mini-notation in the phrase sequencer** — the one AGPL dependency that brings a community with it.
+10. **Strudel's mini-notation in the phrase sequencer.**
 
-## What this pass could not check
+---
 
-The search budget ended during the manufacturer sweep, so Korg (logue, volca, Kronos), Roland's
-current line, Arturia, Novation Peak/Summit, ASM, UDO and the guitar-pedal world got no dedicated
-pass; the entries above for those brands are incidental. Licences marked *check* were not read. The
-Steinberg validator's licence, the `.ins` master collection's whereabouts and the Gearmulator
-(Virus/Nord Lead emulation) project were each one search short of an answer.
+## Second pass
+
+Same day, different method. With no search budget left, this pass queried the GitHub search API
+directly (by keyword, by manufacturer, by language and by topic), the npm registry, crates.io and
+GitLab, read the "awesome" lists (awesome-juce, awesome-audio-dsp, awesome-musicdsp, awesome-osc,
+OpenAudio, awesome-music, SpotlightKid's list), and read the licence files of everything the first
+pass had marked *check*. Codeberg, midi2.dev, soundprogramming.net and the Linux Audio wiki are
+blocked by the network proxy and were not reached; Strudel's home is on Codeberg, so it was read
+through its npm package instead.
+
+### S1. One corpus is bigger than all the others together
+
+[**roomi-fields/osc-bridge**](https://github.com/roomi-fields/osc-bridge) — GPL-3.0-or-later
+(verified) — carries **849 device drivers as JSON**, one file per device under
+`devices/<vendor>/<model>.json`, across 140-plus vendor directories. Roland alone has 72 files
+(D-50, D-550, JX-8P, JX-3P with the Kiwi and Tauntek retrofits, JV-1080 as a 114-command patch
+editor, XV-5080, the whole Boutique and AIRA lines, SH-4d, TR-8S); Yamaha 37 (DX7, DX7II, TX7,
+TX802, TX81Z, FS1R, TG33, TG77, AN1x, FB-01, the reface family, Montage M, SEQTRAK); Korg 52
+(M1, DW-8000, EX-8000, MS2000, microKORG, minilogue/monologue/prologue, opsix, wavestate, the
+volcas, NTS-1/3, Kronos). A driver file has `device`, a `sysex` header/footer, `cc_params` (CC or
+NRPN with a range) and `commands` (a SysEx `frame` with `{val}`, `{function}` and `{checksum}`
+placeholders), plus `_sources`, `_limitations` and `_coverage` blocks. Two JV-1080 entries, verbatim:
+
+```json
+"/sync":          { "frame": [65, "{function}", 106, 18, 0, 0, 0, 12, "{val}", "{checksum}"] }
+"/default_tempo": { "frame": [65, "{function}", 106, 18, 3, 0, 0, 44, "{function}", "{function}", "{checksum}"] }
+```
+
+That is a Roland DT1 with its address bytes and checksum written down — the same thing
+`compileSysex` produces — and the format maps onto a DPD profile almost field for field.
+
+**Now the awkward part, which is real.** The README marks provenance per driver, and the two files
+read here both say *"imported from an Electra One community preset"*, with the author's name and
+the preset id. Most of the corpus is that: community presets from the Electra One library plus
+`pencilresearch` (midi.guide) CSVs, converted. The repository licenses the whole under GPL-3.0, and
+says it inherits GPL obligations from `sysex-controls`, but the preset authors' terms are not stated
+anywhere in the files. The *facts* (which byte sets which parameter) are not copyrightable; the
+*selection and labelling* of a 114-parameter layout arguably is. The same question the Ctrlr archive
+raised, at ten times the scale. A converter is still worth writing, because the corpus is the fastest
+way to get to a first draft of several hundred profiles, but each profile should carry the source
+preset's author and id through into its own metadata, and the Electra One community should be told.
+Also note `_limitations: untested on hardware` on both files read: this is a *draft* corpus, not a
+verified one, and the DPD's `completeness` field is exactly the right place to say so.
+
+Two smaller corpora in the same spirit:
+
+- [**jazz-soft/JZZ-midi-Gear**](https://github.com/jazz-soft/JZZ-midi-Gear) — the npm package `jzz-midi-gear` maps Identity Reply SysEx to vendor, model and category from two text files, about 200 devices, Roland-heavy (~120), then Yamaha (~40), Korg, BOSS and boutique makers. This is the lookup table `matchIdentityReply` does not have. JZZ is MIT; the data files' licence line was not found (check).
+- [**pencilresearch/midi**](https://github.com/pencilresearch/midi) — the CSVs behind midi.guide, with `template.csv` for CC/NRPN and `template.triggers.csv` for notes, contributions by pull request or email. CC BY-SA 4.0 per the site.
+
+### S2. Corrections to the first pass
+
+- **Edisyn** covers a hundred-plus models, not sixty; the table in §1.1 now lists them.
+- **KnobKraft** also lists 100-plus synths (Access to Zoom). Its [adaptation guide](https://github.com/christofmuc/KnobKraft-orm/blob/master/docs/programming-guide.md) is effectively a specification of the dump layer: `createDeviceDetectMessage` / `channelIfValidDeviceResponse`, `createEditBufferRequest` / `isEditBufferDump` / `convertToEditBuffer`, `createProgramDumpRequest` / `isSingleProgramDump` / `numberFromDump`, `createBankDumpRequest` / `isPartOfBankDump` / `extractPatchesFromBank`, `nameFromDump` / `renamePatch`, `calculateFingerprint`, `numberOfLayers` / `layerName`, `generalMessageDelay` / `messageTimings` / `expectsUploadReply`, `loadPatchesFromLegacyData`. That list is a checklist for what a DPD `dumps` block should be able to express; three of those (handshake timings, upload replies, legacy file formats) it may not.
+- **bipluk** is GPLv3 (verified), 110-plus synths, and each `sysex_adapters/` entry records manufacturer and model id, name offsets, the 7-bit unpacking scheme, the checksum rule, *and a raw `.syx` from real hardware as test data*. Those test dumps are the fixtures the DPD parser has never had.
+- **Ctrlr panels.** The official archive is [RomanKubiak/Panels](https://github.com/RomanKubiak/Panels) (a `DEMO` folder and per-contributor folders, no licence file). `unityconstruct/CtrlrPanels` is BSD-3 (verified). Others with licences: [keinstein/ctrlrpanels](https://github.com/keinstein/ctrlrpanels) GPLv3, [FRDTom/TR-Rack-Editor](https://github.com/FRDTom/TR-Rack-Editor) GPLv3, [ngeiswei/ctrlr-roland-a30-panel](https://github.com/ngeiswei/ctrlr-roland-a30-panel) GPLv3, [eokuwwy/juno-66-ctrlr-panel](https://github.com/eokuwwy/juno-66-ctrlr-panel) MIT, [dnaldoog/CtrlrDemoPanels](https://github.com/dnaldoog/CtrlrDemoPanels) BSD-3 (a how-to archive), [sgorpi/sgorpi_CtrlrX_panels](https://github.com/sgorpi/sgorpi_CtrlrX_panels) GPLv2. Unlicensed but public: Roland Boutique, D-20, Kawai K1, Lexicon MPX100, Yamaha PLG100-SG, Hughes & Kettner. The licensed ones are the importer's first test set.
+- **`.midnam`** has a corpus after all: [lacojim/Ardour-MIDI-Patch-Files](https://github.com/lacojim/Ardour-MIDI-Patch-Files) is 202 files converted from Cakewalk `.ins` by a Tcl script (licence unstated), and [midnamaker](https://github.com/MichaelGJennings/midnamaker) is a browser editor for `.midnam`/`.middev` with WebMIDI auditioning. [Schmitty2005/SY85-Sysex-to-Midnam](https://github.com/Schmitty2005/SY85-Sysex-to-Midnam) is the one-off that shows the pattern.
+- **Licences resolved** (all verified from the file): VST3 SDK MIT; Gist GPLv3; FluCoMa core BSD-3; Bigglesworth GPLv2; SoundPalette MPL-2.0; matriarch-editor CC0; jv1080-sysex-manager MIT; midi-db CC BY-SA 4.0; Gearmulator GPLv3; spessasynth Apache 2.0; signal MIT; Woyten/tune MIT; osc-bridge GPL-3.0. Still unread: Nuked-SC55 (no `LICENSE` at either branch name tried), patch-base-synths (README says "email to contribute", no licence), midi-manufacturers (no licence file), JZZ-midi-Gear data.
+
+### S3. The manufacturer sweep the first pass did not finish
+
+Everything below is a working open-source SysEx implementation for a device CEditor has no profile
+for. Licence from the repository's own metadata where it declares one.
+
+| Maker | Projects |
+|---|---|
+| Korg | [m4l-microkorg-editor](https://github.com/p3r7/m4l-microkorg-editor) MIT (bidirectional), [NEW_microKORG_Program_Decoder](https://github.com/frgonzalezb/NEW_microKORG_Program_Decoder) MIT, [monologue-extract](https://github.com/Windfisch/monologue-extract) MIT, `@julzelements/monologue-midi` (npm, CC + SysEx codec), [minilogue-editor](https://github.com/jeffkistler/minilogue-editor) (React + WebMIDI), `minilogue-xd` (Rust crate, the full MIDI implementation), [volcafm2-tools](https://github.com/mosynthkey/volcafm2-tools) MIT (volca fm2 → DX7 SysEx), [microsampler-editor-librarian](https://github.com/benjamindehli/microsampler-editor-librarian) GPLv3, [e2-scripts](https://github.com/bangcorrupt/e2-scripts) AGPL (electribe 2), [KORG_Read_DS8syx](https://github.com/OlimilO1402/KORG_Read_DS8syx) GPLv3, [Korg-DW6000-editor](https://github.com/craigyjp/Korg-DW6000-editor), Christof Ruch's DW8000 converters (AGPL), [nts-web](https://github.com/oscarrc/nts-web) MIT (NTS-1), [kronut](https://github.com/jimm/kronut) (Kronos set lists) |
+| Roland | [JDTools](https://github.com/sagamusix/JDTools) (JD-800/JD-990 patch conversion, 72 stars), [sysex-mapatron](https://github.com/asutherland/sysex-mapatron) Apache 2.0 — *derives* SysEx maps for ZenCore synths (Jupiter-X, Juno-X, Fantom) by probing, which is `midi-frontier.md` §3.2 "the address-space probe" already written, [roland-sysex.js](https://github.com/motiz88/roland-sysex.js) MIT, [SC-88-Pro-Toolkit](https://github.com/FlashlightET/SC-88-Pro-Toolkit) WTFPL, [sc88sysex](https://github.com/pedrolcl/sc88sysex) GPLv3, [TR-8S-SysEx](https://github.com/compuphonic/TR-8S-SysEx), [tr8s-studio](https://github.com/ideaCompany/tr8s-studio), [S1Utility](https://github.com/denzlobin/S1Utility) GPLv3 (AIRA S-1), [RolandFP30xController](https://github.com/aortegaCampanillas/RolandFP30xController) MIT, [Roland-SE-02-SYSEX-controller](https://github.com/PeZiK73/Roland-SE-02-SYSEX-controller) (with a reverse-engineering whitepaper), [D50SysexBinConverter](https://github.com/wonst719/D50SysexBinConverter) MIT, [RoMi](https://github.com/DrHardReset/RoMi) GPLv3, [fsex](https://github.com/cmatsuoka/fsex) (Fantom S/X, Juno-G), [jamrouter](https://github.com/williamweston/jamrouter) (Juno-106 SysEx translator) |
+| Yamaha | [Sysex77](https://github.com/nseaSeb/Sysex77) (SY77/TG77/SY99, JUCE), [dxsyx](https://github.com/rogerallen/dxsyx) GPLv3 (DX7 C++), [DX7Dump](https://github.com/francoiswnel/DX7Dump) GPLv3, [dvisti](https://github.com/duvha/dvisti) GPLv3 (DX range editor), [dxwire](https://github.com/alexferl/dxwire) MIT (web DX7 editor), `dxex` (npm, DX SysEx create/parse), `dx7-patches` (npm, the classic bank as JSON), [MDX_Tool](https://github.com/BobanSpasic/MDX_Tool) (DX7 and 4-op repair), [XFM](https://github.com/wrightflyer/XFM) Apache 2.0 (Sonicware Liven XFM), [cp-liveset](https://github.com/michiel-dewilde/cp-liveset) MIT (CP88/CP73), [fs1r-wav2syx](https://github.com/quadratschulz/fs1r-wav2syx) MIT and [fs1r-live](https://github.com/tekfunk/fs1r-live), [portasound-js](https://github.com/mmontag/portasound-js), [motif-rack-xs-editor](https://github.com/CommmandrCody/motif-rack-xs-editor) (C++, VST3), [qy100-toolkit](https://github.com/afbecerra7-netizen/qy100-toolkit), [MidiKraft-yamaha-refacedx](https://github.com/christofmuc/MidiKraft-yamaha-refacedx) AGPL |
+| Arturia | [microdude](https://github.com/dagargo/microdude) GPLv3 (MicroBrute editor, by the Elektroid author), [mf-utils](https://github.com/dcower/mf-utils) MIT and [microfreak-reader](https://github.com/francoisgeorgy/microfreak-reader) and [managefreak](https://github.com/GiovanniBitbyBit/managefreak) GPLv3 (MicroFreak), [keylab-essential-mk3-accessible-editor](https://github.com/aefren/keylab-essential-mk3-accessible-editor) MIT — a *screen-reader* editor, which is the accessibility argument made by somebody who needed it |
+| Novation | [circuit_samples](https://github.com/mungewell/circuit_samples) GPLv2, [NovationCircuitTracksPatchEditor](https://github.com/0mandrock1/NovationCircuitTracksPatchEditor) MIT (tested SysEx codec) and its browser sibling, [xkey](https://github.com/darkarnium/xkey) AGPL (Launchkey/FLKey), [NovationSLmk3-SysEx](https://github.com/cbradburne/NovationSLmk3-SysEx) CC0 (the SL mk3 *display* protocol — a screen-builder target like the CTRL49), `ncc` (Rust, a compiler for Novation custom modes), [launchkey-sdk](https://github.com/bornacvitanic/launchkey-sdk) MIT |
+| Elektron | [libanalogrytm](https://github.com/bsp2/libanalogrytm) MIT (portable C SysEx library, 71 stars) and `rytm-rs`, [libdigitone](https://github.com/d-huck/libdigitone) MIT, [elektron-analog-four-sound-sysex](https://github.com/kimasendorf/elektron-analog-four-sound-sysex) (byte tables), [syxgrid-digitone-ii](https://github.com/xrcstrecords/syxgrid-digitone-ii) AGPL, [elektron-sysex-processor](https://github.com/rmoetwil/elektron-sysex-processor) MIT, [Elektroid](https://github.com/dagargo/elektroid) |
+| Kawai | `ksynth` (Rust, "patch manipulation for Kawai digital synths", by the k5ktools author), [k4edit](https://gitlab.com/schessman/k4edit) (Rust/Slint K4 editor and librarian, GitLab) |
+| Kurzweil | [psobot/k2000](https://github.com/psobot/k2000) MIT |
+| Akai | [aksy](https://github.com/watzo/aksy) (Python, samplers over USB), [s3ked](https://github.com/lentferj/s3ked), [AKAISDS](https://github.com/martincurkovic/AKAISDS), [ewi-usb-config-cli](https://github.com/SpotlightKid/ewi-usb-config-cli) MIT, [MPK249](https://github.com/dobemad/MPK249), [MPC-Studio-Mk2-Midi-Sysex-Charts](https://github.com/bcrowe306/MPC-Studio-Mk2-Midi-Sysex-Charts) |
+| Casio | [VZenit](https://github.com/innerrecess/VZenit) (Swift, VZ-1/VZ-10M/VZ-8M), [ajwills72/cz101](https://github.com/ajwills72/cz101) |
+| E-mu, Ensoniq, Alesis | [eosed](https://github.com/lentferj/eosed) (E-mu EOS samplers, terminal), [EnsoniqEPS16Plus](https://github.com/summitt/EnsoniqEPS16Plus), [midiverb3](https://github.com/violet-black/midiverb3) MIT, [Ensoniq-ESQ-M-Cartridge-Dumps](https://github.com/livvy94/Ensoniq-ESQ-M-Cartridge-Dumps) |
+| Access, Clavia | [virusc-max-midi-editor](https://gitlab.com/npes/virusc-max-midi-editor) (GitLab), [nord-lead-viewer](https://github.com/larme/nord-lead-viewer), [g2-webeditor](https://github.com/ty-art-ty/g2-webeditor) (browser SPA over a headless Java/USB bridge — the tablet idea, built for one synth) |
+| Waldorf | [wave2blofeld](https://github.com/clrnd/wave2blofeld) Apache 2.0, [WaldorfRocketController](https://github.com/OceanSwift/WaldorfRocketController) |
+| Deluge, Dirtywave | [cyface/deluge-editor](https://github.com/cyface/deluge-editor) MIT — **Svelte 5 + Web MIDI SysEx**, the closest thing to CEditor's stack found anywhere; [deluge-extensions](https://github.com/silicakes/deluge-extensions) MIT (the Deluge's SysEx/USB feature layer, 50 stars); [awesome-m8](https://github.com/v3rm0n/awesome-m8) |
+| Pedals and amps | [mercury7-web-editor](https://github.com/francoisgeorgy/mercury7-web-editor) and [enzo-web-editor](https://github.com/francoisgeorgy/enzo-web-editor) GPLv3 (Meris), [valeton-gp50](https://github.com/drewmerc302/valeton-gp50) MIT, [fcbtool](https://github.com/trafficpest/fcbtool) MIT (FCB1010), [FreeMajor](https://github.com/linuxmao-org/FreeMajor) BSL-1.0 (TC G-Major), [g1on](https://github.com/SysExTones/g1on) AGPL (Zoom), `fractal-midi` (npm, TypeScript codec for Axe-Fx/FM3/FM9), [fm3-cli](https://gitlab.com/biblesword/fm3-cli), [Kemper-Live-Companion](https://github.com/edmei014/Kemper-Live-Companion), [mvave-blackbox-edit](https://github.com/jvsobrinho/mvave-blackbox-edit) MIT (Web *Bluetooth*), [midiverb3](https://github.com/violet-black/midiverb3) MIT |
+| Controllers | [sysex-controls](https://github.com/soyersoyer/sysex-controls) GPLv3 (154 stars; Akai MPK mini, Arturia BeatStep/KeyStep/KeyLab/MiniLab, Korg nano series, Moog Matriarch — device *settings* over SysEx, Libadwaita), [mft-editor](https://github.com/BrettKinny/mft-editor) LGPL-3 (MIDI Fighter Twister, **Svelte**), `pmtc` and `mft-config` (npm), [Freepad](https://github.com/GeoDF/Freepad) GPLv3 (LPD8), [kenton-freak-studio](https://github.com/kerouanton/kenton-freak-studio) GPLv3, [BCR2000_Master](https://github.com/christofmuc/BCR2000_Master), `@misofm/control-surface` (npm, typed control-surface drivers over Web MIDI) |
+| Misc. hardware | [orba-protocol](https://github.com/holofermes/orba-protocol), [blocksd](https://github.com/hyperb1iss/blocksd) ISC (ROLI Blocks topology and LEDs), [iconnectivity-js](https://github.com/leolabs/iconnectivity-js) (interface routing), [reveng-mutantbrain](https://github.com/noriah/reveng-mutantbrain), `exquis-midi` (npm, MPE controller) |
+
+Two general-purpose tools from the same sweep: [sysexxer-ng](https://github.com/linuxmao-org/sysexxer-ng)
+(BSL-1.0, "a universal tool to exchange MIDI system-exclusive data") and
+[sysex-drop](https://github.com/sourcebox/sysex-drop) (MIT, drag-and-drop SysEx sender) are the two
+small things people reach for when a librarian is too much; CEditor's monitor could absorb both.
+
+### S4. More devices that answer back
+
+- [**Gearmulator**](https://github.com/dsp56300/gearmulator) — GPLv3 (verified). DSP56300 emulation of the Access Virus A/B/C and TI, Waldorf microQ and Microwave II/XT, Clavia Nord Lead 2/2X, Roland JP-8000 and the Sound Canvas family. Needs the original ROMs, which is the same caveat as munt. Whether it accepts each synth's native SysEx patch format was not confirmed; discoDSP's commercial Retromulator, built on it, advertises loading Virus and Nord Lead SysEx, which suggests the layer is there.
+- [**Octavia**](https://github.com/ltgcgo/octavia) — LGPL-3 (verified), browser JavaScript, "event-driven multi-standard MIDI tool chain" with *state tracking* for MT-32, GM, GS, XG and GM2 and their plug-in boards. Not a synth: a model of what a GS or XG module's state *is* after a stream of messages. That is the shadow state `midi-frontier.md` §1.2 wants for drift detection, already written for the one family of devices whose SysEx is fully public — and it runs in the same JavaScript the panel does.
+- [**spessasynth**](https://github.com/spessasus/spessasynth_core) — Apache 2.0 (verified). A SoundFont2/DLS synthesiser in JavaScript with a MIDI implementation. A General MIDI *device* for the browser-only mode at `localhost:5173`, which today has no sound at all.
+- [**moont**](https://gitlab.gnome.org/geoffhill/moont) — a CM-32L in Rust, on GitLab; listed for completeness next to munt.
+
+### S5. Libraries the first pass missed
+
+- [**Woyten/tune**](https://github.com/Woyten/tune) — MIT (verified), Rust. Scala `.scl`/`.kbm`, *and a generator for the MTS SysEx messages themselves*: Single Note Tuning Change, Scale/Octave Tuning in both forms, plus MOS-based isomorphic keyboard layouts. [scala2mts](https://github.com/unremarkablegarden/scala2mts) (GPLv3) does the narrow version for the Prophet Rev2 and the Cirklon. Between them and Surge's library, every tuning message a hardware synth understands is already encoded somewhere.
+- [**helgoboss-learn**](https://github.com/helgoboss/helgoboss-learn) — the DAW-agnostic MIDI-learn model extracted from ReaLearn, in Rust: sources, modes, relative-encoder encodings, takeover. Not on crates.io yet and the licence was not stated; the *design* (`midi-pickup.md` covers the same ground) is the reference.
+- [**JZZ**](https://github.com/jazz-soft/JZZ), [**midi-test**](https://github.com/jazz-soft/midi-test) and [**web-midi-test**](https://github.com/jazz-soft/web-midi-test) — all MIT, all by the same author. `web-midi-test` is a *fake Web MIDI API* for test runners: the Playwright `browser-checks/` could drive real MIDI paths through a mock port with no hardware and no ALSA. `midi-test` does the same for Node.
+- [**MidiExplorer**](https://github.com/EMATech/MidiExplorer) — GPL-3.0-or-later, Python: monitor, analyser and SysEx decoder with manufacturer identification, aiming at MIDI 2.0. A reference for what the monitor's SysEx column should decode.
+- [**midimonster**](https://github.com/cbdevnet/midimonster) — a translation hub between MIDI, OSC, ArtNet, sACN and others; [**Birdhouse**](https://github.com/madskjeldgaard/Birdhouse) — an OSC-to-MIDI bridge as VST/CLAP/standalone (JUCE). The OSC end of the tablet idea, twice.
+- [**LinkBridge**](https://github.com/Benceking24/LinkBridge) MIT and [**x42/jack_midi_clock**](https://github.com/x42/jack_midi_clock) — Ableton Link to MIDI DIN clock, and JACK transport to MIDI clock. Small, and the second is by the person who wrote most of Ardour's MIDI clock handling.
+- MIDI effects with a JUCE pedigree, for the modular chain: [QMidiArp](https://github.com/emuse/qmidiarp) (arp, sequencer and MIDI LFO in one), [ripchord](https://github.com/trackbout/ripchord) (chord progressions), [stochas](https://github.com/surge-synthesizer/stochas) (probabilistic polyrhythmic sequencer), [b-step](https://github.com/surge-synthesizer/b-step) (chord sequencer), [LibreArp](https://gitlab.com/LibreArp/LibreArp), [Topiary](https://github.com/tomto66/Topiary-Beatz) (drum patterns, riffs, preset variations), [Midi-Transposer](https://github.com/stfufane/Midi-Transposer) (chords from a bass pedal), [polyrhythmix](https://github.com/dredozubov/polyrhythmix) (drum generator), [mididings](https://github.com/mididings/mididings) (a Python MIDI router that is the reference for "rules engine").
+- Audio to MIDI: [**basic-pitch**](https://github.com/spotify/basic-pitch) (Apache 2.0, Spotify) and [**NeuralNote**](https://github.com/DamRsn/NeuralNote) (Apache 2.0, a JUCE plugin around it). "Velocity calibration by playing" and "Sonic Capture" both need to know what note the hardware played; these do that from the exported plugin's audio input.
+- Sequencer UI: [**signal**](https://github.com/ryohey/signal) — MIT (verified), TypeScript, an online MIDI editor with a piano roll; [efflux-tracker](https://github.com/igorski/efflux-tracker) MIT. If the phrase sequencer ever needs a piano roll, signal's is the one to read.
+- Rust, since the crate search was cheap: `midi2` (midi2-dev's own MIDI 2.0 message types), `midi-msg` (complete MIDI 1.0), `midir`, `sim-lib-midi-sysex` (checksums and device payload helpers), `midilab` (SysEx controller programming), `phosphor` (a terminal DAW). None is a dependency for a C++/JS project; all are readable specifications.
+
+### S6. Svelte and the web side
+
+- [**cyface/deluge-editor**](https://github.com/cyface/deluge-editor) — Svelte 5, Web MIDI, SysEx, MIT. The only project found that is the same stack as CEditor's panel. Read its SysEx-over-Web-MIDI code before writing the browser-mode bridge.
+- [**mochreach/midi-surf**](https://github.com/mochreach/midi-surf) — a browser MIDI controller as an installable PWA for tablets and phones: buttons, faders, isomorphic and chord keyboards, presets shared as links, automatic parameter detection. Licence unstated. It is the tablet idea's *client* as somebody else shipped it.
+- [**conormkelly/reamo**](https://github.com/conormkelly/reamo) — MIT. A phone/tablet remote for REAPER: WebSocket server (in Zig), React client, **QR-code pairing**, and the honest latency note that USB tethering beats Wi-Fi for touch instruments. The pairing and transport decisions `product-ideas.md` §1 leaves open are made here.
+- npm packages worth a look: `@xyflow/svelte` (node-graph UI, for the modular MIDI chain), `vanilla-jsoneditor` / `svelte-jsoneditor` (for the API tab's JSON), `svelte-highlight`, `@svelte-put/shortcut`, `svelte-floating-ui`, `svelte-sonner`, `@svar-ui/svelte-menu`, `midiwire` (declarative browser MIDI), `midi-ports` (typed Web MIDI ports by name), `kommidi` (pipeline-style MIDI processing in TypeScript), `@wcstack/midi` (declarative Web MIDI as a web component). Svelte-specific *audio* widgets, by contrast, barely exist on npm; the knob and slider components in the tree are not reinventing something available.
+
+### S7. JUCE-side additions (from awesome-juce)
+
+- [**nectar**](https://github.com/blackboxaudio/nectar) — MIT, framework-agnostic TypeScript wrapper over JUCE's WebView JavaScript: a `Result` type, a global event manager, typed Boolean/Choice/Float parameter bindings. The `bridge.js` file is CEditor's own version of this; compare.
+- [**juce-end-to-end**](https://github.com/FocusriteGroup/juce-end-to-end) (Focusrite) — end-to-end functional testing of JUCE apps *driven from JavaScript*; [**straw**](https://github.com/kunitoki/straw) — a JUCE automation framework for integration tests. The native side has no equivalent of `browser-checks/` today.
+- [**Gin**](https://github.com/FigBug/Gin) has a WebSockets module; [**juce_bluetooth**](https://github.com/genkiinstruments/juce_bluetooth) is BLE for macOS and Windows (BLE MIDI); [**juce_serialport**](https://github.com/cpr2323/juce_serialport) for serial MIDI; [**juce-utils**](https://github.com/christofmuc/juce-utils) is Christof Ruch's MIDI and i18n helpers; [**cello**](https://github.com/bgporter/cello) is "ValueTrees for humans"; [**JIVE**](https://github.com/ImJimmi/JIVE) builds JUCE GUIs from declarative markup.
+- [**Chataigne**](https://github.com/benkuper/Chataigne) — a JUCE application whose whole purpose is routing and mapping between MIDI, OSC, DMX, serial and more, with a module and mapping model that has been used on stage for years. The modular MIDI chain's closest living relative.
+- [**yup**](https://github.com/kunitoki/yup) — a permissively licensed JUCE 7 fork with a modern renderer; [**juce_emscripten**](https://github.com/Casperaki/juce_emscripten) — JUCE in the browser. Neither is a plan; both are options if the JUCE licence question ever bites.
+- [**popsicle**](https://github.com/kunitoki/popsicle) bridges JUCE to Python, which is a different answer to "Python panels" than embedding an interpreter.
+
+### S8. Sound analysis additions
+
+[**librosa.cpp**](https://github.com/olilarkin/librosa.cpp) (a C++ port of librosa with WASM and Swift
+packages) and [**audioFlux**](https://github.com/libAudioFlux/audioFlux) (MIT, built for deep-learning
+features) sit between Gist and Essentia in size and in licence. [**pitch_detector**](https://github.com/adamski/pitch_detector)
+is a YIN pitch estimator as a JUCE module.
+
+### The shortlist, revised
+
+1. **A converter from the osc-bridge corpus** — 849 draft profiles, GPL-compatible, with provenance to carry through and a `completeness: draft` to be honest about. Followed immediately by the Edisyn and KnobKraft converters, which are the *verified* layer over the same synths.
+2. **Dexed as a CI device**, now with **bipluk's real-hardware `.syx` fixtures** as the parser's test set and **Octavia** as the GS/XG shadow-state model.
+3. **web-midi-test in `browser-checks/`** — real MIDI paths under Playwright with no hardware, today.
+4. **MIDI2.0Workbench** for M1.
+5. **JZZ-midi-Gear's identity table** behind `matchIdentityReply`.
+6. **DSEG plus the public-domain u8g2 groups.**
+7. **SignPath.**
+8. **regl-scatterplot and umap-js.**
+9. **The licensed Ctrlr panels** (BSD, MIT, GPL ones first) for the importer.
+10. **Woyten/tune's MTS generator, Surge's tuning library and MTS-ESP** together, and **cyface/deluge-editor** as the reference before any Web MIDI SysEx is written for browser mode.
+
+### Still unchecked after two passes
+
+The licence of the JZZ-midi-Gear data files, of Nuked-SC55, of patch-base-synths and of
+midi-manufacturers; whether Gearmulator accepts each synth's native SysEx; the terms the Electra One
+community presets were shared under, which decides how much of the osc-bridge corpus can be
+redistributed rather than merely learned from; and everything on Codeberg, midi2.dev and the Linux
+Audio wiki, which the proxy would not fetch.
