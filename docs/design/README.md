@@ -50,6 +50,7 @@ with an *as built* section per phase.
 
 | Document | What it is |
 |---|---|
+| [Control sets](control-sets.md) | *Nothing built.* An idea record: a set is one visual language every control draws from, so a knob, a fader, a toggle and a meter belong together and switching sets restyles the whole panel at once. Three layers — a token dictionary of named roles, one family design per ready-made control bound to those tokens, and a shareable package in the custom-component envelope — with link/override/reset/detach on the inspector, an extractor that turns today's literal-colour panels into token references, a specimen-sheet editor, and a coverage matrix with fallback to the base set. Names what it stands on (Parts/States trees, card presets, the package envelope, palettes), what is awkward (every document is literals, states carry literals too, bitmap sets do not recolour, size classes, drift), the prior art worth taking (Godot themes, JUCE LookAndFeel, VCV component families, Surge skins, Figma variants, the W3C design-tokens format), and three phases with a stop after each. |
 | [Ready-made slider guide](slider-ready-made-implementation-guide.md) | Adding sliders as ready-made components without pre-empting the Component Designer. Superseded in scope by the unified family guide below. |
 | [Unified slider family guide](slider-unified-family-implementation-guide.md) | The full slider family — linear and circular together — replacing the more conservative linear-first plan. |
 
