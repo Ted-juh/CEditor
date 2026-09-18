@@ -1,7 +1,8 @@
 # Control sets — one design, every control
 
-> Status: **idea record, 2026-09-18. Nothing built.** Written against the tree as it stands, in
-> answer to a plain request: *it would be nice to have "sets" — designs for knobs, sliders, faders
+> Status: **phase 1 built, 2026-09-18** — see [What phase 1 shipped](#what-phase-1-shipped) at the
+> end. The rest of this record is the idea as it was written the same morning, against the tree
+> as it stood, in answer to a plain request: *it would be nice to have "sets" — designs for knobs, sliders, faders
 > that belong to one set.* This record says what a set would have to be for that sentence to come
 > true on this program, what in the tree it already stands on, what it costs, and where the open
 > source world has solved the same problem. Companion to
@@ -228,3 +229,50 @@ renderers is wide but mechanical. Phase 2 medium. Phase 3 is where the drift mac
 which is work the custom-component side owes anyway.
 
 **The line:** *choose once; every control agrees.*
+
+## What phase 1 shipped
+
+Built the same day, on the plan above, with one deliberate departure.
+
+- **The dictionary** is `CE/web/src/CE_Application/models/controlSets.js`: forty colour roles
+  (`surface`, `control.track`, `control.cap.hot`, `accent`, `text.muted`, …) and three built-in
+  sets — **Graphite**, which reproduces colour for colour what every ready-made control looked like
+  before sets existed, and **Ember** and **Ivory**, which exist so that switching has something to
+  switch to. A set value may alias another token (`'control.fill': '{accent}'`).
+- **The reference form is a string, not an object.** The sketch above says `{ token: 'accent.hot' }`;
+  what shipped is `'{accent.hot}'`, the alias syntax of the W3C Design Tokens format this record
+  already points at. Every colour consumer in the tree is string-typed (`cssColour`, `hexToRgba`,
+  the `.slice(-6)` in a dozen swatches) and every one has a fallback for a string that is not hex;
+  an object would have thrown in all of them. And `shrinkControl` diffs against the type defaults
+  with plain equality, which a string satisfies for free. The resolver only looks at keys that name
+  a colour (`colour`, `underlineColour`, `'Background.Fill.colour'`), so a Label whose content is
+  literally `{value}` stays `{value}`.
+- **Every ready-made family is written in tokens**: the Slider/Knob anatomy in
+  `utils/sliderEntityFactory.js`, the Number and Range parts and every family's state rules in
+  `models/interactionDefaults.js`, the button family's states and the Combobox/Listbox/TextInput
+  bodies in `models/componentTypes.js`, and the root `Background` fill and `Text` fill every control
+  starts from in `models/sectionDefaults.js`. The displays (LCD, oscilloscope, the screens) keep their
+  literals: they are fixed dark glass, and whether a light set should recolour them is the coverage
+  matrix's question, not this phase's.
+- **Resolution happens once, where a control enters the renderer.** `CanvasControl` renders the
+  resolved tree and keeps the document's tree for edits; the preview surface (and so the Player)
+  hands its panel's set down through Svelte context, the editor canvas takes the active panel's.
+  Copy-on-write: a control without references is the same object it always was, so an existing
+  document costs a walk and nothing more, and a set switch repaints only what changed.
+- **The document** carries `controlSet: { id }` on the "right or absent" rule the rest of the file
+  uses — a panel on Graphite writes no key, so every `.cepanel` from before round-trips byte-identical.
+  An id this build does not know is kept and written back; the panel renders in Graphite meanwhile.
+  The build payload is **baked** to literals against the panel's set, because the player has no
+  resolver and the exported plugin's reader has never heard of a set.
+- **The UI is the picker and the chip**, as the phase said: a *Control set* section on the panel
+  card's Background tab, and a small token chip under a linked colour field in the Background and
+  Text editors. Clicking a linked swatch opens the chooser at the colour the set gives it; what the
+  chooser writes back is a literal — which is exactly *override* as defined above. *Reset to set*
+  and *detach* are phase 2.
+- **Tests**: `CE/web/test/controlSets.test.js` — completeness of every built-in set, Graphite's
+  fidelity to the old literals for every family, copy-on-write, the unknown-token fallback, the
+  document round trip, export baking, and the store.
+
+What phase 1 did *not* do, so nobody looks for it: the extractor (existing literal-colour panels do
+not join a set until phase 2), material / shape / typography / motion tokens (colour roles only), and
+per-panel token overrides. Every existing document renders exactly as before.

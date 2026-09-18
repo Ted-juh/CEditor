@@ -35,6 +35,8 @@
   import Hammer from 'lucide-svelte/icons/hammer';
   import Scale from 'lucide-svelte/icons/scale';
   import ListMusic from 'lucide-svelte/icons/list-music';
+  import Palette from 'lucide-svelte/icons/palette';
+  import { BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, getControlSet, normalizeControlSet } from '../models/controlSets.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
@@ -556,6 +558,27 @@
     </PropertySection>
 
   {:else if tabId === 'background'}
+    <!-- The control set: one visual language every ready-made control draws from. Switching it
+         restyles every control that has not been given a colour of its own — see
+         docs/design/control-sets.md. -->
+    {@const activeSetId = panel.controlSet?.id ?? DEFAULT_CONTROL_SET_ID}
+    {@const activeSet = getControlSet(activeSetId)}
+    <PropertySection title="Control set" icon={Palette}>
+      <PropertyCell label="Set" span={4} hint="Colour roles every ready-made control draws from. Switching restyles controls that have no colour of their own.">
+        <select class="val" value={activeSetId}
+                onchange={(e) => updatePanel(panel.id, { controlSet: normalizeControlSet(e.target.value) })}>
+          {#each BUILT_IN_CONTROL_SETS as set (set.id)}
+            <option value={set.id}>{set.name}</option>
+          {/each}
+          {#if !activeSet}
+            <option value={activeSetId}>{activeSetId} (not in this build)</option>
+          {/if}
+        </select>
+        <p class="set-note">
+          {#if activeSet}{activeSet.description}{:else}This panel names a set this build does not have; it renders with Graphite until that set is installed.{/if}
+        </p>
+      </PropertyCell>
+    </PropertySection>
     <PropertySection title="Background" icon={Layers}>
       <div class="bg-layer-buttons">
         <button class="bg-layer-btn" class:active={panel.bgSolid !== false}
@@ -1472,5 +1495,11 @@
   .layer-tool-btn:disabled {
     opacity: 0.3;
     pointer-events: none;
+  }
+  .set-note {
+    margin: 4px 0 0;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: var(--text-muted, #9a9a9a);
   }
 </style>

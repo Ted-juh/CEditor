@@ -24,6 +24,7 @@ import { presetSlotInfo } from '../stores/deviceProfileLocalEngine.js';
 import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js';
 import { noteScriptTouchedControl } from '../stores/scriptTouchedControls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
+import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
 // ce.image (§50). The file cache is how a path source becomes something renderable, which is also
@@ -605,6 +606,10 @@ function getValue(path, form = '') {
       : undefined;
     if (raw === undefined) raw = valueAtPath(control, modelPath);
   }
+  // A colour the document holds as a control-set reference ('{surface}', models/controlSets.js)
+  // reads as the literal the panel's set gives it — the answer the exported plugin gives too,
+  // whose payload was baked at export. A script should never see the reference.
+  if (typeof raw === 'string' && isTokenReference(raw)) raw = resolveColourValue(raw, controlSetForPanel(activePanel()));
   if (addressed.form !== 'normalizedValue') return raw;
 
   const range = rangeOf(control);

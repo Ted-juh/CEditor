@@ -26,6 +26,7 @@
 // with it. Eight-digit hex says the same thing about the colour and nothing about the children.
 
 import { normalizeCorner } from './cornerNormalization.js';
+import { resolveColourValue } from '../models/controlSets.js';
 import { gradientToCSS } from './gradientCSS.js';
 import { buildLayerStyle } from './backgroundCSS.js';
 import { buildFillClipPath } from './cornerPaths.js';
@@ -69,7 +70,10 @@ function layerVisible(background, layerId) {
 
 /** `FF3A3A3A` (AARRGGBB) -> `#3A3A3AFF` (CSS #RRGGBBAA), so alpha rides in the colour. */
 function argbToCss(raw) {
-  const hex = String(raw ?? '').replace('#', '').trim();
+  // A control-set reference ('{surface}') that reached this far missed the canvas's resolver —
+  // a raw default in a test, a tree read off the document. The base set is the honest answer
+  // then: what the control looked like before sets existed, rather than no fill at all.
+  const hex = String(resolveColourValue(raw) ?? '').replace('#', '').trim();
   if (/^[0-9a-fA-F]{8}$/.test(hex)) return `#${hex.slice(2)}${hex.slice(0, 2)}`;
   if (/^[0-9a-fA-F]{6}$/.test(hex)) return `#${hex}`;
   return null;

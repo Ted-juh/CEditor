@@ -131,10 +131,13 @@
     resizeHandleStyle,
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
+  import { getContext } from 'svelte';
+  import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
+  import { resolveControlTokens } from '../models/controlSets.js';
 
   let {
-    control,
-    sourceControl = control,
+    control: documentControl,
+    sourceControl = documentControl,
     scale = 1,
     previewSessionOverride = null,
     resolvedControlOverride = null,
@@ -208,6 +211,16 @@
     layoutPosition = null,
     childPreviewPropsFor = null,
   } = $props();
+
+  // The control as the document holds it may say '{accent}' where a colour goes (a control-set
+  // token, models/controlSets.js). Everything below renders the RESOLVED tree; `documentControl`
+  // is what the document says and is what edits are written against. A surface that renders a
+  // panel of its own — the preview, the Player — provides its panel's set through context; the
+  // editor canvas takes the active panel's. Copy-on-write, so a control without references is
+  // the same object it always was.
+  const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
+  let controlSet = $derived(typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet);
+  let control = $derived(resolveControlTokens(documentControl, controlSet));
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
   // role→descriptor map (used by the two-value Range spinner for lowField /
@@ -334,7 +347,7 @@
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(
-    resolvedControlOverride
+    (resolvedControlOverride ? resolveControlTokens(resolvedControlOverride, controlSet) : null)
       ?? (interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control)
   );
   let interactionRuntime = $derived(

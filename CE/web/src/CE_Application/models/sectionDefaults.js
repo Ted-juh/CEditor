@@ -62,7 +62,7 @@ export const SECTION_DEFAULTS = {
         _type: 'Fill',
         mode: 'solid',          // legacy primary layer / fallback
         layerOrder: ['solid', 'gradient', 'image', 'overlay'],
-        colour: 'FF3A3A3A',
+        colour: '{surface}',
         solidEnabled: true,
         solidBlend: 'normal',
         solidClipMode: 'shape',
@@ -192,7 +192,7 @@ export const SECTION_DEFAULTS = {
       Fill: {
         _type: 'Fill',
         mode: 'solid',
-        colour: 'FFFFFFFF',
+        colour: '{text.primary}',
         order: 50,
         gradientEnabled: false,
         gradientName: '',

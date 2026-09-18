@@ -5,12 +5,14 @@
  */
 
 import { gradientToCSS } from './gradientCSS.js';
+import { resolveColourValue } from '../models/controlSets.js';
 
 /**
  * Parse AARRGGBB or RRGGBB hex to rgba(). Falls back to low-alpha white for 6-char.
  */
 export function hexToRgba(hex) {
-  const h = String(hex).replace(/^#/, '');
+  // A control-set reference that was never resolved renders in the base set — see plainFillCSS.
+  const h = String(resolveColourValue(hex)).replace(/^#/, '');
   if (h.length === 8) {
     const a = parseInt(h.slice(0, 2), 16) / 255;
     const r = parseInt(h.slice(2, 4), 16);

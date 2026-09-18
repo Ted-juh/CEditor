@@ -1753,6 +1753,9 @@
                 "Text": {
                   "content": "OUT 52%",
                   "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
                     "Font": {
                       "weight": "Bold",
                       "weightValue": 700,

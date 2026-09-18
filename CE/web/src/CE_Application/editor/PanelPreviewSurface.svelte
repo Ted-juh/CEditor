@@ -1,5 +1,6 @@
 <script>
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, setContext, untrack } from 'svelte';
+  import { CONTROL_SET_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
@@ -294,6 +295,11 @@
     gridStyle = '',
     surfaceRef = $bindable(null),
   } = $props();
+
+  // The set this panel's controls resolve their colour tokens against. Through context rather
+  // than the editor's store because the Player renders a document the editor's panel list has
+  // never seen — CanvasControl prefers this when present (stores/controlSets.js).
+  setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
 
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 

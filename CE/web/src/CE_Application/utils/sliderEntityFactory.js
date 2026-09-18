@@ -65,7 +65,7 @@ function backgroundFill(colour, {
 
 function textSection({
   content = '',
-  colour = 'FFF5F5F5',
+  colour = '{text.label}',
   size = 11,
   weight = 600,
   family = 'Arial',
@@ -90,9 +90,9 @@ export function createSliderSemanticParts() {
         zIndex: 0,
         layout: { width: 100, height: 10, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FF2C2C2C', {
+          Background: backgroundFill('{control.track}', {
             borderEnabled: true,
-            borderColour: '55202020',
+            borderColour: '{control.track.edge}',
             borderThickness: 1,
             radius: 999,
           }),
@@ -103,7 +103,7 @@ export function createSliderSemanticParts() {
         zIndex: 1,
         layout: { width: 100, height: 10, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FF5B9BD5', { radius: 999 }),
+          Background: backgroundFill('{control.fill}', { radius: 999 }),
         },
       }),
       bodySelectedRange: createPartNode('bodySelectedRange', {
@@ -111,7 +111,7 @@ export function createSliderSemanticParts() {
         zIndex: 1,
         layout: { width: 100, height: 10, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FF7BB3FF', { radius: 999 }),
+          Background: backgroundFill('{control.range}', { radius: 999 }),
         },
       }),
       bodyCenterMarker: createPartNode('bodyCenterMarker', {
@@ -120,7 +120,7 @@ export function createSliderSemanticParts() {
         layout: { width: 2, height: 18, widthUnit: 'px', heightUnit: 'px' },
         opacity: 0.6,
         sections: {
-          Background: backgroundFill('99FFFFFF', { radius: 999 }),
+          Background: backgroundFill('{control.marker}', { radius: 999 }),
         },
       }),
       pointerStart: createPartNode('pointerStart', {
@@ -128,9 +128,9 @@ export function createSliderSemanticParts() {
         zIndex: 3,
         layout: { width: 18, height: 18, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FFF2B44B', {
+          Background: backgroundFill('{control.cap.start}', {
             borderEnabled: true,
-            borderColour: '99201000',
+            borderColour: '{control.cap.edge}',
             borderThickness: 1,
             radius: 999,
           }),
@@ -141,9 +141,9 @@ export function createSliderSemanticParts() {
         zIndex: 4,
         layout: { width: 20, height: 20, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FFF6F6F6', {
+          Background: backgroundFill('{control.cap}', {
             borderEnabled: true,
-            borderColour: '99333333',
+            borderColour: '{control.cap.edge}',
             borderThickness: 1,
             radius: 999,
           }),
@@ -154,9 +154,9 @@ export function createSliderSemanticParts() {
         zIndex: 3,
         layout: { width: 18, height: 18, widthUnit: 'px', heightUnit: 'px' },
         sections: {
-          Background: backgroundFill('FF55C79A', {
+          Background: backgroundFill('{control.cap.end}', {
             borderEnabled: true,
-            borderColour: '99202020',
+            borderColour: '{control.cap.edge}',
             borderThickness: 1,
             radius: 999,
           }),
@@ -168,7 +168,7 @@ export function createSliderSemanticParts() {
         layout: { width: 2, height: 12, widthUnit: 'px', heightUnit: 'px' },
         opacity: 0.95,
         sections: {
-          Background: backgroundFill('CCFFFFFF', { radius: 999 }),
+          Background: backgroundFill('{control.tick}', { radius: 999 }),
         },
       }),
       tickMinor: createPartNode('tickMinor', {
@@ -177,7 +177,7 @@ export function createSliderSemanticParts() {
         layout: { width: 1, height: 7, widthUnit: 'px', heightUnit: 'px' },
         opacity: 0.55,
         sections: {
-          Background: backgroundFill('99FFFFFF', { radius: 999 }),
+          Background: backgroundFill('{control.tick.minor}', { radius: 999 }),
         },
       }),
       labelMin: createPartNode('labelMin', {
@@ -193,17 +193,17 @@ export function createSliderSemanticParts() {
       labelStart: createPartNode('labelStart', {
         role: 'labelStart',
         zIndex: 5,
-        sections: { Text: textSection({ colour: 'FFF2B44B' }) },
+        sections: { Text: textSection({ colour: '{control.cap.start}' }) },
       }),
       labelCurrent: createPartNode('labelCurrent', {
         role: 'labelCurrent',
         zIndex: 5,
-        sections: { Text: textSection({ colour: 'FFF6F6F6' }) },
+        sections: { Text: textSection({ colour: '{control.cap}' }) },
       }),
       labelEnd: createPartNode('labelEnd', {
         role: 'labelEnd',
         zIndex: 5,
-        sections: { Text: textSection({ colour: 'FF55C79A' }) },
+        sections: { Text: textSection({ colour: '{control.cap.end}' }) },
       }),
       labelValue: createPartNode('labelValue', {
         role: 'labelValue',
@@ -213,12 +213,12 @@ export function createSliderSemanticParts() {
       labelTitle: createPartNode('labelTitle', {
         role: 'labelTitle',
         zIndex: 6,
-        sections: { Text: textSection({ size: 11, weight: 700, colour: 'FFB8C7D8' }) },
+        sections: { Text: textSection({ size: 11, weight: 700, colour: '{text.muted}' }) },
       }),
       labelUnit: createPartNode('labelUnit', {
         role: 'labelUnit',
         zIndex: 6,
-        sections: { Text: textSection({ size: 10, weight: 600, colour: 'FFB8C7D8' }) },
+        sections: { Text: textSection({ size: 10, weight: 600, colour: '{text.muted}' }) },
       }),
     },
   };
