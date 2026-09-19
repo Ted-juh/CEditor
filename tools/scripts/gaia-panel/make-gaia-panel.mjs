@@ -20,11 +20,20 @@ import { parameterAdoptionPatches } from '../../../CE/web/src/CE_Application/uti
 import { createPanel, serializePanel } from '../../../CE/web/src/CE_Application/stores/panelModel.js';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { ARP_STRIP, COMMON_STRIP, EFFECTS_STRIP, PANEL_WIDTH, SKIN, TONE_STRIP } from './layout.mjs';
-import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from './components.mjs';
+import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, gaiaSectionTab, gaiaHardwareSyncStatus } from './components.mjs';
 import { ARP_LANES, arpBridgeScript } from './arp-bridge.mjs';
 import { EFFECT_PARAMETER_NAMES, effectLabelScript } from './effect-parameters.mjs';
 import { effectProbeScript } from './effect-probe.mjs';
+import { presetNamesScript } from './preset-names.mjs';
+import { applyArpeggioLabels } from './arpeggio-labels.mjs';
+import { applyStatusDisplay, moveStatusDisplayToBottom } from './status-display.mjs';
+import { applyEditableEnvelopes } from './editable-envelopes.mjs';
 import { readCommitted } from '../readCommitted.mjs';
+import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
+import { applyToneControls } from './tone-controls.mjs';
+import { applyPerformanceLayout } from './performance-layout.mjs';
+import { applyGaiaTabStyle } from './tab-style.mjs';
+import { applyCompactHeader } from './compact-header.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -38,7 +47,7 @@ const DEFAULT_OUT = path.join(REPO, 'CE/panels/Roland GAIA SH-01.cepanel');
  * that name to a port. So the name has to be one a person would recognise in a list of their gear.
  *
  * This said `primary` by accident, which was worse than ugly: nothing in the app could configure a
- * device by that name, so all 183 bindings resolved no mapping and failed with "Not sent: unresolved
+ * device by that name, so all 189 bindings resolved no mapping and failed with "Not sent: unresolved
  * profile for primary" whichever port was chosen. Naming it after the instrument means the device
  * shows up in Settings already called the right thing, and anyone who calls their GAIA something
  * else can rename it there — which rewrites these bindings to match.
@@ -90,6 +99,7 @@ function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bo
       _children: {
         Font: { size, bold, weight: bold ? 'Bold' : 'Regular', weightValue: bold ? 700 : 400, letterSpacing: 0.3 },
         Fill: { colour },
+        Position: { justification: align === 'center' ? 'centred' : align },
         // A caption is one or two short words under a control. Left to its own devices it breaks
         // mid-word — "PORTAMENTO" came out as "PORTAME / NTO" — which no instrument does and no
         // reader forgives. Word wrapping, two lines at most, and shrink rather than break.
@@ -128,25 +138,61 @@ function sectionBox(box, originX, originY) {
     },
   });
 
-  const tab = createControl('Label', {
-    Core: { id: nextId('tab'), name: `tab_${box.title}` },
-    Transform: { x: x + 2, y: y + 2, width: Math.min(box.w - 4, Math.max(64, box.title.length * 9 + 22)), height: 20 },
-    Text: {
-      content: box.title,
-      _children: {
-        Font: { size: 11, bold: true, weight: 'Bold', weightValue: 700, letterSpacing: 1 },
-        Fill: { colour: 'FF13161A' },
-      },
-    },
-    Background: { _children: { Fill: { colour: box.tint }, Border: { enabled: false, thickness: 0 }, Corners: { radius: 4 } } },
-    ContentLayout: { mode: 'text_only', horizontalAlign: 'center', verticalAlign: 'center', paddingLeft: 8, paddingRight: 8, paddingTop: 1, paddingBottom: 1 },
-  });
+  const tabWidth = Math.min(box.w - 4, Math.max(64, box.title.length * 9 + 22));
+  const tab = gaiaSectionTab({ title: box.title, width: tabWidth, height: 20, tint: box.tint });
+  tab._children.Core.id = nextId('tab');
+  tab._children.Core.name = `tab_${box.title}`;
+  Object.assign(tab._children.Transform, { x: x + 2, y: y + 2, width: tabWidth, height: 20 });
 
   // An optional printed caveat along the bottom of the box, where whoever is looking at the knobs
   // will see it. The notepad already says this; the notepad is not where anyone is looking.
   if (!box.note) return [frame, tab];
   return [frame, tab, label(box.note, { x: x + 8, y: y + box.h - 15, w: box.w - 16, h: 12 },
     { size: 7, colour: SKIN.labelDim, align: 'center' })];
+}
+
+/**
+ * The slim rail over each repeated voice.
+ *
+ * Three complete tone strips are the screen's main advantage over the hardware, but without a
+ * shared rail they looked like fifteen unrelated boxes. This line binds the boxes into one voice
+ * and prints the same left-to-right signal path Roland uses on the top panel.
+ */
+function toneFlowHeader(tone, y) {
+  const rail = createControl('Background', {
+    Core: { id: nextId('voice_rail'), name: `tone${tone}.signalFlow` },
+    Transform: { x: 16, y, width: 1560, height: 18 },
+    Background: {
+      _children: {
+        Fill: { colour: 'FF1C2125' },
+        Border: { enabled: true, thickness: 1, colour: 'FF46515B' },
+        Corners: { radius: 4 },
+      },
+    },
+  });
+  const lamp = createControl('Background', {
+    Core: { id: nextId('voice_lamp'), name: `tone${tone}.lamp` },
+    Transform: { x: 24, y: y + 5, width: 8, height: 8 },
+    Background: {
+      _children: {
+        Fill: { colour: 'FFFF3B30' },
+        Border: { enabled: true, thickness: 1, colour: 'FF210908' },
+        Corners: { radius: 999 },
+      },
+    },
+  });
+  return [
+    rail,
+    lamp,
+    label(`TONE ${tone}`, { x: 38, y: y + 1, w: 82, h: 16 },
+      { size: 11, bold: true, colour: 'FFE8EEF4', align: 'left' }),
+    label('VOICE SIGNAL PATH', { x: 124, y: y + 1, w: 140, h: 16 },
+      { size: 8, colour: SKIN.labelDim, align: 'left' }),
+    label('AUDIO: OSC  →  FILTER  →  AMP     ·     LFO: PITCH / FILTER / AMP MODULATION', { x: 292, y: y + 1, w: 900, h: 16 },
+      { size: 9, bold: true, colour: 'FFC6D0D8' }),
+    label('MOD LFO · MIDI-ONLY VOICE MODULATION', { x: 1284, y: y + 1, w: 286, h: 16 },
+      { size: 8, colour: SKIN.labelDim, align: 'right' }),
+  ];
 }
 
 /**
@@ -210,6 +256,13 @@ function bound(parameter, type, box, overrides = {}, make = null) {
   for (const [dotted, value] of Object.entries(parameterAdoptionPatches(type, parameter))) {
     setPath(control, dotted, value);
   }
+  // GAIA OFF/ON selectors use boolean buttons, not an enum cycler with no enumValues.
+  if (type === 'ToggleButton' && parameter.choices?.length === 2
+    && parameter.choices.some(c => c.value === 0) && parameter.choices.some(c => c.value === 1)) {
+    control._children.Behavior.valueType = 'bool';
+    control._children.Behavior.defaultValue = parameter.choices.find(c => c.id === parameter.default)?.value === 1;
+  }
+  if (type === 'Number') control._children.Behavior.defaultValue = parameter.default;
   for (const [dotted, value] of Object.entries(overrides)) setPath(control, dotted, value);
   return control;
 }
@@ -301,10 +354,11 @@ const KINDS = {
     const options = (parameter.choices ?? []).map((choice) => ({ label: choice.label, value: choice.value }));
     if (options.length === 0) return KINDS.ledsLegacy(parameter, spec, at);
 
-    const build = () => gaiaLeds({ options, width: SKIN.ledW, rowHeight: SKIN.ledRow });
+    const w = spec.w ?? SKIN.ledW;
+    const build = () => gaiaLeds({ options, width: w, rowHeight: SKIN.ledRow });
     const h = options.length * SKIN.ledRow + 8;
-    const control = boundCustom(parameter, build, { x: at.x, y: at.y, w: SKIN.ledW, h });
-    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w: SKIN.ledW } : null, bottom: at.y + h };
+    const control = boundCustom(parameter, build, { x: at.x, y: at.y, w, h });
+    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x + 3, y: at.y - 14, w: w - 3, align: 'left' } : null, bottom: at.y + h };
   },
 
   // Same component at the pre-glyph width, for option lists the instrument prints as words —
@@ -313,10 +367,10 @@ const KINDS = {
   ledsNarrow: (parameter, spec, at) => {
     const options = (parameter.choices ?? []).map((choice) => ({ label: choice.label, value: choice.value }));
     if (options.length === 0) return KINDS.ledsLegacy(parameter, spec, at);
-    const w = 104;
+    const w = spec.w ?? 104;
     const h = options.length * SKIN.ledRow + 8;
     const control = boundCustom(parameter, () => gaiaLeds({ options, width: w, rowHeight: SKIN.ledRow }), { x: at.x, y: at.y, w, h });
-    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w } : null, bottom: at.y + h };
+    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x + 3, y: at.y - 14, w: w - 3, align: 'left' } : null, bottom: at.y + h };
   },
 
   ledsLegacy: (parameter, spec, at) => {
@@ -391,7 +445,7 @@ const KINDS = {
   },
 
   toggle: (parameter, spec, at) => {
-    const control = bound(parameter, 'ToggleButton', { x: at.x, y: at.y, w: spec.w ?? 80, h: 22 }, {
+    const control = bound(parameter, 'ToggleButton', { x: at.x, y: at.y, w: spec.w ?? 80, h: spec.h ?? 22 }, {
       'Text.content': spec.label,
       'Background._children.Corners.radius': 4,
       // 12pt in a 22px-tall button is what wrapped PORTAMENTO across two lines and clipped it.
@@ -406,12 +460,14 @@ const KINDS = {
       'ContentLayout.paddingTop': 2,
       'ContentLayout.paddingBottom': 2,
     });
-    return { controls: [control], caption: null, bottom: at.y + 22 };
+    const selected = control._children.States?._children?.Selected;
+    if (selected) selected.patches.component = { 'Background.Fill.colour': 'FFAA3445', 'Background.Border.colour': 'FFFF7B8B', 'Text.Fill.colour': 'FFFFFFFF' };
+    return { controls: [control], caption: spec.caption ? { text: spec.caption, x: at.x, y: at.y - 20, w: spec.w ?? 80 } : null, bottom: at.y + (spec.h ?? 22) };
   },
 
   combo: (parameter, spec, at) => {
     const control = bound(parameter, 'Combobox', { x: at.x, y: at.y, w: spec.w ?? 100, h: 24 });
-    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 13, w: spec.w ?? 100 } : null, bottom: at.y + 24 };
+    return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - (spec.captionOffset ?? 13), w: spec.w ?? 100 } : null, bottom: at.y + 24 };
   },
 
   text: (parameter, spec, at) => {
@@ -448,8 +504,19 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
 
     if (box.grid) {
       const g = box.grid;
-      controls.push(placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps }),
-        'arp_pattern_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h }));
+      controls.push(label('RULER: CLICK / DRAG = END STEP     |     NOTE: LEFT = MOVE   ·   MIDDLE = VELOCITY   ·   RIGHT = LENGTH   ·   SHIFT = FINE',
+        { x: originX + box.x + g.x, y: originY + box.y + 23, w: g.w, h: 16 },
+        { size: 9, colour: SKIN.labelDim, align: 'left', name: 'arp_gesture_guide' }));
+      const grid = placeStatic(gaiaArpGrid({ width: g.w, height: g.h, steps: g.steps }),
+        'arp_pattern_grid', { x: originX + box.x + g.x, y: originY + box.y + CONTENT_TOP + g.y, w: g.w, h: g.h });
+      grid._children.Designer.patternEditing = { kind: 'gaia', mode: 'manual' };
+      grid._children.DeviceBindings = { _type: 'DeviceBindings', enabled: true, bindings: [{
+        kind: 'deviceParameter', port: 'arpEndStep', deviceRole: DEVICE_NAME,
+        parameterId: 'arp.endStep', parameterType: byId.get('arp.endStep').type,
+        adoptMetadata: false, dryRun: false,
+        feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
+      }] };
+      controls.push(grid);
     }
 
     for (const spec of box.controls) {
@@ -458,12 +525,14 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
 
       const at = { x: originX + box.x + spec.x, y: originY + box.y + CONTENT_TOP + spec.y };
       const built = KINDS[spec.kind](parameter, spec, at);
-      controls.push(...built.controls);
+      // Reserve the retired knob/caption IDs so existing panels and scripts keep stable IDs.
+      if (!spec.rulerOnly) controls.push(...built.controls);
       if (built.caption) {
-        controls.push(label(built.caption.text, {
+        const caption = label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label, name: spec.captionName ?? 'label' }));
+        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center', name: spec.captionName ?? 'label' });
+        if (!spec.rulerOnly) controls.push(caption);
       }
     }
   }
@@ -476,23 +545,26 @@ const NOTES = `Roland GAIA SH-01 — editor panel.
 Generated by tools/scripts/gaia-panel/make-gaia-panel.mjs from
 CE/profiles/test/roland-gaia-sh01.ceditor-device.json. Do not hand-edit — change layout.mjs.
 
-The layout is the instrument's
-  Left to right is the signal path, the way the SH-01 prints it: LFO -> OSC -> FILTER -> AMP.
-  Blue for the LFO, amber for OSC/FILTER/AMP, the same as the panel. Envelopes are fader banks,
-  not knobs, with the envelope curve printed over each bank the way the silkscreen does. WAVE,
+The layout is the instrument's:
+  Audio flows OSC -> FILTER -> AMP; the LFO separately modulates those sections.
+  Blue for the LFO, amber for OSC/FILTER/AMP/EFFECTS, the same as the panel. Envelopes are fader banks,
+  not knobs, with an editable envelope curve over each bank in the silkscreen's position. WAVE,
   FILTER MODE, LFO SHAPE and the rest are LED columns with every option visible, not dropdowns —
   because that is how you read them on the hardware — and each option carries its wave GLYPH, not
   the word for it, for the same reason.
 
-  The envelope drawings are printed, not driven: they do not move when the faders do. The Envelope
-  component declares attack/decay/sustain/release ports, but inbound device sync only reflects
-  value / state / selectedChoice / text / brightness / backlight, so wiring them would look live
-  and be dead. A drawing that is honestly a drawing beats a control that lies.
+  The envelope graphs share their stage values with the faders, including incoming MIDI updates.
+  Drag A/D/R horizontally; D vertically sets sustain level. S moves horizontally at D height,
+  changing only the illustrated key-hold duration (not a synth parameter). Shift-drag is fine.
+  A/D/S/R keys select a handle,
+  arrows adjust it, and Escape restores a cancelled drag. Graphs show relative stage settings,
+  not calibrated milliseconds. The oscillator has AD only; filter and amp each have ADSR.
 
 Three tones, all visible
   The instrument has one strip and a TONE SELECT button, because it has one set of knobs. A screen
-  does not need that compromise, so all three are here. MOD LFO is set apart in grey: it is a real
-  part of every tone but it is not on the front panel, so it should not look like it is.
+  does not need that compromise, so all three are here and every MIDI-exposed tone parameter is
+  present. MOD LFO is set apart in grey: it is a real part of every tone but it is not on the front
+  panel, so it should not look like it is.
 
 The effects are honest, not pretty
   The hardware's EFFECTS section is SELECT CONTROL, CONTROL 1/2/3 and LEVEL — five knobs whose
@@ -522,8 +594,132 @@ The arpeggiator is a grid, because that is what it is
   The grid's note rows are still a 12-row piano-roll view rather than the hardware's sixteen fixed
   lanes; the lanes are assigned by ascending note when the pattern is written.
 
+Patch bank names
+  Open PATCH BANKS, choose USER / PRESET / USB / PCM, then READ NAMES FROM GAIA.
+  Every slot shows its bank number and the actual twelve-character name returned by the synth.
+  USER reads use 20 nn 00 00 directly and do not change the selected sound.
+  PRESET, USB and PCM reads select each patch, verify System bank/program, and read 10 00 00 00.
+  Save unsaved edits before those scans; the confirmation explains this. No stored patch is written.
+  The original patch is reselected on completion or STOP, but unsaved edits cannot be recovered.
+  Names are cached with the panel (save it after scanning); [not read] is explicitly unknown.
+  A timeout or invalid reply does not replace a cached name. Refresh USER/USB after changing patches.
+
 Not here
   No keyboard: this edits a patch, and the synth has its own keys.`;
+
+function tabs(name, x, y, width, height, pages, stripSize = 28) {
+  const control = createControl('TabContainer', {
+    Core: { id: nextId(name), name }, Transform: { x, y, width, height },
+    TabContainer: { pages: pages.map(({ id, title }) => ({ id, label: title })), pageIndex: 0,
+      stripSize, stripColour: SKIN.plate, tabColour: 'FF252C32', activeTabColour: 'FF8894A0',
+      labelColour: 'FFBAC5CE', activeLabelColour: 'FF10171D' },
+    Children: { padding: 0, clipChildren: true },
+    Background: { _children: { Fill: { colour: SKIN.plate }, Border: { enabled: false } } },
+  });
+  control._children.Children._children = {};
+  for (const page of pages) for (const child of page.controls) {
+    child._children.Core.tabPageId = page.id;
+    control._children.Children._children[child._children.Core.id] = child;
+  }
+  return control;
+}
+
+function patchBanks(profile, scripts) {
+  const pages = ['preset', 'user', 'usb', 'preset-pcm'].map((bankId) => {
+    const bank = profile.presets.banks.find((b) => b.id === bankId);
+    const controls = [];
+    const groups = bank.slotCount / 8;
+    for (let group = 0; group < groups; group++) {
+      const letter = 'ABCDEFGH'[group];
+      const x = 8 + group * 194;
+      controls.push(label(bankId === 'preset-pcm' ? 'PCM' : `BANK ${letter}`, { x, y: 2, w: 182, h: 16 }, { bold: true, size: 10 }));
+      controls.at(-1)._children.Core.name = `patch_bank_header_${bankId.replace(/-/g, '_')}_${letter}`;
+      for (let note = 0; note < 8; note++) {
+        const slot = bank.startSlot + group * 8 + note;
+        const name = `recall_${bankId.replace(/-/g, '_')}_${letter}${note + 1}`;
+        const button = createControl('Button', {
+          Core: { id: nextId(name), name, description: `Recall ${bank.label} ${letter}-${note + 1}; does not store or overwrite a patch.` },
+          Transform: { x, y: 22 + note * 19, width: 182, height: 17 },
+          Text: { content: `${bankId === 'preset-pcm' ? `PCM ${note + 1}` : `${letter}-${note + 1}`}  [not read]`, _children: { Font: { size: 11 }, Position: { justification: 'left' } } },
+          Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
+          ContentLayout: { horizontalAlign: 'left', paddingLeft: 8, paddingRight: 4, paddingTop: 0, paddingBottom: 0 },
+        });
+        controls.push(button);
+        scripts.push(createScript({ id: name, name: `Recall ${bank.label} ${letter}-${note + 1}`, scope: 'panel', target: name,
+          language: 'javascript', event: 'onClick',
+          source: `function onClick() { run("gaiaNamesRecall", ${slot}); }` }));
+      }
+    }
+    if (groups === 1) controls.push(label('PCM PRESETS  ·  8 SLOTS\nPatch recall only — no memory writes.', { x: 220, y: 55, w: 800, h: 60 }, { size: 14, align: 'left' }));
+    for (const [suffix, title, x, width, action, arg] of [
+      ['read', 'READ NAMES FROM GAIA', 8, 182, 'gaiaNamesScan', bankId],
+      ['stop', 'STOP', 202, 76, 'gaiaNamesStop', null],
+    ]) {
+      const name = `names_${suffix}_${bankId.replace(/-/g, '_')}`;
+      controls.push(createControl('Button', {
+        Core: { id: nextId(name), name },
+        Transform: { x, y: 178, width, height: 22 },
+        Text: { content: title, _children: { Font: { size: 10 } } },
+        Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
+      }));
+      scripts.push(createScript({ id: name, name: title, scope: 'panel', target: name, language: 'javascript', event: 'onClick',
+        source: `function onClick() { run(${JSON.stringify(action)}, ${JSON.stringify(arg)}); }` }));
+    }
+    const info = label('READ NAMES fetches actual patch names from the connected GAIA.', { x: 290, y: 178, w: 1258, h: 22 }, { size: 10, align: 'left' });
+    // Explicit IDs do not disturb IDs referenced by previously saved panel scripts.
+    const checkName = `names_check_${bankId.replace(/-/g, '_')}`;
+    controls.push(createControl('Button', {
+      Core: { id: `gaia_${checkName}`, name: checkName, tooltip: 'Read current bank/program without changing sounds or writing memory.' },
+      Transform: { x: 290, y: 178, width: 132, height: 22 },
+      Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 } } },
+      Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
+    }));
+    scripts.push(createScript({ id: checkName, name: 'Check current patch', scope: 'panel', target: checkName, language: 'javascript', event: 'onClick',
+      source: 'function onClick() { run("gaiaNamesCheck"); }' }));
+    info._children.Transform.x = 434;
+    info._children.Transform.width = 1114;
+    info._children.Text._children.Font.size = 9;
+    info._children.Core.name = `names_status_${bankId.replace(/-/g, '_')}`;
+    controls.push(info);
+    return { id: bank.id, title: bankId === 'preset' ? 'PRESET / ROM' : bankId === 'usb' ? 'USB MEMORY' : bankId === 'user' ? 'USER' : 'PCM / ROM', controls };
+  });
+  return tabs('patch_banks', 0, 0, 1560, 228, pages, 24);
+}
+
+function systemPage(byId) {
+  const controls = [];
+  const groups = [
+    { title: 'MASTER / CLOCK', x: 0, w: 252, ids: ['masterLevel', 'masterTune', 'patchRemain', 'clockSource', 'tempo', 'powerSave'], labels: ['MASTER LEVEL', 'TUNE (cent)', 'PATCH REMAIN', 'CLOCK SOURCE', 'TEMPO (BPM)', 'POWER SAVE'] },
+    { title: 'CONTROLLERS', x: 262, w: 270, ids: ['keyboardVelocity', 'pedalPolarity', 'pedalAssign', 'dBeamSens', 'rxTxChannel'], labels: ['KEY VELOCITY', 'PEDAL POLARITY', 'PEDAL ASSIGN', 'D BEAM SENS', 'MIDI CHANNEL'] },
+    { title: 'MIDI', x: 542, w: 280, ids: ['midiUsbThru', 'softThru', 'rxProgramChange', 'rxBankSelect', 'remoteKeyboard', 'txProgramChange', 'txBankSelect', 'txEditData'], labels: ['MIDI–USB THRU', 'SOFT THRU', 'RX PROGRAM', 'RX BANK', 'REMOTE KEYBOARD', 'TX PROGRAM', 'TX BANK', 'TX EDIT DATA'] },
+    { title: 'RECORDER / ADDRESS', x: 832, w: 310, ids: ['recorderSyncOutput', 'metronomeMode', 'metronomeLevel', 'bankSelectMsb', 'bankSelectLsb', 'programNumber'], labels: ['SYNC OUTPUT', 'METRONOME', 'CLICK LEVEL', 'BANK MSB (RAW)', 'BANK LSB (RAW)', 'PROGRAM (0–127)'] },
+  ];
+  for (const group of groups) {
+    controls.push(...sectionBox({ ...group, y: 0, h: 292, tint: 'FF98A4AE' }, 0, 0));
+    group.ids.forEach((id, i) => {
+      const parameter = byId.get(`system.${id}`);
+      if (!parameter) throw new Error(`Missing System parameter ${id}`);
+      const y = 38 + i * 29;
+      const inputWidth = group.title === 'CONTROLLERS' ? 130 : 112;
+      const x = group.x + group.w - inputWidth - 10;
+      controls.push(label(group.labels[i], { x: group.x + 8, y, w: x - group.x - 14, h: 23 }, { size: 9, align: 'left' }));
+      const input = bound(parameter, parameter.choices ? 'Combobox' : 'Number', { x, y, w: inputWidth, h: 23 });
+      controls.push(input);
+    });
+  }
+  const x = 1152;
+  controls.push(...sectionBox({ title: 'USER PATCH WRITE PROTECT', x, y: 0, w: 408, h: 292, tint: 'FF98A4AE' }, 0, 0));
+  controls.push(label('LIT = PROTECTED   ·   Click one slot to change', { x: x + 8, y: 27, w: 390, h: 16 }, { size: 9, align: 'left' }));
+  for (let bank = 0; bank < 8; bank++) {
+    for (let slot = 1; slot <= 8; slot++) {
+      const key = `${'ABCDEFGH'[bank]}${slot}`;
+      const parameter = byId.get(`system.writeProtect${key}`);
+      controls.push(...KINDS.toggle(parameter, { label: `${'ABCDEFGH'[bank]}-${slot}`, w: 44, h: 23 },
+        { x: x + 10 + slot * 48 - 48, y: 52 + bank * 28 }).controls);
+    }
+  }
+  return controls;
+}
 
 export function buildGaiaPanel() {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
@@ -533,6 +729,7 @@ export function buildGaiaPanel() {
   const panel = createPanel('Roland GAIA SH-01');
   const controls = [];
   const missing = [];
+  const bankScripts = [];
 
   // The dark control plate the sections sit on, and the white body around it. Emitted first so
   // everything else lands on top — the panel has no z-order beyond document order.
@@ -552,13 +749,16 @@ export function buildGaiaPanel() {
 
   // Header, then three tone strips, then arpeggio + effects.
   let y = 26;
-  const common = buildStrip(COMMON_STRIP, byId, { originX: 16, originY: y });
-  controls.push(...common.controls);
+  const common = buildStrip(COMMON_STRIP, byId, { originX: 0, originY: 0 });
+  controls.push(tabs('top_pages', 16, y, 1560, 256, [
+    { id: 'controls', title: 'CONTROLS', controls: common.controls },
+    { id: 'banks', title: 'PATCH BANKS — RECALL', controls: [patchBanks(profile, bankScripts)] },
+  ]));
   missing.push(...common.missing);
-  y += COMMON_STRIP.height;
+  y += 264;
 
   for (const tone of [1, 2, 3]) {
-    controls.push(label(`TONE ${tone}`, { x: 16, y: y - 2, w: 90, h: 16 }, { size: 12, bold: true, colour: 'FFE8EEF4', align: 'left' }));
+    controls.push(...toneFlowHeader(tone, y - 2));
     const strip = buildStrip(TONE_STRIP, byId, {
       originX: 16,
       originY: y + 16,
@@ -575,10 +775,17 @@ export function buildGaiaPanel() {
   missing.push(...effects.missing);
   y += EFFECTS_STRIP.height;
 
-  const arp = buildStrip(ARP_STRIP, byId, { originX: 16, originY: y });
-  controls.push(...arp.controls);
+  const arp = buildStrip(ARP_STRIP, byId, { originX: 0, originY: 0 });
+  const feedback = gaiaHardwareSyncStatus();
+  Object.assign(feedback._children.Core, { id: 'gaia_hardware_sync_status', name: 'gaia_hardware_sync_status' });
+  Object.assign(feedback._children.Transform, { x: 196, y: 2 });
+  arp.controls.push(feedback); // Dedicated ID: inserting this must not renumber existing controls.
+  controls.push(tabs('bottom_pages', 16, y, 1560, 320, [
+    { id: 'arpeggiator', title: 'ARPEGGIATOR', controls: arp.controls },
+    { id: 'system', title: 'SYSTEM', controls: systemPage(byId) },
+  ]));
   missing.push(...arp.missing);
-  y += ARP_STRIP.height;
+  y += 328;
 
   if (missing.length) {
     throw new Error(`layout.mjs places parameters the profile does not have:\n  ${[...new Set(missing)].join('\n  ')}`);
@@ -598,7 +805,7 @@ export function buildGaiaPanel() {
   panel.bgColour = SKIN.panelBg;
   panel.gridEnabled = false;
   panel.snapToGrid = false;
-  panel.description = 'Roland GAIA SH-01 — all three tones, laid out like the instrument';
+  panel.description = 'Roland GAIA SH-01 — three complete tones, hardware-style signal flow, 32-step arpeggiator';
   panel.requiredProfiles = [{ role: DEVICE_NAME, profileId: profile.id, version: '*' }];
   panel.notepad = { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: NOTES }] };
   // The grid actually reaches the synth now — see arp-bridge.mjs. A panel-scope script rather than
@@ -607,6 +814,7 @@ export function buildGaiaPanel() {
   // of MIDI for moving one block one step.
   panel.scripts = [createScript({
     id: 'gaia_arp_pattern_bridge',
+    enabled: false, // Replaced by explicit, validated Read/Send Pattern in the grid toolbar.
     name: 'Arpeggio pattern → synth',
     language: 'javascript',
     scope: 'panel',
@@ -614,11 +822,16 @@ export function buildGaiaPanel() {
     target: '*',
     description: 'Writes the drawn arpeggio grid to the GAIA\'s sixteen Patch Arpeggio Pattern blocks.',
     source: arpBridgeScript('arp_pattern_grid', { lanes: ARP_LANES, steps: ARP_STRIP.boxes[0].grid.steps }),
-  })];
+  }), createScript({
+    id: 'gaia_preset_names', name: 'Patch bank names from GAIA', language: 'javascript',
+    scope: 'panel', event: 'onPanelLoad', target: '*',
+    description: 'Reads and caches real SH-01 patch names. User reads never select a patch. ROM/USB scans ask before switching sounds.',
+    source: presetNamesScript(profile, DEVICE_NAME),
+  }), ...bankScripts];
 
   // The effect knobs' captions, IF anyone has filled in the names table. Null while it is empty,
   // so the panel carries no dead script waiting for the owner's manual — see effect-parameters.mjs.
-  const relabel = effectLabelScript(effectLabelBlocks(controls, byId));
+  const relabel = effectLabelScript(effectLabelBlocks(flatControls(controls), byId));
   if (relabel) {
     panel.scripts.push(createScript({
       id: 'gaia_effect_parameter_labels',
@@ -657,7 +870,7 @@ export function buildGaiaPanel() {
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
 
-  return panel;
+  return applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile)))))));
 }
 
 export function serializeGaiaPanel() {

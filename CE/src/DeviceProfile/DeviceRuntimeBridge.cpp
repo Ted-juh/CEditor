@@ -119,7 +119,7 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
             auto result = s.compileParameterMessage (p, true);
             e ("deviceParameterSet", result);
             e ("midiPreview", result);
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
             e ("deviceSessionState", s.getSessionState());
         }))
         .withEventListener ("compileRawMidiAction", on ([] (S& s, E e, const juce::var& p)
@@ -131,7 +131,7 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
             auto result = s.compileRawMidiAction (p, true);
             e ("rawMidiActionTriggered", result);
             e ("rawMidiPreview", result);
-            e ("midiMonitorEvents", s.getMonitorEvents());
+            s.publishMonitorEvents();
             e ("deviceSessionState", s.getSessionState());
         }))
         .withEventListener ("parseDumpMessage", on ([] (S& s, E e, const juce::var& p)
@@ -144,9 +144,8 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
         .withEventListener ("ingestIncomingMidiMessage", on ([] (S& s, E e, const juce::var& p)
         {
             e ("incomingMidiIngested", s.ingestIncomingMidiMessage (p));
-            e ("deviceRuntimeState", s.getRuntimeState());
-            e ("midiMonitorEvents", s.getMonitorEvents());
-            e ("deviceSessionState", s.getSessionState());
+            // The service publishes the same events as hardware input, including
+            // coalesced monitor snapshots. Do not resend an unchanged runtime cache.
         }))
         .withEventListener ("requestMidiCiDiscovery", on ([] (S& s, E e, const juce::var& p)
         {

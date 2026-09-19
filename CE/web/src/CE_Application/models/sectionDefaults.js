@@ -2063,6 +2063,8 @@ export const SECTION_DEFAULTS = {
       { id: 'p1', label: 'Page 2' },
     ],
     // Colours.
+    appearance: 'flat',
+    accentColour: 'FFE2A52C',
     stripColour: 'FF1B1B20',
     tabColour: 'FF26262E',
     activeTabColour: 'FF3A5A80',

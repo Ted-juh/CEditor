@@ -1,0 +1,10 @@
+3x bg #E0A030FF
+1x radius 5px 5px 5px 5px
+1x font-family Arial
+1x font-size 11px
+1x font-style normal
+1x font-weight 700
+1x line-height 1
+1x text-align center
+1x white-space nowrap
+1x transform none

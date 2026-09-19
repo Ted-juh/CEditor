@@ -21,6 +21,8 @@ export const DEFAULT_GENERAL_SETTINGS = {
   // the GAIA 237 instead of 413. Preview has always folded, so leaving this off also meant the
   // editor and the preview were doing different work on the same panel.
   foldSceneryInEditor: true,
+  backgroundPreviewPreparation: true,
+  previewPreparationDelayMs: 800,
   insertOffset: 20,
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,
@@ -71,6 +73,8 @@ export const showPreviewSelectionRing = writable(DEFAULT_GENERAL_SETTINGS.showPr
 // folds unconditionally because nothing there can select anything; this is the half that has to
 // earn its place on real panels first.
 export const foldSceneryInEditor = writable(DEFAULT_GENERAL_SETTINGS.foldSceneryInEditor);
+export const backgroundPreviewPreparation = writable(DEFAULT_GENERAL_SETTINGS.backgroundPreviewPreparation);
+export const previewPreparationDelayMs = writable(DEFAULT_GENERAL_SETTINGS.previewPreparationDelayMs);
 export const insertOffset = writable(DEFAULT_GENERAL_SETTINGS.insertOffset);
 export const duplicateOffset = writable(DEFAULT_GENERAL_SETTINGS.duplicateOffset);
 export const keyboardNudgeSmall = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall);
@@ -93,6 +97,8 @@ export function applyGeneralSettingsToRuntime(settings) {
   showDistances.set(settings.showDistances);
   showPreviewSelectionRing.set(settings.showPreviewSelectionRing);
   foldSceneryInEditor.set(settings.foldSceneryInEditor);
+  backgroundPreviewPreparation.set(settings.backgroundPreviewPreparation !== false);
+  previewPreparationDelayMs.set(settings.previewPreparationDelayMs ?? 800);
   insertOffset.set(settings.insertOffset);
   duplicateOffset.set(settings.duplicateOffset);
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);

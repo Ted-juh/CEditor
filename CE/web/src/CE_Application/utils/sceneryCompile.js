@@ -265,21 +265,14 @@ export function classifySceneryControls(controls) {
 
 /* ------------------------------------------------------------------ the cache */
 
-// One image per distinct drawing, keyed by a digest over exactly the fields that reach the SVG.
-// Same reasoning as staticPartBaking: JSON.stringify is exact and honest and costs more than the
-// work it is guarding. A collision draws the wrong picture, so the walk below covers every field
-// `controlElements` and `boxElement` read, and nothing is left implicit about which those are.
+// One image per distinct drawing, keyed by an exact description of the fields
+// that reach the SVG. MIDI bindings and other nonvisual edits reuse the image.
 const CACHE_LIMIT = 64;
 const byContent = new Map();
 
-function fold(hash, value) {
-  const text = typeof value === 'string' ? value : String(value);
-  let h = hash;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return (h ^ 0x2c) >>> 0;
+function fold(fields, value) {
+  fields.push(value);
+  return fields;
 }
 
 function foldControl(h, control) {
@@ -292,6 +285,7 @@ function foldControl(h, control) {
   const bg = children.Background?._children ?? {};
   const fill = bg.Fill ?? {};
   h = fold(h, fill.colour ?? '');
+  h = fold(h, fill.solidEnabled !== false);
   h = fold(h, fill.gradientEnabled === true ? 1 : 0);
   if (fill.gradientEnabled === true && fill.gradient) {
     const g = fill.gradient;
@@ -320,9 +314,9 @@ function foldControl(h, control) {
 }
 
 function digestOf(controls, width, height) {
-  let h = fold(fold(0x811c9dc5, width), height);
+  let h = fold(fold([], width), height);
   for (const control of controls) h = foldControl(h, control);
-  return h >>> 0;
+  return JSON.stringify(h);
 }
 
 export const sceneryCacheSize = () => byContent.size;

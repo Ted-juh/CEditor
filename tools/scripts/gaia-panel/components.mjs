@@ -117,7 +117,10 @@ function text(name, content, { x, y, width, height }, { size = 9, colour = 'FFC3
   section._children.Font.family = 'Arial';
   section._children.Font.weightValue = 600;
   section._children.Font.weight = 'SemiBold';
-  section._children.Position.justification = align === 'left' ? 'centredLeft' : 'centred';
+  // InteractivePartRenderer recognizes `left` / `near`, not JUCE's `centredLeft` spelling. The
+  // latter silently falls through to centred, which is why short selector labels wandered toward
+  // the middle of differently sized controls even though their part x coordinates matched.
+  section._children.Position.justification = align === 'left' ? 'left' : 'centred';
 
   return createPartNode(name, {
     role: 'custom',
@@ -183,10 +186,53 @@ function component({
   return control;
 }
 
+/* ------------------------------------------------------------------ section chrome */
+
+/**
+ * A GAIA section-name tab attached to the section outline.
+ *
+ * The tab is not a floating rounded pill. Its outside top-left corner continues the rounded
+ * section outline; the top-right and both lower corners are square where the printed colour block
+ * terminates against the panel. A rounded base plus two same-colour masks expresses that mixed
+ * corner geometry without pretending the renderer has independent per-corner radii.
+ */
+export function gaiaSectionTab({ title, width, height = 20, tint }) {
+  const corner = 5;
+  const titlePart = text('title', title, {
+    x: 0, y: 1, width, height: height - 2,
+  }, { size: 11, colour: 'FF13161A', align: 'left' });
+  titlePart._children.Text._children.Font.weight = 'Bold';
+  titlePart._children.Text._children.Font.weightValue = 700;
+  titlePart._children.Text._children.Font.letterSpacing = 1;
+
+  return component({
+    name: `GAIA Section Tab ${title}`,
+    width,
+    height,
+    parts: {
+      body: rect('body', { x: 0, y: 0, width, height }, tint, { zIndex: 0, radius: corner }),
+      // Square the inner end of the top edge while preserving the outside top-left curve.
+      topRight: rect('topRight', { x: width - corner, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
+      // Both lower corners meet the section interior at 90 degrees.
+      bottom: rect('bottom', { x: 0, y: height - corner, width, height: corner }, tint, { zIndex: 1 }),
+      title: titlePart,
+    },
+    // Pure chrome: unlike a knob or selector, a section tab must not publish a phantom automation
+    // parameter merely because it is implemented as a custom component.
+    channels: {},
+    published: {
+      _type: 'PublishedProperties', inputs: {}, outputs: {}, editableProperties: {},
+    },
+  });
+}
+
 const SLOT = 'FF0C0F11';
 const FILL = 'FF3D4C57';
-const CAP = 'FFE7ECF0';
-const CAP_LINE = 'FF11151800';
+// The SH-01 uses dark graphite caps. The earlier near-white caps were easy to see, but looked like
+// generic mixer faders and were the loudest repeated shape on the panel.
+const CAP = 'FF343B42';
+const CAP_EDGE = 'FF69737C';
+const CAP_LINE = 'FFB8C1C8';
 
 /**
  * A vertical fader: slot, fill, and a wide flat cap.
@@ -194,7 +240,7 @@ const CAP_LINE = 'FF11151800';
  * The cap travels by binding the value channel to its Layout.y. Top of travel is a small y and
  * bottom is a large one, so the range is written high-to-low — a fader at zero sits at the bottom.
  */
-export function gaiaFader({ width = 30, height = 108, ticks = 11 } = {}) {
+export function gaiaFader({ width = 30, height = 108, ticks = 11, legacySkin = false } = {}) {
   const slotX = Math.round(width / 2) - 4;
   const capH = 13;
   const travelTop = 2;
@@ -229,14 +275,28 @@ export function gaiaFader({ width = 30, height = 108, ticks = 11 } = {}) {
       ...scale,
       slot: rect('slot', { x: slotX, y: 4, width: 8, height: height - 8 }, SLOT, { zIndex: 1, radius: 4, borderColour: '66000000', borderThickness: 1 }),
       fill: rect('fill', { x: slotX + 1, y: height - 8, width: 6, height: 4 }, FILL, { zIndex: 2, radius: 3 }),
-      cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, CAP, { zIndex: 6, radius: 2, borderColour: CAP_LINE, borderThickness: 1 }),
-      capLine: rect('capLine', { x: 5, y: travelBottom + 6, width: width - 10, height: 1 }, '55000000', { zIndex: 7 }),
+      ...(legacySkin ? {
+        cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, 'FFE7ECF0', { zIndex: 6, radius: 2, borderColour: 'FF11151800', borderThickness: 1 }),
+        capLine: rect('capLine', { x: 5, y: travelBottom + 6, width: width - 10, height: 1 }, '55000000', { zIndex: 7 }),
+      } : {
+      cap: rect('cap', { x: 2, y: travelBottom, width: width - 4, height: capH }, CAP, {
+        zIndex: 6, radius: 2, borderColour: CAP_EDGE, borderThickness: 1,
+        gradient: linear(180, [[0, '56616A'], [42, '343B42'], [58, '242A2F'], [100, '171B1F']]),
+      }),
+      // A pale centre index and two fine moulding ribs give the cap the same readable, machined
+      // profile as the hardware without turning it back into a white slab.
+      capTopRib: rect('capTopRib', { x: 5, y: travelBottom + 3, width: width - 10, height: 1 }, '555E6972', { zIndex: 7 }),
+      capLine: rect('capLine', { x: 4, y: travelBottom + 6, width: width - 8, height: 1.5 }, CAP_LINE, { zIndex: 8, radius: 1 }),
+      capBottomRib: rect('capBottomRib', { x: 5, y: travelBottom + 10, width: width - 10, height: 1 }, '55101518', { zIndex: 7 }),
+      }),
     },
     behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical' }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
     bindings: {
       capY: binding('capY', 'channel.value.normalized', 'Parts.cap.Layout.y', { outputMin: travelBottom, outputMax: travelTop, round: true }),
+      ...(!legacySkin && { capTopRibY: binding('capTopRibY', 'channel.value.normalized', 'Parts.capTopRib.Layout.y', { outputMin: travelBottom + 3, outputMax: travelTop + 3, round: true }) }),
       capLineY: binding('capLineY', 'channel.value.normalized', 'Parts.capLine.Layout.y', { outputMin: travelBottom + 6, outputMax: travelTop + 6, round: true }),
+      ...(!legacySkin && { capBottomRibY: binding('capBottomRibY', 'channel.value.normalized', 'Parts.capBottomRib.Layout.y', { outputMin: travelBottom + 10, outputMax: travelTop + 10, round: true }) }),
       fillY: binding('fillY', 'channel.value.normalized', 'Parts.fill.Layout.y', { outputMin: height - 8, outputMax: travelTop + 6, round: true }),
       fillH: binding('fillH', 'channel.value.normalized', 'Parts.fill.Layout.height', { outputMin: 4, outputMax: height - 14, round: true }),
     },
@@ -251,7 +311,19 @@ export function gaiaFader({ width = 30, height = 108, ticks = 11 } = {}) {
  * component and not a styled Knob — rotation of an arbitrary part is not something the built-in
  * one exposes.
  */
-export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
+function numericReadout(size, zeroLabel) {
+  const box = size === 42 ? { x: 48, y: 12, width: 62, height: 22 }
+    : { x: 0, y: size + 1, width: size, height: 20 };
+  const part = text('numericValue', '0', box, { size: 11, colour: 'FFE6C66C', align: 'center' });
+  part.role = 'customValueField';
+  part.meta = { zeroLabel };
+  part._children.Background = rect('field', box, 'FF11181E', {
+    radius: 3, borderColour: 'FF58616A', borderThickness: 1,
+  })._children.Background;
+  return part;
+}
+
+export function gaiaKnob({ size = 54, ticks = 11, numeric = false, zeroLabel = '' } = {}) {
   const r = size / 2;
 
   // The ring of tick marks printed around every knob on the instrument. Placed here rather than
@@ -282,10 +354,11 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
 
   return component({
     name: 'GAIA Knob',
-    width: size,
-    height: size,
+    width: numeric && size === 42 ? 110 : size,
+    height: numeric && size !== 42 ? size + 21 : size,
     parts: {
       ...tickParts,
+      ...(numeric ? { numericValue: numericReadout(size, zeroLabel) } : {}),
       // A dark cylinder with a lighter rim and a lit chamfer, which is what gives the hardware's
       // knobs their depth. Three stacked circles do it; a gradient would do it better.
       // Five stacked circles, lit from above, which is how a photographed knob actually reads:
@@ -319,7 +392,9 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
       }),
     },
     behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical' }),
-    hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
+    hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: numeric
+      ? { x: 0, y: 0, width: size, height: size, unit: 'px' }
+      : { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
     bindings: {
       // -135deg at minimum to +135deg at maximum: the 270-degree sweep the instrument uses.
       pointerAngle: binding('pointerAngle', 'channel.value.normalized', 'Parts.pointer.Layout.rotation', { outputMin: -135, outputMax: 135, round: true }),
@@ -328,8 +403,10 @@ export function gaiaKnob({ size = 54, ticks = 11 } = {}) {
 }
 
 const LED_ON = 'FFFF3B30';
-const LED_OFF = 'FF3A1E1C';
-const LED_RIM = 'FF120A0A';
+const LED_OFF = 'FF2B1718';
+const LED_RIM = 'FF080D11';
+const LED_RAIL = 'FF172630';
+const LED_RAIL_EDGE = 'FF2B3B45';
 
 /**
  * An LED column: one lamp per option, and only the selected one is lit.
@@ -345,29 +422,51 @@ const LED_RIM = 'FF120A0A';
  * as `mapMode: 'enum'` — a table keyed by the source value. One binding per lamp, each with a table
  * that names its own index the lit colour and every other index the dark one.
  */
-export function gaiaLeds({ options, width = 96, rowHeight = 15 } = {}) {
+export function gaiaLeds({ options, width = 96, rowHeight = 15, legacySkin = false } = {}) {
   const count = options.length;
   const height = count * rowHeight + 8;
   const parts = {};
   const bindings = {};
   const hitZones = {};
+  const railRight = 17;
+  const printedMarkX = railRight + 6;
+  // InteractivePartRenderer gives every text part 8px horizontal padding. Starting the PART 8px
+  // earlier makes the visible ink begin at printedMarkX, exactly where a waveform glyph begins.
+  const wordPartX = printedMarkX - 8;
 
-  parts.plate = rect('plate', { x: 0, y: 0, width, height }, 'FF171C20', {
-    zIndex: 0, radius: 4, borderColour: '55000000', borderThickness: 1,
+  // The photograph shows one NARROW blue-black strip following the vertical lamp column. The
+  // waveform symbols and legends sit on the main panel beside it; the strip never extends behind
+  // them. Its two ends are semicircles centred exactly on the first and last lamps — not a rounded
+  // rectangle with spare rail above and below the choices.
+  if (legacySkin) {
+    // Preserve the original shared skin for the AN1x generator.
+    parts.plate = rect('plate', { x: 0, y: 0, width, height }, 'FF171C20', {
+      zIndex: 0, radius: 4, borderColour: '55000000', borderThickness: 1,
+    });
+  } else parts.ledRail = rect('ledRail', {
+    x: 5, y: 5, width: 12, height: (count - 1) * rowHeight + 12,
+  }, LED_RAIL, {
+    zIndex: 0, radius: 999, borderColour: LED_RAIL_EDGE, borderThickness: 1,
+    gradient: linear(90, [[0, '0B141A'], [45, '1B2B35'], [100, '101B22']]),
   });
 
   options.forEach((option, index) => {
     const y = 4 + index * rowHeight;
 
-    // The lamp: a dark bezel with the lamp face inside it, so an unlit LED still reads as a lamp
-    // rather than as an empty circle.
-    parts[`bezel${index}`] = rect(`bezel${index}`, { x: 7, y: y + 3, width: 9, height: 9 }, LED_RIM, { zIndex: 2, radius: 999 });
-    parts[`led${index}`] = rect(`led${index}`, { x: 8.5, y: y + 4.5, width: 6, height: 6 }, LED_OFF, { zIndex: 3, radius: 999 });
-    // A glyph where the instrument prints one, and the name beside it rather than instead of it.
-    const glyph = glyphKindFor(option.label);
-    const textX = glyph ? 44 : 22;
+    // Tiny lens on the rail. Off lamps remain dark red-brown, exactly as they do in the reference;
+    // the blue-black colour belongs to the rail behind them, not to a ring around each lamp.
+    const off = legacySkin ? 'FF3A1E1C' : LED_OFF;
+    parts[`bezel${index}`] = legacySkin
+      ? rect(`bezel${index}`, { x: 7, y: y + 3, width: 9, height: 9 }, 'FF120A0A', { zIndex: 2, radius: 999 })
+      : rect(`bezel${index}`, { x: 7.5, y: y + 3.5, width: 7, height: 7 }, LED_RIM, { zIndex: 2, radius: 999 });
+    parts[`led${index}`] = legacySkin
+      ? rect(`led${index}`, { x: 8.5, y: y + 4.5, width: 6, height: 6 }, off, { zIndex: 3, radius: 999 })
+      : rect(`led${index}`, { x: 9, y: y + 5, width: 4, height: 4 }, off, { zIndex: 3, radius: 999 });
+    // A glyph OR a printed name beside the rail. The SH-01 does not print "SAW" next to its saw
+    // symbol; NOISE, SUPER-SAW, RND and the effect types are the rows that use words.
+    const glyph = (legacySkin && ({ NOISE: 'noise', 'SUPER-SAW': 'supersaw', RND: 'noise' })[option.label]) || glyphKindFor(option.label);
     if (glyph) {
-      for (const stroke of glyphStrokes(glyph, 21, y + (rowHeight - 9) / 2)) {
+      for (const stroke of glyphStrokes(glyph, legacySkin ? 21 : printedMarkX, y + (rowHeight - 9) / 2)) {
         parts[`g${index}_${stroke.name}`] = rect(`g${index}_${stroke.name}`,
           { x: stroke.x, y: stroke.y, width: stroke.width, height: stroke.height },
           stroke.colour, { zIndex: 5, radius: 0, ...(stroke.rotation ? { pivotX: 0, pivotY: 50 } : {}) });
@@ -376,19 +475,28 @@ export function gaiaLeds({ options, width = 96, rowHeight = 15 } = {}) {
         }
       }
     }
-    parts[`name${index}`] = text(`name${index}`, option.label, { x: textX, y: y + 1, width: width - textX - 4, height: rowHeight - 2 }, { size: 9 });
+    if (legacySkin) {
+      const textX = glyph ? 44 : 22;
+      parts[`name${index}`] = text(`name${index}`, option.label, { x: textX, y: y + 1, width: width - textX - 4, height: rowHeight - 2 }, { size: 9 });
+      parts[`name${index}`]._children.Text._children.Position.justification = 'centredLeft';
+    } else if (!glyph) {
+      parts[`name${index}`] = text(`name${index}`, option.label, {
+        x: wordPartX, y: y + 1, width: width - wordPartX, height: rowHeight - 2,
+      }, { size: 9 });
+    }
 
     // The table that lights exactly one lamp. Written per lamp rather than per value because the
     // binding layer resolves one target at a time.
     const litMap = {};
-    const textMap = {};
     options.forEach((other, otherIndex) => {
-      litMap[String(other.value)] = otherIndex === index ? LED_ON : LED_OFF;
-      textMap[String(other.value)] = otherIndex === index ? 'FFFFFFFF' : 'FF8A959E';
+      litMap[String(other.value)] = otherIndex === index ? LED_ON : off;
     });
 
     bindings[`led${index}`] = enumBinding(`led${index}`, 'channel.value.raw', `Parts.led${index}.Background.Fill.colour`, litMap);
-    bindings[`name${index}`] = enumBinding(`name${index}`, 'channel.value.raw', `Parts.name${index}.Text.Fill.colour`, textMap);
+    if (legacySkin) {
+      const textMap = Object.fromEntries(options.map((other, otherIndex) => [String(other.value), otherIndex === index ? 'FFFFFFFF' : 'FF8A959E']));
+      bindings[`name${index}`] = enumBinding(`name${index}`, 'channel.value.raw', `Parts.name${index}.Text.Fill.colour`, textMap);
+    }
 
     hitZones[`pick${index}`] = createHitZone(`pick${index}`, {
       targetBehavior: 'drive',
@@ -535,6 +643,16 @@ export function stepCell({ width = 92, height = 40, colour = 'FF52B788', accent 
  * the profile so that bridge has somewhere to land; until it exists this grid edits a pattern, not
  * a synth, and the panel's notes say so rather than leaving it to be discovered.
  */
+export function gaiaHardwareSyncStatus({ width = 1348 } = {}) {
+  const status = text('feedback', 'MIDI NOT CHECKED   |   EDITOR PATTERN · NOT READ FROM GAIA',
+    { x: 0, y: 0, width, height: 18 }, { size: 10, colour: 'FFE6C66C', align: 'left' });
+  status.role = 'deviceSyncStatus';
+  return component({ name: 'GAIA hardware sync feedback', width, height: 18,
+    parts: { feedback: status }, channels: {},
+    designer: { deviceSyncFeedback: { kind: 'gaiaArpeggio', gridName: 'arp_pattern_grid' } },
+  });
+}
+
 export function gaiaArpGrid({ width = 1200, height = 250, steps = 32, viewNote = 60, blocks = null } = {}) {
   // A starter pattern, so the grid opens showing what it is for rather than as an empty field.
   const seed = blocks ?? [
@@ -562,6 +680,7 @@ export function gaiaArpGrid({ width = 1200, height = 250, steps = 32, viewNote =
     channels: {
       arpCurrentStep: createValueChannel('arpCurrentStep', { label: 'Current Step', type: 'int', min: 0, max: steps - 1, step: 1, defaultValue: 0 }),
       arpStepCount: createValueChannel('arpStepCount', { label: 'Step Count', type: 'int', min: 1, max: 256, step: 1, defaultValue: steps }),
+      arpEndStep: createValueChannel('arpEndStep', { label: 'Loop End Step', type: 'int', min: 1, max: steps, step: 1, defaultValue: steps }),
       arpGate: createValueChannel('arpGate', { label: 'Gate', type: 'bool', min: 0, max: 1, step: 1, defaultValue: 0 }),
       arpNote: createValueChannel('arpNote', { label: 'Note', type: 'int', min: 0, max: 127, step: 1, defaultValue: 0 }),
       arpVelocity: createValueChannel('arpVelocity', { label: 'Velocity', type: 'int', min: 0, max: 127, step: 1, defaultValue: 0 }),
@@ -571,6 +690,7 @@ export function gaiaArpGrid({ width = 1200, height = 250, steps = 32, viewNote =
       ...createCustomComponentDesignerDefaults(),
       arpeggiator: {
         enabled: true,
+        numericFields: true,
         stepCount: steps,
         noteMin: 0,
         noteMax: 127,
@@ -581,7 +701,10 @@ export function gaiaArpGrid({ width = 1200, height = 250, steps = 32, viewNote =
     },
     published: {
       _type: 'PublishedProperties',
-      inputs: { currentStep: { channel: 'arpCurrentStep', label: 'Current Step', type: 'int' } },
+      inputs: {
+        currentStep: { channel: 'arpCurrentStep', label: 'Current Step', type: 'int' },
+        endStep: { channel: 'arpEndStep', label: 'Loop End Step', type: 'int' },
+      },
       outputs: {
         gate: { channel: 'arpGate', label: 'Gate', type: 'bool' },
         note: { channel: 'arpNote', label: 'Note', type: 'int' },
@@ -663,7 +786,7 @@ function glyphStrokes(kind, ox, oy, w = 18, h = 9) {
 /** Which glyph an option label means. Anything unlisted keeps its text and gets no drawing. */
 const GLYPH_FOR = {
   SAW: 'saw', SQR: 'square', 'PW-SQR': 'pulse', TRI: 'triangle', SINE: 'sine',
-  NOISE: 'noise', 'SUPER-SAW': 'supersaw', SIN: 'sine', 'S&H': 'noise', RND: 'noise',
+  SIN: 'sine', 'S&H': 'noise',
 };
 
 export function glyphKindFor(label) {

@@ -19,6 +19,7 @@
   import { clearMidiMonitorEvents, isJuceAvailable } from '../bridge/bridge.js';
   import {
     MONITOR_DIRECTIONS,
+    createMonitorEventReconciler,
     filterMonitorEvents,
     isMonitorFailure,
     monitorCounts,
@@ -35,8 +36,12 @@
   let paused = $state(false);
   let frozen = $state([]);
   let copyStatus = $state('');
+  const rowHeight = 22;
+  let scrollTop = $state(0);
+  let viewportHeight = $state(300);
 
-  let live = $derived($midiMonitorEvents ?? []);
+  const reconcileEvents = createMonitorEventReconciler();
+  let live = $derived(reconcileEvents($midiMonitorEvents ?? []));
   // Only while it is the LAST thing that happened: once a send succeeds the store carries a
   // transaction instead, and a stale banner would accuse a panel that is now working.
   let notSent = $derived($latestMidiPreview?.ok === false ? String($latestMidiPreview.error ?? '') : '');
@@ -44,6 +49,9 @@
   let facets = $derived(monitorFacets(events));
   let counts = $derived(monitorCounts(events));
   let rows = $derived(filterMonitorEvents(events, { direction, device, type, search, failuresOnly }));
+  let firstRow = $derived(Math.min(Math.max(0, rows.length - 1), Math.max(0, Math.floor(scrollTop / rowHeight) - 4)));
+  let lastRow = $derived(Math.min(rows.length, firstRow + Math.ceil(viewportHeight / rowHeight) + 8));
+  let visibleRows = $derived(rows.slice(firstRow, lastRow));
 
   function togglePause() {
     if (!paused) frozen = [...live];
@@ -144,8 +152,11 @@
     </div>
   {/if}
 
-  <div class="rows" role="log" aria-label="MIDI events">
-    {#each rows as event, index (`${event.timestamp}_${index}`)}
+  <div class="rows" role="log" aria-label="MIDI events" bind:clientHeight={viewportHeight}
+    onscroll={event => { scrollTop = event.currentTarget.scrollTop; }}>
+    {#if rows.length}
+    <div aria-hidden="true" style:height={`${firstRow * rowHeight}px`}></div>
+    {#each visibleRows as event (event.monitorKey)}
       <div class="row" class:failed={isMonitorFailure(event)} title={monitorEventLine(event)}>
         <span class="time">{monitorTime(event)}</span>
         <span class="dir" class:out={event.direction === 'out'}>{event.direction === 'out' ? '→' : '←'}</span>
@@ -155,6 +166,8 @@
         <span class="hex">{event.hex || ''}</span>
         <span class="status">{event.status || ''}</span>
       </div>
+    {/each}
+    <div aria-hidden="true" style:height={`${(rows.length - lastRow) * rowHeight}px`}></div>
     {:else}
       <div class="empty">
         {#if counts.total === 0}
@@ -163,7 +176,7 @@
           Nothing matches these filters — {counts.total} event{counts.total === 1 ? '' : 's'} hidden.
         {/if}
       </div>
-    {/each}
+    {/if}
   </div>
 </div>
 
@@ -263,10 +276,14 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
+    overflow-anchor: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
   .row {
+    height: 22px;
+    box-sizing: border-box;
+    line-height: 15px;
     display: grid;
     /* Status is given room rather than squeezed: a failure explains itself there — "Not sent:
        unresolved profile for <device>" — and truncating it hides the one line worth reading. */

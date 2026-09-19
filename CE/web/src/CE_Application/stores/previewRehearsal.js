@@ -99,6 +99,18 @@ export function endPreviewRehearsal() {
   saved = null;
   let restored = false;
   try {
+    // saveSetting is an explicit persistent write, not a rehearsed control edit.
+    // The snapshot is a deep clone: mutating today's settings alone cannot update it.
+    // Preserve those writes (including deletions) while reverting the visual preview.
+    for (const panel of json) {
+      const current = get(panels).find(p => p.id === panel.id);
+      if (!current?.scripting?.settings) continue;
+      if (JSON.stringify(panel.scripting?.settings) !== JSON.stringify(current.scripting.settings)) {
+        panel.scripting ??= {};
+        panel.scripting.settings = JSON.parse(JSON.stringify(current.scripting.settings));
+        panel.modified = true;
+      }
+    }
     if (JSON.stringify(get(panels)) !== JSON.stringify(json)) {
       panels.set(json);
       restored = true;

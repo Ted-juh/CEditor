@@ -59,6 +59,9 @@
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { createScreenDocument } from '../stores/screenBuilder.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
+  import { backgroundPreviewPreparation, previewPreparationDelayMs } from '../stores/runtimePreferences.js';
+  import { preparePreviewInBackground } from '../utils/previewPreparation.js';
+  import { scriptTouchedControlIds } from '../stores/scriptTouchedControls.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
 
@@ -119,6 +122,14 @@
   let splitPanelSize = $derived(1 - splitDesignerSize);
   let splitGridStyle = $derived(buildEditorSplitStyle(panelDesignerSplit, splitDeviceOnLeft, splitDesignerSize, splitPanelSize));
   let canvasPanel = $derived($activePanel);
+
+  $effect(() => {
+    if (!$backgroundPreviewPreparation || $previewModeEnabled || !canvasPanel
+        || $activeEditorTab?.type !== 'panel') return;
+    return preparePreviewInBackground(canvasPanel, {
+      scale, delay: $previewPreparationDelayMs, neverFold: $scriptTouchedControlIds,
+    });
+  });
 
   function bindViewport(node) {
     viewportEl = node;

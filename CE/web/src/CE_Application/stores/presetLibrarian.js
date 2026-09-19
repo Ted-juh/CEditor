@@ -13,6 +13,7 @@ import {
 } from './deviceProfileLocalEngine.js';
 import { startBulkDumpSend } from './devicePresetJobs.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
+import { invalidateDeviceFeedback } from './deviceSyncFeedback.js';
 
 import { deepClone } from '../utils/deepClone.js';
 const STORAGE_KEY = 'ce.presetLibrarian.v1';
@@ -195,6 +196,7 @@ export function recallPreset(profile, { slot, deviceRole = DEFAULT_DEVICE_ROLE, 
   if (!compiled.ok) return compiled;
   const live = !dryRun && isJuceAvailable();
   if (live) {
+    invalidateDeviceFeedback(deviceRole, 'PATCH CHANGED — READ REQUIRED');
     for (const message of compiled.messages) {
       triggerRawMidiAction({ deviceRole, actionId: `preset_recall_${slot}`, message: message.hex, dryRun: false });
     }

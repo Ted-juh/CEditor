@@ -39,6 +39,7 @@ import {
 import { queueContinuousParameterSend, discardPendingParameterSends } from './deviceMidiRuntime.js';
 import { initDeviceProfileBridge, normalizeSyncDirection, refreshProfileParameters } from './deviceProfileSession.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
+import { nextFeedbackRequestId, noteDeviceFeedbackWrite, noteDeviceFeedbackResult, noteDeviceFeedbackRead } from './deviceSyncFeedback.js';
 
 /**
  * Is this a profile the engine has?
@@ -171,6 +172,7 @@ export function commitDeviceParameter({
   dryRun = true,
 }) {
   initDeviceProfileBridge();
+  requestId ||= nextFeedbackRequestId();
   const payload = {
     requestId,
     deviceRole,
@@ -182,7 +184,9 @@ export function commitDeviceParameter({
   };
 
   const resolved = resolveParameterSend(payload);
+  noteDeviceFeedbackWrite(payload);
   if (!resolved.ok) {
+    noteDeviceFeedbackResult({ ...payload, ok: false, error: resolved.error });
     latestMidiPreview.set({
       ok: false,
       error: resolved.error,
@@ -230,10 +234,12 @@ export function startDeviceSync({
   const resolvedProfileId = String(profileId || get(deviceRoleMappings)?.[role]?.profileId || '');
   const direction = normalizeSyncDirection(syncDirection || get(deviceRoleMappings)?.[role]?.syncDirection || get(selectedSyncDirection));
   latestDeviceSyncResult.set({ requestId: correlationId, profileId: resolvedProfileId, deviceRole: role, syncDirection: direction, running: true });
+  if (!dryRun && direction !== 'push') noteDeviceFeedbackRead({ correlationId, deviceRole: role, request, running: true });
 
   if (localProfileMode(resolvedProfileId, source)) {
     const parsed = parseProfileSourceText(resolvedProfileId, source);
     if (!parsed.ok) {
+      noteDeviceFeedbackRead({ correlationId, deviceRole: role, ok: false, error: parsed.error }, 'resolved');
       latestDeviceSyncResult.set({ requestId: correlationId, profileId: resolvedProfileId, deviceRole: role, ok: false, error: parsed.error });
       return;
     }
@@ -266,6 +272,7 @@ export function startDeviceSync({
       variables,
     });
     latestDeviceSyncResult.set({ ...result, syncDirection: direction });
+    noteDeviceFeedbackRead({ correlationId, deviceRole: role }, 'resolved');
     return;
   }
 

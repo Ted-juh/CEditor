@@ -1,5 +1,6 @@
 <script>
   import { onDestroy, untrack } from 'svelte';
+  import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
@@ -15,7 +16,16 @@
     isStateSource, stateKeyOf, stateInfo, moveCursor, regionStartOffset,
   } from '../utils/lcdZones.js';
   import { deviceParameterValues } from '../stores/deviceParameterValues.js';
-  import { profileParameters, deviceRoleMappings, profileParameterPages } from '../stores/deviceProfileStores.js';
+  import { profileParameters, deviceRoleMappings, profileParameterPages, midiDestinations, midiInputs, deviceTransportCapabilities } from '../stores/deviceProfileStores.js';
+  import { deviceSyncFeedback, feedbackEndpointAvailable, noteDeviceFeedbackRead } from '../stores/deviceSyncFeedback.js';
+  import { gaiaSyncStatus } from '../utils/gaiaSyncStatus.js';
+  import { customLcdInfo, formatLcdInfo } from '../utils/customLcdInfo.js';
+  import { linkedEnvelopeConfig, linkedEnvelopeStages, linkedEnvelopePoints, linkedEnvelopeDragValue, linkedEnvelopeValue, linkedEnvelopeHold } from '../utils/linkedEnvelope.js';
+  import { hasGaiaPatternEditing, GaiaPatternHistory, editSelectedPatternNote, patternEditingShortcut } from '../utils/gaiaPatternEditing.js';
+  import { getCustomArpeggiator, syncCustomArpeggiatorValues, revealArpeggiatorNote } from '../utils/customComponentArpeggiator.js';
+  import { createGaiaPatternTransfer } from '../utils/gaiaPatternTransfer.js';
+  import { startDeviceSync } from '../stores/deviceMidiOps.js';
+  import { deepClone } from '../utils/deepClone.js';
   import { refreshProfileParameters } from '../stores/deviceProfileSession.js';
   import { pixelTextMetrics } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
@@ -41,7 +51,7 @@
   import { layerNames, normalizeLayerName, normalizePanelLayers } from '../utils/panelLayers.js';
   import { buildSceneryRenderPlan, controlItem } from '../utils/sceneryRenderPlan.js';
   import SceneryGround from './SceneryGround.svelte';
-  import { flatControls } from '../utils/containment.js';
+  import { flatControls, controlPanelRect } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
     listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
@@ -284,6 +294,7 @@
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
   import { dispatchInteraction } from '../scripting/panelRuntime.js';
+  import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
@@ -552,9 +563,15 @@
     return control?._children?.Mouse ?? null;
   }
 
+  // A knob/MIDI update replaces one session. Reading the whole $store here
+  // invalidated every previewPropsFor, cloning and rebuilding the entire panel.
+  // Cross-control displays still track every source they actually read.
+  const previewSessionView = keyedStoreView(panelPreviewSessions);
+  onDestroy(previewSessionView.destroy);
+
   function sessionFor(control) {
     const controlId = getControlId(control);
-    return $panelPreviewSessions?.[controlId] ?? createInteractionPreviewSession(control);
+    return previewSessionView.values.get(controlId) ?? createInteractionPreviewSession(control);
   }
 
   function resolvedPreviewFor(rawControl) {
@@ -565,14 +582,38 @@
     // as they always do. It has to happen before the chain rather than inside it: several of those
     // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
     // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
-    const control = applySectionValues(rawControl, previewOverrides?.sectionValues);
+    const control = applyDeviceSyncStatus(applySectionValues(rawControl, previewOverrides?.sectionValues));
     const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
+  }
+
+  function applyDeviceSyncStatus(control) {
+    if (hasGaiaPatternEditing(control)) {
+      const next = deepClone(control);
+      next._children.Designer.patternEditingState = customSessionValues(control).__arpEditState ?? {};
+      return next;
+    }
+    const config = control?._children?.Designer?.deviceSyncFeedback;
+    if (config?.kind !== 'gaiaArpeggio') return control;
+    const grid = allControls.find(c => c._children?.Core?.name === config.gridName);
+    if (!grid) return control;
+    const role = grid._children?.DeviceBindings?.bindings?.find(b => b.parameterId === 'arp.endStep')?.deviceRole;
+    const status = gaiaSyncStatus({ grid, values: customSessionValues(grid), feedback: $deviceSyncFeedback?.[role],
+      mapping: $deviceRoleMappings?.[role], destinations: $midiDestinations, inputs: $midiInputs, capabilities: $deviceTransportCapabilities });
+    const next = deepClone(control);
+    next._children.Core.description = status.detail;
+    next._children.Core.tooltip = status.detail;
+    const text = next._children.Parts._children.feedback._children.Text;
+    text.content = `● ${status.text}`;
+    text._children.Fill.colour = status.colour;
+    return next;
   }
 
   // The current numeric value + range of a value-producing control (slider,
   // knob, range spinner, number) from its live preview session.
   function lcdSourceValueRange(src) {
+    const custom = customLcdInfo(src, customSessionValues(src));
+    if (custom) return { value: custom.value, min: custom.min, max: custom.max };
     const behavior = getBehavior(src);
     if (!isRangeBehavior(behavior)) return null;
     const value = isSliderControl(src)
@@ -642,6 +683,12 @@
   // name, an On/Off or choice text, and a selector key for page switching.
   function lcdSourceInfo(src) {
     if (!src) return null;
+    if (src._children?.Designer?.deviceSyncFeedback?.kind === 'gaiaArpeggio') {
+      const resolved = applyDeviceSyncStatus(src);
+      return { present: true, text: resolved._children.Parts._children.feedback._children.Text.content.replace(/^● /, '') };
+    }
+    const custom = customLcdInfo(src, customSessionValues(src));
+    if (custom) return custom;
     const behavior = getBehavior(src);
     const session = sessionFor(src);
     const info = {
@@ -684,7 +731,7 @@
       info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
       info.selector = info.on ? '1' : '0';
     }
-    return info;
+    return formatLcdInfo(info, src._children.Designer?.lcdReadout);
   }
 
   // --- On-screen editing (an edit zone writes back to its target) ---
@@ -1202,6 +1249,8 @@
   // numbers are 'value'; momentary/toggle/select buttons are 'switch'; multi-
   // choice pickers are 'choice'.
   function lcdControlKind(src) {
+    const custom = customLcdInfo(src, customSessionValues(src));
+    if (custom) return custom.kind;
     const behavior = getBehavior(src);
     const family = String(behavior?.family ?? '').trim().toLowerCase();
     const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
@@ -1522,8 +1571,74 @@
   }
   // The working points: the live session copy while dragging, else the model.
   function envWorkingPoints(control) {
+    if (linkedEnvelopeConfig(control)) return linkedEnvelopePoints(control, linkedEnvValues(control), sessionFor(control)?.envHold ?? control._children.Envelope.holdPreview);
     const sess = sessionFor(control)?.envPoints;
     return Array.isArray(sess) ? sess : envelopePoints(control);
+  }
+  function linkedEnvValues(control) {
+    return Object.fromEntries(Object.entries(linkedEnvelopeConfig(control) ?? {}).map(([stage, link]) => {
+      const source = controlById(link.controlId);
+      return [stage, linkedEnvelopeValue(link, source ? customSessionValues(source)[link.channel] : link.defaultValue)];
+    }));
+  }
+  function setLinkedEnvStage(control, stage, value, dragging = false) {
+    const link = linkedEnvelopeConfig(control)?.[stage];
+    const source = link && controlById(link.controlId);
+    if (!source || isDisabled(source) || isReadOnly(source)) return false;
+    const next = linkedEnvelopeValue(link, value);
+    // Use the fader's existing send policy and binding. The graph has no duplicate
+    // device binding, and receiving or merely rendering a graph never sends MIDI.
+    patchControlSession(link.controlId, { customValues: { [link.channel]: next },
+      valueOverrideEnabled: true, valueOverride: next, dragging });
+    lcdActiveAt[link.controlId] = Date.now(); lcdActiveId = link.controlId;
+    return true;
+  }
+  function finishLinkedEnvDrag(control, cancelled = false) {
+    if (!envDrag?.stage) return false;
+    const drag = envDrag;
+    envDrag = null;
+    if (drag.stage === 'sustain') {
+      if (cancelled) patchControlSession(getControlId(control), { envHold: drag.startHold });
+    } else if (drag.changed) {
+      for (const stage of drag.changedStages ?? [drag.stage]) setLinkedEnvStage(control, stage,
+        cancelled ? drag.startValues[stage] : linkedEnvValues(control)[stage], false);
+    }
+    // Clear the source's echo guard even if the drag did not change a value.
+    updatePanelPreviewSession(drag.sourceId, { dragging: false });
+    if (drag.levelSourceId) updatePanelPreviewSession(drag.levelSourceId, { dragging: false });
+    return true;
+  }
+  function linkedEnvKey(control, event) {
+    const stages = linkedEnvelopeStages(control);
+    if (!stages.length || event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (event.key === 'Escape' && envDrag?.id === getControlId(control) && envDrag.stage) {
+      handleWindowPointerUp(event, { cancelled: true });
+      return true;
+    }
+    const byKey = { a: 'attack', d: 'decay', s: 'sustain', r: 'release' };
+    const selected = byKey[String(event.key).toLowerCase()];
+    if (stages.includes(selected)) {
+      patchControlSession(getControlId(control), { envActiveIndex: stages.indexOf(selected) + 1 });
+      return true;
+    }
+    const index = Math.max(1, Math.min(stages.length, sessionFor(control)?.envActiveIndex ?? 1));
+    let stage = stages[index - 1];
+    if (stage === 'sustain') {
+      const old = linkedEnvelopeHold(sessionFor(control)?.envHold ?? control._children.Envelope.holdPreview);
+      const next = event.key === 'Home' ? .05 : event.key === 'End' ? .25
+        : event.key === 'ArrowLeft' ? old - .005 : event.key === 'ArrowRight' ? old + .005 : null;
+      if (next !== null) patchControlSession(getControlId(control), { envHold: linkedEnvelopeHold(next), envActiveIndex: index });
+      return next !== null || ['ArrowUp', 'ArrowDown'].includes(event.key);
+    }
+    if (stage === 'decay' && stages.includes('sustain') && ['ArrowUp','ArrowDown'].includes(event.key)) stage = 'sustain';
+    const link = linkedEnvelopeConfig(control)[stage];
+    const value = linkedEnvValues(control)[stage];
+    const sign = ['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : ['ArrowDown', 'ArrowLeft'].includes(event.key) ? -1 : 0;
+    const next = event.key === 'Home' ? link.min : event.key === 'End' ? link.max : sign ? value + sign * (event.shiftKey ? 10 : 1) : null;
+    if (next == null) return false;
+    patchControlSession(getControlId(control), { envActiveIndex: index });
+    if (linkedEnvelopeValue(link, next) !== value) setLinkedEnvStage(control, stage, next);
+    return true;
   }
   // Envelope presets keep the start (and one-shot end) pinned to y=0; free/MSEG
   // shapes let every node move in y. Ends always keep their x (span the axis).
@@ -1575,13 +1690,15 @@
     const base = resolved?.control ?? control;
     const env = base?._children?.Envelope;
     if (!env) return resolved;
-    const sessPoints = sessionFor(control)?.envPoints;
+    const linked = linkedEnvelopeConfig(control);
+    const sessPoints = linked ? envWorkingPoints(control) : sessionFor(control)?.envPoints;
     const phaseRange = env.phaseSourceId ? lcdRangeForSource(env.phaseSourceId) : null;
     const phase = phaseRange
       ? (phaseRange.max === phaseRange.min ? 0 : (phaseRange.value - phaseRange.min) / (phaseRange.max - phaseRange.min))
       : undefined;
     if (!Array.isArray(sessPoints) && phase === undefined) return resolved;
     const nextEnv = { ...env };
+    if (linked) { nextEnv.__stageValues = linkedEnvValues(control); nextEnv.__hold = linkedEnvelopeHold(sessionFor(control)?.envHold ?? env.holdPreview); }
     if (Array.isArray(sessPoints)) nextEnv.points = sessPoints;
     if (phase !== undefined) {
       nextEnv.__phase = Math.max(0, Math.min(1, phase));
@@ -1606,6 +1723,23 @@
     const geom = envGeomFor(control);
     const points = envWorkingPoints(control);
     const hit = envHitNode(points, geom, localPoint.x, localPoint.y, Math.max(8, numberOr(envelopeConfig(control).nodeRadius, 4) + 6));
+    const linked = linkedEnvelopeConfig(control);
+    if (linked) {
+      const stage = points[hit]?.id, link = linked[stage];
+      const source = link && controlById(link.controlId);
+      if (!source || isDisabled(source) || isReadOnly(source)) return false;
+      envDrag = { id: getControlId(control), index: hit, stage, sourceId: link.controlId,
+        startValue: linkedEnvValues(control)[stage], startValues: linkedEnvValues(control),
+        startHold: linkedEnvelopeHold(sessionFor(control)?.envHold ?? control._children.Envelope.holdPreview),
+        startPoint: localPoint, changed: false, changedStages: new Set() };
+      if (stage !== 'sustain') updatePanelPreviewSession(link.controlId, { dragging: true });
+      if (stage === 'decay' && linked.sustain) {
+        envDrag.levelSourceId = linked.sustain.controlId;
+        updatePanelPreviewSession(linked.sustain.controlId, { dragging: true });
+      }
+      patchControlSession(getControlId(control), { envActiveIndex: hit });
+      return true; // Fixed-stage graphs never add/remove nodes on a double click.
+    }
     if (isDoubleTap) {
       // Double-click: remove an interior node, or add one where there's none.
       if (hit > 0 && hit < points.length - 1) {
@@ -5638,12 +5772,20 @@
   }
 
   function comboboxMenuStyle(control) {
-    const transform = control?._children?.Transform ?? {};
-    const x = numberOr(transform?.x, 0);
-    const y = numberOr(transform?.y, 0);
-    const width = Math.max(32, numberOr(transform?.width, 160));
-    const height = Math.max(1, numberOr(transform?.height, 34));
-    return `left:${x}px; top:${y + height + 4}px; width:${width}px;`;
+    // The dropdown lives at panel level, including for controls inside tabs or
+    // scroll containers. Use the rendered box so padding, anchors, scrolling and
+    // zoom are already accounted for; local Transform.x/y cannot locate a child.
+    const id = getControlId(control);
+    const element = surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
+      .find(node => node.getAttribute('data-control-id') === id);
+    const surfaceBox = surfaceRef?.getBoundingClientRect();
+    const box = element?.getBoundingClientRect();
+    const zoom = surfaceBox?.width > 0 && surfaceRef.offsetWidth > 0 ? surfaceBox.width / surfaceRef.offsetWidth : scale || 1;
+    const rect = controlPanelRect(panel.controls, id) ?? { x: 0, y: 0, w: 160, h: 34 };
+    const x = box ? (box.left - surfaceBox.left) / zoom - surfaceRef.clientLeft : rect.x;
+    const y = box ? (box.bottom - surfaceBox.top) / zoom - surfaceRef.clientTop : rect.y + rect.h;
+    const width = Math.max(32, box ? box.width / zoom : rect.w);
+    return `left:${x}px; top:${y + 4}px; width:${width}px;`;
   }
 
   function selectComboboxRow(control, row) {
@@ -5731,6 +5873,51 @@
       lowField: { ...base, value: spinnerFieldValue(control, 'lowField'), ariaLabel: 'Low value' },
       highField: { ...base, value: spinnerFieldValue(control, 'highField'), ariaLabel: 'High value' },
     };
+  }
+
+  let numericDrafts = $state({});
+  const numericRole = role => ['customValueField', 'arpPitchField', 'arpStartField', 'arpLengthField', 'arpVelocityField'].includes(role);
+  const numericKey = (control, role) => `${getControlId(control)}:${role}`;
+  function numericEditableFields(control) {
+    if (!control?._children?.Designer?.arpeggiator?.numericFields
+      && !Object.values(control?._children?.Parts?._children ?? {}).some(p => p.role === 'customValueField')) return {};
+    const fields = customNumericFields(control, customSessionValues(control));
+    return Object.fromEntries(Object.entries(fields).map(([role, field]) => [role, {
+      ...field, value: numericDrafts[numericKey(control, role)]?.blockId === field.blockId
+        ? numericDrafts[numericKey(control, role)]?.text ?? field.value : field.value,
+      disabled: field.disabled || isDisabled(control), readOnly: isReadOnly(control),
+      inputMode: field.inputMode ?? 'decimal', tabIndex: 0,
+    }]));
+  }
+  function numericFieldEvent(control, role, event, kind) {
+    event.stopPropagation();
+    if (isReadOnly(control) || isDisabled(control)) return;
+    const key = numericKey(control, role);
+    const field = customNumericFields(control, customSessionValues(control))[role];
+    if (!field || field.disabled) return;
+    if (kind === 'focus') {
+      numericDrafts[key] = { text: field.value, blockId: field.blockId };
+      event.currentTarget?.select?.();
+    } else if (kind === 'input') {
+      numericDrafts[key] = { ...numericDrafts[key], text: event.currentTarget.value };
+    } else if (kind === 'blur' || (kind === 'keydown' && event.key === 'Enter')) {
+      if (kind === 'keydown') event.preventDefault();
+      const draft = numericDrafts[key];
+      delete numericDrafts[key];
+      if (draft) {
+        const patch = customNumericPatch(control, customSessionValues(control), role, draft.text, draft.blockId);
+        if (patch) patchControlSession(getControlId(control), patch);
+      }
+      if (kind === 'keydown') {
+        event.currentTarget?.blur?.();
+        if (role.startsWith('arp')) event.currentTarget?.closest?.('[data-control-id]')?.focus?.({ preventScroll: true });
+      }
+    } else if (kind === 'keydown' && event.key === 'Escape') {
+      event.preventDefault();
+      delete numericDrafts[key];
+      event.currentTarget?.blur?.();
+      if (role.startsWith('arp')) event.currentTarget?.closest?.('[data-control-id]')?.focus?.({ preventScroll: true });
+    }
   }
 
   function beginSpinnerFieldEdit(control, role) {
@@ -6042,6 +6229,7 @@
     }
 
     const port = String(binding?.port ?? 'value');
+    if (port !== 'value' && control?._children?.ValueChannels?._children?.[port]) return patch.customValues?.[port];
     if (['pageIndex', 'scrollX', 'scrollY'].includes(port)) return patch[port];
     if (port === 'trigger') {
       if (String(binding?.parameterType ?? '') === 'momentary') {
@@ -6078,12 +6266,14 @@
     return undefined;
   }
 
-  function emitDeviceBindingsForPatch(control, patch = {}) {
+  function emitDeviceBindingsForPatch(control, patch = {}, previous = null) {
     const controlId = getControlId(control);
     const interactionPhase = patch.dragging === true ? 'continuous' : 'commit';
     for (const binding of activeDeviceBindings(control)) {
       const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
+      if (binding.port !== 'value' && control?._children?.ValueChannels?._children?.[binding.port]
+        && value === previous?.customValues?.[binding.port]) continue;
       commitDeviceParameter({
         requestId: `panel_preview_${controlId || 'control'}_${interactionPhase}_${Date.now()}`,
         deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
@@ -6237,11 +6427,73 @@
     }
   }
 
-  function patchControlSession(controlId, patch = {}) {
+  const patternHistories = new Map();
+  const patternTransfers = new Map();
+  onDestroy(() => { for (const transfer of patternTransfers.values()) transfer.cancel(); });
+  function patternHistory(control) {
+    const id = getControlId(control);
+    if (!patternHistories.has(id)) patternHistories.set(id, new GaiaPatternHistory());
+    return patternHistories.get(id);
+  }
+  function patternEditStatus(control, message, busy = false, error = false) {
+    const current = customSessionValues(control);
+    updatePanelPreviewSession(getControlId(control), { customValues: { __arpEditState: {
+      ...current.__arpEditState, ...patternHistory(control).flags(), message, busy, error,
+    } } });
+  }
+  function handlePatternCommand(control, command) {
+    if (!hasGaiaPatternEditing(control)) return;
+    const values = customSessionValues(control), history = patternHistory(control), id = getControlId(control);
+    if (['undo', 'redo'].includes(command)) {
+      const restored = history.restore(command, control, values);
+      if (restored) patchControlSession(id, { customValues: restored }, false);
+      patternEditStatus(control, restored ? `${command.toUpperCase()} · local edit, not sent` : `Nothing to ${command}`);
+    } else if (['duplicate', 'delete'].includes(command)) {
+      const result = editSelectedPatternNote(control, values, command);
+      if (result.values) patchControlSession(id, { customValues: result.values });
+      patternEditStatus(control, result.error || `${command === 'delete' ? 'NOTE DELETED' : 'NOTE DUPLICATED'} · local edit, not sent`, false, !!result.error);
+    } else if (['read', 'send'].includes(command)) {
+      let transfer = patternTransfers.get(id);
+      if (transfer?.busy) { if (command === 'read') transfer.cancel(); return; }
+      const role = control._children.DeviceBindings?.bindings?.find(b => b.parameterId === 'arp.endStep')?.deviceRole;
+      const mapping = () => get(deviceRoleMappings)?.[role];
+      transfer = createGaiaPatternTransfer({ control, values: () => customSessionValues(control), revision: () => history.revision,
+        feedback: () => get(deviceSyncFeedback)?.[role] ?? {},
+        route: () => {
+          const m = mapping(), cap = get(deviceTransportCapabilities);
+          return { key: JSON.stringify(m), ready: !!m?.profileId && cap?.canSendSysex === true && cap?.canReceiveSysex === true
+            && feedbackEndpointAvailable(m.midiDestination, get(midiDestinations)) && feedbackEndpointAvailable(m.midiInput, get(midiInputs)) };
+        },
+        read: args => startDeviceSync({ ...args, deviceRole: role, profileId: mapping()?.profileId, syncDirection: 'pull', dryRun: false }),
+        finishRead: (correlationId, error) => noteDeviceFeedbackRead({ correlationId, deviceRole: role, ok: !error, error }, 'resolved'),
+        write: args => commitDeviceParameter({ ...args, deviceRole: role, profileId: mapping()?.profileId, dryRun: false }),
+        status: (message, busy, error) => patternEditStatus(control, message, busy, error),
+        apply: decoded => {
+          const current = customSessionValues(control), arp = getCustomArpeggiator(control, current);
+          const next = { ...arp, blocks: decoded.blocks, selectedBlock: decoded.blocks[0]?.id ?? '' };
+          patchControlSession(id, { customValues: syncCustomArpeggiatorValues(control, { ...current,
+            __arpeggiator: decoded.blocks.length ? revealArpeggiatorNote(next, decoded.blocks[0].note) : next,
+            arpEndStep: decoded.endStep, __arpPatternSource: decoded.source,
+          }) });
+        },
+      });
+      patternTransfers.set(id, transfer);
+      void transfer.run(command);
+    }
+  }
+
+  function patchControlSession(controlId, patch = {}, recordPatternHistory = true) {
     const previousSessions = get(panelPreviewSessions);
     const control = controlById(controlId);
     const previous = control ? sessionFor(control) : null;
     const behavior = getBehavior(control);
+    if (hasGaiaPatternEditing(control)) {
+      const values = customSessionValues(control), history = patternHistory(control);
+      if (recordPatternHistory) history.record(control, values, { ...values, ...patch.customValues }, patch.dragging ?? previous?.dragging ?? false);
+      patch = { ...patch, customValues: { ...patch.customValues, __arpEditState: {
+        ...values.__arpEditState, ...patch.customValues?.__arpEditState, ...history.flags(),
+      } } };
+    }
     if (behavior?.buttonType === 'one_shot' && patch.pressed === true && !isDisabled(control)) {
       patch = { ...patch, executed: false };
     }
@@ -6261,9 +6513,13 @@
     if (control) {
       // Blurring an idle control and cancelling outside its bounds are not trigger releases.
       const output = { ...patch };
+      if (hasGaiaPatternEditing(control) && output.customValues) {
+        output.customValues = { ...output.customValues };
+        delete output.customValues.arpEndStep; // Staged with the notes; only Send Pattern writes it.
+      }
       if (output.pressed === false && previous?.pressed !== true) delete output.pressed;
       if (output.hover === false) output.cancelled = true;
-      emitDeviceBindingsForPatch(control, output);
+      emitDeviceBindingsForPatch(control, output, previous);
     }
     emitDependentChoiceChanges(previousSessions);
   }
@@ -6314,6 +6570,11 @@
 
   function patchCustomInteraction(control, hitZoneEntry, event, extraPatch = {}) {
     const controlId = getControlId(control);
+    if (hitZoneEntry?.zone?.action === 'arpeggiatorCommand') {
+      handlePatternCommand(control, hitZoneEntry.zone.payload?.command);
+      patchControlSession(controlId, extraPatch);
+      return;
+    }
     const rect = pointerActiveElement?.getBoundingClientRect?.()
       ?? event?.currentTarget?.getBoundingClientRect?.();
     const patch = resolveCustomInteractionPatch(control, sessionFor(control), hitZoneEntry, {
@@ -6335,6 +6596,8 @@
 
   function updateCustomDragFromPointer(control, event) {
     if (!pointerCustomHitZone) return;
+    // Drawing is a single click on release, never a repeated toggle during a drag.
+    if (['arpeggiatordraw', 'arpeggiatorselect', 'arpeggiatorcommand'].includes(String(pointerCustomHitZone.zone?.action).toLowerCase())) return;
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return;
     const patch = resolveCustomInteractionPatch(control, sessionFor(control), pointerCustomHitZone, {
@@ -7047,6 +7310,21 @@
     if (envDrag && envDrag.id === getControlId(control)) {
       const geom = envGeomFor(control);
       const local = controlLocalPoint(event);
+      if (envDrag.stage) {
+        const dx = local.x - envDrag.startPoint.x, dy = local.y - envDrag.startPoint.y;
+        if (envDrag.stage === 'sustain') {
+          patchControlSession(getControlId(control), { envHold: linkedEnvelopeHold(envDrag.startHold + dx / geom.w * (event.shiftKey ? .1 : 1)) });
+          return;
+        }
+        const stages = envDrag.levelSourceId ? ['decay','sustain'] : [envDrag.stage];
+        for (const stage of stages) {
+          const next = linkedEnvelopeDragValue(control, stage, envDrag.startValues[stage], dx, dy, geom, event.shiftKey);
+          if (next !== linkedEnvValues(control)[stage] && setLinkedEnvStage(control, stage, next, true)) {
+            envDrag.changed = true; envDrag.changedStages.add(stage);
+          }
+        }
+        return;
+      }
       const points = envWorkingPoints(control);
       const norm = envSnap(control, envFromPx(local.x, local.y, geom));
       const next = envDragNode(points, envDrag.index, norm.x, norm.y, { lockEndsX: true, lockYIndices: envLockY(control, points) });
@@ -7390,7 +7668,7 @@
         ?? customHitZoneFromEventTarget(control, event);
       pointerCustomStartValues = { ...(sessionFor(control)?.customValues ?? {}) };
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || action === '';
+      const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
       if (isDragAction) {
         patchCustomInteraction(control, pointerCustomHitZone, event, {
           hover: true,
@@ -7561,6 +7839,8 @@
     // Commit an envelope node drag: persist the working points to the model,
     // then drop the live session override so the model is the source of truth.
     if (envDrag && activeControl) {
+      if (envDrag.stage) finishLinkedEnvDrag(activeControl, cancelled);
+      else {
       const finalPoints = sessionFor(activeControl)?.envPoints;
       if (Array.isArray(finalPoints)) {
         commitEnvPoints(activeControl, finalPoints);
@@ -7568,6 +7848,7 @@
       }
       patchControlSession(activeId, { envPoints: undefined });
       envDrag = null;
+      }
     }
 
     // Commit a matrix cell drag: persist the amounts, drop the session override.
@@ -7694,7 +7975,7 @@
 
     if (isCustomComponent(activeControl)) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue') {
+      if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(activeControl, pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,
@@ -7791,6 +8072,7 @@
 
   function handleBlur(control, event) {
     const controlId = getControlId(control);
+    if (envDrag?.id === controlId && envDrag.stage) finishLinkedEnvDrag(control, false);
     if (event?.relatedTarget?.closest?.('.panel-combobox-menu')?.dataset.controlId === controlId) return;
     const momentaryRelease = momentaryButtonPreview.releasePress(controlId, getBehavior(control));
     if (lcdEdit.active && lcdEdit.id === controlId) {
@@ -7826,6 +8108,10 @@
   }
 
   function handleKeyDown(control, event) {
+    // A nested selector owns its keys. Letting them reach the container can
+    // focus/activate the parent and close the child's dropdown immediately.
+    const keyOwner = event.target?.closest?.('.canvas-control');
+    if (keyOwner && keyOwner !== event.currentTarget) return;
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
     if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
@@ -7834,6 +8120,24 @@
     lastInputMode = 'keyboard';
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
+
+    if (linkedEnvKey(control, event)) {
+      event.preventDefault(); event.stopPropagation();
+      return;
+    }
+    const patternCommand = hasGaiaPatternEditing(control) ? patternEditingShortcut(event) : '';
+    if (patternCommand) {
+      event.preventDefault(); event.stopPropagation();
+      handlePatternCommand(control, patternCommand);
+      return;
+    }
+    const arpKeyPatch = isCustomComponent(control) ? customArpeggiatorKeyPatch(control, customSessionValues(control), event) : null;
+    if (arpKeyPatch) {
+      event.preventDefault();
+      event.stopPropagation();
+      patchControlSession(controlId, arpKeyPatch);
+      return;
+    }
 
     // Listbox keyboard navigation (arrows / page / home / end) + type-ahead.
     if (isListboxControl(control)) {
@@ -7955,10 +8259,15 @@
   }
 
   function handleKeyUp(control, event) {
+    const keyOwner = event.target?.closest?.('.canvas-control');
+    if (keyOwner && keyOwner !== event.currentTarget) return;
     if (isDisabled(control)) return;
     if (isReadOnly(control)) return;
     if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false) return;
     if (isListboxControl(control)) return; // navigation/confirmation is completed on keydown
+    // Inspector Enter returns focus here before key-up. Never reinterpret that release
+    // as a pointer edit at the grid centre (or repeat the last navigation button).
+    if (control?._children?.Designer?.arpeggiator?.numericFields) return;
     if (event.key !== ' ' && event.key !== 'Enter') return;
 
     event.preventDefault();
@@ -8065,7 +8374,7 @@
       renderIdNamespace: previewRenderIdNamespace,
       previewRole: previewRoleFor(control),
       previewTabIndex: previewTabIndexFor(control),
-      previewTooltip: resolveTooltip(control),
+      previewTooltip: resolveTooltip(resolvedPreview?.control ?? control),
       previewImageRole: needsImageRole(control, previewRoleFor(control)),
       // The author's screen-reader text wins over the generated "<name> preview". That generated
       // string was being written over the top of whatever they had typed, which is the same defect
@@ -8090,7 +8399,7 @@
         ariaLabel: resolveAriaLabel(control, `${coreName} value`),
         tabIndex: -1,
       } : null,
-      previewEditableFields: spinnerEditableFields(control),
+      previewEditableFields: { ...spinnerEditableFields(control), ...numericEditableFields(control) },
       previewKeyboardFocus: keyboardFocusControlId === getControlId(control),
       previewHighlighted: $showPreviewSelectionRing && $previewInspectedControlId === getControlId(control),
       onpreviewpointerenter: () => handlePointerEnter(control),
@@ -8106,10 +8415,10 @@
       onpreviewvaluefieldkeydown: (event) => handleRangeFieldKeyDown(control, event),
       onpreviewvaluefieldfocus: (event) => handleRangeFieldFocus(control, event),
       onpreviewvaluefieldblur: (event) => handleRangeFieldBlur(control, event),
-      onpreviewfieldinput: (role, event) => handleSpinnerFieldInput(control, role, event),
-      onpreviewfieldkeydown: (role, event) => handleSpinnerFieldKeyDown(control, role, event),
-      onpreviewfieldfocus: (role, event) => handleSpinnerFieldFocus(control, role, event),
-      onpreviewfieldblur: (role, event) => handleSpinnerFieldBlur(control, role, event),
+      onpreviewfieldinput: (role, event) => numericRole(role) ? numericFieldEvent(control, role, event, 'input') : handleSpinnerFieldInput(control, role, event),
+      onpreviewfieldkeydown: (role, event) => numericRole(role) ? numericFieldEvent(control, role, event, 'keydown') : handleSpinnerFieldKeyDown(control, role, event),
+      onpreviewfieldfocus: (role, event) => numericRole(role) ? numericFieldEvent(control, role, event, 'focus') : handleSpinnerFieldFocus(control, role, event),
+      onpreviewfieldblur: (role, event) => numericRole(role) ? numericFieldEvent(control, role, event, 'blur') : handleSpinnerFieldBlur(control, role, event),
       previewTextField: isTextInputControl(control) ? {
         value: currentTextValue(control),
         placeholder: String(control?._children?.Text?.content ?? ''),
@@ -8182,7 +8491,12 @@
       childPreviewPropsFor={previewPropsFor}
       {...previewPropsFor(control)}
     />
-    {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
+
+    {/if}
+  {/each}
+  {#if openComboboxControlId}
+    {@const control = controlById(openComboboxControlId)}
+    {#if control && isComboboxControl(control) && getValueRows(control).length}
       <div class="panel-combobox-menu" data-control-id={getControlId(control)} style={comboboxMenuStyle(control)} role="listbox"
         onfocusout={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) openComboboxControlId = ''; }}>
         {#if String(getBehavior(control)?.subtype) === 'searchable'}
@@ -8196,7 +8510,8 @@
               else if (event.key === 'ArrowDown') { event.preventDefault(); event.currentTarget.parentElement?.querySelector('[role="option"]')?.focus(); }
             }} />
         {/if}
-        {#each comboboxRows(control) as row (row.id ?? row.internalValue ?? row.displayText)}
+        <!-- Row IDs/values are authored data and need not be unique (or nonempty). -->
+        {#each comboboxRows(control) as row}
           {@const selected = String(rowValue(row)) === String(currentComboboxValue(control))}
           <button
             type="button"
@@ -8219,8 +8534,7 @@
         {#if comboboxRows(control).length === 0}<div class="combobox-empty">No matching choices</div>{/if}
       </div>
     {/if}
-    {/if}
-  {/each}
+  {/if}
 </div>
 
 <style>

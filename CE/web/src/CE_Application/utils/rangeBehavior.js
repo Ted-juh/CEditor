@@ -1,4 +1,5 @@
 import { numberOr, clamp } from './primitives.js';
+import { displayScale, displayPrecision, toDisplay, fromDisplay } from './valueDisplayScale.js';
 
 // Re-exported so existing `from './rangeBehavior.js'` importers keep working.
 export { numberOr, clamp };
@@ -117,6 +118,8 @@ export function resolveMouseDirection(behavior = null, direction = 1) {
 
 export function formatRangeValue(behavior = null, value = 0) {
   const snapped = snapRangeValue(behavior, value);
+  const scale = displayScale(behavior, getRangeMin(behavior), getRangeMax(behavior));
+  if (scale) return toDisplay(scale, snapped).toFixed(displayPrecision(scale, 0));
   if (String(behavior?.valueType ?? '') === 'int') {
     return String(Math.round(snapped));
   }
@@ -144,7 +147,7 @@ export function parseRangeInputValue(behavior = null, input = '') {
 
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed)) return null;
-  return snapRangeValue(behavior, parsed);
+  return snapRangeValue(behavior, fromDisplay(displayScale(behavior, getRangeMin(behavior), getRangeMax(behavior)), parsed));
 }
 
 export function isRangeTextInputKey(key = '') {

@@ -1,39 +1,31 @@
 15x shape rect
-1x box 0,0 96x53
-1x box 0.5,0.5 95x52
-1x box 21,15.3 16.676978143536676x1.4
-1x box 21,21.3 9x1.4
-1x box 21,30.3 9x1.4
-1x box 21,40.8 6.3639610306789285x1.4
-1x box 25.5,36.3 6.363961030678928x1.4
-1x box 30,21.3 9x1.4
-1x box 30,30.3 9x1.4
-1x box 30,40.8 6.3639610306789285x1.4
-1x box 34.5,45.3 6.363961030678928x1.4
-1x box 35.04,6.3 9x1.4
-1x box 7,22 9x9
-1x box 7,37 9x9
-1x box 7,7 9x9
-1x svg-transform rotate(-32.7 21.000 16.000)
-1x svg-transform rotate(-45 21.000 41.500)
-1x svg-transform rotate(-45 34.500 46.000)
-1x svg-transform rotate(-90 21.000 31.000)
-1x svg-transform rotate(45 25.500 37.000)
-1x svg-transform rotate(45 30.000 41.500)
-1x svg-transform rotate(90 30.000 22.000)
-1x svg-transform rotate(90 35.040 7.000)
-1x stroke #000000 @ 1
-3x fill #120A0A
-1x fill #171C20
+1x box 23,15.3 16.676978143536676x1.4
+1x box 23,21.3 9x1.4
+1x box 23,30.3 9x1.4
+1x box 23,40.8 6.3639610306789285x1.4
+1x box 27.5,36.3 6.363961030678928x1.4
+1x box 32,21.3 9x1.4
+1x box 32,30.3 9x1.4
+1x box 32,40.8 6.3639610306789285x1.4
+1x box 36.5,45.3 6.363961030678928x1.4
+1x box 37.04,6.3 9x1.4
+1x box 5,5 12x42
+1x box 5.5,5.5 11x41
+1x box 7.5,22.5 7x7
+1x box 7.5,37.5 7x7
+1x box 7.5,7.5 7x7
+1x svg-transform rotate(-32.7 23.000 16.000)
+1x svg-transform rotate(-45 23.000 41.500)
+1x svg-transform rotate(-45 36.500 46.000)
+1x svg-transform rotate(-90 23.000 31.000)
+1x svg-transform rotate(45 27.500 37.000)
+1x svg-transform rotate(45 32.000 41.500)
+1x svg-transform rotate(90 32.000 22.000)
+1x svg-transform rotate(90 37.040 7.000)
+1x stroke #2B3B45 @ 1
+3x fill #080D11
 10x fill #D3DCE4
-2x bg #3A1E1CFF
+1x fill url(#g0)
+2x bg #2B1718FF
 1x bg #FF3B30FF
 3x radius 999px 999px 999px 999px
-3x font-family Arial
-3x font-size 9px
-3x font-style normal
-3x font-weight 600
-3x line-height 1
-3x text-align center
-3x white-space nowrap
-3x transform none

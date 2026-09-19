@@ -17,14 +17,28 @@ import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
 import { expandControl } from '../src/CE_Application/stores/documentShape.js';
 import { buildGaiaPanel, serializeGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { TONE_STRIP } from '../../../tools/scripts/gaia-panel/layout.mjs';
+import { flatControls, buildControlIndex, controlPanelRect } from '../src/CE_Application/utils/containment.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const PANEL = path.join(REPO, 'CE/panels/Roland GAIA SH-01.cepanel');
 const panel = buildGaiaPanel();
+const index = buildControlIndex(panel.controls);
+const layoutControls = flatControls(panel.controls).map((control) => {
+  const id = control._children.Core.id;
+  const rect = controlPanelRect(panel.controls, id);
+  const pageScope = {};
+  let entry = index.get(id);
+  while (entry?.parent) {
+    if (entry.parent._children.TabContainer) pageScope[entry.parent._children.Core.id] = entry.control._children.Core.tabPageId;
+    entry = index.get(entry.parent._children.Core.id);
+  }
+  return { ...control, pageScope, _children: { ...control._children, Transform: { ...control._children.Transform, x: rect.x, y: rect.y } } };
+});
+const coexist = (a, b) => Object.keys(a.pageScope).every((key) => !b.pageScope[key] || a.pageScope[key] === b.pageScope[key]);
 
 const boundIds = () => {
   const ids = [];
-  for (const control of panel.controls) {
+  for (const control of layoutControls) {
     for (const binding of control._children?.DeviceBindings?.bindings ?? []) {
       if (binding.parameterId) ids.push(binding.parameterId);
     }
@@ -46,6 +60,14 @@ test('all three tones carry the same controls', () => {
   assert.deepEqual(counts, [perStrip, perStrip, perStrip], `tone strips differ: ${counts.join(' / ')}`);
 });
 
+test('each visible tone is complete, including the MIDI-only modulation controls', () => {
+  const ids = new Set(boundIds());
+  for (const tone of [1, 2, 3]) {
+    assert.ok(ids.has(`tone${tone}.lfo.panDepth`), `tone ${tone} is missing LFO pan depth`);
+    assert.ok(ids.has(`tone${tone}.modLfo.tempoSyncNote`), `tone ${tone} is missing MOD LFO sync note`);
+  }
+});
+
 test('no parameter is bound twice', () => {
   const ids = boundIds();
   const seen = new Set();
@@ -54,7 +76,7 @@ test('no parameter is bound twice', () => {
 });
 
 test('nothing is placed outside the panel', () => {
-  for (const control of panel.controls) {
+  for (const control of layoutControls) {
     const { x, y, width, height } = control._children.Transform;
     const id = control._children.Core.id;
     assert.ok(x >= 0 && y >= 0, `${id} sits off the top-left at ${x},${y}`);
@@ -66,14 +88,15 @@ test('nothing is placed outside the panel', () => {
 test('no two interactive controls overlap', () => {
   // Labels and section boxes are allowed to sit under things — captions are drawn over the box
   // they belong to, by design. Two controls a user can grab are never both grabbable.
-  const boxes = panel.controls
+  const boxes = layoutControls
     .filter((c) => (c._children?.DeviceBindings?.bindings ?? []).length > 0)
-    .map((c) => ({ id: c._children.Core.id, ...c._children.Transform }));
+    .map((c) => ({ id: c._children.Core.id, pageScope: c.pageScope, ...c._children.Transform }));
 
   const collisions = [];
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
       const a = boxes[i], b = boxes[j];
+      if (!coexist(a, b)) continue;
       if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
         collisions.push(`${a.id} over ${b.id}`);
       }
@@ -102,16 +125,17 @@ test('no two captions overlap each other', () => {
     return { x: t.x + (t.width - width) / 2, y: t.y, width, height: t.height };
   };
 
-  const captions = panel.controls
+  const captions = layoutControls
     .filter((c) => String(c._children?.Core?.controlType) === 'Label'
       && (c._children?.DeviceBindings?.bindings ?? []).length === 0
       && String(c._children?.Text?.content ?? '').trim())
-    .map((c) => ({ id: `${c._children.Core.id} "${String(c._children.Text.content).replace(/\n/g, ' ')}"`, ...ink(c) }));
+    .map((c) => ({ pageScope: c.pageScope, id: `${c._children.Core.id} "${String(c._children.Text.content).replace(/\n/g, ' ')}"`, ...ink(c) }));
 
   const collisions = [];
   for (let i = 0; i < captions.length; i++) {
     for (let j = i + 1; j < captions.length; j++) {
       const a = captions[i], b = captions[j];
+      if (!coexist(a, b)) continue;
       if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) {
         collisions.push(`${a.id} over ${b.id}`);
       }
@@ -123,7 +147,7 @@ test('no two captions overlap each other', () => {
 test('every control renders', () => {
   const controls = JSON.parse(serializeGaiaPanel()).controls.map(expandControl);
   const failures = [];
-  for (const control of controls) {
+  for (const control of flatControls(controls)) {
     try {
       const { body } = render(CanvasControl, { props: { control, allControls: controls, editorInteractionEnabled: false } });
       if (!body || body.length < 32) failures.push(`${control._children.Core.id}: ${body?.length ?? 0} bytes`);

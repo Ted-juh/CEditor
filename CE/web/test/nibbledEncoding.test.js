@@ -44,7 +44,7 @@ test('the profile speaks the vocabulary both engines read', () => {
   // C++ matches "nibbled" and calls propInt(encoding, "nibbles"). Anything else is refused at send
   // time with no validation at load, so the mismatch only shows when a knob is turned.
   const nibbled = GAIA.parameters.filter((p) => p.encoding?.type === 'nibbled');
-  assert.equal(nibbled.length, 622);
+  assert.equal(nibbled.length, 624);
   for (const parameter of nibbled) {
     assert.ok([2, 3, 4].includes(parameter.encoding.nibbles),
       `${parameter.id}: nibble count must be in the property C++ reads`);
@@ -118,7 +118,7 @@ test('every parameter in the profile compiles', () => {
     if (!result?.ok) failures.push(`${parameter.id}: ${result?.error}`);
   }
   assert.deepEqual(failures, []);
-  assert.equal(GAIA.parameters.length, 793);
+  assert.equal(GAIA.parameters.length, 882);
 });
 
 test('the decoder reads back what each encoder writes', () => {

@@ -50,6 +50,8 @@ juce::var DeviceProfileService::startDeviceSync (const juce::var& payload)
                                         obj != nullptr ? obj->getProperty ("variables") : juce::var {});
     if (! request.ok)
         return errorResponse (correlationId, request.error);
+    if (obj != nullptr && obj->hasProperty ("chainStartup") && ! static_cast<bool> (obj->getProperty ("chainStartup")))
+        request.nextStartupRequestId = {};
 
     auto status = juce::String ("Preview");
     auto direction = juce::String ("preview");

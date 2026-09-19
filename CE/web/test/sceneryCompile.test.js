@@ -43,6 +43,15 @@ function box(id, overrides = {}) {
 const svgOf = (result) => Buffer.from(String(result.url).split(',')[1], 'base64').toString('utf8');
 const rects = (svg) => [...svg.matchAll(/<rect [^>]*\/>/g)].map((m) => m[0]);
 
+test('disabling solid fill invalidates a cached scenery image', () => {
+  clearSceneryCache();
+  const control = box('fill-switch');
+  const solid = compileScenery([control], 400, 300);
+  const disabled = structuredClone(control);
+  disabled._children.Background._children.Fill.solidEnabled = false;
+  assert.notEqual(compileScenery([disabled], 400, 300).url, solid.url);
+});
+
 /* ------------------------------------------------------------------ what it draws */
 
 test('a plain box folds, and its geometry survives', () => {
@@ -589,7 +598,8 @@ test('an EMPTY fitted container re-compiles when its own size fields change', ()
  * THE CASE THIS SECTION EXISTS FOR.
  *
  * The image compiler refuses text, because an <img> cannot see the page's fonts. On a real panel
- * text is nearly all of it — the GAIA's 409 controls are 189 Labels and 27 Backgrounds — so a
+ * text is nearly all of it — the GAIA has more than 400 controls, dominated by Labels and
+ * Backgrounds — so a
  * scenery layer that compiles folds the 27 and hands back the 189. The frozen ground takes exactly
  * what the image cannot, so the two run in sequence rather than one instead of the other.
  *

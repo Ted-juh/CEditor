@@ -616,12 +616,15 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
 
         auto parsed = parseDumpMessage (juce::var (payload), true);
         emitDeviceEvent ("dumpMessageParsed", parsed);
-        emitDeviceEvent ("deviceRuntimeState", getRuntimeState());
 
         if (auto* parsedObject = parsed.getDynamicObject())
         {
             if (static_cast<bool> (parsedObject->getProperty ("ok")))
             {
+                // A failed bulk-dump match changed no native parameters. Sending
+                // that cache would overwrite the value just decoded from raw MIDI
+                // by the frontend (normal GAIA fader edits are single-parameter DT1).
+                emitDeviceEvent ("deviceRuntimeState", getRuntimeState());
                 DumpParseResult parsedResult;
                 parsedResult.ok = true;
                 parsedResult.dumpId = parsedObject->getProperty ("dumpId").toString();

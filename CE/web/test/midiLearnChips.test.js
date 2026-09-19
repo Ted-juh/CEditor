@@ -89,15 +89,15 @@ test('a CC the profile declares is named, not left as a number', () => {
 test('a controller the profile has no parameter for still binds, as a raw CC', () => {
   // This chip used to be inert, and that was the gap the raw binding kind closes: a generic fader
   // box, or any CC a profile author never mapped, could be seen moving and had nowhere to go.
-  const chips = chipList(fold(['B0 4A 10', 'B0 4A 60']), opts);
+  const chips = chipList(fold(['B0 1F 10', 'B0 1F 60']), opts);
   assert.equal(chips.length, 1);
   assert.equal(chips[0].parameter, null, 'the profile still cannot name it');
-  assert.equal(chips[0].controller, 74);
+  assert.equal(chips[0].controller, 31);
   assert.match(chips[0].reason, /binds as a raw CC/);
 
   const payload = chipDragPayload(chips[0], 'Fader box');
   assert.equal(payload.kind, 'ceditor.midiControl');
-  assert.equal(payload.controller, 74);
+  assert.equal(payload.controller, 31);
   assert.equal(payload.parameter.type, 'integer', 'so the drop target can judge compatibility');
 });
 

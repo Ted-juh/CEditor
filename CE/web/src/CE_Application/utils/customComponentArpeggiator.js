@@ -20,6 +20,33 @@ export function noteNameFromMidi(note) {
   return `${names[midi % 12]}${Math.floor(midi / 12) - 1}`;
 }
 
+/** Inspector positions are shared by rendering and pointer-to-grid arithmetic. */
+export function arpeggiatorInspectorLayout(width, toolbar = false) {
+  const columns = width >= 880 ? 4 : width >= 500 ? 2 : 1;
+  const rows = Math.ceil(4 / columns);
+  const inline = columns === 4;
+  return { height: (inline ? 28 : 28 * (rows + 1)) + (toolbar ? 28 : 0),
+    fields: ['Pitch', 'Start', 'Length', 'Velocity'].map((name, index) => ({
+      name, x: (inline ? 280 : 44) + (index % columns) * 140,
+      y: inline ? 0 : 28 * (1 + Math.floor(index / columns)),
+    })) };
+}
+
+export function revealArpeggiatorNote(arp, note) {
+  const viewNote = note < arp.viewNote ? note : note > arp.viewNote + 11 ? note - 11 : arp.viewNote;
+  return { ...arp, viewNote: clamp(viewNote, 0, 116) };
+}
+
+export function selectArpeggiatorNote(arp, direction) {
+  const ordered = [...arp.blocks].sort((a, b) => a.step - b.step || a.note - b.note || a.id.localeCompare(b.id));
+  if (!ordered.length) return arp;
+  const current = ordered.findIndex(b => b.id === arp.selectedBlock);
+  const index = direction === 'first' ? 0 : direction === 'last' ? ordered.length - 1
+    : current < 0 ? (direction === 'previous' ? ordered.length - 1 : 0)
+      : clamp(current + (direction === 'previous' ? -1 : 1), 0, ordered.length - 1);
+  return revealArpeggiatorNote({ ...arp, selectedBlock: ordered[index].id }, ordered[index].note);
+}
+
 export function normalizeCustomArpeggiator(value = {}) {
   const stepCount = Math.max(1, Math.min(CUSTOM_ARP_MAX_STEP_COUNT, Math.round(numberOr(value?.stepCount, CUSTOM_ARP_DEFAULT_STEP_COUNT))));
   const viewNote = Math.max(CUSTOM_ARP_NOTE_MIN, Math.min(116, Math.round(numberOr(value?.viewNote, 60))));
@@ -41,6 +68,7 @@ export function normalizeCustomArpeggiator(value = {}) {
 
   return {
     enabled: value?.enabled === true,
+    ...(value?.numericFields === true ? { numericFields: true } : {}),
     stepCount,
     noteMin: CUSTOM_ARP_NOTE_MIN,
     noteMax: CUSTOM_ARP_NOTE_MAX,
@@ -113,7 +141,11 @@ export function syncCustomArpeggiatorValues(control, values = {}) {
 
 export function resolveRuntimeArpeggiatorEdit(control, values = {}, hitZone = null, point = null) {
   const action = String(hitZone?.action ?? hitZone?.meta?.action ?? '').trim().toLowerCase();
-  if (!['arpeggiatordraw', 'arpeggiatormove', 'arpeggiatorresize'].includes(action)) return null;
+  if (action === 'arpeggiatorselect') {
+    const arp = getCustomArpeggiator(control, values);
+    return arp.enabled ? selectArpeggiatorNote(arp, hitZone?.payload?.direction) : null;
+  }
+  if (!['arpeggiatordraw', 'arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize'].includes(action)) return null;
   if (!point?.rect) return null;
 
   const arpeggiator = getCustomArpeggiator(control, values);
@@ -127,7 +159,7 @@ export function resolveRuntimeArpeggiatorEdit(control, values = {}, hitZone = nu
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
   const gridWidth = Math.max(1, width - labelWidth - 8);
-  const gridHeight = Math.max(1, height - rulerHeight - 8);
+  const gridHeight = Math.max(1, height - rulerHeight - 8 - (control?._children?.Designer?.arpeggiator?.numericFields ? arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia').height : 0));
   const rowHeight = gridHeight / 12;
   const stepWidth = gridWidth / Math.max(1, arpeggiator.stepCount);
   const localX = clamp(numberOr(point.clientX, point.rect.left) - point.rect.left, 0, point.rect.width);
@@ -157,12 +189,26 @@ export function resolveRuntimeArpeggiatorEdit(control, values = {}, hitZone = nu
   const index = blocks.findIndex((block) => block.id === blockId);
   if (index < 0) return arpeggiator;
 
+  // Every update is relative to the original grab, not the last rendered block.
+  // This keeps the grabbed offset stable and prevents unrelated parameters drifting.
+  const anchored = Number.isFinite(point.startClientX) && Number.isFinite(point.startClientY);
+  const original = anchored
+    ? getCustomArpeggiator(control, point.startValues).blocks.find((block) => block.id === blockId) ?? blocks[index]
+    : blocks[index];
+  const dx = anchored ? (point.clientX - point.startClientX) * width / Math.max(1, point.rect.width) : 0;
+  const dy = anchored ? (point.clientY - point.startClientY) * height / Math.max(1, point.rect.height) : 0;
   if (action === 'arpeggiatormove') {
-    const length = Math.min(blocks[index].length, arpeggiator.stepCount - step);
-    blocks[index] = { ...blocks[index], step, note, length, velocity };
+    blocks[index] = {
+      ...original,
+      step: clamp(anchored ? original.step + Math.round(dx / stepWidth) : step, 0, arpeggiator.stepCount - original.length),
+      note: clamp(anchored ? original.note - Math.round(dy / rowHeight) : note, CUSTOM_ARP_NOTE_MIN, CUSTOM_ARP_NOTE_MAX),
+    };
+  } else if (action === 'arpeggiatorvelocity') {
+    // Two design pixels per MIDI velocity unit; Shift gives quarter-speed precision.
+    blocks[index] = { ...original, velocity: Math.round(clamp(original.velocity - dy / (point.fine ? 8 : 2), 1, 127)) };
   } else if (action === 'arpeggiatorresize') {
-    const length = Math.max(1, step - blocks[index].step + 1);
-    blocks[index] = { ...blocks[index], length: Math.min(length, arpeggiator.stepCount - blocks[index].step), velocity };
+    const length = anchored ? original.length + Math.round(dx / stepWidth) : step - original.step + 1;
+    blocks[index] = { ...original, length: clamp(length, 1, arpeggiator.stepCount - original.step) };
   }
 
   return normalizeCustomArpeggiator({ ...arpeggiator, selectedBlock: blocks[index].id, blocks });

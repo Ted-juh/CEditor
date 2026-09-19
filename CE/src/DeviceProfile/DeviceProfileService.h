@@ -70,6 +70,7 @@ public:
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
     juce::var getMonitorEvents() const;
+    void publishMonitorEvents();
     /** Forget the monitor log. The engine owns it, so clearing only the UI's copy does nothing. */
     void clearMonitorEvents();
     juce::var getDiagnostics() const;
@@ -240,6 +241,9 @@ private:
     std::map<juce::String, DumpCollectionState> dumpCollections;
     std::map<juce::String, std::map<juce::String, juce::var>> runtimeState;
     juce::Array<juce::var> monitorEvents;
+    juce::int64 monitorEventSequence = 0;
+    double lastMonitorEmitMs = -1000.0;
+    bool monitorEmitPending = false;
     double lastInboundHeavyEmitMs = 0.0;  // throttles per-incoming heavy bridge emits (CC streams)
     double lastProfileScanMs = 0.0;       // throttles the profile directory rescan (see loadInternalTestProfiles)
     std::map<juce::String, juce::Time> refusedProfiles;  // path -> mtime of the copy we already refused

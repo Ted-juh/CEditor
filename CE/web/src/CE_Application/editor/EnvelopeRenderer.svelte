@@ -8,6 +8,7 @@
     envelopeConfig, envelopePoints, envelopeGeometry, envToPx,
     envPath, envFillPath, envValueAt,
   } from '../utils/envelopeLayout.js';
+  import { linkedEnvelopeConfig } from '../utils/linkedEnvelope.js';
 
   let { control = null, width = 0, height = 0, activeIndex = -1 } = $props();
 
@@ -24,6 +25,7 @@
   function n(v, f = 0) { const x = Number(v); return Number.isFinite(x) ? x : f; }
 
   let cfg = $derived(envelopeConfig(control));
+  let linked = $derived(linkedEnvelopeConfig(control));
   let points = $derived(envelopePoints(control));
   let geom = $derived(envelopeGeometry(width, height, PAD));
   let line = $derived(envPath(points, geom, 24));
@@ -66,7 +68,7 @@
   let baseY = $derived(geom.y0 + geom.h);
 </script>
 
-<svg class="envelope" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`}>
+  <svg class="envelope" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`}>
   {#each gridLines.v as x (`v${x}`)}<line x1={x} y1={geom.y0} x2={x} y2={baseY} stroke={gridCss} stroke-width="1" />{/each}
   {#each gridLines.h as y (`h${y}`)}<line x1={geom.x0} y1={y} x2={geom.x0 + geom.w} y2={y} stroke={gridCss} stroke-width="1" />{/each}
 
@@ -89,11 +91,27 @@
   {/if}
 
   {#each nodesPx as node (node.i)}
+    {#if !linked || node.i > 0}
     <circle cx={node.px} cy={node.py} r={node.i === activeIndex ? nodeR + 2 : nodeR}
+            data-envelope-stage={linked ? points[node.i].id : undefined}
             fill={node.i === Math.round(n(cfg.sustainIndex, -1)) ? sustainCss : nodeCss}
             stroke="rgba(0,0,0,0.5)" stroke-width="1"
             class:active={node.i === activeIndex} />
+    {#if linked}
+      {@const stage = points[node.i].id}
+      <text x={node.px} y={node.py < geom.y0 + 14 ? node.py + 15 : node.py - 8}
+        fill={node.i === activeIndex ? sustainCss : nodeCss} text-anchor="middle" font-size="8" font-family="sans-serif"
+      >{stage.slice(0,1).toUpperCase()}</text>
+    {/if}
+    {/if}
   {/each}
+  {#if linked && activeIndex > 0 && points[activeIndex]}
+    {@const stage = points[activeIndex].id}
+    <text x={width - 7} y={9} text-anchor="end" fill={nodeCss} font-size="8" font-family="monospace"
+    >{stage === 'sustain' ? 'HOLD (view only)' : stage === 'decay' && linked.sustain
+      ? `D ${cfg.__stageValues?.decay ?? linked.decay.defaultValue} / S ${cfg.__stageValues?.sustain ?? linked.sustain.defaultValue}`
+      : `${stage.slice(0,1).toUpperCase()} ${cfg.__stageValues?.[stage] ?? linked[stage]?.defaultValue}`}</text>
+  {/if}
 </svg>
 
 <style>

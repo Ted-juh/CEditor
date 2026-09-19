@@ -22,6 +22,8 @@ import { readCommitted } from '../../readCommitted.mjs';
 // Imported rather than re-transcribed: it is one table, and two copies of it would agree until one
 // was edited. The panel reads it for the knob CAPTIONS; this file reads it for the RANGES.
 import { EFFECT_PARAMETER_RANGES } from '../../gaia-panel/effect-parameters.mjs';
+import { SYSTEM, SYSTEM_BASE } from './system-map.mjs';
+import { OSC_PITCH_CC, OSC_DETUNE_CC, LFO_SYNC_CC } from './cc-map.mjs';
 
 import {
   BLOCK_SIZES, BLOCKS, MODEL, PATCH_ARPEGGIO_COMMON, PATCH_ARPEGGIO_PATTERN, PATCH_COMMON,
@@ -114,6 +116,7 @@ function mfxSlotOf(name) {
  * happened once already this session; a shared table is what makes it unrepresentable.
  */
 const BLOCK_DUMPS = [
+  { dump: 'system', name: 'System', block: 'system', base: SYSTEM_BASE, sizeKey: 'system' },
   { dump: 'common', name: 'Patch Common', block: 'common', sizeKey: 'common' },
   { dump: 'tone1', name: 'Patch Tone 1', block: 'tone1', sizeKey: 'tone' },
   { dump: 'tone2', name: 'Patch Tone 2', block: 'tone2', sizeKey: 'tone' },
@@ -135,6 +138,7 @@ const BLOCK_DUMPS = [
 
 /** `requestCommon`, `requestTone1`, `requestArpPattern16` — derived from the dump id, once. */
 const requestIdFor = (dump) => `request${dump[0].toUpperCase()}${dump.slice(1)}`;
+const dumpBase = (row) => row.base ?? addressFor(BLOCKS[row.block], '00 00');
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');
@@ -234,14 +238,32 @@ function preferredComponent(entry) {
  * profile is generated from the address map rather than from DPD, so it needs its own statement of
  * the same fact. Keyed by section.leaf, applied per tone.
  */
+const cc = (base, options = {}) => tone => [{ kind: 'cc', controller: base + tone - 1, ...options }];
+const bipolarCc = base => cc(base, { valueMap: Array.from({ length: 128 }, (_, value) => Math.max(1, value)) });
 const TONE_INBOUND = {
-  'filter.cutoff': (tone) => [{ kind: 'cc', controller: 101 + tone }],
+  'lfo.rate': tone => [{ kind: 'cc', controller: 15 + tone,
+    alternate: { whenParameter: `tone${tone}.lfo.tempoSyncSwitch`, whenValues: [1, 'on'],
+      parameterId: `tone${tone}.lfo.tempoSyncNote`, valueMap: LFO_SYNC_CC } }],
+  'lfo.fadeTime': cc(19),
+  'lfo.pitchDepth': bipolarCc(22),
+  'lfo.filterDepth': bipolarCc(25),
+  'lfo.ampDepth': bipolarCc(28),
+  'osc.pitch': cc(70, { valueMap: OSC_PITCH_CC }),
+  'osc.detune': cc(73, { valueMap: OSC_DETUNE_CC }),
+  'osc.pulseWidthModDepth': cc(76),
+  'osc.pulseWidth': cc(79),
+  'osc.pitchEnvDepth': bipolarCc(85),
+  'filter.cutoff': cc(102),
+  'filter.resonance': cc(105),
+  'filter.envDepth': bipolarCc(108),
+  'filter.cutoffKeyfollow': cc(111, { valueMap: Array.from({ length: 128 }, (_, value) => 54 + Math.floor(value / 6.1)) }),
+  'amp.level': cc(114),
 };
 
-function buildParameter(entry, { idPrefix, group, blockOffset, inbound }) {
+function buildParameter(entry, { idPrefix, group, blockOffset, inbound, baseAddress }) {
   const { section, leaf } = splitName(entry.name);
-  const id = [idPrefix, section, leaf].filter(Boolean).join('.');
-  const address = addressFor(blockOffset, entry.offset);
+  const id = entry.id ? `${idPrefix}.${entry.id}` : [idPrefix, section, leaf].filter(Boolean).join('.');
+  const address = baseAddress ? `${baseAddress.split(' ').slice(0, 2).join(' ')} ${entry.offset}` : addressFor(blockOffset, entry.offset);
 
   const base = {
     id,
@@ -250,12 +272,20 @@ function buildParameter(entry, { idPrefix, group, blockOffset, inbound }) {
     address,
     access: { canRead: true, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
     messageRecipe: 'dt1',
-    ...(inbound?.length ? { inbound } : {}),
+    ...(inbound?.length ? { inbound } : id === 'common.portamentoTime' ? { inbound: [{ kind: 'cc', controller: 5 }] } : {}),
     ui: { preferredComponent: preferredComponent(entry) },
   };
 
   if (entry.labels) {
-    const choices = entry.labels.map((label, value) => ({ id: slug(label), label, value: entry.min + value }));
+    const usedIds = new Set();
+    const choices = entry.labels.map((label, index) => {
+      const value = entry.min + index;
+      const base = slug(label);
+      // Fractions must not collide with whole-note counts: 12 vs 1/2, 16 vs 1/6.
+      const id = usedIds.has(base) ? `${base}_${value}` : base;
+      usedIds.add(id);
+      return { id, label, value };
+    });
     return {
       ...base,
       type: 'choice',
@@ -401,7 +431,7 @@ function addressDelta(base, address) {
  */
 function buildDumpDefinitions(parameters) {
   const byBlock = new Map(BLOCK_DUMPS.map((row) => [row.dump, []]));
-  const bases = BLOCK_DUMPS.map((row) => ({ ...row, base: addressFor(BLOCKS[row.block], '00 00') }));
+  const bases = BLOCK_DUMPS.map((row) => ({ ...row, base: dumpBase(row) }));
 
   for (const parameter of parameters) {
     if (!parameter.address) continue; // master.volume is CC 7 — it is not in any dump
@@ -523,6 +553,15 @@ function buildTests(deviceId, parameters) {
 
 export function buildProfile() {
   const parameters = [patchNameParameter()];
+  for (const entry of SYSTEM) {
+    const parameter = buildParameter(entry, { idPrefix: 'system', group: entry.id.startsWith('writeProtect') ? 'System · Write Protection' : 'System', baseAddress: SYSTEM_BASE });
+    // System configuration is intentional, committed editing, never a continuous sweep.
+    parameter.access.realtimeSafe = false;
+    parameter.sendPolicy = { mode: 'onCommit', coalesce: true };
+    if (entry.id === 'masterTune') parameter.display.precision = 1;
+    if (entry.id === 'rxTxChannel') parameter.default = 0;
+    parameters.push(parameter);
+  }
 
   for (const entry of PATCH_COMMON) {
     if (/^Patch Name \d+$/.test(entry.name)) continue; // folded into common.patchName
@@ -590,7 +629,7 @@ export function buildProfile() {
 
   return {
     schemaVersion: 1,
-    profileVersion: '1.0.0',
+    profileVersion: '1.1.0',
     minCEditorVersion: '0.9.0',
     id: 'roland-gaia-sh01',
     name: 'Roland GAIA SH-01 (full)',
@@ -604,7 +643,7 @@ export function buildProfile() {
     sources: [{
       type: 'manual',
       title: 'Roland SH-01 GAIA MIDI Implementation (v1.01, Sep 2010)',
-      notes: 'Section 3 Parameter Address Map, transcribed in full for Patch Common and Patch Tone. '
+      notes: 'Section 3 Parameter Address Map, including System at 01 00 00 00 (reserved bytes excluded), Patch Common and Patch Tone. '
         + 'Model ID 00 00 41, DT1=12 / RQ1=11, roland-7bit checksum. Temporary Patch 10 00 00 00; '
         + 'Tone 1/2/3 at block offsets 00 01 00 / 00 02 00 / 00 03 00. Verified against the manual\'s '
         + 'own Example 1: F0 41 10 00 00 41 12 10 00 01 00 06 69 F7.',
@@ -678,6 +717,16 @@ export function buildProfile() {
       },
       { id: 'volumeCc', kind: 'cc', channel: '$channel', controller: 7, value: '$encodedValue' },
     ],
+    // Effect CC meanings depend on the active algorithm. Read just its block;
+    // do not run the 26-block startup sync for each physical knob movement.
+    inboundRefresh: [
+      { controllers: [12, 91], request: 'requestReverb' },
+      { controllers: [13, 92], request: 'requestDelay' },
+      { controllers: [14, 93], request: 'requestFlanger' },
+      { controllers: [15, 94], request: 'requestDistortion' },
+      ...[1, 2, 3].map(tone => ({ controllers: [15 + tone], request: `requestTone${tone}`,
+        whenMissing: `tone${tone}.lfo.tempoSyncSwitch` })),
+    ],
     requests: [
       {
         id: 'identityRequest',
@@ -701,8 +750,8 @@ export function buildProfile() {
         id: requestIdFor(row.dump),
         name: `Request ${row.block}`,
         kind: 'sysex',
-        template: rq1Template(addressFor(BLOCKS[row.block], '00 00'), BLOCK_SIZES[row.sizeKey]),
-        address: addressFor(BLOCKS[row.block], '00 00'),
+        template: rq1Template(dumpBase(row), BLOCK_SIZES[row.sizeKey]),
+        address: dumpBase(row),
         size: BLOCK_SIZES[row.sizeKey],
         response: { kind: 'bulkDump', dump: row.dump },
         timeoutMs: 1000,

@@ -131,7 +131,7 @@ test('the data URL is base64, like every other one in the app', () => {
 });
 
 test('a big layer thumbnails fast enough to sit in a drag', () => {
-  // 0.41 ms measured for 409 controls. The budget is generous because this is about catching a
+  // 0.41 ms measured for the 400+ control GAIA panel. The budget is generous because this is about catching a
   // change of ALGORITHM — rendering controls for real, say — not about timing a fast machine.
   clearThumbnailCache();
   const controls = Array.from({ length: 400 }, (unused, i) => at((i * 7) % 1500, (i * 11) % 1700, 40, 40));

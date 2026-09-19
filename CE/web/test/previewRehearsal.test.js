@@ -21,6 +21,7 @@ import {
 import { updateControlProperty } from '../src/CE_Application/stores/controls.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { MODULES } from '../src/CE_Application/scripting/panelApi.js';
+import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 function seed(name = 'Cutoff') {
   const control = createControl('Knob', { name });
@@ -57,6 +58,23 @@ test('a rehearsal that changed nothing does not touch the store', () => {
     assert.equal(endPreviewRehearsal(), false, 'nothing to put back, so nothing written');
     assert.equal(get(panels), before, 'the same array instance — modified stays as it was');
   } finally { panels.set([]); }
+});
+
+test('explicit script settings survive preview rollback while visual edits do not', () => {
+  try {
+    const id = seed();
+    const api = scriptApiForTesting('', 'names-cache');
+    api.saveSetting('obsolete', 'old');
+    beginPreviewRehearsal();
+    updateControlProperty(id, 'Transform.x', 512);
+    api.saveSetting('patchNames', { 0: 'Real name' });
+    api.forgetSetting('obsolete');
+    endPreviewRehearsal();
+    assert.notEqual(get(panels)[0].controls[0]._children.Transform.x,512);
+    assert.deepEqual(api.loadSetting('patchNames'),{0:'Real name'});
+    assert.equal(api.loadSetting('obsolete'),undefined);
+    assert.equal(get(panels)[0].modified,true,'persistent settings must be saved with the panel');
+  } finally { endPreviewRehearsal(); panels.set([]); }
 });
 
 test('a control created during a rehearsal is gone after it', () => {

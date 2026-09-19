@@ -3,6 +3,7 @@
 // via appSettings/projectDeviceSession, and owns role-mapping + profile/source refresh calls.
 import { get } from 'svelte/store';
 import { clearDeviceParameterValues } from './deviceParameterValues.js';
+import { syncFeedbackRoutes, invalidateDeviceFeedback, noteDeviceFeedbackReceived, noteDeviceFeedbackResult, noteDeviceFeedbackRead, noteDeviceFeedbackIdentity } from './deviceSyncFeedback.js';
 import {
   getDeviceProfileSource,
   getProfileParameterDetail,
@@ -57,9 +58,12 @@ import {
   onMidiCiDiscoveryComplete,
   getBulkDumpSends,
   requestFileData,
+  startDeviceSync,
 } from '../bridge/bridge.js';
 import { fileDataText, profileSourceText } from '../utils/fileDataPayload.js';
 import { decodeInbound } from '../utils/inboundParameterIndex.js';
+import { createNativeRuntimeDelta } from '../utils/nativeRuntimeDelta.js';
+import { createInboundRefreshQueue } from '../utils/inboundRefresh.js';
 import { inboundIndexFor } from './inboundIndexCache.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
@@ -175,27 +179,58 @@ function echoWindowMsForRole(deviceRole) {
  * the other's controls. Echo-suppressed, or our own send comes back a few milliseconds later and
  * fights the hand that is still turning the knob.
  */
+const nativeRuntimeDelta = createNativeRuntimeDelta();
+const inboundRefresh = createInboundRefreshQueue(payload => {
+  if (get(deviceRoleMappings)?.[payload.deviceRole]?.profileId === payload.profileId) startDeviceSync(payload);
+});
+const lastRawSysex = new Map();
+
+function mergeRuntimeValues(delta) {
+  const current = get(deviceRuntimeState);
+  let next = current;
+  for (const [role, values] of Object.entries(delta)) {
+    for (const [id, value] of Object.entries(values)) {
+      if (Object.is(next?.[role]?.[id], value)) continue;
+      if (next === current) next = { ...current };
+      if (next[role] === current?.[role]) next[role] = { ...current?.[role] };
+      (next[role] ??= {})[id] = value;
+    }
+  }
+  if (next !== current) deviceRuntimeState.set(next);
+}
+
 export function followInboundMessage(payload) {
   const hex = String(payload?.hex ?? '');
   if (!hex) return;
 
   const role = String(payload?.deviceRole ?? DEFAULT_DEVICE_ROLE);
+  if (/^c[0-9a-f]\s+[0-7][0-9a-f]$/i.test(hex.trim())) invalidateDeviceFeedback(role, 'PATCH CHANGED — READ REQUIRED');
   const profileId = String(get(deviceRoleMappings)?.[role]?.profileId ?? '');
   if (!profileId) return;
 
   const indexed = inboundIndexFor(profileId, get(profileSources)?.[profileId]?.source ?? '');
   if (!indexed?.index) return;   // the source has not arrived yet; ordinary, not an error
 
-  const hit = decodeInbound(indexed.index, hex);
+  const values = get(deviceRuntimeState)?.[role] ?? {};
+  const cc = /^b[0-9a-f]\s+([0-7][0-9a-f])\s+[0-7][0-9a-f]$/i.exec(hex.trim());
+  let readingContext = false;
+  if (cc && get(deviceRoleMappings)?.[role]?.midiDestination?.type !== 'previewOnly') {
+    for (const rule of indexed.inboundRefresh) {
+      if (!rule.controllers?.includes(parseInt(cc[1], 16))) continue;
+      if (rule.whenMissing && values[rule.whenMissing] !== undefined) continue;
+      inboundRefresh.request({ deviceRole: role, profileId, request: rule.request });
+      readingContext = true;
+    }
+  }
+  if (readingContext) return;
+  const hit = decodeInbound(indexed.index, hex, values);
   if (!hit) return;
 
+  noteDeviceFeedbackReceived(role, { [hit.parameterId]: hit.value });
   if (shouldSuppressEcho(role, hit.parameterId, hit.value)) return;
   markRuntimeOrigin(role, hit.parameterId, 'deviceInbound');
   recordRuntimeConflict(role, hit.parameterId, hit.value, { source: 'inbound' });
-  deviceRuntimeState.update((state) => ({
-    ...state,
-    [role]: { ...(state?.[role] ?? {}), [hit.parameterId]: hit.value },
-  }));
+  mergeRuntimeValues({ [role]: { [hit.parameterId]: hit.value } });
   queueDeviceParameterPanelPreviewSync(role, hit.parameterId, hit.value);
 }
 
@@ -348,6 +383,10 @@ export function initDeviceProfileBridge() {
   initDeviceSessionPersistence();
   if (initialized) return;
   initialized = true;
+  const refreshFeedbackRoute = () => syncFeedbackRoutes(get(deviceRoleMappings), get(midiDestinations), get(midiInputs));
+  deviceRoleMappings.subscribe(refreshFeedbackRoute);
+  midiDestinations.subscribe(refreshFeedbackRoute);
+  midiInputs.subscribe(refreshFeedbackRoute);
 
   onDeviceProfilesListed((payload) => {
     deviceProfiles.set(Array.isArray(payload?.profiles) ? payload.profiles : []);
@@ -404,6 +443,10 @@ export function initDeviceProfileBridge() {
         fallback: false,
       },
     }));
+    // Build the decoder while idle, before the first physical fader movement.
+    const warm = () => inboundIndexFor(payload.profileId, get(profileSources)?.[payload.profileId]?.source ?? '');
+    if (typeof window !== 'undefined' && window.requestIdleCallback) window.requestIdleCallback(warm, { timeout: 500 });
+    else setTimeout(warm, 0);
   });
 
   onFileData((payload) => {
@@ -474,6 +517,7 @@ export function initDeviceProfileBridge() {
   });
 
   onMidiInputMessage((payload) => {
+    if (payload?.messageType === 'sysex') lastRawSysex.set(payload.deviceRole, payload);
     // ce.midi.interceptIn sits HERE, not in the scripting runtime, because everything downstream —
     // the panel's bindings, the note input, the transport — reads this store. A filter applied only
     // where scripts listen would be a rule that holds for scripts and not for the panel.
@@ -485,10 +529,13 @@ export function initDeviceProfileBridge() {
 
   onSysexInputMessage((payload) => {
     latestSysexInputMessage.set(payload ?? null);
+    const raw = lastRawSysex.get(payload?.deviceRole);
+    if (raw && raw.timestampSeconds != null && raw.timestampSeconds === payload?.timestampSeconds && raw.hex === payload?.hex) return;
     followInboundMessage(payload);
   });
 
   onDeviceSyncStarted((payload) => {
+    noteDeviceFeedbackRead(payload);
     latestDeviceSyncResult.set(payload ?? null);
     if (payload?.sessionState) deviceSessionState.set(payload.sessionState);
   });
@@ -499,18 +546,24 @@ export function initDeviceProfileBridge() {
   });
 
   onDeviceRequestResolved((payload) => {
+    inboundRefresh.finish(payload?.correlationId);
+    noteDeviceFeedbackRead(payload, 'resolved');
     latestDeviceRequestResolved.set(payload ?? null);
   });
 
   onDeviceRequestTimedOut((payload) => {
+    inboundRefresh.finish(payload?.correlationId);
+    noteDeviceFeedbackRead(payload, 'timeout');
     latestDeviceRequestTimedOut.set(payload ?? null);
   });
 
   onDeviceIdentityReply((payload) => {
+    noteDeviceFeedbackIdentity(payload);
     latestDeviceIdentityReply.set(payload ?? null);
   });
 
   onDeviceIdentityMismatch((payload) => {
+    noteDeviceFeedbackIdentity({ ...payload, matched: false });
     latestDeviceIdentityMismatch.set(payload ?? null);
   });
 
@@ -668,10 +721,9 @@ export function initDeviceProfileBridge() {
   });
 
   onDeviceParameterSet((payload) => {
+    noteDeviceFeedbackResult(payload);
     latestMidiPreview.set(payload);
-    if (payload?.runtimeState) {
-      deviceRuntimeState.set(payload.runtimeState);
-    }
+    mergeRuntimeValues(nativeRuntimeDelta(payload?.runtimeState));
     if (payload?.ok === true && payload?.parameterId) {
       const value = payload?.transaction?.semanticValue
         ?? payload?.runtimeState?.[payload.deviceRole ?? DEFAULT_DEVICE_ROLE]?.[payload.parameterId];
@@ -680,6 +732,7 @@ export function initDeviceProfileBridge() {
         echoWindowMs: echoWindowMsForRole(payload.deviceRole),
       });
       if (value !== undefined) {
+        mergeRuntimeValues({ [payload.deviceRole ?? DEFAULT_DEVICE_ROLE]: { [payload.parameterId]: value } });
         queueDeviceParameterPanelPreviewSync(payload.deviceRole ?? DEFAULT_DEVICE_ROLE, payload.parameterId, value, {
           skipControlId: sourceControlIdFromRequestId(payload?.requestId),
         });
@@ -688,11 +741,13 @@ export function initDeviceProfileBridge() {
   });
 
   onDumpMessageParsed((payload) => {
-    latestDumpParseResult.set(payload);
-    if (payload?.runtimeState) {
-      deviceRuntimeState.set(payload.runtimeState);
-      syncDeviceRuntimeStateToPanelPreview(payload.runtimeState);
+    // Manual/file parses and runtime caches must never impersonate a hardware reply.
+    if (payload?.ok === true && String(payload?.requestId ?? '').startsWith('incoming_')) {
+      noteDeviceFeedbackReceived(payload.deviceRole ?? DEFAULT_DEVICE_ROLE, payload.values);
     }
+    latestDumpParseResult.set(payload);
+    mergeRuntimeValues(nativeRuntimeDelta(payload?.runtimeState,
+      payload?.ok === true ? { [payload.deviceRole ?? DEFAULT_DEVICE_ROLE]: payload.values ?? {} } : {}));
     if (payload?.ok === true && payload?.values && typeof payload.values === 'object') {
       for (const [parameterId, value] of Object.entries(payload.values)) {
         markRuntimeOrigin(payload.deviceRole ?? DEFAULT_DEVICE_ROLE, parameterId, 'device', {
@@ -712,6 +767,7 @@ export function initDeviceProfileBridge() {
 
   onDumpCollectionUpdated((payload) => {
     latestDumpCollectionResult.set(payload ?? null);
+    if (payload?.values) mergeRuntimeValues({ [payload.deviceRole ?? DEFAULT_DEVICE_ROLE]: payload.values });
     if (payload?.values && typeof payload.values === 'object') {
       for (const [parameterId, value] of Object.entries(payload.values)) {
         markRuntimeOrigin(payload.deviceRole ?? DEFAULT_DEVICE_ROLE, parameterId, 'deviceCollection', {
@@ -730,9 +786,10 @@ export function initDeviceProfileBridge() {
   });
 
   onDeviceRuntimeState((payload) => {
-    deviceRuntimeState.set(payload ?? {});
+    const delta = nativeRuntimeDelta(payload ?? {});
+    mergeRuntimeValues(delta);
     const filtered = {};
-    for (const [role, values] of Object.entries(payload ?? {})) {
+    for (const [role, values] of Object.entries(delta)) {
       if (!values || typeof values !== 'object') continue;
       filtered[role] = {};
       for (const [parameterId, value] of Object.entries(values)) {
@@ -782,6 +839,13 @@ export function initDeviceProfileBridge() {
   // without visiting Settings first meant every control on it was refused with "Not sent:
   // unresolved profile for <role>".
   listDeviceProfiles();
+  // Receiving must work without visiting the Device/Parameter Browser dock.
+  // The selected profile can differ from the profiles bound to the open panel.
+  deviceRoleMappings.subscribe(mappings => {
+    for (const id of new Set(Object.values(mappings ?? {}).map(mapping => mapping?.profileId).filter(Boolean))) {
+      if (!get(profileSources)?.[id]?.source) requestProfileSource(id);
+    }
+  });
 }
 
 export function refreshProfileParameters(profileId, deviceRole = DEFAULT_DEVICE_ROLE, options = {}) {

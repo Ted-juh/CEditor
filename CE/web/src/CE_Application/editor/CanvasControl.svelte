@@ -24,6 +24,7 @@
   import ScrollAreaRenderer from './ScrollAreaRenderer.svelte';
   import { clampScroll, scrollGeometry } from '../utils/scrollAreaLayout.js';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
+  import { resolveLinkedEnvelope } from '../utils/linkedEnvelope.js';
   import MatrixRenderer from './MatrixRenderer.svelte';
   import JoystickRenderer from './JoystickRenderer.svelte';
   import CrossfaderRenderer from './CrossfaderRenderer.svelte';
@@ -334,8 +335,8 @@
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(
-    resolvedControlOverride
-      ?? (interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control)
+    resolvedControlOverride ?? resolveLinkedEnvelope(
+      interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control, allControls)
   );
   let interactionRuntime = $derived(
     interactionRuntimeOverride
@@ -2325,8 +2326,13 @@
         height: customTextLayout.bounds.height,
       };
     }
-    const baseWidth = Math.max(0, domTextGlyphSize.width) * blockTextFitScale;
-    const baseHeight = Math.max(0, domTextGlyphSize.height || numberOr(textFont?.size, 12)) * blockTextFitScale;
+    // Use the same pre-measurement width as textUnrotatedOrigin. Otherwise a frozen
+    // left/right-aligned label computes its centre from zero but subtracts half a full
+    // line box below, clipping the first half of "Roland" and the TONE legends.
+    const baseWidth = (Math.max(0, domTextGlyphSize.width) || Math.max(0, Math.round(blockTextLayout.lineBoxWidth || 0))) * blockTextFitScale;
+    // Detached scenery has no DOM measurement. Match the explicit CSS line box
+    // (including multiline and integer offsetHeight rounding), not just font size.
+    const baseHeight = Math.max(0, domTextGlyphSize.height || Math.round(blockTextLayout.lineHeight * Math.max(1, blockTextLayout.lines.length))) * blockTextFitScale;
     return rotatedBoxSize(baseWidth, baseHeight, textRotationDegrees);
   });
   let textPlacement = $derived.by(() => {
@@ -2380,9 +2386,9 @@
     // measured the same lines itself — its lineBoxWidth is the width the span is styled to — so an
     // unanswered DOM measurement falls back to that instead of to nothing.
     const width = Math.max(0, domTextGlyphSize.width)
-      || Math.max(0, blockTextLayout.lineBoxWidth || 0)
+      || Math.max(0, Math.round(blockTextLayout.lineBoxWidth || 0))
       || Math.max(0, textLayoutBounds.width || 0);
-    const height = Math.max(0, domTextGlyphSize.height || numberOr(textFont?.size, 12));
+    const height = Math.max(0, domTextGlyphSize.height || Math.round(blockTextLayout.lineHeight * Math.max(1, blockTextLayout.lines.length)));
     return {
       left: textAxisCenter.x - (width / 2),
       top: textAxisCenter.y - (height / 2),

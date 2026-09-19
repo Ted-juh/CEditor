@@ -16,6 +16,29 @@ export const MONITOR_DIRECTIONS = ['out', 'in'];
 
 const text = (value) => (typeof value === 'string' ? value : '');
 
+// Bridge snapshots deserialize into fresh objects. Preserve both row identity and
+// references across snapshots so appending one event does not repaint the log.
+export function createMonitorEventReconciler() {
+  let previous = new Map();
+  return (events) => {
+    const occurrences = new Map();
+    const next = new Map();
+    const rows = (events ?? []).map(event => {
+      const signature = JSON.stringify([event.timestamp, event.direction, event.deviceRole,
+        event.messageType, event.semantic, event.hex, event.status]);
+      const occurrence = occurrences.get(signature) ?? 0;
+      occurrences.set(signature, occurrence + 1);
+      const key = event.eventId != null ? `id:${event.eventId}` : `${signature}:${occurrence}`;
+      const old = previous.get(key);
+      const row = old?.signature === signature ? old.row : { ...event, monitorKey: key };
+      next.set(key, { signature, row });
+      return row;
+    });
+    previous = next;
+    return rows;
+  };
+}
+
 /**
  * Just the time, from an ISO8601 stamp.
  *

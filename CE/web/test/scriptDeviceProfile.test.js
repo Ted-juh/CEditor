@@ -61,6 +61,27 @@ function withDevice(file, fn, { variables, timingOverrides } = {}) {
 const said = () => get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
 const withVars = SHIPPED.find((p) => p.profile.variables?.deviceId !== undefined).file;
 
+test('repeated script reads parse a profile once and edits invalidate it', () => {
+  withDevice(withVars, (d, profile) => {
+    const first = JSON.stringify({ ...profile, variables: { deviceId: 43 }, description: 'parse-cache-test' });
+    const second = JSON.stringify({ ...profile, variables: { deviceId: 44 }, description: 'parse-cache-edited' });
+    profileSources.set({ [profile.id]: { source: first } });
+    const parse = JSON.parse;
+    let parses = 0;
+    JSON.parse = function(text, ...rest) {
+      if (text === first || text === second) parses++;
+      return parse.call(this, text, ...rest);
+    };
+    try {
+      for (let i = 0; i < 20; i++) assert.equal(d.variables().deviceId, 43);
+      assert.equal(parses, 1);
+      profileSources.set({ [profile.id]: { source: second } });
+      assert.equal(d.variables().deviceId, 44);
+      assert.equal(parses, 2);
+    } finally { JSON.parse = parse; }
+  });
+});
+
 /* ------------------------------------------------------------------- reading the document */
 
 test('variables read as the profile declares them', () => {
@@ -212,6 +233,7 @@ const EXEMPT = {
   description: 'prose about the device',
   identity: 'the sysex identity handshake — the session performs it, a script does not',
   startup: 'what to send on connect, performed by the session',
+  inboundRefresh: 'mode-dependent CC readback, coalesced automatically by the receive session',
   ui: 'how the profile editor lays itself out',
   presetBrowser: 'the preset list, driven by ce.device dumps rather than described here',
   presets: 'the preset model (slot map / recall / catalog) — consumed by the librarian and preset selectors; scripts recall via ce.midi programChange',

@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
+  import { customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { deepClone } from '../utils/deepClone.js';
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
@@ -129,6 +130,7 @@
         }
 
         const port = String(binding?.port ?? 'value');
+        if (port !== 'value' && control?._children?.ValueChannels?._children?.[port]) return patch.customValues?.[port];
         if (port === 'trigger') {
             if (String(binding?.parameterType ?? '') === 'momentary') {
                 return Object.prototype.hasOwnProperty.call(patch, 'pressed') ? patch.pressed === true : undefined;
@@ -509,6 +511,7 @@
     const rect = hitboxElement?.getBoundingClientRect?.();
     if (!rect) return;
     const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
+    if (['arpeggiatordraw', 'arpeggiatorselect'].includes(action)) return;
     if (action.startsWith('arpeggiator')) {
       patchCustomInteraction(pointerCustomHitZone, event, {
         hover: true,
@@ -1331,7 +1334,7 @@
       pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedControl ?? control, rect, event.clientX, event.clientY, customSessionValues());
       pointerCustomStartValues = { ...customSessionValues() };
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || action.startsWith('arpeggiator') || action === '';
+      const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
       if (isDragAction) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: true,
@@ -1443,7 +1446,7 @@
 
     if (isCustomComponent) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue') {
+      if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,
@@ -1522,6 +1525,13 @@
   function handleKeyDown(event) {
     if (isReadOnly) return;
     if (isDisabled) return;
+    const arpPatch = isCustomComponent ? customArpeggiatorKeyPatch(control, customSessionValues(), event) : null;
+    if (arpPatch) {
+      event.preventDefault();
+      event.stopPropagation();
+      patchSession(arpPatch);
+      return;
+    }
     if (isCustomComponent) {
       lastInputMode = 'keyboard';
       keyboardFocusActive = true;
@@ -1724,7 +1734,7 @@
             style="top:{controlHeight + 4}px; width:{controlWidth}px;"
             role="listbox"
           >
-            {#each comboboxRows as row (row.id ?? row.internalValue ?? row.displayText)}
+            {#each comboboxRows as row}
               {@const selected = String(rowValue(row)) === String(currentComboboxValue())}
               <button
                 type="button"

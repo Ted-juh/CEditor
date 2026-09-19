@@ -475,6 +475,8 @@ void DeviceProfileService::timerCallback()
     pollMidiCiDiscovery();
 
     auto now = nowMs();
+    if (monitorEmitPending && now - lastMonitorEmitMs >= 50.0)
+        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
     for (auto it = queuedTransactions.begin(); it != queuedTransactions.end();)
     {
         if (it->dueTimeMs > now)
@@ -501,7 +503,7 @@ void DeviceProfileService::timerCallback()
                             sent ? status + " from queue" : "Not sent from queue: " + error);
     }
 
-    if (queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive)
+    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive)
         stopTimer();
 }
 
@@ -536,6 +538,7 @@ void DeviceProfileService::appendMonitorEvent (const juce::String& direction,
                                                const juce::String& status)
 {
     auto* event = new juce::DynamicObject();
+    event->setProperty ("eventId", ++monitorEventSequence);
     event->setProperty ("timestamp", juce::Time::getCurrentTime().toISO8601 (true));
     event->setProperty ("direction", direction);
     event->setProperty ("deviceRole", deviceRole);

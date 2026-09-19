@@ -79,6 +79,12 @@
   </PropertySection>
 
   <PropertySection title="Colours" icon={Palette}>
+    <PropertyCell label="Style" span={4}>
+      <select class="val" value={t.appearance ?? 'flat'} onchange={(event) => set('appearance', event.target.value)}>
+        <option value="flat">Flat</option>
+        <option value="instrument">Instrument</option>
+      </select>
+    </PropertyCell>
     <PropertyCell label="" span={4} compact>
       <SwatchCluster swatches={[
         { key: 'stripColour', label: 'Strip', value: t.stripColour ?? 'FF1B1B20', target: { type: 'control', controlId: core?.id, path: 'TabContainer.stripColour' } },
@@ -86,6 +92,7 @@
         { key: 'activeTabColour', label: 'Active', value: t.activeTabColour ?? 'FF3A5A80', target: { type: 'control', controlId: core?.id, path: 'TabContainer.activeTabColour' } },
         { key: 'labelColour', label: 'Label', value: t.labelColour ?? 'FFB9B9B9', target: { type: 'control', controlId: core?.id, path: 'TabContainer.labelColour' } },
         { key: 'activeLabelColour', label: 'Active label', value: t.activeLabelColour ?? 'FFFFFFFF', target: { type: 'control', controlId: core?.id, path: 'TabContainer.activeLabelColour' } },
+        ...(t.appearance === 'instrument' ? [{ key: 'accentColour', label: 'Accent', value: t.accentColour ?? 'FFE2A52C', target: { type: 'control', controlId: core?.id, path: 'TabContainer.accentColour' } }] : []),
       ]} />
     </PropertyCell>
   </PropertySection>

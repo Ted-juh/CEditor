@@ -786,15 +786,13 @@
     }
   }
 
+  let lastPaint = null;
   function draw() {
     if (!canvasEl) return;
     const w = Math.max(1, Math.round(width));
     const h = Math.max(1, Math.round(height));
-    canvasEl.width = w;
-    canvasEl.height = h;
     const ctx = canvasEl.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, w, h);
 
     const now = performance.now();
     const dtMs = lastDrawAt ? Math.min(200, now - lastDrawAt) : 16;
@@ -921,8 +919,20 @@
       }
     }
 
-    const cellW = w / pixW;
-    const cellH = h / pixH;
+    // Snapshot reactive inputs once, not once per dot. MIDI can update the
+    // display's source while its current page still produces identical pixels.
+    const gridW = pixW, gridH = pixH;
+    const ghosts = showGhost, shape = dotShape, offColour = unlitCss;
+    const paintKey = JSON.stringify([w, h, gridW, gridH, palette, ghosts, shape, offColour, gamma, brightness, contrast, glow]);
+    if (lastPaint?.key === paintKey && lastPaint.canvas === canvasEl
+        && lastPaint.bits.length === buf.length && buf.every((value, i) => value === lastPaint.bits[i])) return;
+    lastPaint = { key: paintKey, bits: buf, canvas: canvasEl };
+    if (canvasEl.width !== w) canvasEl.width = w;
+    if (canvasEl.height !== h) canvasEl.height = h;
+    ctx.clearRect(0, 0, w, h);
+
+    const cellW = w / gridW;
+    const cellH = h / gridH;
     const rad = Math.max(0.5, Math.min(cellW, cellH) * 0.42);
     // Gamma shapes the brightness response (>1 lifts mids, <1 crushes them);
     // brightness spans a low floor (dim but not black) to full.
@@ -933,15 +943,15 @@
     const glowRad = rad * (1 + glowAmt * 1.6);
 
     const paintDot = (cx, cy, r) => {
-      if (dotShape === 'square') ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      if (shape === 'square') ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
       else { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); }
     };
 
-    for (let y = 0; y < pixH; y += 1) {
-      for (let x = 0; x < pixW; x += 1) {
-        const id = buf[y * pixW + x];
+    for (let y = 0; y < gridH; y += 1) {
+      for (let x = 0; x < gridW; x += 1) {
+        const id = buf[y * gridW + x];
         const on = id > 0;
-        if (!on && !showGhost) continue;
+        if (!on && !ghosts) continue;
         const cx = x * cellW + cellW / 2;
         const cy = y * cellH + cellH / 2;
         // Bloom halo under lit dots (larger, faint) then the crisp dot on top.
@@ -951,7 +961,7 @@
           paintDot(cx, cy, glowRad);
         }
         ctx.globalAlpha = on ? litOpacity : ghostOpacity;
-        ctx.fillStyle = on ? palette[id] : unlitCss;
+        ctx.fillStyle = on ? palette[id] : offColour;
         paintDot(cx, cy, rad);
       }
     }
@@ -975,7 +985,8 @@
   });
 </script>
 
-<canvas bind:this={canvasEl} class="lcd-graphic"></canvas>
+<canvas bind:this={canvasEl} class="lcd-graphic"
+  aria-label={lines.map(line => Array.isArray(line) ? line.join('') : String(line)).join('\n')}></canvas>
 
 <style>
   .lcd-graphic {

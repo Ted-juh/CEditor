@@ -56,6 +56,10 @@ const FALLBACK_PROBES = [0, 1, 42, 127];
  * declared range moves every byte the parameter can move.
  */
 function probeValues(parameter) {
+  if (parameter?.type === 'choice' && parameter.choices?.length) {
+    // Sparse choice tables need valid wire values, not arbitrary range probes.
+    return [...new Set(parameter.choices.map(choice => Number(choice.value)))];
+  }
   const min = Number(parameter?.range?.min);
   const max = Number(parameter?.range?.max);
   if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return FALLBACK_PROBES;
@@ -185,6 +189,8 @@ function declaredInboundEntries(parameter) {
       encoding: U7,          // a CC is one 7-bit byte whatever the parameter's own encoder is
       valueType: '',
       source: 'declared',
+      valueMap: wire.valueMap,
+      alternate: wire.alternate,
     });
   }
   return out;
@@ -214,6 +220,8 @@ export function buildInboundIndex(profile) {
         encoding: print.encoding,
         valueType: print.valueType ?? '',
         source: print.source,
+        valueMap: print.valueMap,
+        alternate: print.alternate,
       });
     }
     byPrefix.get(key).parameterIds.push(print.parameterId);
@@ -285,7 +293,7 @@ export function inboundValueBytes(index, hex) {
  * byte and you get its top nibble, which is a plausible number and the wrong one. Returns null
  * rather than guessing when the message is unknown, ambiguous, or too short to hold its own value.
  */
-export function decodeInbound(index, hex) {
+export function decodeInbound(index, hex, values = {}) {
   const bytes = bytesFromHex(hex);
   if (!bytes.length) return null;
   const entry = entryFor(index, bytes);
@@ -293,7 +301,13 @@ export function decodeInbound(index, hex) {
 
   const raw = bytes.slice(entry.valueStart, entry.valueStart + entry.valueLength);
   if (raw.length !== entry.valueLength) return null;
-  const parameterId = entry.parameterIds[0];
+  const alternate = entry.alternate;
+  const mapping = alternate?.whenValues?.includes(values?.[alternate.whenParameter]) ? alternate : entry;
+  const parameterId = mapping === alternate ? alternate.parameterId : entry.parameterIds[0];
+  if (Array.isArray(mapping.valueMap)) {
+    const value = mapping.valueMap[raw[0]];
+    return Number.isFinite(value) ? { parameterId, value } : null;
+  }
   const value = decodeParameterValue(
     { id: parameterId, type: entry.valueType, encoding: entry.encoding }, raw);
   return value === null ? null : { parameterId, value };

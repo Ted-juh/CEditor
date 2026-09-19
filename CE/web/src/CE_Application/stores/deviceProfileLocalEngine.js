@@ -231,6 +231,22 @@ export function decodeParameterValue(parameter, bytes) {
 export function encodeParameterValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
   if (String(parameter?.type ?? '') === 'text') return encodeTextValue(parameter, value);
+  if (String(parameter?.type ?? '') === 'choice') {
+    const choices = Array.isArray(parameter.choices) ? parameter.choices : [];
+    // A string is a semantic ID/label first; a number is a wire value.
+    // Numeric-looking IDs (GAIA note lengths, for example) must not match an
+    // earlier row's wire value before their own row is reached.
+    const requested = String(typeof value === 'boolean' ? Number(value) : value);
+    const choice = (typeof value === 'string'
+      ? choices.find(c => String(c.id) === requested) ?? choices.find(c => String(c.label) === requested)
+      : null) ?? choices.find(c => String(c.value) === requested);
+    if (!choice) return { error: `Unknown choice value '${requested}' for ${parameter.id ?? ''}` };
+    const number = Number(choice.value);
+    if (!Number.isInteger(number) || number < 0 || number > 127) return { error: `Choice encoded value outside MIDI data byte range for ${parameter.id ?? ''}` };
+    return { bytes: [number], number, semantic: choice.id,
+      normalized: choices.length > 1 ? choices.indexOf(choice) / (choices.length - 1) : 1,
+      displayed: choice.label || choice.id };
+  }
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
     return { bytes: [on ? 127 : 0], number: on ? 127 : 0, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
@@ -383,7 +399,7 @@ export function localCompileParameter(profile, request = {}) {
       transactionId: request.requestId ?? 'local_dry_tx',
       deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
       parameterId,
-      semanticValue: request.value,
+      semanticValue: encoded.semantic ?? request.value,
       displayedValue: encoded.displayed,
       normalizedValue: encoded.normalized,
       encodedValueHex: bytesToHex(encoded.bytes),

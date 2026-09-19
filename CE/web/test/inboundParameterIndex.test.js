@@ -103,11 +103,11 @@ test('every parameter of both profiles round-trips to itself', () => {
   }
 });
 
-test('the GAIA indexes all 793 of its parameters, not the 39 the hand map covers', () => {
+test('the GAIA indexes all 882 of its parameters, not the 39 the hand map covers', () => {
   const index = buildInboundIndex(GAIA);
-  // 793 compiled, plus the three CCs the tone cutoffs declare as inbound — a knob can arrive on
+  // 882 compiled, plus the three CCs the tone cutoffs declare as inbound — a knob can arrive on
   // more than one message, so entries outnumber parameters.
-  assert.equal(index.size, 796);
+  assert.equal(index.size, 928);
   assert.equal(index.unresolved.length, 0);
   assert.deepEqual(index.collisions, []);
 });
@@ -134,7 +134,7 @@ test('the value bytes stop where the value stops', () => {
   const index = buildInboundIndex(GAIA);
   assert.deepEqual(inboundValueBytes(index, 'F0 41 10 00 00 41 12 10 00 01 0C 05 34 F7'), [5],
     'tone1.filter.cutoff is a u7: one byte, not the checksum and terminator too');
-  assert.deepEqual(inboundValueBytes(index, 'B0 4A 5A'), [], 'a message that matches nothing has no value');
+  assert.deepEqual(inboundValueBytes(index, 'B0 63 5A'), [], 'a message that matches nothing has no value');
 });
 
 test('a value is decoded with the encoder its parameter declares', () => {
@@ -260,13 +260,15 @@ test('the lookup maps come out in the shape the Player already reads', () => {
   const maps = inboundLookupMaps(buildInboundIndex(GAIA));
   assert.equal(maps.sysexIn['10 00 01 0C'], 'tone1.filter.cutoff');
   assert.equal(maps.sysexIn['10 00 00 0C'], 'common.patchLevel');
-  assert.equal(Object.keys(maps.sysexIn).length, 792);
-  assert.deepEqual(maps.ccIn, {
-    7: 'master.volume',                 // the one CC the profile writes
-    102: 'tone1.filter.cutoff',         // and the three its knobs transmit, declared as inbound
-    103: 'tone2.filter.cutoff',
-    104: 'tone3.filter.cutoff',
-  });
+  assert.equal(Object.keys(maps.sysexIn).length, 881);
+  const expected = { 5: 'common.portamentoTime', 7: 'master.volume' };
+  const groups = [[16, 'lfo.rate'], [19, 'lfo.fadeTime'], [22, 'lfo.pitchDepth'],
+    [25, 'lfo.filterDepth'], [28, 'lfo.ampDepth'], [70, 'osc.pitch'], [73, 'osc.detune'],
+    [76, 'osc.pulseWidthModDepth'], [79, 'osc.pulseWidth'], [85, 'osc.pitchEnvDepth'],
+    [102, 'filter.cutoff'], [105, 'filter.resonance'], [108, 'filter.envDepth'],
+    [111, 'filter.cutoffKeyfollow'], [114, 'amp.level']];
+  for (const [base, leaf] of groups) for (let tone = 1; tone <= 3; tone++) expected[base + tone - 1] = `tone${tone}.${leaf}`;
+  assert.deepEqual(maps.ccIn, expected);
 });
 
 test('the derived map covers the hand-written one it replaces', () => {
@@ -293,5 +295,24 @@ test('the derived map covers the hand-written one it replaces', () => {
 
   for (const [cc, id] of Object.entries(runtime.ccIn ?? {})) {
     assert.equal(derived.ccIn[cc], id, `the derived map lost CC ${cc}, which the hand map had`);
+  }
+});
+
+
+test('GAIA hardware CCs use their measured value conversion and tone', () => {
+  const index = buildInboundIndex(GAIA);
+  for (let tone = 1; tone <= 3; tone++) {
+    const cc = (base, value) => `B0 ${(base + tone - 1).toString(16)} ${value.toString(16).padStart(2, '0')}`;
+    for (const [base, leaf, value, expected] of [
+      [70, 'osc.pitch', 0, 40], [70, 'osc.pitch', 64, 64], [70, 'osc.pitch', 127, 88],
+      [73, 'osc.detune', 0, 14], [73, 'osc.detune', 63, 64], [73, 'osc.detune', 127, 114],
+      [111, 'filter.cutoffKeyfollow', 64, 64], [111, 'filter.cutoffKeyfollow', 127, 74],
+      [22, 'lfo.pitchDepth', 0, 1], [108, 'filter.envDepth', 0, 1],
+      [105, 'filter.resonance', 86, 86], [114, 'amp.level', 55, 55],
+    ]) assert.deepEqual(decodeInbound(index, cc(base, value)), { parameterId: `tone${tone}.${leaf}`, value: expected });
+    assert.deepEqual(decodeInbound(index, cc(16, 64), { [`tone${tone}.lfo.tempoSyncSwitch`]: 'on' }),
+      { parameterId: `tone${tone}.lfo.tempoSyncNote`, value: 10 });
+    assert.deepEqual(decodeInbound(index, cc(16, 64), { [`tone${tone}.lfo.tempoSyncSwitch`]: 0 }),
+      { parameterId: `tone${tone}.lfo.rate`, value: 64 });
   }
 });

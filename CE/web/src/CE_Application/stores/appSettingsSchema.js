@@ -330,6 +330,8 @@ export function normalizeGeneralSettings(general) {
     showDistances: general?.showDistances !== false,
     showPreviewSelectionRing: general?.showPreviewSelectionRing !== false,
     foldSceneryInEditor: general?.foldSceneryInEditor === true,
+    backgroundPreviewPreparation: general?.backgroundPreviewPreparation !== false,
+    previewPreparationDelayMs: clampInteger(general?.previewPreparationDelayMs, DEFAULT_GENERAL_SETTINGS.previewPreparationDelayMs, 250, 5000),
     insertOffset: clampInteger(general?.insertOffset, DEFAULT_GENERAL_SETTINGS.insertOffset, 0, 400),
     duplicateOffset: clampInteger(general?.duplicateOffset, DEFAULT_GENERAL_SETTINGS.duplicateOffset, 0, 400),
     keyboardNudgeSmall: clampInteger(

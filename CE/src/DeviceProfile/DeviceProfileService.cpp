@@ -475,6 +475,11 @@ juce::var DeviceProfileService::getMonitorEvents() const
     return juce::var (monitorEvents);
 }
 
+void DeviceProfileService::publishMonitorEvents()
+{
+    emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+}
+
 /**
  * Forget the monitor log.
  *
@@ -674,6 +679,21 @@ juce::String DeviceProfileService::resolveProfileId (const juce::String& profile
 
 void DeviceProfileService::emitDeviceEvent (const juce::String& eventName, const juce::var& payload)
 {
+    // The log is a snapshot, not a MIDI delivery channel. Coalesce snapshots in
+    // both directions, including high-rate SysEx parameter edits. Raw MIDI and
+    // transaction replies still reach listeners immediately.
+    if (eventName == "midiMonitorEvents")
+    {
+        const auto now = nowMs();
+        if (now - lastMonitorEmitMs < 50.0)
+        {
+            monitorEmitPending = true;
+            startTimerHz (60);
+            return;
+        }
+        lastMonitorEmitMs = now;
+        monitorEmitPending = false;
+    }
     if (eventCallback)
         eventCallback (eventName, payload);
 }

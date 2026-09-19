@@ -185,12 +185,12 @@ const KINDS = {
       ?? (parameter.choices ?? []).map((choice) => ({ label: choice.label, value: choice.value }));
     const w = spec.w ?? 104;
     const h = options.length * SKIN.ledRow + 8;
-    const control = boundCustom(parameter, () => gaiaLeds({ options, width: w, rowHeight: SKIN.ledRow }), { x: at.x, y: at.y, w, h });
+    const control = boundCustom(parameter, () => gaiaLeds({ options, width: w, rowHeight: SKIN.ledRow, legacySkin: true }), { x: at.x, y: at.y, w, h });
     return { controls: [control], caption: spec.label ? { text: spec.label, x: at.x, y: at.y - 14, w } : null };
   },
 
   fader: (parameter, spec, at) => {
-    const control = boundCustom(parameter, () => gaiaFader({ width: SKIN.faderW + 4, height: SKIN.faderH }), { x: at.x, y: at.y, w: SKIN.faderW + 4, h: SKIN.faderH });
+    const control = boundCustom(parameter, () => gaiaFader({ width: SKIN.faderW + 4, height: SKIN.faderH, legacySkin: true }), { x: at.x, y: at.y, w: SKIN.faderW + 4, h: SKIN.faderH });
     return {
       controls: [control],
       caption: { text: spec.label, x: at.x - 12, y: at.y + SKIN.faderH + 2, w: SKIN.faderW + 24, lines: 2 },

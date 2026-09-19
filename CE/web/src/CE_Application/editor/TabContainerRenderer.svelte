@@ -29,6 +29,8 @@
   let activeCss = $derived(css(cfg.activeTabColour, 'rgba(58,90,128,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
   let activeLabelCss = $derived(css(cfg.activeLabelColour, 'rgba(255,255,255,1)'));
+  let instrument = $derived(cfg.appearance === 'instrument');
+  let accentCss = $derived(css(cfg.accentColour, 'rgba(226,165,44,1)'));
 </script>
 
 {#if cfg.showStrip !== false}
@@ -38,13 +40,26 @@
       {@const rect = tabRect(geom, index, pages.length)}
       <rect
         x={rect.x + 1} y={rect.y + 1} width={Math.max(1, rect.w - 2)} height={Math.max(1, rect.h - 2)}
-        rx={3}
+        rx={instrument ? 4 : 3}
         fill={index === active ? activeCss : tabCss}
+        stroke={instrument ? (index === active ? accentCss : '#48545c') : 'none'}
+        stroke-width={instrument ? 1 : 0}
       />
+      {#if instrument}
+        <path d={`M ${rect.x + 7} ${rect.y + 3} H ${rect.x + rect.w - 7}`} stroke="#ffffff" stroke-opacity="0.12" />
+        <circle cx={rect.x + 13} cy={rect.y + rect.h / 2} r={2.5}
+          fill={index === active ? accentCss : '#13191d'} stroke={index === active ? '#ffe1a0' : '#63717a'} stroke-width="0.7" />
+        {#if index === active}
+          <path d={`M ${rect.x + 7} ${rect.y + rect.h - 3} H ${rect.x + rect.w - 7}`} stroke={accentCss} stroke-width="2" />
+        {/if}
+      {/if}
       <text
         x={rect.x + rect.w / 2} y={rect.y + rect.h / 2 + 3.5}
         fill={index === active ? activeLabelCss : labelCss}
         font-size={Math.min(11, rect.h * 0.5)}
+        font-weight={instrument ? 600 : undefined}
+        letter-spacing={instrument ? '1.2' : undefined}
+        style:font-family={instrument ? 'Arial, sans-serif' : undefined}
         text-anchor="middle"
       >{page.label ?? `Page ${index + 1}`}</text>
     {/each}

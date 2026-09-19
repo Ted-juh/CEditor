@@ -16,6 +16,7 @@ import { panelPreviewSessions, updatePanelPreviewSession } from '../../src/CE_Ap
 import * as rt from '../../src/CE_Application/scripting/panelRuntime.js';
 import { syncCustomArpeggiatorValues } from '../../src/CE_Application/utils/customComponentArpeggiator.js';
 import { seedCustomValues } from '../../src/CE_Application/utils/customComponentInteraction.js';
+import { flatControls } from '../../src/CE_Application/utils/containment.js';
 
 /** Put a built panel into the store as the active one, with a clean runtime. */
 export function mountPanel(built, id = 'gaia') {
@@ -27,7 +28,7 @@ export function mountPanel(built, id = 'gaia') {
   setActivePanel(id);
   return {
     /** The panel as it stands in the store — where a script's set() actually lands. */
-    controls: () => get(panels).find((p) => p.id === id).controls,
+    controls: () => flatControls(get(panels).find((p) => p.id === id).controls),
   };
 }
 
@@ -100,6 +101,6 @@ export function drawPattern(control, blocks, { stepCount = 32 } = {}) {
 }
 
 export const controlNamed = (built, name) =>
-  built.controls.find((c) => c._children?.Core?.name === name);
+  flatControls(built.controls).find((c) => c._children?.Core?.name === name);
 
 export const idOf = (control) => String(control?._children?.Core?.id ?? '');

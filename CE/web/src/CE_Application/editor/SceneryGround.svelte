@@ -1,37 +1,7 @@
 <script module>
-  /**
-   * Baked grounds, keyed by what they were baked from, for the life of the session.
-   *
-   * Deliberately not persisted. Written into the .cepanel it would be derived data in a source file
-   * — inflating every diff, and a stale one would render a panel that no longer matches its own
-   * controls. In IndexedDB it would be a cache layer with its own invalidation to get wrong. In
-   * memory it cannot go stale: the key IS the content, so scenery that changed simply misses.
-   *
-   * Bounded because the key changes on every edit to a folded control. Dragging one label across the
-   * panel mints a new entry per frame, and without a cap a long editing session would hold every
-   * intermediate ground alive. Insertion order is eviction order, which for this access pattern —
-   * the useful entry is the one just written — is what an LRU would have done anyway.
-   */
-  const BAKE_CACHE_LIMIT = 8;
-  const bakeCache = new Map();
-
-  function readCache(key) {
-    return bakeCache.get(key) ?? null;
-  }
-
-  function writeCache(key, markup) {
-    bakeCache.set(key, markup);
-    while (bakeCache.size > BAKE_CACHE_LIMIT) bakeCache.delete(bakeCache.keys().next().value);
-  }
-
-  /** Exposed for the tests, which need to prove a second render is a cache hit and not a re-bake. */
-  export function _sceneryBakeCacheSize() {
-    return bakeCache.size;
-  }
-
-  export function _clearSceneryBakeCache() {
-    bakeCache.clear();
-  }
+  import { sceneryMarkupStats, clearSceneryMarkupCache } from '../utils/sceneryMarkupCache.js';
+  export const _sceneryBakeCacheSize = () => sceneryMarkupStats().entries;
+  export const _clearSceneryBakeCache = clearSceneryMarkupCache;
 </script>
 
 <script>
@@ -63,9 +33,9 @@
    * or an input. isSceneryType is derived from the same registry, so a type that gained one could
    * not become scenery without failing sceneryModel.test.js first.
    */
-  import { mount, unmount } from 'svelte';
+  import { untrack } from 'svelte';
   import SceneryLayer from './SceneryLayer.svelte';
-  import { sceneryFingerprint } from '../utils/sceneryModel.js';
+  import { sceneryGroundKey, bakeSceneryGround } from '../utils/sceneryMarkupCache.js';
 
   let {
     controls = [],
@@ -96,7 +66,7 @@
 
   const layerProps = () => ({ controls, allControls, panelControls, panelWidth, panelHeight, scale, annotate });
 
-  let fingerprint = $derived(`${annotate ? 'a' : 'p'}:${sceneryFingerprint(controls)}`);
+  let fingerprint = $derived(sceneryGroundKey(controls, { panelWidth, panelHeight, scale, annotate }));
   let baked = $state(null);
 
   // Server-side there is no DOM to bake into and no second render to save, so the scenery is drawn
@@ -108,21 +78,10 @@
     if (!canBake) return;
     const key = fingerprint;
 
-    const hit = readCache(key);
-    if (hit !== null) {
-      baked = hit;
-      return;
-    }
-
-    // Mount the scenery detached, take its markup, throw the components away. Detached rather than
-    // in place so nothing is ever visible mid-bake and no layout is computed for it.
-    const scratch = document.createElement('div');
-    const app = mount(SceneryLayer, { target: scratch, props: layerProps() });
-    const markup = scratch.innerHTML;
-    unmount(app);
-
-    writeCache(key, markup);
-    baked = markup;
+    // No live first mount followed by a second detached mount. A warm ground
+    // joins cached strings; a cold one mounts each missing control exactly once.
+    const props = layerProps();
+    baked = { key, markup: untrack(() => bakeSceneryGround(controls, props)) };
   });
 
   // Hiding is done to the rendered nodes rather than baked into the markup, so that what is hidden
@@ -146,11 +105,11 @@
   style="width:{panelWidth}px; height:{panelHeight}px;"
   aria-hidden="true"
 >
-  {#if baked !== null}
+  {#if canBake}
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- the markup is this app's own render output, not input -->
-    {@html baked}
+    {@html baked?.key === fingerprint ? baked.markup : ''}
   {:else}
-    <SceneryLayer {controls} {allControls} {panelControls} {panelWidth} {panelHeight} {scale} />
+    <SceneryLayer {controls} {allControls} {panelControls} {panelWidth} {panelHeight} {scale} {annotate} />
   {/if}
 </div>
 

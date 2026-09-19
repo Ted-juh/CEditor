@@ -47,6 +47,44 @@ juce::File profileRoot()
  * those have their own tests, and folding them in here would make a nibble test that fails for
  * reasons that are not about nibbles.
  */
+int runGaiaNoteChoiceTests (const juce::File& file)
+{
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromFile (file, error)) return 1;
+    const auto document = juce::JSON::parse (file.loadFileAsString());
+    auto* parameters = document.getProperty ("parameters", {}).getArray();
+    if (parameters == nullptr) return 1;
+    int failures = 0, checked = 0;
+    for (const auto& parameter : *parameters)
+    {
+        const auto id = parameter.getProperty ("id", {}).toString();
+        if (! id.endsWith (".tempoSyncNote")) continue;
+        auto* choices = parameter.getProperty ("choices", {}).getArray();
+        if (choices == nullptr) { ++failures; continue; }
+        for (const auto& choice : *choices)
+        {
+            const auto expected = juce::String::toHexString ((int) choice.getProperty ("value", {})).paddedLeft ('0', 2).toUpperCase();
+            for (const auto* field : { "id", "label", "value" })
+            {
+                const auto value = choice.getProperty (field, {});
+                const auto result = engine.compileSetParameter ("mainSynth", id, value, true);
+                if (! result.ok || result.transaction.encodedValueHex != expected
+                    || result.transaction.semanticValue.toString() != choice.getProperty ("id", {}).toString())
+                {
+                    std::cerr << "[FAIL] note choice " << id << " " << field << "=" << value.toString()
+                              << ": expected " << expected << ", got " << result.transaction.encodedValueHex << "\n";
+                    ++failures;
+                }
+                ++checked;
+            }
+        }
+    }
+    if (checked != 360) ++failures;
+    if (failures == 0) std::cout << "[PASS] GAIA note choices: all 360 ID, label and numeric encodings\n";
+    return failures;
+}
+
 int runNibbledEncoderTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -1248,6 +1286,70 @@ int runMonitorClearTests()
     return 0;
 }
 
+int runRealtimeMonitorTests()
+{
+    ceditor::device::DeviceProfileService service;
+    auto* mapping = new juce::DynamicObject();
+    mapping->setProperty ("role", "mainSynth");
+    mapping->setProperty ("profileId", "roland-gaia-sh01");
+    service.setDeviceRoleMapping (juce::var (mapping));
+    int rawMessages = 0, sysexMessages = 0, runtimeSnapshots = 0, monitorSnapshots = 0;
+    auto* read = new juce::DynamicObject();
+    read->setProperty ("deviceRole", "mainSynth");
+    read->setProperty ("request", "requestTone1");
+    read->setProperty ("dryRun", true);
+    const juce::var readPayload (read);
+    auto chained = service.startDeviceSync (readPayload);
+    read->setProperty ("chainStartup", false);
+    auto single = service.startDeviceSync (readPayload);
+    if (! static_cast<bool> (single.getProperty ("ok", false))
+        || chained.getProperty ("nextStartupRequestId", "").toString() != "requestTone2"
+        || single.getProperty ("nextStartupRequestId", "").toString().isNotEmpty())
+    {
+        std::cerr << "[FAIL] a live block read must not chain through the whole startup sync\n";
+        return 1;
+    }
+    juce::var lastMonitor;
+    service.setEventCallback ([&] (const juce::String& name, const juce::var& payload)
+    {
+        if (name == "midiInputMessage") ++rawMessages;
+        if (name == "sysexInputMessage") ++sysexMessages;
+        if (name == "deviceRuntimeState") ++runtimeSnapshots;
+        if (name == "midiMonitorEvents") { ++monitorSnapshots; lastMonitor = payload; }
+    });
+    for (int i = 0; i < 100; ++i)
+    {
+        auto* incoming = new juce::DynamicObject();
+        incoming->setProperty ("deviceRole", "mainSynth");
+        incoming->setProperty ("hex", "F0 41 10 00 00 41 12 10 00 01 10 40 1F F7");
+        service.ingestIncomingMidiMessage (juce::var (incoming));
+    }
+    if (rawMessages != 100 || sysexMessages != 100 || runtimeSnapshots != 0 || monitorSnapshots >= 100)
+    {
+        std::cerr << "[FAIL] realtime SysEx: raw=" << rawMessages << " sysex=" << sysexMessages
+                  << " stale runtime=" << runtimeSnapshots << " log snapshots=" << monitorSnapshots << '\n';
+        return 1;
+    }
+    juce::Thread::sleep (100);
+    juce::Timer::callPendingTimersSynchronously();
+    auto expected = service.getMonitorEvents();
+    if (lastMonitor.getArray() == nullptr || expected.getArray() == nullptr
+        || lastMonitor.getArray()->size() != expected.getArray()->size())
+    {
+        std::cerr << "[FAIL] monitor throttle lost the final snapshot\n";
+        return 1;
+    }
+    juce::int64 lastId = 0;
+    for (const auto& event : *expected.getArray())
+    {
+        auto id = static_cast<juce::int64> (event.getProperty ("eventId", 0));
+        if (id <= lastId) { std::cerr << "[FAIL] monitor event ids are not unique\n"; return 1; }
+        lastId = id;
+    }
+    std::cout << "[PASS] realtime SysEx retains every message, avoids stale state, and coalesces monitor snapshots\n";
+    return 0;
+}
+
 int runServiceRequestTests()
 {
     ceditor::device::DeviceProfileService service;
@@ -2169,10 +2271,12 @@ int main (int argc, char** argv)
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runMonitorClearTests();
+    failures += runRealtimeMonitorTests();
     failures += runServiceRequestTests();
     failures += runMidiCiTests();
     failures += runChecksumTableTests();
     failures += runNibbledEncoderTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runGaiaNoteChoiceTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPatchDumpTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runDumpBuildTests (root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
     failures += runPresetRecallTests (root);

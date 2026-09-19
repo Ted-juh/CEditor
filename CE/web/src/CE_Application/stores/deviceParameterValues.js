@@ -39,10 +39,9 @@ export function recordDeviceParameterValue(deviceRole, parameterId, value) {
   const id = String(parameterId ?? '');
   if (!role || !id || value === undefined) return;
 
-  deviceParameterValues.update((current) => {
-    if (current?.[role]?.[id] === value) return current;
-    return { ...current, [role]: { ...(current?.[role] ?? {}), [id]: value } };
-  });
+  const current = get(deviceParameterValues);
+  if (current?.[role]?.[id] === value) return;
+  deviceParameterValues.set({ ...current, [role]: { ...(current?.[role] ?? {}), [id]: value } });
 }
 
 /** The recorded value, or undefined when nothing has set it yet. */

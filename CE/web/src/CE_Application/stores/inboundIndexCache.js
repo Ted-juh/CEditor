@@ -39,7 +39,7 @@ export function inboundIndexFor(profileId, source) {
   for (const parameter of profile.parameters ?? []) {
     if (parameter?.id) parameterById[String(parameter.id)] = parameter;
   }
-  const entry = { source: text, index: buildInboundIndex(profile), parameterById };
+  const entry = { source: text, index: buildInboundIndex(profile), parameterById, inboundRefresh: profile.inboundRefresh ?? [] };
 
   cache.set(id, entry);
   // Oldest out first. A session realistically holds one or two profiles; the cap is here so a long

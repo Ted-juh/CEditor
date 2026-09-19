@@ -54,7 +54,9 @@ import { render } from 'svelte/server';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import CanvasControl from '../src/CE_Application/editor/CanvasControl.svelte';
-import { gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds } from '../../../tools/scripts/gaia-panel/components.mjs';
+import {
+  gaiaArpGrid, gaiaEnvelope, gaiaFader, gaiaKnob, gaiaLeds, gaiaSectionTab,
+} from '../../../tools/scripts/gaia-panel/components.mjs';
 
 const GOLDEN_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'golden');
 const UPDATING = process.env.UPDATE_GOLDEN === '1';
@@ -201,6 +203,11 @@ const SPECIMENS = {
     gaiaLeds({ options: [{ label: 'SAW', value: 0 }, { label: 'SQR', value: 1 }, { label: 'SINE', value: 2 }] }),
     'g_leds', 96, 53,
   ),
+  // Mixed corner geometry: one rounded outside corner, three square attached corners.
+  'gaia-section-tab': () => place(
+    gaiaSectionTab({ title: 'FILTER', width: 86, height: 20, tint: 'FFE0A030' }),
+    'g_section_tab', 86, 20,
+  ),
 
   // The printed envelope, which is nothing BUT geometry: five points, four rotated segments, and
   // a pivot on each. The first draft of the wave glyphs had exactly this shape of bug — strokes
@@ -330,4 +337,22 @@ test('a specimen that loses its alpha fails the gate', () => {
   const after = paintSummary(renderControl(control));
 
   assert.notEqual(after, before, 'dropping a border\'s alpha changed nothing in the paint summary');
+});
+
+test('GAIA selector words share one left edge at a fixed gap from the LED rail', () => {
+  const starts = [];
+  for (const width of [96, 104, 128]) {
+    const control = gaiaLeds({ options: [{ label: 'OFF', value: 0 }, { label: 'DELAY', value: 1 }], width });
+    const parts = control._children.Parts._children;
+    const rail = parts.ledRail._children.Layout;
+    for (const name of ['name0', 'name1']) {
+      const word = parts[name];
+      assert.equal(word._children.Text._children.Position.justification, 'left');
+      // InteractivePartRenderer adds 8px padding inside a text part. Compare the visible ink edge,
+      // not just the transparent part box.
+      starts.push(word._children.Layout.x + 8);
+      assert.equal(word._children.Layout.x + 8, rail.x + rail.width + 6);
+    }
+  }
+  assert.deepEqual([...new Set(starts)], [23]);
 });

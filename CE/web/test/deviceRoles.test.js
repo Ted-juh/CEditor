@@ -5,7 +5,7 @@
 // What was missing is that every mapDeviceRole call in the UI passed one hardcoded constant,
 // `mainSynth`, so that was the only device anything could configure.
 //
-// And the names in the data did not agree with it. All 183 of the GAIA panel's bindings name a
+// And the names in the data did not agree with it. All 189 of the GAIA panel's bindings name a
 // device called `primary`. Sending one looks it up, finds nothing, and gives up with "Not sent:
 // unresolved profile for primary" — so the panel could not reach a synth whichever port you picked,
 // because the port was attached to a different name than its controls asked for.
@@ -142,19 +142,19 @@ test('renaming leaves a custom component\'s part roles alone', () => {
 
 test('the GAIA panel names its device after the instrument', () => {
   // It used to say `primary` — a slot name, by accident. Nothing in the app could configure a device
-  // by that name, so all 183 bindings resolved no mapping and failed with "Not sent: unresolved
+  // by that name, so all 189 bindings resolved no mapping and failed with "Not sent: unresolved
   // profile for primary" whichever port was picked. Generated from make-gaia-panel.mjs, so this
   // guards the generator as much as the file.
   const panel = JSON.parse(readText(fileURLToPath(new URL('../../panels/Roland GAIA SH-01.cepanel', import.meta.url))));
   const counts = countRolesInControls((panel.controls ?? []).map(expandControl));
 
   assert.deepEqual([...counts.keys()], ['Roland GAIA SH-01'], 'the panel names some other device');
-  assert.equal(counts.get('Roland GAIA SH-01'), 183);
-  // 15 of the 197 exported parameters name no device, and correctly so: they belong to the envelope
+  assert.equal(counts.get('Roland GAIA SH-01'), 278);
+  // 11 exported parameters name no device, and correctly so: they belong to the envelope
   // displays, which carry no device bindings at all. What matters is that none names a DIFFERENT one.
   const exported = new Set(panel.exportParameters.map((e) => e.deviceRole).filter(Boolean));
   assert.deepEqual([...exported], ['Roland GAIA SH-01'],
     'an exported parameter names a different device from the controls');
-  assert.equal(panel.exportParameters.filter((e) => !e.deviceRole).length, 15);
+  assert.equal(panel.exportParameters.filter((e) => !e.deviceRole).length, 11);
   assert.deepEqual(panel.requiredProfiles.map((e) => e.role), ['Roland GAIA SH-01']);
 });

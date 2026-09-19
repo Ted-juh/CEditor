@@ -862,6 +862,17 @@ function resolveSecondaryChannelName(hitZone, behaviorModule, primaryChannelName
 
 export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntry = null, point = null) {
   const hitZone = hitZoneEntry?.zone ?? null;
+  if (String(hitZone?.action).toLowerCase() === 'arpeggiatorendstep') {
+    const channel = getCustomValueChannels(control).arpEndStep;
+    if (!channel || !point?.rect || point.rect.width <= 0) return {};
+    const width = Math.max(320, numberOr(control?._children?.Transform?.width, point.rect.width));
+    const steps = Math.max(1, numberOr(hitZone?.payload?.steps, 32));
+    const x = (point.clientX - point.rect.left) * width / point.rect.width;
+    const end = clamp(Math.floor((x - 44) / ((width - 52) / steps)) + 1, 1, steps);
+    // This is a loop boundary, not a note edit or a playhead change.
+    return { customValues: { arpEndStep: snapCustomChannelValue(channel, end) },
+      activeCustomBehavior: 'arpeggiator', activeCustomHitZone: hitZoneEntry.name };
+  }
   const arpeggiatorEdit = resolveRuntimeArpeggiatorEdit(control, session?.customValues ?? {}, hitZone, point);
   if (arpeggiatorEdit) {
     const customValues = syncCustomArpeggiatorValues(control, {

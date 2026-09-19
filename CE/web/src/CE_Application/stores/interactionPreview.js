@@ -196,7 +196,7 @@ function getActivePanel() {
 
 function getActivePanelControlById(controlId = '') {
   if (!controlId) return null;
-  return getActivePanel()?.controls?.find((control) => getControlId(control) === controlId) ?? null;
+  return allControls(getActivePanel()?.controls).find((control) => getControlId(control) === controlId) ?? null;
 }
 
 function getEnabledValueRows(control) {
@@ -272,7 +272,13 @@ export function setPreviewModeEnabled(enabled) {
 
   // Photograph the document BEFORE anything runs against it: the runtime's subscriber fires
   // synchronously inside .set(), and onPanelBuild creates controls the moment it does.
-  if (nextEnabled && !wasEnabled) beginPreviewRehearsal();
+  if (nextEnabled && !wasEnabled) {
+    beginPreviewRehearsal();
+    // Seed before the preview mounts. Missing SvelteMap keys subscribe to its
+    // entire key set; adding hundreds afterwards invalidates the whole surface
+    // once per insertion instead of once for the transition.
+    syncPanelPreviewSessions(getActivePanel()?.controls ?? []);
+  }
 
   previewModeEnabled.set(nextEnabled);
 
@@ -299,41 +305,51 @@ export function setPreviewInspectedControlId(controlId = '') {
 export function syncPanelPreviewSessions(controls = []) {
   const controlList = allControls(controls);
 
-  panelPreviewSessions.update((current) => {
-    const next = {};
-    let changed = false;
+  const current = get(panelPreviewSessions);
+  const next = {};
+  let changed = false;
 
-    for (const control of controlList) {
-      const controlId = getControlId(control);
-      if (!controlId) continue;
+  for (const control of controlList) {
+    const controlId = getControlId(control);
+    if (!controlId) continue;
 
-      const previousSession = current?.[controlId];
-      const nextSession = previousSession
-        ? { ...createInteractionPreviewSession(control), ...previousSession }
-        : createInteractionPreviewSession(control);
+    const previousSession = current?.[controlId];
+    const nextSession = previousSession
+      ? { ...createInteractionPreviewSession(control), ...previousSession }
+      : createInteractionPreviewSession(control);
 
-      next[controlId] = nextSession;
-      if (!previousSession || !shallowEqualSession(previousSession, nextSession)) {
-        changed = true;
-      }
+    const unchanged = previousSession && shallowEqualSession(previousSession, nextSession);
+    next[controlId] = unchanged ? previousSession : nextSession;
+    if (!unchanged) {
+      changed = true;
     }
+  }
 
-    const currentKeys = Object.keys(current ?? {});
-    if (currentKeys.length !== Object.keys(next).length) changed = true;
-    const routed = applyPanelSessionEffects(controlList, next);
-    if (!changed && routed === next) return current;
-    return routed;
-  });
+  const currentKeys = Object.keys(current ?? {});
+  if (currentKeys.length !== Object.keys(next).length) changed = true;
+  const routed = applyPanelSessionEffects(controlList, next);
+  if (changed || routed !== next) panelPreviewSessions.set(routed);
 }
 
 export function updatePanelPreviewSession(controlId, patch = {}) {
   if (!controlId) return;
+  updatePanelPreviewSessions([{ controlId, patch }]);
+}
 
-  panelPreviewSessions.update((current) => {
-    const control = getActivePanelControlById(controlId);
+/** Apply a received parameter block atomically, settling links and scripts once. */
+export function updatePanelPreviewSessions(patches = []) {
+  if (!patches.length) return;
+  const panel = getActivePanel();
+  const controls = allControls(panel?.controls);
+  const byId = new Map(controls.map(control => [getControlId(control), control]));
+  const current = get(panelPreviewSessions);
+  let nextSessions = current;
+  for (const { controlId, patch = {} } of patches) {
+    if (!controlId) continue;
+    const control = byId.get(controlId) ?? null;
     const previousSession = {
       ...createInteractionPreviewSession(control),
-      ...(current?.[controlId] ?? {}),
+      ...(nextSessions?.[controlId] ?? {}),
     };
     const nextPatch = patch?.customValues
       ? {
@@ -349,17 +365,21 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
       ...nextPatch,
     };
 
-    if (shallowEqualSession(previousSession, nextSession)) {
-      return current;
+    // Merging an identical channel value must not give every fader a new
+    // session. Native MIDI replies carry the whole cached device state.
+    if (shallowEqualSession(previousSession.customValues, nextSession.customValues)) {
+      nextSession.customValues = previousSession.customValues;
     }
+    if (shallowEqualSession(previousSession, nextSession)) continue;
+    if (nextSessions === current) nextSessions = { ...current };
+    nextSessions[controlId] = nextSession;
+  }
 
-    const nextSessions = {
-      ...current,
-      [controlId]: nextSession,
-    };
-    const panel = getActivePanel();
-    return applyPanelSessionEffects(allControls(panel?.controls), nextSessions, panel);
-  });
+  // writable.update(() => current) still NOTIFIES for object values in Svelte.
+  // Don't publish at all when the device repeats values we already display.
+  if (nextSessions !== current) {
+    panelPreviewSessions.set(applyPanelSessionEffects(controls, nextSessions, panel));
+  }
 }
 
 export function resetPanelPreviewSessions(controls = []) {

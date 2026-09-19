@@ -87,7 +87,7 @@ try {
   );
   assert.equal(baked.pointerEvents, 'none', 'the ground would swallow clicks meant for the surface');
   assert.deepEqual(baked.headingBox, [20, 10, 120, 16], 'a folded control is not where its Transform puts it');
-  assert.equal(baked.cacheSize, 1, 'expected exactly one baked ground');
+  assert.equal(baked.cacheSize, baked.expected.length, 'expected one cache entry per static control');
 
   await page.evaluate(() => window.__scenery.hide('heading'));
   await page.waitForTimeout(120);
@@ -98,7 +98,7 @@ try {
   }));
   assert.equal(hidden.heading, 'hidden', 'a held control was not hidden inside the ground');
   assert.equal(hidden.legend, '', 'hiding one control hid another');
-  assert.equal(hidden.cacheSize, 1,
+  assert.equal(hidden.cacheSize, baked.cacheSize,
     're-baked on hide — this is the whole design: holding a control live must not change the ground');
 
   await page.evaluate(() => window.__scenery.unhide());

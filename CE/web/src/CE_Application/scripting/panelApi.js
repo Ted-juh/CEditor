@@ -4031,11 +4031,12 @@ const EXTENSIONS = new Map();   // id -> { id, version, requires, runtime, summa
 export function registerExtension(ext) {
   if (!ext?.id) return;
   EXTENSIONS.set(ext.id, ext);
+  invalidateModuleScan();
 }
 
-export function unregisterExtension(id) { EXTENSIONS.delete(id); }
+export function unregisterExtension(id) { EXTENSIONS.delete(id); invalidateModuleScan(); }
 export function registeredExtensions() { return [...EXTENSIONS.values()]; }
-export function clearExtensions() { EXTENSIONS.clear(); }
+export function clearExtensions() { EXTENSIONS.clear(); invalidateModuleScan(); }
 
 /** Built-in modules plus every installed extension, in that order. */
 export function allModules() {
@@ -4156,6 +4157,33 @@ function escapeForRe(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Building each handler's API asks which modules ALL panel scripts use. A panel
+// with hundreds of handlers used to rescan every source and rebuild every regex
+// hundreds of times on preview entry. Sources and the module registry are the
+// complete inputs; visual edits and MIDI values cannot change this result.
+let moduleScanMatchers = null;
+const sourceModuleCache = new Map();
+const MODULE_SCAN_CACHE_LIMIT = 512;
+const MODULE_SCAN_CACHE_CHARS = 2_000_000;
+let sourceModuleCacheChars = 0;
+
+function invalidateModuleScan() {
+  moduleScanMatchers = null;
+  sourceModuleCache.clear();
+  sourceModuleCacheChars = 0;
+}
+
+function scanMatchers() {
+  if (moduleScanMatchers) return moduleScanMatchers;
+  const known = allModules();
+  const members = Object.entries(memberModule())
+    .filter(([, at]) => !moduleById(at.module)?.global)
+    .map(([id, at]) => ({ module: at.module, re: memberReferenceRe(id, at.name) }));
+  const paths = known.filter((module) => !module.global)
+    .map((module) => ({ module: module.id, re: new RegExp(`\\b${escapeForRe(module.id)}\\b`) }));
+  return moduleScanMatchers = { known, members, paths };
+}
+
 /**
  * Which modules a piece of script source actually reaches for. A scan, not a parse — same
  * standing caveat as scriptValidate.js: it can over-report from a comment or a string, and
@@ -4164,20 +4192,29 @@ function escapeForRe(s) {
 export function modulesUsedBy(source) {
   const src = typeof source === 'string' ? source : '';
   if (!src) return [];
-  const known = allModules();
+  const cached = sourceModuleCache.get(src);
+  if (cached) return [...cached];
+  const { known, members, paths } = scanMatchers();
   const hit = new Set();
-  for (const [memberId, at] of Object.entries(memberModule())) {
-    if (hit.has(at.module)) continue;
-    if (moduleById(at.module)?.global) continue;      // ce.core is never gated, never scanned for
-    if (memberReferenceRe(memberId, at.name).test(src)) hit.add(at.module);
+  for (const { module, re } of members) {
+    if (!hit.has(module) && re.test(src)) hit.add(module);
   }
   // A script may also address a module wholesale — `local midi = ce.midi`, `ce.has("ce.time")`.
-  for (const module of known) {
-    if (hit.has(module.id) || module.global) continue;
-    const path = escapeForRe(module.id);
-    if (new RegExp(`\\b${path}\\b`).test(src)) hit.add(module.id);
+  for (const { module, re } of paths) {
+    if (!hit.has(module) && re.test(src)) hit.add(module);
   }
-  return known.map((m) => m.id).filter((id) => hit.has(id));
+  const result = known.map((m) => m.id).filter((id) => hit.has(id));
+  if (src.length <= MODULE_SCAN_CACHE_CHARS) {
+    while (sourceModuleCache.size >= MODULE_SCAN_CACHE_LIMIT
+      || sourceModuleCacheChars + src.length > MODULE_SCAN_CACHE_CHARS) {
+      const oldest = sourceModuleCache.keys().next().value;
+      sourceModuleCacheChars -= oldest.length;
+      sourceModuleCache.delete(oldest);
+    }
+    sourceModuleCache.set(src, result);
+    sourceModuleCacheChars += src.length;
+  }
+  return [...result];
 }
 
 /** The scripts a panel ships, flattened — panel-level plus per-control. Sources only. */

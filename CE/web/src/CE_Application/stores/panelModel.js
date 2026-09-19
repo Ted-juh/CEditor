@@ -5,6 +5,7 @@ import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
+import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
 
 let nextId = 1;
 
@@ -400,7 +401,7 @@ export function deserializePanel(json, filePath, name) {
   // is always the full control, because everything that reads one reads deep paths off it. Done
   // once and reused — expanding a 4.8 MB panel twice to build a layer list would be a silly way
   // to spend a hundred milliseconds.
-  const controls = (data.controls ?? []).map(expandControl);
+  const controls = repairGaiaNoteChoices((data.controls ?? []).map(expandControl));
 
   return {
     ...createPanel(),

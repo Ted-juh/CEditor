@@ -27,7 +27,7 @@ import { createPartNode } from '../src/CE_Application/utils/customComponentFacto
 import { isBakeable, partsToSvg, svgToDataUrl, whyNotBakeable } from '../src/CE_Application/utils/partsToSvg.js';
 import {
   BAKED_PART_NAME, bakeStaticPartEntries, classifyParts, clearBakeCache, bakeCacheSize,
-  movingPartNames, whyControlNotBakeable,
+  movingPartNames, whyControlNotBakeable, bakeCacheStats,
 } from '../src/CE_Application/utils/staticPartBaking.js';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/CE_Application');
@@ -53,6 +53,35 @@ function componentWith(parts, extra = {}) {
 }
 
 const entriesOf = (control) => Object.entries(control._children.Parts._children);
+
+test('a non-first part edit invalidates the image; MIDI-only edits and undo reuse it', () => {
+  clearBakeCache();
+  const control = componentWith(Object.fromEntries(['a', 'b', 'c', 'd'].map(n => [n, plainPart(n)])));
+  const bake = c => bakeStaticPartEntries(c, entriesOf(c), 40, 40)[0][1]._children.Background._children.Fill.imageSrc;
+  const original = bake(control);
+  const changed = { ...control, _children: { ...control._children,
+    Parts: { _children: { ...control._children.Parts._children, d: plainPart('d', { opacity: 0.25 }) } } } };
+  assert.notEqual(bake(changed), original, 'the first part is unchanged, but the picture is different');
+  assert.equal(bakeCacheStats().builds, 2);
+  const midiOnly = clone(control);
+  midiOnly._children.DeviceBindings = { bindings: [{ parameterId: 'new.cc', deviceRole: 'synth' }] };
+  assert.equal(bake(midiOnly), original);
+  assert.equal(bakeCacheStats().builds, 2, 'equal older artwork is reused after undo or nonvisual edits');
+  clearBakeCache();
+  assert.equal(bake(control), original);
+  assert.equal(bakeCacheStats().builds, 1, 'clearing must clear the identity cache as well');
+});
+
+test('turning solid fill off cannot return the solid image from the content cache', () => {
+  clearBakeCache();
+  const control = componentWith(Object.fromEntries(['a', 'b', 'c', 'd'].map(n => [n, plainPart(n)])));
+  const original = bakeStaticPartEntries(control, entriesOf(control), 40, 40);
+  const changed = clone(control);
+  changed._children.Parts._children.d._children.Background._children.Fill.solidEnabled = false;
+  const next = bakeStaticPartEntries(changed, entriesOf(changed), 40, 40);
+  assert.notEqual(next[0][1]._children.Background._children.Fill.imageSrc,
+    original[0][1]._children.Background._children.Fill.imageSrc);
+});
 
 /* ------------------------------------------------------------------ what it will draw */
 

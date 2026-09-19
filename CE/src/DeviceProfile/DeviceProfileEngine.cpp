@@ -2241,6 +2241,10 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
         if (choices == nullptr || choices->isEmpty())
             return juce::Result::fail ("Choice parameter has no choices: " + propString (parameter, "id"));
 
+        // Resolve string IDs before labels and wire values. Otherwise a note ID
+        // such as "2" can select an earlier choice whose encoded byte is 2.
+        // Numeric inputs explicitly denote wire values, not numeric-looking IDs.
+        for (int matchKind = inputValue.isString() ? 0 : 2; matchKind < 3; ++matchKind)
         for (int index = 0; index < choices->size(); ++index)
         {
             auto* choice = asObject ((*choices)[index]);
@@ -2251,7 +2255,7 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             auto label = propString (*choice, "label");
             auto value = propInt (*choice, "value");
 
-            if (requested == id || requested == label || requested == juce::String (value))
+            if (requested == (matchKind == 0 ? id : matchKind == 1 ? label : juce::String (value)))
             {
                 if (! isMidiDataByte (value))
                     return juce::Result::fail ("Choice encoded value outside MIDI data byte range for " + propString (parameter, "id"));

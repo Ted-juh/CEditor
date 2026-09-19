@@ -36,6 +36,24 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const profile = buildProfile();
 const byId = new Map(profile.parameters.map((p) => [p.id, p]));
 
+test('choice IDs are unique and fractional LFO notes compile to distinct wire values', () => {
+  for (const parameter of profile.parameters) {
+    const ids = (parameter.choices ?? []).map(c => c.id);
+    assert.equal(new Set(ids).size, ids.length, `${parameter.id} has duplicate choice IDs`);
+  }
+  for (const tone of [1, 2, 3]) for (const kind of ['lfo', 'modLfo']) {
+    const parameterId = `tone${tone}.${kind}.tempoSyncNote`;
+    for (const choice of byId.get(parameterId).choices) {
+      for (const value of [choice.id, choice.label, choice.value]) {
+        const result = localCompileParameter(profile, { parameterId, value });
+        assert.equal(result.ok, true, result.error);
+        assert.equal(parseInt(result.hex.split(' ').at(-3), 16), choice.value, `${parameterId} ${choice.label} (${JSON.stringify(value)})`);
+        assert.equal(result.transaction.semanticValue, choice.id);
+      }
+    }
+  }
+});
+
 /**
  * Verbatim from "SH-01 MIDI Implementation", Roland Corporation, version 1.01 (2010-09-01),
  * §4 "Examples of Actual MIDI Messages", Example 1 — Setting OSC Wave of Temporary Patch to
@@ -328,7 +346,7 @@ test('every request that names a dump names one that exists', () => {
   // vanishing from the device list before.
   const declared = new Set(profile.dumpDefinitions.map((d) => d.id));
   const wired = profile.requests.filter((r) => r.response?.kind === 'bulkDump');
-  assert.equal(wired.length, 25, 'a block request stopped parsing its reply');
+  assert.equal(wired.length, 26, 'System plus 25 patch blocks must parse their replies');
   for (const request of wired) {
     assert.ok(declared.has(request.response.dump), `${request.id} asks for an undefined dump`);
   }

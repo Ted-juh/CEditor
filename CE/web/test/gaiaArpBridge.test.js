@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { flatControls } from '../src/CE_Application/utils/containment.js';
 
 import { ARP_LANES, arpBridgeScript, blocksToLanes } from '../../../tools/scripts/gaia-panel/arp-bridge.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
@@ -110,14 +111,14 @@ test('garbage in is a valid pattern out', () => {
 
 /* ------------------------------------------------------------------ what actually ships */
 
-test('the panel carries the bridge as a panel-scope onPanelLoad script', () => {
+test('the panel retains the legacy bridge disabled in favour of explicit safe pattern editing', () => {
   const panel = buildGaiaPanel();
   const script = (panel.scripts ?? []).find((s) => s.id === 'gaia_arp_pattern_bridge');
   assert.ok(script, 'the GAIA panel has no arpeggio bridge script');
   assert.equal(script.scope, 'panel');
   assert.equal(script.event, 'onPanelLoad');
   assert.equal(script.language, 'javascript');
-  assert.equal(script.enabled, true);
+  assert.equal(script.enabled, false);
 });
 
 test('the script watches the grid control that actually exists', () => {
@@ -125,7 +126,7 @@ test('the script watches the grid control that actually exists', () => {
   // silent failure this whole bridge is meant to end.
   const panel = buildGaiaPanel();
   const script = panel.scripts.find((s) => s.id === 'gaia_arp_pattern_bridge');
-  const names = new Set(panel.controls.map((c) => c._children?.Core?.name));
+  const names = new Set(flatControls(panel.controls).map((c) => c._children?.Core?.name));
   const [, watched] = script.source.match(/watch\("([^".]+)\./) ?? [];
   assert.ok(watched, 'the script does not watch anything');
   assert.ok(names.has(watched), `the script watches "${watched}", which is not a control on the panel`);

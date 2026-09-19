@@ -265,7 +265,15 @@ test('materializedCustomComponentSnapshot creates arpeggiator runtime parts', ()
   assert.equal(parts.arp_block_lead._children.Text.content, 'G4 118');
   assert.equal(zones.arp_grid_draw.action, 'arpeggiatorDraw');
   assert.equal(zones.arp_block_bass_move.action, 'arpeggiatorMove');
+  assert.equal(zones.arp_block_bass_velocity.action, 'arpeggiatorVelocity');
   assert.equal(zones.arp_block_bass_resize.action, 'arpeggiatorResize');
+  const thirds = ['move', 'velocity', 'resize'].map((suffix) => zones[`arp_block_bass_${suffix}`]);
+  for (let i = 0; i < thirds.length; i++) {
+    assert.equal(thirds[i].bounds.width, thirds[0].bounds.width);
+    if (i) assert.ok(Math.abs(thirds[i].bounds.x - thirds[i - 1].bounds.x - thirds[i - 1].bounds.width) < 1e-8);
+  }
+  assert.equal(thirds[1].cursor, 'ns-resize');
+  assert.ok(parts.arp_block_bass_zone_1_top);
 });
 
 test('extractDetachedGeneratedParts returns editable generated parts for a generator', () => {

@@ -64,6 +64,10 @@ export function whyControlNotBakeable(control) {
 /** Part names something in this control can move — every binding target, conservatively parsed. */
 export function movingPartNames(control) {
   const names = new Set();
+  // Inline numeric inputs are live DOM controls, even without a visual binding.
+  for (const [name, part] of Object.entries(control?._children?.Parts?._children ?? {})) {
+    if (part.role === 'customValueField' || part.role === 'deviceSyncStatus') names.add(name);
+  }
   for (const binding of Object.values(control?._children?.Bindings?._children ?? {})) {
     if (binding?.enabled === false) continue;
     const match = String(binding?.target ?? '').match(/^Parts\.([^.]+)/);
@@ -114,85 +118,85 @@ export function bakeDiagnostics(control) {
 //
 // IDENTITY (WeakMap) is the fast path and covers re-renders. Parts are immutable — the store
 // replaces what it edits and returns everything else by reference — so the same object means the
-// same picture, decided in one pointer comparison. This is the lookup that runs on every render.
+// same picture, decided by comparing the participating part references. This is the lookup that runs on every render.
 //
 // CONTENT (Map) is the slow path and covers the 69 faders. They are 69 distinct objects holding the
 // same drawing, so identity alone would mint 69 identical data URLs and make the browser decode
 // each one. A digest folds them onto one.
 //
-// The digest is a rolling FNV-1a over just the fields that reach the SVG. The first version was
-// `JSON.stringify(entries)`, which is exact and honest and cost 200 ms per load building 2.9 MB of
-// strings that were thrown away — visible in a profile as `innerSerialize` sitting at the top.
-// A collision here would draw the wrong picture, so the digest covers every field the serializer
-// reads and nothing is left to chance about which those are: they are listed below, once.
+// Intern only the fields painted by the SVG serializer. This avoids serializing
+// bindings and metadata for every fader, while retaining exact content equality.
 const CACHE_LIMIT = 512;
 const byContent = new Map();
-const byIdentity = new WeakMap();
+let byIdentity = new WeakMap();
+let partTokens = new WeakMap();
+const tokenByPaint = new Map();
+let nextToken = 0;
+const counts = { hits: 0, builds: 0 };
 
-function fold(hash, value) {
-  const text = typeof value === 'string' ? value : String(value);
-  let h = hash;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
+// Exact paint descriptions are interned, not reduced to a collision-prone hash.
+// Part identity avoids serialization during MIDI updates; equal drawings from
+// different controls share tokens even if their MIDI bindings differ.
+function paintToken(part) {
+  let token = partTokens.get(part);
+  if (token !== undefined) return token;
+  const l = part?._children?.Layout ?? {};
+  const bg = part?._children?.Background?._children ?? {};
+  const f = bg.Fill ?? {}, b = bg.Border ?? {}, g = f.gradient ?? {};
+  const key = JSON.stringify([
+    part.zIndex ?? 0, part.opacity ?? 1, part.visible !== false,
+    ...['x', 'y', 'width', 'height', 'rotation', 'pivotX', 'pivotY'].map(k => l[k] ?? null),
+    f.solidEnabled !== false, f.colour ?? '', f.gradientEnabled === true,
+    f.gradientEnabled === true ? [g.type, g.angle, g.centerX, g.centerY, g.radiusX, g.radiusY,
+      (g.stops ?? []).map(stop => [stop.color, stop.position])] : null,
+    b.enabled === true, b.thickness ?? 0, b.colour ?? '', bg.Corners?.radius ?? 0,
+  ]);
+  token = tokenByPaint.get(key);
+  if (token === undefined) {
+    token = ++nextToken;
+    tokenByPaint.set(key, token);
+    if (tokenByPaint.size > 8192) tokenByPaint.delete(tokenByPaint.keys().next().value);
   }
-  return (h ^ 0x2c) >>> 0;   // separator, so ('ab','c') and ('a','bc') differ
-}
-
-/** Every field partsToSvg reads, and only those. Add a field there, add it here. */
-function digestOf(entries, width, height) {
-  let h = fold(fold(0x811c9dc5, width), height);
-  for (const [name, part] of entries) {
-    h = fold(h, name);
-    h = fold(h, part?.zIndex ?? 0);
-    h = fold(h, part?.opacity ?? 1);
-    h = fold(h, part?.visible === false ? 0 : 1);
-
-    const layout = part?._children?.Layout ?? {};
-    for (const key of ['x', 'y', 'width', 'height', 'rotation', 'pivotX', 'pivotY']) h = fold(h, layout[key] ?? '');
-
-    const bg = part?._children?.Background?._children ?? {};
-    const fill = bg.Fill ?? {};
-    h = fold(h, fill.colour ?? '');
-    h = fold(h, fill.gradientEnabled === true ? 1 : 0);
-    if (fill.gradientEnabled === true && fill.gradient) {
-      const g = fill.gradient;
-      for (const key of ['type', 'angle', 'centerX', 'centerY', 'radiusX', 'radiusY']) h = fold(h, g[key] ?? '');
-      for (const stop of g.stops ?? []) h = fold(fold(h, stop.color ?? ''), stop.position ?? '');
-    }
-    const border = bg.Border ?? {};
-    h = fold(fold(fold(h, border.enabled === true ? 1 : 0), border.thickness ?? 0), border.colour ?? '');
-    h = fold(h, bg.Corners?.radius ?? 0);
-  }
-  return h >>> 0;
+  partTokens.set(part, token);
+  return token;
 }
 
 function cached(entries, width, height) {
-  // `entries` is a fresh array each render, so identity is keyed on the parts objects it holds.
   const anchor = entries[0]?.[1];
-  if (anchor && typeof anchor === 'object') {
-    const hit = byIdentity.get(anchor);
-    if (hit && hit.count === entries.length && hit.width === width && hit.height === height) return hit.url;
+  const hit = anchor && byIdentity.get(anchor);
+  if (hit && hit.width === width && hit.height === height && hit.entries.length === entries.length
+      && hit.entries.every(([name, part], i) => name === entries[i][0] && part === entries[i][1])) {
+    counts.hits++;
+    return hit.url;
   }
-
-  const key = `${digestOf(entries, width, height)}`;
+  // Names do not affect the image. Order does: equal-z parts paint in input order.
+  const key = `${width}:${height}:${entries.map(([, part]) => paintToken(part)).join(',')}`;
   let url;
   if (byContent.has(key)) {
+    counts.hits++;
     url = byContent.get(key);
+    byContent.delete(key); // Retain recently reused versions for undo and preview re-entry.
   } else {
+    counts.builds++;
     const svg = partsToSvg(entries, width, height);
     url = svg ? svgToDataUrl(svg) : null;
-    if (byContent.size >= CACHE_LIMIT) byContent.delete(byContent.keys().next().value);
-    byContent.set(key, url);
   }
-
-  if (anchor && typeof anchor === 'object') byIdentity.set(anchor, { url, count: entries.length, width, height });
+  byContent.set(key, url);
+  if (byContent.size > CACHE_LIMIT) byContent.delete(byContent.keys().next().value);
+  if (anchor) byIdentity.set(anchor, { url, entries, width, height });
   return url;
 }
 
-/** Exposed for tests and for a diagnostics readout — never for behaviour. */
 export const bakeCacheSize = () => byContent.size;
-export const clearBakeCache = () => byContent.clear();
+export const bakeCacheStats = () => ({ ...counts, entries: byContent.size });
+export function clearBakeCache() {
+  byContent.clear();
+  byIdentity = new WeakMap();
+  partTokens = new WeakMap();
+  tokenByPaint.clear();
+  nextToken = 0;
+  counts.hits = counts.builds = 0;
+}
 
 /** The single part that stands in for all the folded ones. */
 function bakedPart(url, width, height, zIndex) {

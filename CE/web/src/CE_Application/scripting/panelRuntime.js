@@ -173,11 +173,30 @@ function activePanel() {
   return get(panels).find((p) => p.id === get(scriptRuntimePanelId)) ?? null;
 }
 
+// Editor document writes replace the controls array. Reuse name/id lookups
+// across the many watch() reads in a settle pass; host adapters can own mutable
+// documents, so retain their uncached lookup semantics.
+const editorNameIndexes = new WeakMap();
+
 /** Find a control in the active panel by its friendly name (case-insensitive), id fallback. */
 function findControlByName(name) {
   const panel = activePanel();
   if (!panel) return null;
   const target = String(name ?? '').toLowerCase();
+  if (!host && Array.isArray(panel.controls)) {
+    let index = editorNameIndexes.get(panel.controls);
+    if (!index) {
+      index = new Map();
+      for (const control of flatControls(panel.controls)) {
+        const core = control?._children?.Core;
+        for (const key of [String(core?.name ?? '').toLowerCase(), String(core?.id ?? '').toLowerCase()]) {
+          if (!index.has(key)) index.set(key, control);
+        }
+      }
+      editorNameIndexes.set(panel.controls, index);
+    }
+    return index.get(target) ?? null;
+  }
   // flatControls, NOT panel.controls: a control inside a Group or Container was unreachable by
   // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
   // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
@@ -527,7 +546,10 @@ function setValue(path, value, formOrOpts = '') {
     wrote = true;
   } else {
     wrote = shape.writes;
-    if (wrote) {
+    if (wrote && (shape.fresh || !Object.is(valueAtPath(control, modelPath), value))) {
+      // Status/name polling often writes the same text or colour repeatedly.
+      // Avoid cloning the control and waking every document watcher for a no-op.
+      // Continue below: an explicit device send still has its normal semantics.
       // Out of the scenery ground, for good — see stores/scriptTouchedControls.js. A folded control
       // a script writes to would otherwise re-bake the whole ground on every write.
       noteScriptTouchedControl(control?._children?.Core?.id);
@@ -5529,6 +5551,7 @@ function runningTimersRead() {
 // far better than returning an empty list that looks like "this synth has no parameters".
 
 const parameterRequests = new Set();   // profileIds we have already asked for, to not spam the bridge
+const deviceSourceCache = new Map();
 
 function roleMapping(role) {
   const mappings = get(deviceRoleMappings) ?? {};
@@ -5548,8 +5571,13 @@ function deviceProfileSource(role = DEFAULT_ROLE) {
   if (!profileId) return null;
   const text = (get(profileSources) ?? {})[profileId]?.source ?? '';
   if (!text) return null;
+  const cached = deviceSourceCache.get(profileId);
+  if (cached?.text === text) return cached.profile;
   const parsed = parseProfileSourceText(profileId, text);
-  return parsed.ok ? parsed.profile : null;
+  const profile = parsed.ok ? parsed.profile : null;
+  deviceSourceCache.set(profileId, { text, profile });
+  if (deviceSourceCache.size > 8) deviceSourceCache.delete(deviceSourceCache.keys().next().value);
+  return profile;
 }
 
 /**
@@ -7573,13 +7601,12 @@ function scriptsForPanel(panel) {
   return (panel.scripts ?? []).filter(isSourceScript);
 }
 
-/** The source scripts that should react for the active panel (live editor override, else the doc). */
+/** Source scripts for the active panel, including those embedded in the saved panel. */
 function activeScripts() {
-  if (host) return host.scripts ?? [];
-  const pid = live.activePanelId;
-  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) return live.editOverride.scripts;
-  const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
-  return (doc?.scripts ?? []).filter(isSourceScript);
+  // The saved .cepanel is a script source too. Requiring a separate script workspace
+  // made ordinary preview silently ignore every embedded onPanelLoad/onClick handler.
+  // Use the same precedence as exports: live override, bound workspace, panel document.
+  return scriptsForPanel(livePanel());
 }
 
 /**
@@ -7674,6 +7701,9 @@ async function dispatchEvents(events, { inbound = false } = {}) {
     if (inbound) origin.inboundDepth -= 1;
     snapshotValues();          // absorb panels writes our scripts just made
     live.dispatching = false;
+    // Changes that raised declared events skipped the reactive pass while this async
+    // dispatch was busy. Settle their watchers before absorbing the session baseline.
+    runReactive();
     if (live.sessionsDirty) {
       // Something arrived while we were busy. Do NOT seed — seeding is what would swallow it.
       // Leave the baseline alone and diff again on the next microtask, so the change is measured
@@ -7804,6 +7834,7 @@ function onPreviewSessionsChanged(sessions) {
   if (live.dispatching) { live.sessionsDirty = true; return; }
   const events = [];
   const next = new Map();
+  let controlsById = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
     const cur = {
       value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
@@ -7814,8 +7845,13 @@ function onPreviewSessionsChanged(sessions) {
     next.set(id, cur);
     const prev = live.sessionLast.get(id);
     if (!prev) continue;
-    const name = controlNameById(id);
-    const control = controlByRuntimeId(id);
+    // Most entries are unchanged. Previously each entry walked the entire tree
+    // twice, even on a single hover/value update (quadratic in panel size).
+    if (Object.keys(cur).every((key) => Object.is(prev[key], cur[key]))) continue;
+    controlsById ??= new Map(flatControls(livePanel()?.controls ?? [])
+      .map((control) => [control?._children?.Core?.id, control]));
+    const control = controlsById.get(id) ?? null;
+    const name = control?._children?.Core?.name ?? id;
     const behavior = control?._children?.Behavior ?? {};
     const confirmedButton = behavior.buttonType === 'timed' || behavior.buttonType === 'one_shot';
     const pressStart = behavior.buttonType === 'momentary' && behavior.fireOn === 'onPressStart';

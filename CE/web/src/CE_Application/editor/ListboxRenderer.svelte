@@ -137,7 +137,7 @@
       {#if selIndex >= 0}
         <div class="listbox-sel-indicator" class:ind-outline={selStyle === 'outline'} style={`transform: translateY(${selIndex * stride}px); height:${rowH}px;`}></div>
       {/if}
-      {#each rows as row, i (row.id ?? row.internalValue ?? row.displayText)}
+      {#each rows as row, i}
         {#if row.isHeader === true}
           <div class="listbox-header" style={`height:${rowH}px; margin-bottom:${gap}px; padding-left:${padLeft}px;`}>{row.displayText ?? ''}</div>
         {:else}

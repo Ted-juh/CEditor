@@ -1,5 +1,5 @@
 import { createBackground, createPartNode, createText } from './customComponentFactory.js';
-import { getCustomArpeggiator, noteNameFromMidi } from './customComponentArpeggiator.js';
+import { getCustomArpeggiator, noteNameFromMidi, arpeggiatorInspectorLayout } from './customComponentArpeggiator.js';
 import { deepClone } from './deepClone.js';
 import { numberOr, clamp } from './primitives.js';
 
@@ -171,6 +171,7 @@ function makeArpRuntimePart(name, {
   colour = '44FFFFFF',
   borderEnabled = false,
   borderColour = '55FFFFFF',
+  borderThickness = 1,
   radius = 0,
   text = '',
   textColour = 'FFFFFFFF',
@@ -183,7 +184,7 @@ function makeArpRuntimePart(name, {
     Background: createBackground(colour, {
       borderEnabled,
       borderColour,
-      borderThickness: 1,
+      borderThickness,
       radius,
     }),
   };
@@ -232,12 +233,27 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
   const gridWidth = Math.max(1, width - labelWidth - 8);
-  const gridHeight = Math.max(1, height - rulerHeight - 8);
+  const numericFields = control?._children?.Designer?.arpeggiator?.numericFields === true;
+  const editing = control?._children?.Designer?.patternEditing?.kind === 'gaia';
+  const inspector = arpeggiatorInspectorLayout(width, editing);
+  const gridHeight = Math.max(1, height - rulerHeight - 8 - (numericFields ? inspector.height : 0));
   const rowHeight = gridHeight / 12;
   const stepWidth = gridWidth / Math.max(1, arpeggiator.stepCount);
   const currentStepRaw = signals?.customChannels?.['channel.arpCurrentStep.raw'];
   const currentStep = Math.max(0, Math.min(arpeggiator.stepCount - 1, Math.round(numberOr(currentStepRaw, -1))));
   const showPlayhead = Number.isFinite(Number(currentStepRaw));
+  // Loop length is independent of the editor's width: never crop stored notes.
+  const endStepRaw = signals?.customChannels?.['channel.arpEndStep.raw'];
+  const hasEndStep = endStepRaw != null && Number.isFinite(Number(endStepRaw));
+  const endStep = Math.round(clamp(numberOr(endStepRaw, arpeggiator.stepCount), 1, arpeggiator.stepCount));
+  if (hasEndStep) {
+    addHitZone(hitZones, 'arp_end_step_ruler', {
+      shape: 'rectangle', action: 'arpeggiatorEndStep', targetValueChannel: 'arpEndStep',
+      priority: 50, cursor: 'ew-resize',
+      bounds: { x: percent(gridLeft, width), y: 0, width: percent(gridWidth, width), height: percent(rulerHeight, height), unit: 'percent' },
+      payload: { steps: arpeggiator.stepCount },
+    }, 'arpeggiator');
+  }
 
   addHitZone(hitZones, 'arp_grid_draw', {
     shape: 'rectangle',
@@ -313,9 +329,9 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
         width: Math.max(14, stepWidth),
         height: rulerHeight,
         zIndex: 19,
-        colour: '00000000',
+        colour: hasEndStep && step + 1 === endStep ? 'FF60491F' : '00000000',
         text: String(step + 1),
-        textColour: major ? 'FFD7E7EF' : 'FF77848D',
+        textColour: hasEndStep && step + 1 === endStep ? 'FFFFD77A' : major ? 'FFD7E7EF' : 'FF77848D',
         fontSize: 8,
         meta: { step },
       }), 'arpeggiator');
@@ -371,35 +387,131 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
       meta: { ...block },
     }), 'arpeggiator');
 
-    addHitZone(hitZones, `${blockName}_move`, {
-      shape: 'rectangle',
-      action: 'arpeggiatorMove',
-      priority: 80,
-      cursor: 'move',
-      bounds: {
-        x: percent(gridLeft + (block.step * stepWidth) + 1, width),
-        y: percent(gridTop + (row * rowHeight) + 2, height),
-        width: percent(Math.max(3, (block.length * stepWidth) - 2), width),
-        height: percent(Math.max(4, rowHeight - 4), height),
-        unit: 'percent',
-      },
-      payload: { type: 'arpeggiatorBlock', blockId: block.id },
-    }, 'arpeggiator');
-
-    addHitZone(hitZones, `${blockName}_resize`, {
-      shape: 'rectangle',
-      action: 'arpeggiatorResize',
-      priority: 90,
-      cursor: 'ew-resize',
-      bounds: {
-        x: percent(gridLeft + ((block.step + block.length) * stepWidth) - 7, width),
-        y: percent(gridTop + (row * rowHeight) + 2, height),
-        width: percent(10, width),
-        height: percent(Math.max(4, rowHeight - 4), height),
-        unit: 'percent',
-      },
-      payload: { type: 'arpeggiatorBlockResize', blockId: block.id },
-    }, 'arpeggiator');
+    const blockX = gridLeft + block.step * stepWidth + 1;
+    const blockY = gridTop + row * rowHeight + 2;
+    const blockWidth = Math.max(3, block.length * stepWidth - 2);
+    const blockHeight = Math.max(4, rowHeight - 4);
+    if (block.id === arpeggiator.selectedBlock) {
+      // Above the inactive-step shade so an edited outside-loop note remains identifiable.
+      addPart(parts, `${blockName}_selected`, makeArpRuntimePart(`${blockName}_selected`, {
+        role: 'arpeggiatorSelectionOutline', x: blockX - 1, y: blockY - 1,
+        width: blockWidth + 2, height: blockHeight + 2, zIndex: 28,
+        colour: '00000000', borderEnabled: true, borderColour: 'FFFFD77A', borderThickness: 2, radius: 4,
+      }), 'arpeggiator');
+    }
+    const zones = [
+      ['move', 'arpeggiatorMove', 'move'],
+      ['velocity', 'arpeggiatorVelocity', 'ns-resize'],
+      ['resize', 'arpeggiatorResize', 'ew-resize'],
+    ];
+    zones.forEach(([suffix, action, cursor], zoneIndex) => {
+      addHitZone(hitZones, `${blockName}_${suffix}`, {
+        shape: 'rectangle', action, priority: 80, cursor,
+        bounds: {
+          x: percent(blockX + zoneIndex * blockWidth / 3, width),
+          y: percent(blockY, height),
+          width: percent(blockWidth / 3, width),
+          height: percent(blockHeight, height),
+          unit: 'percent',
+        },
+        payload: { type: 'arpeggiatorBlock', blockId: block.id },
+      }, 'arpeggiator');
+      if (zoneIndex > 0) {
+        // Short notches mark the thirds without running through the note/velocity text.
+        for (const [edge, y] of [['top', blockY], ['bottom', blockY + blockHeight - 3]]) {
+          const name = `${blockName}_zone_${zoneIndex}_${edge}`;
+          addPart(parts, name, makeArpRuntimePart(name, {
+            role: 'arpeggiatorZoneDivider', x: blockX + zoneIndex * blockWidth / 3,
+            y, width: 1, height: 3, zIndex: 25, colour: '99081015',
+          }), 'arpeggiator');
+        }
+      }
+    });
+  }
+  if (hasEndStep) {
+    const endX = gridLeft + endStep * stepWidth;
+    if (endStep < arpeggiator.stepCount) {
+      addPart(parts, 'arp_inactive_steps', makeArpRuntimePart('arp_inactive_steps', {
+        role: 'arpeggiatorInactiveSteps', x: endX, y: 0,
+        width: gridWidth - endStep * stepWidth, height: gridTop + gridHeight,
+        zIndex: 26, colour: '99000000',
+        meta: { endStep },
+      }), 'arpeggiator');
+    }
+    addPart(parts, 'arp_end_boundary', makeArpRuntimePart('arp_end_boundary', {
+      role: 'arpeggiatorEndBoundary', x: endX - 2, y: 0, width: 2,
+      height: gridTop + gridHeight, zIndex: 27, colour: 'FFE5AD35',
+      meta: { endStep },
+    }), 'arpeggiator');
+    addPart(parts, 'arp_end_label', makeArpRuntimePart('arp_end_label', {
+      role: 'arpeggiatorEndLabel', x: Math.max(gridLeft, endX - 62), y: gridTop + gridHeight - 18,
+      width: 60, height: 18, zIndex: 28, colour: 'E6222529',
+      text: `END ${endStep}`, textColour: 'FFE5AD35', fontSize: 10,
+    }), 'arpeggiator');
+  }
+  if (numericFields) {
+    const selected = arpeggiator.blocks.find(b => b.id === arpeggiator.selectedBlock);
+    const ordered = [...arpeggiator.blocks].sort((a, b) => a.step - b.step || a.note - b.note || a.id.localeCompare(b.id));
+    const selectionIndex = ordered.findIndex(b => b.id === arpeggiator.selectedBlock);
+    const y = height - inspector.height + 2;
+    const footer = [
+      ['selection', 'arpeggiatorSelectionLabel', 44, 156, selected ? `NOTE ${selectionIndex + 1} / ${ordered.length}` : 'SELECT A NOTE', 0],
+      ['previous', 'arpeggiatorNavigation', 208, 28, '‹', 0],
+      ['next', 'arpeggiatorNavigation', 244, 28, '›', 0],
+    ];
+    const fieldValues = selected ? { Pitch: noteNameFromMidi(selected.note), Start: selected.step + 1, Length: selected.length, Velocity: selected.velocity } : {};
+    for (const field of inspector.fields) {
+      footer.push([`${field.name}Label`, 'arpeggiatorFieldLabel', field.x, 72, field.name.toUpperCase(), field.y]);
+      footer.push([field.name.toLowerCase(), `arp${field.name}Field`, field.x + 72, 60, selected ? String(fieldValues[field.name]) : '—', field.y]);
+    }
+    if (width >= 1180) {
+      const outside = selected && hasEndStep && selected.step >= endStep;
+      const crosses = selected && hasEndStep && selected.step < endStep && selected.step + selected.length > endStep;
+      footer.push(['status', 'arpeggiatorSelectionStatus', 848, 144, outside ? 'OUTSIDE LOOP' : crosses ? 'TAIL OUTSIDE LOOP' : selected ? 'IN LOOP' : '', 0]);
+      footer.push(['keys', 'arpeggiatorKeyboardHint', 1000, width - 1008, '[ / ] SELECT · ARROWS MOVE / PITCH', 0]);
+    }
+    for (const [name, role, x, w, text, offsetY] of footer) {
+      const editable = /^arp(Pitch|Start|Length|Velocity)Field$/.test(role);
+      const navigation = role === 'arpeggiatorNavigation';
+      addPart(parts, `arp_numeric_${name}`, makeArpRuntimePart(`arp_numeric_${name}`, {
+        role, x, y: y + offsetY, width: w, height: 22, zIndex: 29, text, fontSize: role === 'arpeggiatorKeyboardHint' ? 9 : 11,
+        colour: editable || navigation ? 'FF11181E' : '00000000', textColour: editable || role === 'arpeggiatorSelectionStatus' ? 'FFE6C66C' : 'FFAEBAC6',
+        borderEnabled: editable || navigation, borderColour: 'FF58616A', radius: 3,
+      }), 'arpeggiator');
+      if (navigation && ordered.length) addHitZone(hitZones, `arp_select_${name}`, {
+        shape: 'rectangle', action: 'arpeggiatorSelect', priority: 80, cursor: 'pointer',
+        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(22, height), unit: 'percent' },
+        payload: { direction: name },
+      }, 'arpeggiator');
+    }
+  }
+  if (editing && numericFields) {
+    const state = control._children.Designer.patternEditingState ?? {};
+    const selected = arpeggiator.blocks.some(b => b.id === arpeggiator.selectedBlock);
+    const y = height - 26;
+    const buttons = [
+      ['undo', 'UNDO', 44, 62, state.undo], ['redo', 'REDO', 112, 62, state.redo],
+      ['duplicate', 'DUPLICATE', 190, 90, selected], ['delete', 'DELETE NOTE', 286, 102, selected],
+      ['read', state.busy ? 'CANCEL' : 'READ PATTERN', 412, 122, true],
+      ['send', 'SEND PATTERN', 540, 122, !state.busy],
+    ];
+    for (const [action, text, x, w, enabled] of buttons) {
+      addPart(parts, `arp_edit_${action}`, makeArpRuntimePart(`arp_edit_${action}`, {
+        role: 'arpeggiatorEditButton', x, y, width: w, height: 22, zIndex: 29, text,
+        colour: 'FF17222B', textColour: enabled ? (action === 'send' ? 'FFE6C66C' : 'FFD7E1E9') : 'FF626C75',
+        borderEnabled: true, borderColour: enabled ? 'FF687684' : 'FF343F48', radius: 3, fontSize: 10,
+      }), 'arpeggiator');
+      if (enabled) addHitZone(hitZones, `arp_edit_${action}`, {
+        shape: 'rectangle', action: 'arpeggiatorCommand', priority: 90, cursor: 'pointer',
+        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(22, height), unit: 'percent' },
+        payload: { command: action },
+      }, 'arpeggiator');
+    }
+    if (width > 740) addPart(parts, 'arp_edit_status', makeArpRuntimePart('arp_edit_status', {
+      role: 'arpeggiatorEditStatus', x: 682, y, width: width - 690, height: 22, zIndex: 29,
+      text: state.message || 'LOCAL EDITS · Ctrl+Z / Y undo / redo · Ctrl+D duplicate · Delete note',
+      colour: '00000000', textColour: state.error ? 'FFFF8080' : 'FFAEBAC6', fontSize: 10,
+    }), 'arpeggiator');
   }
 }
 

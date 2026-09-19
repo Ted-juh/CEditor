@@ -184,6 +184,19 @@
       </div>
       <input type="checkbox" checked={general.foldSceneryInEditor} onchange={(event) => setBool('foldSceneryInEditor', event)} />
     </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Prepare Preview in the Background</strong>
+        <span>Prepare static graphics when you pause editing. Reuse them for MIDI and routing changes; rebuild only changed artwork. Moving parts always stay live.</span>
+      </div>
+      <input type="checkbox" checked={general.backgroundPreviewPreparation} onchange={(event) => setBool('backgroundPreviewPreparation', event)} />
+    </label>
+    <div class="mini-setting">
+      <span>Pause Before Preparation (ms)</span>
+      <NumberCell value={general.previewPreparationDelayMs} min={250} max={5000} step={50}
+        onchange={(value) => setNumber('previewPreparationDelayMs', value)} />
+    </div>
   </section>
 
   <section class="settings-card">

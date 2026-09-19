@@ -13,7 +13,7 @@
 // A screen does not, so there are three — one per tone — and that is the whole point of showing
 // them at once.
 //
-// Colours are the panel's: LFO in blue, OSC/FILTER/AMP in amber, everything else grey.
+// Colours are the panel's: LFO in blue, OSC/FILTER/AMP/EFFECTS in amber, everything else grey.
 
 import { anyEffectHasNames, genericParameterLabel } from './effect-parameters.mjs';
 
@@ -25,8 +25,10 @@ export const TINT = {
   amp: 'FFE0A030',
   modLfo: 'FF6C7A86',
   common: 'FF8894A0',
-  effects: 'FFB05CC8',
-  arp: 'FF52B788',
+  // The hardware continues the same amber rule around EFFECTS. Purple looked attractive but made
+  // the block read as a different product. ARPEGGIO lives in the neutral lower control rail.
+  effects: 'FFE0A030',
+  arp: 'FF98A4AE',
 };
 
 export const SKIN = {
@@ -56,84 +58,91 @@ export const SKIN = {
  * `p` is the parameter id inside the tone (`osc.wave` -> `tone2.osc.wave`).
  */
 export const TONE_STRIP = {
-  height: 316,
+  height: 346,
   boxes: [
     {
-      title: 'LFO', tint: TINT.lfo, x: 0, y: 0, w: 286, h: 308,
+      title: 'LFO', tint: TINT.lfo, x: 0, y: 0, w: 286, h: 338,
       controls: [
         { p: 'lfo.shape', kind: 'ledsNarrow', x: 10, y: 30, label: 'SHAPE' },
-        { p: 'lfo.rate', kind: 'knob', x: 126, y: 40, label: 'RATE' },
-        { p: 'lfo.tempoSyncSwitch', kind: 'toggle', x: 192, y: 40, w: 84, label: 'TEMPO SYNC' },
-        { p: 'lfo.tempoSyncNote', kind: 'combo', x: 192, y: 84, w: 84, label: 'NOTE' },
-        { p: 'lfo.keyTrigger', kind: 'toggle', x: 126, y: 120, w: 64, label: 'KEY TRIG' },
+        { p: 'lfo.rate', kind: 'knob', x: 126, y: 30, label: 'RATE' },
+        { p: 'lfo.tempoSyncSwitch', kind: 'toggle', x: 190, y: 30, w: 84, label: 'TEMPO SYNC' },
+        { p: 'lfo.tempoSyncNote', kind: 'combo', x: 190, y: 84, w: 84, label: 'NOTE' },
+        { p: 'lfo.keyTrigger', kind: 'toggle', x: 190, y: 124, w: 84, label: 'KEY TRIG' },
         // The four faders the hardware prints under the LFO, in its order.
-        { p: 'lfo.fadeTime', kind: 'fader', x: 12, y: 162, label: 'FADE\nTIME' },
-        { p: 'lfo.pitchDepth', kind: 'fader', x: 72, y: 162, label: 'PITCH\nDEPTH' },
-        { p: 'lfo.filterDepth', kind: 'fader', x: 132, y: 162, label: 'FILTER\nDEPTH' },
-        { p: 'lfo.ampDepth', kind: 'fader', x: 192, y: 162, label: 'AMP\nDEPTH' },
+        { p: 'lfo.fadeTime', kind: 'fader', x: 18, y: 180, label: 'FADE\nTIME' },
+        { p: 'lfo.pitchDepth', kind: 'fader', x: 74, y: 180, label: 'PITCH\nDEPTH' },
+        { p: 'lfo.filterDepth', kind: 'fader', x: 130, y: 180, label: 'FILTER\nDEPTH' },
+        { p: 'lfo.ampDepth', kind: 'fader', x: 186, y: 180, label: 'AMP\nDEPTH' },
+        // MIDI exposes the per-tone pan modulation even though the compact hardware strip omits a
+        // fifth depth fader. Keeping the three on-screen voices complete is more useful than hiding
+        // it again, and this last bay was deliberately left wide enough for it.
+        { p: 'lfo.panDepth', kind: 'fader', x: 242, y: 180, label: 'PAN\nDEPTH' },
       ],
     },
     {
-      title: 'OSC', tint: TINT.osc, x: 296, y: 0, w: 410, h: 308,
+      title: 'OSC', tint: TINT.osc, x: 296, y: 0, w: 410, h: 338,
       controls: [
-        { p: 'osc.wave', kind: 'leds', x: 12, y: 30, label: 'WAVE' },
-        { p: 'osc.waveVariation', kind: 'leds', x: 148, y: 30, label: 'VARIATION' },
-        { p: 'osc.pitch', kind: 'knob', x: 286, y: 40, label: 'PITCH' },
-        { p: 'osc.detune', kind: 'knob', x: 350, y: 40, label: 'DETUNE' },
-        { p: 'osc.pulseWidthModDepth', kind: 'fader', x: 16, y: 162, label: 'PWM' },
-        { p: 'osc.pulseWidth', kind: 'fader', x: 66, y: 162, label: 'PW' },
+        { p: 'osc.wave', kind: 'leds', x: 12, y: 30, w: 110, label: 'WAVE' },
+        { p: 'osc.waveVariation', kind: 'leds', x: 132, y: 30, w: 84, label: 'VARIATION' },
+        { p: 'osc.pitch', kind: 'knob', x: 236, y: 30, label: 'PITCH' },
+        { p: 'osc.detune', kind: 'knob', x: 326, y: 30, label: 'DETUNE' },
+        { p: 'osc.pulseWidthModDepth', kind: 'fader', x: 16, y: 180, label: 'PWM' },
+        { p: 'osc.pulseWidth', kind: 'fader', x: 66, y: 180, label: 'PW' },
         // The pitch envelope: A and D with its own drawing, the way the panel prints it.
-        { p: 'osc.pitchEnvAttackTime', kind: 'fader', x: 136, y: 162, label: 'A' },
-        { p: 'osc.pitchEnvDecay', kind: 'fader', x: 186, y: 162, label: 'D' },
-        { p: 'osc.pitchEnvDepth', kind: 'fader', x: 300, y: 162, label: 'ENV\nDEPTH' },
+        { p: 'osc.pitchEnvAttackTime', kind: 'fader', x: 174, y: 180, label: 'A' },
+        { p: 'osc.pitchEnvDecay', kind: 'fader', x: 224, y: 180, label: 'D' },
+        { p: 'osc.pitchEnvDepth', kind: 'fader', x: 338, y: 180, label: 'ENV\nDEPTH' },
       ],
       // The printed envelope drawing above its fader bank. `env` names which stages the bank has;
       // `bind` is the parameter prefix whose A/D/S/R the curve follows.
-      envelopes: [{ x: 288, y: 118, w: 114, h: 40, stages: 'ad', bind: 'osc.pitchEnv' }],
+      envelopes: [{ x: 164, y: 134, w: 100, h: 42, stages: 'ad', bind: 'osc.pitchEnv' }],
     },
     {
-      title: 'FILTER', tint: TINT.filter, x: 716, y: 0, w: 410, h: 308,
+      title: 'FILTER', tint: TINT.filter, x: 716, y: 0, w: 410, h: 338,
       controls: [
-        { p: 'filter.mode', kind: 'leds', x: 12, y: 30, label: 'MODE' },
-        { p: 'filter.slope', kind: 'ledsNarrow', x: 148, y: 30, label: 'SLOPE' },
-        { p: 'filter.cutoff', kind: 'knob', x: 262, y: 30, label: 'CUTOFF' },
-        { p: 'filter.resonance', kind: 'knob', x: 344, y: 30, label: 'RESONANCE' },
-        { p: 'filter.envAttackTime', kind: 'fader', x: 16, y: 162, label: 'A' },
-        { p: 'filter.envDecayTime', kind: 'fader', x: 66, y: 162, label: 'D' },
-        { p: 'filter.envSustainLevel', kind: 'fader', x: 116, y: 162, label: 'S' },
-        { p: 'filter.envReleaseTime', kind: 'fader', x: 166, y: 162, label: 'R' },
-        { p: 'filter.envDepth', kind: 'fader', x: 228, y: 162, label: 'ENV\nDEPTH' },
-        { p: 'filter.envVelocitySens', kind: 'fader', x: 282, y: 162, label: 'VELO\nSENS' },
-        { p: 'filter.cutoffKeyfollow', kind: 'knob', x: 344, y: 178, label: 'KEY FOLLOW' },
+        { p: 'filter.mode', kind: 'leds', x: 12, y: 30, w: 110, label: 'MODE' },
+        { p: 'filter.slope', kind: 'ledsNarrow', x: 132, y: 30, w: 84, label: 'SLOPE' },
+        { p: 'filter.cutoff', kind: 'knob', x: 236, y: 30, label: 'CUTOFF' },
+        { p: 'filter.resonance', kind: 'knob', x: 326, y: 30, label: 'RESONANCE' },
+        { p: 'filter.envAttackTime', kind: 'fader', x: 16, y: 180, label: 'A' },
+        { p: 'filter.envDecayTime', kind: 'fader', x: 66, y: 180, label: 'D' },
+        { p: 'filter.envSustainLevel', kind: 'fader', x: 116, y: 180, label: 'S' },
+        { p: 'filter.envReleaseTime', kind: 'fader', x: 166, y: 180, label: 'R' },
+        { p: 'filter.envDepth', kind: 'fader', x: 228, y: 180, label: 'ENV\nDEPTH' },
+        { p: 'filter.envVelocitySens', kind: 'fader', x: 282, y: 180, label: 'VELO\nSENS' },
+        { p: 'filter.cutoffKeyfollow', kind: 'knob', x: 326, y: 196, label: 'KEY FOLLOW' },
       ],
-      envelopes: [{ x: 16, y: 116, w: 200, h: 42, stages: 'adsr', bind: 'filter.env' }],
+      envelopes: [{ x: 16, y: 134, w: 200, h: 42, stages: 'adsr', bind: 'filter.env' }],
     },
     {
-      title: 'AMP', tint: TINT.amp, x: 1136, y: 0, w: 224, h: 308,
+      title: 'AMP', tint: TINT.amp, x: 1136, y: 0, w: 224, h: 338,
       controls: [
-        { p: 'amp.level', kind: 'knob', x: 16, y: 40, label: 'LEVEL' },
-        { p: 'amp.pan', kind: 'knob', x: 84, y: 40, label: 'PAN' },
-        { p: 'amp.levelVelocitySens', kind: 'knob', x: 152, y: 40, label: 'VELO SENS' },
-        { p: 'amp.envAttackTime', kind: 'fader', x: 24, y: 162, label: 'A' },
-        { p: 'amp.envDecayTime', kind: 'fader', x: 74, y: 162, label: 'D' },
-        { p: 'amp.envSustainLevel', kind: 'fader', x: 124, y: 162, label: 'S' },
-        { p: 'amp.envReleaseTime', kind: 'fader', x: 174, y: 162, label: 'R' },
+        { p: 'amp.level', kind: 'knob', x: 16, y: 30, label: 'LEVEL' },
+        { p: 'amp.pan', kind: 'knob', x: 84, y: 30, label: 'PAN' },
+        { p: 'amp.levelVelocitySens', kind: 'knob', x: 152, y: 30, label: 'VELO SENS' },
+        { p: 'amp.envAttackTime', kind: 'fader', x: 24, y: 180, label: 'A' },
+        { p: 'amp.envDecayTime', kind: 'fader', x: 74, y: 180, label: 'D' },
+        { p: 'amp.envSustainLevel', kind: 'fader', x: 124, y: 180, label: 'S' },
+        { p: 'amp.envReleaseTime', kind: 'fader', x: 174, y: 180, label: 'R' },
       ],
-      envelopes: [{ x: 14, y: 116, w: 196, h: 42, stages: 'adsr', bind: 'amp.env' }],
+      envelopes: [{ x: 14, y: 134, w: 196, h: 42, stages: 'adsr', bind: 'amp.env' }],
     },
     {
       // Not on the instrument's front panel — the modulation LFO is reached through the mod wheel
       // rather than through knobs. It is a real part of every tone, so it gets a box, set apart in
       // grey so nobody mistakes it for something they can point at on the hardware.
-      title: 'MOD LFO', tint: TINT.modLfo, x: 1370, y: 0, w: 190, h: 308,
+      title: 'MOD LFO', tint: TINT.modLfo, x: 1370, y: 0, w: 190, h: 338,
       controls: [
-        { p: 'modLfo.shape', kind: 'ledsNarrow', x: 8, y: 30, label: 'SHAPE' },
-        { p: 'modLfo.rate', kind: 'knob', x: 120, y: 40, label: 'RATE' },
-        { p: 'modLfo.tempoSyncSwitch', kind: 'toggle', x: 118, y: 120, w: 64, label: 'SYNC' },
-        { p: 'modLfo.pitchDepth', kind: 'fader', x: 8, y: 162, label: 'PIT' },
-        { p: 'modLfo.filterDepth', kind: 'fader', x: 54, y: 162, label: 'FLT' },
-        { p: 'modLfo.ampDepth', kind: 'fader', x: 100, y: 162, label: 'AMP' },
-        { p: 'modLfo.panDepth', kind: 'fader', x: 146, y: 162, label: 'PAN' },
+        { p: 'modLfo.shape', kind: 'ledsNarrow', x: 8, y: 30, w: 96, label: 'SHAPE' },
+        { p: 'modLfo.rate', kind: 'knob', x: 120, y: 30, label: 'RATE' },
+        // A paired timing row: equal caption baselines, control heights and widths. The left
+        // column starts after the shape list; the right sits directly under the rate knob.
+        { p: 'modLfo.tempoSyncNote', kind: 'combo', x: 108, y: 150, w: 78, label: 'NOTE', captionOffset: 20 },
+        { p: 'modLfo.tempoSyncSwitch', kind: 'toggle', x: 8, y: 150, w: 78, h: 24, label: 'SYNC', caption: 'TEMPO' },
+        { p: 'modLfo.pitchDepth', kind: 'fader', x: 8, y: 180, label: 'PIT' },
+        { p: 'modLfo.filterDepth', kind: 'fader', x: 54, y: 180, label: 'FLT' },
+        { p: 'modLfo.ampDepth', kind: 'fader', x: 100, y: 180, label: 'AMP' },
+        { p: 'modLfo.panDepth', kind: 'fader', x: 146, y: 180, label: 'PAN' },
       ],
     },
   ],
@@ -155,9 +164,9 @@ export const COMMON_STRIP = {
         { p: 'common.octaveShift', kind: 'knob', x: 392, y: 26, label: 'OCTAVE' },
         { p: 'common.monoSwitch', kind: 'toggle', x: 12, y: 118, w: 62, label: 'MONO' },
         { p: 'common.portamentoSwitch', kind: 'toggle', x: 82, y: 118, w: 104, label: 'PORTAMENTO' },
-        { p: 'common.portamentoTime', kind: 'knobSmall', x: 198, y: 106, label: 'PORTA TIME' },
-        { p: 'common.pitchBendRangeUp', kind: 'knobSmall', x: 276, y: 106, label: 'BEND UP' },
-        { p: 'common.pitchBendRangeDown', kind: 'knobSmall', x: 354, y: 106, label: 'BEND DN' },
+        { p: 'common.portamentoTime', kind: 'knobSmall', x: 242, y: 106, label: 'PORTA TIME' },
+        { p: 'common.pitchBendRangeUp', kind: 'knobSmall', x: 320, y: 106, label: 'BEND UP' },
+        { p: 'common.pitchBendRangeDown', kind: 'knobSmall', x: 398, y: 106, label: 'BEND DN' },
       ],
     },
     {
@@ -166,10 +175,10 @@ export const COMMON_STRIP = {
       controls: [
         { p: 'common.tone1Switch', kind: 'toggle', x: 12, y: 30, w: 84, label: 'TONE 1 ON' },
         { p: 'common.tone1Select', kind: 'toggle', x: 106, y: 30, w: 88, label: 'SELECT' },
-        { p: 'common.tone2Switch', kind: 'toggle', x: 12, y: 58, w: 84, label: 'TONE 2 ON' },
-        { p: 'common.tone2Select', kind: 'toggle', x: 106, y: 58, w: 88, label: 'SELECT' },
-        { p: 'common.tone3Switch', kind: 'toggle', x: 12, y: 86, w: 84, label: 'TONE 3 ON' },
-        { p: 'common.tone3Select', kind: 'toggle', x: 106, y: 86, w: 88, label: 'SELECT' },
+        { p: 'common.tone2Switch', kind: 'toggle', x: 12, y: 74, w: 84, label: 'TONE 2 ON' },
+        { p: 'common.tone2Select', kind: 'toggle', x: 106, y: 74, w: 88, label: 'SELECT' },
+        { p: 'common.tone3Switch', kind: 'toggle', x: 12, y: 118, w: 84, label: 'TONE 3 ON' },
+        { p: 'common.tone3Select', kind: 'toggle', x: 106, y: 118, w: 88, label: 'SELECT' },
       ],
     },
     {
@@ -182,20 +191,20 @@ export const COMMON_STRIP = {
       title: 'D BEAM', tint: TINT.common, x: 860, y: 0, w: 250, h: 196,
       controls: [
         { p: 'common.dBeamAssign', kind: 'combo', x: 12, y: 34, w: 220, label: 'ASSIGN' },
-        { p: 'common.dBeamPolarity', kind: 'leds', x: 12, y: 74, label: 'POLARITY' },
+        { p: 'common.dBeamPolarity', kind: 'leds', x: 12, y: 100, label: 'POLARITY' },
       ],
     },
     {
-      title: 'EFFECTS ROUTING', tint: TINT.effects, x: 1120, y: 0, w: 464, h: 196,
+      title: 'EFFECTS / OUTPUT', tint: TINT.effects, x: 1120, y: 0, w: 440, h: 196,
       controls: [
-        { p: 'common.effectsMasterSwitch', kind: 'toggle', x: 12, y: 32, w: 84, label: 'FX MASTER' },
-        { p: 'common.effectsDistortionSelect', kind: 'toggle', x: 104, y: 32, w: 76, label: 'DIST' },
-        { p: 'common.effectsFlangerSelect', kind: 'toggle', x: 188, y: 32, w: 76, label: 'FLANGER' },
-        { p: 'common.effectsDelaySelect', kind: 'toggle', x: 272, y: 32, w: 76, label: 'DELAY' },
-        { p: 'common.effectsReverbSelect', kind: 'toggle', x: 356, y: 32, w: 76, label: 'REVERB' },
-        { p: 'common.lowBoostSwitch', kind: 'toggle', x: 12, y: 80, w: 84, label: 'LOW BOOST' },
-        { p: 'common.tempoSyncSwitch', kind: 'toggle', x: 104, y: 80, w: 100, label: 'DELAY SYNC' },
-        { p: 'master.volume', kind: 'knob', x: 388, y: 92, label: 'VOLUME' },
+        { p: 'common.effectsDistortionSelect', kind: 'toggle', x: 12, y: 40, w: 120, label: 'DISTORTION', caption: 'SELECT CONTROL' },
+        { p: 'common.effectsFlangerSelect', kind: 'toggle', x: 144, y: 40, w: 120, label: 'FLANGER' },
+        { p: 'common.effectsDelaySelect', kind: 'toggle', x: 12, y: 78, w: 120, label: 'DELAY' },
+        { p: 'common.effectsReverbSelect', kind: 'toggle', x: 144, y: 78, w: 120, label: 'REVERB' },
+        { p: 'common.lowBoostSwitch', kind: 'toggle', x: 12, y: 132, w: 120, label: 'LOW BOOST' },
+        { p: 'common.tempoSyncSwitch', kind: 'toggle', x: 144, y: 132, w: 120, label: 'DELAY SYNC' },
+        { p: 'common.effectsMasterSwitch', kind: 'toggle', x: 300, y: 40, w: 128, label: 'FX MASTER' },
+        { p: 'master.volume', kind: 'knob', x: 337, y: 100, label: 'OUTPUT' },
       ],
     },
   ],
@@ -215,27 +224,27 @@ export const EFFECTS_STRIP = {
   height: 202,
   boxes: [
     {
-      title: 'ARPEGGIO', tint: TINT.arp, x: 0, y: 0, w: 520, h: 176,
+      title: 'ARPEGGIO', tint: TINT.arp, x: 0, y: 0, w: 520, h: 194,
       controls: [
         { p: 'common.switch', kind: 'toggle', x: 12, y: 32, w: 72, label: 'ON' },
         { p: 'arp.grid', kind: 'combo', x: 94, y: 32, w: 88, label: 'GRID' },
         { p: 'arp.duration', kind: 'combo', x: 190, y: 32, w: 88, label: 'DURATION' },
-        { p: 'arp.motif', kind: 'combo', x: 286, y: 32, w: 128, label: 'MOTIF' },
-        { p: 'arp.octaveRange', kind: 'knobSmall', x: 430, y: 26, label: 'OCTAVE' },
-        { p: 'arp.accentRate', kind: 'knobSmall', x: 12, y: 92, label: 'ACCENT' },
-        { p: 'arp.velocity', kind: 'knobSmall', x: 90, y: 92, label: 'VELOCITY' },
-        { p: 'arp.endStep', kind: 'knobSmall', x: 168, y: 92, label: 'END STEP' },
+        { p: 'arp.motif', kind: 'combo', x: 286, y: 32, w: 216, label: 'MOTIF' },
+        { p: 'arp.octaveRange', kind: 'knobSmall', x: 408, y: 92, label: 'OCTAVE' },
+        { p: 'arp.accentRate', kind: 'knobSmall', x: 68, y: 92, label: 'ACCENT' },
+        { p: 'arp.velocity', kind: 'knobSmall', x: 238, y: 92, label: 'VELOCITY' },
+        { p: 'arp.endStep', kind: 'knobSmall', x: 268, y: 92, label: 'END STEP', rulerOnly: true },
       ],
     },
     ...[
       ['distortion', 'DISTORTION', 530],
-      ['flanger', 'FLANGER', 796],
-      ['delay', 'DELAY', 1062],
-      ['reverb', 'REVERB', 1328],
+      ['flanger', 'FLANGER', 790],
+      ['delay', 'DELAY', 1050],
+      ['reverb', 'REVERB', 1310],
     ].map(([prefix, title, x]) => ({
       // 194 rather than the arpeggio box's 176: the printed caveat needs a row of its own under the
       // bottom knobs' captions, and sharing it put two lines of text in the same 16px band.
-      title, tint: TINT.effects, x, y: 0, w: 256, h: 194,
+      title, tint: TINT.effects, x, y: 0, w: 250, h: 194,
       // Printed on the panel, not just in the notepad: the knobs are right here and the caveat
       // belongs where someone is looking at them. Drops away by itself once the names table in
       // effect-parameters.mjs is filled in.
@@ -267,9 +276,9 @@ export const ARP_STRIP = {
   height: 300,
   boxes: [
     {
-      title: 'ARPEGGIO PATTERN', tint: TINT.arp, x: 0, y: 0, w: 1568, h: 292,
+      title: 'ARPEGGIO PATTERN', tint: TINT.arp, x: 0, y: 0, w: 1560, h: 292,
       controls: [],
-      grid: { x: 12, y: 26, w: 1544, h: 240, steps: 32 },
+      grid: { x: 12, y: 26, w: 1536, h: 240, steps: 32 },
     },
   ],
 };

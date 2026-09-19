@@ -232,23 +232,23 @@ export function sceneryHoldSet(ground, isSeed) {
   return { held, heldIds };
 }
 
-// FNV-1a over the control's serialized form. Memoized on the control object itself: the document is
-// immutable on write, so an untouched control keeps its identity across a panel edit and never
-// hashes twice. Without this the fingerprint would re-stringify every label on every keystroke.
+// Exact content tokens avoid hash collisions. Immutable controls skip serialization;
+// equal content (including undo) gets the same token while it remains cached.
 const hashCache = new WeakMap();
-
+const contentTokens = new Map();
+let nextToken = 0;
 function hashControl(control) {
   const cached = hashCache.get(control);
   if (cached !== undefined) return cached;
   const text = JSON.stringify(control);
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
+  let token = contentTokens.get(text);
+  if (token === undefined) {
+    token = ++nextToken;
+    contentTokens.set(text, token);
+    if (contentTokens.size > 4096) contentTokens.delete(contentTokens.keys().next().value);
   }
-  const out = hash.toString(36);
-  hashCache.set(control, out);
-  return out;
+  hashCache.set(control, token);
+  return token;
 }
 
 /**
