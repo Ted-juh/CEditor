@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "da9dfeb4",
+  "fingerprint": "3e1630ae",
   "set": {
     "id": "ladder",
     "name": "Ladder",
@@ -56,7 +56,11 @@
       "border": "66050506",
       "border.surface": "66050506",
       "border.field": "66050506",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FF1B1B1D",
+      "display.unlit": "241B1B1D",
+      "display.screen": "FFF3E9C8",
+      "display.backlight": "FFF4ECCF"
     },
     "lamp": {
       "azimuth": 225,
@@ -112,6 +116,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {
@@ -169,12 +175,12 @@
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 10,
           "Background.Effects.Material.grain": 100,
-          "ContentLayout.lamp": "led",
-          "ContentLayout.lampSize": 8,
+          "ContentLayout.lamp": "bat",
+          "ContentLayout.lampSize": 10,
           "ContentLayout.lampSide": "left",
           "ContentLayout.lampGap": 8,
-          "ContentLayout.lampColour": "{accent.hot}",
-          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampColour": "{control.cap}",
+          "ContentLayout.lampOffColour": "{control.cap}",
           "ContentLayout.lampBezelColour": "{border.surface}",
           "States.Selected": {
             "_type": "State",

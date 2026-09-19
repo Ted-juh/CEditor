@@ -615,11 +615,13 @@ export const SECTION_DEFAULTS = {
     rows: 2,
     cols: 16,
     lines: ['PATCH:INIT VOICE', 'VOL120  PAN C   '],
-    litColour: 'FF2BE86A',         // lit phosphor (foreground)
-    unlitColour: '242BE86A',       // faint unlit "ghost" segment
-    screenColour: 'FF06371C',      // screen substrate behind the pixels
+    // The glass follows the control set (models/controlSets.js `display.*`): the base set gives
+    // back exactly the green STN these used to be as literals, so no saved display changes.
+    litColour: '{display.lit}',         // lit phosphor (foreground)
+    unlitColour: '{display.unlit}',     // faint unlit "ghost" segment
+    screenColour: '{display.screen}',   // screen substrate behind the pixels
     backlightOn: true,
-    backlightColour: 'FF0E5A2E',   // backlight wash
+    backlightColour: '{display.backlight}',   // backlight wash
     brightness: 100,               // 0..100 (foreground intensity)
     contrast: 55,                  // 0..100 (LCD trim-pot feel)
     brightnessSourceId: '',        // range control that drives brightness live in preview
@@ -906,6 +908,8 @@ export const SECTION_DEFAULTS = {
     // Which major stops draw: every one, only the two ends, or the ends and the centre — a scale
     // that marks min, max and the detent and nothing else. Minor ticks follow the majors shown.
     tickStops: 'all',             // all / ends / endsCentre
+    // What a numeral tick prints: the stop's index (a dial's 0…10) or the value at the stop.
+    tickNumerals: 'index',        // index / value
     showMinMaxLabels: true,
     showHandleLabels: false,
     showValueReadout: true,
@@ -914,7 +918,12 @@ export const SECTION_DEFAULTS = {
     labelMinMaxGap: 22,
     labelMinMaxOffsetX: 0,
     labelMinMaxOffsetY: 0,
+    // auto / top / center / bottom, or a corner (topLeft, topRight, bottomLeft, bottomRight) that
+    // hangs the label from the track's end. The title takes the same set; a title top-left and a
+    // readout top-right is the row above the track the control-set boards drew. Both share the
+    // readout gap: they are one row.
     labelReadoutPlacement: 'auto',
+    labelTitlePlacement: 'auto',
     labelReadoutGap: 14,
     labelReadoutOffsetX: 0,
     labelReadoutOffsetY: 0,

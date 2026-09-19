@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "703b7f1a",
+  "fingerprint": "5d217672",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -56,7 +56,11 @@
       "border": "662A2D31",
       "border.surface": "662A2D31",
       "border.field": "662A2D31",
-      "border.mixed": "FFFFB020"
+      "border.mixed": "FFFFB020",
+      "display.lit": "FF39FF7A",
+      "display.unlit": "2439FF7A",
+      "display.screen": "FF101214",
+      "display.backlight": "FF2D2E30"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

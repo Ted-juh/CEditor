@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "82e2fe11",
+  "fingerprint": "b29267d1",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -53,6 +53,10 @@
       "text.muted": "FFC8B6A2",
       "text.focus": "FFFFE4C2",
       "text.inverse": "FFFFFFFF",
+      "display.lit": "FFFFB35C",
+      "display.unlit": "24FFB35C",
+      "display.screen": "FF1A1208",
+      "display.backlight": "FF2A1E10",
       "border": "665A4A40",
       "border.surface": "66FFF1DD",
       "border.field": "666A5A4C",
@@ -104,6 +108,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "72ffca69",
+  "fingerprint": "40162369",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -53,6 +53,10 @@
       "text.muted": "FFCDBF9E",
       "text.focus": "FF8A1F18",
       "text.inverse": "FF1C1A17",
+      "display.lit": "FFF2D07A",
+      "display.unlit": "24F2D07A",
+      "display.screen": "FF1A1208",
+      "display.backlight": "FF2A1E10",
       "border": "88F1E6CC",
       "border.surface": "AA1C1A17",
       "border.field": "CCB8892E",
@@ -105,7 +109,9 @@
       "Slider": {
         "component": {
           "Behavior.showTicks": false,
-          "Behavior.showMinMaxLabels": false
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight"
         },
         "parts": {
           "pointerCurrent": {

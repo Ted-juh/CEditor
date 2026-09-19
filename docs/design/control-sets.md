@@ -432,3 +432,34 @@ min/max, the value under the knob. The base colours are untouched — the marker
 translucent white, and the dot draws with the cap token — so a saved document's colours are what
 they were; only the drawing is. Graphite says nothing about the panel: its board's grey is a shade
 off the default panel colour, and that colour is every existing panel's.
+
+## The still-short four
+
+The boards' reproduction left four things it could not do, and they are done:
+
+**A numeral tick prints the value.** `Behavior.tickNumerals` is `index` (the stop's number, so a
+dial reads 0…10 whatever its range — every existing numeral) or `value` (what the stop is worth,
+in the readout's format with its trailing zeros dropped: 0 · 0.5 · 1, not 0.00 · 0.50 · 1.00, a
+scale not being a readout). The recipes take it as `ticks.numerals`, the Reel dial asks for it,
+and the Slider editor shows the choice when the tick style is numeral.
+
+**The row above the track.** A slider's title used to sit centred above the track and its value
+centred above the title, because the two label anchors only knew a point. A placement can now be
+a corner — `topLeft`, `topRight`, `bottomLeft`, `bottomRight` — which hangs the label from the
+track's end rather than centring it on a point, and the title has a placement of its own
+(`Behavior.labelTitlePlacement`, sharing the readout's gap: they are one row). `sliderFamily`'s
+board labels are title top-left, value top-right, which is what every board drew and what the
+default set now draws. A knob's corners are the arc's extent.
+
+**A bat switch.** The lamp kinds gain `bat`: a lever in a round bezel beside the legend, thrown up
+while the control is checked and down when not, three bezels tall. The lever takes the lamp
+colour and the ball on its end a lighter tone of it; the bezel is the lamp's bezel colour. Reel,
+Ladder, Aerospace, Field and Machined had bat switches on their boards and have them now, with
+the lever in the set's cap metal.
+
+**The glass follows the set.** Four new roles — `display.lit`, `display.unlit`, `display.screen`,
+`display.backlight` — and the Display section's colours are now those tokens rather than the
+green-STN literals. Graphite's tokens are exactly those literals, so no saved display changes;
+every other set carries its board's readout: Machined's ice-blue OLED, Valve's amber, Reel's cream
+meter face with dark digits, Field's red LED behind a filter. The LCD's palette dropdown still
+writes literals, which is an author's override of the set, as it should be.

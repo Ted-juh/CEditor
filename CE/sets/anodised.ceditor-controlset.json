@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f7c9ea06",
+  "fingerprint": "00ca7d9e",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -56,7 +56,11 @@
       "border": "663A3F45",
       "border.surface": "663A3F45",
       "border.field": "663A3F45",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FFFF7A1A",
+      "display.unlit": "24FF7A1A",
+      "display.screen": "FF101214",
+      "display.backlight": "FF2D2E30"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

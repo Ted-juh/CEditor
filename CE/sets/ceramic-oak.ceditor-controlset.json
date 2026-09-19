@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d5e01bd3",
+  "fingerprint": "3d1fcc0f",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -56,7 +56,11 @@
       "border": "6694928F",
       "border.surface": "AA7C7A77",
       "border.field": "6694928F",
-      "border.mixed": "FFD99A1E"
+      "border.mixed": "FFD99A1E",
+      "display.lit": "FF2B2A26",
+      "display.unlit": "242B2A26",
+      "display.screen": "FFE9E6DC",
+      "display.backlight": "FFECE9E0"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

@@ -28,6 +28,7 @@ function material(kind, strength = 100, shine = 100, grain = 100) {
  *             index printed where the tick would be: a dial's 0…10) | 'engraved' (a dark line over
  *             a light one, cut into the plate)
  *     stops — 'all' | 'ends' | 'endsCentre': which major stops draw
+ *     numerals — 'index' (0…10, whatever the range) | 'value' (what the stop is worth)
  * Writes into `parts` (tickMajor / tickMinor) and returns the Behavior patch.
  */
 function tickSettings(ticks, parts) {
@@ -40,6 +41,7 @@ function tickSettings(ticks, parts) {
     'Behavior.majorTickLength': ticks.length ?? 5,
   };
   if (ticks.stops) component['Behavior.tickStops'] = ticks.stops;
+  if (ticks.numerals) component['Behavior.tickNumerals'] = ticks.numerals;
   const major = { 'Layout.width': ticks.width ?? 1.5, 'Layout.height': ticks.length ?? 5 };
   if (ticks.kind && ticks.kind !== 'line') {
     major.kind = ticks.kind;
@@ -153,12 +155,17 @@ export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, co
 export function sliderFamily({
   cap = 'dot', capAlong = 20, capAcross = 20, capFill = '{control.cap}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
   track = 0, trackRadius = null,
-  // The boards drew a clean track with no ticks and no min/max; the value sits above the track.
+  // The boards drew a clean track with no ticks and no min/max, the title at the left end of
+  // the row above the track and the value at its right end; `labels: 'board'` says so.
   labels = 'board', ticks = false,
 } = {}) {
   const parts = {};
   const component = {};
-  if (labels === 'board') component['Behavior.showMinMaxLabels'] = false;
+  if (labels === 'board') {
+    component['Behavior.showMinMaxLabels'] = false;
+    component['Behavior.labelTitlePlacement'] = 'topLeft';
+    component['Behavior.labelReadoutPlacement'] = 'topRight';
+  }
   Object.assign(component, tickSettings(ticks, parts));
   const pointer = {
     'Layout.width': capAlong,
@@ -183,8 +190,8 @@ export function sliderFamily({
 }
 
 /**
- * A lamp on the toggle (sectionDefaults ContentLayout): 'led', 'jewel' or 'window', its size and
- * side, and its lit and unlit colours. Radio groups draw their own selection and are left alone.
+ * A lamp on the toggle (sectionDefaults ContentLayout): 'led', 'jewel', 'window' or 'bat' (a
+ * lever, up when on — the lamp colour is the lever's), its size and side, and its lit and unlit colours. Radio groups draw their own selection and are left alone.
  */
 export function lampFamily({ lamp = 'led', size = 9, side = 'left', gap = 8, colour = '{accent.hot}', offColour = '{control.track}', bezel = '{border.surface}', keepBody = true } = {}) {
   const component = {

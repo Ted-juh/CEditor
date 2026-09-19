@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0acd2c7a",
+  "fingerprint": "d4c49069",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -53,6 +53,10 @@
       "text.muted": "FF3E4247",
       "text.focus": "FF0F5C70",
       "text.inverse": "FFF4F6F8",
+      "display.lit": "FF7DE3FF",
+      "display.unlit": "247DE3FF",
+      "display.screen": "FF0A0C0E",
+      "display.backlight": "FF121A20",
       "border": "66303338",
       "border.surface": "AA3A3E43",
       "border.field": "66303338",
@@ -128,7 +132,9 @@
       "Slider": {
         "component": {
           "Behavior.showTicks": false,
-          "Behavior.showMinMaxLabels": false
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight"
         },
         "parts": {
           "pointerCurrent": {
@@ -159,9 +165,10 @@
           "Background.Effects.Material.kind": "blast",
           "Background.Effects.Material.strength": 90,
           "Background.Effects.Material.shine": 60,
-          "ContentLayout.lamp": "led",
-          "ContentLayout.lampSize": 8,
-          "ContentLayout.lampColour": "{accent.hot}",
+          "ContentLayout.lamp": "bat",
+          "ContentLayout.lampSize": 10,
+          "ContentLayout.lampColour": "{control.cap}",
+          "ContentLayout.lampOffColour": "{control.cap}",
           "States.Selected": {
             "_type": "State",
             "name": "Selected",

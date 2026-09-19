@@ -62,6 +62,10 @@ export const TOLEX_CONTROL_SET = {
     'text.muted': 'FFCDBF9E',
     'text.focus': 'FF8A1F18',
     'text.inverse': 'FF1C1A17',
+    'display.lit': 'FFF2D07A',
+    'display.unlit': '24F2D07A',
+    'display.screen': 'FF1A1208',
+    'display.backlight': 'FF2A1E10',
     'border': '88F1E6CC',
     'border.surface': 'AA1C1A17',
     'border.field': 'CCB8892E',
@@ -98,7 +102,7 @@ export const TOLEX_CONTROL_SET = {
     },
     // A cream fader cap with a black stripe, on a gold track with square ends.
     Slider: {
-      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false },
+      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
       parts: {
         pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 28, 'Background.Border.thickness': 1.5 },
         bodyTrackBase: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
@@ -175,6 +179,10 @@ export const MACHINED_CONTROL_SET = {
     'text.muted': 'FF3E4247',
     'text.focus': 'FF0F5C70',
     'text.inverse': 'FFF4F6F8',
+    'display.lit': 'FF7DE3FF',
+    'display.unlit': '247DE3FF',
+    'display.screen': 'FF0A0C0E',
+    'display.backlight': 'FF121A20',
     'border': '66303338',
     'border.surface': 'AA3A3E43',
     'border.field': '66303338',
@@ -234,7 +242,7 @@ export const MACHINED_CONTROL_SET = {
     },
     // A machined fader cap, bead-blasted like the knobs, in a dark slot.
     Slider: {
-      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false },
+      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
       parts: {
         pointerCurrent: {
           kind: 'bar', 'Layout.width': 14, 'Layout.height': 30, 'Background.Border.thickness': 1.5,
@@ -245,7 +253,7 @@ export const MACHINED_CONTROL_SET = {
         bodyTrackFill: { 'Layout.height': 5, 'Background.Corners.radius': 2 },
       },
     },
-    // The toggle has an LED set into the plate beside its legend.
+    // The toggle is a bat switch beside its legend, thrown up when on, as the board drew it.
     ToggleButton: {
       component: {
         'Background.Corners.radius': 4,
@@ -254,9 +262,10 @@ export const MACHINED_CONTROL_SET = {
         'Background.Effects.Material.kind': 'blast',
         'Background.Effects.Material.strength': 90,
         'Background.Effects.Material.shine': 60,
-        'ContentLayout.lamp': 'led',
-        'ContentLayout.lampSize': 8,
-        'ContentLayout.lampColour': '{accent.hot}',
+        'ContentLayout.lamp': 'bat',
+        'ContentLayout.lampSize': 10,
+        'ContentLayout.lampColour': '{control.cap}',
+        'ContentLayout.lampOffColour': '{control.cap}',
         'States.Selected': lampSelectedState(),
       },
     },

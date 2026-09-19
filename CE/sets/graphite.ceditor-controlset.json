@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "342f7b3e",
+  "fingerprint": "143b1b87",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -53,6 +53,10 @@
       "text.muted": "FFB8C7D8",
       "text.focus": "FFDAEEFF",
       "text.inverse": "FFFFFFFF",
+      "display.lit": "FF2BE86A",
+      "display.unlit": "242BE86A",
+      "display.screen": "FF06371C",
+      "display.backlight": "FF0E5A2E",
       "border": "664C4C4C",
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
@@ -97,6 +101,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

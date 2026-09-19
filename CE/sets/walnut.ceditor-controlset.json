@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c1ce9d08",
+  "fingerprint": "df444b9a",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -56,7 +56,11 @@
       "border": "662B1E17",
       "border.surface": "662B1E17",
       "border.field": "662B1E17",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FFF2D07A",
+      "display.unlit": "24F2D07A",
+      "display.screen": "FF161009",
+      "display.backlight": "FF322D27"
     },
     "lamp": {
       "azimuth": 225,
@@ -105,6 +109,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

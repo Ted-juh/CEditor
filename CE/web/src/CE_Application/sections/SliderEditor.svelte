@@ -46,6 +46,10 @@
     { value: 'top', label: 'top' },
     { value: 'center', label: 'center' },
     { value: 'bottom', label: 'bottom' },
+    { value: 'topLeft', label: 'top left' },
+    { value: 'topRight', label: 'top right' },
+    { value: 'bottomLeft', label: 'bottom left' },
+    { value: 'bottomRight', label: 'bottom right' },
   ];
 
   function set(path, value) {
@@ -365,14 +369,21 @@
         <NumberCell label="Y" value={behavior.labelMinMaxOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
       </PropertyCell>
     {:else if labelPositionTarget === 'readout'}
-      <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout.">
+      <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout. A corner hangs it from the track's end: top left and top right make the row above the track.">
         <select class="val" value={behavior.labelReadoutPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelReadoutPlacement', event.target.value)}>
           {#each READOUT_POSITION_OPTIONS as option (option.value)}
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for top or bottom readout placement.">
+      <PropertyCell label="Title Pos" span={1} hint="Position for the title (the control's text). It shares the readout's gap: title top left with the readout top right is one row above the track.">
+        <select class="val" value={behavior.labelTitlePlacement ?? 'auto'} onchange={(event) => set('Behavior.labelTitlePlacement', event.target.value)}>
+          {#each READOUT_POSITION_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for a top or bottom readout or title placement.">
         <NumberCell label="Gap" value={behavior.labelReadoutGap ?? 14} defaultValue={14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
       </PropertyCell>
       <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for the generated value readout.">
@@ -408,6 +419,14 @@
         <option value="engraved">engraved</option>
       </select>
     </PropertyCell>
+    {#if (parts?._children?.tickMajor?.kind ?? 'line') === 'numeral'}
+      <PropertyCell label="Numerals" span={2} hint="What a numeral prints: the stop's index (0…10 whatever the range) or the value at the stop.">
+        <select class="val" value={behavior.tickNumerals ?? 'index'} onchange={(event) => set('Behavior.tickNumerals', event.target.value)}>
+          <option value="index">index</option>
+          <option value="value">value</option>
+        </select>
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Tick Stops" span={2} hint="Which major stops draw: every one, only the two ends, or the ends and the centre.">
       <select class="val" value={behavior.tickStops ?? 'all'} onchange={(event) => set('Behavior.tickStops', event.target.value)}>
         <option value="all">all</option>

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "139cbe48",
+  "fingerprint": "3373f57d",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -56,7 +56,11 @@
       "border": "660D1014",
       "border.surface": "AA0B0D10",
       "border.field": "660D1014",
-      "border.mixed": "FFC98A2A"
+      "border.mixed": "FFC98A2A",
+      "display.lit": "FF5FE3FF",
+      "display.unlit": "245FE3FF",
+      "display.screen": "FF03040A",
+      "display.backlight": "FF212227"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

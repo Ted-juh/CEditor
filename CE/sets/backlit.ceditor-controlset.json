@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "512a67ed",
+  "fingerprint": "c45bc3b4",
   "set": {
     "id": "backlit",
     "name": "Backlit",
@@ -56,7 +56,11 @@
       "border": "66000000",
       "border.surface": "66000000",
       "border.field": "66000000",
-      "border.mixed": "FFFFB86C"
+      "border.mixed": "FFFFB86C",
+      "display.lit": "FF4DD9FF",
+      "display.unlit": "244DD9FF",
+      "display.screen": "FF050608",
+      "display.backlight": "FF232426"
     },
     "lamp": {
       "azimuth": 225,
@@ -98,6 +102,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

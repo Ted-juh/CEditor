@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c1c7f7c8",
+  "fingerprint": "c4a5ecd9",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -56,7 +56,11 @@
       "border": "661B1B1B",
       "border.surface": "661B1B1B",
       "border.field": "661B1B1B",
-      "border.mixed": "FFFFB020"
+      "border.mixed": "FFFFB020",
+      "display.lit": "FFF6D96B",
+      "display.unlit": "24F6D96B",
+      "display.screen": "FF1B1B1B",
+      "display.backlight": "FF363636"
     },
     "lamp": {
       "azimuth": 225,
@@ -97,6 +101,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

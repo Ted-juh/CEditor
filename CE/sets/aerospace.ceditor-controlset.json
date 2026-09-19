@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "352404f6",
+  "fingerprint": "ab3f4e8d",
   "set": {
     "id": "aerospace",
     "name": "Aerospace",
@@ -56,7 +56,11 @@
       "border": "6623262A",
       "border.surface": "AA1D2023",
       "border.field": "6623262A",
-      "border.mixed": "FFFFB020"
+      "border.mixed": "FFFFB020",
+      "display.lit": "FF5FE3FF",
+      "display.unlit": "245FE3FF",
+      "display.screen": "FF03040A",
+      "display.backlight": "FF212227"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {
@@ -171,12 +177,12 @@
           "Background.Effects.Material.strength": 70,
           "Background.Effects.Material.shine": 40,
           "Background.Effects.Material.grain": 100,
-          "ContentLayout.lamp": "led",
-          "ContentLayout.lampSize": 8,
+          "ContentLayout.lamp": "bat",
+          "ContentLayout.lampSize": 10,
           "ContentLayout.lampSide": "left",
           "ContentLayout.lampGap": 8,
-          "ContentLayout.lampColour": "{accent.hot}",
-          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampColour": "{control.cap}",
+          "ContentLayout.lampOffColour": "{control.cap}",
           "ContentLayout.lampBezelColour": "{border.surface}",
           "States.Selected": {
             "_type": "State",

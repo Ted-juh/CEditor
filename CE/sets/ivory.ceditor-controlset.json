@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7781927d",
+  "fingerprint": "60d7a9fd",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -53,6 +53,10 @@
       "text.muted": "FF6B665C",
       "text.focus": "FF0F3D5E",
       "text.inverse": "FFFFFFFF",
+      "display.lit": "FF8FE3B0",
+      "display.unlit": "248FE3B0",
+      "display.screen": "FF1D2A22",
+      "display.backlight": "FF2A3B30",
       "border": "66807A6E",
       "border.surface": "66403A30",
       "border.field": "66807A6E",
@@ -105,6 +109,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

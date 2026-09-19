@@ -471,6 +471,45 @@ test('ticks: a set can switch them off, count them, shape them and choose which 
   assert.equal(getControlSet('phosphor').families.Knob.parts.tickMajor.kind, 'dot');
 });
 
+test('the still-short four: numerals by value, the row above the track, the bat switch, the glass', () => {
+  // 1. A numeral tick can print the value at the stop, not the stop's index.
+  const dial = knobFamily({ cap: 90, ticks: { count: 11, kind: 'numeral', numerals: 'value' } }).Knob;
+  assert.equal(dial.component['Behavior.tickNumerals'], 'value');
+  assert.equal(SECTION_DEFAULTS.Behavior.tickNumerals, 'index', 'every existing numeral prints what it printed');
+  assert.equal(getControlSet('reel').families.Knob.component['Behavior.tickNumerals'], 'value', 'the Reel dial is worth what it says');
+
+  // 2. A slider's board labels: the title at the left end of the row above the track, the value
+  //    at the right end — not both centred on top of each other.
+  const board = sliderFamily({ cap: 'bar' }).Slider.component;
+  assert.equal(board['Behavior.labelTitlePlacement'], 'topLeft');
+  assert.equal(board['Behavior.labelReadoutPlacement'], 'topRight');
+  assert.equal(SECTION_DEFAULTS.Behavior.labelTitlePlacement, 'auto');
+  const styledSlider = resolveControlForSet(createControl('Slider'), getControlSet('graphite'));
+  assert.equal(readControlPath(styledSlider, 'Behavior.labelTitlePlacement'), 'topLeft', 'the default set draws its board');
+
+  // 3. A bat switch is a lamp kind: the lever takes the lamp colour, and the pilot's Machined
+  //    toggle is one, as its board drew.
+  const bat = lampFamily({ lamp: 'bat', size: 10, colour: '{control.cap}', offColour: '{control.cap}' }).ToggleButton.component;
+  assert.equal(bat['ContentLayout.lamp'], 'bat');
+  assert.equal(readControlPath(resolveControlForSet(createControl('ToggleButton'), machined), 'ContentLayout.lamp'), 'bat');
+  for (const id of ['reel', 'ladder', 'aerospace', 'field']) {
+    assert.equal(getControlSet(id).families.ToggleButton.component['ContentLayout.lamp'], 'bat', `${id}'s board had bat switches`);
+  }
+  assert.equal(getControlSet('valve').families.ToggleButton.component['ContentLayout.lamp'], 'jewel');
+
+  // 4. Displays follow the set: the Display defaults are tokens, every set defines them, and the
+  //    base set resolves to exactly the green STN the literals used to be.
+  for (const role of ['display.lit', 'display.unlit', 'display.screen', 'display.backlight']) {
+    assert.ok(CONTROL_SET_TOKEN_NAMES.includes(role), role);
+  }
+  assert.equal(SECTION_DEFAULTS.Display.litColour, '{display.lit}');
+  assert.equal(resolveToken('display.lit', getControlSet('graphite')), 'FF2BE86A');
+  assert.equal(resolveToken('display.screen', getControlSet('graphite')), 'FF06371C');
+  assert.equal(resolveToken('display.lit', machined), 'FF7DE3FF', 'Machined\'s OLED is ice blue');
+  assert.equal(resolveToken('display.screen', getControlSet('reel')), 'FFF3E9C8', 'Reel\'s readout is a cream meter face');
+  assert.notEqual(resolveToken('display.lit', getControlSet('valve')), resolveToken('display.lit', getControlSet('graphite')));
+});
+
 test('the panel follows the set\'s colour only while it wears the default one', () => {
   const fresh = { ...createPanel(), controlSet: { id: 'tolex' } };
   assert.match(buildSolidStyle(fresh), /#1C1A17/);

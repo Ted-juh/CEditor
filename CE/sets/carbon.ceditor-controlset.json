@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0890d00b",
+  "fingerprint": "0a63123c",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -56,7 +56,11 @@
       "border": "660F1012",
       "border.surface": "660F1012",
       "border.field": "660F1012",
-      "border.mixed": "FFFFC26B"
+      "border.mixed": "FFFFC26B",
+      "display.lit": "FFFF7A1A",
+      "display.unlit": "24FF7A1A",
+      "display.screen": "FF0A0A0B",
+      "display.backlight": "FF272728"
     },
     "lamp": {
       "azimuth": 225,
@@ -109,6 +113,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

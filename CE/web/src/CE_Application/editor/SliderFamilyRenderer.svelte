@@ -165,9 +165,13 @@
     const effects = text?._children?.Effects ?? null;
     const shadow = buildLabelShadow(effects, fill?.colour ?? 'FFFFFFFF');
     const filter = buildLabelFilter(effects);
+    // A corner-placed label (utils/sliderGeometry.js placedLabel) hangs from its start or end
+    // rather than its centre; the stylesheet's translate is the centred default.
+    const align = anchor?.align === 'start' ? 'translate(0, -50%)' : (anchor?.align === 'end' ? 'translate(-100%, -50%)' : '');
     return [
       `left:${numberOr(anchor?.x, 0)}px`,
       `top:${numberOr(anchor?.y, 0)}px`,
+      align ? `transform:${align}` : '',
       `color:${argbToCss(fill?.colour, '#FFFFFF')}`,
       `font-family:${JSON.stringify(font?.family ?? 'Arial')}`,
       `font-size:${numberOr(font?.size, 11)}px`,
@@ -366,6 +370,16 @@
   }
   let majorTickKind = $derived(tickKindOf(tickMajorPart));
   let minorTickKind = $derived(tickKindOf(tickMinorPart));
+  // What a numeral tick prints: the stop's index, or the value at the stop in the readout's
+  // format with its trailing zeros dropped — a dial reads 0 · 0.5 · 1, not 0.00 · 0.50 · 1.00;
+  // the precision is the readout's, and a scale is not a readout.
+  function tickNumeral(stop) {
+    if (String(behavior?.tickNumerals ?? 'index') !== 'value') return String(stop.index ?? 0);
+    const min = numberOr(behavior?.min, 0);
+    const max = numberOr(behavior?.max, 1);
+    const text = formatSliderNumericValue(behavior, min + (max - min) * numberOr(stop.normalized, 0));
+    return text.replace(/(\.\d*?[1-9])0+(?!\d)|\.0+(?!\d)/g, '$1');
+  }
   let majorStopsShown = $derived.by(() => {
     const mode = String(behavior?.tickStops ?? 'all').trim();
     const list = tickStops.major.map((stop, index) => ({ ...stop, index }));
@@ -575,12 +589,12 @@
 
 <div class="slider-family-renderer">
   <svg class="slider-svg" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
-    {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, index)}
+    {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
       {#if kind === 'dot'}
         <circle cx={(line.x1 + line.x2) / 2} cy={(line.y1 + line.y2) / 2} r={Math.max(1.5, length * 0.45)} fill={colour} opacity={opacity} />
       {:else if kind === 'numeral'}
         <text x={line.x2 + (line.x2 - line.x1) * 0.6} y={line.y2 + (line.y2 - line.y1) * 0.6} text-anchor="middle" dominant-baseline="central"
-          font-size={Math.max(6, length * 1.4)} font-weight="700" fill={colour} opacity={opacity}>{index}</text>
+          font-size={Math.max(6, length * 1.4)} font-weight="700" fill={colour} opacity={opacity}>{label}</text>
       {:else if kind === 'engraved'}
         <line x1={line.x1 + 0.6} y1={line.y1 + 0.8} x2={line.x2 + 0.6} y2={line.y2 + 0.8} stroke="#FFFFFF" stroke-width={strokeWidth} stroke-linecap="round" opacity={opacity * 0.35} />
         <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={colour} stroke-width={strokeWidth} stroke-linecap="round" opacity={opacity} />
@@ -668,12 +682,12 @@
         {#each minorStopsShown as stop (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), stop.index ?? 0)}
+          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
         {/each}
         {#each majorStopsShown as stop (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), stop.index ?? 0)}
+          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
         {/each}
       {/if}
 
@@ -882,12 +896,12 @@
         {#each minorStopsShown as stop (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), stop.index ?? 0)}
+          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
         {/each}
         {#each majorStopsShown as stop (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), stop.index ?? 0)}
+          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
         {/each}
       {/if}
 

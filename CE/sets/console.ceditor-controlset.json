@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8e33ba2b",
+  "fingerprint": "4a3c1076",
   "set": {
     "id": "console",
     "name": "Console",
@@ -56,7 +56,11 @@
       "border": "661E1F22",
       "border.surface": "661E1F22",
       "border.field": "661E1F22",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FF9BE870",
+      "display.unlit": "249BE870",
+      "display.screen": "FF141A12",
+      "display.backlight": "FF30352E"
     },
     "lamp": {
       "azimuth": 225,
@@ -112,6 +116,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

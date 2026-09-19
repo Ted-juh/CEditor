@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "886f8adf",
+  "fingerprint": "5d6e304f",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -56,7 +56,11 @@
       "border": "662F3B49",
       "border.surface": "662F3B49",
       "border.field": "662F3B49",
-      "border.mixed": "FFFFB86C"
+      "border.mixed": "FFFFB86C",
+      "display.lit": "FF6EF2E8",
+      "display.unlit": "246EF2E8",
+      "display.screen": "FF080A0E",
+      "display.backlight": "FF26272B"
     },
     "lamp": {
       "azimuth": 225,
@@ -103,6 +107,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

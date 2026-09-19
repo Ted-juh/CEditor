@@ -1821,14 +1821,19 @@
   let textPosition = $derived(text?._children?.Position ?? null);
   let contentLayoutMode = $derived(String(contentLayout?.mode ?? 'text_only'));
   // The lamp beside the legend (sectionDefaults ContentLayout `lamp`): an LED, a jewel or a lit
-  // window, lit while the runtime says the control is checked. It takes its room from the
-  // padding on its side, so the text and icon move over rather than sit on it.
+  // window, lit while the runtime says the control is checked, or a bat switch — a lever in a
+  // round bezel, thrown up when checked and down when not, the amp and tape-deck toggle. It
+  // takes its room from the padding on its side, so the text and icon move over rather than
+  // sit on it.
   let lampKind = $derived(String(contentLayout?.lamp ?? 'none').toLowerCase());
-  let hasLamp = $derived(['led', 'jewel', 'window'].includes(lampKind) && !isRadioGroupControl);
+  let hasLamp = $derived(['led', 'jewel', 'window', 'bat'].includes(lampKind) && !isRadioGroupControl);
   let lampSize = $derived(Math.max(3, numberOr(contentLayout?.lampSize, 9)));
   let lampGap = $derived(Math.max(0, numberOr(contentLayout?.lampGap, 8)));
   let lampOnRight = $derived(String(contentLayout?.lampSide ?? 'left') === 'right');
   let lampWidth = $derived(lampKind === 'window' ? lampSize * 2 : lampSize);
+  // The lever's throw: the bezel is `lampSize` across and the lever reaches a bezel above or
+  // below it, so a bat is as tall as three bezels.
+  let lampHeight = $derived(lampKind === 'bat' ? lampSize * 3 : lampSize);
   let lampLit = $derived(interactionRuntime?.signals?.checked === true || interactionRuntime?.signals?.selectionActive === true);
   function lampCss(value, fallback) {
     const raw = String(value ?? '').replace(/^#/, '').trim();
@@ -1843,7 +1848,11 @@
     const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
     const inset = numberOr(contentLayout?.[lampOnRight ? 'paddingRight' : 'paddingLeft'], 8);
     const left = lampOnRight ? displayW - inset - lampWidth : inset;
-    const top = (displayH - lampSize) / 2;
+    const top = (displayH - lampHeight) / 2;
+    if (lampKind === 'bat') {
+      // The lever is inline SVG (below); the box only places it.
+      return [`left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampHeight}px`].join('; ');
+    }
     const colour = lampLit ? lit : off;
     const face = lampKind === 'jewel'
       ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,${lampLit ? 0.75 : 0.35}) 0%, rgba(255,255,255,0) 45%), ${colour}`
@@ -1854,6 +1863,14 @@
       `background:${face}`, `border:1px solid ${bezel}`, `box-shadow:${glow}`,
       `border-radius:${lampKind === 'window' ? '2px' : '50%'}`,
     ].join('; ');
+  });
+  // The bat's inks: the bezel is the set's bezel colour, the lever the lamp colour when thrown up
+  // and the off colour when down, and the ball on its end a lighter tone of the lever.
+  let batInks = $derived.by(() => {
+    if (lampKind !== 'bat') return null;
+    const lever = lampCss(lampLit ? contentLayout?.lampColour : contentLayout?.lampOffColour, lampLit ? '#5B9BD5' : '#2C2C2C');
+    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
+    return { lever, bezel };
   });
   let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4) + (hasLamp && !lampOnRight ? lampWidth + lampGap : 0));
   let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4) + (hasLamp && lampOnRight ? lampWidth + lampGap : 0));
@@ -3591,7 +3608,27 @@
     {/if}
 
     {#if hasLamp}
-      <div class="lamp-indicator" class:lit={lampLit} style={lampStyle} aria-hidden="true"></div>
+      <div class="lamp-indicator" class:lit={lampLit} style={lampStyle} aria-hidden="true">
+        {#if batInks}
+          <!-- A bat switch in a 10×30 box: the bezel ring at the centre, the lever from the
+               pivot to the top when checked and to the bottom when not, a ball on its end. -->
+          <svg class="lamp-bat" viewBox="0 0 10 30" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <defs>
+              <radialGradient id="bat-ball-{svgIdSeed}" cx="35%" cy="30%" r="70%">
+                <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85" />
+                <stop offset="0.45" stop-color={batInks.lever} stop-opacity="0.15" />
+                <stop offset="1" stop-color="#000000" stop-opacity="0.35" />
+              </radialGradient>
+            </defs>
+            <circle cx="5" cy="15" r="4.6" fill={batInks.bezel} stroke="rgba(0,0,0,0.45)" stroke-width="0.6" />
+            <circle cx="5" cy="15" r="1.8" fill="rgba(0,0,0,0.55)" />
+            <line x1="5" y1="15" x2="5" y2={lampLit ? 4.5 : 25.5} stroke="rgba(0,0,0,0.5)" stroke-width="3.4" stroke-linecap="round" transform="translate(0.6 0.8)" />
+            <line x1="5" y1="15" x2="5" y2={lampLit ? 4.5 : 25.5} stroke={batInks.lever} stroke-width="2.8" stroke-linecap="round" />
+            <circle cx="5" cy={lampLit ? 4 : 26} r="3.4" fill={batInks.lever} stroke="rgba(0,0,0,0.45)" stroke-width="0.5" />
+            <circle cx="5" cy={lampLit ? 4 : 26} r="3.4" fill="url(#bat-ball-{svgIdSeed})" />
+          </svg>
+        {/if}
+      </div>
     {/if}
 
     {#if hasIcon}
@@ -4515,6 +4552,11 @@
     pointer-events: none;
     z-index: 1;
     transition: background 120ms ease-out, box-shadow 120ms ease-out;
+  }
+
+  .lamp-bat {
+    display: block;
+    overflow: visible;
   }
 
   .icon-image {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6ba22add",
+  "fingerprint": "1dac3726",
   "set": {
     "id": "valve",
     "name": "Valve",
@@ -56,7 +56,11 @@
       "border": "6615100D",
       "border.surface": "6615100D",
       "border.field": "6615100D",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FFFF8A2A",
+      "display.unlit": "24FF8A2A",
+      "display.screen": "FF120B06",
+      "display.backlight": "FF2E2824"
     },
     "lamp": {
       "azimuth": 225,
@@ -112,6 +116,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

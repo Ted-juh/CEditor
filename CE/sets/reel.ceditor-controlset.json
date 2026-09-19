@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "28fe7006",
+  "fingerprint": "77b9dde5",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -56,7 +56,11 @@
       "border": "66141814",
       "border.surface": "66141814",
       "border.field": "66141814",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FF1E1B18",
+      "display.unlit": "241E1B18",
+      "display.screen": "FFF3E9C8",
+      "display.backlight": "FFF4ECCF"
     },
     "lamp": {
       "azimuth": 225,
@@ -70,7 +74,8 @@
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 6
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickNumerals": "value"
         },
         "parts": {
           "tickMinor": {
@@ -111,6 +116,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {
@@ -163,12 +170,12 @@
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 40,
           "Background.Effects.Material.grain": 100,
-          "ContentLayout.lamp": "led",
-          "ContentLayout.lampSize": 8,
+          "ContentLayout.lamp": "bat",
+          "ContentLayout.lampSize": 10,
           "ContentLayout.lampSide": "left",
           "ContentLayout.lampGap": 8,
-          "ContentLayout.lampColour": "{accent.hot}",
-          "ContentLayout.lampOffColour": "{control.track}",
+          "ContentLayout.lampColour": "{control.cap}",
+          "ContentLayout.lampOffColour": "{control.cap}",
           "ContentLayout.lampBezelColour": "{border.surface}",
           "States.Selected": {
             "_type": "State",

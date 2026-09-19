@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "180a8f51",
+  "fingerprint": "343a96aa",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -56,7 +56,11 @@
       "border": "66826C37",
       "border.surface": "AA6C5A2E",
       "border.field": "66826C37",
-      "border.mixed": "FFFF2E1F"
+      "border.mixed": "FFFF2E1F",
+      "display.lit": "FFF2D07A",
+      "display.unlit": "24F2D07A",
+      "display.screen": "FF1A1208",
+      "display.backlight": "FF352E26"
     },
     "lamp": {
       "azimuth": 225,
@@ -114,6 +118,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

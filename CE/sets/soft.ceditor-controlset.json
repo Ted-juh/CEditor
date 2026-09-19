@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e1a603ec",
+  "fingerprint": "54d52020",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -56,7 +56,11 @@
       "border": "66DFE2E8",
       "border.surface": "66DFE2E8",
       "border.field": "66DFE2E8",
-      "border.mixed": "FFE39A2E"
+      "border.mixed": "FFE39A2E",
+      "display.lit": "FFA9A9F0",
+      "display.unlit": "24A9A9F0",
+      "display.screen": "FF262A33",
+      "display.backlight": "FF40444B"
     },
     "lamp": {
       "azimuth": 225,
@@ -98,6 +102,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

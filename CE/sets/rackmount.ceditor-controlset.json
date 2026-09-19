@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b174fa7d",
+  "fingerprint": "dc105dfd",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -56,7 +56,11 @@
       "border": "660A0A0B",
       "border.surface": "660A0A0B",
       "border.field": "660A0A0B",
-      "border.mixed": "FFE0A43A"
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FF1B1B1D",
+      "display.unlit": "241B1B1D",
+      "display.screen": "FFF3E9C8",
+      "display.backlight": "FFF4ECCF"
     },
     "lamp": {
       "azimuth": 225,
@@ -107,6 +111,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

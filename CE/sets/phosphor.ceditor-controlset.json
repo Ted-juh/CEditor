@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1b195119",
+  "fingerprint": "9e66a818",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -56,7 +56,11 @@
       "border": "662C312C",
       "border.surface": "662C312C",
       "border.field": "662C312C",
-      "border.mixed": "FFFFB020"
+      "border.mixed": "FFFFB020",
+      "display.lit": "FF39FF7A",
+      "display.unlit": "2439FF7A",
+      "display.screen": "FF050705",
+      "display.backlight": "FF232523"
     },
     "lamp": {
       "azimuth": 225,
@@ -108,6 +112,8 @@
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

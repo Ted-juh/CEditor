@@ -12,7 +12,7 @@
 
   let { control = null } = $props();
 
-  const LAMP_OPTIONS = ['none', 'led', 'jewel', 'window'];
+  const LAMP_OPTIONS = ['none', 'led', 'jewel', 'window', 'bat'];
 
   const MODE_OPTIONS = [
     'text_only',
@@ -110,7 +110,7 @@
   <!-- A lamp beside the legend, lit while the control is checked. What a toggle IS on an amp
        or a desk; a control set usually chooses it, and this is where an author overrides it. -->
   <PropertySection title="Lamp" icon={Lightbulb}>
-    <PropertyCell label="Lamp" span={2} hint="An LED, a jewel lens or a lit window beside the legend, lit while the control is checked.">
+    <PropertyCell label="Lamp" span={2} hint="An LED, a jewel lens or a lit window beside the legend, lit while the control is checked — or a bat switch, a lever thrown up while checked.">
       <select class="val" value={layout.lamp ?? 'none'} onchange={(event) => set('lamp', event.target.value)}>
         {#each LAMP_OPTIONS as option}
           <option value={option}>{option}</option>
@@ -123,7 +123,7 @@
         <option value="right">right</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="Size" span={1} compact hint="The lamp's diameter in px (a window is twice as wide).">
+    <PropertyCell label="Size" span={1} compact hint="The lamp's diameter in px (a window is twice as wide, a bat three times as tall).">
       <NumberCell label="Size" value={layout.lampSize ?? 9} step={1} min={3} max={40} defaultValue={9} onchange={(value) => set('lampSize', value)} />
     </PropertyCell>
     <PropertyCell label="Gap" span={1} compact hint="Space between the lamp and the legend.">
