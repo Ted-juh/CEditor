@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d2439dc2",
+  "fingerprint": "6481ffab",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -138,22 +138,58 @@
         },
         "parts": {
           "pointerCurrent": {
-            "kind": "bar",
-            "Layout.width": 14,
-            "Layout.height": 30,
-            "Background.Border.thickness": 1.5,
+            "kind": "block",
+            "Layout.width": 22,
+            "Layout.height": 44,
+            "Background.Border.thickness": 1,
             "Background.Effects.Material.enabled": true,
             "Background.Effects.Material.kind": "blast",
             "Background.Effects.Material.strength": 90,
-            "Background.Effects.Material.shine": 60
+            "Background.Effects.Material.shine": 60,
+            "grooveColour": "{control.marker}",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true
+          },
+          "pointerStart": {
+            "kind": "block",
+            "Layout.width": 22,
+            "Layout.height": 44,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 90,
+            "Background.Effects.Material.shine": 60,
+            "grooveColour": "{control.marker}",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.start}"
+          },
+          "pointerEnd": {
+            "kind": "block",
+            "Layout.width": 22,
+            "Layout.height": 44,
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 90,
+            "Background.Effects.Material.shine": 60,
+            "grooveColour": "{control.marker}",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.end}"
           },
           "bodyTrackBase": {
-            "Layout.height": 5,
-            "Background.Corners.radius": 2
+            "Layout.height": 10,
+            "Background.Corners.radius": 2,
+            "slot": true
           },
           "bodyTrackFill": {
-            "Layout.height": 5,
-            "Background.Corners.radius": 2
+            "Layout.height": 10,
+            "Background.Corners.radius": 2,
+            "inset": 3
           }
         }
       },

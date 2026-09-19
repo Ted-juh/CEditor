@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "acc744b6",
+  "fingerprint": "0ec0a58f",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -122,7 +122,29 @@
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
+          },
+          "pointerStart": {
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
+          },
+          "pointerEnd": {
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
           },
           "bodyTrackBase": {
             "Layout.height": 6,

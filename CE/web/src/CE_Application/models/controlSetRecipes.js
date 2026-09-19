@@ -147,14 +147,23 @@ export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, co
 
 /**
  * A linear slider family: the cap that rides the track and the track itself.
- *   cap        — 'dot' (the original circle) | 'bar' | 'console' (a bar with a groove) | 'ring' | 'line'
+ *   cap        — 'dot' (the original circle) | 'bar' (a fader cap with a groove) | 'console' (the
+ *                bar with a sheen) | 'block' (a billet with a top plate) | 'lens' (a lit dome) |
+ *                'glass' (a dot in a halo) | 'ring' | 'line'
  *   capAlong / capAcross — the cap's size in px along the travel and across the track
  *   capMaterial — [kind, strength, shine, grain]
  *   track / trackRadius — the track's thickness and corner radius (999 is a pill)
  */
 export function sliderFamily({
   cap = 'dot', capAlong = 20, capAcross = 20, capFill = '{control.cap}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
-  track = 0, trackRadius = null,
+  // The cap's drawing beyond its shape (editor/SliderFamilyRenderer.svelte linearCap): the
+  // groove's ink (bar, console, block — and a lens's light), a block's top plate, the cylinder
+  // sheen, a drop shadow on the panel, a halo in the cap's own colour.
+  groove = null, plate = null, sheen = null, shadow = false, glow = false,
+  // The track: its thickness, a corner radius below a pill's for a square-ended track, a slot
+  // (an inner shadow along its upper edge), the fill inset from the slot's edge in px each
+  // side, and a glow under the fill for a lit board.
+  track = 0, trackRadius = null, slot = false, fillInset = 0, fillGlow = false,
   // The boards drew a clean track with no ticks and no min/max, the title at the left end of
   // the row above the track and the value at its right end; `labels: 'board'` says so.
   labels = 'board', ticks = false,
@@ -176,13 +185,25 @@ export function sliderFamily({
     ...material(...(capMaterial ?? [null])),
   };
   if (cap !== 'dot') pointer.kind = cap;
+  if (groove) pointer.grooveColour = groove;
+  if (plate) pointer.plateColour = plate;
+  if (sheen != null) pointer.sheen = sheen === true;
+  if (shadow) pointer.shadow = true;
+  if (glow) pointer.glow = true;
+  // The three handles are the same cap in their own colours: a range slider's ends are the
+  // board's cap twice, not two circles beside a fader cap.
   parts.pointerCurrent = pointer;
-  if (track > 0 || trackRadius != null) {
+  parts.pointerStart = { ...pointer, 'Background.Fill.colour': '{control.cap.start}' };
+  parts.pointerEnd = { ...pointer, 'Background.Fill.colour': '{control.cap.end}' };
+  if (track > 0 || trackRadius != null || slot || fillInset > 0 || fillGlow) {
     const patch = {};
     if (track > 0) patch['Layout.height'] = track;
     if (trackRadius != null) patch['Background.Corners.radius'] = trackRadius;
     parts.bodyTrackBase = { ...patch };
     parts.bodyTrackFill = { ...patch };
+    if (slot) parts.bodyTrackBase.slot = true;
+    if (fillInset > 0) parts.bodyTrackFill.inset = fillInset;
+    if (fillGlow) parts.bodyTrackFill.glow = true;
   }
   const out = { parts };
   if (Object.keys(component).length) out.component = component;

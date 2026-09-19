@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "258fdc20",
+  "fingerprint": "78a5957c",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -124,8 +124,8 @@
         },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 12,
-            "Layout.height": 28,
+            "Layout.width": 20,
+            "Layout.height": 40,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -134,15 +134,55 @@
             "Background.Effects.Material.strength": 50,
             "Background.Effects.Material.shine": 20,
             "Background.Effects.Material.grain": 100,
-            "kind": "bar"
+            "kind": "block",
+            "grooveColour": "{control.marker}",
+            "plateColour": "FFF7F4EE",
+            "sheen": true,
+            "shadow": true
+          },
+          "pointerStart": {
+            "Layout.width": 20,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 20,
+            "Background.Effects.Material.grain": 100,
+            "kind": "block",
+            "grooveColour": "{control.marker}",
+            "plateColour": "FFF7F4EE",
+            "sheen": true,
+            "shadow": true
+          },
+          "pointerEnd": {
+            "Layout.width": 20,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 50,
+            "Background.Effects.Material.shine": 20,
+            "Background.Effects.Material.grain": 100,
+            "kind": "block",
+            "grooveColour": "{control.marker}",
+            "plateColour": "FFF7F4EE",
+            "sheen": true,
+            "shadow": true
           },
           "bodyTrackBase": {
-            "Layout.height": 6,
-            "Background.Corners.radius": 2
+            "Layout.height": 10,
+            "Background.Corners.radius": 2,
+            "slot": true
           },
           "bodyTrackFill": {
-            "Layout.height": 6,
-            "Background.Corners.radius": 2
+            "Layout.height": 10,
+            "Background.Corners.radius": 2,
+            "inset": 3
           }
         }
       },

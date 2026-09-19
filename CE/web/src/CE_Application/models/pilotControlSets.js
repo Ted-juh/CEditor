@@ -104,7 +104,10 @@ export const TOLEX_CONTROL_SET = {
     Slider: {
       component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
       parts: {
-        pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 28, 'Background.Border.thickness': 1.5 },
+        // The board's cream fader cap with a dark groove, on a square-ended track.
+        pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true },
+        pointerStart: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true, 'Background.Fill.colour': '{control.cap.start}' },
+        pointerEnd: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true, 'Background.Fill.colour': '{control.cap.end}' },
         bodyTrackBase: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
         bodyTrackFill: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
       },
@@ -143,6 +146,13 @@ export const TOLEX_CONTROL_SET = {
  * Machined — billet aluminium, bead-blasted. Lathe-turned caps with a painted line, a dark slot
  * for the arc, buttons that sit proud of the plate, one cyan accent where something is live.
  */
+const MACHINED_CAP = {
+  kind: 'block', 'Layout.width': 22, 'Layout.height': 44, 'Background.Border.thickness': 1,
+  'Background.Effects.Material.enabled': true, 'Background.Effects.Material.kind': 'blast',
+  'Background.Effects.Material.strength': 90, 'Background.Effects.Material.shine': 60,
+  grooveColour: '{control.marker}', plateColour: '{control.cap.hot}', sheen: true, shadow: true,
+};
+
 export const MACHINED_CONTROL_SET = {
   id: 'machined',
   name: 'Machined',
@@ -250,13 +260,13 @@ export const MACHINED_CONTROL_SET = {
     Slider: {
       component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
       parts: {
-        pointerCurrent: {
-          kind: 'bar', 'Layout.width': 14, 'Layout.height': 30, 'Background.Border.thickness': 1.5,
-          'Background.Effects.Material.enabled': true, 'Background.Effects.Material.kind': 'blast',
-          'Background.Effects.Material.strength': 90, 'Background.Effects.Material.shine': 60,
-        },
-        bodyTrackBase: { 'Layout.height': 5, 'Background.Corners.radius': 2 },
-        bodyTrackFill: { 'Layout.height': 5, 'Background.Corners.radius': 2 },
+        // The billet fader: a blasted block with a brushed top plate and an engraved line,
+        // casting a shadow, riding a slot cut in the plate with a 4 px light inside it.
+        pointerCurrent: MACHINED_CAP,
+        pointerStart: { ...MACHINED_CAP, 'Background.Fill.colour': '{control.cap.start}' },
+        pointerEnd: { ...MACHINED_CAP, 'Background.Fill.colour': '{control.cap.end}' },
+        bodyTrackBase: { 'Layout.height': 10, 'Background.Corners.radius': 2, slot: true },
+        bodyTrackFill: { 'Layout.height': 10, 'Background.Corners.radius': 2, inset: 3 },
       },
     },
     // The toggle is a bat switch beside its legend, thrown up when on, as the board drew it.

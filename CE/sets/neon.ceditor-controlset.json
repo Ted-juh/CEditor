@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8d4bbcee",
+  "fingerprint": "52c9f603",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -117,18 +117,34 @@
             "Layout.height": 22,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "Background.Effects.Material.enabled": true,
-            "Background.Effects.Material.kind": "glass",
-            "Background.Effects.Material.strength": 50,
-            "Background.Effects.Material.shine": 140,
-            "Background.Effects.Material.grain": 100
+            "Background.Border.thickness": 0,
+            "kind": "glass",
+            "glow": true
+          },
+          "pointerStart": {
+            "Layout.width": 22,
+            "Layout.height": 22,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 0,
+            "kind": "glass",
+            "glow": true
+          },
+          "pointerEnd": {
+            "Layout.width": 22,
+            "Layout.height": 22,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 0,
+            "kind": "glass",
+            "glow": true
           },
           "bodyTrackBase": {
             "Layout.height": 6
           },
           "bodyTrackFill": {
-            "Layout.height": 6
+            "Layout.height": 6,
+            "glow": true
           }
         }
       },

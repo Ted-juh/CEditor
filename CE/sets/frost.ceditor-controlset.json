@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "1bc7e154",
+  "fingerprint": "c8999155",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -111,7 +111,21 @@
             "Layout.width": 20,
             "Layout.height": 20,
             "Background.Fill.colour": "D9FFFFFF",
-            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.colour": "{control.cap}",
+            "Background.Border.thickness": 2
+          },
+          "pointerStart": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap}",
+            "Background.Border.thickness": 2
+          },
+          "pointerEnd": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap}",
             "Background.Border.thickness": 2
           },
           "bodyTrackBase": {

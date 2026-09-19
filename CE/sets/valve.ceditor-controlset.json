@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "68b434eb",
+  "fingerprint": "f349cf33",
   "set": {
     "id": "valve",
     "name": "Valve",
@@ -125,6 +125,20 @@
             "Layout.width": 20,
             "Layout.height": 20,
             "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerStart": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerEnd": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.end}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1
           },

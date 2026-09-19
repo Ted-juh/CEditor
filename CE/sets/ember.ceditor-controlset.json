@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "df69a47a",
+  "fingerprint": "b1b7a6b6",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -119,7 +119,26 @@
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "bar",
+            "grooveColour": "FF3B2A1E"
+          },
+          "pointerStart": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF3B2A1E"
+          },
+          "pointerEnd": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF3B2A1E"
           },
           "bodyTrackBase": {
             "Layout.height": 8

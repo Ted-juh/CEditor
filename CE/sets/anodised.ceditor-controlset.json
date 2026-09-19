@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b87cb933",
+  "fingerprint": "8fdb77d6",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -126,7 +126,7 @@
           "pointerCurrent": {
             "Layout.width": 20,
             "Layout.height": 40,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
             "Background.Effects.Material.enabled": true,
@@ -134,10 +134,49 @@
             "Background.Effects.Material.strength": 80,
             "Background.Effects.Material.shine": 60,
             "Background.Effects.Material.grain": 100,
-            "kind": "bar"
+            "kind": "block",
+            "grooveColour": "FF1B1D20",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true
+          },
+          "pointerStart": {
+            "Layout.width": 20,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100,
+            "kind": "block",
+            "grooveColour": "FF1B1D20",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true
+          },
+          "pointerEnd": {
+            "Layout.width": 20,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "blast",
+            "Background.Effects.Material.strength": 80,
+            "Background.Effects.Material.shine": 60,
+            "Background.Effects.Material.grain": 100,
+            "kind": "block",
+            "grooveColour": "FF1B1D20",
+            "plateColour": "{control.cap.hot}",
+            "sheen": true,
+            "shadow": true
           },
           "bodyTrackBase": {
-            "Layout.height": 8
+            "Layout.height": 8,
+            "slot": true
           },
           "bodyTrackFill": {
             "Layout.height": 8

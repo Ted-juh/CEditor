@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "37c5b009",
+  "fingerprint": "de1f192b",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -121,10 +121,29 @@
           "pointerCurrent": {
             "Layout.width": 12,
             "Layout.height": 32,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "bar",
+            "grooveColour": "FFFF7A1A"
+          },
+          "pointerStart": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FFFF7A1A"
+          },
+          "pointerEnd": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FFFF7A1A"
           },
           "bodyTrackBase": {
             "Layout.height": 6,

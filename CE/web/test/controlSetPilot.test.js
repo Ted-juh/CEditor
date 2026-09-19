@@ -576,6 +576,66 @@ test('a set\'s type: the board\'s face on the labels, the legends and the fields
   assert.equal(readControlPath(resolveControlForSet(createControl('Slider'), { ...tolex, id: 'mute', type: undefined, families: undefined }), 'Parts.labelTitle.Text.Font.family'), 'Arial');
 });
 
+test('the boards\' faders: cap kinds with a groove, a plate, a sheen, a shadow, a glow; a slot with a light in it', () => {
+  const block = sliderFamily({ cap: 'block', capAlong: 22, capAcross: 44, groove: '{control.marker}', plate: '{control.cap.hot}', sheen: true, shadow: true, track: 10, trackRadius: 2, slot: true, fillInset: 3, fillGlow: true }).Slider.parts;
+  assert.equal(block.pointerCurrent.kind, 'block');
+  assert.equal(block.pointerCurrent.grooveColour, '{control.marker}');
+  assert.equal(block.pointerCurrent.plateColour, '{control.cap.hot}');
+  assert.equal(block.pointerCurrent.sheen, true);
+  assert.equal(block.pointerCurrent.shadow, true);
+  assert.equal(block.pointerCurrent.glow, undefined);
+  // A range slider's ends are the same cap in the start and end colours, not two circles.
+  assert.equal(block.pointerStart.kind, 'block');
+  assert.equal(block.pointerStart['Background.Fill.colour'], '{control.cap.start}');
+  assert.equal(block.pointerEnd['Background.Fill.colour'], '{control.cap.end}');
+  assert.equal(block.bodyTrackBase.slot, true);
+  assert.equal(block.bodyTrackBase['Background.Corners.radius'], 2);
+  assert.equal(block.bodyTrackFill.inset, 3);
+  assert.equal(block.bodyTrackFill.glow, true);
+  const lens = sliderFamily({ cap: 'lens', groove: '{accent}', glow: true }).Slider.parts;
+  assert.equal(lens.pointerCurrent.kind, 'lens');
+  assert.equal(lens.pointerCurrent.glow, true);
+  assert.equal(lens.pointerCurrent.shadow, undefined, 'a flag not asked for is not written');
+  assert.equal(sliderFamily({ cap: 'dot' }).Slider.parts.bodyTrackBase, undefined, 'a plain track says nothing about itself');
+
+  // Applied: the flags are plain part keys and land on the factory parts; the groove ink is a
+  // token and resolves like any other colour.
+  const styled = resolveControlForSet(createControl('Slider'), machined);
+  assert.equal(part(styled, 'pointerCurrent').kind, 'block');
+  assert.equal(part(styled, 'pointerCurrent').grooveColour, resolveToken('control.marker', machined));
+  assert.equal(part(styled, 'pointerCurrent').shadow, true);
+  assert.equal(part(styled, 'bodyTrackBase').slot, true);
+  assert.equal(part(styled, 'bodyTrackFill').inset, 3);
+  assert.equal(part(styled, 'pointerStart').kind, 'block');
+  // Nothing about a factory slider changed: no flags, no slot, no inset.
+  const factory = createControl('Slider');
+  assert.equal(part(factory, 'pointerCurrent').kind, undefined);
+  assert.equal(part(factory, 'bodyTrackBase').slot, undefined);
+  assert.equal(part(factory, 'bodyTrackFill').inset, undefined);
+
+  // The boards, kind by kind: a lens on Eurorack and Backlit, a block in a slot on Anodised and
+  // every lit board, a sheened console cap on Console, a bar with a groove on Ember, a dot in a
+  // halo on Neon with a lit fill, and the default set's plain dot.
+  const capOf = (id) => getControlSet(id).families.Slider.parts;
+  assert.equal(capOf('eurorack').pointerCurrent.kind, 'lens');
+  assert.equal(capOf('eurorack').bodyTrackBase.slot, true);
+  assert.equal(capOf('backlit').bodyTrackFill.glow, true);
+  assert.equal(capOf('anodised').pointerCurrent.kind, 'block');
+  for (const id of ['saddle', 'obsidian', 'laboratory', 'aerospace', 'ceramic', 'field', 'receiver']) {
+    assert.equal(capOf(id).bodyTrackBase.slot, true, `${id} rides a slot`);
+    assert.equal(capOf(id).bodyTrackFill.inset, 3, `${id} has the 4 px light in the 10 px slot`);
+  }
+  assert.equal(capOf('obsidian').pointerCurrent.kind, 'lens');
+  assert.equal(capOf('console').pointerCurrent.kind, 'console');
+  assert.equal(capOf('console').pointerCurrent.sheen, true);
+  assert.equal(capOf('ember').pointerCurrent.kind, 'bar');
+  assert.equal(capOf('ember').pointerCurrent.grooveColour, 'FF3B2A1E');
+  assert.equal(capOf('neon').pointerCurrent.kind, 'glass');
+  assert.equal(capOf('neon').bodyTrackFill.glow, true);
+  assert.equal(capOf('carbon').pointerCurrent['Background.Fill.colour'], '{control.body}', 'Carbon\'s board: a dark cap with the orange line');
+  assert.equal(capOf('graphite').pointerCurrent.kind, undefined);
+});
+
 test('the panel follows the set\'s colour only while it wears the default one', () => {
   const fresh = { ...createPanel(), controlSet: { id: 'tolex' } };
   assert.match(buildSolidStyle(fresh), /#1C1A17/);

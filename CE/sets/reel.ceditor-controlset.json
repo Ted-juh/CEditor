@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "77018fde",
+  "fingerprint": "34d287ac",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -127,7 +127,26 @@
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "bar",
+            "grooveColour": "FF1E1B18"
+          },
+          "pointerStart": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF1E1B18"
+          },
+          "pointerEnd": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF1E1B18"
           },
           "bodyTrackBase": {
             "Layout.height": 6,

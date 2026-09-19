@@ -499,3 +499,35 @@ the boards' type into the base tokens: Graphite's board is DM Sans, and since Gr
 default set, every factory label on every existing panel now renders in DM Sans rather than
 Arial — the same trade the knob geometry made, and for the same reason: the default set draws its
 board.
+
+## The faders, drawn
+
+The contact sheet said it plainly: thirty sets, one slider, in thirty colours. The caps had a
+kind since the pilot, but a kind was a rectangle or a circle and nothing more, every track was
+the same flat pill, and the boards' slots, halos, grooves, sheens and shadows had no way in.
+So the renderer learned the boards' fader, part by part (`linearCap` in
+`SliderFamilyRenderer.svelte`):
+
+- **Cap kinds**: `dot` (the original), `bar` (a fader cap with a groove), `console` (the bar
+  with a cylinder sheen — the long-throw desk fader), `block` (the bar with a sheen and an inset
+  top plate — the photographed billet), `lens` (a domed dot lit from inside, its light the
+  groove ink), `glass` (a dot in a halo), `ring`, `line`. All three handles take the kind: a
+  range slider's ends are the board's cap twice, in the start and end colours, not two circles
+  beside a fader cap.
+- **Cap flags** on the part: `grooveColour`, `plateColour`, `sheen`, `shadow` (a drop shadow on
+  the panel), `glow` (a halo in the cap's own colour).
+- **The track**: `slot` on the base (an inner shadow along its upper edge, the cut in the
+  plate), a corner radius below a pill's for the boards' square-ended tracks (which used to be
+  ignored), the track's own edge stroke (which the masked fill could never draw), `inset` on the
+  fill (px each side — the lit boards' 4 px light in a 10 px slot) and `glow` on the fill.
+
+None of it touches a slider that does not ask: a factory slider carries no flag, and every
+default stays what it was. `sliderFamily` takes the lot, the conversion maps each board's cap
+(`SLIDER_CAPS`, `LIT_CAPS`) and the Slider editor has a Cap select and a Cap Finish strip for an
+author who wants to say otherwise.
+
+One rule in the conversion is worth knowing about. Two boards' palettes give the bar's groove
+the cap's own ink (Carbon: both orange) or its near tone (Walnut: two browns), and the boards as
+rendered drew the cap dark with the orange line, and the line in the brass edge, respectively.
+The conversion does the same by contrast: a groove that would vanish on its cap moves the cap to
+the knob body's colour if that reads, or takes the cap's edge ink if not.

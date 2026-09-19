@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "81cc7e32",
+  "fingerprint": "ff199cfe",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -117,8 +117,28 @@
           "pointerCurrent": {
             "kind": "bar",
             "Layout.width": 12,
-            "Layout.height": 28,
-            "Background.Border.thickness": 1.5
+            "Layout.height": 32,
+            "Background.Border.thickness": 1.5,
+            "grooveColour": "{control.marker}",
+            "shadow": true
+          },
+          "pointerStart": {
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Border.thickness": 1.5,
+            "grooveColour": "{control.marker}",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.start}"
+          },
+          "pointerEnd": {
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Border.thickness": 1.5,
+            "grooveColour": "{control.marker}",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.end}"
           },
           "bodyTrackBase": {
             "Layout.height": 6,

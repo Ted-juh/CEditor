@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6f87b2a1",
+  "fingerprint": "5aa2b7fa",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -125,13 +125,30 @@
             "Background.Border.thickness": 2.5,
             "kind": "ring"
           },
+          "pointerStart": {
+            "Layout.width": 18,
+            "Layout.height": 10,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 2.5,
+            "kind": "ring"
+          },
+          "pointerEnd": {
+            "Layout.width": 18,
+            "Layout.height": 10,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 2.5,
+            "kind": "ring"
+          },
           "bodyTrackBase": {
             "Layout.height": 6,
             "Background.Corners.radius": 2
           },
           "bodyTrackFill": {
             "Layout.height": 6,
-            "Background.Corners.radius": 2
+            "Background.Corners.radius": 2,
+            "glow": true
           }
         }
       },

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ae31b37f",
+  "fingerprint": "473b0c8c",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -120,7 +120,26 @@
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "bar",
+            "grooveColour": "FF6B5A2E"
+          },
+          "pointerStart": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF6B5A2E"
+          },
+          "pointerEnd": {
+            "Layout.width": 12,
+            "Layout.height": 32,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "bar",
+            "grooveColour": "FF6B5A2E"
           },
           "bodyTrackBase": {
             "Layout.height": 6

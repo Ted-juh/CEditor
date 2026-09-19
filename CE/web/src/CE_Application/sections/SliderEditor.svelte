@@ -7,6 +7,11 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import Cloud from 'lucide-svelte/icons/cloud';
+  import Sun from 'lucide-svelte/icons/sun';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Minus from 'lucide-svelte/icons/minus';
+  import Lightbulb from 'lucide-svelte/icons/lightbulb';
   import Magnet from 'lucide-svelte/icons/magnet';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Shuffle from 'lucide-svelte/icons/shuffle';
@@ -407,6 +412,34 @@
         <option value="cross">cross</option>
       </select>
     </PropertyCell>
+    {#if geometry === 'linear'}
+      <!-- The cap that rides the track, as the control-set boards draw them. A set usually
+           chooses it; this is where an author overrides it. -->
+      <PropertyCell label="Cap" span={2} hint="The handle: a dot, a fader cap with a groove, a console cap with a sheen, a billet block with a top plate, a lit lens, a dot in a halo, a ring, or a line.">
+        <select class="val" value={parts?._children?.pointerCurrent?.kind ?? 'dot'}
+                onchange={(event) => setPatch({ 'Parts.pointerCurrent.kind': event.target.value, 'Parts.pointerStart.kind': event.target.value, 'Parts.pointerEnd.kind': event.target.value })}>
+          {#each ['dot', 'bar', 'console', 'block', 'lens', 'glass', 'ring', 'line'] as kind}
+            <option value={kind}>{kind}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Cap Finish" span={2} hint="A drop shadow on the panel, a halo in the cap's colour, and a slot cut for the track.">
+        <FlagStrip
+          flags={[
+            { key: 'shadow', title: 'Shadow — the cap casts one on the panel', on: parts?._children?.pointerCurrent?.shadow === true, icon: Cloud },
+            { key: 'glow', title: 'Glow — a halo in the cap colour', on: parts?._children?.pointerCurrent?.glow === true, icon: Sun },
+            { key: 'sheen', title: 'Sheen — the cylinder gradient across the cap', on: parts?._children?.pointerCurrent?.sheen === true, icon: Layers },
+            { key: 'slot', title: 'Slot — an inner shadow along the track', on: parts?._children?.bodyTrackBase?.slot === true, icon: Minus },
+            { key: 'fillGlow', title: 'Lit fill — a glow under the filled part of the track', on: parts?._children?.bodyTrackFill?.glow === true, icon: Lightbulb },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'slot') set('Parts.bodyTrackBase.slot', !(parts?._children?.bodyTrackBase?.slot === true));
+            else if (key === 'fillGlow') set('Parts.bodyTrackFill.glow', !(parts?._children?.bodyTrackFill?.glow === true));
+            else setPatch({ [`Parts.pointerCurrent.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true), [`Parts.pointerStart.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true), [`Parts.pointerEnd.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true) });
+          }}
+        />
+      </PropertyCell>
+    {/if}
     <!-- How a tick is drawn, and which major stops draw. A control set usually chooses these;
          this is where an author overrides it. Numerals are for the majors, so the minors between
          them stay lines. -->

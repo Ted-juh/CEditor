@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6f551d08",
+  "fingerprint": "d6a831fc",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -110,6 +110,20 @@
             "Layout.width": 20,
             "Layout.height": 20,
             "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerStart": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerEnd": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap.end}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1
           },

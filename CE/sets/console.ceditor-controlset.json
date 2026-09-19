@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ad8763db",
+  "fingerprint": "63df4f5a",
   "set": {
     "id": "console",
     "name": "Console",
@@ -127,7 +127,29 @@
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "console"
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
+          },
+          "pointerStart": {
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
+          },
+          "pointerEnd": {
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "kind": "console",
+            "grooveColour": "FF111111",
+            "sheen": true
           },
           "bodyTrackBase": {
             "Layout.height": 6,
