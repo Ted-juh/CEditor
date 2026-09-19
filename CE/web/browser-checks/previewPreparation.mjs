@@ -1,13 +1,14 @@
-import { createServer } from 'vite';
+import { preview } from 'vite';
 import { chromium } from 'playwright-core';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 
+// Use the built harness: dependency discovery in a dev server can reload the second page in
+// the middle of a measurement, destroying the execution context rather than testing a transition.
 const server = process.env.PREVIEW_URL
-  ? { resolvedUrls: { local: [process.env.PREVIEW_URL] }, async listen() {}, async close() {} }
-  : await createServer({ configFile: fileURLToPath(new URL('./vite.config.mjs', import.meta.url)), server: { host: '127.0.0.1', port: 0 } });
-await server.listen();
+  ? { resolvedUrls: { local: [process.env.PREVIEW_URL] }, httpServer: null }
+  : await preview({ configFile: fileURLToPath(new URL('./vite.config.mjs', import.meta.url)), preview: { host: '127.0.0.1', port: 0 } });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 2300 } });
@@ -72,4 +73,4 @@ try {
     'the real EditorCanvas prepares the exact scenery consumed by preview');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ groundCount, prepareMs, warmTransitionMs, prepared, beforeMidi, afterMidi, errors }, null, 2));
-} finally { await browser.close(); await server.close(); }
+} finally { await browser.close(); if (server.httpServer) await new Promise(resolve => server.httpServer.close(resolve)); }

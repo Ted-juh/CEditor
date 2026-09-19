@@ -10,11 +10,11 @@ const LIMIT = 2048;
 const counts = { builds: 0, hits: 0 };
 export function sceneryMarkupKey(control, props) {
   return JSON.stringify([props.panelWidth ?? 0, props.panelHeight ?? 0,
-    props.scale ?? 1, props.annotate === true, sceneryFingerprint([control])]);
+    props.scale ?? 1, props.annotate === true, props.controlSet ?? null, sceneryFingerprint([control])]);
 }
 export function sceneryGroundKey(controls, props) {
   return JSON.stringify([props.panelWidth ?? 0, props.panelHeight ?? 0,
-    props.scale ?? 1, props.annotate === true, sceneryFingerprint(controls)]);
+    props.scale ?? 1, props.annotate === true, props.controlSet ?? null, sceneryFingerprint(controls)]);
 }
 export function bakeSceneryControl(control, props) {
   const key = sceneryMarkupKey(control, props);

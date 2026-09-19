@@ -19,6 +19,7 @@ export const SECTION_DEFAULTS = {
     tooltip: '',
     screenReaderText: '',
     stylePreset: '',
+    controlSetId: '',
     visible: true,
     enabled: true,
     locked: false,
@@ -1428,6 +1429,8 @@ export const SECTION_DEFAULTS = {
     // colour (AARRGGBB), choke (0 = none) and roll. Anything omitted falls back
     // to the generated map, so renaming one pad doesn't mean writing all sixteen.
     pads: [],
+    padAppearance: 'flat',
+    padRadius: 6,
     // Colours.
     fieldColour: 'FF101017',
     padColour: 'FF171720',
@@ -1883,6 +1886,8 @@ export const SECTION_DEFAULTS = {
     showLabels: true,
     showGains: false,             // draw per-side gain bars
     handleSize: 14,
+    handleStyle: 'default',
+    trackSize: 10,
     // Colours.
     trackColour: 'FF1B1B1B',
     fillAColour: 'FF5B9BD5',

@@ -50,7 +50,7 @@ try {
   // the field's own minimum — a message the index would refuse to match at all.
   await page.evaluate(() => {
     window.__chips.sysex('F0 41 10 00 00 41 12 10 00 04 01 08 00 07 0F 4D F7');
-    window.__chips.cc('B0 4A 60');    // CC 74 — not in this profile, binds as a raw CC
+    window.__chips.cc('B0 1F 60');    // CC 31 — unmapped; CC 74 now names GAIA filter cutoff
     window.__chips.cc('D0 70');       // channel pressure — binds by message, with no CC number
     // One NRPN knob, as four separate arrivals. It must become ONE chip, not four.
     for (const hex of ['B0 63 01', 'B0 62 20', 'B0 06 02', 'B0 26 40']) window.__chips.cc(hex);
@@ -62,7 +62,7 @@ try {
 
   const rendered = await page.evaluate(() => window.__chips.rendered());
   const named = rendered.find((chip) => chip.label.includes('MFX') || chip.detail === 'SysEx');
-  const rawCc = rendered.find((chip) => /CC 74/.test(chip.label));
+  const rawCc = rendered.find((chip) => /CC 31/.test(chip.label));
   const pressure = rendered.find((chip) => /Aftertouch/.test(chip.label));
   const nrpnChip = rendered.find((chip) => /NRPN/.test(chip.label));
 
@@ -101,7 +101,7 @@ try {
   const rawDrag = await page.evaluate((label) => window.__chips.drag(label), rawCc.label);
   const rawPayload = JSON.parse(rawDrag.payload);
   assert.equal(rawPayload.kind, 'ceditor.midiControl');
-  assert.equal(rawPayload.controller, 74);
+  assert.equal(rawPayload.controller, 31);
   assert.equal(rawPayload.parameter.type, 'integer', 'the drop target judges compatibility on this');
   await page.evaluate((label) => window.__chips.dragEnd(label), rawCc.label);
 

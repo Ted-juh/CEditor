@@ -33,7 +33,8 @@
    * or an input. isSceneryType is derived from the same registry, so a type that gained one could
    * not become scenery without failing sceneryModel.test.js first.
    */
-  import { untrack } from 'svelte';
+  import { getContext, untrack } from 'svelte';
+  import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
   import SceneryLayer from './SceneryLayer.svelte';
   import { sceneryGroundKey, bakeSceneryGround } from '../utils/sceneryMarkupCache.js';
 
@@ -64,9 +65,11 @@
 
   let groundEl = $state(null);
 
-  const layerProps = () => ({ controls, allControls, panelControls, panelWidth, panelHeight, scale, annotate });
+  const contextSet = getContext(CONTROL_SET_CONTEXT_KEY);
+  let controlSet = $derived(typeof contextSet === 'function' ? contextSet() : $activeControlSet);
+  const layerProps = () => ({ controls, allControls, panelControls, panelWidth, panelHeight, scale, annotate, controlSet });
 
-  let fingerprint = $derived(sceneryGroundKey(controls, { panelWidth, panelHeight, scale, annotate }));
+  let fingerprint = $derived(sceneryGroundKey(controls, { panelWidth, panelHeight, scale, annotate, controlSet }));
   let baked = $state(null);
 
   // Server-side there is no DOM to bake into and no second render to save, so the scenery is drawn
@@ -109,7 +112,7 @@
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- the markup is this app's own render output, not input -->
     {@html baked?.key === fingerprint ? baked.markup : ''}
   {:else}
-    <SceneryLayer {controls} {allControls} {panelControls} {panelWidth} {panelHeight} {scale} {annotate} />
+    <SceneryLayer {controls} {allControls} {panelControls} {panelWidth} {panelHeight} {scale} {annotate} {controlSet} />
   {/if}
 </div>
 

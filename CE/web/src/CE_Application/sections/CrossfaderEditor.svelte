@@ -23,6 +23,16 @@
 </script>
 
 {#if x}
+  <PropertySection title="Handle design" icon={Palette}>
+    <PropertyCell label="Shape" span={2}>
+      <select class="val" value={x.handleStyle ?? 'default'} onchange={(e) => set('handleStyle', e.target.value)}>
+        {#each ['default', 'round', 'ring', 'blade', 'block'] as style}<option value={style}>{style}</option>{/each}
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Track" span={2}>
+      <NumberCell label="Width" value={x.trackSize ?? 10} min={2} max={20} step={1} defaultValue={10} onchange={(v) => set('trackSize', v)} />
+    </PropertyCell>
+  </PropertySection>
   <PropertySection title="Crossfader" icon={ArrowLeftRight}>
     <PropertyCell label="Law" span={2} hint="Equal-power = constant loudness. Linear = −6 dB dip at centre. Sharp = both full through the middle.">
       <select class="val" value={x.law ?? 'equalPower'} onchange={(e) => set('law', e.target.value)}>

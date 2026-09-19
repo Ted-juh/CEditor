@@ -36,6 +36,7 @@
   import Scale from 'lucide-svelte/icons/scale';
   import ListMusic from 'lucide-svelte/icons/list-music';
   import Palette from 'lucide-svelte/icons/palette';
+  import ControlSetGallery from './ControlSetGallery.svelte';
   import { DEFAULT_CONTROL_SET_ID, getControlSet } from '../models/controlSets.js';
   import { controlSetFileName, createControlSetEnvelope } from '../models/controlSetPackage.js';
   import { setActivePanelControlSet } from '../stores/controlSets.js';
@@ -73,6 +74,7 @@
   const SET_GROUP_LABELS = { document: 'In this panel', library: 'My library', 'built-in': 'Built in' };
   let setFileInput = $state(null);
   let setStatus = $state('');
+  let galleryOpen = $state(false);
   let setGroups = $derived(['document', 'library', 'built-in']
     .map((origin) => ({ origin, label: SET_GROUP_LABELS[origin], sets: $availableControlSets.filter((set) => set.origin === origin) }))
     .filter((group) => group.sets.length));
@@ -485,6 +487,8 @@
   }
 </script>
 
+{#if galleryOpen}<ControlSetGallery initialId={panel?.controlSet?.id ?? 'graphite'} onclose={() => galleryOpen = false} />{/if}
+
 {#if panel}
   {#if tabId === 'core'}
     <PropertySection title="Identity" icon={IdCard}>
@@ -636,6 +640,7 @@
           {#if activeSet}{activeSet.description}{:else}This panel names a set that is not installed here; it renders with Graphite until that set is imported.{/if}
         </p>
         <div class="set-tools">
+          <button type="button" class="set-tool-btn" onclick={() => galleryOpen = true}>Browse 12 starter designs…</button>
           <button type="button" class="set-tool-btn" title="Import a .ceditor-controlset.json file into your library and this panel"
                   onclick={() => setFileInput?.click()}>Import set…</button>
           <button type="button" class="set-tool-btn" disabled={!activeSet} title="Save this set as a file others can import"

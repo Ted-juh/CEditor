@@ -25,6 +25,7 @@
 
 import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
+import { extendControlSet } from './controlSetCoverage.js';
 
 const TOKEN_REFERENCE_PATTERN = /^\{([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*)\}$/i;
 const COLOUR_LITERAL_PATTERN = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/i;
@@ -276,7 +277,7 @@ export const BUILT_IN_CONTROL_SETS = [
   ...PILOT_CONTROL_SETS,
   // And the rest of the boards.
   ...CATALOG_CONTROL_SETS,
-];
+].map(extendControlSet);
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 
@@ -440,7 +441,7 @@ export function resolveColourLiteral(value, set = BASE_CONTROL_SET, fallback = '
 // or is a dotted property path ending in `.colour` (the keys of a State's patch map). Nothing
 // else is looked at — see the note on text content at the top of the file.
 function isColourKey(key) {
-  return key === 'colour' || key.endsWith('Colour') || key.endsWith('.colour');
+  return key === 'colour' || key.endsWith('Colour') || key.endsWith('.colour') || key === 'cellBg' || key.endsWith('.cellBg');
 }
 
 function resolveNode(node, set, stats) {

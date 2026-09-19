@@ -32,6 +32,7 @@ const isStyling = (field) => /colour$|color$|^palette$|tint$|Bg$/i.test(field);
 const GEOMETRY = new Set([
   'segmentGap', 'thickness', 'rounded', 'tickCount', 'majorTickCount', 'minorTickCount',
   'handleSize', 'indicatorSize', 'puckRadius', 'nodeRadius', 'lineWidth', 'trailLength',
+  'padRadius', 'trackSize',
   'rowHeaderW', 'colHeaderH', 'charSpacing', 'lineSpacing', 'padding', 'fontScale',
   'dotMatrix', 'dotShape', 'dotPitch', 'snapGrid', 'gridDiv', 'gridX', 'gridY',
   'scrollGap', 'segments', 'labelPosition', 'arcStart', 'arcSweep',
@@ -42,6 +43,8 @@ const GEOMETRY = new Set([
  * than missed — and the reason is checked by a human reading it, which is the only check there is.
  */
 const EXEMPT = {
+  'drumpads.padAppearance': 'authoring: the pad face design, editable in Pad design and by set()',
+  'crossfader.handleStyle': 'authoring: the cap shape, editable in Handle design and by set()',
   // Authoring surfaces: what the inspector is FOR. A script that rewrote a display's page layout
   // mid-song is not a performance, it is a different panel.
   'lcd.fields': 'a display layout is an authoring surface, not a performance one',

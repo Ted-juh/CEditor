@@ -24,6 +24,8 @@
   }
 
   let cfg = $derived(drumConfig(control));
+  let face = $derived(cfg.padAppearance ?? 'flat');
+  let radius = $derived(Math.max(0, Math.min(40, Number(cfg.padRadius) || 0)));
   let pads = $derived(drumPads(control));
   let origin = $derived(String(cfg.origin ?? 'bottomLeft'));
   // The corners carrying an action, once. Sixteen pads x four corners is a lot of ink for a map
@@ -98,18 +100,27 @@
       <rect x={c.r.x - 2} y={c.r.y - 2} width={c.r.w + 4} height={c.r.h + 4} rx="8" fill="none"
             stroke={echoCss} stroke-width="2" opacity={0.9 * echoAlpha(c.p.note)} />
     {/if}
-    <rect x={c.r.x} y={c.r.y} width={c.r.w} height={c.r.h} rx="6"
-          fill={isHit ? 'rgba(38,38,48,1)' : (isEcho ? 'rgba(30,40,36,1)' : padCss)}
+    {#if face === 'raised'}
+      <rect x={c.r.x + 2} y={c.r.y + 3} width={c.r.w} height={c.r.h} rx={radius} fill="black" opacity="0.55" />
+    {/if}
+    <rect x={c.r.x} y={c.r.y} width={c.r.w} height={c.r.h} rx={face === 'chamfer' ? 0 : radius}
+          style={face === 'chamfer' ? `clip-path:polygon(8% 0,92% 0,100% 12%,100% 88%,92% 100%,8% 100%,0 88%,0 12%);transform-box:fill-box;` : ''}
+          fill={isHit ? hitCss : (isEcho ? 'rgba(30,40,36,1)' : (face === 'outline' ? 'none' : padCss))}
           stroke={isHit ? hitCss : (isEcho ? echoCss : 'rgba(44,44,56,1)')}
           stroke-opacity={isEcho && !isHit ? echoAlpha(c.p.note) : 1}
           stroke-width={isHit || isEcho ? 2 : 1} />
+    {#if face === 'glass'}
+      <rect x={c.r.x + 2} y={c.r.y + 2} width={Math.max(1, c.r.w - 4)} height={c.r.h * 0.42} rx={Math.min(radius, 8)} fill="white" opacity={isHit ? 0.08 : 0.19} />
+    {:else if face === 'raised' || face === 'inset'}
+      <path d={`M ${c.r.x + 5} ${c.r.y + c.r.h - 5} V ${c.r.y + 5} H ${c.r.x + c.r.w - 5}`} fill="none" stroke={face === 'raised' ? 'white' : 'black'} stroke-width="2" opacity={isHit ? 0.1 : 0.3} />
+    {/if}
     <!-- the pad's own accent stripe: its per-pad colour, or the section accent -->
     <rect x={c.r.x + 6} y={c.r.y + 6} width={Math.max(2, c.r.w - 12)} height="3" rx="1.5"
           fill={isHit ? hitCss : accent} opacity={isHit ? 1 : 0.7} />
     {#if labelFits}
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h / 2 + (noteFits ? 1 : 4)}
             font-size={Math.max(8, Math.min(12, c.r.w * 0.19))}
-            fill={isHit ? '#fff' : 'rgba(232,232,238,1)'} text-anchor="middle" style="font-weight:600">{c.p.label}</text>
+            fill={face === 'flat' ? (isHit ? '#fff' : 'rgba(232,232,238,1)') : labelCss} text-anchor="middle" style="font-weight:600">{c.p.label}</text>
     {/if}
     {#if noteFits}
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h - 7} font-size="8.5"

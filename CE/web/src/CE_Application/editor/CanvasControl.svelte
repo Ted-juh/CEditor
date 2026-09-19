@@ -135,7 +135,7 @@
   import { getContext, setContext } from 'svelte';
   import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
   import { CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
-  import { resolveControlForSet } from '../models/controlSetFamilies.js';
+  import { resolveControlForSet, controlSetForControl } from '../models/controlSetFamilies.js';
 
   let {
     control: documentControl,
@@ -221,7 +221,7 @@
   // editor canvas takes the active panel's. Copy-on-write, so a control without references is
   // the same object it always was.
   const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
-  let controlSet = $derived(typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet);
+  let controlSet = $derived(controlSetForControl(documentControl, typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet));
   // The set's family patch first (a knob gets its cap, a button its finish), then the tokens —
   // models/controlSetFamilies.js. The set's lamp goes into context for every material filter
   // drawn under this control, so all of them are lit from the panel's one light.

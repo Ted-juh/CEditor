@@ -32,6 +32,8 @@ import { sortControlsForRender } from './controlOrder.js';
 import { layerNames, normalizeLayerName, normalizePanelLayers } from './panelLayers.js';
 import { compileScenery, sceneryLayerIsCompiled } from './sceneryCompile.js';
 import { planSceneryFold } from './sceneryModel.js';
+import { controlSetForPanel } from '../models/controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 // THE ITEM WRAPPERS ARE REUSED, and this is a performance contract rather than tidiness.
 //
@@ -141,7 +143,8 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false, n
       continue;
     }
 
-    const result = compileScenery(controls, panel?.width ?? 0, panel?.height ?? 0);
+    const set = controlSetForPanel(panel);
+    const result = compileScenery(controls.map(c => resolveControlForSet(c, set)), panel?.width ?? 0, panel?.height ?? 0);
     scenery.set(layer.name, { folded: result.folded, refusals: result.refusals });
     if (result.url) items.push(sceneryItem(layer.name, result.url));
     // Whatever the compiler refused still renders, in its own order, on top of the image it could
@@ -151,7 +154,8 @@ export function buildSceneryRenderPlan(panel, { preview = false, fold = false, n
     // And it goes through the SAME fold as an ordinary layer, which is the point of doing it here:
     // the refusals are mostly captions, captions are what the ground was built for, and refusing
     // them from the image is not a reason to render 189 of them as components.
-    pushLayerControls(items, layer.name, result.live, fold, neverFold);
+    const liveIds = new Set(result.live.map(c => c._children.Core.id));
+    pushLayerControls(items, layer.name, controls.filter(c => liveIds.has(c._children.Core.id)), fold, neverFold);
   }
 
   return { items, scenery };

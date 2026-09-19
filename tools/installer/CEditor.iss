@@ -57,6 +57,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#MySourceDir}\CE\profiles\*"; DestDir: "{app}\CE\profiles"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\sets\*"; DestDir: "{app}\CE\sets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#MySourceDir}\CE\panels\Control set starters\*"; DestDir: "{app}\CE\panels\Control set starters"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#MySourceDir}\CEditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginScanner.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MySourceDir}\CEditorPluginWorker.exe"; DestDir: "{app}"; Flags: ignoreversion

@@ -27,7 +27,7 @@
 
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
-import { resolveControlTokens } from './controlSets.js';
+import { resolveControlTokens, getControlSet } from './controlSets.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -175,6 +175,7 @@ export function familyPatchFor(set, controlType) {
  * resolveControlForSet, which does both).
  */
 export function resolveControlFamily(control, set) {
+  set = controlSetForControl(control, set);
   const type = control?._children?.Core?.controlType;
   const family = familyPatchFor(set, type);
   if (!family) return control;
@@ -207,5 +208,11 @@ export function resolveControlFamily(control, set) {
  * build bakes, and what a script reads.
  */
 export function resolveControlForSet(control, set) {
+  set = controlSetForControl(control, set);
   return resolveControlTokens(resolveControlFamily(control, set), set);
+}
+
+/** A built-in design pinned to an individual control survives copying into another panel. */
+export function controlSetForControl(control, panelSet) {
+  return getControlSet(control?._children?.Core?.controlSetId) ?? panelSet;
 }

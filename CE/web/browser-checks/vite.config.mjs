@@ -20,7 +20,7 @@ export default defineConfig({
       // 93% of a 4m22s build there. It bit here the moment a harness imported Player.svelte and so
       // pulled in the whole app graph — the build went from 8s to not finishing inside 400s.
       treeshake: false,
-      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips', 'panelShot', 'effectsTab', 'typographyTab', 'assetsTab', 'screenTab', 'apiTab', 'libraryTab', 'animationTab', 'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'releaseWorkflow', 'controlSetShot'].map(page),
+      input: ['sceneryGround', 'textPlacement', 'midi', 'monitor', 'strip', 'playerInbound', 'learnChips', 'panelShot', 'effectsTab', 'typographyTab', 'assetsTab', 'screenTab', 'apiTab', 'libraryTab', 'animationTab', 'designerTab', 'dockOpeners', 'propertyFilter', 'panelStrip', 'insertFlyout', 'releaseWorkflow', 'controlSetShot', 'previewPreparation', 'gaiaPages'].map(page),
     },
   },
 });

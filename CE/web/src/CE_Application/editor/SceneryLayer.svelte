@@ -10,6 +10,8 @@
    * control it replaced.
    */
   import CanvasControl from './CanvasControl.svelte';
+  import { setContext, getContext } from 'svelte';
+  import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
   import { needsImageRole, resolveAriaLabel, resolveTooltip } from '../utils/coreAccessibility.js';
 
   let {
@@ -19,6 +21,7 @@
     panelWidth = 0,
     panelHeight = 0,
     scale = 1,
+    controlSet = null,
     /**
      * Whether these controls should carry their Core tooltip and screen-reader label.
      *
@@ -30,6 +33,8 @@
      */
     annotate = false,
   } = $props();
+  const inheritedSet = getContext(CONTROL_SET_CONTEXT_KEY);
+  setContext(CONTROL_SET_CONTEXT_KEY, () => controlSet ?? (typeof inheritedSet === 'function' ? inheritedSet() : $activeControlSet));
 </script>
 
 {#each controls as control (control._children?.Core?.id)}

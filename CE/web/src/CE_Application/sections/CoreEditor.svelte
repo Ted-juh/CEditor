@@ -10,6 +10,7 @@
    */
   import { getSection, renameControl, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
+  import { BUILT_IN_CONTROL_SETS } from '../models/controlSets.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyText from '../properties/PropertyText.svelte';
@@ -66,6 +67,14 @@
 </script>
 
 {#if core}
+  <PropertySection title="Control design" icon={Tag}>
+    <PropertyCell label="Set" span={4} hint="Follow the panel, or pin a built-in design to this control so it keeps its look when copied to another panel. Your property edits take precedence.">
+      <select class="val" value={core.controlSetId ?? ''} onchange={(e) => set('controlSetId', e.target.value)}>
+        <option value="">Follow panel</option>
+        {#each BUILT_IN_CONTROL_SETS as design}<option value={design.id}>{design.name}</option>{/each}
+      </select>
+    </PropertyCell>
+  </PropertySection>
   <PropertySection title="Identity" icon={Tag}>
     <PropertyCell label="Name" span={4} hint="The script-addressable handle. Must be unique; cleared names are filled in for you.">
       <PropertyText value={core.name} onfocus={selectAll} commit={handleNameChange} />
@@ -131,6 +140,7 @@
 {/if}
 
 <style>
+  .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .readout {
     display: flex;
     align-items: center;

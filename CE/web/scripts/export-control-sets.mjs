@@ -9,7 +9,7 @@
 // models/, never edited by hand: change the definition, run this, commit both.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BUILT_IN_CONTROL_SETS, getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { controlSetFileName, createControlSetEnvelope } from '../src/CE_Application/models/controlSetPackage.js';
@@ -28,7 +28,7 @@ export function shippedSetFile(id) {
   return { path: join(SETS_DIR, controlSetFileName(set)), text: `${JSON.stringify(envelope, null, 2)}\n` };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const check = process.argv.includes('--check');
   let stale = 0;
   mkdirSync(SETS_DIR, { recursive: true });

@@ -62,7 +62,7 @@ test('every field of the section has a verb, bar the styling the module delibera
   // The section's own colours. componentVerbs.js states the line at the top of the file — a verb
   // earns its place by being worth driving mid-song — and no family of the twenty-three exposes
   // styling. They stay reachable by set(), which addresses any model path.
-  const styling = ['fieldColour', 'padColour', 'accentColour', 'hitColour', 'labelColour', 'echoColour'];
+  const styling = ['fieldColour', 'padColour', 'accentColour', 'hitColour', 'labelColour', 'echoColour', 'padAppearance', 'padRadius'];
   const fields = Object.keys(SECTION_DEFAULTS.DrumPads).filter((k) => !k.startsWith('_'));
 
   assert.deepEqual(

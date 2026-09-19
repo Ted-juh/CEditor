@@ -44,7 +44,7 @@
 
   // Groove is a slim bar centred in the track; the handle rides along it.
   let groove = $derived.by(() => {
-    const thin = Math.max(4, Math.min(vertical ? geom.w : geom.h, 10));
+    const thin = Math.max(2, Math.min(vertical ? geom.w : geom.h, n(cfg.trackSize, 10)));
     if (vertical) return { x: geom.x0 + (geom.w - thin) / 2, y: geom.y0, w: thin, h: geom.h };
     return { x: geom.x0, y: geom.y0 + (geom.h - thin) / 2, w: geom.w, h: thin };
   });
@@ -86,7 +86,18 @@
   {/if}
 
   <!-- Handle -->
-  {#if vertical}
+  {#if cfg.handleStyle === 'round' || cfg.handleStyle === 'ring'}
+    <circle cx={handle.px} cy={handle.py} r={handleSize / 2} fill={cfg.handleStyle === 'ring' ? trackCss : handleCss} stroke={handleCss} stroke-width={cfg.handleStyle === 'ring' ? 3 : 1} />
+    {#if cfg.handleStyle === 'round'}<circle cx={handle.px} cy={handle.py} r="2" fill={fillACss} />{/if}
+  {:else if cfg.handleStyle === 'blade' || cfg.handleStyle === 'block'}
+    {@const blade = cfg.handleStyle === 'blade'}
+    {@const hw = vertical ? handleSize : (blade ? 12 : 22)}
+    {@const hh = vertical ? (blade ? 12 : 22) : handleSize}
+    <rect x={handle.px - hw / 2 + 2} y={handle.py - hh / 2 + 3} width={hw} height={hh} rx="2" fill="black" opacity="0.4" />
+    <rect x={handle.px - hw / 2} y={handle.py - hh / 2} width={hw} height={hh} rx="2" fill={handleCss} stroke={trackCss} />
+    <rect x={handle.px - hw / 2 + 2} y={handle.py - hh / 2 + 2} width={Math.max(1, hw - 4)} height={Math.max(1, hh / 3)} rx="1" fill="white" opacity="0.3" />
+    <line x1={handle.px - hw / 2 + 3} x2={handle.px + hw / 2 - 3} y1={handle.py} y2={handle.py} stroke={fillACss} stroke-width="2" />
+  {:else if vertical}
     <rect x={geom.x0 + geom.w / 2 - handleSize / 2} y={handle.py - handleSize * 0.34} width={handleSize} height={handleSize * 0.68} rx="3" fill={handleCss} stroke="rgba(0,0,0,0.5)" stroke-width="1" />
   {:else}
     <rect x={handle.px - handleSize * 0.34} y={geom.y0 + geom.h / 2 - handleSize / 2} width={handleSize * 0.68} height={handleSize} rx="3" fill={handleCss} stroke="rgba(0,0,0,0.5)" stroke-width="1" />

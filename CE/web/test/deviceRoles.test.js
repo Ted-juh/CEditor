@@ -150,11 +150,11 @@ test('the GAIA panel names its device after the instrument', () => {
 
   assert.deepEqual([...counts.keys()], ['Roland GAIA SH-01'], 'the panel names some other device');
   assert.equal(counts.get('Roland GAIA SH-01'), 278);
-  // 11 exported parameters name no device, and correctly so: they belong to the envelope
-  // displays, which carry no device bindings at all. What matters is that none names a DIFFERENT one.
+  // The linked envelopes now export their hardware bindings. Only the remaining page selector
+  // is local; the removed top_pages selector must not survive in the generated export metadata.
   const exported = new Set(panel.exportParameters.map((e) => e.deviceRole).filter(Boolean));
   assert.deepEqual([...exported], ['Roland GAIA SH-01'],
     'an exported parameter names a different device from the controls');
-  assert.equal(panel.exportParameters.filter((e) => !e.deviceRole).length, 11);
+  assert.deepEqual(panel.exportParameters.filter((e) => !e.deviceRole).map(e => e.id), ['bottom_pages.page']);
   assert.deepEqual(panel.requiredProfiles.map((e) => e.role), ['Roland GAIA SH-01']);
 });

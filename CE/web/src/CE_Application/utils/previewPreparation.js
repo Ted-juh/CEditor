@@ -4,6 +4,8 @@ import { bakeStaticPartEntries, whyControlNotBakeable } from './staticPartBaking
 import { resolveInteractiveControl } from './interactionRuntime.js';
 import { getChildControls } from './containment.js';
 import { scheduleIdlePreparation } from './idlePreparation.js';
+import { controlSetForPanel } from '../models/controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 function* controlsIn(controls) {
   for (const control of controls) {
@@ -18,7 +20,7 @@ export function preparePreviewInBackground(panel, { scale = 1, delay = 800, neve
     // executes panel scripts, starts a preview session or sends MIDI here.
     const plan = buildSceneryRenderPlan(panel, { preview: true, fold: true, neverFold });
     const props = { allControls: panel.controls, panelControls: panel.controls,
-      panelWidth: panel.width, panelHeight: panel.height, scale, annotate: true };
+      panelWidth: panel.width, panelHeight: panel.height, scale, annotate: true, controlSet: controlSetForPanel(panel) };
     for (const item of plan.items) {
       if (item.type !== 'ground') continue;
       for (const control of item.controls) yield () => bakeSceneryControl(control, props);
@@ -28,7 +30,7 @@ export function preparePreviewInBackground(panel, { scale = 1, delay = 800, neve
       yield () => {
         // Resolve generated defaults and geometry exactly as CanvasControl does.
         // This pure resolver clones before materializing; the document is untouched.
-        const resolved = resolveInteractiveControl(control, {}).control;
+        const resolved = resolveInteractiveControl(resolveControlForSet(control, props.controlSet), {}).control;
         const entries = Object.entries(resolved._children.Parts?._children ?? {}).filter(([, part]) => part?.visible !== false);
         const t = resolved._children.Transform ?? {};
         bakeStaticPartEntries(resolved, entries, t.width, t.height);

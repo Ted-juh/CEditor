@@ -433,4 +433,15 @@ export const EDITOR_PATHS = [
   /^States\.Selected$/,
   // The part-level keys the Slider editor's Cap select, Cap Finish strip and tick style write.
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
+  /^Listbox\.(cardRows|rowHeight|selectionStyle|zebra|accentColour)$/,
+  /^TabContainer\.(appearance|accentColour|stripColour|tabColour|activeTabColour|labelColour|activeLabelColour)$/,
+  /^ScrollArea\.(scrollbarSize|trackColour|thumbColour)$/,
+  /^Meter\.(segments|segmentGap|rounded|thickness|showTicks|trackColour|fillColour|peakColour)$/,
+  /^Ribbon\.(style|showGlow|indicatorSize|trackColour|fillColour|indicatorColour|glowColour|wheelColour|labelColour)$/,
+  /^Crossfader\.(handleStyle|trackSize|handleSize|showGains|trackColour|fillAColour|fillBColour|handleColour|labelColour)$/,
+  /^DrumPads\.(padAppearance|padRadius|fieldColour|padColour|accentColour|hitColour|labelColour)$/,
+  /^Numpad\.(gap|keyColour|keyDownColour|keyLabelColour|actionColour|displayColour|displayTextColour|borderColour)$/,
+  /^Matrix\.(cellStyle|cellBg|rowHeaderW|gridColour|posColour|negColour|labelColour|activeColour)$/,
+  /^Envelope\.(fillUnder|lineWidth|nodeRadius|lineColour|fillColour|nodeColour|gridColour|sustainColour|playheadColour)$/,
+  /^Joystick\.(puckRadius|showGrid|gridDiv|padColour|gridColour|crosshairColour|puckColour|cornerColour|labelColour)$/,
 ];

@@ -1,0 +1,2317 @@
+{
+  "panelGuid": "0c1bd5dc-b49c-5641-2ba8-7d2fd22b4564",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Graphite — starter",
+  "scriptId": "panel_1",
+  "author": "",
+  "version": "1.0.0",
+  "description": "Quiet pills, round handles and continuous meters.",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 880,
+  "height": 636,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF333333",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Knob_1789856866549.value",
+      "label": "Knob_1789856866549",
+      "controlName": "Knob_1789856866549",
+      "path": "Knob_1789856866549.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.63,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob_1789856866551.value",
+      "label": "Knob_1789856866551",
+      "controlName": "Knob_1789856866551",
+      "path": "Knob_1789856866551.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789856866552.value",
+      "label": "Slider_1789856866552",
+      "controlName": "Slider_1789856866552",
+      "path": "Slider_1789856866552.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.66,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Crossfader_1789856866554.value",
+      "label": "Crossfader_1789856866554",
+      "controlName": "Crossfader_1789856866554",
+      "path": "Crossfader_1789856866554.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789856866557.value",
+      "label": "ToggleButton_1789856866557",
+      "controlName": "ToggleButton_1789856866557",
+      "path": "ToggleButton_1789856866557.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CyclicButton_1789856866559.value",
+      "label": "CyclicButton_1789856866559",
+      "controlName": "CyclicButton_1789856866559",
+      "path": "CyclicButton_1789856866559.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Combobox_1789856866560.value",
+      "label": "Combobox_1789856866560",
+      "controlName": "Combobox_1789856866560",
+      "path": "Combobox_1789856866560.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Number_1789856866562.value",
+      "label": "Number_1789856866562",
+      "controlName": "Number_1789856866562",
+      "path": "Number_1789856866562.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ribbon_1789856866569.value",
+      "label": "Ribbon_1789856866569",
+      "controlName": "Ribbon_1789856866569",
+      "path": "Ribbon_1789856866569.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789856866572.x",
+      "label": "VectorJoystick_1789856866572 X",
+      "controlName": "VectorJoystick_1789856866572",
+      "path": "VectorJoystick_1789856866572.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789856866572.y",
+      "label": "VectorJoystick_1789856866572 Y",
+      "controlName": "VectorJoystick_1789856866572",
+      "path": "VectorJoystick_1789856866572.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866544",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866544",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 16,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "GRAPHITE",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 24,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866546",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866546",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 48,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Flat / essential",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866547",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866547",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 92,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TURN / SLIDE",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866548",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866548",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 92,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PRESS / SELECT",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789856866549",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866549",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 126,
+          "width": 120,
+          "height": 132
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.63,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2C2C2C"
+                    },
+                    "Border": {
+                      "colour": "55202020"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B9BD5"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF7BB3FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3A3A3A"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 26,
+                  "height": 66
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              },
+              "kind": "capdot"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF71B8F1"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF9FD0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF89C2FF"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFDAEEFF"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789856866551",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866551",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 164,
+          "y": 142,
+          "width": 92,
+          "height": 110
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.35,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2C2C2C"
+                    },
+                    "Border": {
+                      "colour": "55202020"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B9BD5"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF7BB3FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3A3A3A"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 26,
+                  "height": 66
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              },
+              "kind": "capdot"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF71B8F1"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF9FD0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF89C2FF"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFDAEEFF"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789856866552",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866552",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 288,
+          "y": 140,
+          "width": 214,
+          "height": 78
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.66,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2C2C2C"
+                    },
+                    "Border": {
+                      "colour": "55202020"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B9BD5"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF7BB3FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Border": {
+                      "colour": "99333333"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF2B44B"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF6F6F6"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF55C79A"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF5F5F5"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "LEVEL",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB8C7D8"
+                    },
+                    "Font": {
+                      "family": "DM Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF71B8F1"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF9FD0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF89C2FF"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFDAEEFF"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Crossfader_1789856866554",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866554",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 288,
+          "y": 224,
+          "width": 214,
+          "height": 62
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789856866555",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866555",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 128,
+          "width": 126,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF3A3A3A"
+            },
+            "Border": {
+              "colour": "66FFFFFF"
+            }
+          }
+        },
+        "Text": {
+          "content": "TRIGGER",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4A4A4A"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2C2C2C"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF89C2FF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "ToggleButton_1789856866557",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866557",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 692,
+          "y": 128,
+          "width": 160,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF3A3A3A"
+            },
+            "Border": {
+              "colour": "66FFFFFF"
+            }
+          }
+        },
+        "Text": {
+          "content": "HOLD",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        },
+        "Behavior": {
+          "defaultValue": true
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4A4A4A"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2C2C2C"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF89C2FF"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2D6F9C",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF806019",
+                  "Background.Border.colour": "FFFFD166",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "CyclicButton_1789856866559",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866559",
+          "controlType": "CyclicButton"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 186,
+          "width": 126,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF3A3A3A"
+            },
+            "Border": {
+              "colour": "66FFFFFF"
+            }
+          }
+        },
+        "Text": {
+          "content": "CYCLE",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4A4A4A"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2C2C2C"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF89C2FF"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2D6F9C",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF806019",
+                  "Background.Border.colour": "FFFFD166",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Combobox_1789856866560",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866560",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 692,
+          "y": 186,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF2F2F2F"
+            },
+            "Border": {
+              "colour": "66FFFFFF"
+            },
+            "Corners": {
+              "radius": 8
+            }
+          }
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF414141"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2A2A2A"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF89C2FF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Number_1789856866562",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866562",
+          "controlType": "Number"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 246,
+          "width": 150
+        },
+        "Parts": {
+          "_children": {
+            "decrement": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF343434"
+                    },
+                    "Border": {
+                      "colour": "664C4C4C"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "valueField": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF151515"
+                    },
+                    "Border": {
+                      "colour": "665B5B5B"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono"
+                    }
+                  }
+                }
+              }
+            },
+            "increment": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF343434"
+                    },
+                    "Border": {
+                      "colour": "664C4C4C"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FF3D3D3D"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FF3D3D3D"
+                  },
+                  "valueField": {
+                    "Background.Fill.colour": "FF1B1B1B"
+                  }
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FF282828"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FF282828"
+                  }
+                }
+              }
+            },
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Fill.colour": "FF203141",
+                    "Background.Border.colour": "FF5B9BD5"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Border.colour": "FF89C2FF"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "TextInput_1789856866564",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866564",
+          "controlType": "TextInput"
+        },
+        "Transform": {
+          "x": 710,
+          "y": 246,
+          "width": 142,
+          "height": 38
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF2F2F2F"
+            },
+            "Border": {
+              "colour": "66FFFFFF"
+            }
+          }
+        },
+        "Text": {
+          "content": "Studio A",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF414141"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF2A2A2A"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF89C2FF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866565",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866565",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PLAY / SHAPE",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866566",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866566",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "MEASURE / ROUTE",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "DrumPads_1789856866567",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866567",
+          "controlType": "DrumPads"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 348,
+          "width": 228,
+          "height": 214
+        },
+        "DrumPads": {
+          "rows": 2,
+          "cols": 2,
+          "showNotes": false,
+          "showHeader": false
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Envelope_1789856866568",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866568",
+          "controlType": "Envelope"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 348,
+          "width": 220,
+          "height": 120
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Ribbon_1789856866569",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866569",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 484,
+          "width": 220,
+          "height": 76
+        },
+        "Ribbon": {
+          "orientation": "horizontal"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Meter_1789856866570",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866570",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 354,
+          "width": 312,
+          "height": 48
+        },
+        "Meter": {
+          "value": 0.7
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789856866571",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866571",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 430,
+          "width": 166,
+          "height": 134
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ]
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789856866572",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866572",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 430,
+          "width": 124,
+          "height": 134
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866573",
+          "controlSetId": "graphite",
+          "id": "ctrl_1789856866573",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 590,
+          "width": 820,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Copy a control into your panel. Its pinned design travels with it.",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Font": {
+              "family": "DM Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF5B9BD5",
+          "lampOffColour": "FF2C2C2C",
+          "lampBezelColour": "66FFFFFF"
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

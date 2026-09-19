@@ -1829,6 +1829,10 @@ if (TARGET CEditor)
         DESTINATION "CE/profiles" COMPONENT CEditor
         FILES_MATCHING PATTERN "*.json"
     )
+    install(DIRECTORY "${CE_ROOT}/sets/"
+        DESTINATION "CE/sets" COMPONENT CEditor FILES_MATCHING PATTERN "*.json")
+    install(DIRECTORY "${CE_ROOT}/panels/Control set starters/"
+        DESTINATION "CE/panels/Control set starters" COMPONENT CEditor FILES_MATCHING PATTERN "*.cepanel")
     install(TARGETS CEditor
         RUNTIME DESTINATION "." COMPONENT CEditor
         RESOURCE DESTINATION "." COMPONENT CEditor

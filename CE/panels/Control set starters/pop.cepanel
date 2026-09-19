@@ -1,0 +1,2748 @@
+{
+  "panelGuid": "ba372893-9152-3f80-2112-9abdc348ed14",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Pop — starter",
+  "scriptId": "panel_3",
+  "author": "",
+  "version": "1.0.0",
+  "description": "Heavy outlines, offset shadows, oversized caps and round pads.",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 880,
+  "height": 636,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF333333",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Knob_1789856866626.value",
+      "label": "Knob_1789856866626",
+      "controlName": "Knob_1789856866626",
+      "path": "Knob_1789856866626.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.63,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob_1789856866627.value",
+      "label": "Knob_1789856866627",
+      "controlName": "Knob_1789856866627",
+      "path": "Knob_1789856866627.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789856866628.value",
+      "label": "Slider_1789856866628",
+      "controlName": "Slider_1789856866628",
+      "path": "Slider_1789856866628.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.66,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Crossfader_1789856866629.value",
+      "label": "Crossfader_1789856866629",
+      "controlName": "Crossfader_1789856866629",
+      "path": "Crossfader_1789856866629.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789856866631.value",
+      "label": "ToggleButton_1789856866631",
+      "controlName": "ToggleButton_1789856866631",
+      "path": "ToggleButton_1789856866631.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CyclicButton_1789856866632.value",
+      "label": "CyclicButton_1789856866632",
+      "controlName": "CyclicButton_1789856866632",
+      "path": "CyclicButton_1789856866632.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Combobox_1789856866633.value",
+      "label": "Combobox_1789856866633",
+      "controlName": "Combobox_1789856866633",
+      "path": "Combobox_1789856866633.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Number_1789856866634.value",
+      "label": "Number_1789856866634",
+      "controlName": "Number_1789856866634",
+      "path": "Number_1789856866634.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ribbon_1789856866640.value",
+      "label": "Ribbon_1789856866640",
+      "controlName": "Ribbon_1789856866640",
+      "path": "Ribbon_1789856866640.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789856866643.x",
+      "label": "VectorJoystick_1789856866643 X",
+      "controlName": "VectorJoystick_1789856866643",
+      "path": "VectorJoystick_1789856866643.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789856866643.y",
+      "label": "VectorJoystick_1789856866643 Y",
+      "controlName": "VectorJoystick_1789856866643",
+      "path": "VectorJoystick_1789856866643.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "pop"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866622",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866622",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 16,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "POP",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 24,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866623",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866623",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 48,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Playful / print",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866624",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866624",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 92,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TURN / SLIDE",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866625",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866625",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 92,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PRESS / SELECT",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789856866626",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866626",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 126,
+          "width": 120,
+          "height": 132
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.63,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 7
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "colour": "551B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 7
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5BC8FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Border": {
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 40,
+                  "height": 62
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              },
+              "kind": "capdot"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Border": {
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "881B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF74D0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF1B1B1B"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF1B1B1B"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789856866627",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866627",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 164,
+          "y": 142,
+          "width": 92,
+          "height": 110
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.35,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 7
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "colour": "551B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 7
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5BC8FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Border": {
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 40,
+                  "height": 62
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              },
+              "kind": "capdot"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Border": {
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "881B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF74D0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF1B1B1B"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF1B1B1B"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789856866628",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866628",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 288,
+          "y": 140,
+          "width": 214,
+          "height": 78
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.66,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 14
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 14
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5BC8FF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    },
+                    "Border": {
+                      "colour": "991B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 28,
+                  "height": 28
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 28,
+                  "height": 28
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 28,
+                  "height": 28
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Border": {
+                      "thickness": 3,
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "881B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFF6B5B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BC46E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "LEVEL",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A4A1E"
+                    },
+                    "Font": {
+                      "family": "Rubik",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF74D0FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFFF8A7D"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF1B1B1B"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF1B1B1B"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Crossfader_1789856866629",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866629",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 288,
+          "y": 224,
+          "width": 214,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Crossfader": {
+          "handleSize": 22,
+          "handleStyle": "round",
+          "trackSize": 8,
+          "trackColour": "FFFFFFFF",
+          "fillAColour": "FFFF6B5B",
+          "fillBColour": "FF5BC8FF",
+          "handleColour": "FFFF6B5B",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789856866630",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866630",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 128,
+          "width": 126,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 999
+            }
+          }
+        },
+        "Text": {
+          "content": "TRIGGER",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFF3E0"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFD9C9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "ToggleButton_1789856866631",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866631",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 692,
+          "y": 128,
+          "width": 160,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 999
+            }
+          }
+        },
+        "Text": {
+          "content": "HOLD",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        },
+        "Behavior": {
+          "defaultValue": true
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFF3E0"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFD9C9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFF6B5B",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFCC8D1A",
+                  "Background.Border.colour": "FFFFB020",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "CyclicButton_1789856866632",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866632",
+          "controlType": "CyclicButton"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 186,
+          "width": 126,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 999
+            }
+          }
+        },
+        "Text": {
+          "content": "CYCLE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFF3E0"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFD9C9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B",
+                  "Text.Fill.colour": "FF202020",
+                  "_removed": [
+                    "Background.Fill.colour"
+                  ]
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFCC8D1A",
+                  "Background.Border.colour": "FFFFB020",
+                  "Text.Fill.colour": "FFFFFFFF"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Combobox_1789856866633",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866633",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 692,
+          "y": 186,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 12
+            }
+          }
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFEBEBEB"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Number_1789856866634",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866634",
+          "controlType": "Number"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 246,
+          "width": 150
+        },
+        "Parts": {
+          "_children": {
+            "decrement": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "colour": "661B1B1B"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            },
+            "valueField": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "colour": "661B1B1B"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono"
+                    }
+                  }
+                }
+              }
+            },
+            "increment": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "colour": "661B1B1B"
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1B1B1B"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  },
+                  "valueField": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  }
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FFE6E6E6"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FFE6E6E6"
+                  }
+                }
+              }
+            },
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Fill.colour": "FFFFD3CE",
+                    "Background.Border.colour": "FFFF6B5B"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Border.colour": "FF1B1B1B"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "TextInput_1789856866635",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866635",
+          "controlType": "TextInput"
+        },
+        "Transform": {
+          "x": 710,
+          "y": 246,
+          "width": 142,
+          "height": 38
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 999
+            }
+          }
+        },
+        "Text": {
+          "content": "Studio A",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFEBEBEB"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF1B1B1B"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866636",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866636",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PLAY / SHAPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866637",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866637",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "MEASURE / ROUTE",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "DrumPads_1789856866638",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866638",
+          "controlType": "DrumPads"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 348,
+          "width": 228,
+          "height": 214
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "DrumPads": {
+          "rows": 2,
+          "cols": 2,
+          "showNotes": false,
+          "showHeader": false,
+          "padAppearance": "raised",
+          "padRadius": 24,
+          "fieldColour": "FFFFFFFF",
+          "padColour": "FFFFFFFF",
+          "accentColour": "FFFF6B5B",
+          "hitColour": "FF1B1B1B",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Envelope_1789856866639",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866639",
+          "controlType": "Envelope"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 348,
+          "width": 220,
+          "height": 120
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Envelope": {
+          "lineWidth": 3,
+          "nodeRadius": 6,
+          "lineColour": "FFFF6B5B",
+          "fillColour": "20000000",
+          "nodeColour": "FFFF6B5B",
+          "gridColour": "661B1B1B",
+          "sustainColour": "FF5BC8FF",
+          "playheadColour": "FF1B1B1B"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Ribbon_1789856866640",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866640",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 484,
+          "width": 220,
+          "height": 76
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Ribbon": {
+          "orientation": "horizontal",
+          "style": "strip",
+          "showGlow": false,
+          "indicatorSize": 8,
+          "trackColour": "FFFFFFFF",
+          "fillColour": "FFFF6B5B",
+          "indicatorColour": "FFFF6B5B",
+          "glowColour": "FFFF6B5B",
+          "wheelColour": "FFFFFFFF",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Meter_1789856866641",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866641",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 354,
+          "width": 312,
+          "height": 48
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Meter": {
+          "value": 0.7,
+          "segments": 8,
+          "segmentGap": 3,
+          "trackColour": "FFFFFFFF",
+          "fillColour": "FFFF6B5B",
+          "thickness": 16,
+          "rounded": true,
+          "peakColour": "FF1B1B1B",
+          "showTicks": true
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789856866642",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866642",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 430,
+          "width": 166,
+          "height": 134
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ],
+          "cellStyle": "dot",
+          "rowHeaderW": 42,
+          "cellBg": "FFFFFFFF",
+          "gridColour": "661B1B1B",
+          "posColour": "FFFF6B5B",
+          "negColour": "FF5BC8FF",
+          "labelColour": "FF202020",
+          "activeColour": "FF1B1B1B"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789856866643",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866643",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 430,
+          "width": 124,
+          "height": 134
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFFFFFFF"
+            },
+            "Border": {
+              "thickness": 3,
+              "colour": "FF1B1B1B"
+            },
+            "Corners": {
+              "radius": 14
+            }
+          }
+        },
+        "Joystick": {
+          "puckRadius": 14,
+          "padColour": "FFFFFFFF",
+          "gridColour": "661B1B1B",
+          "crosshairColour": "FFFF6B5B",
+          "puckColour": "FFFF6B5B",
+          "cornerColour": "FF5A4A1E",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 3,
+                  "offsetY": 3,
+                  "blur": 0,
+                  "spread": 0,
+                  "colour": "FF1B1B1B"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789856866644",
+          "controlSetId": "pop",
+          "id": "ctrl_1789856866644",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 590,
+          "width": 820,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Copy a control into your panel. Its pinned design travels with it.",
+          "_children": {
+            "Fill": {
+              "colour": "FF1B1B1B"
+            },
+            "Font": {
+              "family": "Rubik",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFFF6B5B",
+          "lampOffColour": "FFFFFFFF",
+          "lampBezelColour": "661B1B1B"
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

@@ -62,6 +62,16 @@
 </script>
 
 {#if d}
+  <PropertySection title="Pad design" icon={Palette}>
+    <PropertyCell label="Face" span={2}>
+      <select class="val" value={d.padAppearance ?? 'flat'} onchange={(e) => set('padAppearance', e.target.value)}>
+        {#each ['flat', 'outline', 'raised', 'inset', 'glass', 'chamfer'] as style}<option value={style}>{style}</option>{/each}
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Corners" span={2}>
+      <NumberCell label="Radius" value={d.padRadius ?? 6} min={0} max={40} step={1} defaultValue={6} onchange={(v) => set('padRadius', v)} />
+    </PropertyCell>
+  </PropertySection>
   <PropertySection title="Drum Pads" icon={LayoutGrid}>
     <PropertyCell label="Rows" span={1} compact hint="Grid height.">
       <NumberCell label="Rows" value={num(d.rows, 4)} step={1} min={1} max={8} defaultValue={4} onchange={(v) => set('rows', clampInt(v, 1, 8, 4))} />

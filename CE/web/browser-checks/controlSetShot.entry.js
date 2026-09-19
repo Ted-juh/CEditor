@@ -5,6 +5,11 @@ import { createPanel } from '../src/CE_Application/stores/panelModel.js';
 import { normalizeControlSet } from '../src/CE_Application/models/controlSets.js';
 // The panel faces: a set's type block names them, and a picture in the fallback face proves nothing.
 import '../src/assets/fonts/panelFonts.css';
+import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
+import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
+import ControlSetGallery from '../src/CE_Application/panels/ControlSetGallery.svelte';
+import { panels, activePanel, addPanel } from '../src/CE_Application/stores/panels.js';
+import { get } from 'svelte/store';
 
 window.__JUCE__ = undefined;
 
@@ -38,6 +43,19 @@ function specimenPanel(setId) {
 
 let mounted = null;
 window.__controlSetShot = {
+  starterIds: STARTER_CONTROL_SETS.map(s => s.id),
+  showStarter(id) {
+    if (mounted) unmount(mounted);
+    const panel = createControlSetStarter(id);
+    mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
+    return { width: panel.width, height: panel.height, controls: panel.controls.length };
+  },
+  gallery() {
+    if (mounted) unmount(mounted);
+    if (!get(activePanel)) addPanel(createControlSetStarter('graphite'));
+    mounted = mount(ControlSetGallery, { target: document.getElementById('host'), props: { onclose: () => { if (mounted) unmount(mounted); mounted = null; } } });
+  },
+  active() { const p = get(activePanel); return { count: get(panels).length, name: p?.name, set: p?.controlSet?.id, pins: p?.controls?.map(c => c._children.Core.controlSetId) }; },
   show(setId) {
     if (mounted) unmount(mounted);
     const panel = specimenPanel(setId);
