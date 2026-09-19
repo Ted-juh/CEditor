@@ -184,7 +184,9 @@ export const MACHINED_CONTROL_SET = {
     Knob: {
       component: { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
       parts: {
-        tickMajor: { 'Layout.width': 1.5, 'Layout.height': 5 },
+        // Eleven marks cut into the plate: a dark line over its own light edge.
+        tickMajor: { kind: 'engraved', 'Layout.width': 1.5, 'Layout.height': 5 },
+        tickMinor: { kind: 'engraved' },
         // The slot the arc runs in: thin and dark, with a hairline.
         bodyTrackBase: { 'Layout.height': 5 },
         bodyTrackFill: { 'Layout.height': 5 },

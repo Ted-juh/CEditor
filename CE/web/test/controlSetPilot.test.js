@@ -40,7 +40,7 @@ import {
   writeControlPath,
 } from '../src/CE_Application/models/controlSetFamilies.js';
 import { DEFAULT_LAMP, MATERIAL_KINDS, materialActive, materialPrimitives, resolveMaterialLamp } from '../src/CE_Application/utils/materialFilter.js';
-import { buttonFamily, lampFamily, mergeFamilies, sliderFamily } from '../src/CE_Application/models/controlSetRecipes.js';
+import { buttonFamily, knobFamily, lampFamily, mergeFamilies, sliderFamily } from '../src/CE_Application/models/controlSetRecipes.js';
 import { hasSurfaceEffects } from '../src/CE_Application/utils/surfaceEffects.js';
 import { COMPONENT_GROUPS } from '../src/CE_Application/utils/effectStack.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
@@ -445,6 +445,30 @@ test('the recipes: a fader cap, a toggle lamp that keeps the body, and inks per 
   // Every control with a ContentLayout starts with no lamp, so nothing that exists changes.
   assert.equal(SECTION_DEFAULTS.ContentLayout.lamp, 'none');
   assert.equal(createControl('Button')._children.ContentLayout.lamp, 'none');
+});
+
+test('ticks: a set can switch them off, count them, shape them and choose which stops draw', () => {
+  const off = sliderFamily({ ticks: false }).Slider.component;
+  assert.equal(off['Behavior.showTicks'], false);
+  const dial = knobFamily({ cap: 77, ticks: { count: 11, length: 6, width: 1, kind: 'numeral', stops: 'all' } }).Knob;
+  assert.equal(dial.component['Behavior.majorTickCount'], 11);
+  assert.equal(dial.parts.tickMajor.kind, 'numeral');
+  assert.equal(dial.parts.tickMinor.kind, 'line', 'numerals are for the majors; the minors between them stay lines');
+  const cut = knobFamily({ cap: 77, ticks: { kind: 'engraved', stops: 'endsCentre' } }).Knob;
+  assert.equal(cut.parts.tickMajor.kind, 'engraved');
+  assert.equal(cut.parts.tickMinor.kind, 'engraved');
+  assert.equal(cut.component['Behavior.tickStops'], 'endsCentre');
+  // Applied: the kind lands on the factory tick parts, and the default stays a plain line.
+  const knob = createControl('Knob');
+  assert.equal(part(knob, 'tickMajor').kind, undefined);
+  assert.equal(SECTION_DEFAULTS.Behavior.tickStops, 'all');
+  const styled = resolveControlForSet(knob, { ...tolex, id: 't', families: { Knob: cut } });
+  assert.equal(part(styled, 'tickMajor').kind, 'engraved');
+  assert.equal(readControlPath(styled, 'Behavior.tickStops'), 'endsCentre');
+  // The boards: Machined cuts its marks, Reel prints its dial, Phosphor's ring is LEDs.
+  assert.equal(machined.families.Knob.parts.tickMajor.kind, 'engraved');
+  assert.equal(getControlSet('reel').families.Knob.parts.tickMajor.kind, 'numeral');
+  assert.equal(getControlSet('phosphor').families.Knob.parts.tickMajor.kind, 'dot');
 });
 
 test('the panel follows the set\'s colour only while it wears the default one', () => {

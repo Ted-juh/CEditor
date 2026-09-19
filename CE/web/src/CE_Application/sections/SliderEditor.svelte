@@ -396,6 +396,25 @@
         <option value="cross">cross</option>
       </select>
     </PropertyCell>
+    <!-- How a tick is drawn, and which major stops draw. A control set usually chooses these;
+         this is where an author overrides it. Numerals are for the majors, so the minors between
+         them stay lines. -->
+    <PropertyCell label="Tick Style" span={2} hint="A line, a dot (an LED ring), the stop's numeral (a dial's 0–10), or a line engraved into the plate.">
+      <select class="val" value={parts?._children?.tickMajor?.kind ?? 'line'}
+              onchange={(event) => setPatch({ 'Parts.tickMajor.kind': event.target.value, 'Parts.tickMinor.kind': event.target.value === 'numeral' ? 'line' : event.target.value })}>
+        <option value="line">line</option>
+        <option value="dot">dot</option>
+        <option value="numeral">numeral</option>
+        <option value="engraved">engraved</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Tick Stops" span={2} hint="Which major stops draw: every one, only the two ends, or the ends and the centre.">
+      <select class="val" value={behavior.tickStops ?? 'all'} onchange={(event) => set('Behavior.tickStops', event.target.value)}>
+        <option value="all">all</option>
+        <option value="ends">ends</option>
+        <option value="endsCentre">ends and centre</option>
+      </select>
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Interaction" icon={MousePointer}>

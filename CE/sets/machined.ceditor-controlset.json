@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0a12e1ac",
+  "fingerprint": "0acd2c7a",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -73,8 +73,12 @@
         },
         "parts": {
           "tickMajor": {
+            "kind": "engraved",
             "Layout.width": 1.5,
             "Layout.height": 5
+          },
+          "tickMinor": {
+            "kind": "engraved"
           },
           "bodyTrackBase": {
             "Layout.height": 5

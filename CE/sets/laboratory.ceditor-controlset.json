@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6c820676",
+  "fingerprint": "700e0dcc",
   "set": {
     "id": "laboratory",
     "name": "Laboratory",
@@ -73,9 +73,13 @@
           "Behavior.majorTickLength": 6
         },
         "parts": {
+          "tickMinor": {
+            "kind": "engraved"
+          },
           "tickMajor": {
             "Layout.width": 1.3,
-            "Layout.height": 6
+            "Layout.height": 6,
+            "kind": "engraved"
           },
           "bodyCap": {
             "visible": true,

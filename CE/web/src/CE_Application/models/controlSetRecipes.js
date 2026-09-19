@@ -21,6 +21,35 @@ function material(kind, strength = 100, shine = 100, grain = 100) {
 }
 
 /**
+ * The tick marks a set asks for, as Behavior settings plus the tick parts' drawing.
+ *   false               — none
+ *   { count, minor, length, width, kind, stops }
+ *     kind  — 'line' (the default) | 'dot' (an LED ring, a dotted scale) | 'numeral' (the stop's
+ *             index printed where the tick would be: a dial's 0…10) | 'engraved' (a dark line over
+ *             a light one, cut into the plate)
+ *     stops — 'all' | 'ends' | 'endsCentre': which major stops draw
+ * Writes into `parts` (tickMajor / tickMinor) and returns the Behavior patch.
+ */
+function tickSettings(ticks, parts) {
+  if (ticks === false) return { 'Behavior.showTicks': false };
+  if (!ticks || typeof ticks !== 'object') return {};
+  const component = {
+    'Behavior.showTicks': true,
+    'Behavior.majorTickCount': ticks.count ?? 11,
+    'Behavior.minorTickCount': ticks.minor ?? 0,
+    'Behavior.majorTickLength': ticks.length ?? 5,
+  };
+  if (ticks.stops) component['Behavior.tickStops'] = ticks.stops;
+  const major = { 'Layout.width': ticks.width ?? 1.5, 'Layout.height': ticks.length ?? 5 };
+  if (ticks.kind && ticks.kind !== 'line') {
+    major.kind = ticks.kind;
+    parts.tickMinor = { kind: ticks.kind === 'numeral' ? 'line' : ticks.kind };
+  }
+  parts.tickMajor = major;
+  return component;
+}
+
+/**
  * A knob family.
  *   cap      — diameter as a % of the track's diameter (0 = no cap: the arc-and-dot knob)
  *   capFill / capEdge / capEdgeWidth — the disc (defaults: the set's cap tokens, 1 px)
@@ -43,15 +72,7 @@ export function knobFamily({
     component['Behavior.showMinMaxLabels'] = false;
     component['Behavior.labelReadoutPlacement'] = 'bottom';
   }
-  if (ticks === false) {
-    component['Behavior.showTicks'] = false;
-  } else if (ticks && typeof ticks === 'object') {
-    component['Behavior.showTicks'] = true;
-    component['Behavior.majorTickCount'] = ticks.count ?? 11;
-    component['Behavior.minorTickCount'] = ticks.minor ?? 0;
-    component['Behavior.majorTickLength'] = ticks.length ?? 5;
-    parts.tickMajor = { 'Layout.width': ticks.width ?? 1.5, 'Layout.height': ticks.length ?? 5 };
-  }
+  Object.assign(component, tickSettings(ticks, parts));
   // The value readout sits in the middle of the knob when the labels are left alone, which with
   // a cap on is the middle of the cap; `readoutFill` names an ink that reads there.
   if (cap > 0 && readoutFill && labels !== 'board') parts.labelValue = { 'Text.Fill.colour': readoutFill };
@@ -138,14 +159,7 @@ export function sliderFamily({
   const parts = {};
   const component = {};
   if (labels === 'board') component['Behavior.showMinMaxLabels'] = false;
-  if (ticks === false) {
-    component['Behavior.showTicks'] = false;
-  } else if (ticks && typeof ticks === 'object') {
-    component['Behavior.showTicks'] = true;
-    component['Behavior.majorTickCount'] = ticks.count ?? 11;
-    component['Behavior.minorTickCount'] = ticks.minor ?? 0;
-    component['Behavior.majorTickLength'] = ticks.length ?? 5;
-  }
+  Object.assign(component, tickSettings(ticks, parts));
   const pointer = {
     'Layout.width': capAlong,
     'Layout.height': capAcross,

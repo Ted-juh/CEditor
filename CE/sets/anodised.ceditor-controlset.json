@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d2a48104",
+  "fingerprint": "f7c9ea06",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -73,9 +73,13 @@
           "Behavior.majorTickLength": 5
         },
         "parts": {
+          "tickMinor": {
+            "kind": "engraved"
+          },
           "tickMajor": {
             "Layout.width": 1.5,
-            "Layout.height": 5
+            "Layout.height": 5,
+            "kind": "engraved"
           },
           "bodyCap": {
             "visible": true,

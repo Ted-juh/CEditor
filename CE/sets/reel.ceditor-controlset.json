@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c926b815",
+  "fingerprint": "28fe7006",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -67,9 +67,20 @@
         "component": {
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.showTicks": false
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
         },
         "parts": {
+          "tickMinor": {
+            "kind": "line"
+          },
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral"
+          },
           "bodyCap": {
             "visible": true,
             "Layout.width": 90,

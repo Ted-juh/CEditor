@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8085189c",
+  "fingerprint": "8ca8ad6d",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -74,7 +74,7 @@
         },
         "parts": {
           "tickMajor": {
-            "Layout.width": 1.5,
+            "Layout.width": 1,
             "Layout.height": 5
           },
           "bodyCap": {

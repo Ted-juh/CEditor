@@ -903,6 +903,9 @@ export const SECTION_DEFAULTS = {
     majorTickLength: 12,
     minorTickLength: 7,
     tickPlacement: 'outside',
+    // Which major stops draw: every one, only the two ends, or the ends and the centre — a scale
+    // that marks min, max and the detent and nothing else. Minor ticks follow the majors shown.
+    tickStops: 'all',             // all / ends / endsCentre
     showMinMaxLabels: true,
     showHandleLabels: false,
     showValueReadout: true,

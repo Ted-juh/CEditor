@@ -415,6 +415,15 @@ patch reaching the Behavior tick and label settings, so a set can switch ticks o
 short ones, hide the min/max labels and put the value under the knob. An arc the board did not draw
 is hidden by opacity rather than removed, so the value still has its ring for the hit test.
 
+**Ticks have a kind.** Every tick used to be one SVG line, so no set could ask for anything but
+stripes. The tick parts now carry a `kind`: `line` (the default, every existing control), `dot` (an
+LED ring, a dotted scale — Phosphor), `numeral` (the stop's index printed where the tick would be —
+the Reel dial's 0…10), `engraved` (a dark line over its own light edge — the machined and lit
+boards). `Behavior.tickStops` says which major stops draw at all: every one, the two ends, or the
+ends and the centre. One snippet in the slider renderer draws all four loops (major and minor,
+linear and circular), so a kind means the same thing on a fader and a knob. The recipes take it as
+`ticks: { count, length, width, kind, stops }` and the conversion maps each board's style.
+
 **Graphite follows its board too.** Its board is "today's look" in colour, but it draws a dark body
 with a white dot, a thin arc, no ticks, the value below — not the arc-and-dot with a tick comb the
 renderer drew by default. Graphite now carries that family through the extras, which means the

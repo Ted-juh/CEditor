@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f732ac08",
+  "fingerprint": "703b7f1a",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -73,9 +73,13 @@
           "Behavior.majorTickLength": 5
         },
         "parts": {
+          "tickMinor": {
+            "kind": "engraved"
+          },
           "tickMajor": {
             "Layout.width": 1.5,
-            "Layout.height": 5
+            "Layout.height": 5,
+            "kind": "engraved"
           },
           "bodyCap": {
             "visible": true,
