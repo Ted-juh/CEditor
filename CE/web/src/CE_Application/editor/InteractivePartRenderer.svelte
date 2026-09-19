@@ -4,6 +4,8 @@
   import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { materialActive } from '../utils/materialFilter.js';
+  import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
 
   let {
     part = null,
@@ -148,7 +150,18 @@
   let partRotation = $derived(numberOr(layout?.rotation, 0));
   let shadowCSS = $derived(buildShadowCSS(effects));
   let blendCSS = $derived(buildBlendCSS(effects));
-  let filterCSS = $derived(buildFilterCSS(effects));
+  // A lit material (utils/materialFilter.js) is an SVG filter this part owns; it goes first in the
+  // filter list so the CSS blur / brightness that follow act on the lit surface.
+  const partUid = $props.id();
+  let material = $derived(effects?._children?.Material ?? null);
+  let materialLit = $derived(materialActive(material));
+  let materialId = $derived(`part-material-${partUid}`);
+  let filterCSS = $derived.by(() => {
+    const css = buildFilterCSS(effects);
+    if (!materialLit) return css;
+    const rest = css.replace(/^filter:\s*/, '').replace(/;$/, '');
+    return `filter: url(#${materialId})${rest ? ` ${rest}` : ''};`;
+  });
   let partStyle = $derived.by(() => {
     const transforms = [];
     if (Math.abs(partRotation) > 0.001) transforms.push(`rotate(${partRotation}deg)`);
@@ -481,6 +494,9 @@
 
 {#if part?.visible !== false}
   <div class="interactive-part" class:debug={debug} style={partStyle}>
+    {#if materialLit}
+      <MaterialFilter id={materialId} {material} />
+    {/if}
     {#if background && usesSimpleBackground && !rendersVectorShape}
       <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
     {:else if background && !rendersVectorShape}

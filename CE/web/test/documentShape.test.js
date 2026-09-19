@@ -329,7 +329,7 @@ test('the export payload is written in full, because C++ reads it', () => {
   const exported = JSON.parse(serializePanel(panel, { elide: false }));
 
   assert.ok(!('Parts' in authored.controls[0]._children), 'the authoring document should be a diff');
-  assert.equal(Object.keys(exported.controls[0]._children.Parts._children).length, 17,
+  assert.equal(Object.keys(exported.controls[0]._children.Parts._children).length, 18,
     'the export payload must carry every section in full');
   assert.equal(difference(panel.controls[0], exported.controls[0]), null,
     'the un-elided form should be the control itself');

@@ -22,6 +22,8 @@
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -153,7 +155,10 @@
   });
   let textDraft = $state('');
   let textDraftSource = $state('');
-  let displayTextFillColour = $derived(String(textFill?.colour ?? 'FFFFFFFF').slice(-6));
+  // Linked to the control set ('{text.primary}'): show the set's colour, name the token. See
+  // BackgroundEditor for the same arrangement and the reasoning.
+  let textFillToken = $derived(tokenNameOf(textFill?.colour));
+  let displayTextFillColour = $derived(resolveColourLiteral(textFill?.colour ?? 'FFFFFFFF', $activeControlSet, 'FFFFFFFF').slice(-6));
 
   $effect(() => {
     const current = String(text?.content ?? '');
@@ -1237,6 +1242,9 @@
             <button class="mini-swatch" title="Pick colour" style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
             <input class="val" type="text" value={displayTextFillColour} onfocus={selectAll} onchange={setTextFillDisplayColour} />
           </div>
+          {#if textFillToken}
+            <span class="token-chip" title={`Follows the panel's control set (${textFillToken}). Typing a colour overrides the link for this property.`}>{textFillToken}</span>
+          {/if}
         </PropertyCell>
         <PropertyCell label="Fill Order" span={2} hint="Paint order among the text fill layers. Lower paints first.">
           <NumberCell value={Number(fillProp('order', 50))} step={1} onchange={(value) => setFillNumber('order', value, 1)} />
@@ -2142,5 +2150,24 @@
     line-height: 1;
     text-decoration: overline;
     text-decoration-thickness: 1px;
+  }
+  /* A colour that follows the panel's control set names its token here. Phase 1 of
+     docs/design/control-sets.md: the link is shown; override is typing a colour. */
+  .token-chip {
+    display: inline-block;
+    max-width: 100%;
+    margin-top: 3px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    line-height: 14px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #9fd0ff;
+    background: rgba(91, 155, 213, 0.16);
+    border: 1px solid rgba(91, 155, 213, 0.35);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: help;
   }
 </style>

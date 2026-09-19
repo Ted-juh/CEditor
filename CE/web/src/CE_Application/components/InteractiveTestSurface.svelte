@@ -705,6 +705,7 @@
         trackThickness,
         pointerSize: maxPointerSize,
         majorTickLength: sliderMajorTickLength() * scale,
+        hasTicks: behavior?.showTicks !== false,
         hasReadout: showReadout,
         circularDiameter: numberOr(behavior?.circularDiameter, 0) * scale,
       });

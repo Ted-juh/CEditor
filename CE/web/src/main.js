@@ -3,6 +3,8 @@ import { mount } from 'svelte';
 // assets/fonts/webFonts.css for why: as a remote @import this cost 12.5 s of blank window on a
 // machine that could not reach fonts.googleapis.com.
 import './assets/fonts/webFonts.css';
+// The faces a panel may use (a control set's `type` block); the player loads the same sheet.
+import './assets/fonts/panelFonts.css';
 import App from './App.svelte';
 
 const app = mount(App, {

@@ -225,17 +225,17 @@ function sliderParts() {
 
 function rangeParts() {
   const buttonBackground = rootBackgroundClone();
-  buttonBackground._children.Fill.colour = 'FF343434';
+  buttonBackground._children.Fill.colour = '{control.button}';
   buttonBackground._children.Border.enabled = true;
   buttonBackground._children.Border.thickness = 1;
-  buttonBackground._children.Border.colour = '664C4C4C';
+  buttonBackground._children.Border.colour = '{border}';
   buttonBackground._children.Corners.radius = 8;
 
   const fieldBackground = rootBackgroundClone();
-  fieldBackground._children.Fill.colour = 'FF151515';
+  fieldBackground._children.Fill.colour = '{control.field}';
   fieldBackground._children.Border.enabled = true;
   fieldBackground._children.Border.thickness = 1;
-  fieldBackground._children.Border.colour = '665B5B5B';
+  fieldBackground._children.Border.colour = '{border.field}';
   fieldBackground._children.Corners.radius = 8;
 
   const buttonText = (content) => {
@@ -326,20 +326,20 @@ function rangeParts() {
 // border). Distinct from Number, which is a single-value stepper.
 function rangeSpinnerParts(lowContent = '40', highContent = '90') {
   const buttonBackground = rootBackgroundClone();
-  buttonBackground._children.Fill.colour = 'FF343434';
+  buttonBackground._children.Fill.colour = '{control.button}';
   buttonBackground._children.Border.enabled = true;
   buttonBackground._children.Border.thickness = 1;
-  buttonBackground._children.Border.colour = '664C4C4C';
+  buttonBackground._children.Border.colour = '{border}';
   buttonBackground._children.Corners.radius = 8;
 
   const fieldBackground = (active = false) => {
     const bg = rootBackgroundClone();
-    bg._children.Fill.colour = 'FF151515';
+    bg._children.Fill.colour = '{control.field}';
     bg._children.Border.enabled = true;
     bg._children.Border.thickness = 1;
     // Active field gets the accent border so it's clear which value the
     // steppers (and typing) will change.
-    bg._children.Border.colour = active ? 'FF89C2FF' : '665B5B5B';
+    bg._children.Border.colour = active ? '{accent.hot}' : '{border.field}';
     bg._children.Corners.radius = 8;
     return bg;
   };
@@ -687,14 +687,14 @@ export function createStatesDefaults(type) {
           description: 'Highlight when the pointer is over the control.',
           when: { hover: true },
           component: {
-            'Background.Fill.colour': 'FF4A4A4A',
+            'Background.Fill.colour': '{surface.hover}',
           },
         }),
         Pressed: createStateNode('Pressed', {
           description: 'Darken the control while it is pressed.',
           when: { pressed: true },
           component: {
-            'Background.Fill.colour': 'FF2C2C2C',
+            'Background.Fill.colour': '{surface.pressed}',
             'Transform.scale': 0.98,
           },
         }),
@@ -702,7 +702,7 @@ export function createStatesDefaults(type) {
           description: 'Slight emphasis for keyboard focus.',
           when: { focused: true },
           component: {
-            'Background.Border.colour': 'FF89C2FF',
+            'Background.Border.colour': '{accent.hot}',
           },
         }),
         Checked: createStateNode('Checked', {
@@ -710,8 +710,8 @@ export function createStatesDefaults(type) {
           description: 'Selected visual state.',
           when: { checked: true },
           component: {
-            'Background.Fill.colour': 'FF2D6F9C',
-            'Text.Fill.colour': 'FFFFFFFF',
+            'Background.Fill.colour': '{surface.checked}',
+            'Text.Fill.colour': '{text.inverse}',
           },
         }),
         Mixed: createStateNode('Mixed', {
@@ -719,9 +719,9 @@ export function createStatesDefaults(type) {
           description: 'Indeterminate visual state when mixed values are allowed.',
           when: { mixed: true },
           component: {
-            'Background.Fill.colour': 'FF806019',
-            'Background.Border.colour': 'FFFFD166',
-            'Text.Fill.colour': 'FFFFFFFF',
+            'Background.Fill.colour': '{surface.mixed}',
+            'Background.Border.colour': '{border.mixed}',
+            'Text.Fill.colour': '{text.inverse}',
           },
         }),
         Disabled: createStateNode('Disabled', {
@@ -766,13 +766,13 @@ export function createStatesDefaults(type) {
           when: { dragging: true },
           parts: {
             bodyTrackFill: {
-              'Background.Fill.colour': 'FF71B8F1',
+              'Background.Fill.colour': '{control.fill.hot}',
             },
             bodySelectedRange: {
-              'Background.Fill.colour': 'FF9FD0FF',
+              'Background.Fill.colour': '{control.range.hot}',
             },
             pointerCurrent: {
-              'Background.Fill.colour': 'FFFFFFFF',
+              'Background.Fill.colour': '{control.cap.hot}',
               'Layout.scale': 1.08,
             },
           },
@@ -782,10 +782,10 @@ export function createStatesDefaults(type) {
           when: { focused: true },
           parts: {
             pointerCurrent: {
-              'Background.Border.colour': 'FF89C2FF',
+              'Background.Border.colour': '{accent.hot}',
             },
             labelValue: {
-              'Text.Fill.colour': 'FFDAEEFF',
+              'Text.Fill.colour': '{text.focus}',
             },
           },
         }),
@@ -843,13 +843,13 @@ export function createStatesDefaults(type) {
           when: { hover: true },
           parts: {
             decrement: {
-              'Background.Fill.colour': 'FF3D3D3D',
+              'Background.Fill.colour': '{control.button.hover}',
             },
             increment: {
-              'Background.Fill.colour': 'FF3D3D3D',
+              'Background.Fill.colour': '{control.button.hover}',
             },
             valueField: {
-              'Background.Fill.colour': 'FF1B1B1B',
+              'Background.Fill.colour': '{control.field.hover}',
             },
           },
         }),
@@ -861,10 +861,10 @@ export function createStatesDefaults(type) {
           },
           parts: {
             decrement: {
-              'Background.Fill.colour': 'FF282828',
+              'Background.Fill.colour': '{control.button.pressed}',
             },
             increment: {
-              'Background.Fill.colour': 'FF282828',
+              'Background.Fill.colour': '{control.button.pressed}',
             },
           },
         }),
@@ -873,8 +873,8 @@ export function createStatesDefaults(type) {
           when: { dragging: true },
           parts: {
             valueField: {
-              'Background.Fill.colour': 'FF203141',
-              'Background.Border.colour': 'FF5B9BD5',
+              'Background.Fill.colour': '{control.field.active}',
+              'Background.Border.colour': '{accent}',
             },
           },
         }),
@@ -883,7 +883,7 @@ export function createStatesDefaults(type) {
           when: { focused: true },
           parts: {
             valueField: {
-              'Background.Border.colour': 'FF89C2FF',
+              'Background.Border.colour': '{accent.hot}',
             },
           },
         }),
@@ -911,16 +911,16 @@ export function createStatesDefaults(type) {
           when: { hover: true },
           parts: {
             decrement: {
-              'Background.Fill.colour': 'FF3D3D3D',
+              'Background.Fill.colour': '{control.button.hover}',
             },
             increment: {
-              'Background.Fill.colour': 'FF3D3D3D',
+              'Background.Fill.colour': '{control.button.hover}',
             },
             lowField: {
-              'Background.Fill.colour': 'FF1B1B1B',
+              'Background.Fill.colour': '{control.field.hover}',
             },
             highField: {
-              'Background.Fill.colour': 'FF1B1B1B',
+              'Background.Fill.colour': '{control.field.hover}',
             },
           },
         }),
@@ -932,10 +932,10 @@ export function createStatesDefaults(type) {
           },
           parts: {
             decrement: {
-              'Background.Fill.colour': 'FF282828',
+              'Background.Fill.colour': '{control.button.pressed}',
             },
             increment: {
-              'Background.Fill.colour': 'FF282828',
+              'Background.Fill.colour': '{control.button.pressed}',
             },
           },
         }),
@@ -944,10 +944,10 @@ export function createStatesDefaults(type) {
           when: { activeHandle: 'start' },
           parts: {
             lowField: {
-              'Background.Border.colour': 'FF89C2FF',
+              'Background.Border.colour': '{accent.hot}',
             },
             highField: {
-              'Background.Border.colour': '665B5B5B',
+              'Background.Border.colour': '{border.field}',
             },
           },
         }),
@@ -956,10 +956,10 @@ export function createStatesDefaults(type) {
           when: { activeHandle: 'end' },
           parts: {
             highField: {
-              'Background.Border.colour': 'FF89C2FF',
+              'Background.Border.colour': '{accent.hot}',
             },
             lowField: {
-              'Background.Border.colour': '665B5B5B',
+              'Background.Border.colour': '{border.field}',
             },
           },
         }),
@@ -985,14 +985,14 @@ export function createStatesDefaults(type) {
         description: 'Highlight when the pointer is over the control.',
         when: { hover: true },
         component: {
-          'Background.Fill.colour': 'FF4A4A4A',
+          'Background.Fill.colour': '{surface.hover}',
         },
       }),
       Pressed: createStateNode('Pressed', {
         description: 'Darken and slightly compress while pressed.',
         when: { pressed: true },
         component: {
-          'Background.Fill.colour': 'FF2C2C2C',
+          'Background.Fill.colour': '{surface.pressed}',
           'Transform.scale': 0.98,
         },
       }),
@@ -1000,7 +1000,7 @@ export function createStatesDefaults(type) {
         description: 'Slight emphasis for keyboard focus.',
         when: { focused: true },
         component: {
-          'Background.Border.colour': 'FF89C2FF',
+          'Background.Border.colour': '{accent.hot}',
         },
       }),
       Disabled: createStateNode('Disabled', {

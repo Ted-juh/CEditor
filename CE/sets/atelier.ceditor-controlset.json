@@ -1,0 +1,216 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "atelier",
+    "name": "Atelier",
+    "description": "Rams. Warm light-grey aluminium, flat pale knobs with one coloured dot, ticks but no arcs, tiny accents of orange and green. Less than you expect.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "7f81025b",
+  "set": {
+    "id": "atelier",
+    "name": "Atelier",
+    "description": "Rams. Warm light-grey aluminium, flat pale knobs with one coloured dot, ticks but no arcs, tiny accents of orange and green. Less than you expect.",
+    "tokens": {
+      "surface": "FFEDEDEA",
+      "surface.hover": "FFF6F6F3",
+      "surface.pressed": "FFD0D0CB",
+      "surface.checked": "FF1C1C1A",
+      "surface.mixed": "FFBA470A",
+      "control.button": "FFEDEDEA",
+      "control.button.hover": "FFEEEEEC",
+      "control.button.pressed": "FFD5D5D3",
+      "control.field": "FFF6F6F3",
+      "control.field.hover": "FFF6F6F4",
+      "control.field.active": "FFB5B5B2",
+      "control.select": "FFF6F6F3",
+      "control.select.hover": "FFF7F7F4",
+      "control.select.pressed": "FFE2E2E0",
+      "control.track": "FFB9B9B3",
+      "control.track.edge": "55B9B9B3",
+      "control.fill": "FF1C1C1A",
+      "control.fill.hot": "FFE8590C",
+      "control.range": "FF8C8C86",
+      "control.range.hot": "FF9D9D98",
+      "control.body": "FFEDEDEA",
+      "control.cap": "FF1C1C1A",
+      "control.cap.hot": "FFE8590C",
+      "control.cap.edge": "99B9B9B3",
+      "control.cap.start": "FFE8590C",
+      "control.cap.end": "FF3E8E4E",
+      "control.marker": "FF1C1C1A",
+      "control.tick": "CC1C1C1A",
+      "control.tick.minor": "881C1C1A",
+      "accent": "FF1C1C1A",
+      "accent.hot": "FFE8590C",
+      "text.primary": "FF1C1C1A",
+      "text.label": "FF1C1C1A",
+      "text.muted": "FF5E5E5A",
+      "text.focus": "FFE8590C",
+      "text.inverse": "FFFFFFFF",
+      "border": "66B9B9B3",
+      "border.surface": "66B9B9B3",
+      "border.field": "66B9B9B3",
+      "border.mixed": "FFE8590C",
+      "display.lit": "FFE8590C",
+      "display.unlit": "24E8590C",
+      "display.screen": "FF1C1C1A",
+      "display.backlight": "FF373735"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "capdot",
+            "Layout.width": 26,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5,
+            "opacity": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5,
+            "opacity": 0
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.tickNumerals": "value"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral",
+            "Background.Fill.colour": "CC1C1C1A"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "551C1C1A"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "FF1C1C1A",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "991C1C1A",
+            "Background.Border.colour": "FF1C1C1A",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "FF1C1C1A"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFD9D9D4"
+    },
+    "type": {
+      "label": {
+        "family": "Libre Franklin",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Libre Franklin",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

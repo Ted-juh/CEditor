@@ -62,7 +62,7 @@ export const SECTION_DEFAULTS = {
         _type: 'Fill',
         mode: 'solid',          // legacy primary layer / fallback
         layerOrder: ['solid', 'gradient', 'image', 'overlay'],
-        colour: 'FF3A3A3A',
+        colour: '{surface}',
         solidEnabled: true,
         solidBlend: 'normal',
         solidClipMode: 'shape',
@@ -192,7 +192,7 @@ export const SECTION_DEFAULTS = {
       Fill: {
         _type: 'Fill',
         mode: 'solid',
-        colour: 'FFFFFFFF',
+        colour: '{text.primary}',
         order: 50,
         gradientEnabled: false,
         gradientName: '',
@@ -494,6 +494,17 @@ export const SECTION_DEFAULTS = {
     textAboveIcon: true,
     textZIndex: 2,
     iconZIndex: 1,
+    // A lamp beside the legend, lit while the control is checked: an LED, a jewel lens, or a
+    // small lit window. What a toggle IS on an amp or a desk, as opposed to a button that changes
+    // colour. 'none' draws nothing and every existing control is on 'none'. The text and icon
+    // move over by the lamp's width plus the gap so the legend never sits on it.
+    lamp: 'none',            // none / led / jewel / window
+    lampSide: 'left',        // left / right
+    lampSize: 9,
+    lampGap: 8,
+    lampColour: '{accent}',
+    lampOffColour: '{control.track}',
+    lampBezelColour: '{border.surface}',
   },
 
   /** Effects — shadows, bevel/emboss, CSS filters, blend mode. */
@@ -533,6 +544,22 @@ export const SECTION_DEFAULTS = {
       Blend: {
         _type: 'Blend',
         mode: 'normal',
+      },
+      // A lit material: bump-mapped noise shaded by one distant lamp, multiplied onto whatever
+      // the surface already paints (utils/materialFilter.js). Bead-blast, brushed metal, leather,
+      // hammertone — the finishes that make a control read as a thing rather than a colour. The
+      // lamp normally comes from the panel's control set so every surface is lit from the same
+      // side; `lampFollowsSet: false` pins this surface's own azimuth and elevation.
+      Material: {
+        _type: 'Material',
+        enabled: false,
+        kind: 'blast',           // blast / brushed / leather / hammer / rubber / glass
+        strength: 100,           // relief depth, % of the kind's recipe
+        shine: 100,              // specular, % of the kind's recipe
+        grain: 100,              // noise frequency, % of the kind's recipe
+        lampFollowsSet: true,
+        lampAzimuth: 225,
+        lampElevation: 48,
       },
     },
   },
@@ -588,11 +615,13 @@ export const SECTION_DEFAULTS = {
     rows: 2,
     cols: 16,
     lines: ['PATCH:INIT VOICE', 'VOL120  PAN C   '],
-    litColour: 'FF2BE86A',         // lit phosphor (foreground)
-    unlitColour: '242BE86A',       // faint unlit "ghost" segment
-    screenColour: 'FF06371C',      // screen substrate behind the pixels
+    // The glass follows the control set (models/controlSets.js `display.*`): the base set gives
+    // back exactly the green STN these used to be as literals, so no saved display changes.
+    litColour: '{display.lit}',         // lit phosphor (foreground)
+    unlitColour: '{display.unlit}',     // faint unlit "ghost" segment
+    screenColour: '{display.screen}',   // screen substrate behind the pixels
     backlightOn: true,
-    backlightColour: 'FF0E5A2E',   // backlight wash
+    backlightColour: '{display.backlight}',   // backlight wash
     brightness: 100,               // 0..100 (foreground intensity)
     contrast: 55,                  // 0..100 (LCD trim-pot feel)
     brightnessSourceId: '',        // range control that drives brightness live in preview
@@ -876,6 +905,11 @@ export const SECTION_DEFAULTS = {
     majorTickLength: 12,
     minorTickLength: 7,
     tickPlacement: 'outside',
+    // Which major stops draw: every one, only the two ends, or the ends and the centre — a scale
+    // that marks min, max and the detent and nothing else. Minor ticks follow the majors shown.
+    tickStops: 'all',             // all / ends / endsCentre
+    // What a numeral tick prints: the stop's index (a dial's 0…10) or the value at the stop.
+    tickNumerals: 'index',        // index / value
     showMinMaxLabels: true,
     showHandleLabels: false,
     showValueReadout: true,
@@ -884,7 +918,12 @@ export const SECTION_DEFAULTS = {
     labelMinMaxGap: 22,
     labelMinMaxOffsetX: 0,
     labelMinMaxOffsetY: 0,
+    // auto / top / center / bottom, or a corner (topLeft, topRight, bottomLeft, bottomRight) that
+    // hangs the label from the track's end. The title takes the same set; a title top-left and a
+    // readout top-right is the row above the track the control-set boards drew. Both share the
+    // readout gap: they are one row.
     labelReadoutPlacement: 'auto',
+    labelTitlePlacement: 'auto',
     labelReadoutGap: 14,
     labelReadoutOffsetX: 0,
     labelReadoutOffsetY: 0,

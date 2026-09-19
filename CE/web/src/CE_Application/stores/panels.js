@@ -34,6 +34,7 @@ import { runWhenIdle } from '../utils/runWhenIdle.js';
 import { rememberRecentFile } from './recentFiles.js';
 import { equalityWritable } from '../utils/equalityStore.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
+import { controlSetForPanel } from '../models/controlSets.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
   getProjectDeviceSessionSnapshot,
@@ -203,6 +204,8 @@ function serializePanelForExport(panel) {
     // player's C++ reads Core, Behavior and Scripts and has never heard of a capture session, so
     // carrying one would compile tens of KB of somebody's SysEx dumps into the build for nothing.
     captureSession: null,
+    // Colour tokens resolved to literals against the panel's set — see serializePanel.
+    bakeControlSet: controlSetForPanel(panel),
     elide: false,
   });
 }

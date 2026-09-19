@@ -7,6 +7,11 @@
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import Cloud from 'lucide-svelte/icons/cloud';
+  import Sun from 'lucide-svelte/icons/sun';
+  import Layers from 'lucide-svelte/icons/layers';
+  import Minus from 'lucide-svelte/icons/minus';
+  import Lightbulb from 'lucide-svelte/icons/lightbulb';
   import Magnet from 'lucide-svelte/icons/magnet';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Shuffle from 'lucide-svelte/icons/shuffle';
@@ -46,6 +51,10 @@
     { value: 'top', label: 'top' },
     { value: 'center', label: 'center' },
     { value: 'bottom', label: 'bottom' },
+    { value: 'topLeft', label: 'top left' },
+    { value: 'topRight', label: 'top right' },
+    { value: 'bottomLeft', label: 'bottom left' },
+    { value: 'bottomRight', label: 'bottom right' },
   ];
 
   function set(path, value) {
@@ -365,14 +374,21 @@
         <NumberCell label="Y" value={behavior.labelMinMaxOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
       </PropertyCell>
     {:else if labelPositionTarget === 'readout'}
-      <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout.">
+      <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout. A corner hangs it from the track's end: top left and top right make the row above the track.">
         <select class="val" value={behavior.labelReadoutPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelReadoutPlacement', event.target.value)}>
           {#each READOUT_POSITION_OPTIONS as option (option.value)}
             <option value={option.value}>{option.label}</option>
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for top or bottom readout placement.">
+      <PropertyCell label="Title Pos" span={1} hint="Position for the title (the control's text). It shares the readout's gap: title top left with the readout top right is one row above the track.">
+        <select class="val" value={behavior.labelTitlePlacement ?? 'auto'} onchange={(event) => set('Behavior.labelTitlePlacement', event.target.value)}>
+          {#each READOUT_POSITION_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for a top or bottom readout or title placement.">
         <NumberCell label="Gap" value={behavior.labelReadoutGap ?? 14} defaultValue={14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
       </PropertyCell>
       <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for the generated value readout.">
@@ -394,6 +410,61 @@
         <option value="outside">outside</option>
         <option value="inside">inside</option>
         <option value="cross">cross</option>
+      </select>
+    </PropertyCell>
+    {#if geometry === 'linear'}
+      <!-- The cap that rides the track, as the control-set boards draw them. A set usually
+           chooses it; this is where an author overrides it. -->
+      <PropertyCell label="Cap" span={2} hint="The handle: a dot, a fader cap with a groove, a console cap with a sheen, a billet block with a top plate, a lit lens, a dot in a halo, a ring, or a line.">
+        <select class="val" value={parts?._children?.pointerCurrent?.kind ?? 'dot'}
+                onchange={(event) => setPatch({ 'Parts.pointerCurrent.kind': event.target.value, 'Parts.pointerStart.kind': event.target.value, 'Parts.pointerEnd.kind': event.target.value })}>
+          {#each ['dot', 'bar', 'console', 'block', 'lens', 'glass', 'ring', 'line'] as kind}
+            <option value={kind}>{kind}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Cap Finish" span={2} hint="A drop shadow on the panel, a halo in the cap's colour, and a slot cut for the track.">
+        <FlagStrip
+          flags={[
+            { key: 'shadow', title: 'Shadow — the cap casts one on the panel', on: parts?._children?.pointerCurrent?.shadow === true, icon: Cloud },
+            { key: 'glow', title: 'Glow — a halo in the cap colour', on: parts?._children?.pointerCurrent?.glow === true, icon: Sun },
+            { key: 'sheen', title: 'Sheen — the cylinder gradient across the cap', on: parts?._children?.pointerCurrent?.sheen === true, icon: Layers },
+            { key: 'slot', title: 'Slot — an inner shadow along the track', on: parts?._children?.bodyTrackBase?.slot === true, icon: Minus },
+            { key: 'fillGlow', title: 'Lit fill — a glow under the filled part of the track', on: parts?._children?.bodyTrackFill?.glow === true, icon: Lightbulb },
+          ]}
+          ontoggle={(key) => {
+            if (key === 'slot') set('Parts.bodyTrackBase.slot', !(parts?._children?.bodyTrackBase?.slot === true));
+            else if (key === 'fillGlow') set('Parts.bodyTrackFill.glow', !(parts?._children?.bodyTrackFill?.glow === true));
+            else setPatch({ [`Parts.pointerCurrent.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true), [`Parts.pointerStart.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true), [`Parts.pointerEnd.${key}`]: !(parts?._children?.pointerCurrent?.[key] === true) });
+          }}
+        />
+      </PropertyCell>
+    {/if}
+    <!-- How a tick is drawn, and which major stops draw. A control set usually chooses these;
+         this is where an author overrides it. Numerals are for the majors, so the minors between
+         them stay lines. -->
+    <PropertyCell label="Tick Style" span={2} hint="A line, a dot (an LED ring), the stop's numeral (a dial's 0–10), or a line engraved into the plate.">
+      <select class="val" value={parts?._children?.tickMajor?.kind ?? 'line'}
+              onchange={(event) => setPatch({ 'Parts.tickMajor.kind': event.target.value, 'Parts.tickMinor.kind': event.target.value === 'numeral' ? 'line' : event.target.value })}>
+        <option value="line">line</option>
+        <option value="dot">dot</option>
+        <option value="numeral">numeral</option>
+        <option value="engraved">engraved</option>
+      </select>
+    </PropertyCell>
+    {#if (parts?._children?.tickMajor?.kind ?? 'line') === 'numeral'}
+      <PropertyCell label="Numerals" span={2} hint="What a numeral prints: the stop's index (0…10 whatever the range) or the value at the stop.">
+        <select class="val" value={behavior.tickNumerals ?? 'index'} onchange={(event) => set('Behavior.tickNumerals', event.target.value)}>
+          <option value="index">index</option>
+          <option value="value">value</option>
+        </select>
+      </PropertyCell>
+    {/if}
+    <PropertyCell label="Tick Stops" span={2} hint="Which major stops draw: every one, only the two ends, or the ends and the centre.">
+      <select class="val" value={behavior.tickStops ?? 'all'} onchange={(event) => set('Behavior.tickStops', event.target.value)}>
+        <option value="all">all</option>
+        <option value="ends">ends</option>
+        <option value="endsCentre">ends and centre</option>
       </select>
     </PropertyCell>
   </PropertySection>

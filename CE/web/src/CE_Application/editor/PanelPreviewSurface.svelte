@@ -1,6 +1,10 @@
 <script>
-  import { onDestroy, untrack } from 'svelte';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
+  import { onDestroy, setContext, untrack } from 'svelte';
+  import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { resolveControlFamily } from '../models/controlSetFamilies.js';
+  import { materialActive } from '../utils/materialFilter.js';
+  import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import { keyboardConfig, keyboardContext, keyboardNoteAt, keyboardPress } from '../utils/keyboardLayout.js';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
@@ -306,6 +310,19 @@
     surfaceRef = $bindable(null),
   } = $props();
 
+  // The set this panel's controls resolve their colour tokens against. Through context rather
+  // than the editor's store because the Player renders a document the editor's panel list has
+  // never seen — CanvasControl prefers this when present (stores/controlSets.js).
+  setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
+  // The set's lamp, for every material filter on this panel; and the set's own material for the
+  // panel behind the controls (a black tolex, a bead-blasted plate), lit by the same lamp.
+  setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSetForPanel(panel)?.lamp ?? null);
+  const surfaceUid = $props.id();
+  const panelMaterialId = `panel-material-${surfaceUid}`;
+  let panelControlSet = $derived(controlSetForPanel(panel));
+  let panelMaterial = $derived(panelControlSet?.panel?.material ?? null);
+  let panelLit = $derived(materialActive(panelMaterial));
+
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
   // The panel's own layer order, not one inferred from array position. Inferring it meant
@@ -582,7 +599,11 @@
     // as they always do. It has to happen before the chain rather than inside it: several of those
     // functions read the ORIGINAL `control` rather than the resolved one, so an overlay applied
     // later would be visible to some of them and not others. See utils/sectionValueOverrides.js.
-    const control = applyDeviceSyncStatus(applySectionValues(rawControl, previewOverrides?.sectionValues));
+    // The control set's family patch comes first of all (models/controlSetFamilies.js): a set may
+    // replace a State — a toggle with a lamp keeps its body when checked — and a state that was
+    // already applied to the document's control is a state the set can no longer change. Tokens
+    // are resolved later, in CanvasControl, as they are for every control.
+    const control = applyDeviceSyncStatus(applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel)), previewOverrides?.sectionValues));
     const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides));
     return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
   }
@@ -6111,6 +6132,7 @@
         trackThickness,
         pointerSize: maxPointerSize,
         majorTickLength: sliderMajorTickLength(control) * scaleFactor,
+        hasTicks: behavior?.showTicks !== false,
         hasReadout: showReadout,
         circularDiameter: numberOr(behavior?.circularDiameter, 0) * scaleFactor,
       });
@@ -8449,9 +8471,12 @@
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
   use:bindSurface
 >
+  {#if panelLit}
+    <MaterialFilter id={panelMaterialId} material={panelMaterial} lamp={panelControlSet?.lamp ?? null} />
+  {/if}
   {#each panel.bgLayerOrder ?? DEFAULT_LAYER_ORDER as layerId}
     {#if bgLayers[layerId]}
-      <div class="bg-layer" style={bgLayers[layerId]}></div>
+      <div class="bg-layer" style={`${bgLayers[layerId]}${layerId === 'solid' && panelLit ? ` filter: url(#${panelMaterialId});` : ''}`}></div>
     {/if}
   {/each}
 

@@ -189,6 +189,7 @@ export const PRESET_SCOPE_OPTIONS = {
   'component:effects': [
     { id: 'shadows', label: 'Shadows', paths: ['Effects.Shadows'] },
     { id: 'bevel', label: 'Bevel', paths: ['Effects.Bevel'] },
+    { id: 'material', label: 'Material', paths: ['Effects.Material'] },
     { id: 'filters', label: 'Filters', paths: ['Effects.Filters'] },
     { id: 'blend', label: 'Blend', paths: ['Effects.Blend'] },
   ],

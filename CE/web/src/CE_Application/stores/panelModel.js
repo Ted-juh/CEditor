@@ -6,6 +6,8 @@ import { collectExportParameters } from '../utils/exportParameters.js';
 import { expandControl, shrinkControl } from './documentShape.js';
 import { createLayer, normalizePanelLayers } from '../utils/panelLayers.js';
 import { repairGaiaNoteChoices } from '../utils/gaiaNoteChoiceMigration.js';
+import { DEFAULT_CONTROL_SET_ID, normalizeControlSet, normalizeControlSetList, serializeControlSet } from '../models/controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 let nextId = 1;
 
@@ -201,6 +203,14 @@ export function createPanel(name = null) {
     // file describes then cannot be reproduced by the person who received it. So the file
     // carries its own copy and the store merges the two on open, document winning.
     cardPresets: [],
+    // The control set this panel's ready-made controls resolve their colour tokens against
+    // (models/controlSets.js). Always present in the model so readers can index into it; written
+    // to the file only when it is not the default — see serializePanel.
+    controlSet: { id: DEFAULT_CONTROL_SET_ID },
+    // The sets this document carries with it (stores/controlSetLibrary.js): a set chosen from the
+    // user's library or imported from a file is copied here so a shared panel arrives with the set
+    // it was designed in. Built-ins are never copied. Written only when there is something in it.
+    controlSets: [],
     modified: false,
     controls: [],
     // Paint order, back to front. One layer to begin with, because a panel with none is a panel
@@ -294,7 +304,14 @@ export function serializePanel(panel, options = {}) {
   // Generated controls come out first (they are regenerated on load), then what remains is
   // written as a diff against each type's defaults — unless this document is leaving the editor.
   const controls = stripGeneratedControls(data.controls);
-  data.controls = elide ? controls.map(toDocumentForm) : controls;
+  // A build payload wants literals: the player has no business looking up tokens per frame, and
+  // the exported plugin's reader has never heard of a set. `bakeControlSet` names the set to
+  // resolve against. A saved .cepanel passes none and keeps its references and its `controlSet`,
+  // which is what lets the set be switched later.
+  const baked = options.bakeControlSet
+    ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
+    : controls;
+  data.controls = elide ? baked.map(toDocumentForm) : baked;
 
   // Panel identity. deserializePanel prefers the name the host derives from the filename, so a
   // stale `name` in the document is invisible in the app and only shows up when someone reads the
@@ -337,6 +354,18 @@ export function serializePanel(panel, options = {}) {
   const cardPresets = normalizeCardPresets(data.cardPresets);
   if (cardPresets.length) data.cardPresets = cardPresets;
   else delete data.cardPresets;
+
+  // The control set, same rule: a panel on the default set writes no key, so every document
+  // written before sets existed round-trips byte-identical, and a reader never has to tell "no
+  // set" from "the default set". An id this build does not know is written as it was read.
+  const controlSet = serializeControlSet(data.controlSet);
+  if (controlSet) data.controlSet = controlSet;
+  else delete data.controlSet;
+
+  // The sets the document carries, same rule: present only when there is at least one.
+  const controlSets = normalizeControlSetList(data.controlSets);
+  if (controlSets.length) data.controlSets = controlSets;
+  else delete data.controlSets;
 
   // The program bank, on the same "right or absent" rule as `name` and `cardPresets`: a panel with
   // no bank writes no key, so every committed .cepanel does not grow a `"programBank": null` and
@@ -412,6 +441,8 @@ export function deserializePanel(json, filePath, name) {
     // assume an array of {id,…} and the merge in stores/cardPresets.js never has to defend
     // itself against a string or a null.
     cardPresets: normalizeCardPresets(data.cardPresets),
+    controlSet: normalizeControlSet(data.controlSet),
+    controlSets: normalizeControlSetList(data.controlSets),
     // Migration lives here rather than in a version bump: a document with no `layers` gets one
     // built from first-appearance order, which is exactly what rendering used to infer, so it
     // looks identical on the first load and stops restacking on every load after it.

@@ -1,0 +1,152 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "graphite",
+    "name": "Graphite",
+    "description": "The original look: neutral dark greys with a cool blue accent.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "cdcbd5e4",
+  "set": {
+    "id": "graphite",
+    "name": "Graphite",
+    "description": "The original look: neutral dark greys with a cool blue accent.",
+    "tokens": {
+      "surface": "FF3A3A3A",
+      "surface.hover": "FF4A4A4A",
+      "surface.pressed": "FF2C2C2C",
+      "surface.checked": "FF2D6F9C",
+      "surface.mixed": "FF806019",
+      "control.button": "FF343434",
+      "control.button.hover": "FF3D3D3D",
+      "control.button.pressed": "FF282828",
+      "control.field": "FF151515",
+      "control.field.hover": "FF1B1B1B",
+      "control.field.active": "FF203141",
+      "control.select": "FF2F2F2F",
+      "control.select.hover": "FF414141",
+      "control.select.pressed": "FF2A2A2A",
+      "control.track": "FF2C2C2C",
+      "control.track.edge": "55202020",
+      "control.fill": "{accent}",
+      "control.fill.hot": "FF71B8F1",
+      "control.range": "FF7BB3FF",
+      "control.range.hot": "FF9FD0FF",
+      "control.body": "FF3A3A3A",
+      "control.cap": "FFF6F6F6",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99333333",
+      "control.cap.start": "FFF2B44B",
+      "control.cap.end": "FF55C79A",
+      "control.marker": "99FFFFFF",
+      "control.tick": "CCFFFFFF",
+      "control.tick.minor": "99FFFFFF",
+      "accent": "FF5B9BD5",
+      "accent.hot": "FF89C2FF",
+      "text.primary": "FFFFFFFF",
+      "text.label": "FFF5F5F5",
+      "text.muted": "FFB8C7D8",
+      "text.focus": "FFDAEEFF",
+      "text.inverse": "FFFFFFFF",
+      "display.lit": "FF2BE86A",
+      "display.unlit": "242BE86A",
+      "display.screen": "FF06371C",
+      "display.backlight": "FF0E5A2E",
+      "border": "664C4C4C",
+      "border.surface": "66FFFFFF",
+      "border.field": "665B5B5B",
+      "border.mixed": "FFFFD166"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "capdot",
+            "Layout.width": 26,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": false
+        }
+      }
+    },
+    "type": {
+      "label": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

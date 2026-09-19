@@ -519,7 +519,7 @@
           "packageName": "Neon Dial",
           "packageVersion": "1.0.0",
           "packageId": "stress-neon-dial@1-0-0",
-          "packageFingerprint": "f5c41810",
+          "packageFingerprint": "3ae3eef3",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-neon-dial@1-0-0",
@@ -529,7 +529,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "f5c41810",
+            "fingerprint": "3ae3eef3",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "custom",
@@ -1212,7 +1212,7 @@
           "packageName": "Range Macro Arc",
           "packageVersion": "1.0.0",
           "packageId": "stress-range-macro-arc@1-0-0",
-          "packageFingerprint": "5a5d2abe",
+          "packageFingerprint": "6c4d219b",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-range-macro-arc@1-0-0",
@@ -1222,7 +1222,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "5a5d2abe",
+            "fingerprint": "6c4d219b",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "multi",
@@ -1753,6 +1753,9 @@
                 "Text": {
                   "content": "OUT 52%",
                   "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
                     "Font": {
                       "weight": "Bold",
                       "weightValue": 700,
@@ -2579,7 +2582,7 @@
           "packageName": "Fine Horizontal Scale",
           "packageVersion": "1.0.0",
           "packageId": "stress-fine-horizontal-scale@1-0-0",
-          "packageFingerprint": "b587fc92",
+          "packageFingerprint": "21ee46d7",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-fine-horizontal-scale@1-0-0",
@@ -2589,7 +2592,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "b587fc92",
+            "fingerprint": "21ee46d7",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "slider",
@@ -3314,7 +3317,7 @@
           "packageName": "Bipolar Horizontal Scale",
           "packageVersion": "1.0.0",
           "packageId": "stress-bipolar-horizontal-scale@1-0-0",
-          "packageFingerprint": "58b56ebb",
+          "packageFingerprint": "988c6f2e",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-bipolar-horizontal-scale@1-0-0",
@@ -3324,7 +3327,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "58b56ebb",
+            "fingerprint": "988c6f2e",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "slider",
@@ -4030,7 +4033,7 @@
           "packageName": "Segment Meter",
           "packageVersion": "1.0.0",
           "packageId": "stress-segment-meter@1-0-0",
-          "packageFingerprint": "a4c4f39b",
+          "packageFingerprint": "d7269424",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-segment-meter@1-0-0",
@@ -4040,7 +4043,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "a4c4f39b",
+            "fingerprint": "d7269424",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "slider",
@@ -4525,7 +4528,7 @@
           "packageName": "Vertical LED Ladder",
           "packageVersion": "1.0.0",
           "packageId": "stress-vertical-led-ladder@1-0-0",
-          "packageFingerprint": "e52de425",
+          "packageFingerprint": "2a37a696",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-vertical-led-ladder@1-0-0",
@@ -4535,7 +4538,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "e52de425",
+            "fingerprint": "2a37a696",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "slider",
@@ -5121,7 +5124,7 @@
           "packageName": "XY Pad",
           "packageVersion": "1.0.0",
           "packageId": "stress-xy-pad@1-0-0",
-          "packageFingerprint": "d42d49db",
+          "packageFingerprint": "b5a554e4",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-xy-pad@1-0-0",
@@ -5131,7 +5134,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "d42d49db",
+            "fingerprint": "b5a554e4",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "grid",
@@ -5997,7 +6000,7 @@
           "packageName": "Label Above Button",
           "packageVersion": "1.0.0",
           "packageId": "stress-label-above-button@1-0-0",
-          "packageFingerprint": "8b19166e",
+          "packageFingerprint": "2849e77d",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-label-above-button@1-0-0",
@@ -6007,7 +6010,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "8b19166e",
+            "fingerprint": "2849e77d",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "button",
@@ -6516,7 +6519,7 @@
           "packageName": "Transport Cluster",
           "packageVersion": "1.0.0",
           "packageId": "stress-transport-cluster@1-0-0",
-          "packageFingerprint": "e52b634d",
+          "packageFingerprint": "e2e0787a",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-transport-cluster@1-0-0",
@@ -6526,7 +6529,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "e52b634d",
+            "fingerprint": "e2e0787a",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "multi",
@@ -7311,7 +7314,7 @@
           "packageName": "Arpeggiator Sequencer",
           "packageVersion": "1.0.0",
           "packageId": "stress-arp-sequencer@1-0-0",
-          "packageFingerprint": "ef7b6855",
+          "packageFingerprint": "f7b7df3a",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-arp-sequencer@1-0-0",
@@ -7321,7 +7324,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "ef7b6855",
+            "fingerprint": "f7b7df3a",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "arpeggiator",
@@ -7959,7 +7962,7 @@
           "packageName": "ADSR Envelope",
           "packageVersion": "1.0.0",
           "packageId": "stress-adsr-envelope@1-0-0",
-          "packageFingerprint": "8aee9753",
+          "packageFingerprint": "b6683934",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-adsr-envelope@1-0-0",
@@ -7969,7 +7972,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "8aee9753",
+            "fingerprint": "b6683934",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "grid",
@@ -9476,7 +9479,7 @@
           "packageName": "Waveform Selector",
           "packageVersion": "1.0.0",
           "packageId": "stress-waveform-selector@1-0-0",
-          "packageFingerprint": "992c3756",
+          "packageFingerprint": "0b769793",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-waveform-selector@1-0-0",
@@ -9486,7 +9489,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "992c3756",
+            "fingerprint": "0b769793",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "multi",
@@ -10541,7 +10544,7 @@
           "packageName": "Mini Keyboard",
           "packageVersion": "1.0.0",
           "packageId": "stress-mini-keyboard@1-0-0",
-          "packageFingerprint": "f72249d7",
+          "packageFingerprint": "c173c3d6",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-mini-keyboard@1-0-0",
@@ -10551,7 +10554,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "f72249d7",
+            "fingerprint": "c173c3d6",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "piano",
@@ -10974,7 +10977,7 @@
           "packageName": "Mod Matrix",
           "packageVersion": "1.0.0",
           "packageId": "stress-mod-matrix@1-0-0",
-          "packageFingerprint": "2b0d9183",
+          "packageFingerprint": "f17e9b10",
           "packageImportedAt": "2026-09-14T00:00:00.000Z",
           "sourcePackage": {
             "id": "stress-mod-matrix@1-0-0",
@@ -10984,7 +10987,7 @@
             "category": "Stress Test",
             "license": "Internal test fixture",
             "homepage": "",
-            "fingerprint": "2b0d9183",
+            "fingerprint": "f17e9b10",
             "importedAt": "2026-09-14T00:00:00.000Z",
             "capabilities": {
               "primaryKind": "grid",

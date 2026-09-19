@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
-import { resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
+import { activePanel, resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
+import { controlSetForPanel, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
 import { updateControlProperty } from './controls.js';
 
 /**
@@ -45,8 +46,14 @@ export const colorTarget = writable(null);
  * @returns {{ color: string, alpha: number }} Parsed color + alpha for the ColorChooser
  */
 export function activateColorTarget(target, currentColor) {
+  // A value linked to the control set ('{accent}') opens the chooser at the colour the active
+  // set gives it. What the chooser writes back is a literal — which is what "override" means in
+  // docs/design/control-sets.md: the link breaks for this property and nothing else.
+  const literal = isTokenReference(currentColor)
+    ? resolveColourLiteral(currentColor, controlSetForPanel(get(activePanel)), '333333')
+    : currentColor;
   // Parse AARRGGBB or RRGGBB
-  const hex = (currentColor || '333333').replace(/^#/, '');
+  const hex = (literal || '333333').replace(/^#/, '');
   let color, alpha;
   if (hex.length === 8) {
     alpha = parseInt(hex.slice(0, 2), 16) / 255;

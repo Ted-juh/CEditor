@@ -1,0 +1,518 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "valve",
+    "name": "Valve",
+    "description": "A valve radio. Bakelite brown with a gold ring on every knob, a lacquered wood surround, cream dial text and a nixie-tube readout glowing orange.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "e4197d02",
+  "set": {
+    "id": "valve",
+    "name": "Valve",
+    "description": "A valve radio. Bakelite brown with a gold ring on every knob, a lacquered wood surround, cream dial text and a nixie-tube readout glowing orange.",
+    "tokens": {
+      "surface": "FF4A3A30",
+      "surface.hover": "FF5A4738",
+      "surface.pressed": "FF33271F",
+      "surface.checked": "FFB08D3C",
+      "surface.mixed": "FFB3832E",
+      "control.button": "FF4A3A30",
+      "control.button.hover": "FF584A41",
+      "control.button.pressed": "FF43342B",
+      "control.field": "FF1A1410",
+      "control.field.hover": "FF25201C",
+      "control.field.active": "FF564930",
+      "control.select": "FF33271F",
+      "control.select.hover": "FF433831",
+      "control.select.pressed": "FF2F241D",
+      "control.track": "FF1A1410",
+      "control.track.edge": "550D0906",
+      "control.fill": "FFE3C67A",
+      "control.fill.hot": "FFFFE7A3",
+      "control.range": "FFB08D3C",
+      "control.range.hot": "FFBC9E59",
+      "control.body": "FF3A2A22",
+      "control.cap": "FFF6E7C8",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99B08D3C",
+      "control.cap.start": "FFE0A43A",
+      "control.cap.end": "FF8FB07A",
+      "control.marker": "FFF6E7C8",
+      "control.tick": "CCF6E7C8",
+      "control.tick.minor": "88F6E7C8",
+      "accent": "FFE3C67A",
+      "accent.hot": "FFFFB020",
+      "text.primary": "FFF6E7C8",
+      "text.label": "FFF6E7C8",
+      "text.muted": "FFCDB99A",
+      "text.focus": "FFFFF3D6",
+      "text.inverse": "FF22170F",
+      "border": "6615100D",
+      "border.surface": "6615100D",
+      "border.field": "6615100D",
+      "border.mixed": "FFE0A43A",
+      "display.lit": "FFFF8A2A",
+      "display.unlit": "24FF8A2A",
+      "display.screen": "FF120B06",
+      "display.backlight": "FF2E2824"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 40,
+            "Background.Effects.Material.shine": 20,
+            "Background.Effects.Material.grain": 100
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 3,
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5,
+            "opacity": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5,
+            "opacity": 0
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF4A3A30",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "radial",
+            "centerX": 38,
+            "centerY": 30,
+            "radiusX": 70,
+            "radiusY": 70,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "897F78",
+                "position": 0
+              },
+              {
+                "color": "4A3A30",
+                "position": 55
+              },
+              {
+                "color": "342922",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FFB08D3C",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 2,
+              "spread": 0,
+              "colour": "88000000"
+            }
+          ],
+          "Text.Fill.colour": "F6E7C8"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF4A3A30",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "radial",
+            "centerX": 38,
+            "centerY": 30,
+            "radiusX": 70,
+            "radiusY": 70,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "897F78",
+                "position": 0
+              },
+              {
+                "color": "4A3A30",
+                "position": 55
+              },
+              {
+                "color": "342922",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FFB08D3C",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 2,
+              "spread": 0,
+              "colour": "88000000"
+            }
+          ],
+          "Text.Fill.colour": "F6E7C8"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF4A3A30",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "radial",
+            "centerX": 38,
+            "centerY": 30,
+            "radiusX": 70,
+            "radiusY": 70,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "897F78",
+                "position": 0
+              },
+              {
+                "color": "4A3A30",
+                "position": 55
+              },
+              {
+                "color": "342922",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FFB08D3C",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 2,
+              "spread": 0,
+              "colour": "88000000"
+            }
+          ],
+          "Text.Fill.colour": "F6E7C8",
+          "ContentLayout.lamp": "jewel",
+          "ContentLayout.lampSize": 12,
+          "ContentLayout.lampColour": "{accent.hot}",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 5,
+          "Background.Border.thickness": 1.5,
+          "Background.Effects.Material.enabled": true,
+          "Background.Effects.Material.kind": "glass",
+          "Background.Effects.Material.strength": 40,
+          "Background.Effects.Material.shine": 80,
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF4A3A30",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "radial",
+            "centerX": 38,
+            "centerY": 30,
+            "radiusX": 70,
+            "radiusY": 70,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "897F78",
+                "position": 0
+              },
+              {
+                "color": "4A3A30",
+                "position": 55
+              },
+              {
+                "color": "342922",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FFB08D3C",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 2,
+              "spread": 0,
+              "colour": "88000000"
+            }
+          ],
+          "Text.Fill.colour": "F6E7C8"
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 4,
+          "Behavior.tickPlacement": "outside"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 4,
+            "Background.Fill.colour": "AAF6E7C8"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "55F6E7C8"
+          },
+          "pointerCurrent": {
+            "kind": "bar",
+            "Layout.width": 14,
+            "Layout.height": 34,
+            "grooveColour": "FF222222",
+            "shadow": true,
+            "Background.Fill.colour": "FFF6E7C8",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "radial",
+              "centerX": 38,
+              "centerY": 30,
+              "radiusX": 70,
+              "radiusY": 70,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FAF2E1",
+                  "position": 0
+                },
+                {
+                  "color": "F6E7C8",
+                  "position": 55
+                },
+                {
+                  "color": "948B78",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF6F685A",
+            "Background.Border.thickness": 1
+          },
+          "pointerStart": {
+            "kind": "bar",
+            "Layout.width": 14,
+            "Layout.height": 34,
+            "grooveColour": "FF222222",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "radial",
+              "centerX": 38,
+              "centerY": 30,
+              "radiusX": 70,
+              "radiusY": 70,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FAF2E1",
+                  "position": 0
+                },
+                {
+                  "color": "F6E7C8",
+                  "position": 55
+                },
+                {
+                  "color": "948B78",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF6F685A",
+            "Background.Border.thickness": 1
+          },
+          "pointerEnd": {
+            "kind": "bar",
+            "Layout.width": 14,
+            "Layout.height": 34,
+            "grooveColour": "FF222222",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "radial",
+              "centerX": 38,
+              "centerY": 30,
+              "radiusX": 70,
+              "radiusY": 70,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FAF2E1",
+                  "position": 0
+                },
+                {
+                  "color": "F6E7C8",
+                  "position": 55
+                },
+                {
+                  "color": "948B78",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF6F685A",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5,
+            "Background.Corners.radius": 2,
+            "Background.Fill.colour": "FFB08D3C",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "D4C094",
+                  "position": 0
+                },
+                {
+                  "color": "846A2D",
+                  "position": 50
+                },
+                {
+                  "color": "D4C094",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF58471E",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5,
+            "Background.Corners.radius": 2,
+            "Background.Fill.colour": "FFE3C67A"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF6B4A2E",
+      "material": {
+        "enabled": true,
+        "kind": "brushed",
+        "strength": 50,
+        "shine": 30,
+        "grain": 60,
+        "lampFollowsSet": true
+      }
+    },
+    "type": {
+      "label": {
+        "family": "Libre Franklin",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Libre Franklin",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

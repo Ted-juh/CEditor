@@ -1,0 +1,247 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "blueprint",
+    "name": "Blueprint",
+    "description": "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "c2ae8106",
+  "set": {
+    "id": "blueprint",
+    "name": "Blueprint",
+    "description": "Line work only. One ink, one paper, hairline strokes on a faint grid. The schematic, for panels that are documents.",
+    "tokens": {
+      "surface": "FF14243A",
+      "surface.hover": "FF1D3252",
+      "surface.pressed": "FF0E1A2C",
+      "surface.checked": "FFDCE8F5",
+      "surface.mixed": "FFC29D4E",
+      "control.button": "FF14243A",
+      "control.button.hover": "FF27364A",
+      "control.button.pressed": "FF122034",
+      "control.field": "FF0E1A2C",
+      "control.field.hover": "FF1A2537",
+      "control.field.active": "FF4C5868",
+      "control.select": "FF14243A",
+      "control.select.hover": "FF27364A",
+      "control.select.pressed": "FF122135",
+      "control.track": "FF22375A",
+      "control.track.edge": "55DCE8F5",
+      "control.fill": "FFDCE8F5",
+      "control.fill.hot": "FFFFFFFF",
+      "control.range": "FF7FA6D6",
+      "control.range.hot": "FF92B3DC",
+      "control.body": "FF14243A",
+      "control.cap": "FFDCE8F5",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99DCE8F5",
+      "control.cap.start": "FFF2C462",
+      "control.cap.end": "FF8FE3B0",
+      "control.marker": "FFDCE8F5",
+      "control.tick": "CCDCE8F5",
+      "control.tick.minor": "88DCE8F5",
+      "accent": "FFDCE8F5",
+      "accent.hot": "FFFFD166",
+      "text.primary": "FFDCE8F5",
+      "text.label": "FFDCE8F5",
+      "text.muted": "FF9DB4CF",
+      "text.focus": "FFFFD166",
+      "text.inverse": "FF14243A",
+      "border": "66DCE8F5",
+      "border.surface": "66DCE8F5",
+      "border.field": "669DB4CF",
+      "border.mixed": "FFF2C462",
+      "display.lit": "FFDCE8F5",
+      "display.unlit": "24DCE8F5",
+      "display.screen": "FF0E1A2C",
+      "display.backlight": "FF2B3545"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 5
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1.5
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 1.5,
+            "Layout.height": 95,
+            "Layout.offsetX": 0,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 0,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FFDCE8F5",
+          "Text.Fill.colour": "FFDCE8F5"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 0,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FFDCE8F5",
+          "Text.Fill.colour": "FFDCE8F5"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 0,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FFDCE8F5",
+          "Text.Fill.colour": "FFDCE8F5",
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 7,
+          "ContentLayout.lampColour": "FFDCE8F5",
+          "ContentLayout.lampOffColour": "00000000",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 0,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FFDCE8F5",
+          "Text.Fill.colour": "FFDCE8F5"
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.tickNumerals": "value"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral",
+            "Background.Fill.colour": "CCDCE8F5"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "55DCE8F5"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "FFDCE8F5",
+            "Background.Border.colour": "FF14243A",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FF14243A",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FF14243A",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "99DCE8F5",
+            "Background.Border.colour": "FFDCE8F5",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "FFDCE8F5"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF14243A"
+    },
+    "type": {
+      "label": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

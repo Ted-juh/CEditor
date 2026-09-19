@@ -1,0 +1,254 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "phosphor",
+    "name": "Phosphor",
+    "description": "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "4e571aa5",
+  "set": {
+    "id": "phosphor",
+    "name": "Phosphor",
+    "description": "Hardware from a rack: LED rings, segmented meters, one green phosphor on matte black. Nothing is drawn that a real front panel could not light up.",
+    "tokens": {
+      "surface": "FF151815",
+      "surface.hover": "FF1F241F",
+      "surface.pressed": "FF0F110F",
+      "surface.checked": "FF123D22",
+      "surface.mixed": "FFCC8D1A",
+      "control.button": "FF151815",
+      "control.button.hover": "FF282A28",
+      "control.button.pressed": "FF131613",
+      "control.field": "FF0B0D0B",
+      "control.field.hover": "FF171917",
+      "control.field.active": "FF19562C",
+      "control.select": "FF111311",
+      "control.select.hover": "FF242624",
+      "control.select.pressed": "FF101110",
+      "control.track": "FF1F241F",
+      "control.track.edge": "552C312C",
+      "control.fill": "FF39FF7A",
+      "control.fill.hot": "FFB8FFD2",
+      "control.range": "FF1FA35A",
+      "control.range.hot": "FF41B173",
+      "control.body": "FF39FF7A",
+      "control.cap": "FF39FF7A",
+      "control.cap.hot": "FFB8FFD2",
+      "control.cap.edge": "990B0D0B",
+      "control.cap.start": "FFFFB020",
+      "control.cap.end": "FF39FF7A",
+      "control.marker": "FF5A6A5A",
+      "control.tick": "CC5A6A5A",
+      "control.tick.minor": "885A6A5A",
+      "accent": "FF39FF7A",
+      "accent.hot": "FF39FF7A",
+      "text.primary": "FFD6FFE3",
+      "text.label": "FFD6FFE3",
+      "text.muted": "FF7FA88C",
+      "text.focus": "FFB8FFD2",
+      "text.inverse": "FF0B0D0B",
+      "border": "662C312C",
+      "border.surface": "662C312C",
+      "border.field": "662C312C",
+      "border.mixed": "FFFFB020",
+      "display.lit": "FF39FF7A",
+      "display.unlit": "2439FF7A",
+      "display.screen": "FF050705",
+      "display.backlight": "FF232523"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
+        "parts": {
+          "tickMinor": {
+            "kind": "dot"
+          },
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5,
+            "kind": "dot"
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 62,
+            "Layout.height": 62,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "capdot",
+            "Layout.width": 26,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FF39FF7A",
+          "Text.Fill.colour": "FF39FF7A"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FF39FF7A",
+          "Text.Fill.colour": "FF39FF7A"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FF39FF7A",
+          "Text.Fill.colour": "FF39FF7A",
+          "ContentLayout.lamp": "led",
+          "ContentLayout.lampSize": 7,
+          "ContentLayout.lampColour": "FF39FF7A",
+          "ContentLayout.lampOffColour": "00000000",
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}"
+              },
+              "parts": {}
+            }
+          }
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 2,
+          "Background.Border.thickness": 1,
+          "Background.Fill.colour": "00000000",
+          "Background.Border.colour": "FF39FF7A",
+          "Text.Fill.colour": "FF39FF7A"
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5,
+          "Behavior.tickPlacement": "outside"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5,
+            "kind": "dot",
+            "Background.Fill.colour": "EE39FF7A"
+          },
+          "tickMinor": {
+            "kind": "dot",
+            "Background.Fill.colour": "5539FF7A"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 18,
+            "Layout.height": 10,
+            "glow": true,
+            "Background.Fill.colour": "FF39FF7A",
+            "Background.Border.colour": "FF39FF7A",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 18,
+            "Layout.height": 10,
+            "glow": true,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FF39FF7A",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 18,
+            "Layout.height": 10,
+            "glow": true,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FF39FF7A",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "Background.Fill.colour": "FF1F241F",
+            "Background.Border.colour": "FF414541",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "glow": true,
+            "Background.Fill.colour": "FF39FF7A"
+          }
+        }
+      }
+    },
+    "panel": {
+      "colour": "FF0B0D0B"
+    },
+    "type": {
+      "label": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

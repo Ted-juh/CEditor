@@ -207,7 +207,7 @@ test('component shadows become rows, groups do not stack', () => {
   const { rows, unordered } = buildComponentRows(componentControl());
   assert.equal(rows.length, 1, 'the shipped default has one shadow');
   assert.ok(rows.every((row) => row.stackable));
-  assert.deepEqual(unordered.map((row) => row.key), ['bevel', 'filters', 'blend']);
+  assert.deepEqual(unordered.map((row) => row.key), ['bevel', 'material', 'filters', 'blend']);
   assert.ok(unordered.every((row) => row.stackable === false));
 });
 

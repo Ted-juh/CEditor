@@ -79,3 +79,31 @@ test('a vertical slider takes the same gap, on its own axis', () => {
   );
   assert.equal(wider.min.x - base.min.x, 20, 'a gap of 42 against the default 22 is twenty further out');
 });
+
+test('a corner placement hangs the label from the track\'s end, and says which end', () => {
+  const base = anchorsFor({});
+  assert.equal(base.title.align, undefined, 'auto is centred, as it always was');
+  assert.equal(base.value.align, undefined);
+
+  const board = anchorsFor({ labelTitlePlacement: 'topLeft', labelReadoutPlacement: 'topRight' });
+  assert.equal(board.title.align, 'start');
+  assert.equal(board.value.align, 'end');
+  assert.ok(board.title.x < 150 && board.value.x > 150, 'the title starts at the left of the track, the value ends at its right');
+  assert.equal(board.title.y, board.value.y, 'one row above the track');
+  assert.equal(board.value.y, 14, 'at the readout gap');
+  assert.equal(anchorsFor({ labelTitlePlacement: 'topLeft', labelReadoutPlacement: 'topRight', labelReadoutGap: 20 }).title.y, 20, 'the title shares the readout gap');
+
+  const below = anchorsFor({ labelReadoutPlacement: 'bottomRight' });
+  assert.equal(below.value.align, 'end');
+  assert.equal(below.value.y, 90 - 14);
+
+  // The readout offsets still apply on top of a corner.
+  const nudged = anchorsFor({ labelReadoutPlacement: 'topRight', labelReadoutOffsetX: -6 });
+  assert.equal(nudged.value.x, board.value.x - 6);
+  assert.equal(nudged.value.align, 'end');
+
+  // A knob's corners are the arc's extent.
+  const knob = buildSliderLabelAnchors({ min: 0, max: 100, geometry: 'circular', labelTitlePlacement: 'topLeft', labelReadoutPlacement: 'topRight' }, 120, 120, { current: 0.5 }, { trackThickness: 6, pointerSize: 14, hasReadout: true });
+  assert.ok(knob.title.x < 60 && knob.value.x > 60);
+  assert.equal(knob.title.align, 'start');
+});

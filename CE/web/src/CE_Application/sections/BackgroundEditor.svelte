@@ -9,6 +9,8 @@
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -354,7 +356,11 @@
     set(`${pathPrefix}.Fill.colour`, val);
   }
 
-  let displayColour = $derived(fill?.colour ? fill.colour.slice(-6) : '3A3A3A');
+  // A colour linked to the control set ('{surface}') shows what the active set resolves it to,
+  // with the token named under the field. Typing a colour writes a literal — the link breaks for
+  // this property and nothing else (docs/design/control-sets.md, "override").
+  let fillToken = $derived(tokenNameOf(fill?.colour));
+  let displayColour = $derived(resolveColourLiteral(fill?.colour, $activeControlSet, 'FF3A3A3A').slice(-6));
   let gradientPreview = $derived(gradientToCSS(fill?.gradient ?? DEFAULT_FILL_GRADIENT));
 </script>
 
@@ -430,6 +436,9 @@
               <button class="mini-swatch" title="Pick colour" style="background:#{displayColour}" onclick={handleSwatchClick}></button>
               <input class="val" type="text" value={displayColour} onfocus={selectAll} onchange={setColour} />
             </div>
+            {#if fillToken}
+              <span class="token-chip" title={`Follows the panel's control set (${fillToken}). Typing a colour overrides the link for this property.`}>{fillToken}</span>
+            {/if}
           </PropertyCell>
           <PropertyCell label="Blend" span={2} hint="How this layer composites with the layers beneath it.">
             <BlendModeSelect value={fill?.solidBlend ?? 'normal'} onchange={(v) => setFillProp('solidBlend', v)} />
@@ -745,5 +754,24 @@
   .zorder-btn:disabled {
     opacity: 0.2;
     pointer-events: none;
+  }
+  /* A colour that follows the panel's control set names its token here. Phase 1 of
+     docs/design/control-sets.md: the link is shown; override is typing a colour. */
+  .token-chip {
+    display: inline-block;
+    max-width: 100%;
+    margin-top: 3px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    line-height: 14px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #9fd0ff;
+    background: rgba(91, 155, 213, 0.16);
+    border: 1px solid rgba(91, 155, 213, 0.35);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: help;
   }
 </style>

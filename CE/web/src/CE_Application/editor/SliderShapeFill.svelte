@@ -76,6 +76,8 @@
       />
     {:else if shape.kind === 'circle'}
       <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill="white" />
+    {:else if shape.kind === 'rect'}
+      <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx={shape.rx ?? 0} fill="white" />
     {:else if shape.kind === 'circle-stroke'}
       <circle
         cx={shape.cx}

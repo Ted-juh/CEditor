@@ -132,10 +132,14 @@
     resizeHandleStyle,
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
+  import { getContext, setContext } from 'svelte';
+  import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
+  import { CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
+  import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
   let {
-    control,
-    sourceControl = control,
+    control: documentControl,
+    sourceControl = documentControl,
     scale = 1,
     previewSessionOverride = null,
     resolvedControlOverride = null,
@@ -209,6 +213,20 @@
     layoutPosition = null,
     childPreviewPropsFor = null,
   } = $props();
+
+  // The control as the document holds it may say '{accent}' where a colour goes (a control-set
+  // token, models/controlSets.js). Everything below renders the RESOLVED tree; `documentControl`
+  // is what the document says and is what edits are written against. A surface that renders a
+  // panel of its own — the preview, the Player — provides its panel's set through context; the
+  // editor canvas takes the active panel's. Copy-on-write, so a control without references is
+  // the same object it always was.
+  const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
+  let controlSet = $derived(typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet);
+  // The set's family patch first (a knob gets its cap, a button its finish), then the tokens —
+  // models/controlSetFamilies.js. The set's lamp goes into context for every material filter
+  // drawn under this control, so all of them are lit from the panel's one light.
+  let control = $derived(resolveControlForSet(documentControl, controlSet));
+  setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSet?.lamp ?? null);
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
   // role→descriptor map (used by the two-value Range spinner for lowField /
@@ -335,8 +353,8 @@
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(
-    resolvedControlOverride ?? resolveLinkedEnvelope(
-      interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control, allControls)
+    (resolvedControlOverride ? resolveControlForSet(resolvedControlOverride, controlSet) : null)
+      ?? resolveLinkedEnvelope(interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control, allControls)
   );
   let interactionRuntime = $derived(
     interactionRuntimeOverride
@@ -401,7 +419,7 @@
       .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
   );
   const SLIDER_SEMANTIC_PARTS = new Set([
-    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker',
+    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
     'pointerStart', 'pointerCurrent', 'pointerEnd',
     'tickMajor', 'tickMinor', 'tickAccent',
     'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',
@@ -1803,8 +1821,60 @@
   let textEffects = $derived(text?._children?.Effects ?? null);
   let textPosition = $derived(text?._children?.Position ?? null);
   let contentLayoutMode = $derived(String(contentLayout?.mode ?? 'text_only'));
-  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4));
-  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4));
+  // The lamp beside the legend (sectionDefaults ContentLayout `lamp`): an LED, a jewel or a lit
+  // window, lit while the runtime says the control is checked, or a bat switch — a lever in a
+  // round bezel, thrown up when checked and down when not, the amp and tape-deck toggle. It
+  // takes its room from the padding on its side, so the text and icon move over rather than
+  // sit on it.
+  let lampKind = $derived(String(contentLayout?.lamp ?? 'none').toLowerCase());
+  let hasLamp = $derived(['led', 'jewel', 'window', 'bat'].includes(lampKind) && !isRadioGroupControl);
+  let lampSize = $derived(Math.max(3, numberOr(contentLayout?.lampSize, 9)));
+  let lampGap = $derived(Math.max(0, numberOr(contentLayout?.lampGap, 8)));
+  let lampOnRight = $derived(String(contentLayout?.lampSide ?? 'left') === 'right');
+  let lampWidth = $derived(lampKind === 'window' ? lampSize * 2 : lampSize);
+  // The lever's throw: the bezel is `lampSize` across and the lever reaches a bezel above or
+  // below it, so a bat is as tall as three bezels.
+  let lampHeight = $derived(lampKind === 'bat' ? lampSize * 3 : lampSize);
+  let lampLit = $derived(interactionRuntime?.signals?.checked === true || interactionRuntime?.signals?.selectionActive === true);
+  function lampCss(value, fallback) {
+    const raw = String(value ?? '').replace(/^#/, '').trim();
+    if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(raw)) return fallback;
+    if (raw.length === 6) return `#${raw}`;
+    return `rgba(${parseInt(raw.slice(2, 4), 16)}, ${parseInt(raw.slice(4, 6), 16)}, ${parseInt(raw.slice(6, 8), 16)}, ${(parseInt(raw.slice(0, 2), 16) / 255).toFixed(3)})`;
+  }
+  let lampStyle = $derived.by(() => {
+    if (!hasLamp) return '';
+    const lit = lampCss(contentLayout?.lampColour, '#5B9BD5');
+    const off = lampCss(contentLayout?.lampOffColour, '#2C2C2C');
+    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
+    const inset = numberOr(contentLayout?.[lampOnRight ? 'paddingRight' : 'paddingLeft'], 8);
+    const left = lampOnRight ? displayW - inset - lampWidth : inset;
+    const top = (displayH - lampHeight) / 2;
+    if (lampKind === 'bat') {
+      // The lever is inline SVG (below); the box only places it.
+      return [`left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampHeight}px`].join('; ');
+    }
+    const colour = lampLit ? lit : off;
+    const face = lampKind === 'jewel'
+      ? `radial-gradient(circle at 35% 30%, rgba(255,255,255,${lampLit ? 0.75 : 0.35}) 0%, rgba(255,255,255,0) 45%), ${colour}`
+      : colour;
+    const glow = lampLit ? `0 0 ${Math.max(4, lampSize * 0.8)}px ${lit}, 0 0 ${Math.max(2, lampSize * 0.25)}px ${lit}` : 'inset 0 1px 2px rgba(0,0,0,0.6)';
+    return [
+      `left:${left}px`, `top:${top}px`, `width:${lampWidth}px`, `height:${lampSize}px`,
+      `background:${face}`, `border:1px solid ${bezel}`, `box-shadow:${glow}`,
+      `border-radius:${lampKind === 'window' ? '2px' : '50%'}`,
+    ].join('; ');
+  });
+  // The bat's inks: the bezel is the set's bezel colour, the lever the lamp colour when thrown up
+  // and the off colour when down, and the ball on its end a lighter tone of the lever.
+  let batInks = $derived.by(() => {
+    if (lampKind !== 'bat') return null;
+    const lever = lampCss(lampLit ? contentLayout?.lampColour : contentLayout?.lampOffColour, lampLit ? '#5B9BD5' : '#2C2C2C');
+    const bezel = lampCss(contentLayout?.lampBezelColour, 'rgba(255,255,255,0.4)');
+    return { lever, bezel };
+  });
+  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4) + (hasLamp && !lampOnRight ? lampWidth + lampGap : 0));
+  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4) + (hasLamp && lampOnRight ? lampWidth + lampGap : 0));
   let layoutPaddingTop = $derived(numberOr(contentLayout?.paddingTop, 0));
   let layoutPaddingBottom = $derived(numberOr(contentLayout?.paddingBottom, 0));
   let layoutGap = $derived(Math.max(0, numberOr(contentLayout?.gap, 8)));
@@ -3543,6 +3613,30 @@
       <div class="combobox-arrow" aria-hidden="true"></div>
     {/if}
 
+    {#if hasLamp}
+      <div class="lamp-indicator" class:lit={lampLit} style={lampStyle} aria-hidden="true">
+        {#if batInks}
+          <!-- A bat switch in a 10×30 box: the bezel ring at the centre, the lever from the
+               pivot to the top when checked and to the bottom when not, a ball on its end. -->
+          <svg class="lamp-bat" viewBox="0 0 10 30" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <defs>
+              <radialGradient id="bat-ball-{svgIdSeed}" cx="35%" cy="30%" r="70%">
+                <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85" />
+                <stop offset="0.45" stop-color={batInks.lever} stop-opacity="0.15" />
+                <stop offset="1" stop-color="#000000" stop-opacity="0.35" />
+              </radialGradient>
+            </defs>
+            <circle cx="5" cy="15" r="4.6" fill={batInks.bezel} stroke="rgba(0,0,0,0.45)" stroke-width="0.6" />
+            <circle cx="5" cy="15" r="1.8" fill="rgba(0,0,0,0.55)" />
+            <line x1="5" y1="15" x2="5" y2={lampLit ? 4.5 : 25.5} stroke="rgba(0,0,0,0.5)" stroke-width="3.4" stroke-linecap="round" transform="translate(0.6 0.8)" />
+            <line x1="5" y1="15" x2="5" y2={lampLit ? 4.5 : 25.5} stroke={batInks.lever} stroke-width="2.8" stroke-linecap="round" />
+            <circle cx="5" cy={lampLit ? 4 : 26} r="3.4" fill={batInks.lever} stroke="rgba(0,0,0,0.45)" stroke-width="0.5" />
+            <circle cx="5" cy={lampLit ? 4 : 26} r="3.4" fill="url(#bat-ball-{svgIdSeed})" />
+          </svg>
+        {/if}
+      </div>
+    {/if}
+
     {#if hasIcon}
       <div class="icon-content" style={iconContainerStyle}>
         {#if iconIsTinted}
@@ -4456,6 +4550,19 @@
     position: absolute;
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  .lamp-indicator {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 1;
+    transition: background 120ms ease-out, box-shadow 120ms ease-out;
+  }
+
+  .lamp-bat {
+    display: block;
+    overflow: visible;
   }
 
   .icon-image {

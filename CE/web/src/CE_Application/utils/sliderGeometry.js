@@ -170,6 +170,7 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   trackThickness = 10,
   pointerSize = 18,
   majorTickLength = 12,
+  hasTicks = true,
   hasReadout = false,
   circularDiameter = 0,
   labelMetrics = {},
@@ -180,7 +181,16 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   const handleSize = Math.max(0, numberOr(labelMetrics?.handleSize, 11));
   const labelAllowance = Math.max(minMaxSize, handleSize, titleSize, hasReadout ? readoutSize : 0);
   const topInset = hasReadout ? Math.max(12, readoutSize * 0.5) : 0;
-  const outerPadding = 14 + majorTickLength + (pointerSize / 2) + (labelAllowance * 0.5);
+  // What actually sits outside the arc, measured rather than summed. The ticks and the pointer
+  // both reach outward from the track, into the SAME ring, so the room they need is the larger of
+  // the two and not both added together — and a knob with its ticks off needs none for them. The
+  // old padding added the tick length, the whole pointer half-size and a 14 px slack on top of
+  // each other, which for a 100 px knob left an arc 16 px in radius (the floor below) in a box
+  // that could hold one twice that; the min/max labels, which hang 24 px past the arc's ends at
+  // the bottom corners, are what the label allowance is still reserving for.
+  const tickRoom = hasTicks ? Math.max(0, majorTickLength) + 2 : 0;
+  const pointerRoom = Math.max(0, (pointerSize - trackThickness) / 2) + 2;
+  const outerPadding = 6 + Math.max(tickRoom, pointerRoom) + (labelAllowance * 0.4);
   const center = resolveCircularCenter(width, height, { hasReadout });
   const autoRadius = Math.max(
     16,
@@ -259,6 +269,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
   const geometry = getSliderGeometry(behavior);
   const minMaxPlacement = String(behavior?.labelMinMaxPlacement ?? 'auto').trim().toLowerCase();
   const readoutPlacement = String(behavior?.labelReadoutPlacement ?? 'auto').trim().toLowerCase();
+  const titlePlacement = String(behavior?.labelTitlePlacement ?? 'auto').trim().toLowerCase();
   // THE GAPS APPLY UNDER `auto` TOO, and they did not used to. Both `auto` branches carried the
   // distance as a literal — 22 below a horizontal track, 14 above it for the readout — which are
   // exactly the two defaults declared beside them in sectionDefaults.js. So the Gap cells in the
@@ -284,19 +295,32 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
     };
   }
 
-  function applyReadoutPlacement(anchors, centerX, centerY) {
-    let value = anchors.value;
-    if (readoutPlacement === 'top') {
-      value = { x: centerX, y: readoutGap };
-    } else if (readoutPlacement === 'center') {
-      value = { x: centerX, y: centerY };
-    } else if (readoutPlacement === 'bottom') {
-      value = { x: centerX, y: height - readoutGap };
-    }
+  // A placed label is a point and, for the four corners, the side it hangs from: `topleft` puts
+  // its left edge on the left of the span, `topright` its right edge on the right, so a title
+  // and a readout share the row above the track the way the boards drew them — the title
+  // starting where the track starts, the value ending where it ends. `span` is the track's
+  // extent (the arc's diameter for a knob, the frame for a linear track); the centre placements
+  // keep the point-only shape they had.
+  function placedLabel(placement, centerX, centerY, gap, span) {
+    if (placement === 'top') return { x: centerX, y: gap };
+    if (placement === 'center') return { x: centerX, y: centerY };
+    if (placement === 'bottom') return { x: centerX, y: height - gap };
+    const corner = /^(top|bottom)(left|right)$/.exec(placement);
+    if (!corner) return null;
+    const y = corner[1] === 'top' ? gap : height - gap;
+    return corner[2] === 'left'
+      ? { x: span.x1, y, align: 'start' }
+      : { x: span.x2, y, align: 'end' };
+  }
+
+  function applyReadoutPlacement(anchors, centerX, centerY, span = { x1: 0, x2: width }) {
+    const value = placedLabel(readoutPlacement, centerX, centerY, readoutGap, span) ?? anchors.value;
+    const title = placedLabel(titlePlacement, centerX, centerY, readoutGap, span) ?? anchors.title;
 
     return {
       ...anchors,
-      value: offset(value, readoutOffsetX, readoutOffsetY),
+      title,
+      value: { ...value, ...offset(value, readoutOffsetX, readoutOffsetY) },
     };
   }
 
@@ -305,6 +329,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       trackThickness,
       pointerSize,
       majorTickLength: numberOr(behavior?.majorTickLength, 12),
+      hasTicks: behavior?.showTicks !== false,
       hasReadout,
       circularDiameter: behavior?.circularDiameter,
       labelMetrics,
@@ -334,7 +359,7 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       title: { x: metrics.centerX, y: metrics.centerY - 18 },
       value: { x: metrics.centerX, y: metrics.centerY + 10 },
     };
-    return applyReadoutPlacement(anchors, metrics.centerX, metrics.centerY);
+    return applyReadoutPlacement(anchors, metrics.centerX, metrics.centerY, { x1: metrics.centerX - metrics.radius, x2: metrics.centerX + metrics.radius });
   }
 
   const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, pointerSize, hasReadout, labelMetrics);
@@ -361,7 +386,8 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
       title: { x: width / 2, y: height - 14 },
       value: { x: width / 2, y: readoutGap },
     };
-    return applyReadoutPlacement(anchors, width / 2, height / 2);
+    // A vertical track has no width to speak of; the corners hang off the component's edges.
+    return applyReadoutPlacement(anchors, width / 2, height / 2, { x1: 0, x2: width });
   }
 
   const anchorY = minMaxPlacement === 'above'
@@ -380,5 +406,5 @@ export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, 
     title: { x: width / 2, y: height - 12 },
     value: { x: width / 2, y: readoutGap },
   };
-  return applyReadoutPlacement(anchors, width / 2, height / 2);
+  return applyReadoutPlacement(anchors, width / 2, height / 2, { x1: frame.x1, x2: frame.x2 });
 }

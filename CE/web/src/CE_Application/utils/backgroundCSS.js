@@ -5,12 +5,18 @@
  */
 
 import { gradientToCSS } from './gradientCSS.js';
+import { controlSetForPanel, resolveColourValue } from '../models/controlSets.js';
+
+// What panelModel gives a new panel (stores/panelModel.js `bgColour`), spelled the way it is
+// compared here.
+const DEFAULT_PANEL_COLOUR = 'FF333333';
 
 /**
  * Parse AARRGGBB or RRGGBB hex to rgba(). Falls back to low-alpha white for 6-char.
  */
 export function hexToRgba(hex) {
-  const h = String(hex).replace(/^#/, '');
+  // A control-set reference that was never resolved renders in the base set — see plainFillCSS.
+  const h = String(resolveColourValue(hex)).replace(/^#/, '');
   if (h.length === 8) {
     const a = parseInt(h.slice(0, 2), 16) / 255;
     const r = parseInt(h.slice(2, 4), 16);
@@ -102,7 +108,12 @@ export function fitToCSS(fit, align, offsetX, offsetY, flipH, flipV, tileScale, 
  */
 export function buildSolidStyle(panel) {
   if (!panel || panel.bgSolid === false) return '';
-  const hex = String(panel.bgColour || 'FF2A2A2A');
+  // A control set may ask for a panel colour (a black tolex, a grey billet). It gets it only
+  // while the panel still wears the colour it was created with — an author who picked a colour
+  // keeps it, the same rule a set's family patch follows for a control.
+  const setColour = controlSetForPanel(panel)?.panel?.colour;
+  const authored = String(panel.bgColour || DEFAULT_PANEL_COLOUR).toUpperCase();
+  const hex = setColour && authored === DEFAULT_PANEL_COLOUR ? String(setColour).toUpperCase() : authored;
   if (hex.length === 8) {
     const a = parseInt(hex.slice(0, 2), 16) / 255;
     const rgb = hex.slice(2);

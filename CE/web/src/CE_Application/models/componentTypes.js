@@ -29,14 +29,14 @@ function createStateNode(name, when = {}, component = {}) {
 function createButtonStates({ includeSelected = false, includeExecuted = false } = {}) {
   const children = {
     Hover: createStateNode('Hover', { hover: true }, {
-      'Background.Fill.colour': 'FF4A4A4A',
+      'Background.Fill.colour': '{surface.hover}',
     }),
     Pressed: createStateNode('Pressed', { pressed: true }, {
-      'Background.Fill.colour': 'FF2C2C2C',
+      'Background.Fill.colour': '{surface.pressed}',
       'Transform.scale': 0.985,
     }),
     Focused: createStateNode('Focused', { focused: true }, {
-      'Background.Border.colour': 'FF89C2FF',
+      'Background.Border.colour': '{accent.hot}',
     }),
     Disabled: createStateNode('Disabled', { disabled: true }, {
       'Transform.opacity': 0.55,
@@ -45,13 +45,13 @@ function createButtonStates({ includeSelected = false, includeExecuted = false }
 
   if (includeSelected) {
     children.Selected = createStateNode('Selected', { checked: true }, {
-      'Background.Fill.colour': 'FF2D6F9C',
-      'Text.Fill.colour': 'FFFFFFFF',
+      'Background.Fill.colour': '{surface.checked}',
+      'Text.Fill.colour': '{text.inverse}',
     });
     children.Mixed = createStateNode('Mixed', { mixed: true }, {
-      'Background.Fill.colour': 'FF806019',
-      'Background.Border.colour': 'FFFFD166',
-      'Text.Fill.colour': 'FFFFFFFF',
+      'Background.Fill.colour': '{surface.mixed}',
+      'Background.Border.colour': '{border.mixed}',
+      'Text.Fill.colour': '{text.inverse}',
     });
   }
 
@@ -78,13 +78,13 @@ function createComboboxStates() {
     priority: ['disabled', 'pressed', 'hover', 'focused'],
     _children: {
       Hover: createStateNode('Hover', { hover: true }, {
-        'Background.Fill.colour': 'FF414141',
+        'Background.Fill.colour': '{control.select.hover}',
       }),
       Pressed: createStateNode('Pressed', { pressed: true }, {
-        'Background.Fill.colour': 'FF2A2A2A',
+        'Background.Fill.colour': '{control.select.pressed}',
       }),
       Focused: createStateNode('Focused', { focused: true }, {
-        'Background.Border.colour': 'FF89C2FF',
+        'Background.Border.colour': '{accent.hot}',
       }),
       Disabled: createStateNode('Disabled', { disabled: true }, {
         'Transform.opacity': 0.55,
@@ -139,8 +139,8 @@ function createButtonType({
       Text: { content: label },
       Background: {
         _children: {
-          Fill: { colour: 'FF3A3A3A' },
-          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Fill: { colour: '{surface}' },
+          Border: { enabled: true, thickness: 1, colour: '{border.surface}' },
           Corners: { radius: 8 },
         },
       },
@@ -298,8 +298,8 @@ export const COMPONENT_TYPES = {
       Text: { content: 'Option 1' },
       Background: {
         _children: {
-          Fill: { colour: 'FF2F2F2F' },
-          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Fill: { colour: '{control.select}' },
+          Border: { enabled: true, thickness: 1, colour: '{border.surface}' },
           Corners: { radius: 6 },
         },
       },
@@ -349,8 +349,8 @@ export const COMPONENT_TYPES = {
       Text: { content: 'Option 1' },
       Background: {
         _children: {
-          Fill: { colour: 'FF2F2F2F' },
-          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Fill: { colour: '{control.select}' },
+          Border: { enabled: true, thickness: 1, colour: '{border.surface}' },
           Corners: { radius: 6 },
         },
       },
@@ -399,8 +399,8 @@ export const COMPONENT_TYPES = {
       Text: { content: 'Enter text…' }, // placeholder (NOT the live value)
       Background: {
         _children: {
-          Fill: { colour: 'FF2F2F2F' },
-          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Fill: { colour: '{control.select}' },
+          Border: { enabled: true, thickness: 1, colour: '{border.surface}' },
           Corners: { radius: 6 },
         },
       },
