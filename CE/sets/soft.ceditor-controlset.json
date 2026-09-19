@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "54d52020",
+  "fingerprint": "f2b454b1",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -149,6 +149,23 @@
     },
     "panel": {
       "colour": "FFE8EAEE"
+    },
+    "type": {
+      "label": {
+        "family": "Nunito Sans",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Nunito Sans",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

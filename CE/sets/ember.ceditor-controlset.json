@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b29267d1",
+  "fingerprint": "df69a47a",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -163,6 +163,23 @@
         "shine": 0,
         "grain": 100,
         "lampFollowsSet": true
+      }
+    },
+    "type": {
+      "label": {
+        "family": "Barlow Semi Condensed",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Barlow Semi Condensed",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
       }
     }
   }

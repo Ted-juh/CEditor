@@ -50,6 +50,7 @@ try {
   for (const setId of SETS) {
     const shown = await page.evaluate((id) => window.__controlSetShot.show(id), setId);
     await page.waitForFunction((n) => document.querySelectorAll('[data-control-id]').length >= n, shown.controls, { timeout: 60000 });
+    await page.evaluate(() => window.__controlSetShot.fontsReady());
     await page.waitForTimeout(1200);
     const boxes = await page.evaluate(() => [...document.querySelectorAll('[data-control-id]')].map((el) => {
       const rect = el.getBoundingClientRect();

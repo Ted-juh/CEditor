@@ -463,3 +463,39 @@ green-STN literals. Graphite's tokens are exactly those literals, so no saved di
 every other set carries its board's readout: Machined's ice-blue OLED, Valve's amber, Reel's cream
 meter face with dark digits, Field's red LED behind a filter. The LCD's palette dropdown still
 writes literals, which is an author's override of the set, as it should be.
+
+## The boards' type
+
+Every board was drawn in a typeface, and until now no set carried one, so all thirty rendered in
+Arial. The boards chose: DM Sans (Graphite, Ivory, Chrome, Eurorack), Barlow (Console, Carbon,
+Rackmount, Anodised, Machined, Aerospace, Field — whose legends are Allerta Stencil), Barlow Semi
+Condensed (Ember), Space Grotesk (Neon, Frost, Obsidian, Backlit), JetBrains Mono (Blueprint,
+Phosphor), Libre Franklin (Walnut, Atelier, Tolex, Reel, Valve, Ladder, Saddle, Laboratory,
+Ceramic, Receiver), Nunito Sans (Soft), Rubik (Pop); and every readout was JetBrains Mono.
+
+**The faces ship.** `assets/fonts/panelFonts.css` declares the eight families plus JetBrains
+Mono, as Google Fonts' own woff2 subsets (latin and latin-ext, 536 KB for all of them), each
+under the SIL Open Font License with its text beside it. It is a different sheet from
+`webFonts.css`, which is the editor's own UI faces, because these have to be present wherever a
+panel is drawn: the editor, the standalone player and the exported plugin's player all import it,
+and a test says so. The font picker lists them beside the system families and the author's
+imports. `models/panelFonts.js` is the list as data.
+
+**A set has a `type` block.** Three roles, each a family, a weight and a letter-spacing in px:
+`label` (a knob's or slider's title, value, min/max and handle labels, and the Label control — the
+silkscreen), `legend` (buttons, toggles, momentaries, the combobox — the key cap) and `field` (the
+digits in a Number or Range — the readout window). The block becomes family patches
+(`typeFamilies` in the recipes) that sit beneath the set's own families, so a set that names a
+face for one part explicitly wins over its own type, and the pristine rule applies as it does to
+everything else: an author who chose Georgia keeps Georgia. The role's weight lands on the title
+and the Label only; the value and min/max keep their factory weights, so a bold set does not make
+every number bold.
+
+**What the type does not carry, deliberately.** The boards set their legends in capitals; that is
+the author's text, not the set's, so no set writes a case mode. The lit boards drew their labels
+engraved, embossed or backlit; those are text effects, and the Effects tab has the shadow and
+glow to do them, but a set asking for them is a further step. And the conversion did not carry
+the boards' type into the base tokens: Graphite's board is DM Sans, and since Graphite is the
+default set, every factory label on every existing panel now renders in DM Sans rather than
+Arial — the same trade the knob geometry made, and for the same reason: the default set draws its
+board.

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "00ca7d9e",
+  "fingerprint": "b87cb933",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -251,6 +251,23 @@
         "shine": 40,
         "grain": 100,
         "lampFollowsSet": true
+      }
+    },
+    "type": {
+      "label": {
+        "family": "Barlow",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Barlow",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
       }
     }
   }

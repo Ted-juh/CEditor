@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "40162369",
+  "fingerprint": "81cc7e32",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -219,6 +219,23 @@
         "lampFollowsSet": true
       },
       "colour": "FF1C1A17"
+    },
+    "type": {
+      "label": {
+        "family": "Libre Franklin",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Libre Franklin",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

@@ -28,6 +28,7 @@
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 import { resolveControlTokens } from './controlSets.js';
+import { typeFamilies } from './controlSetRecipes.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const pristineCache = new Map();
@@ -133,9 +134,38 @@ function applyPatchWhereDefault(target, pristine, patch, prefix, out) {
   return out;
 }
 
-/** The family patch a set holds for a control type, or null. */
+/**
+ * The family patch a set holds for a control type, or null: the set's `type` block (its fonts,
+ * as families — controlSetRecipes.typeFamilies) with the set's own families over it. Computed
+ * once per set object; this runs for every control on every draw.
+ */
+const familiesWithType = new WeakMap();
+function effectiveFamilies(set) {
+  if (!set || typeof set !== 'object') return null;
+  if (familiesWithType.has(set)) return familiesWithType.get(set);
+  const fromType = typeFamilies(set.type);
+  const own = set.families && typeof set.families === 'object' ? set.families : {};
+  let out;
+  if (!Object.keys(fromType).length) {
+    out = own;
+  } else {
+    out = { ...fromType };
+    for (const [type, patch] of Object.entries(own)) {
+      const base = fromType[type];
+      if (!base || !patch || typeof patch !== 'object') { out[type] = patch; continue; }
+      const parts = { ...(base.parts ?? {}) };
+      for (const [part, paths] of Object.entries(patch.parts ?? {})) parts[part] = { ...(parts[part] ?? {}), ...paths };
+      out[type] = { ...base, ...patch, component: { ...(base.component ?? {}), ...(patch.component ?? {}) }, parts };
+      if (!Object.keys(out[type].component).length) delete out[type].component;
+      if (!Object.keys(out[type].parts).length) delete out[type].parts;
+    }
+  }
+  familiesWithType.set(set, out);
+  return out;
+}
+
 export function familyPatchFor(set, controlType) {
-  const patch = set?.families?.[String(controlType ?? '')];
+  const patch = effectiveFamilies(set)?.[String(controlType ?? '')];
   return patch && typeof patch === 'object' ? patch : null;
 }
 

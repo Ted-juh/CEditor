@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "60d7a9fd",
+  "fingerprint": "55d93c2e",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -157,6 +157,23 @@
     },
     "panel": {
       "colour": "FFEFEAE0"
+    },
+    "type": {
+      "label": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

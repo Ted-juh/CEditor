@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9b5d679f",
+  "fingerprint": "32f3a3fc",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -159,6 +159,23 @@
     },
     "panel": {
       "colour": "FF14243A"
+    },
+    "type": {
+      "label": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

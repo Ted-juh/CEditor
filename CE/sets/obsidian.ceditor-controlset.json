@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3373f57d",
+  "fingerprint": "090bb034",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -222,6 +222,23 @@
         "shine": 120,
         "grain": 100,
         "lampFollowsSet": true
+      }
+    },
+    "type": {
+      "label": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
       }
     }
   }

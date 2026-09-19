@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c4a5ecd9",
+  "fingerprint": "8a68827c",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -148,6 +148,23 @@
     },
     "panel": {
       "colour": "FFF6D96B"
+    },
+    "type": {
+      "label": {
+        "family": "Rubik",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Rubik",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

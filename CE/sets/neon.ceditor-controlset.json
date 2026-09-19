@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5d6e304f",
+  "fingerprint": "8d4bbcee",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -159,6 +159,23 @@
     },
     "panel": {
       "colour": "FF0E1116"
+    },
+    "type": {
+      "label": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

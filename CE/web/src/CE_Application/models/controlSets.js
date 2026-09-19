@@ -334,7 +334,31 @@ export function normalizeControlSetDefinition(value) {
   if (Number.isFinite(azimuth) && Number.isFinite(elevation)) out.lamp = { azimuth, elevation };
   if (value.families && typeof value.families === 'object' && !Array.isArray(value.families)) out.families = value.families;
   if (value.panel && typeof value.panel === 'object' && !Array.isArray(value.panel)) out.panel = value.panel;
+  const type = normalizeControlSetType(value.type);
+  if (type) out.type = type;
   return out;
+}
+
+/**
+ * A set's `type` block: the roles `label`, `legend` and `field`, each a family name, a weight and
+ * a letter-spacing in px (see controlSetRecipes.typeFamilies for where each lands). Anything
+ * else is dropped; a block with no role is no block.
+ */
+export const CONTROL_SET_TYPE_ROLES = ['label', 'legend', 'field'];
+export function normalizeControlSetType(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const out = {};
+  for (const role of CONTROL_SET_TYPE_ROLES) {
+    const raw = value[role];
+    if (!raw || typeof raw !== 'object') continue;
+    const entry = {};
+    const family = String(raw.family ?? '').trim();
+    if (family) entry.family = family;
+    if (Number.isFinite(Number(raw.weight))) entry.weight = Number(raw.weight);
+    if (Number.isFinite(Number(raw.letterSpacing))) entry.letterSpacing = Number(raw.letterSpacing);
+    if (Object.keys(entry).length) out[role] = entry;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** A document's `controlSets` list: every entry that is a set, in order, each id once. */

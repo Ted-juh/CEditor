@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d4c49069",
+  "fingerprint": "d2439dc2",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -225,6 +225,23 @@
         "lampFollowsSet": true
       },
       "colour": "FF9A9FA6"
+    },
+    "type": {
+      "label": {
+        "family": "Barlow",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Barlow",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

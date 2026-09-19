@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "9e66a818",
+  "fingerprint": "6f87b2a1",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -185,6 +185,23 @@
     },
     "panel": {
       "colour": "FF0B0D0B"
+    },
+    "type": {
+      "label": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

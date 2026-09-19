@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "143b1b87",
+  "fingerprint": "6f551d08",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -144,6 +144,23 @@
           "Background.Corners.radius": 8,
           "Background.Border.thickness": 1
         }
+      }
+    },
+    "type": {
+      "label": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
       }
     }
   }

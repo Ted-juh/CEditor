@@ -2,9 +2,10 @@
 // converted from the boards' own palettes and part choices by a one-off script and then kept here
 // as source. Edit by hand from here on; there is no generator to re-run.
 //
-// Each set is what every catalogue set is: forty colour roles, a lamp, a family patch (a knob's
-// cap and pointer, the buttons' corners and finish — models/controlSetRecipes.js) and what it
-// asks of the panel. Tolex and Machined, the pilot, are in models/pilotControlSets.js; Graphite,
+// Each set is what every catalogue set is: forty-odd colour roles, a lamp, a family patch (a knob's
+// cap and pointer, the buttons' corners and finish — models/controlSetRecipes.js), its type (the
+// board's face for the labels, the legends and the fields — models/panelFonts.js has the faces)
+// and what it asks of the panel. Tolex and Machined, the pilot, are in models/pilotControlSets.js; Graphite,
 // Ember and Ivory are in models/controlSets.js, and CATALOG_SET_EXTRAS gives the last two the
 // families and panels their boards showed.
 
@@ -20,6 +21,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capMaterial: ["brushed", 40, 60], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "console", capAlong: 18, capAcross: 40, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 50, 60] }), lampFamily({ lamp: "led", size: 7 })),
     panel: panelSpec("FF5E6166", "brushed", 70, 50),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF3B3D42",
       "surface.hover": "FF4A4D53",
@@ -74,6 +76,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capMaterial: ["glass", 60, 140], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 6, ticks: false, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 22, capAcross: 22, capMaterial: ["glass", 50, 140], track: 6 }), buttonFamily({ radius: 10 })),
     panel: panelSpec("FF0E1116"),
+    type: { label: { family: "Space Grotesk", weight: 700, letterSpacing: 0.9 }, legend: { family: "Space Grotesk", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF1B222B",
       "surface.hover": "FF243040",
@@ -128,6 +131,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capEdgeWidth: 1.5, pointer: "line", pointerWidth: 1.5, pointerStart: 0, pointerLength: 95, track: 2, ticks: {"count": 11, "length": 5, "width": 1, "kind": "line"}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "ring", capAlong: 18, capAcross: 10, capEdgeWidth: 2.5, track: 4, trackRadius: 2 }), buttonFamily({ radius: 2, border: 1 })),
     panel: panelSpec("FF14243A"),
+    type: { label: { family: "JetBrains Mono", weight: 600, letterSpacing: 0.9 }, legend: { family: "JetBrains Mono", weight: 600, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF14243A",
       "surface.hover": "FF1D3252",
@@ -182,6 +186,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capEdgeWidth: 4, pointer: "line", pointerWidth: 2, pointerStart: 35, pointerLength: 90, track: 3, ticks: {"count": 11, "length": 5, "width": 1.5} }), sliderFamily({ cap: "console", capAlong: 12, capAcross: 32, track: 6 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 40, 60] })),
     panel: panelSpec("FF4A3226", "brushed", 50, 30, 60),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF5C4033",
       "surface.hover": "FF6B4B3C",
@@ -236,6 +241,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capEdgeWidth: 1, pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, ticks: false, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, track: 8 }), buttonFamily({ radius: 12, border: 1 })),
     panel: panelSpec("FFE8EAEE"),
+    type: { label: { family: "Nunito Sans", weight: 700, letterSpacing: 0.9 }, legend: { family: "Nunito Sans", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFF7F8FA",
       "surface.hover": "FFFFFFFF",
@@ -290,6 +296,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 62, pointer: "capdot", pointerWidth: 26, pointerLength: 66, track: 6, ticks: {"count": 11, "length": 5, "width": 1.5, "kind": "dot"} }), sliderFamily({ cap: "ring", capAlong: 18, capAcross: 10, capEdgeWidth: 2.5, track: 6, trackRadius: 2 }), buttonFamily({ radius: 2 }), lampFamily({ lamp: "led", size: 7 })),
     panel: panelSpec("FF0B0D0B"),
+    type: { label: { family: "JetBrains Mono", weight: 600, letterSpacing: 0.9 }, legend: { family: "JetBrains Mono", weight: 600, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF151815",
       "surface.hover": "FF1F241F",
@@ -344,6 +351,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capEdgeWidth: 3, pointer: "capdot", pointerWidth: 40, pointerLength: 62, track: 7, ticks: false }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, track: 12 }), buttonFamily({ radius: 10, border: 3 })),
     panel: panelSpec("FFF6D96B"),
+    type: { label: { family: "Rubik", weight: 700, letterSpacing: 0.9 }, legend: { family: "Rubik", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFFFFFFF",
       "surface.hover": "FFFFF3E0",
@@ -398,6 +406,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capMaterial: ["rubber", 80, 0], pointer: "capdot", pointerWidth: 26, pointerLength: 66, track: 3, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "console", capAlong: 12, capAcross: 32, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 50, 40] })),
     panel: panelSpec("FF1C1E21", "leather", 60, 20, 140),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF2A2D32",
       "surface.hover": "FF343840",
@@ -452,6 +461,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, pointer: "capdot", pointerWidth: 26, pointerLength: 66, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, track: 4 }), buttonFamily({ radius: 4 })),
     panel: panelSpec("FFD9D9D4"),
+    type: { label: { family: "Libre Franklin", weight: 600, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 600, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFEDEDEA",
       "surface.hover": "FFF6F6F3",
@@ -506,6 +516,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capMaterial: ["glass", 50, 180], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, ticks: {"count": 11, "length": 5, "width": 1.5} }), sliderFamily({ cap: "console", capAlong: 18, capAcross: 40, track: 8 }), buttonFamily({ radius: 6, border: 1, buttonMaterial: ["glass", 40, 120] })),
     panel: panelSpec("FF10151F"),
+    type: { label: { family: "DM Sans", weight: 700, letterSpacing: 0.9 }, legend: { family: "DM Sans", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF2A3544",
       "surface.hover": "FF34425A",
@@ -560,6 +571,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capFill: "38FFFFFF", capEdge: "8CFFFFFF", capEdgeWidth: 1.2, pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, ticks: false }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, capFill: "D9FFFFFF", capEdgeWidth: 2, track: 8 }), buttonFamily({ radius: 14, border: 1, text: "{text.inverse}", comboText: "{text.inverse}", fieldText: "{text.inverse}" })),
     panel: panelSpec("FF6A5BD6"),
+    type: { label: { family: "Space Grotesk", weight: 700, letterSpacing: 0.9 }, legend: { family: "Space Grotesk", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "38FFFFFF",
       "surface.hover": "55FFFFFF",
@@ -614,6 +626,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capEdgeWidth: 3, pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "console", capAlong: 18, capAcross: 40, track: 6, trackRadius: 2 }), buttonFamily({ radius: 2, border: 1, buttonMaterial: ["brushed", 50, 60], text: "FFFFFFFF", comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FFA9ADB2", "brushed", 60, 50),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF3B3D42",
       "surface.hover": "FF4A4D53",
@@ -668,6 +681,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 90, capEdgeWidth: 1, pointer: "line", pointerWidth: 2.5, pointerStart: 0, pointerLength: 70, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 6, "width": 1, "kind": "numeral", "numerals": "value"}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "console", capAlong: 12, capAcross: 32, track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 40] }), lampFamily({ lamp: "bat", size: 10, colour: "{control.cap}", offColour: "{control.cap}" })),
     panel: panelSpec("FF5E6A5E", "hammer", 80, 40),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF3A4038",
       "surface.hover": "FF454C43",
@@ -722,6 +736,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, capMaterial: ["rubber", 40, 20], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, track: 6 }), buttonFamily({ radius: 8, border: 1, buttonMaterial: ["glass", 40, 80] }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FF6B4A2E", "brushed", 50, 30, 60),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF4A3A30",
       "surface.hover": "FF5A4738",
@@ -776,6 +791,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 82, capMaterial: ["brushed", 80, 90], pointer: "line", pointerWidth: 2.2, pointerStart: 30, pointerLength: 88, track: 3, ticks: {"count": 11, "length": 5, "width": 1.5, "kind": "engraved"}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "bar", capAlong: 20, capAcross: 40, capMaterial: ["blast", 80, 60], track: 8 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 80, 60], comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF9DA3AA", "blast", 90, 40),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFB8BDC3",
       "surface.hover": "FFCDD2D7",
@@ -830,6 +846,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 95, capMaterial: ["rubber", 70, 10], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 5, trackOpacity: 0, ticks: {"count": 11, "length": 5, "width": 1.5}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "bar", capAlong: 20, capAcross: 40, capMaterial: ["blast", 80, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["rubber", 50, 10] }), lampFamily({ lamp: "bat", size: 10, colour: "{control.cap}", offColour: "{control.cap}" })),
     panel: panelSpec("FF1B1B1D", "rubber", 40, 0),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF2A2A2D",
       "surface.hover": "FF3A3A3E",
@@ -884,6 +901,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 82, capMaterial: ["glass", 60, 200], pointer: "line", pointerWidth: 3, pointerStart: 30, pointerLength: 92, track: 3, ticks: {"count": 11, "length": 5, "width": 1.5, "kind": "engraved"}, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, capMaterial: ["glass", 60, 160], track: 6 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["blast", 60, 60], comboText: "FFFFFFFF", fieldText: "FFFFFFFF" }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FFC4C8CC", "brushed", 60, 50),
+    type: { label: { family: "DM Sans", weight: 700, letterSpacing: 0.9 }, legend: { family: "DM Sans", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFD5D9DD",
       "surface.hover": "FFE6E9EC",
@@ -938,6 +956,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 82, pointer: "line", pointerWidth: 4, pointerStart: 35, pointerLength: 90, track: 4, ticks: false, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, capMaterial: ["glass", 60, 160], track: 6 }), buttonFamily({ radius: 6, border: 1 }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF121316"),
+    type: { label: { family: "Space Grotesk", weight: 700, letterSpacing: 0.9 }, legend: { family: "Space Grotesk", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF1F2126",
       "surface.hover": "FF2A2D34",
@@ -992,6 +1011,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 74, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["brushed", 60, 80], track: 6, trackRadius: 2 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["brushed", 60, 80], fieldText: "FFFFFFFF" }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FFB3873A", "brushed", 60, 70),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFD9B45B",
       "surface.hover": "FFE6C77A",
@@ -1046,6 +1066,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["glass", 80, 160], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "dot", capMaterial: ["glass", 70, 160], track: 6, trackRadius: 2 }), buttonFamily({ radius: 7, border: 1, buttonMaterial: ["glass", 50, 120] }), lampFamily({ lamp: "window", size: 8 })),
     panel: panelSpec("FF0B0D11", "glass", 40, 120),
+    type: { label: { family: "Space Grotesk", weight: 700, letterSpacing: 0.9 }, legend: { family: "Space Grotesk", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF161A21",
       "surface.hover": "FF1E232B",
@@ -1100,6 +1121,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["rubber", 50, 30], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["rubber", 50, 20], track: 6, trackRadius: 2 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["glass", 30, 60] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FF5F6B5E", "hammer", 80, 40),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF4A5548",
       "surface.hover": "FF5A665A",
@@ -1154,6 +1176,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 70, capMaterial: ["brushed", 70, 50], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 90, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 4, border: 1, buttonMaterial: ["blast", 70, 40] }), lampFamily({ lamp: "bat", size: 10, colour: "{control.cap}", offColour: "{control.cap}" })),
     panel: panelSpec("FF1A1C20", "blast", 60, 20, 120),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF3A3F46",
       "surface.hover": "FF4A5058",
@@ -1208,6 +1231,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 74, capMaterial: ["glass", 40, 120], pointer: "line", pointerWidth: 2.5, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["rubber", 50, 20], track: 6, trackRadius: 2 }), buttonFamily({ radius: 5, border: 1, buttonMaterial: ["glass", 30, 100] }), lampFamily({ lamp: "led", size: 8 })),
     panel: panelSpec("FFF2EFE7", "glass", 30, 60),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFF7F4EE",
       "surface.hover": "FFFFFFFF",
@@ -1262,6 +1286,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 72, capMaterial: ["rubber", 60, 20], pointer: "line", pointerWidth: 3, pointerLength: 84, track: 5, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 14, capAcross: 30, capMaterial: ["blast", 90, 60], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["hammer", 50, 30] }), lampFamily({ lamp: "bat", size: 10, colour: "{control.cap}", offColour: "{control.cap}" })),
     panel: panelSpec("FF4F5A3C", "leather", 90, 20, 150),
+    type: { label: { family: "Barlow", weight: 700, letterSpacing: 0.9 }, legend: { family: "Allerta Stencil", weight: 400, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FF3A4230",
       "surface.hover": "FF4A5340",
@@ -1316,6 +1341,7 @@ export const CATALOG_CONTROL_SETS = [
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 72, capEdgeWidth: 3, capMaterial: ["glass", 30, 60], pointer: "line", pointerWidth: 2, pointerLength: 84, track: 4, ticks: {"count": 11, "length": 6, "width": 1.3, "kind": "engraved"} }), sliderFamily({ cap: "bar", capAlong: 12, capAcross: 28, capMaterial: ["brushed", 60, 80], track: 6, trackRadius: 2 }), buttonFamily({ radius: 3, border: 1, buttonMaterial: ["brushed", 60, 70], fieldText: "FFFFFFFF" }), lampFamily({ lamp: "jewel", size: 12 })),
     panel: panelSpec("FFC9CED3", "brushed", 70, 60),
+    type: { label: { family: "Libre Franklin", weight: 700, letterSpacing: 0.9 }, legend: { family: "Libre Franklin", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: {
       "surface": "FFB9BEC3",
       "surface.hover": "FFCDD2D7",
@@ -1371,18 +1397,21 @@ export const CATALOG_SET_EXTRAS = {
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, pointer: "capdot", pointerWidth: 26, pointerLength: 66, track: 5, ticks: false, pointerFill: "{control.cap}" }), sliderFamily({ cap: "dot", capAlong: 20, capAcross: 20, track: 10 }), buttonFamily({ radius: 8 })),
     panel: undefined,
+    type: { label: { family: "DM Sans", weight: 700, letterSpacing: 0.9 }, legend: { family: "DM Sans", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: { "control.body": "FF3A3A3A" },
   },
   "ember": {
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 48, pointer: "chicken", pointerWidth: 18, pointerLength: 165, track: 4, ticks: {"count": 11, "length": 5, "width": 1.5} }), sliderFamily({ cap: "console", capAlong: 12, capAcross: 32, track: 8 }), buttonFamily({ radius: 6 })),
     panel: panelSpec("FF2A2320", "rubber", 40, 0),
+    type: { label: { family: "Barlow Semi Condensed", weight: 700, letterSpacing: 0.9 }, legend: { family: "Barlow Semi Condensed", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: { "control.body": "FFF3E9DC", "control.marker": "FF3B2A1E" },
   },
   "ivory": {
     lamp: LAMP,
     families: mergeFamilies(knobFamily({ cap: 77, pointer: "line", pointerWidth: 4, pointerStart: 70, pointerLength: 100, track: 4, ticks: {"count": 11, "length": 5, "width": 1.5} }), sliderFamily({ cap: "ring", capAlong: 18, capAcross: 10, capEdgeWidth: 2.5, track: 6 }), buttonFamily({ radius: 4 })),
     panel: panelSpec("FFEFEAE0"),
+    type: { label: { family: "DM Sans", weight: 700, letterSpacing: 0.9 }, legend: { family: "DM Sans", weight: 700, letterSpacing: 0.7 }, field: { family: "JetBrains Mono", weight: 600, letterSpacing: 0 } },
     tokens: { "control.body": "FF22201C", "control.marker": "FF22201C" },
   },
 };

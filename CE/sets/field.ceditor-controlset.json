@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e6fbc6f2",
+  "fingerprint": "d53916aa",
   "set": {
     "id": "field",
     "name": "Field",
@@ -223,6 +223,23 @@
         "shine": 20,
         "grain": 150,
         "lampFollowsSet": true
+      }
+    },
+    "type": {
+      "label": {
+        "family": "Barlow",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Allerta Stencil",
+        "weight": 400,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
       }
     }
   }

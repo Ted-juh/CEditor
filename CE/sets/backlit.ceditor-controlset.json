@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c45bc3b4",
+  "fingerprint": "6d3bfc1b",
   "set": {
     "id": "backlit",
     "name": "Backlit",
@@ -177,6 +177,23 @@
     },
     "panel": {
       "colour": "FF121316"
+    },
+    "type": {
+      "label": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Space Grotesk",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

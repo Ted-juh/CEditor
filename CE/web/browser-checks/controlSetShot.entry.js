@@ -3,6 +3,8 @@ import ControlSetShotHarness from './ControlSetShotHarness.svelte';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createPanel } from '../src/CE_Application/stores/panelModel.js';
 import { normalizeControlSet } from '../src/CE_Application/models/controlSets.js';
+// The panel faces: a set's type block names them, and a picture in the fallback face proves nothing.
+import '../src/assets/fonts/panelFonts.css';
 
 window.__JUCE__ = undefined;
 
@@ -41,5 +43,9 @@ window.__controlSetShot = {
     const panel = specimenPanel(setId);
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
     return { width: panel.width, height: panel.height, controls: panel.controls.length, set: panel.controlSet.id };
+  },
+  /** Resolves once every face the page asked for has loaded (or failed), so a shot is in the real font. */
+  fontsReady() {
+    return document.fonts.ready.then(() => Array.from(document.fonts).filter((face) => face.status === 'loaded').map((face) => face.family));
   },
 };

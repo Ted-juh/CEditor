@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "22bbcf6c",
+  "fingerprint": "e23773c1",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -157,6 +157,23 @@
     },
     "panel": {
       "colour": "FFD9D9D4"
+    },
+    "type": {
+      "label": {
+        "family": "Libre Franklin",
+        "weight": 600,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "Libre Franklin",
+        "weight": 600,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
     }
   }
 }

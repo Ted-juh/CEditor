@@ -131,6 +131,12 @@ export const TOLEX_CONTROL_SET = {
     material: { enabled: true, kind: 'leather', strength: 55, shine: 30, grain: 130, lampFollowsSet: true },
     colour: 'FF1C1A17',
   },
+  // The board's silkscreen: Libre Franklin, bold and tracked; the readout in the mono.
+  type: {
+    label: { family: 'Libre Franklin', weight: 700, letterSpacing: 0.9 },
+    legend: { family: 'Libre Franklin', weight: 700, letterSpacing: 0.7 },
+    field: { family: 'JetBrains Mono', weight: 600, letterSpacing: 0 },
+  },
 };
 
 /**
@@ -286,6 +292,12 @@ export const MACHINED_CONTROL_SET = {
   panel: {
     material: { enabled: true, kind: 'blast', strength: 100, shine: 40, grain: 100, lampFollowsSet: true },
     colour: 'FF9A9FA6',
+  },
+  // Engraved Barlow on the plate; the OLED's digits in the mono.
+  type: {
+    label: { family: 'Barlow', weight: 700, letterSpacing: 0.9 },
+    legend: { family: 'Barlow', weight: 700, letterSpacing: 0.7 },
+    field: { family: 'JetBrains Mono', weight: 600, letterSpacing: 0 },
   },
 };
 

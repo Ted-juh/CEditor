@@ -10,6 +10,7 @@ import {
   onFontsImported,
 } from '../bridge/bridge.js';
 import { parseFontMetadataFromDataUrl } from '../utils/fontParsing.js';
+import { PANEL_FONTS } from '../models/panelFonts.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import {
   DEFAULT_GENERAL_SETTINGS,
@@ -115,6 +116,26 @@ export const availableFonts = derived(appSettings, ($settings) => {
       label: family,
       sourceType: 'builtin',
       supportsWeight: false,
+      supportedFeatures: [],
+      featureSupportKnown: false,
+    });
+  }
+
+  // The faces shipped for panels (assets/fonts/panelFonts.css): what a control set's type block
+  // names, offered to the author too. A variable family takes any weight in its range; the
+  // static ones (Barlow) have their cuts and are listed as weighted all the same, since asking
+  // for 600 gets the 600 cut rather than a synthesised bold.
+  for (const font of PANEL_FONTS) {
+    const key = font.family.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({
+      value: font.family,
+      label: `${font.family} [W]`,
+      family: font.family,
+      cssFamily: font.family,
+      sourceType: 'shipped',
+      supportsWeight: font.max > font.min,
       supportedFeatures: [],
       featureSupportKnown: false,
     });

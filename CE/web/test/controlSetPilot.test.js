@@ -40,7 +40,7 @@ import {
   writeControlPath,
 } from '../src/CE_Application/models/controlSetFamilies.js';
 import { DEFAULT_LAMP, MATERIAL_KINDS, materialActive, materialPrimitives, resolveMaterialLamp } from '../src/CE_Application/utils/materialFilter.js';
-import { buttonFamily, knobFamily, lampFamily, mergeFamilies, sliderFamily } from '../src/CE_Application/models/controlSetRecipes.js';
+import { buttonFamily, knobFamily, lampFamily, mergeFamilies, sliderFamily, typeFamilies } from '../src/CE_Application/models/controlSetRecipes.js';
 import { hasSurfaceEffects } from '../src/CE_Application/utils/surfaceEffects.js';
 import { COMPONENT_GROUPS } from '../src/CE_Application/utils/effectStack.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
@@ -295,8 +295,10 @@ test('Tolex turns a factory knob into a chicken-head on a cream cap, and leaves 
   assert.equal(part(styled, 'pointerCurrent')._children.Background._children.Fill.colour, 'FF1C1A17');
   assert.equal(part(styled, 'bodyTrackBase')._children.Layout.height, 8);
   // Untouched parts keep their identity through the family patch (the token pass then copies
-  // whatever still holds a reference, which a factory label does).
-  assert.equal(part(resolveControlFamily(knob, tolex), 'labelTitle'), part(knob, 'labelTitle'));
+  // whatever still holds a reference). The labels are touched now — the set's type puts its face
+  // on them — so the untouched part is one neither the family nor the type reaches.
+  assert.equal(part(resolveControlFamily(knob, tolex), 'pointerEnd'), part(knob, 'pointerEnd'));
+  assert.notEqual(part(resolveControlFamily(knob, tolex), 'labelTitle'), part(knob, 'labelTitle'), 'the type reaches the title');
 });
 
 test('the family patch stops where the author has been: an edited property keeps its edit', () => {
@@ -325,15 +327,16 @@ test('a set with nothing to say returns the same object; a family patch copies o
   literal._children.Text._children.Fill.colour = 'FF123456';
   const states = literal._children.States;
   // Graphite's button patch is the factory radius, and this button has no references left to
-  // resolve — same object.
-  const tokensOnly = resolveControlFamily(literal, getControlSet('graphite'));
+  // resolve — same object, once Graphite's type (DM Sans on the legend) is taken out of it.
+  const tokensOnly = resolveControlFamily(literal, { ...getControlSet('graphite'), type: undefined });
   assert.equal(tokensOnly, literal);
-  // Tolex: the corners change, the States subtree does not.
+  // Tolex: the corners and the legend's face change; the States subtree and the text's fill do not.
   const styled = resolveControlFamily(literal, tolex);
   assert.notEqual(styled, literal);
   assert.equal(styled._children.Background._children.Corners.radius, 5);
   assert.equal(styled._children.States, states);
-  assert.equal(styled._children.Text, literal._children.Text);
+  assert.equal(styled._children.Text._children.Font.family, 'Libre Franklin');
+  assert.equal(styled._children.Text._children.Fill, literal._children.Text._children.Fill);
 });
 
 test('readControlPath / writeControlPath walk _children first and create missing sections whole', () => {
@@ -350,7 +353,7 @@ test('readControlPath / writeControlPath walk _children first and create missing
 });
 
 test('addParts adds a part the control lacks and skips one it has', () => {
-  const set = { ...ivory, id: 'jewelled', families: { Knob: { addParts: { jewel: { _type: 'Part', role: 'custom', visible: true, _children: {} } } } } };
+  const set = { ...ivory, id: 'jewelled', type: undefined, families: { Knob: { addParts: { jewel: { _type: 'Part', role: 'custom', visible: true, _children: {} } } } } };
   const knob = createControl('Knob');
   const styled = resolveControlFamily(knob, set);
   assert.equal(part(styled, 'jewel').name, 'jewel');
@@ -508,6 +511,69 @@ test('the still-short four: numerals by value, the row above the track, the bat 
   assert.equal(resolveToken('display.lit', machined), 'FF7DE3FF', 'Machined\'s OLED is ice blue');
   assert.equal(resolveToken('display.screen', getControlSet('reel')), 'FFF3E9C8', 'Reel\'s readout is a cream meter face');
   assert.notEqual(resolveToken('display.lit', getControlSet('valve')), resolveToken('display.lit', getControlSet('graphite')));
+});
+
+test('a set\'s type: the board\'s face on the labels, the legends and the fields, beneath its families', () => {
+  // The block normalises: three roles, family / weight / letterSpacing, nothing else kept.
+  const set = normalizeControlSetDefinition({ ...tolex, id: 'typed', families: undefined, type: {
+    label: { family: ' Libre Franklin ', weight: '700', letterSpacing: 0.9, colour: 'nope' },
+    legend: { family: 'Allerta Stencil', weight: 400 },
+    field: { family: 'JetBrains Mono' },
+    readout: { family: 'Comic Sans' },
+  } });
+  assert.deepEqual(set.type, {
+    label: { family: 'Libre Franklin', weight: 700, letterSpacing: 0.9 },
+    legend: { family: 'Allerta Stencil', weight: 400 },
+    field: { family: 'JetBrains Mono' },
+  });
+  assert.equal(normalizeControlSetDefinition({ ...tolex, type: { readout: {} } }).type, undefined, 'a block with no role is no block');
+
+  // As families: the label role lands on the title with its weight, on the value without it, on
+  // the Label control; the legend on the buttons and the combobox; the field on the digits.
+  const fam = typeFamilies(set.type);
+  assert.equal(fam.Knob.parts.labelTitle['Text.Font.family'], 'Libre Franklin');
+  assert.equal(fam.Knob.parts.labelTitle['Text.Font.weightValue'], 700);
+  assert.equal(fam.Knob.parts.labelTitle['Text.Font.weight'], 'Bold');
+  assert.equal(fam.Slider.parts.labelValue['Text.Font.family'], 'Libre Franklin');
+  assert.equal(fam.Slider.parts.labelValue['Text.Font.weightValue'], undefined, 'the value keeps the factory weight');
+  assert.equal(fam.Slider.parts.labelValue['Text.Font.letterSpacing'], 0.9);
+  assert.equal(fam.Label.component['Text.Font.weightValue'], 700);
+  assert.equal(fam.Button.component['Text.Font.family'], 'Allerta Stencil');
+  assert.equal(fam.ToggleButton.component['Text.Font.weight'], 'Regular');
+  assert.equal(fam.Combobox.component['Text.Font.family'], 'Allerta Stencil');
+  assert.equal(fam.Number.parts.valueField['Text.Font.family'], 'JetBrains Mono');
+  assert.equal(fam.Range.parts.highField['Text.Font.family'], 'JetBrains Mono');
+  assert.deepEqual(typeFamilies(null), {});
+
+  // Applied to factory controls, under the pristine rule.
+  const knob = resolveControlForSet(createControl('Knob'), set);
+  assert.equal(readControlPath(knob, 'Parts.labelTitle.Text.Font.family'), 'Libre Franklin');
+  assert.equal(readControlPath(knob, 'Parts.labelValue.Text.Font.family'), 'Libre Franklin');
+  assert.equal(readControlPath(resolveControlForSet(createControl('Button'), set), 'Text.Font.family'), 'Allerta Stencil');
+  assert.equal(readControlPath(resolveControlForSet(createControl('Number'), set), 'Parts.valueField.Text.Font.family'), 'JetBrains Mono');
+  const authored = createControl('Button');
+  authored._children.Text._children.Font.family = 'Georgia';
+  assert.equal(readControlPath(resolveControlForSet(authored, set), 'Text.Font.family'), 'Georgia', 'an author\'s face is theirs');
+
+  // The set's own families sit over its type: a family that names a font for one part wins,
+  // and the type still reaches the parts the family says nothing about.
+  const over = { ...set, families: { Knob: { parts: { labelTitle: { 'Text.Font.family': 'Rubik' }, labelMin: { 'Text.Fill.colour': 'FF00FF00' } } } } };
+  const styled = resolveControlForSet(createControl('Knob'), over);
+  assert.equal(readControlPath(styled, 'Parts.labelTitle.Text.Font.family'), 'Rubik');
+  assert.equal(readControlPath(styled, 'Parts.labelTitle.Text.Font.weightValue'), 700, 'the type\'s weight still lands beside the family\'s face');
+  assert.equal(readControlPath(styled, 'Parts.labelMin.Text.Font.family'), 'Libre Franklin');
+  assert.equal(readControlPath(styled, 'Parts.labelMin.Text.Fill.colour'), 'FF00FF00');
+  assert.equal(readControlPath(styled, 'Parts.labelValue.Text.Font.family'), 'Libre Franklin');
+
+  // The boards: Graphite is DM Sans, Machined is Barlow, Field's legends are stencilled, and the
+  // default set's face reaches a factory slider.
+  assert.equal(getControlSet('graphite').type.label.family, 'DM Sans');
+  assert.equal(machined.type.legend.family, 'Barlow');
+  assert.equal(getControlSet('field').type.legend.family, 'Allerta Stencil');
+  assert.equal(getControlSet('field').type.label.family, 'Barlow');
+  assert.equal(readControlPath(resolveControlForSet(createControl('Slider'), getControlSet('graphite')), 'Parts.labelTitle.Text.Font.family'), 'DM Sans');
+  // A set with no type says nothing about fonts.
+  assert.equal(readControlPath(resolveControlForSet(createControl('Slider'), { ...tolex, id: 'mute', type: undefined, families: undefined }), 'Parts.labelTitle.Text.Font.family'), 'Arial');
 });
 
 test('the panel follows the set\'s colour only while it wears the default one', () => {

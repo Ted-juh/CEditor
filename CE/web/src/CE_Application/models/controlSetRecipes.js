@@ -233,14 +233,69 @@ export function panelSpec(colour, materialKind = null, strength = 100, shine = 4
   return out;
 }
 
+/**
+ * A set's `type` block as family patches. Three roles, each { family, weight, letterSpacing }:
+ *   label  — a knob's or slider's title, value, min/max and handle labels, and the Label control:
+ *            the silkscreen. The role's weight lands on the title and the Label; the value and
+ *            min/max keep the weights the factory gives them, so a set that says 700 does not
+ *            make every number on the panel bold.
+ *   legend — the text on a button, toggle, momentary and combobox: the key cap.
+ *   field  — the digits in a Number or Range field: the readout window (the boards' mono).
+ * A missing role says nothing; a role's missing property says nothing about that property. The
+ * families this makes sit BENEATH the set's own families (controlSetFamilies.familyPatchFor), so
+ * a set that names a font for one part explicitly wins over its own type block.
+ */
+const LABEL_PARTS = ['labelTitle', 'labelValue', 'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelUnit'];
+function fontPatch(role, { weight = true } = {}) {
+  if (!role || typeof role !== 'object') return null;
+  const out = {};
+  const family = String(role.family ?? '').trim();
+  if (family) out['Text.Font.family'] = family;
+  const w = Number(role.weight);
+  if (weight && Number.isFinite(w)) {
+    out['Text.Font.weightValue'] = w;
+    out['Text.Font.weight'] = w >= 700 ? 'Bold' : (w >= 600 ? 'SemiBold' : 'Regular');
+  }
+  const spacing = Number(role.letterSpacing);
+  if (Number.isFinite(spacing)) out['Text.Font.letterSpacing'] = spacing;
+  return Object.keys(out).length ? out : null;
+}
+export function typeFamilies(type) {
+  if (!type || typeof type !== 'object') return {};
+  const out = {};
+  const label = fontPatch(type.label);
+  const labelNoWeight = fontPatch(type.label, { weight: false });
+  if (label) {
+    out.Label = { component: label };
+    const parts = {};
+    for (const part of LABEL_PARTS) parts[part] = part === 'labelTitle' ? label : labelNoWeight;
+    out.Knob = { parts };
+    out.Slider = { parts };
+  }
+  const legend = fontPatch(type.legend);
+  if (legend) {
+    for (const t of [...BUTTON_TYPES, 'Combobox']) out[t] = { component: legend };
+  }
+  const field = fontPatch(type.field);
+  if (field) {
+    out.Number = { parts: { valueField: field } };
+    out.Range = { parts: { lowField: field, highField: field } };
+  }
+  return out;
+}
+
 export function mergeFamilies(...fragments) {
   const out = {};
   for (const fragment of fragments) {
     for (const [type, patch] of Object.entries(fragment ?? {})) {
       const current = out[type] ?? {};
+      // Parts merge one level deeper than the component, so two fragments that each patch the
+      // same part (a font on labelTitle, a colour on labelTitle) both land.
+      const parts = { ...(current.parts ?? {}) };
+      for (const [part, paths] of Object.entries(patch.parts ?? {})) parts[part] = { ...(parts[part] ?? {}), ...paths };
       out[type] = {
         component: { ...(current.component ?? {}), ...(patch.component ?? {}) },
-        parts: { ...(current.parts ?? {}), ...(patch.parts ?? {}) },
+        parts,
       };
       if (!Object.keys(out[type].component).length) delete out[type].component;
       if (!Object.keys(out[type].parts).length) delete out[type].parts;
