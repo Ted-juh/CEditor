@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "7b27de56",
+  "fingerprint": "c1ce9d08",
   "set": {
     "id": "walnut",
     "name": "Walnut",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFF2D07A",
       "control.range": "FFB08D3C",
       "control.range.hot": "FFBC9E59",
-      "control.cap": "FFFFF7E6",
-      "control.cap.hot": "FFFFF8E8",
+      "control.body": "FFFFF7E6",
+      "control.cap": "FF2B1E17",
+      "control.cap.hot": "FF000000",
       "control.cap.edge": "996B5A2E",
       "control.cap.start": "FFE0A43A",
       "control.cap.end": "FF8FB07A",
@@ -63,23 +64,33 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 72,
-            "Layout.height": 72,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 2.5
+            "Background.Border.thickness": 4
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 1.5,
-            "Layout.height": 84,
+            "Layout.width": 2,
+            "Layout.height": 90,
+            "Layout.offsetX": 35,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -92,14 +103,18 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 12,
-            "Layout.height": 28,
+            "Layout.height": 32,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "bar"
+            "kind": "console"
           },
           "bodyTrackBase": {
             "Layout.height": 6

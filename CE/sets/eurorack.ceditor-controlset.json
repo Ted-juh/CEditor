@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "69ac3655",
+  "fingerprint": "f732ac08",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFB8FFD2",
       "control.range": "FF6EA6FF",
       "control.range.hot": "FF84B3FF",
-      "control.cap": "FFE2E5E8",
-      "control.cap.hot": "FFE5E8EA",
+      "control.body": "FFE2E5E8",
+      "control.cap": "FF1B1D20",
+      "control.cap.hot": "FF000000",
       "control.cap.edge": "992A2D31",
       "control.cap.start": "FFFFB020",
       "control.cap.end": "FF39FF7A",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 66,
-            "Layout.height": 66,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 82,
+            "Layout.height": 82,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -80,20 +93,25 @@
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.5,
-            "Layout.height": 80,
-            "Background.Fill.colour": "{control.marker}",
+            "Layout.width": 3,
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
+            "Background.Fill.colour": "{control.cap}",
             "Background.Border.enabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 3
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 3
           }
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 20,

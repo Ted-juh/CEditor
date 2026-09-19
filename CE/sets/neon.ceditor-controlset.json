@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "22bee0db",
+  "fingerprint": "886f8adf",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFB6FFFA",
       "control.range": "FF9A8CFF",
       "control.range.hot": "FFA99DFF",
-      "control.cap": "FF1B222B",
-      "control.cap.hot": "FF323840",
+      "control.body": "FF1B222B",
+      "control.cap": "FF6EF2E8",
+      "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "990E1116",
       "control.cap.start": "FFFFB86C",
       "control.cap.end": "FF9A8CFF",
@@ -63,12 +64,17 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -81,8 +87,9 @@
           "pointerCurrent": {
             "kind": "line",
             "Layout.width": 3,
-            "Layout.height": 84,
-            "Background.Fill.colour": "{control.marker}",
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
+            "Background.Fill.colour": "{control.cap}",
             "Background.Border.enabled": false
           },
           "bodyTrackBase": {
@@ -94,10 +101,14 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "Layout.width": 22,
+            "Layout.height": 22,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,

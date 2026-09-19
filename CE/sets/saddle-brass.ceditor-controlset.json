@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "acaaeede",
+  "fingerprint": "33ca369b",
   "set": {
     "id": "saddle",
     "name": "Saddle & Brass",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFE85A4F",
       "control.range": "FF8A6320",
       "control.range.hot": "FFA1824D",
+      "control.body": "FFF3ECD9",
       "control.cap": "FFF3ECD9",
       "control.cap.hot": "FFF4EEDD",
       "control.cap.edge": "FFC99A44",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.3,
+            "Layout.height": 6
+          },
           "bodyCap": {
             "visible": true,
             "Layout.width": 74,
             "Layout.height": 74,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 3,
@@ -82,6 +95,7 @@
             "kind": "line",
             "Layout.width": 2,
             "Layout.height": 84,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -94,6 +108,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 12,

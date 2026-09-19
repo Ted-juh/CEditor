@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "91510890",
+  "fingerprint": "b174fa7d",
   "set": {
     "id": "rackmount",
     "name": "Rackmount",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFFFFFFF",
       "control.range": "FF6E747A",
       "control.range.hot": "FF84898E",
-      "control.cap": "FF16171A",
-      "control.cap.hot": "FF2D2E31",
+      "control.body": "FF16171A",
+      "control.cap": "FFF4F4F4",
+      "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "992A2A2A",
       "control.cap.start": "FFE0A43A",
       "control.cap.end": "FF5CC492",
@@ -63,39 +64,55 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 2
+            "Background.Border.thickness": 3
           },
           "pointerCurrent": {
             "kind": "line",
             "Layout.width": 3,
-            "Layout.height": 80,
-            "Background.Fill.colour": "{control.marker}",
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
+            "Background.Fill.colour": "{control.cap}",
             "Background.Border.enabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 6
+            "Layout.height": 5,
+            "opacity": 0
           },
           "bodyTrackFill": {
-            "Layout.height": 6
+            "Layout.height": 5,
+            "opacity": 0
           }
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 14,
-            "Layout.height": 32,
+            "Layout.width": 18,
+            "Layout.height": 40,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,

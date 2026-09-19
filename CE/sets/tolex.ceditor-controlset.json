@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "57686a35",
+  "fingerprint": "72ffca69",
   "set": {
     "id": "tolex",
     "name": "Tolex",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFF2C85E",
       "control.range": "FFE2B24A",
       "control.range.hot": "FFF2C85E",
+      "control.body": "FFF1E6CC",
       "control.cap": "FFF1E6CC",
       "control.cap.hot": "FFFFF6E2",
       "control.cap.edge": "CC6B5A34",
@@ -63,7 +64,18 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
           "bodyTrackBase": {
             "Layout.height": 8,
             "Background.Border.thickness": 1
@@ -81,9 +93,6 @@
             "Background.Effects.Material.strength": 60,
             "Background.Effects.Material.shine": 45
           },
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
-          },
           "pointerCurrent": {
             "kind": "chicken",
             "Layout.width": 9,
@@ -94,6 +103,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showTicks": false,
+          "Behavior.showMinMaxLabels": false
+        },
         "parts": {
           "pointerCurrent": {
             "kind": "bar",

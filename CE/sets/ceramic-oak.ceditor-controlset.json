@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6e98e3fd",
+  "fingerprint": "34f60e79",
   "set": {
     "id": "ceramic",
     "name": "Ceramic & Oak",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FF3E8FD0",
       "control.range": "FFD99A1E",
       "control.range.hot": "FFE1AE4B",
+      "control.body": "FFF7F4EE",
       "control.cap": "FFF7F4EE",
       "control.cap.hot": "FFF8F5F0",
       "control.cap.edge": "997C7A77",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.3,
+            "Layout.height": 6
+          },
           "bodyCap": {
             "visible": true,
             "Layout.width": 74,
             "Layout.height": 74,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -82,6 +95,7 @@
             "kind": "line",
             "Layout.width": 2.5,
             "Layout.height": 84,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -94,6 +108,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 12,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3300e81b",
+  "fingerprint": "82e2fe11",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFFFA352",
       "control.range": "FFFFC078",
       "control.range.hot": "FFFFD9A8",
+      "control.body": "FFF3E9DC",
       "control.cap": "FFF3E9DC",
       "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "99332A22",
@@ -63,23 +64,32 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 72,
-            "Layout.height": 72,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 48,
+            "Layout.height": 48,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1
           },
           "pointerCurrent": {
             "kind": "chicken",
-            "Layout.width": 9,
-            "Layout.height": 118,
+            "Layout.width": 18,
+            "Layout.height": 165,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -92,14 +102,18 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 12,
-            "Layout.height": 28,
+            "Layout.height": 32,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
-            "kind": "bar"
+            "kind": "console"
           },
           "bodyTrackBase": {
             "Layout.height": 8

@@ -30,15 +30,31 @@ function material(kind, strength = 100, shine = 100, grain = 100) {
  *   capMaterial — [kind, strength, shine, grain]
  */
 export function knobFamily({
-  cap = 0, capFill = '{control.cap}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
-  pointer = 'dot', pointerWidth = 2, pointerLength = 88, pointerFill = '{control.marker}', dotSize = 0,
+  cap = 0, capFill = '{control.body}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
+  pointer = 'dot', pointerWidth = 2, pointerLength = 88, pointerStart = 30, pointerFill = '{control.marker}', dotSize = 0,
   track = 0, trackOpacity = 1, readoutFill = null,
+  // The boards put the value UNDER the knob and drew no min/max; `labels: 'board'` says so.
+  // `ticks`: false for none, or { count, length, width, minor } for the board's ring of marks.
+  labels = 'board', ticks = null,
 } = {}) {
   const parts = {};
-  // The value readout sits in the middle of the knob, which with a cap on is the middle of the
-  // cap: a cream cap under a cream label is a label nobody reads. `readoutFill` names the ink
-  // that reads on the cap — usually the pointer's, which contrasts with the cap by construction.
-  if (cap > 0 && readoutFill) parts.labelValue = { 'Text.Fill.colour': readoutFill };
+  const component = {};
+  if (labels === 'board') {
+    component['Behavior.showMinMaxLabels'] = false;
+    component['Behavior.labelReadoutPlacement'] = 'bottom';
+  }
+  if (ticks === false) {
+    component['Behavior.showTicks'] = false;
+  } else if (ticks && typeof ticks === 'object') {
+    component['Behavior.showTicks'] = true;
+    component['Behavior.majorTickCount'] = ticks.count ?? 11;
+    component['Behavior.minorTickCount'] = ticks.minor ?? 0;
+    component['Behavior.majorTickLength'] = ticks.length ?? 5;
+    parts.tickMajor = { 'Layout.width': ticks.width ?? 1.5, 'Layout.height': ticks.length ?? 5 };
+  }
+  // The value readout sits in the middle of the knob when the labels are left alone, which with
+  // a cap on is the middle of the cap; `readoutFill` names an ink that reads there.
+  if (cap > 0 && readoutFill && labels !== 'board') parts.labelValue = { 'Text.Fill.colour': readoutFill };
   if (cap > 0) {
     parts.bodyCap = {
       visible: true,
@@ -51,11 +67,15 @@ export function knobFamily({
       ...material(...(capMaterial ?? [null])),
     };
   }
-  if (pointer === 'line' || pointer === 'chicken') {
+  if (pointer === 'line' || pointer === 'chicken' || pointer === 'capdot') {
+    // capdot: a dot ON the cap — width is its diameter and height its distance from the centre,
+    // both as a percentage of the cap's radius (the boards' dot: 26 % across, 66 % out).
     parts.pointerCurrent = {
       kind: pointer,
       'Layout.width': pointerWidth,
       'Layout.height': pointerLength,
+      // A line's start, % of the cap radius (Layout.offsetX has no other meaning on this part).
+      ...(pointer === 'line' ? { 'Layout.offsetX': pointerStart } : {}),
       'Background.Fill.colour': pointerFill,
       'Background.Border.enabled': false,
     };
@@ -69,7 +89,9 @@ export function knobFamily({
     parts.bodyTrackBase = { ...patch };
     parts.bodyTrackFill = { ...patch };
   }
-  return { Knob: { parts } };
+  const out = { parts };
+  if (Object.keys(component).length) out.component = component;
+  return { Knob: out };
 }
 
 /**
@@ -110,8 +132,20 @@ export function buttonFamily({ radius = 8, border = 1, buttonMaterial = null, co
 export function sliderFamily({
   cap = 'dot', capAlong = 20, capAcross = 20, capFill = '{control.cap}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
   track = 0, trackRadius = null,
+  // The boards drew a clean track with no ticks and no min/max; the value sits above the track.
+  labels = 'board', ticks = false,
 } = {}) {
   const parts = {};
+  const component = {};
+  if (labels === 'board') component['Behavior.showMinMaxLabels'] = false;
+  if (ticks === false) {
+    component['Behavior.showTicks'] = false;
+  } else if (ticks && typeof ticks === 'object') {
+    component['Behavior.showTicks'] = true;
+    component['Behavior.majorTickCount'] = ticks.count ?? 11;
+    component['Behavior.minorTickCount'] = ticks.minor ?? 0;
+    component['Behavior.majorTickLength'] = ticks.length ?? 5;
+  }
   const pointer = {
     'Layout.width': capAlong,
     'Layout.height': capAcross,
@@ -129,7 +163,9 @@ export function sliderFamily({
     parts.bodyTrackBase = { ...patch };
     parts.bodyTrackFill = { ...patch };
   }
-  return { Slider: { parts } };
+  const out = { parts };
+  if (Object.keys(component).length) out.component = component;
+  return { Slider: out };
 }
 
 /**

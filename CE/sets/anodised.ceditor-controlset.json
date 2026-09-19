@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "81bde92a",
+  "fingerprint": "d2a48104",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFFF7A1A",
       "control.range": "FF8A5A3A",
       "control.range.hot": "FF9C7358",
-      "control.cap": "FFC9CED3",
-      "control.cap.hot": "FFCED3D7",
+      "control.body": "FFC9CED3",
+      "control.cap": "FF1B1D20",
+      "control.cap.hot": "FF000000",
       "control.cap.edge": "992A2D31",
       "control.cap.start": "FFE0A43A",
       "control.cap.end": "FF5CC492",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 72,
-            "Layout.height": 72,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 82,
+            "Layout.height": 82,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -80,24 +93,29 @@
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.5,
-            "Layout.height": 84,
-            "Background.Fill.colour": "{control.marker}",
+            "Layout.width": 2.2,
+            "Layout.height": 88,
+            "Layout.offsetX": 30,
+            "Background.Fill.colour": "{control.cap}",
             "Background.Border.enabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 3
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 3
           }
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 14,
-            "Layout.height": 30,
+            "Layout.width": 20,
+            "Layout.height": 40,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "31977d13",
+  "fingerprint": "4ab59eb6",
   "set": {
     "id": "chrome",
     "name": "Chrome",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FF8EE0FF",
       "control.range": "FF7FA6FF",
       "control.range.hot": "FF92B3FF",
-      "control.cap": "FFB8C0C8",
-      "control.cap.hot": "FFBFC6CE",
+      "control.body": "FFB8C0C8",
+      "control.cap": "FF0E1B2E",
+      "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "993A424B",
       "control.cap.start": "FFFFB020",
       "control.cap.end": "FF4CD98A",
@@ -63,15 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 72,
-            "Layout.height": 72,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -83,8 +93,9 @@
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.5,
-            "Layout.height": 84,
+            "Layout.width": 3,
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -97,10 +108,14 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 14,
-            "Layout.height": 32,
+            "Layout.width": 18,
+            "Layout.height": 40,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,

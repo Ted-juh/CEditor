@@ -256,7 +256,7 @@
   // line / chicken-head drawn from the centre out along the value angle, over the cap.
   let pointerKind = $derived.by(() => {
     const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
-    return geometry === 'circular' && (kind === 'line' || kind === 'chicken') ? kind : 'dot';
+    return geometry === 'circular' && (kind === 'line' || kind === 'chicken' || kind === 'capdot') ? kind : 'dot';
   });
   let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
   // On a linear track the current-value cap can be the original dot, a fader cap ('bar'), a
@@ -298,8 +298,14 @@
     const cy = circularCenter.y;
     const tip = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.height, 88) / 100);
     const thick = Math.max(1, pointerCurrentSize);
+    if (kind === 'capdot') {
+      // A dot on the cap: width is its diameter, height its distance out, both % of the cap radius.
+      const r = Math.max(1.5, pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.width, 26) / 200));
+      return { dot: { cx: cx + ux * tip, cy: cy + uy * tip, r } };
+    }
     if (kind === 'line') {
-      const r0 = pointerReach * 0.3;
+      // Layout.offsetX is where the line starts, as a % of the cap radius (30 unless the set says).
+      const r0 = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30) / 100);
       return { line: { x1: cx + ux * r0, y1: cy + uy * r0, x2: cx + ux * tip, y2: cy + uy * tip, width: thick } };
     }
     // A chicken-head: a blunt taper that starts behind the centre and reaches past the cap.
@@ -930,7 +936,16 @@
 
       {#if (valueMode === 'single' || valueMode === 'band') && pointerKind !== 'dot'}
         {@const radial = radialPointerShape(pointerKind)}
-        {#if radial.line}
+        {#if radial.dot}
+          <circle
+            cx={radial.dot.cx}
+            cy={radial.dot.cy}
+            r={radial.dot.r}
+            fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent')}
+          />
+        {:else if radial.line}
           <line
             x1={radial.line.x1}
             y1={radial.line.y1}

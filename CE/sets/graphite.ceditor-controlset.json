@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0f58ddfe",
+  "fingerprint": "342f7b3e",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FF71B8F1",
       "control.range": "FF7BB3FF",
       "control.range.hot": "FF9FD0FF",
+      "control.body": "FF3A3A3A",
       "control.cap": "FFF6F6F6",
       "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "99333333",
@@ -56,6 +57,88 @@
       "border.surface": "66FFFFFF",
       "border.field": "665B5B5B",
       "border.mixed": "FFFFD166"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
+        "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "capdot",
+            "Layout.width": 26,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 5
+          },
+          "bodyTrackFill": {
+            "Layout.height": 5
+          }
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
+        "parts": {
+          "pointerCurrent": {
+            "Layout.width": 20,
+            "Layout.height": 20,
+            "Background.Fill.colour": "{control.cap}",
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackBase": {
+            "Layout.height": 10
+          },
+          "bodyTrackFill": {
+            "Layout.height": 10
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 8,
+          "Background.Border.thickness": 1
+        }
+      }
     }
   }
 }

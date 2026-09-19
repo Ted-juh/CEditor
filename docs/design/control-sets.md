@@ -394,3 +394,32 @@ was applied, so a state the document held had already painted the body by the ti
 Selected state arrived. The family patch now runs first there, as it does on the canvas; tokens
 still resolve once, in `CanvasControl`. The combobox also takes its own ink, because its body is
 `control.select`, not `surface`, and on two sets those are opposite tones.
+
+## The boards, reproduced
+
+The first catalogue took the boards' *palettes* and left the renderer's defaults for everything
+else, so every set had the same tick comb, the same arc-and-dot knob, the same min/max labels and
+centre readout — and a Graphite that did not look like its own board. That was wrong, and the fix
+was to convert the boards' *drawing code*, not their colours: the mockup generator's knob is a body
+of radius R with the arc at R + 9, eleven ticks of 5 px at R + 16 when it has any, a dot at 0.66 R,
+a line from 0.30 R to 0.92 R, a chicken-head from behind the centre to past the body, and the name
+and value under the knob with no min/max. Every set's knob family is now that geometry, kind by
+kind (`KNOB_KINDS` and `POINTERS` in the conversion, `knobFamily` in the recipes), and every
+slider family is the board's cap and track with no ticks.
+
+What the renderer had to learn for it: a `control.body` role, because the boards' knob body and
+their fader cap are different colours and one token cannot be both; a `capdot` pointer kind, a dot
+*on* the cap rather than riding the arc, sized and placed as a percentage of the cap radius; a start
+point for a line pointer, so a notch can begin at 70 % and a hairline at 35 %; and the family
+patch reaching the Behavior tick and label settings, so a set can switch ticks off, draw eleven
+short ones, hide the min/max labels and put the value under the knob. An arc the board did not draw
+is hidden by opacity rather than removed, so the value still has its ring for the hit test.
+
+**Graphite follows its board too.** Its board is "today's look" in colour, but it draws a dark body
+with a white dot, a thin arc, no ticks, the value below — not the arc-and-dot with a tick comb the
+renderer drew by default. Graphite now carries that family through the extras, which means the
+default look of every existing knob and slider changes: a body under the pointer, no ticks, no
+min/max, the value under the knob. The base colours are untouched — the marker token keeps its
+translucent white, and the dot draws with the cap token — so a saved document's colours are what
+they were; only the drawing is. Graphite says nothing about the panel: its board's grey is a shade
+off the default panel colour, and that colour is every existing panel's.

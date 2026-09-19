@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bfc2f66f",
+  "fingerprint": "512a67ed",
   "set": {
     "id": "backlit",
     "name": "Backlit",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFB6F0FF",
       "control.range": "FFB58CFF",
       "control.range.hot": "FFC09DFF",
-      "control.cap": "FF1A1B1F",
-      "control.cap.hot": "FF313235",
+      "control.body": "FF1A1B1F",
+      "control.cap": "FF4DD9FF",
+      "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "99000000",
       "control.cap.start": "FFFFB86C",
       "control.cap.end": "FFB58CFF",
@@ -63,32 +64,42 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 82,
+            "Layout.height": 82,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 3,
-            "Layout.height": 84,
-            "Background.Fill.colour": "{control.marker}",
+            "Layout.width": 4,
+            "Layout.height": 90,
+            "Layout.offsetX": 35,
+            "Background.Fill.colour": "{control.cap}",
             "Background.Border.enabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 6
+            "Layout.height": 4
           },
           "bodyTrackFill": {
-            "Layout.height": 6
+            "Layout.height": 4
           }
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 20,

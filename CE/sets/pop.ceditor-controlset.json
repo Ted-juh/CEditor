@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8a4a44f8",
+  "fingerprint": "c1c7f7c8",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFFF8A7D",
       "control.range": "FF5BC8FF",
       "control.range.hot": "FF74D0FF",
-      "control.cap": "FFFFFFFF",
-      "control.cap.hot": "FFFFFFFF",
+      "control.body": "FFFFFFFF",
+      "control.cap": "FFFF6B5B",
+      "control.cap.hot": "FFFF8A7D",
       "control.cap.edge": "991B1B1B",
       "control.cap.start": "FFFFB020",
       "control.cap.end": "FF3BC46E",
@@ -63,19 +64,27 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 78,
-            "Layout.height": 78,
-            "Background.Fill.colour": "{control.cap}",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.marker}",
+            "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 3
           },
           "pointerCurrent": {
-            "Layout.width": 24,
-            "Layout.height": 24
+            "kind": "capdot",
+            "Layout.width": 40,
+            "Layout.height": 62,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
           },
           "bodyTrackBase": {
             "Layout.height": 7
@@ -86,6 +95,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 20,

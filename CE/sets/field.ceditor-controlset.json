@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "2d3d1b2a",
+  "fingerprint": "2081f3cb",
   "set": {
     "id": "field",
     "name": "Field",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFFF7A70",
       "control.range": "FFC9A227",
       "control.range.hot": "FFD4B552",
+      "control.body": "FF2A2A26",
       "control.cap": "FF2A2A26",
       "control.cap.hot": "FF3F3F3C",
       "control.cap.edge": "99151513",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.3,
+            "Layout.height": 6
+          },
           "bodyCap": {
             "visible": true,
             "Layout.width": 72,
             "Layout.height": 72,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -82,6 +95,7 @@
             "kind": "line",
             "Layout.width": 3,
             "Layout.height": 84,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -94,6 +108,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 14,

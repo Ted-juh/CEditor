@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3d73ccb8",
+  "fingerprint": "4208c05e",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFFFFFFF",
       "control.range": "FFFFB6E6",
       "control.range.hot": "FFFFC1EA",
+      "control.body": "FFFFFFFF",
       "control.cap": "CCFFFFFF",
       "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "99FFFFFF",
@@ -63,20 +64,26 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 74,
-            "Layout.height": 74,
-            "Background.Fill.colour": "66FFFFFF",
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "38FFFFFF",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "AAFFFFFF",
-            "Background.Border.thickness": 1
+            "Background.Border.colour": "8CFFFFFF",
+            "Background.Border.thickness": 1.2
           },
           "pointerCurrent": {
             "kind": "line",
             "Layout.width": 3,
-            "Layout.height": 80,
+            "Layout.height": 92,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -89,18 +96,17 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 20,
             "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "D9FFFFFF",
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "Background.Effects.Material.enabled": true,
-            "Background.Effects.Material.kind": "glass",
-            "Background.Effects.Material.strength": 40,
-            "Background.Effects.Material.shine": 100,
-            "Background.Effects.Material.grain": 100
+            "Background.Border.thickness": 2
           },
           "bodyTrackBase": {
             "Layout.height": 8

@@ -94,7 +94,8 @@ test('Tolex and Machined are built in, define every role, and carry what colour 
     assert.ok(familyPatchFor(set, 'Button'), `${set.id} says something about buttons`);
     assert.equal(set.panel.material.enabled, true);
   }
-  assert.equal(familyPatchFor(getControlSet('graphite'), 'Knob'), null, 'Graphite is colour only: it is the look every existing document has');
+  // Graphite follows its board too now: a body under the pointer, no ticks, the value below.
+  assert.equal(familyPatchFor(getControlSet('graphite'), 'Knob').parts.pointerCurrent.kind, 'capdot');
   assert.equal(BUILT_IN_CONTROL_SETS.filter((set) => ['tolex', 'machined'].includes(set.id)).length, 2);
 });
 
@@ -312,7 +313,7 @@ test('the family patch stops where the author has been: an edited property keeps
   assert.equal(part(styled, 'pointerCurrent').kind, 'chicken');
 
   // Switching to a set with no knob opinion gives the author's knob back, edits and all.
-  const plain = resolveControlForSet(knob, getControlSet('graphite'));
+  const plain = resolveControlForSet(knob, { ...getControlSet('graphite'), families: {} });
   assert.equal(part(plain, 'bodyCap').visible, true);
   assert.equal(part(plain, 'pointerCurrent').kind, undefined);
 });
@@ -323,7 +324,8 @@ test('a set with nothing to say returns the same object; a family patch copies o
   literal._children.Background._children.Border.colour = 'FF123456';
   literal._children.Text._children.Fill.colour = 'FF123456';
   const states = literal._children.States;
-  // Graphite: colour only, and this button has no references left to resolve — same object.
+  // Graphite's button patch is the factory radius, and this button has no references left to
+  // resolve — same object.
   const tokensOnly = resolveControlFamily(literal, getControlSet('graphite'));
   assert.equal(tokensOnly, literal);
   // Tolex: the corners change, the States subtree does not.

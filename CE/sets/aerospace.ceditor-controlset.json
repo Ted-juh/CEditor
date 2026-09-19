@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c645c680",
+  "fingerprint": "87c14ec0",
   "set": {
     "id": "aerospace",
     "name": "Aerospace",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFFFFFFF",
       "control.range": "FFFF7A1A",
       "control.range.hot": "FFFF9548",
+      "control.body": "FF5B6068",
       "control.cap": "FF5B6068",
       "control.cap.hot": "FF6B7077",
       "control.cap.edge": "992E3034",
@@ -63,12 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.3,
+            "Layout.height": 6
+          },
           "bodyCap": {
             "visible": true,
             "Layout.width": 70,
             "Layout.height": 70,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -82,6 +95,7 @@
             "kind": "line",
             "Layout.width": 2.5,
             "Layout.height": 84,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -94,6 +108,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 14,

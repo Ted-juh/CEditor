@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "844b3483",
+  "fingerprint": "0a12e1ac",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FF8FE9FF",
       "control.range": "FF5FD3F0",
       "control.range.hot": "FF8FE9FF",
+      "control.body": "FFA2A7AE",
       "control.cap": "FFA2A7AE",
       "control.cap.hot": "FFB4B9C0",
       "control.cap.edge": "CC3A3E43",
@@ -63,7 +64,18 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5
+        },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
           "bodyTrackBase": {
             "Layout.height": 5
           },
@@ -110,6 +122,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showTicks": false,
+          "Behavior.showMinMaxLabels": false
+        },
         "parts": {
           "pointerCurrent": {
             "kind": "bar",

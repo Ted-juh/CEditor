@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "53923aa1",
+  "fingerprint": "c19c86ea",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -37,6 +37,7 @@
       "control.fill.hot": "FFFFFFFF",
       "control.range": "FFB58CFF",
       "control.range.hot": "FFC4A3FF",
+      "control.body": "FF161A21",
       "control.cap": "FF161A21",
       "control.cap.hot": "FF2D3137",
       "control.cap.edge": "990B0D10",
@@ -63,15 +64,24 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 6
+        },
         "parts": {
-          "labelValue": {
-            "Text.Fill.colour": "{control.marker}"
+          "tickMajor": {
+            "Layout.width": 1.3,
+            "Layout.height": 6
           },
           "bodyCap": {
             "visible": true,
             "Layout.width": 70,
             "Layout.height": 70,
-            "Background.Fill.colour": "{control.cap}",
+            "Background.Fill.colour": "{control.body}",
             "Background.Border.enabled": true,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
@@ -85,6 +95,7 @@
             "kind": "line",
             "Layout.width": 2.5,
             "Layout.height": 84,
+            "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.marker}",
             "Background.Border.enabled": false
           },
@@ -97,6 +108,10 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
             "Layout.width": 20,

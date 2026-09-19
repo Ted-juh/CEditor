@@ -44,6 +44,7 @@ export const TOLEX_CONTROL_SET = {
     'control.fill.hot': 'FFF2C85E',
     'control.range': 'FFE2B24A',
     'control.range.hot': 'FFF2C85E',
+    'control.body': 'FFF1E6CC',
     'control.cap': 'FFF1E6CC',
     'control.cap.hot': 'FFFFF6E2',
     'control.cap.edge': 'CC6B5A34',
@@ -68,7 +69,9 @@ export const TOLEX_CONTROL_SET = {
   },
   families: {
     Knob: {
+      component: { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
       parts: {
+        tickMajor: { 'Layout.width': 1.5, 'Layout.height': 5 },
         // The gold skirt: a thick arc around the cap.
         bodyTrackBase: { 'Layout.height': 8, 'Background.Border.thickness': 1 },
         bodyTrackFill: { 'Layout.height': 8 },
@@ -83,8 +86,6 @@ export const TOLEX_CONTROL_SET = {
           'Background.Effects.Material.strength': 60,
           'Background.Effects.Material.shine': 45,
         },
-        // The readout sits on the cream cap, so it takes the chicken-head's ink.
-        labelValue: { 'Text.Fill.colour': '{control.marker}' },
         // A black chicken-head, 9 px across at its base, reaching past the cap's edge.
         pointerCurrent: {
           kind: 'chicken',
@@ -97,6 +98,7 @@ export const TOLEX_CONTROL_SET = {
     },
     // A cream fader cap with a black stripe, on a gold track with square ends.
     Slider: {
+      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false },
       parts: {
         pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 28, 'Background.Border.thickness': 1.5 },
         bodyTrackBase: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
@@ -157,6 +159,7 @@ export const MACHINED_CONTROL_SET = {
     'control.fill.hot': 'FF8FE9FF',
     'control.range': 'FF5FD3F0',
     'control.range.hot': 'FF8FE9FF',
+    'control.body': 'FFA2A7AE',
     'control.cap': 'FFA2A7AE',
     'control.cap.hot': 'FFB4B9C0',
     'control.cap.edge': 'CC3A3E43',
@@ -179,7 +182,9 @@ export const MACHINED_CONTROL_SET = {
   },
   families: {
     Knob: {
+      component: { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
       parts: {
+        tickMajor: { 'Layout.width': 1.5, 'Layout.height': 5 },
         // The slot the arc runs in: thin and dark, with a hairline.
         bodyTrackBase: { 'Layout.height': 5 },
         bodyTrackFill: { 'Layout.height': 5 },
@@ -227,6 +232,7 @@ export const MACHINED_CONTROL_SET = {
     },
     // A machined fader cap, bead-blasted like the knobs, in a dark slot.
     Slider: {
+      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false },
       parts: {
         pointerCurrent: {
           kind: 'bar', 'Layout.width': 14, 'Layout.height': 30, 'Background.Border.thickness': 1.5,

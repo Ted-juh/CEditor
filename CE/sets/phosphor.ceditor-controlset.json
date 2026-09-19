@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e7a330fe",
+  "fingerprint": "b983e681",
   "set": {
     "id": "phosphor",
     "name": "Phosphor",
@@ -37,8 +37,9 @@
       "control.fill.hot": "FFB8FFD2",
       "control.range": "FF1FA35A",
       "control.range.hot": "FF41B173",
+      "control.body": "FF39FF7A",
       "control.cap": "FF39FF7A",
-      "control.cap.hot": "FF4DFF87",
+      "control.cap.hot": "FFB8FFD2",
       "control.cap.edge": "990B0D0B",
       "control.cap.start": "FFFFB020",
       "control.cap.end": "FF39FF7A",
@@ -63,7 +64,28 @@
     },
     "families": {
       "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": false
+        },
         "parts": {
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 62,
+            "Layout.height": 62,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "capdot",
+            "Layout.width": 26,
+            "Layout.height": 66,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
           "bodyTrackBase": {
             "Layout.height": 6
           },
@@ -73,13 +95,17 @@
         }
       },
       "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.showTicks": false
+        },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "Layout.width": 18,
+            "Layout.height": 10,
             "Background.Fill.colour": "{control.cap}",
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
+            "Background.Border.thickness": 2.5,
             "kind": "ring"
           },
           "bodyTrackBase": {
