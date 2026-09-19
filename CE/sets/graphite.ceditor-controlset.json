@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d6a831fc",
+  "fingerprint": "cdcbd5e4",
   "set": {
     "id": "graphite",
     "name": "Graphite",
@@ -98,43 +98,6 @@
           }
         }
       },
-      "Slider": {
-        "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
-          "Behavior.showTicks": false
-        },
-        "parts": {
-          "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "pointerStart": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "pointerEnd": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "bodyTrackBase": {
-            "Layout.height": 10
-          },
-          "bodyTrackFill": {
-            "Layout.height": 10
-          }
-        }
-      },
       "Button": {
         "component": {
           "Background.Corners.radius": 8,
@@ -157,6 +120,14 @@
         "component": {
           "Background.Corners.radius": 8,
           "Background.Border.thickness": 1
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": false
         }
       }
     },

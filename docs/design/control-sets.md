@@ -531,3 +531,40 @@ the cap's own ink (Carbon: both orange) or its near tone (Walnut: two browns), a
 rendered drew the cap dark with the orange line, and the line in the brass edge, respectively.
 The conversion does the same by contrast: a groove that would vanish on its cap moves the cap to
 the knob body's colour if that reads, or takes the cap's edge ink if not.
+
+## Designs, not recolours — and every one of them from the editor
+
+Thirty sets that were one slider and one button in thirty palettes is not thirty designs. So
+the sliders and buttons are now archetypes, written by hand in `models/controlSetDesigns.js`,
+and each set is assigned one of each with its own inks. Eleven slider forms and eleven button
+forms — a desk fader in a slot with a printed scale, a schematic in hairlines with numerals, a
+lit lens in dark glass, an LED ladder, a toy in a thick outline, a neumorphic dome, a bakelite
+cap on a brass rail, a billet block in a lit slot, a rubber key, frosted glass; a machined
+aluminium key with an engraved legend and an LED, an illuminated rack key, a print-shop pill
+with a hard shadow, a neumorphic button, line work, glass with a hard highlight and a glow, a
+rubber key with a lit legend, a bakelite cap with a jewel, a chamfered rocker with a bat
+switch, frosted glass.
+
+**The rule that makes them real: every property a design writes is one the editor exposes.**
+A cap's turned look is the gradient editor's three stops at 180°; a brass rail is a light-dark-
+light gradient across the track; a glass highlight is a two-stop gradient with the edge hardness
+at 100 and the layer at 22 %; an aluminium key is the Effects tab's outer bevel and a drop
+shadow; a neumorphic button is two drop shadows, one white to the top-left and one dark to the
+bottom-right; a rocker is the Corners style set to chamfer; an engraved legend is the text's
+shadow at 0,1 in white; a lit legend is the text glow; a rack key's face is an inner bevel; a
+slot is the Cap Finish strip's slot flag; a scale is the Ticks & Labels section. Open any
+control under any set, read the panels, and you can make it by hand — and
+`test/controlSetDesigns.test.js` walks every built-in set's families and refuses any path the
+editor cannot set, so a renderer-only shortcut cannot creep back in. The same test insists the
+archetypes differ in form (cap kind and size, track thickness and corners, slot, glow, tick
+kind, shadows, bevel, gradient) and not only in ink.
+
+The designs take inks rather than tokens because the gradient editor's stops are literal RRGGBB;
+a set hands in its palette and gets its families back. The pilot sets name theirs by hand; the
+catalogue conversion draws them from each board's palette, with one hand-written table saying
+which archetype each board is. That table is the design decision per set, and it is short
+enough to read.
+
+**How to look at a set before it is one.** `CONTROL_SET_SHOT_FILE=my.ceditor-controlset.json`
+renders the specimen under a set file instead of the built-ins — the harness gained a
+`showSet(set)` for it — so a design can be seen in the real renderer in one command.

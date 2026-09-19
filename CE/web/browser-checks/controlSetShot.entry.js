@@ -44,6 +44,15 @@ window.__controlSetShot = {
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
     return { width: panel.width, height: panel.height, controls: panel.controls.length, set: panel.controlSet.id };
   },
+  /** The same specimen under a set given as an object — a set file's contents, or a probe. */
+  showSet(set) {
+    if (mounted) unmount(mounted);
+    // The panel carries it as a document set, which is how a set file travels in a .cepanel.
+    const panel = specimenPanel(set.id ?? 'probe');
+    panel.controlSets = [set];
+    mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
+    return { width: panel.width, height: panel.height, controls: panel.controls.length, set: panel.controlSet.id };
+  },
   /** Resolves once every face the page asked for has loaded (or failed), so a shot is in the real font. */
   fontsReady() {
     return document.fonts.ready.then(() => Array.from(document.fonts).filter((face) => face.status === 'loaded').map((face) => face.family));

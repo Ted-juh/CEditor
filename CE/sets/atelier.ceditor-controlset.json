@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "151fb255",
+  "fingerprint": "7f81025b",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -107,43 +107,6 @@
           }
         }
       },
-      "Slider": {
-        "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
-          "Behavior.showTicks": false
-        },
-        "parts": {
-          "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "pointerStart": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "pointerEnd": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
-          },
-          "bodyTrackBase": {
-            "Layout.height": 4
-          },
-          "bodyTrackFill": {
-            "Layout.height": 4
-          }
-        }
-      },
       "Button": {
         "component": {
           "Background.Corners.radius": 4,
@@ -166,6 +129,66 @@
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.tickNumerals": "value"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral",
+            "Background.Fill.colour": "CC1C1C1A"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "551C1C1A"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "FF1C1C1A",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FFD9D9D4",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "991C1C1A",
+            "Background.Border.colour": "FF1C1C1A",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "FF1C1C1A"
+          }
         }
       }
     },

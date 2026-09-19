@@ -20,6 +20,9 @@ const ROOT = join(HERE, '../dist-scenery');
 const OUT_DIR = process.env.CONTROL_SET_SHOT_DIR ?? '';
 const SCALE = Number(process.env.CONTROL_SET_SHOT_SCALE ?? 2) || 2;
 const SETS = (process.env.CONTROL_SET_SHOT_SETS ?? 'graphite,ivory,tolex,machined').split(',').map((s) => s.trim()).filter(Boolean);
+// A set file (the contents of a .ceditor-controlset.json, or any set object) rendered instead of
+// the built-ins — the way to look at a set before it is one.
+const SET_FILE = process.env.CONTROL_SET_SHOT_FILE ?? '';
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2',
@@ -48,7 +51,9 @@ try {
   await page.waitForFunction(() => !!window.__controlSetShot, null, { timeout: 30000 });
   if (OUT_DIR) await mkdir(OUT_DIR, { recursive: true });
   for (const setId of SETS) {
-    const shown = await page.evaluate((id) => window.__controlSetShot.show(id), setId);
+    const shown = SET_FILE
+      ? await page.evaluate((set) => window.__controlSetShot.showSet(set), JSON.parse(await readFile(SET_FILE, 'utf8')))
+      : await page.evaluate((id) => window.__controlSetShot.show(id), setId);
     await page.waitForFunction((n) => document.querySelectorAll('[data-control-id]').length >= n, shown.controls, { timeout: 60000 });
     await page.evaluate(() => window.__controlSetShot.fontsReady());
     await page.waitForTimeout(1200);

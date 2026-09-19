@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "cee496f6",
+  "fingerprint": "49da5d68",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -106,46 +106,6 @@
           }
         }
       },
-      "Slider": {
-        "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
-          "Behavior.showTicks": false
-        },
-        "parts": {
-          "pointerCurrent": {
-            "Layout.width": 18,
-            "Layout.height": 10,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 2.5,
-            "kind": "ring"
-          },
-          "pointerStart": {
-            "Layout.width": 18,
-            "Layout.height": 10,
-            "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 2.5,
-            "kind": "ring"
-          },
-          "pointerEnd": {
-            "Layout.width": 18,
-            "Layout.height": 10,
-            "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 2.5,
-            "kind": "ring"
-          },
-          "bodyTrackBase": {
-            "Layout.height": 6
-          },
-          "bodyTrackFill": {
-            "Layout.height": 6
-          }
-        }
-      },
       "Button": {
         "component": {
           "Background.Corners.radius": 4,
@@ -168,6 +128,66 @@
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.tickNumerals": "value"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral",
+            "Background.Fill.colour": "CC22201C"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "5522201C"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "FF22201C",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "9922201C",
+            "Background.Border.colour": "FF22201C",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "FF2F6F9A"
+          }
         }
       }
     },

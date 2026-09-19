@@ -8,6 +8,7 @@
 // the cap's radius (pointer length), so one set fits a 60 px knob and a 140 px one alike.
 
 import { lampSelectedState } from './controlSetRecipes.js';
+import { BUTTON_DESIGNS, SLIDER_DESIGNS } from './controlSetDesigns.js';
 
 // The lamp both sets share: upper left, fairly high — the light on every mockup board.
 const LAMP = { azimuth: 225, elevation: 48 };
@@ -101,31 +102,11 @@ export const TOLEX_CONTROL_SET = {
       },
     },
     // A cream fader cap with a black stripe, on a gold track with square ends.
-    Slider: {
-      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
-      parts: {
-        // The board's cream fader cap with a dark groove, on a square-ended track.
-        pointerCurrent: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true },
-        pointerStart: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true, 'Background.Fill.colour': '{control.cap.start}' },
-        pointerEnd: { kind: 'bar', 'Layout.width': 12, 'Layout.height': 32, 'Background.Border.thickness': 1.5, grooveColour: '{control.marker}', shadow: true, 'Background.Fill.colour': '{control.cap.end}' },
-        bodyTrackBase: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
-        bodyTrackFill: { 'Layout.height': 6, 'Background.Corners.radius': 2 },
-      },
-    },
-    // Cream pushbuttons: squarer than Graphite's, a dark hairline, dark legends on the cream.
-    Button: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
-    MomentaryButton: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
-    // The toggle carries a red jewel lamp: lit while it is on, a dark lens while it is not. The
-    // lamp is the indicator, so the cream body stays cream when checked (lampSelectedState).
-    ToggleButton: {
-      component: {
-        'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}',
-        'ContentLayout.lamp': 'jewel', 'ContentLayout.lampSize': 12, 'ContentLayout.lampColour': '{accent.hot}', 'ContentLayout.lampOffColour': 'FF4A1210', 'ContentLayout.lampBezelColour': '{control.cap.edge}',
-        'States.Selected': lampSelectedState(),
-      },
-    },
-    Combobox: { component: { 'Background.Corners.radius': 5, 'Background.Border.thickness': 1.5, 'Text.Fill.colour': '{text.inverse}' } },
-    // Paper value fields and cream steppers: the same dark ink.
+    // The fader and the keys are designs (models/controlSetDesigns.js): a bakelite cap on a
+    // brass rail with a scale above it, and moulded cream keys with a dark hairline, the toggle
+    // carrying its red jewel. Inks are the board's.
+    ...SLIDER_DESIGNS.vintage({ rail: 'C9A24A', fill: 'D9A83A', cap: 'F1E6CF', groove: '3A2E1E', tick: 'F1E6CF' }),
+    ...BUTTON_DESIGNS.bakelite({ face: 'F1E6CF', edge: '3A2E1E', text: '1C1A17', lampKind: 'jewel' }),
     Number: { parts: { valueField: { 'Text.Fill.colour': '{text.inverse}' }, decrement: { 'Text.Fill.colour': '{text.inverse}' }, increment: { 'Text.Fill.colour': '{text.inverse}' } } },
     Range: { parts: { lowField: { 'Text.Fill.colour': '{text.inverse}' }, highField: { 'Text.Fill.colour': '{text.inverse}' }, decrement: { 'Text.Fill.colour': '{text.inverse}' }, increment: { 'Text.Fill.colour': '{text.inverse}' } } },
   },
@@ -146,13 +127,6 @@ export const TOLEX_CONTROL_SET = {
  * Machined — billet aluminium, bead-blasted. Lathe-turned caps with a painted line, a dark slot
  * for the arc, buttons that sit proud of the plate, one cyan accent where something is live.
  */
-const MACHINED_CAP = {
-  kind: 'block', 'Layout.width': 22, 'Layout.height': 44, 'Background.Border.thickness': 1,
-  'Background.Effects.Material.enabled': true, 'Background.Effects.Material.kind': 'blast',
-  'Background.Effects.Material.strength': 90, 'Background.Effects.Material.shine': 60,
-  grooveColour: '{control.marker}', plateColour: '{control.cap.hot}', sheen: true, shadow: true,
-};
-
 export const MACHINED_CONTROL_SET = {
   id: 'machined',
   name: 'Machined',
@@ -236,68 +210,13 @@ export const MACHINED_CONTROL_SET = {
       },
     },
     // Buttons milled from the same billet: tight radius, a dark chamfer, the blast finish.
-    Button: {
-      component: {
-        'Background.Corners.radius': 4,
-        'Background.Border.thickness': 1.5,
-        'Background.Effects.Material.enabled': true,
-        'Background.Effects.Material.kind': 'blast',
-        'Background.Effects.Material.strength': 90,
-        'Background.Effects.Material.shine': 60,
-      },
-    },
-    MomentaryButton: {
-      component: {
-        'Background.Corners.radius': 4,
-        'Background.Border.thickness': 1.5,
-        'Background.Effects.Material.enabled': true,
-        'Background.Effects.Material.kind': 'blast',
-        'Background.Effects.Material.strength': 90,
-        'Background.Effects.Material.shine': 60,
-      },
-    },
-    // A machined fader cap, bead-blasted like the knobs, in a dark slot.
-    Slider: {
-      component: { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' },
-      parts: {
-        // The billet fader: a blasted block with a brushed top plate and an engraved line,
-        // casting a shadow, riding a slot cut in the plate with a 4 px light inside it.
-        pointerCurrent: MACHINED_CAP,
-        pointerStart: { ...MACHINED_CAP, 'Background.Fill.colour': '{control.cap.start}' },
-        pointerEnd: { ...MACHINED_CAP, 'Background.Fill.colour': '{control.cap.end}' },
-        bodyTrackBase: { 'Layout.height': 10, 'Background.Corners.radius': 2, slot: true },
-        bodyTrackFill: { 'Layout.height': 10, 'Background.Corners.radius': 2, inset: 3 },
-      },
-    },
-    // The toggle is a bat switch beside its legend, thrown up when on, as the board drew it.
-    ToggleButton: {
-      component: {
-        'Background.Corners.radius': 4,
-        'Background.Border.thickness': 1.5,
-        'Background.Effects.Material.enabled': true,
-        'Background.Effects.Material.kind': 'blast',
-        'Background.Effects.Material.strength': 90,
-        'Background.Effects.Material.shine': 60,
-        'ContentLayout.lamp': 'bat',
-        'ContentLayout.lampSize': 10,
-        'ContentLayout.lampColour': '{control.cap}',
-        'ContentLayout.lampOffColour': '{control.cap}',
-        'States.Selected': lampSelectedState(),
-      },
-    },
-    // Dark readout windows on a light plate: the digits take the light ink.
+    // The fader and the keys are designs (models/controlSetDesigns.js): a billet block riding
+    // a slot cut in the plate with a light in it, engraved marks either side; machined keys with
+    // a bevelled edge and an engraved legend, the toggle throwing a bat switch.
+    ...SLIDER_DESIGNS.billet({ slot: '0A0C0E', fill: '7DE3FF', cap: 'B4B9BF', plate: 'C9CED3', groove: '1B1D20', tick: '1B1D20' }),
+    ...BUTTON_DESIGNS.aluminium({ face: 'B4B9BF', edge: '4A4F55', text: '1B1D20', lampKind: 'bat', lampColour: '{control.cap}' }),
     Number: { parts: { valueField: { 'Text.Fill.colour': '{text.inverse}' } } },
     Range: { parts: { lowField: { 'Text.Fill.colour': '{text.inverse}' }, highField: { 'Text.Fill.colour': '{text.inverse}' } } },
-    Combobox: {
-      component: {
-        'Background.Corners.radius': 4,
-        'Background.Border.thickness': 1.5,
-        'Background.Effects.Material.enabled': true,
-        'Background.Effects.Material.kind': 'brushed',
-        'Background.Effects.Material.strength': 80,
-        'Background.Effects.Material.shine': 70,
-      },
-    },
   },
   panel: {
     material: { enabled: true, kind: 'blast', strength: 100, shine: 40, grain: 100, lampFollowsSet: true },

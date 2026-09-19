@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f0f42230",
+  "fingerprint": "d490ba6c",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -98,6 +98,86 @@
           }
         }
       },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 999,
+          "Background.Border.thickness": 3,
+          "Background.Fill.colour": "FFFFFFFF",
+          "Background.Border.colour": "FF1B1B1B",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 3,
+              "offsetY": 3,
+              "blur": 0,
+              "spread": 0,
+              "colour": "FF1B1B1B"
+            }
+          ],
+          "Text.Fill.colour": "1B1B1B"
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 999,
+          "Background.Border.thickness": 3,
+          "Background.Fill.colour": "FFFFFFFF",
+          "Background.Border.colour": "FF1B1B1B",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 3,
+              "offsetY": 3,
+              "blur": 0,
+              "spread": 0,
+              "colour": "FF1B1B1B"
+            }
+          ],
+          "Text.Fill.colour": "1B1B1B"
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 999,
+          "Background.Border.thickness": 3,
+          "Background.Fill.colour": "FFFFFFFF",
+          "Background.Border.colour": "FF1B1B1B",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 3,
+              "offsetY": 3,
+              "blur": 0,
+              "spread": 0,
+              "colour": "FF1B1B1B"
+            }
+          ],
+          "Text.Fill.colour": "1B1B1B"
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 12,
+          "Background.Border.thickness": 3,
+          "Background.Fill.colour": "FFFFFFFF",
+          "Background.Border.colour": "FF1B1B1B",
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 3,
+              "offsetY": 3,
+              "blur": 0,
+              "spread": 0,
+              "colour": "FF1B1B1B"
+            }
+          ],
+          "Text.Fill.colour": "1B1B1B"
+        }
+      },
       "Slider": {
         "component": {
           "Behavior.showMinMaxLabels": false,
@@ -107,56 +187,38 @@
         },
         "parts": {
           "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
+            "Layout.width": 28,
+            "Layout.height": 28,
+            "Background.Fill.colour": "FFFF6B5B",
+            "Background.Border.colour": "FF1B1B1B",
+            "Background.Border.thickness": 3
           },
           "pointerStart": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "Layout.width": 28,
+            "Layout.height": 28,
             "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
+            "Background.Border.colour": "FF1B1B1B",
+            "Background.Border.thickness": 3
           },
           "pointerEnd": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "Layout.width": 28,
+            "Layout.height": 28,
             "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
+            "Background.Border.colour": "FF1B1B1B",
+            "Background.Border.thickness": 3
           },
           "bodyTrackBase": {
-            "Layout.height": 12
+            "Layout.height": 14,
+            "Background.Corners.radius": 999,
+            "Background.Fill.colour": "FFFFFFFF",
+            "Background.Border.colour": "FF1B1B1B",
+            "Background.Border.thickness": 3
           },
           "bodyTrackFill": {
-            "Layout.height": 12
+            "Layout.height": 14,
+            "Background.Corners.radius": 999,
+            "Background.Fill.colour": "FFFF6B5B"
           }
-        }
-      },
-      "Button": {
-        "component": {
-          "Background.Corners.radius": 10,
-          "Background.Border.thickness": 3
-        }
-      },
-      "MomentaryButton": {
-        "component": {
-          "Background.Corners.radius": 10,
-          "Background.Border.thickness": 3
-        }
-      },
-      "ToggleButton": {
-        "component": {
-          "Background.Corners.radius": 10,
-          "Background.Border.thickness": 3
-        }
-      },
-      "Combobox": {
-        "component": {
-          "Background.Corners.radius": 10,
-          "Background.Border.thickness": 3
         }
       }
     },

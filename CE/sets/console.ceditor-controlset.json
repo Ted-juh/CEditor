@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "63df4f5a",
+  "fingerprint": "4a165701",
   "set": {
     "id": "console",
     "name": "Console",
@@ -113,54 +113,6 @@
           }
         }
       },
-      "Slider": {
-        "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
-          "Behavior.showTicks": false
-        },
-        "parts": {
-          "pointerCurrent": {
-            "Layout.width": 18,
-            "Layout.height": 40,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "kind": "console",
-            "grooveColour": "FF111111",
-            "sheen": true
-          },
-          "pointerStart": {
-            "Layout.width": 18,
-            "Layout.height": 40,
-            "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "kind": "console",
-            "grooveColour": "FF111111",
-            "sheen": true
-          },
-          "pointerEnd": {
-            "Layout.width": 18,
-            "Layout.height": 40,
-            "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "kind": "console",
-            "grooveColour": "FF111111",
-            "sheen": true
-          },
-          "bodyTrackBase": {
-            "Layout.height": 6,
-            "Background.Corners.radius": 2
-          },
-          "bodyTrackFill": {
-            "Layout.height": 6,
-            "Background.Corners.radius": 2
-          }
-        }
-      },
       "Button": {
         "component": {
           "Background.Corners.radius": 3,
@@ -169,7 +121,54 @@
           "Background.Effects.Material.kind": "brushed",
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 60,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF3B3D42",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "linear",
+            "angle": 180,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "808184",
+                "position": 0
+              },
+              {
+                "color": "3B3D42",
+                "position": 55
+              },
+              {
+                "color": "2E3033",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FF1E1F22",
+          "Effects.Bevel.enabled": true,
+          "Effects.Bevel.style": "outer-bevel",
+          "Effects.Bevel.size": 2,
+          "Effects.Bevel.softness": 1,
+          "Effects.Bevel.highlightOpacity": 60,
+          "Effects.Bevel.shadowOpacity": 55,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 4,
+              "spread": 0,
+              "colour": "77000000"
+            }
+          ],
+          "Text.Fill.colour": "F4F4F4",
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": 1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "99FFFFFF"
         }
       },
       "MomentaryButton": {
@@ -180,7 +179,54 @@
           "Background.Effects.Material.kind": "brushed",
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 60,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF3B3D42",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "linear",
+            "angle": 180,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "808184",
+                "position": 0
+              },
+              {
+                "color": "3B3D42",
+                "position": 55
+              },
+              {
+                "color": "2E3033",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FF1E1F22",
+          "Effects.Bevel.enabled": true,
+          "Effects.Bevel.style": "outer-bevel",
+          "Effects.Bevel.size": 2,
+          "Effects.Bevel.softness": 1,
+          "Effects.Bevel.highlightOpacity": 60,
+          "Effects.Bevel.shadowOpacity": 55,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 4,
+              "spread": 0,
+              "colour": "77000000"
+            }
+          ],
+          "Text.Fill.colour": "F4F4F4",
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": 1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "99FFFFFF"
         }
       },
       "ToggleButton": {
@@ -192,13 +238,56 @@
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 60,
           "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF3B3D42",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "linear",
+            "angle": 180,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "808184",
+                "position": 0
+              },
+              {
+                "color": "3B3D42",
+                "position": 55
+              },
+              {
+                "color": "2E3033",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FF1E1F22",
+          "Effects.Bevel.enabled": true,
+          "Effects.Bevel.style": "outer-bevel",
+          "Effects.Bevel.size": 2,
+          "Effects.Bevel.softness": 1,
+          "Effects.Bevel.highlightOpacity": 60,
+          "Effects.Bevel.shadowOpacity": 55,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 4,
+              "spread": 0,
+              "colour": "77000000"
+            }
+          ],
+          "Text.Fill.colour": "F4F4F4",
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": 1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "99FFFFFF",
           "ContentLayout.lamp": "led",
-          "ContentLayout.lampSize": 7,
-          "ContentLayout.lampSide": "left",
-          "ContentLayout.lampGap": 8,
+          "ContentLayout.lampSize": 8,
           "ContentLayout.lampColour": "{accent.hot}",
-          "ContentLayout.lampOffColour": "{control.track}",
-          "ContentLayout.lampBezelColour": "{border.surface}",
           "States.Selected": {
             "_type": "State",
             "name": "Selected",
@@ -225,7 +314,182 @@
           "Background.Effects.Material.kind": "brushed",
           "Background.Effects.Material.strength": 50,
           "Background.Effects.Material.shine": 60,
-          "Background.Effects.Material.grain": 100
+          "Background.Effects.Material.grain": 100,
+          "Background.Fill.colour": "FF3B3D42",
+          "Background.Fill.gradientEnabled": true,
+          "Background.Fill.gradient": {
+            "type": "linear",
+            "angle": 180,
+            "edge": 0,
+            "stops": [
+              {
+                "color": "808184",
+                "position": 0
+              },
+              {
+                "color": "3B3D42",
+                "position": 55
+              },
+              {
+                "color": "2E3033",
+                "position": 100
+              }
+            ]
+          },
+          "Background.Fill.gradientOpacity": 100,
+          "Background.Border.colour": "FF1E1F22",
+          "Effects.Bevel.enabled": true,
+          "Effects.Bevel.style": "outer-bevel",
+          "Effects.Bevel.size": 2,
+          "Effects.Bevel.softness": 1,
+          "Effects.Bevel.highlightOpacity": 60,
+          "Effects.Bevel.shadowOpacity": 55,
+          "Effects.Shadows.items": [
+            {
+              "enabled": true,
+              "type": "drop",
+              "offsetX": 0,
+              "offsetY": 2,
+              "blur": 4,
+              "spread": 0,
+              "colour": "77000000"
+            }
+          ],
+          "Text.Fill.colour": "F4F4F4",
+          "Text.Effects.shadowEnabled": true,
+          "Text.Effects.shadowStyle": "soft",
+          "Text.Effects.shadowOffsetX": 0,
+          "Text.Effects.shadowOffsetY": 1,
+          "Text.Effects.shadowBlur": 0,
+          "Text.Effects.shadowColour": "99FFFFFF"
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 5,
+          "Behavior.tickPlacement": "outside"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 5,
+            "Background.Fill.colour": "CCF4F4F4"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "66F4F4F4"
+          },
+          "pointerCurrent": {
+            "kind": "console",
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "grooveColour": "FF111111",
+            "shadow": true,
+            "Background.Fill.colour": "FF5B5E63",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "9D9EA1",
+                  "position": 0
+                },
+                {
+                  "color": "5B5E63",
+                  "position": 55
+                },
+                {
+                  "color": "3B3D40",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF2E2F32",
+            "Background.Border.thickness": 1
+          },
+          "pointerStart": {
+            "kind": "console",
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "grooveColour": "FF111111",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "9D9EA1",
+                  "position": 0
+                },
+                {
+                  "color": "5B5E63",
+                  "position": 55
+                },
+                {
+                  "color": "3B3D40",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF2E2F32",
+            "Background.Border.thickness": 1
+          },
+          "pointerEnd": {
+            "kind": "console",
+            "Layout.width": 18,
+            "Layout.height": 40,
+            "grooveColour": "FF111111",
+            "shadow": true,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "9D9EA1",
+                  "position": 0
+                },
+                {
+                  "color": "5B5E63",
+                  "position": 55
+                },
+                {
+                  "color": "3B3D40",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF2E2F32",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackBase": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "slot": true,
+            "Background.Fill.colour": "FF2A2C30",
+            "Background.Border.colour": "FF1A1B1E",
+            "Background.Border.thickness": 1
+          },
+          "bodyTrackFill": {
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "Background.Fill.colour": "FFD8DADF"
+          }
         }
       }
     },

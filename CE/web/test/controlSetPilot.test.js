@@ -408,8 +408,12 @@ test('Machined lights the knob cap and the button face, and the build bakes both
   const [builtKnob, builtButton] = built.controls;
   assert.equal(part(builtKnob, 'bodyCap').visible, true);
   assert.equal(part(builtKnob, 'bodyCap')._children.Background._children.Fill.colour, 'FFA2A7AE', 'a literal, not a reference');
-  assert.equal(builtButton._children.Background._children.Effects._children.Material.kind, 'blast');
-  assert.equal(builtButton._children.Background._children.Fill.colour, 'FF8E939A');
+  // The button is the aluminium design: a turned face (a gradient), a bevelled edge, baked as
+  // literals like everything else.
+  assert.equal(builtButton._children.Background._children.Fill.gradientEnabled, true);
+  assert.equal(builtButton._children.Background._children.Fill.gradient.stops.length, 3);
+  assert.equal(builtButton._children.Effects._children.Bevel.enabled, true);
+  assert.equal(builtButton._children.Background._children.Fill.colour, 'FFB4B9BF');
 
   // A saved document, by contrast, keeps the factory knob: the set is applied at draw time.
   const saved = JSON.parse(serializePanel(panel));
@@ -602,7 +606,7 @@ test('the boards\' faders: cap kinds with a groove, a plate, a sheen, a shadow, 
   // token and resolves like any other colour.
   const styled = resolveControlForSet(createControl('Slider'), machined);
   assert.equal(part(styled, 'pointerCurrent').kind, 'block');
-  assert.equal(part(styled, 'pointerCurrent').grooveColour, resolveToken('control.marker', machined));
+  assert.equal(part(styled, 'pointerCurrent').grooveColour, 'FF1B1D20', 'the design names its inks as literals');
   assert.equal(part(styled, 'pointerCurrent').shadow, true);
   assert.equal(part(styled, 'bodyTrackBase').slot, true);
   assert.equal(part(styled, 'bodyTrackFill').inset, 3);
@@ -613,27 +617,29 @@ test('the boards\' faders: cap kinds with a groove, a plate, a sheen, a shadow, 
   assert.equal(part(factory, 'bodyTrackBase').slot, undefined);
   assert.equal(part(factory, 'bodyTrackFill').inset, undefined);
 
-  // The boards, kind by kind: a lens on Eurorack and Backlit, a block in a slot on Anodised and
-  // every lit board, a sheened console cap on Console, a bar with a groove on Ember, a dot in a
-  // halo on Neon with a lit fill, and the default set's plain dot.
+  // The boards, by design (models/controlSetDesigns.js): a lit lens on Backlit and Obsidian, an
+  // LED ladder with a ring on Eurorack, a billet block in a lit slot on Anodised and the machined
+  // boards, a turned console cap on Console, a bar with a groove on Ember, a brass rail under
+  // Tolex, and the default set's plain dot.
   const capOf = (id) => getControlSet(id).families.Slider.parts;
-  assert.equal(capOf('eurorack').pointerCurrent.kind, 'lens');
-  assert.equal(capOf('eurorack').bodyTrackBase.slot, true);
+  assert.equal(capOf('backlit').pointerCurrent.kind, 'lens');
   assert.equal(capOf('backlit').bodyTrackFill.glow, true);
+  assert.equal(capOf('eurorack').pointerCurrent.kind, 'ring');
+  assert.equal(capOf('eurorack').tickMajor.kind, 'dot');
   assert.equal(capOf('anodised').pointerCurrent.kind, 'block');
-  for (const id of ['saddle', 'obsidian', 'laboratory', 'aerospace', 'ceramic', 'field', 'receiver']) {
+  for (const id of ['machined', 'anodised', 'ladder', 'laboratory', 'aerospace', 'ceramic', 'field']) {
     assert.equal(capOf(id).bodyTrackBase.slot, true, `${id} rides a slot`);
     assert.equal(capOf(id).bodyTrackFill.inset, 3, `${id} has the 4 px light in the 10 px slot`);
   }
   assert.equal(capOf('obsidian').pointerCurrent.kind, 'lens');
   assert.equal(capOf('console').pointerCurrent.kind, 'console');
-  assert.equal(capOf('console').pointerCurrent.sheen, true);
+  assert.equal(capOf('console').pointerCurrent['Background.Fill.gradient'].type, 'linear', 'turned from one piece');
   assert.equal(capOf('ember').pointerCurrent.kind, 'bar');
   assert.equal(capOf('ember').pointerCurrent.grooveColour, 'FF3B2A1E');
-  assert.equal(capOf('neon').pointerCurrent.kind, 'glass');
   assert.equal(capOf('neon').bodyTrackFill.glow, true);
-  assert.equal(capOf('carbon').pointerCurrent['Background.Fill.colour'], '{control.body}', 'Carbon\'s board: a dark cap with the orange line');
-  assert.equal(capOf('graphite').pointerCurrent.kind, undefined);
+  assert.equal(capOf('carbon').pointerCurrent['Background.Fill.colour'], 'FF111214', 'Carbon\'s board: a dark cap with the orange line');
+  assert.equal(capOf('tolex').bodyTrackBase['Background.Fill.gradient'].stops.length, 3);
+  assert.equal(capOf('graphite')?.pointerCurrent?.kind, undefined, 'the default set says nothing about the cap');
 });
 
 test('the panel follows the set\'s colour only while it wears the default one', () => {
