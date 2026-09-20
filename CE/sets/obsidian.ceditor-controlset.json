@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c3a724c6",
+  "fingerprint": "a0ea1884",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -74,7 +74,14 @@
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 6
+          "Behavior.majorTickLength": 6,
+          "Core.controlForm": "lens",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         },
         "parts": {
           "tickMinor": {
@@ -171,7 +178,14 @@
               "colour": "55FFFFFF"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "touch",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "MomentaryButton": {
@@ -230,7 +244,14 @@
               "colour": "55FFFFFF"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "touch",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ToggleButton": {
@@ -308,7 +329,14 @@
               },
               "parts": {}
             }
-          }
+          },
+          "Core.controlForm": "split",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Combobox": {
@@ -558,7 +586,14 @@
               "colour": "55FFFFFF"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "touch",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "OneShotButton": {
@@ -617,7 +652,14 @@
               "colour": "55FFFFFF"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "touch",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "RadioButtonGroup": {
@@ -1136,7 +1178,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "counter",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ProgressBar": {
@@ -1204,7 +1253,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "counter",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Ribbon": {

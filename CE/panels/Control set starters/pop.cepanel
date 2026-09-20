@@ -15,7 +15,7 @@
   "scriptId": "panel_3",
   "author": "",
   "version": "1.0.0",
-  "description": "Heavy outlines, offset shadows, oversized caps and round pads.",
+  "description": "Rotating folded tabs, paper keys, sliding bookmarks and tally tickets.",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -126,10 +126,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789856866626.value",
-      "label": "Knob_1789856866626",
-      "controlName": "Knob_1789856866626",
-      "path": "Knob_1789856866626.value",
+      "id": "Knob_1789880205407.value",
+      "label": "Knob_1789880205407",
+      "controlName": "Knob_1789880205407",
+      "path": "Knob_1789880205407.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +140,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789856866627.value",
-      "label": "Knob_1789856866627",
-      "controlName": "Knob_1789856866627",
-      "path": "Knob_1789856866627.value",
+      "id": "Knob_1789880205408.value",
+      "label": "Knob_1789880205408",
+      "controlName": "Knob_1789880205408",
+      "path": "Knob_1789880205408.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +154,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789856866628.value",
-      "label": "Slider_1789856866628",
-      "controlName": "Slider_1789856866628",
-      "path": "Slider_1789856866628.value",
+      "id": "Slider_1789880205409.value",
+      "label": "Slider_1789880205409",
+      "controlName": "Slider_1789880205409",
+      "path": "Slider_1789880205409.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.66,
@@ -168,10 +168,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789856866629.value",
-      "label": "Crossfader_1789856866629",
-      "controlName": "Crossfader_1789856866629",
-      "path": "Crossfader_1789856866629.value",
+      "id": "Crossfader_1789880205410.value",
+      "label": "Crossfader_1789880205410",
+      "controlName": "Crossfader_1789880205410",
+      "path": "Crossfader_1789880205410.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -184,10 +184,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789856866631.value",
-      "label": "ToggleButton_1789856866631",
-      "controlName": "ToggleButton_1789856866631",
-      "path": "ToggleButton_1789856866631.value",
+      "id": "ToggleButton_1789880205412.value",
+      "label": "ToggleButton_1789880205412",
+      "controlName": "ToggleButton_1789880205412",
+      "path": "ToggleButton_1789880205412.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +198,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789856866632.value",
-      "label": "CyclicButton_1789856866632",
-      "controlName": "CyclicButton_1789856866632",
-      "path": "CyclicButton_1789856866632.value",
+      "id": "CyclicButton_1789880205413.value",
+      "label": "CyclicButton_1789880205413",
+      "controlName": "CyclicButton_1789880205413",
+      "path": "CyclicButton_1789880205413.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +217,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789856866633.value",
-      "label": "Combobox_1789856866633",
-      "controlName": "Combobox_1789856866633",
-      "path": "Combobox_1789856866633.value",
+      "id": "Combobox_1789880205414.value",
+      "label": "Combobox_1789880205414",
+      "controlName": "Combobox_1789880205414",
+      "path": "Combobox_1789880205414.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +236,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789856866634.value",
-      "label": "Number_1789856866634",
-      "controlName": "Number_1789856866634",
-      "path": "Number_1789856866634.value",
+      "id": "Number_1789880205415.value",
+      "label": "Number_1789880205415",
+      "controlName": "Number_1789880205415",
+      "path": "Number_1789880205415.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,10 +250,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789856866640.value",
-      "label": "Ribbon_1789856866640",
-      "controlName": "Ribbon_1789856866640",
-      "path": "Ribbon_1789856866640.value",
+      "id": "Ribbon_1789880205421.value",
+      "label": "Ribbon_1789880205421",
+      "controlName": "Ribbon_1789880205421",
+      "path": "Ribbon_1789880205421.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -266,10 +266,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789856866643.x",
-      "label": "VectorJoystick_1789856866643 X",
-      "controlName": "VectorJoystick_1789856866643",
-      "path": "VectorJoystick_1789856866643.x",
+      "id": "VectorJoystick_1789880205424.x",
+      "label": "VectorJoystick_1789880205424 X",
+      "controlName": "VectorJoystick_1789880205424",
+      "path": "VectorJoystick_1789880205424.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -282,10 +282,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789856866643.y",
-      "label": "VectorJoystick_1789856866643 Y",
-      "controlName": "VectorJoystick_1789856866643",
-      "path": "VectorJoystick_1789856866643.y",
+      "id": "VectorJoystick_1789880205424.y",
+      "label": "VectorJoystick_1789880205424 Y",
+      "controlName": "VectorJoystick_1789880205424",
+      "path": "VectorJoystick_1789880205424.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -311,9 +311,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866622",
+          "name": "Label_1789880205403",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866622",
+          "id": "ctrl_1789880205403",
           "controlType": "Label"
         },
         "Transform": {
@@ -359,9 +359,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866623",
+          "name": "Label_1789880205404",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866623",
+          "id": "ctrl_1789880205404",
           "controlType": "Label"
         },
         "Transform": {
@@ -406,14 +406,14 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866624",
+          "name": "Label_1789880205405",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866624",
+          "id": "ctrl_1789880205405",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 92,
+          "y": 82,
           "width": 250,
           "height": 26
         },
@@ -454,14 +454,14 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866625",
+          "name": "Label_1789880205406",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866625",
+          "id": "ctrl_1789880205406",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 540,
-          "y": 92,
+          "x": 580,
+          "y": 82,
           "width": 250,
           "height": 26
         },
@@ -502,16 +502,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789856866626",
+          "name": "Knob_1789880205407",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866626",
+          "controlForm": "tab",
+          "formFaceColour": "FFFFFFFF",
+          "formHousingColour": "FFFFFFFF",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF1B1B1B",
+          "formAccentColour": "FFFF6B5B",
+          "id": "ctrl_1789880205407",
           "controlType": "Knob"
         },
         "Transform": {
           "x": 26,
-          "y": 126,
-          "width": 120,
-          "height": 132
+          "y": 112,
+          "width": 190,
+          "height": 190
         },
         "Behavior": {
           "defaultCurrentValue": 0.63,
@@ -823,16 +829,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789856866627",
+          "name": "Knob_1789880205408",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866627",
+          "controlForm": "tab",
+          "formFaceColour": "FFFFFFFF",
+          "formHousingColour": "FFFFFFFF",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF1B1B1B",
+          "formAccentColour": "FFFF6B5B",
+          "id": "ctrl_1789880205408",
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 164,
-          "y": 142,
-          "width": 92,
-          "height": 110
+          "x": 220,
+          "y": 125,
+          "width": 128,
+          "height": 158
         },
         "Behavior": {
           "defaultCurrentValue": 0.35,
@@ -1144,15 +1156,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Slider_1789856866628",
+          "name": "Slider_1789880205409",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866628",
+          "id": "ctrl_1789880205409",
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 288,
-          "y": 140,
-          "width": 214,
+          "x": 364,
+          "y": 133,
+          "width": 190,
           "height": 78
         },
         "Behavior": {
@@ -1471,15 +1483,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Crossfader_1789856866629",
+          "name": "Crossfader_1789880205410",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866629",
+          "id": "ctrl_1789880205410",
           "controlType": "Crossfader"
         },
         "Transform": {
-          "x": 288,
-          "y": 224,
-          "width": 214,
+          "x": 364,
+          "y": 234,
+          "width": 190,
           "height": 62
         },
         "Background": {
@@ -1539,16 +1551,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Button_1789856866630",
+          "name": "Button_1789880205411",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866630",
+          "controlForm": "fold",
+          "formFaceColour": "FFFFFFFF",
+          "formHousingColour": "FFFFFFFF",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF1B1B1B",
+          "formAccentColour": "FFFF6B5B",
+          "id": "ctrl_1789880205411",
           "controlType": "Button"
         },
         "Transform": {
-          "x": 540,
-          "y": 128,
-          "width": 126,
-          "height": 42
+          "x": 576,
+          "y": 118,
+          "width": 124,
+          "height": 84
         },
         "Background": {
           "_children": {
@@ -1631,16 +1649,21 @@
     {
       "_children": {
         "Core": {
-          "name": "ToggleButton_1789856866631",
+          "name": "ToggleButton_1789880205412",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866631",
+          "controlForm": "bookmark",
+          "formFaceColour": "FFFFFFFF",
+          "formHousingColour": "FFFFFFFF",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF1B1B1B",
+          "formAccentColour": "FFFF6B5B",
+          "id": "ctrl_1789880205412",
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 692,
-          "y": 128,
-          "width": 160,
-          "height": 42
+          "x": 716,
+          "y": 118,
+          "height": 84
         },
         "Background": {
           "_children": {
@@ -1743,16 +1766,16 @@
     {
       "_children": {
         "Core": {
-          "name": "CyclicButton_1789856866632",
+          "name": "CyclicButton_1789880205413",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866632",
+          "id": "ctrl_1789880205413",
           "controlType": "CyclicButton"
         },
         "Transform": {
-          "x": 540,
-          "y": 186,
-          "width": 126,
-          "height": 42
+          "x": 576,
+          "y": 220,
+          "width": 124,
+          "height": 36
         },
         "Background": {
           "_children": {
@@ -1849,15 +1872,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Combobox_1789856866633",
+          "name": "Combobox_1789880205414",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866633",
+          "id": "ctrl_1789880205414",
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 692,
-          "y": 186,
-          "height": 42
+          "x": 716,
+          "y": 220,
+          "width": 136,
+          "height": 36
         },
         "Background": {
           "_children": {
@@ -1939,15 +1963,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Number_1789856866634",
+          "name": "Number_1789880205415",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866634",
+          "id": "ctrl_1789880205415",
           "controlType": "Number"
         },
         "Transform": {
-          "x": 540,
-          "y": 246,
-          "width": 150
+          "x": 576,
+          "y": 273,
+          "width": 124,
+          "height": 32
         },
         "Parts": {
           "_children": {
@@ -2075,16 +2100,15 @@
     {
       "_children": {
         "Core": {
-          "name": "TextInput_1789856866635",
+          "name": "TextInput_1789880205416",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866635",
+          "id": "ctrl_1789880205416",
           "controlType": "TextInput"
         },
         "Transform": {
-          "x": 710,
-          "y": 246,
-          "width": 142,
-          "height": 38
+          "x": 716,
+          "y": 273,
+          "width": 136
         },
         "Background": {
           "_children": {
@@ -2164,9 +2188,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866636",
+          "name": "Label_1789880205417",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866636",
+          "id": "ctrl_1789880205417",
           "controlType": "Label"
         },
         "Transform": {
@@ -2212,9 +2236,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866637",
+          "name": "Label_1789880205418",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866637",
+          "id": "ctrl_1789880205418",
           "controlType": "Label"
         },
         "Transform": {
@@ -2260,9 +2284,9 @@
     {
       "_children": {
         "Core": {
-          "name": "DrumPads_1789856866638",
+          "name": "DrumPads_1789880205419",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866638",
+          "id": "ctrl_1789880205419",
           "controlType": "DrumPads"
         },
         "Transform": {
@@ -2331,9 +2355,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Envelope_1789856866639",
+          "name": "Envelope_1789880205420",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866639",
+          "id": "ctrl_1789880205420",
           "controlType": "Envelope"
         },
         "Transform": {
@@ -2396,9 +2420,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Ribbon_1789856866640",
+          "name": "Ribbon_1789880205421",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866640",
+          "id": "ctrl_1789880205421",
           "controlType": "Ribbon"
         },
         "Transform": {
@@ -2466,16 +2490,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Meter_1789856866641",
+          "name": "Meter_1789880205422",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866641",
+          "controlForm": "ticket",
+          "formFaceColour": "FFFFFFFF",
+          "formHousingColour": "FFFFFFFF",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF1B1B1B",
+          "formAccentColour": "FFFF6B5B",
+          "id": "ctrl_1789880205422",
           "controlType": "Meter"
         },
         "Transform": {
           "x": 540,
-          "y": 354,
+          "y": 342,
           "width": 312,
-          "height": 48
+          "height": 108
         },
         "Background": {
           "_children": {
@@ -2500,7 +2530,8 @@
           "thickness": 16,
           "rounded": true,
           "peakColour": "FF1B1B1B",
-          "showTicks": true
+          "showTicks": true,
+          "valuePrecision": 2
         },
         "Text": {
           "_children": {
@@ -2535,16 +2566,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Matrix_1789856866642",
+          "name": "Matrix_1789880205423",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866642",
+          "id": "ctrl_1789880205423",
           "controlType": "Matrix"
         },
         "Transform": {
           "x": 540,
-          "y": 430,
+          "y": 466,
           "width": 166,
-          "height": 134
+          "height": 100
         },
         "Background": {
           "_children": {
@@ -2624,16 +2655,16 @@
     {
       "_children": {
         "Core": {
-          "name": "VectorJoystick_1789856866643",
+          "name": "VectorJoystick_1789880205424",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866643",
+          "id": "ctrl_1789880205424",
           "controlType": "VectorJoystick"
         },
         "Transform": {
           "x": 728,
-          "y": 430,
+          "y": 466,
           "width": 124,
-          "height": 134
+          "height": 100
         },
         "Background": {
           "_children": {
@@ -2691,9 +2722,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866644",
+          "name": "Label_1789880205425",
           "controlSetId": "pop",
-          "id": "ctrl_1789856866644",
+          "id": "ctrl_1789880205425",
           "controlType": "Label"
         },
         "Transform": {

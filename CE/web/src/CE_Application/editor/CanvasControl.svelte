@@ -11,6 +11,8 @@
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { bakeStaticPartEntries } from '../utils/staticPartBaking.js';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import ControlAnatomy from './ControlAnatomy.svelte';
+  import { anatomyForm } from '../models/controlAnatomy.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
@@ -265,6 +267,7 @@
 
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
+  let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
@@ -1993,7 +1996,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isKeyboard && !isStepSequencer && !isTabContainer && !isScrollArea && !isShape && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!hasAnatomy && !isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isKeyboard && !isStepSequencer && !isTabContainer && !isScrollArea && !isShape && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isNumpad && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -3172,7 +3175,7 @@
       `--radio-rows:${Math.max(1, radioGroupLayout.rowCount)}`,
     ].join('; ');
   });
-  let hasIcon = $derived(!isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
+  let hasIcon = $derived(!hasAnatomy && !isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
   let iconIsTinted = $derived(usesIconTint(icon?.tint));
   let iconEffects = $derived(icon?._children?.Effects ?? null);
   let iconSizeValue = $derived(Math.max(4, Number(icon?.size ?? 16)));
@@ -3319,14 +3322,17 @@
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
   aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
-  <EffectSurface {effects} width={displayW} height={displayH} shadowsOnly target="component">
-  {#if separateBackground}
+  <EffectSurface effects={hasAnatomy ? null : effects} width={displayW} height={displayH} shadowsOnly target="component">
+  {#if separateBackground && !hasAnatomy}
     <div class="control-background" style={filterCSS}>
       <BackgroundRenderer {background} width={displayW} height={displayH} />
     </div>
   {/if}
-  <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {absorbedFillCSS ?? ''}">
-    {#if background && !separateBackground}
+  <div bind:this={controlContentElement} class="control-content" style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
+    {#if hasAnatomy}
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} />
+    {/if}
+    {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />
     {/if}
 
@@ -3334,7 +3340,7 @@
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
     {/if}
 
-    {#if isMeter}
+    {#if isMeter && !hasAnatomy}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
 
@@ -3531,7 +3537,7 @@
       />
     {/if}
 
-    {#if isSliderControl}
+    {#if isSliderControl && !hasAnatomy}
       <SliderFamilyRenderer
         control={renderControl}
         runtime={interactionRuntime}
@@ -3542,7 +3548,7 @@
       />
     {/if}
 
-    {#if renderedPartEntries.length}
+    {#if renderedPartEntries.length && !hasAnatomy}
       {#each renderedPartEntries as [partName, part] (partName)}
         <InteractivePartRenderer
           {part}
@@ -3613,7 +3619,7 @@
       <div class="combobox-arrow" aria-hidden="true"></div>
     {/if}
 
-    {#if hasLamp}
+    {#if hasLamp && !hasAnatomy}
       <div class="lamp-indicator" class:lit={lampLit} style={lampStyle} aria-hidden="true">
         {#if batInks}
           <!-- A bat switch in a 10×30 box: the bezel ring at the centre, the lever from the

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ca0e24a9",
+  "fingerprint": "1da63471",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -71,7 +71,14 @@
         "component": {
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.showTicks": false
+          "Behavior.showTicks": false,
+          "Core.controlForm": "halo",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         },
         "parts": {
           "bodyCap": {
@@ -116,7 +123,14 @@
               "spread": 0,
               "colour": "33000000"
             }
-          ]
+          ],
+          "Core.controlForm": "glasskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "MomentaryButton": {
@@ -136,7 +150,14 @@
               "spread": 0,
               "colour": "33000000"
             }
-          ]
+          ],
+          "Core.controlForm": "glasskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ToggleButton": {
@@ -175,7 +196,14 @@
               },
               "parts": {}
             }
-          }
+          },
+          "Core.controlForm": "orbit",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Combobox": {
@@ -327,7 +355,14 @@
               "spread": 0,
               "colour": "33000000"
             }
-          ]
+          ],
+          "Core.controlForm": "glasskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "OneShotButton": {
@@ -347,7 +382,14 @@
               "spread": 0,
               "colour": "33000000"
             }
-          ]
+          ],
+          "Core.controlForm": "glasskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "RadioButtonGroup": {
@@ -559,7 +601,14 @@
           "Meter.showTicks": false,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "column",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ProgressBar": {
@@ -589,7 +638,14 @@
           "Meter.showTicks": false,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "column",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Ribbon": {

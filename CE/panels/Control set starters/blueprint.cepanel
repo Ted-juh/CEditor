@@ -15,7 +15,7 @@
   "scriptId": "panel_2",
   "author": "",
   "version": "1.0.0",
-  "description": "Hairline keys, hollow handles, numbered scales and open space.",
+  "description": "Exposed rotating pointers, crosshair keys, knife switches and ruler cursors.",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -126,10 +126,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789856866594.value",
-      "label": "Knob_1789856866594",
-      "controlName": "Knob_1789856866594",
-      "path": "Knob_1789856866594.value",
+      "id": "Knob_1789880205375.value",
+      "label": "Knob_1789880205375",
+      "controlName": "Knob_1789880205375",
+      "path": "Knob_1789880205375.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +140,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789856866595.value",
-      "label": "Knob_1789856866595",
-      "controlName": "Knob_1789856866595",
-      "path": "Knob_1789856866595.value",
+      "id": "Knob_1789880205376.value",
+      "label": "Knob_1789880205376",
+      "controlName": "Knob_1789880205376",
+      "path": "Knob_1789880205376.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,10 +154,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789856866596.value",
-      "label": "Slider_1789856866596",
-      "controlName": "Slider_1789856866596",
-      "path": "Slider_1789856866596.value",
+      "id": "Slider_1789880205377.value",
+      "label": "Slider_1789880205377",
+      "controlName": "Slider_1789880205377",
+      "path": "Slider_1789880205377.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.66,
@@ -168,10 +168,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789856866597.value",
-      "label": "Crossfader_1789856866597",
-      "controlName": "Crossfader_1789856866597",
-      "path": "Crossfader_1789856866597.value",
+      "id": "Crossfader_1789880205378.value",
+      "label": "Crossfader_1789880205378",
+      "controlName": "Crossfader_1789880205378",
+      "path": "Crossfader_1789880205378.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -184,10 +184,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789856866600.value",
-      "label": "ToggleButton_1789856866600",
-      "controlName": "ToggleButton_1789856866600",
-      "path": "ToggleButton_1789856866600.value",
+      "id": "ToggleButton_1789880205381.value",
+      "label": "ToggleButton_1789880205381",
+      "controlName": "ToggleButton_1789880205381",
+      "path": "ToggleButton_1789880205381.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +198,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789856866601.value",
-      "label": "CyclicButton_1789856866601",
-      "controlName": "CyclicButton_1789856866601",
-      "path": "CyclicButton_1789856866601.value",
+      "id": "CyclicButton_1789880205382.value",
+      "label": "CyclicButton_1789880205382",
+      "controlName": "CyclicButton_1789880205382",
+      "path": "CyclicButton_1789880205382.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +217,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789856866603.value",
-      "label": "Combobox_1789856866603",
-      "controlName": "Combobox_1789856866603",
-      "path": "Combobox_1789856866603.value",
+      "id": "Combobox_1789880205384.value",
+      "label": "Combobox_1789880205384",
+      "controlName": "Combobox_1789880205384",
+      "path": "Combobox_1789880205384.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +236,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789856866604.value",
-      "label": "Number_1789856866604",
-      "controlName": "Number_1789856866604",
-      "path": "Number_1789856866604.value",
+      "id": "Number_1789880205385.value",
+      "label": "Number_1789880205385",
+      "controlName": "Number_1789880205385",
+      "path": "Number_1789880205385.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,10 +250,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789856866613.value",
-      "label": "Ribbon_1789856866613",
-      "controlName": "Ribbon_1789856866613",
-      "path": "Ribbon_1789856866613.value",
+      "id": "Ribbon_1789880205394.value",
+      "label": "Ribbon_1789880205394",
+      "controlName": "Ribbon_1789880205394",
+      "path": "Ribbon_1789880205394.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -266,10 +266,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789856866619.x",
-      "label": "VectorJoystick_1789856866619 X",
-      "controlName": "VectorJoystick_1789856866619",
-      "path": "VectorJoystick_1789856866619.x",
+      "id": "VectorJoystick_1789880205400.x",
+      "label": "VectorJoystick_1789880205400 X",
+      "controlName": "VectorJoystick_1789880205400",
+      "path": "VectorJoystick_1789880205400.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -282,10 +282,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789856866619.y",
-      "label": "VectorJoystick_1789856866619 Y",
-      "controlName": "VectorJoystick_1789856866619",
-      "path": "VectorJoystick_1789856866619.y",
+      "id": "VectorJoystick_1789880205400.y",
+      "label": "VectorJoystick_1789880205400 Y",
+      "controlName": "VectorJoystick_1789880205400",
+      "path": "VectorJoystick_1789880205400.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -311,9 +311,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866590",
+          "name": "Label_1789880205371",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866590",
+          "id": "ctrl_1789880205371",
           "controlType": "Label"
         },
         "Transform": {
@@ -359,9 +359,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866591",
+          "name": "Label_1789880205372",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866591",
+          "id": "ctrl_1789880205372",
           "controlType": "Label"
         },
         "Transform": {
@@ -406,14 +406,14 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866592",
+          "name": "Label_1789880205373",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866592",
+          "id": "ctrl_1789880205373",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 92,
+          "y": 82,
           "width": 250,
           "height": 26
         },
@@ -454,14 +454,14 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866593",
+          "name": "Label_1789880205374",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866593",
+          "id": "ctrl_1789880205374",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 540,
-          "y": 92,
+          "x": 580,
+          "y": 82,
           "width": 250,
           "height": 26
         },
@@ -502,16 +502,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789856866594",
+          "name": "Knob_1789880205375",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866594",
+          "controlForm": "pointer",
+          "formDivisions": 24,
+          "formFaceColour": "FF14243A",
+          "formHousingColour": "FF22375A",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFDCE8F5",
+          "formAccentColour": "FFDCE8F5",
+          "id": "ctrl_1789880205375",
           "controlType": "Knob"
         },
         "Transform": {
           "x": 26,
-          "y": 126,
-          "width": 120,
-          "height": 132
+          "y": 112,
+          "width": 190,
+          "height": 190
         },
         "Behavior": {
           "defaultCurrentValue": 0.63,
@@ -830,16 +837,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789856866595",
+          "name": "Knob_1789880205376",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866595",
+          "controlForm": "pointer",
+          "formDivisions": 24,
+          "formFaceColour": "FF14243A",
+          "formHousingColour": "FF22375A",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFDCE8F5",
+          "formAccentColour": "FFDCE8F5",
+          "id": "ctrl_1789880205376",
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 164,
-          "y": 142,
-          "width": 92,
-          "height": 110
+          "x": 220,
+          "y": 125,
+          "width": 128,
+          "height": 158
         },
         "Behavior": {
           "defaultCurrentValue": 0.35,
@@ -1158,15 +1172,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Slider_1789856866596",
+          "name": "Slider_1789880205377",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866596",
+          "id": "ctrl_1789880205377",
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 288,
-          "y": 140,
-          "width": 214,
+          "x": 364,
+          "y": 133,
+          "width": 190,
           "height": 78
         },
         "Behavior": {
@@ -1504,15 +1518,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Crossfader_1789856866597",
+          "name": "Crossfader_1789880205378",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866597",
+          "id": "ctrl_1789880205378",
           "controlType": "Crossfader"
         },
         "Transform": {
-          "x": 288,
-          "y": 224,
-          "width": 214,
+          "x": 364,
+          "y": 234,
+          "width": 190,
           "height": 62
         },
         "Background": {
@@ -1554,16 +1568,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Button_1789856866599",
+          "name": "Button_1789880205380",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866599",
+          "controlForm": "crosskey",
+          "formDivisions": 24,
+          "formFaceColour": "FF14243A",
+          "formHousingColour": "FF22375A",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFDCE8F5",
+          "formAccentColour": "FFDCE8F5",
+          "id": "ctrl_1789880205380",
           "controlType": "Button"
         },
         "Transform": {
-          "x": 540,
-          "y": 128,
-          "width": 126,
-          "height": 42
+          "x": 576,
+          "y": 118,
+          "width": 124,
+          "height": 84
         },
         "Background": {
           "_children": {
@@ -1628,16 +1649,22 @@
     {
       "_children": {
         "Core": {
-          "name": "ToggleButton_1789856866600",
+          "name": "ToggleButton_1789880205381",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866600",
+          "controlForm": "knife",
+          "formDivisions": 24,
+          "formFaceColour": "FF14243A",
+          "formHousingColour": "FF22375A",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFDCE8F5",
+          "formAccentColour": "FFDCE8F5",
+          "id": "ctrl_1789880205381",
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 692,
-          "y": 128,
-          "width": 160,
-          "height": 42
+          "x": 716,
+          "y": 118,
+          "height": 84
         },
         "Background": {
           "_children": {
@@ -1727,16 +1754,16 @@
     {
       "_children": {
         "Core": {
-          "name": "CyclicButton_1789856866601",
+          "name": "CyclicButton_1789880205382",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866601",
+          "id": "ctrl_1789880205382",
           "controlType": "CyclicButton"
         },
         "Transform": {
-          "x": 540,
-          "y": 186,
-          "width": 126,
-          "height": 42
+          "x": 576,
+          "y": 220,
+          "width": 124,
+          "height": 36
         },
         "Background": {
           "_children": {
@@ -1815,15 +1842,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Combobox_1789856866603",
+          "name": "Combobox_1789880205384",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866603",
+          "id": "ctrl_1789880205384",
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 692,
-          "y": 186,
-          "height": 42
+          "x": 716,
+          "y": 220,
+          "width": 136,
+          "height": 36
         },
         "Background": {
           "_children": {
@@ -1887,15 +1915,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Number_1789856866604",
+          "name": "Number_1789880205385",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866604",
+          "id": "ctrl_1789880205385",
           "controlType": "Number"
         },
         "Transform": {
-          "x": 540,
-          "y": 246,
-          "width": 150
+          "x": 576,
+          "y": 273,
+          "width": 124,
+          "height": 32
         },
         "Parts": {
           "_children": {
@@ -2023,16 +2052,15 @@
     {
       "_children": {
         "Core": {
-          "name": "TextInput_1789856866605",
+          "name": "TextInput_1789880205386",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866605",
+          "id": "ctrl_1789880205386",
           "controlType": "TextInput"
         },
         "Transform": {
-          "x": 710,
-          "y": 246,
-          "width": 142,
-          "height": 38
+          "x": 716,
+          "y": 273,
+          "width": 136
         },
         "Background": {
           "_children": {
@@ -2094,9 +2122,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866607",
+          "name": "Label_1789880205388",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866607",
+          "id": "ctrl_1789880205388",
           "controlType": "Label"
         },
         "Transform": {
@@ -2142,9 +2170,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866608",
+          "name": "Label_1789880205389",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866608",
+          "id": "ctrl_1789880205389",
           "controlType": "Label"
         },
         "Transform": {
@@ -2190,9 +2218,9 @@
     {
       "_children": {
         "Core": {
-          "name": "DrumPads_1789856866609",
+          "name": "DrumPads_1789880205390",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866609",
+          "id": "ctrl_1789880205390",
           "controlType": "DrumPads"
         },
         "Transform": {
@@ -2243,9 +2271,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Envelope_1789856866611",
+          "name": "Envelope_1789880205392",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866611",
+          "id": "ctrl_1789880205392",
           "controlType": "Envelope"
         },
         "Transform": {
@@ -2291,9 +2319,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Ribbon_1789856866613",
+          "name": "Ribbon_1789880205394",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866613",
+          "id": "ctrl_1789880205394",
           "controlType": "Ribbon"
         },
         "Transform": {
@@ -2341,16 +2369,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Meter_1789856866615",
+          "name": "Meter_1789880205396",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866615",
+          "controlForm": "ruler",
+          "formDivisions": 24,
+          "formFaceColour": "FF14243A",
+          "formHousingColour": "FF22375A",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFDCE8F5",
+          "formAccentColour": "FFDCE8F5",
+          "id": "ctrl_1789880205396",
           "controlType": "Meter"
         },
         "Transform": {
           "x": 540,
-          "y": 354,
+          "y": 342,
           "width": 312,
-          "height": 48
+          "height": 108
         },
         "Background": {
           "_children": {
@@ -2374,7 +2409,8 @@
           "thickness": 6,
           "rounded": false,
           "peakColour": "FFFFD166",
-          "showTicks": true
+          "showTicks": true,
+          "valuePrecision": 2
         },
         "Text": {
           "_children": {
@@ -2392,16 +2428,16 @@
     {
       "_children": {
         "Core": {
-          "name": "Matrix_1789856866617",
+          "name": "Matrix_1789880205398",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866617",
+          "id": "ctrl_1789880205398",
           "controlType": "Matrix"
         },
         "Transform": {
           "x": 540,
-          "y": 430,
+          "y": 466,
           "width": 166,
-          "height": 134
+          "height": 100
         },
         "Background": {
           "_children": {
@@ -2463,16 +2499,16 @@
     {
       "_children": {
         "Core": {
-          "name": "VectorJoystick_1789856866619",
+          "name": "VectorJoystick_1789880205400",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866619",
+          "id": "ctrl_1789880205400",
           "controlType": "VectorJoystick"
         },
         "Transform": {
           "x": 728,
-          "y": 430,
+          "y": 466,
           "width": 124,
-          "height": 134
+          "height": 100
         },
         "Background": {
           "_children": {
@@ -2513,9 +2549,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789856866621",
+          "name": "Label_1789880205402",
           "controlSetId": "blueprint",
-          "id": "ctrl_1789856866621",
+          "id": "ctrl_1789880205402",
           "controlType": "Label"
         },
         "Transform": {

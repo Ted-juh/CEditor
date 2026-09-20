@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "99f03f01",
+  "fingerprint": "aa698f10",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -71,7 +71,14 @@
         "component": {
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.showTicks": false
+          "Behavior.showTicks": false,
+          "Core.controlForm": "tab",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         },
         "parts": {
           "bodyCap": {
@@ -115,7 +122,14 @@
               "colour": "FF1B1B1B"
             }
           ],
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "fold",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "MomentaryButton": {
@@ -135,7 +149,14 @@
               "colour": "FF1B1B1B"
             }
           ],
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "fold",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ToggleButton": {
@@ -155,7 +176,14 @@
               "colour": "FF1B1B1B"
             }
           ],
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "bookmark",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Combobox": {
@@ -275,7 +303,14 @@
               "colour": "FF1B1B1B"
             }
           ],
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "fold",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "OneShotButton": {
@@ -295,7 +330,14 @@
               "colour": "FF1B1B1B"
             }
           ],
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "fold",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "RadioButtonGroup": {
@@ -507,7 +549,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ticket",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ProgressBar": {
@@ -537,7 +586,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ticket",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Ribbon": {

@@ -10,6 +10,7 @@
   let { initialId = 'graphite', onclose = () => {} } = $props();
   let selected = $state(untrack(() => getControlSet(initialId) ? initialId : 'graphite'));
   let dialog;
+  let grayscale = $state(false);
   let sample = $derived(createControlSetStarter(selected));
   let design = $derived(getControlSet(selected));
   let direction = $derived(STARTER_CONTROL_SETS.find(s => s.id === selected));
@@ -29,10 +30,11 @@
     </nav>
     <section class="preview">
       <div class="intro"><h3>{design.name}</h3><p>{direction?.detail ?? design.description}</p></div>
-      <div class="viewport" inert><div class="sample">
+      <label class="compare"><input type="checkbox" bind:checked={grayscale} /> Compare shapes in grayscale</label>
+      <div class="viewport" class:grayscale inert><div class="sample">
         {#key selected}<PanelPreviewSurface panel={sample} scale={1} bgLayers={{ solid: buildSolidStyle(sample) }} gridStyle="" />{/key}
       </div></div>
-      <p class="hint">Rendered with CEditor’s controls. Open a starter to play, edit, inspect its parts, or copy elements into another panel.</p>
+      <p class="hint">Open a starter to play and copy controls. Core → Form edits the mechanism, size, depth, scale divisions and inks. Original parts restores the Parts renderer.</p>
       <p class="hint">Apply changes controls set to “Follow panel”. Pinned designs and your property edits stay in place.</p>
       <footer><button onclick={() => { setActivePanelControlSet(selected); onclose(); }}>Apply to current panel</button><button class="primary" onclick={openStarter}>Open editable starter →</button></footer>
     </section>
@@ -40,6 +42,7 @@
 </dialog>
 
 <style>
+  .grayscale { filter:grayscale(1); } .compare { display:flex;align-items:center;gap:8px;font-size:12px;margin:0 0 12px;color:#ddd; }
   dialog { width:1120px; max-width:96vw; max-height:94vh; padding:0; background:#17191c; color:#ece9e2; border:1px solid #42454b; border-radius:14px; box-shadow:0 24px 90px #000b; font-family:'Segoe UI',sans-serif; }
   dialog::backdrop { background:#000a; }
   header { display:flex; justify-content:space-between; align-items:center; padding:22px 26px; border-bottom:1px solid #36383d; }

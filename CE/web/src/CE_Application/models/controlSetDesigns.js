@@ -438,6 +438,7 @@ export const EDITOR_PATHS = [
   /^ScrollArea\.(scrollbarSize|trackColour|thumbColour)$/,
   /^Meter\.(segments|segmentGap|rounded|thickness|showTicks|trackColour|fillColour|peakColour)$/,
   /^Ribbon\.(style|showGlow|indicatorSize|trackColour|fillColour|indicatorColour|glowColour|wheelColour|labelColour)$/,
+  /^Core\.(controlForm|formSize|formDepth|formDivisions|formShowValue|formFaceColour|formHousingColour|formInkColour|formLabelColour|formAccentColour)$/,
   /^Crossfader\.(handleStyle|trackSize|handleSize|showGains|trackColour|fillAColour|fillBColour|handleColour|labelColour)$/,
   /^DrumPads\.(padAppearance|padRadius|fieldColour|padColour|accentColour|hitColour|labelColour)$/,
   /^Numpad\.(gap|keyColour|keyDownColour|keyLabelColour|actionColour|displayColour|displayTextColour|borderColour)$/,

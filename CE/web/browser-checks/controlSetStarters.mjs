@@ -29,10 +29,40 @@ try {
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
     assert.equal(await page.locator('[data-control-id]').count(),size.controls);
+    const mechanisms=page.locator('svg.anatomy');
+    assert.equal(await mechanisms.count(),5,`${id}: two rotary faces, button, switch and meter`);
+    const rotary=mechanisms.nth(0);
+    const rotaryControl=rotary.locator('..').locator('..');
+    const valueBefore=Number(await rotary.getAttribute('data-position'));
+    await rotaryControl.focus();
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(30);
+    assert.ok(Number(await rotary.getAttribute('data-position'))>valueBefore,`${id}: rotary follows keyboard value`);
+    const switchFace=page.locator('[data-control-id]').filter({has:page.locator('svg.anatomy')}).filter({hasText:'HOLD'}).first();
+    const switchSvg=switchFace.locator('svg.anatomy');
+    const oldState=await switchSvg.getAttribute('data-active');
+    await switchFace.click();
+    await page.waitForTimeout(30);
+    assert.notEqual(await switchSvg.getAttribute('data-active'),oldState,`${id}: switch mechanism follows state`);
+    await switchFace.click();
+    const actionFace=page.locator('[data-control-id]').filter({has:page.locator('svg.anatomy')}).filter({hasText:'TRIGGER'}).first();
+    const actionBox=await actionFace.boundingBox();
+    await page.mouse.move(actionBox.x+actionBox.width/2,actionBox.y+actionBox.height/2);
+    await page.mouse.down();
+    await page.waitForTimeout(25);
+    assert.equal(await actionFace.locator('svg.anatomy').getAttribute('data-active'),'true',`${id}: pressed face responds`);
+    await page.mouse.up();
+    await page.waitForTimeout(25);
+    assert.equal(await actionFace.locator('svg.anatomy').getAttribute('data-active'),'false',`${id}: released face resets`);
     // The new cap geometry keeps the original hit/drag behavior.
     const fader=page.locator('.xfader').first();
     assert.ok(await fader.count());
     if(out) await page.screenshot({ path:join(out,`${id}.png`),clip:{x:0,y:0,width:size.width,height:size.height} });
+    if(out) {
+      await page.locator('.frame').evaluate(el=>el.style.filter='grayscale(1)');
+      await page.screenshot({path:join(out,`${id}-grayscale.png`),clip:{x:0,y:0,width:size.width,height:size.height}});
+      await page.locator('.frame').evaluate(el=>el.style.filter='');
+    }
     const before = await fader.evaluate(el => el.innerHTML);
     const box = await fader.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -43,11 +73,23 @@ try {
     await page.mouse.up();
     console.log(`${id}: ${size.controls} rendered editor controls`);
   }
+  await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{disabled:true}));
+  const disabledKnob=page.locator('svg.anatomy').first();
+  await disabledKnob.waitFor();
+  const disabledValue=await disabledKnob.getAttribute('data-position');
+  await disabledKnob.locator('..').locator('..').click({force:true});
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await disabledKnob.getAttribute('data-position'),disabledValue,'disabled anatomy cannot change values');
+  await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{original:true}));
+  await page.waitForTimeout(50);
+  assert.equal(await page.locator('svg.anatomy').count(),0,'original parts explicitly restores legacy drawing');
   await page.evaluate(() => window.__controlSetShot.gallery());
   const dialog=page.getByRole('dialog',{name:'Control set gallery'});
   await dialog.waitFor();
   assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),12);
   await dialog.getByRole('button',{name:/Machined Precision/}).click();
+  await dialog.getByRole('checkbox',{name:'Compare shapes in grayscale'}).check();
+  assert.equal(await dialog.locator('.viewport').evaluate(el=>getComputedStyle(el).filter),'grayscale(1)');
   await page.evaluate(() => document.fonts.ready);
   if(out) await page.screenshot({path:join(out,'gallery.png')});
   await dialog.getByRole('button',{name:'Open editable starter'}).click();

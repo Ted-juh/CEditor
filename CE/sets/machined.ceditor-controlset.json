@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "65a81698",
+  "fingerprint": "9929c44a",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -73,7 +73,14 @@
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 5
+          "Behavior.majorTickLength": 5,
+          "Core.controlForm": "vernier",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         },
         "parts": {
           "tickMajor": {
@@ -297,7 +304,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "hexkey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "MomentaryButton": {
@@ -350,7 +364,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "hexkey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ToggleButton": {
@@ -422,7 +443,14 @@
               },
               "parts": {}
             }
-          }
+          },
+          "Core.controlForm": "bolt",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Combobox": {
@@ -615,7 +643,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "hexkey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "OneShotButton": {
@@ -668,7 +703,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "hexkey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "RadioButtonGroup": {
@@ -1097,7 +1139,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "dial",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ProgressBar": {
@@ -1153,7 +1202,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "dial",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Ribbon": {

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b3c89313",
+  "fingerprint": "bd26467c",
   "set": {
     "id": "console",
     "name": "Console",
@@ -74,7 +74,14 @@
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 5
+          "Behavior.majorTickLength": 5,
+          "Core.controlForm": "skirt",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         },
         "parts": {
           "tickMajor": {
@@ -168,7 +175,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "piano",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "MomentaryButton": {
@@ -226,7 +240,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "piano",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ToggleButton": {
@@ -303,7 +324,14 @@
               },
               "parts": {}
             }
-          }
+          },
+          "Core.controlForm": "latch",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Combobox": {
@@ -622,7 +650,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "piano",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "OneShotButton": {
@@ -680,7 +715,14 @@
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF"
+          "Text.Effects.shadowColour": "99FFFFFF",
+          "Core.controlForm": "piano",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "RadioButtonGroup": {
@@ -1149,7 +1191,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "vu",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "ProgressBar": {
@@ -1210,7 +1259,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "vu",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
         }
       },
       "Ribbon": {

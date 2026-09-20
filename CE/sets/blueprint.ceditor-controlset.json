@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ea6ac1a2",
+  "fingerprint": "5417bca0",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -74,7 +74,14 @@
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 5
+          "Behavior.majorTickLength": 5,
+          "Core.controlForm": "pointer",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         },
         "parts": {
           "tickMajor": {
@@ -112,7 +119,14 @@
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "00000000",
           "Background.Border.colour": "FFDCE8F5",
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "MomentaryButton": {
@@ -121,7 +135,14 @@
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "00000000",
           "Background.Border.colour": "FFDCE8F5",
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ToggleButton": {
@@ -150,7 +171,14 @@
               },
               "parts": {}
             }
-          }
+          },
+          "Core.controlForm": "knife",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Combobox": {
@@ -254,7 +282,14 @@
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "00000000",
           "Background.Border.colour": "FFDCE8F5",
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "OneShotButton": {
@@ -263,7 +298,14 @@
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "00000000",
           "Background.Border.colour": "FFDCE8F5",
-          "Text.Fill.colour": "FFF2F2F2"
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "RadioButtonGroup": {
@@ -387,7 +429,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ruler",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ProgressBar": {
@@ -406,7 +455,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ruler",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Ribbon": {

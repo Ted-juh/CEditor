@@ -1,18 +1,19 @@
+import { setAnatomy } from './controlAnatomy.js';
 // Visual properties only. Musical values, routing, gestures and authored edits remain local.
 // Each row is a design direction, not a new name for a palette.
 export const STARTER_CONTROL_SETS = [
-  { id: 'graphite', title: 'Flat / essential', detail: 'Quiet pills, round handles and continuous meters.', pad: 'flat', radius: 6, handle: 'round', meter: 0, ribbon: 'strip', matrix: 'bar' },
-  { id: 'blueprint', title: 'Technical / outline', detail: 'Hairline keys, hollow handles, numbered scales and open space.', pad: 'outline', radius: 0, handle: 'ring', meter: 12, ribbon: 'strip', matrix: 'dot' },
-  { id: 'pop', title: 'Playful / print', detail: 'Heavy outlines, offset shadows, oversized caps and round pads.', pad: 'raised', radius: 24, handle: 'round', meter: 8, ribbon: 'strip', matrix: 'dot' },
-  { id: 'soft', title: 'Soft / relief', detail: 'Domed controls, broad corners and recessed wells.', pad: 'raised', radius: 16, handle: 'round', meter: 0, ribbon: 'wheel', matrix: 'bar' },
-  { id: 'frost', title: 'Frosted / translucent', detail: 'Airy glass faces, white rings and softly rounded fields.', pad: 'glass', radius: 18, handle: 'ring', meter: 0, ribbon: 'strip', matrix: 'dot' },
-  { id: 'obsidian', title: 'Glass / illuminated', detail: 'Hard reflections, lit lenses, glowing strips and dark readouts.', pad: 'glass', radius: 7, handle: 'ring', meter: 24, ribbon: 'strip', matrix: 'dot' },
-  { id: 'console', title: 'Studio / console', detail: 'Long blade faders, square slots, engraved keys and segmented meters.', pad: 'inset', radius: 2, handle: 'blade', meter: 20, ribbon: 'wheel3d', matrix: 'bar' },
-  { id: 'carbon', title: 'Performance / rubber', detail: 'Matte pads, narrow grooved caps and inset fields.', pad: 'inset', radius: 9, handle: 'blade', meter: 16, ribbon: 'wheel3d', matrix: 'bar' },
-  { id: 'machined', title: 'Precision / metal', detail: 'Billet caps, bevelled keys, deep slots and engraved graduations.', pad: 'raised', radius: 3, handle: 'block', meter: 30, ribbon: 'wheel3d', matrix: 'bar' },
-  { id: 'tolex', title: 'Vintage / bakelite', detail: 'Moulded caps on brass rails, jewel lamps and mechanical wheels.', pad: 'raised', radius: 10, handle: 'block', meter: 10, ribbon: 'wheel3d', matrix: 'dot' },
-  { id: 'field', title: 'Field / instrument', detail: 'Chamfered keys, stencilled legends, block handles and deliberate scales.', pad: 'chamfer', radius: 8, handle: 'block', meter: 12, ribbon: 'wheel', matrix: 'bar' },
-  { id: 'phosphor', title: 'Signal / LED', detail: 'Open wire shapes, dot scales, rings and discrete light segments.', pad: 'outline', radius: 3, handle: 'ring', meter: 32, ribbon: 'strip', matrix: 'dot' },
+  { id: 'graphite', title: 'Flat / essential', detail: 'Flat discs, sliding tabs, broad action tiles and continuous bars.', pad: 'flat', radius: 6, handle: 'round', meter: 0, ribbon: 'strip', matrix: 'bar' },
+  { id: 'blueprint', title: 'Technical / outline', detail: 'Exposed rotating pointers, crosshair keys, knife switches and ruler cursors.', pad: 'outline', radius: 0, handle: 'ring', meter: 12, ribbon: 'strip', matrix: 'dot' },
+  { id: 'pop', title: 'Playful / print', detail: 'Rotating folded tabs, paper keys, sliding bookmarks and tally tickets.', pad: 'raised', radius: 24, handle: 'round', meter: 8, ribbon: 'strip', matrix: 'dot' },
+  { id: 'soft', title: 'Soft / relief', detail: 'Moulded pebble dials, compressing cushions, oval rockers and capsule meters.', pad: 'raised', radius: 16, handle: 'round', meter: 0, ribbon: 'wheel', matrix: 'bar' },
+  { id: 'frost', title: 'Frosted / translucent', detail: 'Open rotating rings, glass-disc keys, orbit switches and translucent columns.', pad: 'glass', radius: 18, handle: 'ring', meter: 0, ribbon: 'strip', matrix: 'dot' },
+  { id: 'obsidian', title: 'Glass / illuminated', detail: 'Optical lenses, touch strips, split switches and mechanical digit windows.', pad: 'glass', radius: 7, handle: 'ring', meter: 24, ribbon: 'strip', matrix: 'dot' },
+  { id: 'console', title: 'Studio / console', detail: 'Skirted pointer dials, piano keys, latching caps and live VU needles.', pad: 'inset', radius: 2, handle: 'blade', meter: 20, ribbon: 'wheel3d', matrix: 'bar' },
+  { id: 'carbon', title: 'Performance / rubber', detail: 'Grooved rollers, recessed rubber pads, bending straps and raised meter blocks.', pad: 'inset', radius: 9, handle: 'blade', meter: 16, ribbon: 'wheel3d', matrix: 'bar' },
+  { id: 'machined', title: 'Precision / metal', detail: 'Vernier scales, hexagonal plungers, sliding bolts and instrument needle dials.', pad: 'raised', radius: 3, handle: 'block', meter: 30, ribbon: 'wheel3d', matrix: 'bar' },
+  { id: 'tolex', title: 'Vintage / bakelite', detail: 'Radio tuning windows, typewriter keys, Bakelite levers and arched needle meters.', pad: 'raised', radius: 10, handle: 'block', meter: 10, ribbon: 'wheel3d', matrix: 'dot' },
+  { id: 'field', title: 'Field / instrument', detail: 'Scalloped selectors, guarded keys and toggles, and flag-style indicators.', pad: 'chamfer', radius: 8, handle: 'block', meter: 12, ribbon: 'wheel', matrix: 'bar' },
+  { id: 'phosphor', title: 'Signal / LED', detail: 'Segment encoders, pixel keys, binary switch cells and dot-array meters.', pad: 'outline', radius: 3, handle: 'ring', meter: 32, ribbon: 'strip', matrix: 'dot' },
 ];
 
 const DIRECTIONS = new Map(STARTER_CONTROL_SETS.map((entry) => [entry.id, entry]));
@@ -92,6 +93,14 @@ export function extendControlSet(set) {
   // Translucent and light surfaces need an ink chosen against the composited face.
   for (const type of ['Button', 'MomentaryButton', 'ToggleButton', 'CyclicButton', 'TimedButton', 'OneShotButton', 'RadioButtonGroup', 'Combobox']) {
     families[type] = { ...families[type], component: { ...families[type]?.component, 'Text.Fill.colour': surfaceInk } };
+  }
+  for (const type of ['Knob', 'Button', 'MomentaryButton', 'ToggleButton', 'TimedButton', 'OneShotButton', 'Meter', 'ProgressBar']) {
+    families[type] = { ...families[type], component: { ...families[type]?.component,
+      'Core.controlForm': setAnatomy(type, d.id),
+      'Core.formFaceColour': '{surface}', 'Core.formInkColour': inkOn(set.tokens.surface), 'Core.formLabelColour': '{text.primary}', 'Core.formAccentColour': '{accent}',
+      'Core.formHousingColour': '{control.track}',
+      'Core.formDivisions': ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12,
+    } };
   }
   return { ...set, families };
 }

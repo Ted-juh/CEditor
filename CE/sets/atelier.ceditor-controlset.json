@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "04d53f3f",
+  "fingerprint": "9a0a7615",
   "set": {
     "id": "atelier",
     "name": "Atelier",
@@ -74,7 +74,14 @@
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
-          "Behavior.majorTickLength": 5
+          "Behavior.majorTickLength": 5,
+          "Core.controlForm": "pointer",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         },
         "parts": {
           "tickMajor": {
@@ -111,21 +118,42 @@
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "MomentaryButton": {
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ToggleButton": {
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "knife",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Combobox": {
@@ -223,14 +251,28 @@
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "OneShotButton": {
         "component": {
           "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
-          "Text.Fill.colour": "FF202020"
+          "Text.Fill.colour": "FF202020",
+          "Core.controlForm": "crosskey",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "RadioButtonGroup": {
@@ -345,7 +387,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ruler",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "ProgressBar": {
@@ -363,7 +412,14 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}"
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "ruler",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FF202020",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 24
         }
       },
       "Ribbon": {
