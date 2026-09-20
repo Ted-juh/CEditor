@@ -1825,6 +1825,14 @@ Either raise the cap, or compose the remainder into a flattened backdrop rather 
 
 # 28. The sound library
 
+> **Verified 2026-09-15.** Every claim of absence in this section and the next was re-checked
+> against the code after the first draft. Three were wrong and are corrected in place with the
+> evidence: the parent's name *is* shown, `sonicRefusal` *is* surfaced with an aggregate count, and
+> duplicate sets *are* listed. The method that produced those errors is worth naming — confirming a
+> data structure exists, grepping narrowly for one UI term, and concluding absence. In a 900-line
+> browser that is not enough, and an idea record whose value is knowing what is already built cannot
+> afford it.
+
 The library is one of the better-built things here — records for presets, racks and chains, versions
 with a retention rule, measured sonic profiles, facets, ranges, duplicate detection, smart
 collections, and per-record curation. Most of what follows is a field that exists and is never spent.
@@ -1835,9 +1843,13 @@ Every record carries `branchedFromRecordId` (`CE/src/InstrumentHost/Library.h:12
 Browser shows a **version rail** — a linear list of saves, newest first, each restorable, with a
 "WHAT CHANGED?" diff between the first and now. That part is good.
 
-But `branchedFrom` is used for exactly one thing: as a condition on whether the diff button appears.
-Nothing lets you walk **up** to a sound's parent, **sideways** to its siblings, or **down** to what
-descended from it.
+**Correction to an earlier draft of this section**, which said `branchedFrom` was used for exactly
+one thing — gating that button. It is used for two: the inspector also prints *"branched from
+&lt;name&gt;"* (`SoundBrowser.svelte:954`). So the parent is named.
+
+What is still absent is **navigation and shape**. The parent's name is text, not a link. Nothing
+walks **up** to it, **sideways** to siblings, or **down** to what descended from this sound, and
+there is no view of the family as a whole.
 
 **The feature.** The tree, drawn. *This pad came from that pad, which came from the factory preset.
 Six sounds descend from this one, and here is what each changed.*
@@ -1851,6 +1863,27 @@ It is also the library-side half of the version-control idea in
 [`midi-frontier.md`](midi-frontier.md) §1.4, arriving from the other direction and much cheaper,
 because the edges are already recorded.
 
+> **Built, 2026-09-15.** `recordFamily` in `CE/src/InstrumentHost/Library.cpp` climbs to a
+> record's topmost findable ancestor and then descends from it breadth-first, so a parent always
+> precedes its children and the browser draws the tree in one pass. A `recordFamily` command
+> answers on demand for the one record being looked at — the shape `similarSounds` already
+> established — and the inspector draws the line, indented by depth, with the record you are on
+> marked and every other node a link.
+>
+> **Two things the idea did not see, both found by reading rather than by building.** Descendants
+> cannot be computed in the browser: `p.records` is the filtered result, so scanning it would find
+> only the relatives that happen to match the current query — the same trap as the refusal counts
+> in §28. And navigation had to be made to *land*: `selected` falls back to `records[0]` when an id
+> is not in view, so clicking an ancestor the filter excludes would have quietly selected something
+> else. It now clears the filter to reveal the sound and says that it did.
+>
+> **The caps are the part worth keeping.** `branchedFromRecordId` cannot cycle by any path the
+> program offers — a branch always points at a record that already exists — but a library file is a
+> file, and a hand-edited one can say anything. Both directions carry a visited set and a bound, a
+> cycle comes back as `truncated` rather than as a hung message thread, and the climb hitting its
+> depth cap counts as truncation too. That last one was a real bug the tests caught: a family with
+> ancestors above the one shown was reading as complete.
+
 **Cost:** low-to-medium. The data exists and is already in the browser's record shape
 (`branchedFrom`, `branchedFromName` in `stores/instrumentHost.js`); this is a view and a walk.
 
@@ -1860,17 +1893,26 @@ because the edges are already recorded.
 **stay**. That is exactly the right design — losing somebody's ratings because a drive letter
 changed would be unforgivable.
 
-What is absent is the repair. Somebody who reorganises a preset folder gets four hundred records
-marked missing and no way to say *they are all over here now.*
+**This entry was wrong, and the correction is the finding. Checked 2026-09-15 by driving
+`mergeVendorScan` directly rather than by reading it: the repair already exists, and it is better
+than the button proposed here because nobody has to know about it.**
 
-**The feature.** Point at a folder. Match the missing records against what is in it — by
-`fingerprint` first, then `classIdHex`, then name and manufacturer — and relink in one pass,
-reporting what matched, what matched ambiguously, and what genuinely is not there.
+`scanVstPresets` walks every configured root into one array and calls `mergeVendorScan` with **no
+locator scope**, so every existing record is a match candidate whatever its path. Pass 2 of the
+three-pass identity match — *same content elsewhere* — then claims a moved file for the record it
+already had. Two scenarios, both now pinned by `testMovedLibraryRelinks`:
 
-**Stands on:** the fingerprint is already content identity *"for change detection and matching"*,
-which is this feature's own description.
+| What happens | What the library does |
+|---|---|
+| A folder moves; the next scan finds everything at the new path | Both records relink. No duplicates, paths updated, ratings kept. |
+| The folder vanishes, a scan marks everything missing, and only later is the new location scanned | The missing record is healed rather than a second one minted — a long-missing record is the rename candidate of last resort, and it is still a candidate. |
 
-**Cost:** low.
+**The one real gap is configuration, not repair:** the new folder has to be a scan root, or nothing
+looks there. That is worth a sentence in the UI, and it is not the feature this entry described.
+
+**Cost:** nil — it is built. What was added is the regression test, because a relink that silently
+stopped working would surface as "my ratings vanished when I reorganised my presets", which is the
+kind of report nobody traces back to a scan.
 
 ## Smart collections that notice
 
@@ -1884,30 +1926,115 @@ collection.
 **Awkward:** it needs a per-collection "last seen" marker and it must never become a badge that
 nags. Counted quietly, shown where the collection is listed.
 
-**Cost:** low.
+> **Built as something smaller and more useful, 2026-09-15 — and the idea above was not buildable
+> as written.** `LibraryRecord` had no timestamp of any kind: only `LibraryVersion` carries
+> `savedAtMs`, and a scanned vendor preset has no versions. "New since you looked" had nothing to
+> stand on.
+>
+> What was built instead is the field that was actually missing, plus a filter: `addedAtMs` on the
+> record, `addedWithinDays` on the query, and an "Added recently" row beside Measured. A smart
+> collection is a saved query, so it gets recency **for free** — "bright, plucky, added this week"
+> needs no per-collection state at all, and none of the "what counts as looking?" lifecycle the
+> badge would have needed.
+>
+> Three rules, each tested: an unknown arrival is not a recent one (the same rule the measured
+> ranges follow, where an unknown brightness is not a dark one); the boundary is inclusive; and a
+> record stamped in the future — a clock that ran fast — stays visible rather than falling out of
+> every view.
+>
+> **The bug the tests caught is the one worth recording.** Records enter through exactly two places,
+> which made stamping cheap — but `mergeVendorScan` replaces a matched record's vendor fields
+> wholesale, and `addedAtMs` was not in the keep-list beside the ratings and measurements. Every
+> rescan would have restamped the whole library as new. It is in the keep-list now, with a test that
+> rescans and one that moves a file.
+>
+> Per-collection badges remain possible on top of this, and now have a timestamp to stand on.
 
 ## `sonicRefusal` is a worklist nobody sees
 
-When the probe cannot measure a sound it records **why** — `sonicRefusal` on the record, beside
-`sonicFingerprint`. That is a considerate design and the answer goes nowhere.
+**This entry originally claimed the answer goes nowhere. That was wrong**, and the correction
+shrinks the idea to something much smaller.
 
-Collected, it is a to-do list for finishing the measurement of a library: *forty sounds could not be
-measured — thirty-one because the plug-in is missing, six because they were silent, three because
-the worker crashed on them.* Each of those has a different fix and two of them are one click.
+`sonicRefusal` is surfaced in three places already: a refused tile carries it as its tooltip
+(`SoundBrowser.svelte:664`), the inspector shows it when a sound has no profile, and there is an
+**aggregate count** — *"N could not be heard"* — with a re-analyse action beside it (`:375`). The
+code even explains itself: a refusal is remembered precisely so the auditioner will not ask again
+on its own, and that count is the only way back to one.
 
-**Cost:** very low. It is a group-by over a field.
+So what was missing is not visibility. It was the **breakdown by cause** — and a second correction
+is due here, because the example this entry first gave was also wrong. *"Thirty-one because the
+plug-in is missing"* is not a refusal at all: `measurable` already excludes `available === false`,
+so a record whose plug-in is gone is never tried and never refuses. Nor is "silent" one — a silent
+sound is a successful measurement that found nothing.
+
+The real causes are eight sentences from four producers, and they fall into four classes that take
+**different actions**: a crash or a hang may well pass on a re-run; a damaged or undecodable state
+will fail identically for ever; a preset the plug-in will not take needs the plug-in to change, not
+another attempt; and a build limitation is nobody's to fix. One "measure everything again" button
+was offered for all of them.
+
+> **Built, 2026-09-15.** `refusalCause` / `refusalCauseId` in `CE/src/InstrumentHost/Library.h`
+> classify a refusal sentence into `crashed` / `unreadable` / `mismatch` / `unsupported` / `other`;
+> `emitLibrary` counts them beside the `refused` total it already computed, over every record
+> rather than over the query's matches so the rows add up to the number above them; and the browser
+> draws a row per non-zero cause saying whether asking again may work. Thirteen assertions in
+> `InstrumentHostServiceTests.cpp` pin every producing sentence, so a moved string fails a test
+> rather than silently dropping its sounds into `other`.
+>
+> **Two things deliberately not built**, because each needs more C++ than the change was worth:
+> clicking a row to filter the browser to those records (`LibraryQuery` has no refused-by-cause
+> field), and a retry scoped to the retry-worthy ones (`analyseLibrary(all)` is all-or-nothing).
+> The button keeps its existing wording and meaning; the rows now say what it can and cannot fix.
 
 ## Dedupe should merge curation, not bury it
 
-`LibraryDuplicateSet` exists and duplicates can be folded. The thing that must not be lost when
-folding is the **curation**: one copy is rated four stars, another sits in two collections, a third
-carries the note explaining what the sound is for.
+**Correction:** an earlier draft implied duplicates were merely detected. They are detected *and
+surfaced* — the browser has a Housekeeping rail showing the number of duplicate sets and total
+copies, and lists the first six (`SoundBrowser.svelte:393-403`).
+
+What does not exist is a **merge**. Grepping for one finds nothing. And a merge is where the care is
+needed, because the thing that must not be lost when folding is the **curation**: one copy is rated
+four stars, another sits in two collections, a third carries the note explaining what the sound is
+for.
 
 Merge them into the survivor — union the tags and collections, keep the highest rating, concatenate
 the notes with their sources named — rather than keeping whichever record won and silently
 discarding the rest.
 
 **Cost:** low, and it is the difference between a dedupe people run and one they are afraid of.
+
+> **Built, 2026-09-15 — and the design changed, because a probe said it had to.**
+>
+> The obvious shape was: merge the curation onto the survivor, delete the rest. A probe over
+> `Library` says that shape does not work. Two vendor records, remove one, rescan the folder:
+> there are two again. `mergeVendorScan` is doing exactly its job — the file is still on disk and
+> finding it is what a scan is for — so a fold by deletion silently undoes itself the next time
+> anybody points the scanner at the folder. That is worse than not folding, because the rating and
+> the tags that were gathered onto the survivor have already moved and the copy comes back bare.
+>
+> So **a fold hides rather than deletes**: `hidden` on `LibraryRecord`, and — the load-bearing
+> line — `hidden` in `mergeVendorScan`'s keep-list, beside `user`, `sonic` and `addedAtMs`.
+> `matchesQuery` drops hidden records unless the query's new `includeHidden` asks for them, and
+> `libraryDuplicates` skips them on both loops so a folded set stops being offered. Nothing is
+> deleted, the row keeps its id, and `setLibraryRecordHidden` is the way back.
+>
+> The curation rule is `mergedDuplicateMetadata` in `Library.cpp`, pure so it can be tested
+> without a library to mutate: tags and collections unioned, the highest rating, favourite if any
+> member is, and the notes kept with the name of the sound each came from — except the survivor's
+> own, which is already on the record being looked at. `mergeDuplicateSet` over the bridge
+> re-derives the set rather than trusting the payload, because the page's copy is as old as its
+> last answer and folding a stale list would hide sounds that are no longer duplicates of
+> anything.
+>
+> **Only identical sets can be folded.** `libraryDuplicates` finds two kinds — the same bytes, and
+> the same name and plug-in measuring within a tolerance — and the second is the auditioner's
+> opinion. The difference between two patches that merely sound alike is somebody's edit, and
+> folding those would be the program deciding it did not count. The button does not offer it and
+> the command refuses it.
+>
+> The browser gets a **Fold** button per identical set, a *Folded away* rail row carrying
+> `counts.hidden` (a fold nobody can count is a fold nobody can undo), a `FOLDED` badge on any
+> hidden row that is asked for, and **Unfold** on the row itself.
 
 ## Curation does not travel
 
@@ -1925,6 +2052,41 @@ twice rather than differently.
 
 **Cost:** low.
 
+> **Corrected and partly built, 2026-09-15. The premise was wrong, and the real problem is the
+> other way round.**
+>
+> *"Share a rack or a chain and every one of them is lost"* describes a loss that cannot happen,
+> because the sharing cannot happen. Three probes, not a reading:
+>
+> - There is **no export or import of a library record at all**. No command, nothing under
+>   `tools/`, nothing in the bridge. Grepping for one finds the support bundle and nothing else.
+> - The **support bundle is an allowlist** and `library.json` is not on it — `SupportBundle.cpp`
+>   names every file that travels, and says so in the manifest it writes.
+> - A **built product ships `session-performance.json` as `factory-performance.json`** — the rack
+>   manifest, not the library.
+>
+> So `favourite`, `rating`, `notes`, `tags` and `collections` never leave the machine. Declaring
+> which of them are descriptive would have been half a feature whose other half does not exist.
+>
+> **What the probes found instead is the same concern pointing the other way.** The one thing
+> that does travel is the authored rack, and a `SetlistItem` carries `notes` — documented in
+> `PatternModel.h` as *"what the player needs to read on stage"*. That is the only personal prose
+> anywhere in a `Performance`: a cue, a key change, a reminder about the second verse. Hand a
+> colleague your VST3 and you handed them that.
+>
+> So the split was made, once, in the only place anything about a rack leaves the machine.
+> `factoryPerformance` in `tools/scripts/build-host-product.mjs` strips setlist notes from the
+> rack a product ships; the item keeps its name, scene, rack and tempo, because the set is what
+> it plays and that half is not a confidence. `includeStageNotes` on the Host Project turns it
+> back on, **defaulting to off, and the asymmetry is the decision**: a build that quietly
+> published somebody's notes cannot be taken back, and one that left them out can be run again.
+> The build stages the stripped content as a written file rather than copying the author's own
+> session across, which is exactly how the strip would otherwise be bypassed, and a session file
+> it cannot parse ships as no rack rather than as unread bytes.
+>
+> **What remains genuinely absent** is the sharing itself. When a record can be exported, the
+> rule to honour is the one this entry proposed — and the build's split is the precedent for how.
+
 ## What you own versus what you play
 
 The library knows what has been auditioned, rated, loaded and captured. Nobody has ever told the
@@ -1936,6 +2098,34 @@ recommendation, and the machinery for it — `sonicDistance` over the measured a
 shipping for "sounds like".
 
 **Cost:** low, given the measurements.
+
+> **Built, 2026-09-15.** `loadCount` / `lastLoadedAtMs` / `auditionCount` on `LibraryRecord`,
+> counted where a load is ACCEPTED rather than where a plug-in finishes instantiating —
+> reaching for a sound is the signal, and a plug-in that then fails to start does not mean it
+> was not wanted. All three are in `mergeVendorScan`'s keep-list, beside the ratings: a rescan
+> that reset them would quietly make a well-played library read as untouched.
+>
+> **An audition is counted apart from a load, and that is the design.** Browsing forty pads to
+> pick one is not using forty pads, and one number for both would let somebody who has only ever
+> scrolled the library read as somebody who plays all of it.
+>
+> The recommendation is `habitualProfile` — the average of what has been reached for, weighted
+> by how often — and `unplayedLikeHabits`, which ranks what you own and have never opened
+> against that centre. **The refusal is the load-bearing part.** Below five DISTINCT played
+> records it returns an unmeasured profile, and the caller must treat that as "not enough yet".
+> Distinct, not total: one pad opened fifty times is one data point repeated, and a
+> recommendation built on it is confident nonsense — which is the single outcome that would stop
+> anyone believing the feature again. The browser says *"Load a few more and this can tell you
+> what you'd like"* rather than guessing.
+>
+> The browser gets the sentence (`N of M ever loaded`), a **Never loaded** rail row over the new
+> `neverLoadedOnly` query flag, and **Find what I'd like**, which lists what it found with a
+> percentage and how many sounds that opinion came from — because a recommendation you cannot
+> disagree with is one you cannot trust.
+>
+> **One thing deliberately not done:** loading a sound does not re-emit the library. Recomputing
+> every facet of a twelve-thousand-record library on each preset load is work nobody wants
+> during a gig, so the count arrives with the next browse.
 
 ---
 
@@ -1960,6 +2150,24 @@ file, rather than choosing from the factory set.
 The journal already holds sample positions; the target type already exists and is already applied
 and serialised. This is a measurement and a constructor.
 
+> **Built for patterns, 2026-09-15.** `grooveFromLane` in `CE/src/Performance/PatternModel.cpp`
+> reads a feel out of a lane, `extractGrooveTemplate` keeps it in `performance.grooves` under the
+> same caps an imported groove gets, and a "Steal this feel" button sits beside Apply and Import.
+> The property that makes it trustworthy is pinned by a test: reading at the lane's own
+> `stepsPerBeat` makes the scale on the way back in exactly 1, so applying a groove and reading it
+> returns the same timing, and wearing the result lands every step where the original sat.
+>
+> **Velocity is not symmetric and cannot be.** `applyGrooveTemplate` *multiplies*, so multipliers
+> read as each active step over the mean of the active steps would square the velocities if fed
+> straight back. That is correct for what a groove is for — wearing one pattern's feel on a
+> different pattern — and it is asserted in the tests and stated in the header rather than left to
+> be discovered. Fewer than two active steps yields no multipliers at all, which the struct already
+> defines as "keep dynamics".
+>
+> **Still not built: extraction from captured MIDI.** A clip references a pattern, so clips are
+> covered; free-timed input needs tempo, a grid and quantisation inference, which is a different
+> and much larger problem than reading numbers out of steps that already sit on a grid.
+
 **Cost:** low.
 
 ## Seeds should be something you can hold
@@ -1974,6 +2182,19 @@ or come back to in a year.
 **Why it fits this program in particular:** it is the same instinct as everything else here —
 deterministic, inspectable, and shareable without a server. A pattern becomes a seed plus a rule,
 which is a few bytes.
+
+> **Built, 2026-09-15**, and it needed no C++ at all — which is worth recording, because the first
+> estimate assumed some. `setPatternOptions` already accepted and clamped a seed, the JS sender
+> already existed, and the store already normalised the field in. The entire gap was that nothing
+> showed it. There is now a Seed field beside Swing with a NEW button that rolls one.
+>
+> Two things the implementation had to get right that the idea did not mention. The seed governs
+> **probability only** — a condition (`every`/`offset`) is loop arithmetic, and probability 0 or
+> 100 answers before the dice are reached (`CompiledPattern.h:155-168`) — so the field dims and
+> says so when no step in the pattern carries a probability between 1 and 99, rather than letting
+> somebody change the number, hear nothing, and conclude it is broken. And the mock library never
+> minted a seed, so every pattern in the browser build read 1; mock patterns now get a distinct
+> stable one, because a preview where the feature looks broken is worse than no preview.
 
 **Cost:** very low. The seed exists and is already stored.
 
@@ -1993,6 +2214,47 @@ the document is already a graph and the interface is a list of text rows.
 
 **Cost:** low-to-medium. The edges are all in the model.
 
+> **Built, 2026-09-15 — and "the edges are all in the model" was wrong**, which turned out to be
+> the interesting part. Six probes were run against `PerformanceEngine` rather than reading it,
+> and three of them contradicted what the dropdowns imply:
+>
+> | | |
+> |---|---|
+> | A clip with **Loop off** and *follow after 4* | Stops after one pass. **The follow never fires.** Both boundaries are decided at the same moment in the engine, so a one-shot only ever satisfies a count of exactly 1. |
+> | `followAction: clip` with *after 0 loops* | Never fires. The clip loops for ever with its action set. |
+> | `followAction: clip` with **no target chosen** | The clip **stops**. The dropdown reads "Choose clip…" and the behaviour is Stop. |
+> | `next` on the last clip | **Wraps to the first.** Three clips on Next is a ring nobody meant to build. |
+> | `random` | Chooses among *every* other clip — reproducible from the clip's id and its loop count, but not predictable to a reader. |
+> | One clip in the song | `next` and `random` have nothing to choose, and stop. |
+>
+> So only one of the five actions stores its edge. `next` is derived from position in the list,
+> `random` is "all others", `stop` is a terminal, and there are three separate ways to configure
+> an arrow that will never fire.
+>
+> `clipFollowGraph` in `stores/instrumentHost.js` is the engine's arithmetic as a pure function —
+> nodes, edges and warnings from the clip array. It is in the store rather than in the component
+> because it is the engine's rules and had to be testable against them; `FollowGraph.svelte`
+> holds the geometry and nothing else. **No C++ and no model change**: unlike the library's
+> family tree, the browser already has the whole clip list on every state push, so there is
+> nothing to ask the native side for.
+>
+> Drawn as a column in **document order**, which is deliberate — Next *means* the next row, so
+> reordering the boxes into a prettier graph would hide the thing being drawn. Arrows curve
+> through a left gutter, bulging further the further they travel. A Random follow gets one stub
+> and a count rather than N−1 arrows, because a hairball says less than the number does. A
+> terminal gets an end bar; a clip nothing leads to is labelled *by hand* rather than warned
+> about, since that is how a set starts.
+>
+> **The warnings are the reason to build it**, and each is one of the measurements above: a
+> follow that can never fire, a "Target clip" that is really a Stop, and a ring of clips that
+> only ever hand on to each other so the set never lands. That last one is deliberately **one**
+> warning for the whole ring, and a clip that simply loops with no follow counts as a resting
+> place — otherwise every performance with two clips in it would open with a complaint, and a
+> panel that cries wolf is a panel nobody reads.
+>
+> **Not built:** editing by dragging arrows (the dropdowns stay the editor) and the scene graph,
+> which is a different picture of a different relation.
+
 ## Variations above the pattern
 
 `makePatternVariation (source, label, amount)` generates an A / B / C / D variant of a pattern at a
@@ -2009,6 +2271,31 @@ has to mean something different per kind — which is exactly the per-parameter-
 
 **Cost:** medium.
 
+> **Built, 2026-09-15.** `makeSceneVariation` in `CE/src/Performance/PatternModel.cpp`, with the
+> `createSceneVariations` command and a B/C/D button on every scene row.
+>
+> **The "already solved once" was half right, and the half that was wrong is the interesting
+> one.** `morphPolicyFor` derives its policy from `valueKind`, which panel parameters carry. A
+> `SceneParameterValue` is a bare normalized float with no kind beside it at all. The kind does
+> exist — `discrete`, `boolean` and `numSteps` on a `ParameterDescriptor` — but only in the
+> inventory the service holds per loaded target, not in the scene. So the rule is pure and takes
+> a `SceneParameterIsContinuous` callback; the service supplies it from `partParameters`, and
+> **anything it cannot classify is held**. Holding is never wrong; moving a five-way waveform
+> selector four tenths of the way to somewhere is a byte the synth cannot read.
+>
+> What a percentage means, per kind:
+>
+> | | |
+> |---|---|
+> | Clips | The matching variation of their pattern, **reusing an existing B/C/D in that pattern's variation group** rather than minting a rival, so a scene variation and `createPatternVariations` agree. A varied pattern needs a clip to launch it, so one is minted per clip, inheriting the source's launch behaviour but **not its follow** — a follow names a clip in the source scene, and carrying it over would make the variation hand off into the section it is a variation of. |
+> | Levels and macros | Nudged deterministically, seeded from the scene and the label, and clamped to their own scales. |
+> | **Mutes and enables** | **Untouched.** There is no such thing as forty per cent muted, and flipping one would be the program overruling a decision somebody made. This is the same rule `snapshotModel.js` states for a stepped parameter: a midpoint that does not exist must not be invented. |
+> | Tempo, quantization, focus, page | Copied. A variation is of the sound, not of the set. |
+>
+> The source scene is never touched — nothing is taken out from under a set that is playing —
+> and regenerating replaces the scene carrying that label rather than adding a second B, keeping
+> its id so a setlist item or an arranger block naming it still names it.
+
 ## A gesture library
 
 Gesture clips are recorded automation performances — `gestureClip`, `gesturePasses` — a human hand
@@ -2019,6 +2306,40 @@ gestures, though they are the same kind of reusable human artefact: the sweep yo
 build, the wobble you always put on the filter.
 
 Factory ones, saved ones, applied to any parameter at any length.
+
+> **Built, 2026-09-15.** `GestureShape` in `CE/src/Performance/PatternModel.h`, sitting beside
+> `GrooveTemplate` and seeded with factory shapes by `Performance::create()` exactly as the
+> grooves are, with `gestureFromLane` / `applyGestureShape` mirroring
+> `grooveFromLane` / `applyGrooveTemplate`, four commands, and a library block in the Gestures
+> tab.
+>
+> **A shape is stored against normalised time, not steps**, and that is what makes a library
+> possible at all: a wobble read off a sixteen-step lane has to land on a thirty-two-step one
+> meaning the same thing. Thirty-two points over one pass, sampled at each target step's
+> position, wrapping rather than running out — a shape on a lane longer than itself repeats,
+> because holding its last value would turn a wobble into a wobble followed by silence. It is
+> point-sampled rather than averaged, which is right for a hand movement and means a
+> deliberately jagged shape on a coarse lane loses the detail between its steps.
+>
+> **What has nothing to read says so.** A note lane carries velocities, not a curve. A lane with
+> fewer than two active steps carries a position, not a movement. Only active steps carry a
+> value — the rest are what the lane's glide passes through — so reading them would read zeroes
+> nobody ever heard. In each case `gestureFromLane` answers with an empty shape and the command
+> refuses, the same contract `grooveFromLane` already had.
+>
+> **Depth is not a blend.** `amount` scales the shape's deviation from ITS OWN MEAN, so a gesture
+> at half depth is the same movement, half as deep, centred where the movement was centred.
+> Blending toward whatever the lane held would make the result depend on history nobody can see,
+> and an inactive step's value is not a value.
+>
+> Applying sets every written step active and turns the lane's glide on: a gesture left stepping
+> is a staircase rather than a sweep, which is the same thing the gesture recorder does to the
+> lanes it writes. And unlike a groove — which is the timing of a whole pattern — a gesture goes
+> on **one named lane**, because a filter sweep is a movement of one thing.
+>
+> One naming note worth keeping: the field is `gestureShapes`, not `gestures`, because the
+> emitted state already has a `gestures` — the recorder's own status — and two different things
+> under one key on one object is a bug waiting to be found by somebody else.
 
 **Cost:** low-to-medium. The recording exists; the library is storage, naming and retargeting.
 

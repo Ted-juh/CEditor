@@ -142,6 +142,41 @@ struct LibraryRecord
     bool factory = false;         // vendor-derived (true) vs CEditor-captured (false)
     bool missing = false;         // the source vanished; the record and its metadata stay
 
+    // Folded into another record as a duplicate. NOT deleted, because deleting is not durable:
+    // a vendor record whose file is still on disk is minted again by the very next scan, so a
+    // fold that removed the row would silently undo itself. Hiding survives because this field
+    // is in mergeVendorScan's keep-list, beside the ratings — the same mechanism that lets a
+    // rescan refresh what the vendor says without destroying what the user did.
+    //
+    // Nothing is destroyed and nothing is unreachable: a hidden record keeps its file, its
+    // measurements and its own metadata, and can be shown again.
+    bool hidden = false;
+
+    // When this record FIRST entered the library — not when its file was written, and not when
+    // it was last saved (a version carries that). Zero means "before anyone was counting", which
+    // is every record that predates the field and is the right answer for them: a library that
+    // has always been there is not new.
+    //
+    // Only two places can mint a record — addCapturedRecord and mergeVendorScan's fresh pass —
+    // so only two places stamp it. A rescan that MOVES a file keeps the existing record by
+    // design (the three-pass identity match exists so a rename cannot destroy somebody's
+    // ratings), which means a moved preset is correctly not new.
+    juce::int64 addedAtMs = 0;
+
+    // WHAT YOU OWN VERSUS WHAT YOU PLAY. A twelve-thousand-preset library is mostly a library
+    // nobody has opened, and until now nothing counted which part.
+    //
+    // Counted when the load is ACCEPTED, not when the plug-in finishes instantiating: choosing
+    // a sound is the signal this is for, and a plug-in that then fails to start does not mean
+    // you did not reach for it.
+    int loadCount = 0;
+    juce::int64 lastLoadedAtMs = 0;
+
+    // Heard while browsing, counted separately on purpose. Auditioning forty pads to pick one
+    // is not using forty pads, and one number for both would let somebody who has only ever
+    // scrolled the library read as somebody who plays all of it.
+    int auditionCount = 0;
+
     // What it sounded like when the auditioner last played it. Keyed to `fingerprint` by
     // `sonicFingerprint` so a rescan that finds the same bytes never re-renders them.
     SonicProfile sonic;
@@ -227,6 +262,19 @@ struct LibraryQuery
     int  minRating = 0;         // 0 = unrated included
     bool availableOnly = false; // see the availability hook below
 
+    // Folded duplicates are out of the way, not gone. Off by default, because the point of
+    // folding is not seeing them; on when somebody goes looking, so nothing is unreachable.
+    bool includeHidden = false;
+
+    // Only what has never been loaded. The point of the whole usage feature: a library you
+    // cannot filter down to the part you have never opened is a library you cannot explore.
+    bool neverLoadedOnly = false;
+
+    // "What arrived lately." Zero is off. A record with no `addedAtMs` never matches, because
+    // an unknown arrival is not a recent one — the same rule the measured ranges follow, where
+    // an unknown brightness is not a dark one.
+    int addedWithinDays = 0;
+
     // The measured half. A range that is active refuses anything unmeasured, because an unknown
     // brightness is not a dark one — the browser says how many records that is rather than
     // quietly dropping them.
@@ -246,6 +294,16 @@ struct LibraryQuery
     vanished (`missing`); whether the plug-in a preset targets is installed is the catalogue's
     business and the service's to answer, so `availableOnly` asks through this rather than
     guessing. Defaults to "the source is still there", which is all a pure test can know. */
+/** Is this record recent, as of `nowMs`? Pure and total, the way `pruneLibraryVersions` is pure,
+    because "recent" is a rule worth testing without owning a clock.
+
+    `withinDays` of zero is off and everything passes. A record with no `addedAtMs` never passes a
+    live filter: an unknown arrival is not a recent one, which is the same rule the measured ranges
+    already follow where an unknown brightness is not a dark one. A record stamped in the future —
+    a clock that moved, a file copied from a machine set wrong — counts as recent rather than
+    being hidden, since the alternative is a sound that has silently fallen out of every view. */
+bool recordAddedWithin (const LibraryRecord& record, int withinDays, juce::int64 nowMs);
+
 using LibraryAvailability = std::function<bool (const LibraryRecord&)>;
 
 /** A saved query — the browser's "smart collection". The rail runs it fresh every time, so a
@@ -287,6 +345,16 @@ public:
     /** Updates only the user block of a record. */
     bool setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user);
 
+    /** Records that a record was reached for. `audition` counts a browse rather than a use —
+        see the counters on LibraryRecord for why the two are never one number. Returns false
+        for an unknown record, so a caller can tell a miss from a count. */
+    bool noteRecordUsed (const juce::String& recordId, bool audition, juce::int64 nowMs);
+
+    /** Folds a record out of sight, or brings it back. Not a delete: the row stays, keeps its
+        id and its curation, and survives the next vendor scan (see `mergeVendorScan`). That is
+        the whole point — deleting a vendor record only lasts until the file is found again. */
+    bool setRecordHidden (const juce::String& recordId, bool hidden);
+
     const juce::Array<SmartCollection>& allSmartCollections() const { return smartCollections; }
 
     /** Adds a saved query, or replaces one by id when the id is already known. An empty id is
@@ -318,6 +386,40 @@ juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,
                                                  const LibraryQuery& query,
                                                  const LibraryAvailability& isAvailable = {});
+
+/** One sound in a family, as `recordFamily` found it. */
+struct FamilyNode
+{
+    juce::String recordId;
+    juce::String name;
+    juce::String parentRecordId;   // empty at the root of what could be found
+    int depth = 0;                 // 0 at that root
+};
+
+/** Everything that descends from a record's topmost findable ancestor, the record included. */
+struct RecordFamily
+{
+    juce::String rootRecordId;
+    juce::Array<FamilyNode> nodes; // root first, then breadth-first: a parent always precedes
+                                   // its children, so a tree can be drawn in one pass
+    bool truncated = false;        // a cap was hit and the family is larger than this
+};
+
+/** Walk a record's ancestry to its root, then everything descending from that root.
+
+    THE CAPS ARE NOT DECORATION. `branchedFromRecordId` cannot cycle by any path the program
+    offers — a branch always points at a record that already exists — but a library file is a
+    file, and a hand-edited or half-written one can say anything. A walk that trusted the data
+    would hang the message thread. So both directions carry a visited set, and both are bounded.
+
+    A parent id naming a record that is no longer there stops the climb: that record is the root
+    of what can be FOUND, which is the honest answer, and the UI shows it as the top rather than
+    claiming an ancestor it cannot name.
+
+    `truncated` says a cap was reached, so a caller can say "and more" instead of implying the
+    family ends where the list does. */
+RecordFamily recordFamily (const Library& library, const juce::String& recordId,
+                           int maxNodes = 200, int maxDepth = 64);
 
 struct LibraryFacetValue
 {
@@ -361,6 +463,20 @@ struct LibraryDuplicateSet
 juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library,
                                                     float tolerance = 0.04f);
 
+/** What folding a duplicate set would do, worked out without doing it.
+
+    The curation of every member gathered onto one record: tags and collections unioned, the
+    highest rating taken, favourite if ANY member is, and notes concatenated with the name of the
+    sound each came from — because a note is somebody's sentence and losing whose it was makes it
+    useless.
+
+    `keyRecordId` decides the survivor and `libraryDuplicates` has already chosen it by how much
+    metadata each member carries, so this does not second-guess it.
+
+    Pure, so the rule can be tested without a library to mutate. */
+LibraryRecord::UserMetadata mergedDuplicateMetadata (const Library& library,
+                                                     const LibraryDuplicateSet& set);
+
 /** One candidate, and how close it is. */
 struct SoundMatch
 {
@@ -379,6 +495,30 @@ juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfil
                                        const LibraryAvailability& isAvailable = {},
                                        const juce::String& excludeRecordId = {});
 
+/** The average of what has actually been reached for — the shape of somebody's taste, as far as
+    the library can see it.
+
+    Weighted by how often each record was loaded, because a sound played fifty times says more
+    about a habit than one played once. Only measured records with a load on them count; an
+    unmeasured one has no profile to average.
+
+    Returns an UNMEASURED profile when there are fewer than `minimumRecords` to go on, and the
+    caller must treat that as "not enough yet" rather than as a centre. Three loads of one pad is
+    not a taste, and a recommendation built on it would be confident nonsense — which is the one
+    outcome that would make people stop trusting the feature. */
+SonicProfile habitualProfile (const Library& library, int minimumRecords = 5);
+
+/** What you own and have never played, nearest first to what you actually reach for.
+
+    The whole point of the second half: "you have 12,000 presets and have played 40" is a
+    statistic somebody feels bad about and does nothing with. "Here are twenty you have never
+    opened that sound like the ones you keep loading" is a recommendation.
+
+    Empty when `habitualProfile` has nothing to go on, and empty is the honest answer then. */
+juce::Array<SoundMatch> unplayedLikeHabits (const Library& library, int count,
+                                            const LibraryAvailability& isAvailable = {},
+                                            int minimumRecords = 5);
+
 
 // -- the .vstpreset container ------------------------------------------------------------------
 // Steinberg's preset file: 'VST3' magic, a version word, the 32-character ASCII class id of
@@ -393,5 +533,41 @@ struct VstPresetHeader
 };
 
 VstPresetHeader parseVstPresetHeader (const void* data, size_t size);
+
+
+// -- why a sound could not be heard ------------------------------------------------------------
+//
+// `sonicRefusal` above is a sentence written for a person, and three of the sentences that reach
+// it end with the record's own name, so the strings cannot be grouped as they stand. They still
+// fall into four classes, and the classes matter because they take DIFFERENT ACTIONS:
+//
+//   crashed      the plug-in died or hung while playing this one. Transient; asking again is
+//                exactly the right thing to do, and is the only way back to a sound the
+//                auditioner has stopped offering.
+//   unreadable   the state could not be decoded or is damaged. Asking again fails identically,
+//                every time, because nothing about the bytes will have changed.
+//   mismatch     the plug-in would not take this preset, or no longer has that program. The
+//                preset does not fit this build of this plug-in; retrying changes nothing until
+//                the plug-in does.
+//   unsupported  this build cannot load that kind of preset at all. Nothing the user can do.
+//
+// Without the split, one "measure everything again" button is offered for all of them and
+// re-runs hundreds of sounds that cannot possibly succeed.
+//
+// THE MATCHING IS BY PREFIX and that is a deliberate, stated weakness: the producing strings
+// live in InstrumentHostService::applyStateBlob and ::applyRecordState, ScannerWorkerMain's
+// applyState, and SonicAnalysisWorker's timeout/crash branch. Edit one of those without editing
+// the table below and its sounds become `other` — visible as a row rather than silently
+// miscounted, which is why `other` exists instead of a fallback into one of the four. The
+// alternative is a cause code carried from each site through the finding, the worker's
+// marshalling and the record; worth doing if these strings ever start moving.
+
+enum class RefusalCause { crashed, unreadable, mismatch, unsupported, other };
+
+/** Classify one `sonicRefusal` sentence. Empty is `other`, as is anything unrecognised. */
+RefusalCause refusalCause (const juce::String& refusal);
+
+/** The stable wire name for a cause — what the browser receives and groups on. */
+juce::String refusalCauseId (RefusalCause cause);
 
 } // namespace ceditor::host

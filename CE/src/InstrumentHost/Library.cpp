@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <map>
 #include <utility>
@@ -27,6 +28,8 @@ juce::String Library::addCapturedRecord (LibraryRecord record)
     record.recordId = juce::Uuid().toDashedString();
     record.factory = false;
     record.missing = false;
+    if (record.addedAtMs <= 0)
+        record.addedAtMs = juce::Time::currentTimeMillis();
     const auto id = record.recordId;
     records.add (std::move (record));
     return id;
@@ -117,6 +120,20 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             // from; all three used to go silently when a plug-in was simply loaded again.
             auto& record = *existing[i];
             const auto keepId = record.recordId;
+            // When it first arrived is a fact about this record, not about the vendor's file —
+            // and a rescan that restamped it would make the whole library look new every time
+            // somebody pointed the scanner at it again, which is the opposite of what an
+            // arrival time is for.
+            const auto keepAddedAtMs = record.addedAtMs;
+            // Folded stays folded. Without this the next scan un-hides every duplicate somebody
+            // tidied away, which is exactly how deleting them failed.
+            const auto keepHidden = record.hidden;
+            // How often somebody reached for this sound is a fact about them, not about the
+            // vendor's file. A rescan that reset it would quietly make a well-played library
+            // look untouched — the same class of loss the ratings are kept for.
+            const auto keepLoadCount = record.loadCount;
+            const auto keepLastLoadedAtMs = record.lastLoadedAtMs;
+            const auto keepAuditionCount = record.auditionCount;
             const auto keepUser = record.user;
             const auto keepSonic = record.sonic;
             const auto keepSonicFingerprint = record.sonicFingerprint;
@@ -126,6 +143,11 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
             const auto keepParts = record.parts;
             record = incoming;
             record.recordId = keepId;
+            record.addedAtMs = keepAddedAtMs;
+            record.hidden = keepHidden;
+            record.loadCount = keepLoadCount;
+            record.lastLoadedAtMs = keepLastLoadedAtMs;
+            record.auditionCount = keepAuditionCount;
             record.user = keepUser;
             record.sonic = keepSonic;
             record.sonicFingerprint = keepSonicFingerprint;
@@ -174,8 +196,15 @@ void Library::mergeVendorScan (const juce::String& sourceType, juce::Array<Libra
         if (! matched[i])
             existing[i]->missing = true;
 
+    // `fresh` is what survived all three identity passes unclaimed, which the comment at the
+    // top of this function calls genuinely new — so this is the one moment a scanned preset
+    // has ever been new, and the only place to say when.
+    const auto arrivedAtMs = juce::Time::currentTimeMillis();
     for (auto& record : fresh)
+    {
+        record.addedAtMs = arrivedAtMs;
         records.add (std::move (record));
+    }
 }
 
 bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord::UserMetadata& user)
@@ -183,6 +212,33 @@ bool Library::setUserMetadata (const juce::String& recordId, const LibraryRecord
     if (auto* record = find (recordId))
     {
         record->user = user;
+        return true;
+    }
+    return false;
+}
+
+bool Library::noteRecordUsed (const juce::String& recordId, bool audition, juce::int64 nowMs)
+{
+    auto* record = find (recordId);
+    if (record == nullptr)
+        return false;
+
+    if (audition)
+    {
+        ++record->auditionCount;
+        return true;
+    }
+
+    ++record->loadCount;
+    record->lastLoadedAtMs = nowMs;
+    return true;
+}
+
+bool Library::setRecordHidden (const juce::String& recordId, bool hidden)
+{
+    if (auto* record = find (recordId))
+    {
+        record->hidden = hidden;
         return true;
     }
     return false;
@@ -206,6 +262,18 @@ juce::var Library::toVar() const
 
         auto* r = new juce::DynamicObject();
         r->setProperty ("recordId",        record.recordId);
+        if (record.addedAtMs > 0)
+            r->setProperty ("addedAtMs",   (double) record.addedAtMs);
+        if (record.hidden)
+            r->setProperty ("hidden",      true);
+        // Written only when there is something to write: a library of twelve thousand records
+        // that has never been played should not grow three zeroes per row on disk.
+        if (record.loadCount > 0)
+            r->setProperty ("loadCount",   record.loadCount);
+        if (record.lastLoadedAtMs > 0)
+            r->setProperty ("lastLoadedAtMs", (double) record.lastLoadedAtMs);
+        if (record.auditionCount > 0)
+            r->setProperty ("auditionCount", record.auditionCount);
         r->setProperty ("type",            record.type);
         r->setProperty ("sourceType",      record.sourceType);
         r->setProperty ("sourceLocator",   record.sourceLocator);
@@ -338,6 +406,13 @@ Library Library::fromVar (const juce::var& stored)
     {
         LibraryRecord record;
         record.recordId = r.getProperty ("recordId", {}).toString();
+        // Absent on every record written before the field existed, and zero is right for them:
+        // a library that has always been there is not new.
+        record.addedAtMs = (juce::int64) (double) r.getProperty ("addedAtMs", 0.0);
+        record.hidden = (bool) r.getProperty ("hidden", false);
+        record.loadCount = juce::jmax (0, (int) r.getProperty ("loadCount", 0));
+        record.lastLoadedAtMs = (juce::int64) (double) r.getProperty ("lastLoadedAtMs", 0.0);
+        record.auditionCount = juce::jmax (0, (int) r.getProperty ("auditionCount", 0));
         if (record.recordId.isEmpty())
             continue;   // damaged row; keep loading the rest
 
@@ -580,6 +655,99 @@ juce::Array<SonicAxisDelta> sonicDifferences (const SonicProfile& a, const Sonic
     return out;
 }
 
+SonicProfile habitualProfile (const Library& library, int minimumRecords)
+{
+    SonicProfile centre;
+
+    double weight = 0.0;
+    int contributors = 0;
+    double brightness = 0, attack = 0, tail = 0, width = 0, noisiness = 0, dynamics = 0;
+    double centroidHz = 0, attackSeconds = 0, tailSeconds = 0, peak = 0, cost = 0;
+
+    for (const auto& record : library.allRecords())
+    {
+        // Hidden records are folded duplicates of something still here, so counting them would
+        // weigh one sound twice. A silent measurement is a measurement of nothing and says
+        // nothing about taste.
+        if (record.hidden || record.loadCount <= 0 || ! record.sonic.measured || record.sonic.silent)
+            continue;
+
+        // Weighted by how often it was reached for: a pad loaded fifty times says more about a
+        // habit than one loaded once, and an unweighted mean would let a single curious click
+        // count as much as a year of playing.
+        const auto w = (double) record.loadCount;
+        weight += w;
+        ++contributors;
+
+        brightness    += w * record.sonic.brightness;
+        centroidHz    += w * record.sonic.centroidHz;
+        attack        += w * record.sonic.attack;
+        attackSeconds += w * record.sonic.attackSeconds;
+        tail          += w * record.sonic.tail;
+        tailSeconds   += w * record.sonic.tailSeconds;
+        width         += w * record.sonic.width;
+        noisiness     += w * record.sonic.noisiness;
+        dynamics      += w * record.sonic.dynamics;
+        peak          += w * record.sonic.peak;
+        cost          += w * record.sonic.cost;
+    }
+
+    // DISTINCT RECORDS, not total loads. One pad opened fifty times is one data point about
+    // taste repeated, and letting it clear the bar on its own would build a recommendation out
+    // of a single sound — confident nonsense, which is the one result that stops anybody
+    // trusting this again.
+    if (contributors < juce::jmax (1, minimumRecords) || weight <= 0.0)
+        return centre;   // unmeasured: "not enough to go on", which the caller must respect
+
+    centre.measured = true;
+    centre.brightness    = (float) (brightness / weight);
+    centre.centroidHz    = (float) (centroidHz / weight);
+    centre.attack        = (float) (attack / weight);
+    centre.attackSeconds = (float) (attackSeconds / weight);
+    centre.tail          = (float) (tail / weight);
+    centre.tailSeconds   = (float) (tailSeconds / weight);
+    centre.width         = (float) (width / weight);
+    centre.noisiness     = (float) (noisiness / weight);
+    centre.dynamics      = (float) (dynamics / weight);
+    centre.peak          = (float) (peak / weight);
+    centre.cost          = (float) (cost / weight);
+    return centre;
+}
+
+juce::Array<SoundMatch> unplayedLikeHabits (const Library& library, int count,
+                                            const LibraryAvailability& isAvailable,
+                                            int minimumRecords)
+{
+    juce::Array<SoundMatch> matches;
+    const auto centre = habitualProfile (library, minimumRecords);
+    if (! centre.measured || count <= 0)
+        return matches;
+
+    for (const auto& record : library.allRecords())
+    {
+        // Never opened is the whole question. A record that has been loaded once is not a
+        // discovery, and a folded duplicate is a sound you already have under another name.
+        if (record.loadCount > 0 || record.hidden)
+            continue;
+        if (! record.sonic.measured || record.sonic.silent)
+            continue;
+
+        const auto available = isAvailable ? isAvailable (record) : ! record.missing;
+        if (! available)
+            continue;
+
+        matches.add ({ &record, sonicDistance (centre, record.sonic) });
+    }
+
+    std::stable_sort (matches.begin(), matches.end(),
+                      [] (const SoundMatch& x, const SoundMatch& y)
+                      { return x.distance < y.distance; });
+
+    if (matches.size() > count)
+        matches.removeRange (count, matches.size() - count);
+    return matches;
+}
+
 juce::Array<SoundMatch> nearestSounds (const Library& library, const SonicProfile& to, int count,
                                        const LibraryAvailability& isAvailable,
                                        const juce::String& excludeRecordId)
@@ -627,6 +795,141 @@ bool LibraryFacetSelection::admits (const juce::StringArray& values) const
     return false;
 }
 
+LibraryRecord::UserMetadata mergedDuplicateMetadata (const Library& library,
+                                                     const LibraryDuplicateSet& set)
+{
+    LibraryRecord::UserMetadata merged;
+    const auto* key = library.find (set.keyRecordId);
+    if (key != nullptr)
+        merged = key->user;
+
+    juce::StringArray noteParts;
+    if (key != nullptr && key->user.notes.isNotEmpty())
+        noteParts.add (key->user.notes);
+
+    for (const auto& id : set.recordIds)
+    {
+        if (id == set.keyRecordId)
+            continue;
+        const auto* other = library.find (id);
+        if (other == nullptr)
+            continue;
+
+        merged.favourite = merged.favourite || other->user.favourite;
+        merged.rating = juce::jmax (merged.rating, other->user.rating);
+
+        for (const auto& tag : other->user.tags)
+            merged.tags.addIfNotAlreadyThere (tag);
+        for (const auto& collection : other->user.collections)
+            merged.collections.addIfNotAlreadyThere (collection);
+
+        // A note is a sentence somebody wrote. Merging them without saying which sound each came
+        // from turns two useful notes into one confusing one, so the source is named.
+        if (other->user.notes.isNotEmpty())
+            noteParts.add (other->name + ": " + other->user.notes);
+    }
+
+    merged.notes = noteParts.joinIntoString ("\n");
+    return merged;
+}
+
+RecordFamily recordFamily (const Library& library, const juce::String& recordId,
+                           int maxNodes, int maxDepth)
+{
+    RecordFamily family;
+    const auto* start = library.find (recordId);
+    if (start == nullptr)
+        return family;
+
+    maxNodes = juce::jmax (1, maxNodes);
+    maxDepth = juce::jmax (0, maxDepth);
+
+    // Climb. `seen` is what makes a malformed file a truncated answer instead of a hang.
+    juce::StringArray seen { start->recordId };
+    const LibraryRecord* root = start;
+    for (int step = 0; step < maxDepth; ++step)
+    {
+        if (root->branchedFromRecordId.isEmpty())
+            break;
+        const auto* parent = library.find (root->branchedFromRecordId);
+        if (parent == nullptr)
+            break;                       // a parent that is gone: this is the root we can name
+        if (seen.contains (parent->recordId))
+        {
+            family.truncated = true;     // a cycle, which only a hand-edited file can produce
+            break;
+        }
+        seen.add (parent->recordId);
+        root = parent;
+    }
+    // The climb running out of steps is truncation too, and saying so is the whole point of the
+    // flag: a family that still has ancestors above the one shown must not read as complete.
+    if (root->branchedFromRecordId.isNotEmpty()
+        && library.find (root->branchedFromRecordId) != nullptr
+        && ! seen.contains (root->branchedFromRecordId))
+        family.truncated = true;
+    family.rootRecordId = root->recordId;
+
+    // One pass to index children by parent, rather than rescanning the library per node.
+    std::map<juce::String, juce::Array<const LibraryRecord*>> childrenOf;
+    for (const auto& record : library.allRecords())
+        if (record.branchedFromRecordId.isNotEmpty())
+            childrenOf[record.branchedFromRecordId].add (&record);
+
+    // Descend breadth-first so a parent always precedes its children in `nodes`.
+    struct Pending { const LibraryRecord* record; juce::String parentId; int depth; };
+    std::deque<Pending> queue { { root, {}, 0 } };
+    juce::StringArray placed;
+
+    while (! queue.empty())
+    {
+        const auto pending = queue.front();
+        queue.pop_front();
+
+        if (placed.contains (pending.record->recordId))
+        {
+            family.truncated = true;     // reachable twice: malformed, and reported as such
+            continue;
+        }
+        if (family.nodes.size() >= maxNodes)
+        {
+            family.truncated = true;
+            break;
+        }
+
+        placed.add (pending.record->recordId);
+        family.nodes.add ({ pending.record->recordId, pending.record->name,
+                            pending.parentId, pending.depth });
+
+        if (pending.depth >= maxDepth)
+        {
+            if (childrenOf.count (pending.record->recordId) != 0)
+                family.truncated = true;
+            continue;
+        }
+
+        const auto found = childrenOf.find (pending.record->recordId);
+        if (found == childrenOf.end())
+            continue;
+        for (const auto* child : found->second)
+            queue.push_back ({ child, pending.record->recordId, pending.depth + 1 });
+    }
+
+    return family;
+}
+
+bool recordAddedWithin (const LibraryRecord& record, int withinDays, juce::int64 nowMs)
+{
+    if (withinDays <= 0)
+        return true;                       // the filter is off
+    if (record.addedAtMs <= 0)
+        return false;                      // never counted: not new, not a guess
+
+    const auto window = (juce::int64) withinDays * 24LL * 60LL * 60LL * 1000LL;
+    const auto age = nowMs - record.addedAtMs;
+    return age <= window;                  // a negative age is a future stamp, and still recent
+}
+
 namespace
 {
 
@@ -670,6 +973,12 @@ bool matchesText (const LibraryRecord& record, const juce::String& lowered)
 bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
                    const juce::String& lowered, const LibraryAvailability& isAvailable)
 {
+    if (record.hidden && ! query.includeHidden)
+        return false;
+
+    if (query.neverLoadedOnly && record.loadCount > 0)
+        return false;
+
     if (query.type.isNotEmpty() && record.type != query.type)
         return false;
 
@@ -680,6 +989,12 @@ bool matchesQuery (const LibraryRecord& record, const LibraryQuery& query,
         return false;
 
     if (query.collection.isNotEmpty() && ! record.user.collections.contains (query.collection, true))
+        return false;
+
+    // Read the clock here rather than threading it through every caller: the RULE is pure and
+    // tested (recordAddedWithin), and this is the one place that has to say what "now" is.
+    if (query.addedWithinDays > 0
+        && ! recordAddedWithin (record, query.addedWithinDays, juce::Time::currentTimeMillis()))
         return false;
 
     if (query.availableOnly)
@@ -872,6 +1187,9 @@ juce::var libraryQueryToVar (const LibraryQuery& query)
     o->setProperty ("collection",     query.collection);
     o->setProperty ("favouritesOnly", query.favouritesOnly);
     o->setProperty ("minRating",      query.minRating);
+    o->setProperty ("addedWithinDays", query.addedWithinDays);
+    o->setProperty ("includeHidden",  query.includeHidden);
+    o->setProperty ("neverLoadedOnly", query.neverLoadedOnly);
     o->setProperty ("availableOnly",  query.availableOnly);
     o->setProperty ("measuredOnly",   query.measuredOnly);
     o->setProperty ("facets",         juce::var (facets));
@@ -905,6 +1223,11 @@ LibraryQuery libraryQueryFromVar (const juce::var& stored)
     query.collection = stored.getProperty ("collection", {}).toString();
     query.favouritesOnly = (bool) stored.getProperty ("favouritesOnly", false);
     query.minRating = juce::jlimit (0, 5, (int) stored.getProperty ("minRating", 0));
+    // Capped at a year: beyond that "recently" has stopped meaning anything and the filter is
+    // just a slower way of showing everything.
+    query.addedWithinDays = juce::jlimit (0, 365, (int) stored.getProperty ("addedWithinDays", 0));
+    query.includeHidden = (bool) stored.getProperty ("includeHidden", false);
+    query.neverLoadedOnly = (bool) stored.getProperty ("neverLoadedOnly", false);
     query.availableOnly = (bool) stored.getProperty ("availableOnly", false);
     query.measuredOnly = (bool) stored.getProperty ("measuredOnly", false);
 
@@ -950,7 +1273,10 @@ juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library, floa
     for (int i = 0; i < records.size(); ++i)
     {
         const auto& a = records.getReference (i);
-        if (claimed.contains (a.recordId))
+        // A folded member is not a duplicate any more — it is the fold. Counting it would leave
+        // the set on screen after somebody tidied it, which is the one outcome that would make
+        // folding feel broken.
+        if (a.hidden || claimed.contains (a.recordId))
             continue;
 
         LibraryDuplicateSet set;
@@ -960,7 +1286,7 @@ juce::Array<LibraryDuplicateSet> libraryDuplicates (const Library& library, floa
         for (int j = i + 1; j < records.size(); ++j)
         {
             const auto& b = records.getReference (j);
-            if (claimed.contains (b.recordId))
+            if (b.hidden || claimed.contains (b.recordId))
                 continue;
 
             const auto sameBytes = a.fingerprint.isNotEmpty() && a.fingerprint == b.fingerprint;
@@ -1025,6 +1351,49 @@ VstPresetHeader parseVstPresetHeader (const void* data, size_t size)
     header.classIdHex = classId;
     header.valid = true;
     return header;
+}
+
+// -- why a sound could not be heard --------------------------------------------------------------
+
+RefusalCause refusalCause (const juce::String& refusal)
+{
+    const auto text = refusal.trim();
+    if (text.isEmpty())
+        return RefusalCause::other;
+
+    // Whole sentences first, then the three that append ": <name>" and must match on their stem.
+    // Order matters only in that a stem must not be a prefix of another entry's stem; none is.
+    struct Entry { const char* stem; RefusalCause cause; };
+    static constexpr Entry table[]
+    {
+        { "The plug-in crashed while playing this sound.",        RefusalCause::crashed },
+        { "The plug-in stopped responding while playing this sound.", RefusalCause::crashed },
+        { "That saved state could not be read back.",             RefusalCause::unreadable },
+        { "The captured state for",                               RefusalCause::unreadable },
+        { "The vendor preset could not be read:",                 RefusalCause::unreadable },
+        { "The plug-in refused this preset:",                     RefusalCause::mismatch },
+        { "The plug-in no longer has this program:",              RefusalCause::mismatch },
+        { "Vendor preset loading is not available in this build.", RefusalCause::unsupported },
+    };
+
+    for (const auto& entry : table)
+        if (text.startsWith (entry.stem))
+            return entry.cause;
+
+    return RefusalCause::other;
+}
+
+juce::String refusalCauseId (RefusalCause cause)
+{
+    switch (cause)
+    {
+        case RefusalCause::crashed:     return "crashed";
+        case RefusalCause::unreadable:  return "unreadable";
+        case RefusalCause::mismatch:    return "mismatch";
+        case RefusalCause::unsupported: return "unsupported";
+        case RefusalCause::other:       break;
+    }
+    return "other";
 }
 
 } // namespace ceditor::host

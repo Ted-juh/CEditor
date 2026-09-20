@@ -816,6 +816,12 @@
                           onchange={(v) => setHostProject({ includeStandalone: v })} />
           <PropertyToggle compact label="VST3" value={$hostProject.includeVst3}
                           onchange={(v) => setHostProject({ includeVst3: v })} />
+          <!-- The authored rack ships inside the product, and a setlist item's notes are the
+               one piece of personal prose in it — "what the player needs to read on stage".
+               Off unless asked for: a build that published them cannot be taken back. -->
+          <PropertyToggle compact label="Stage notes" value={$hostProject.includeStageNotes}
+                          ariaLabel="Include my setlist stage notes in the built product"
+                          onchange={(v) => setHostProject({ includeStageNotes: v })} />
         </span>
         <button type="button" class="project-build" data-testid="host-build"
                 disabled={$hostBuild.running} onclick={() => buildHostProduct()}>

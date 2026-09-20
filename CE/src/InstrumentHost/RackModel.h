@@ -558,6 +558,13 @@ struct Performance
 
     perf::TransportSettings transport;
     juce::Array<perf::GrooveTemplate> grooves;
+    /** The same idea for the shape of a hand movement that `grooves` is for the timing of
+        notes. Seeded with factory shapes by `create()`, exactly as the grooves are.
+
+        Named `gestureShapes` rather than `gestures` because the emitted state already has a
+        `gestures` — the gesture RECORDER's own status — and two different things under one key
+        on one object is a bug waiting to be found by somebody else. */
+    juce::Array<perf::GestureShape> gestureShapes;
     juce::Array<perf::Pattern> patterns;
     juce::Array<perf::Clip> clips;
     juce::Array<perf::Scene> scenes;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <functional>
 #include "Transport.h"
 
 // PatternModel — the editable half of the Stage 6 event engine (baseline §18.8.4, §18.8.6).
@@ -104,6 +105,36 @@ struct GrooveTemplate
     static juce::Array<GrooveTemplate> factoryTemplates();
 };
 
+/** How many points a stored gesture shape carries. Fixed, and that is the point: a shape read
+    off a sixteen-step lane has to land on a thirty-two-step one, so it is stored as a curve over
+    normalised time rather than as steps. */
+constexpr int gestureShapePoints = 32;
+
+/** A reusable hand movement, the way a GrooveTemplate is a reusable feel.
+
+    The two are the same kind of artefact and the product only had one of them: a groove library
+    for the timing of notes, and nothing for the shape of a gesture — the sweep you do at the end
+    of a build, the wobble you always put on the filter. A gesture clip records one; this is what
+    makes it something you can keep and put somewhere else.
+
+    `points` are values 0..1, evenly spaced across ONE pass of whatever the shape is applied to.
+    Storing it against normalised time rather than steps is what lets a gesture read off a
+    one-bar lane land on a four-bar one without meaning something different. */
+struct GestureShape
+{
+    juce::String gestureId;
+    juce::String name;
+    juce::String source { "imported" };   // factory | imported
+    juce::Array<float> points;            // gestureShapePoints values, 0..1
+
+    /** The value this shape has at `phase` (0..1 of one pass), interpolated between points.
+        Out-of-range phases wrap, because a shape applied to a longer lane repeats rather than
+        running out. */
+    float at (float phase) const;
+
+    static juce::Array<GestureShape> factoryShapes();
+};
+
 struct Pattern
 {
     juce::String patternId;
@@ -140,6 +171,65 @@ Pattern makePatternVariation (const Pattern& source, char label, float amount = 
     velocity accents are blended into active note/chord/drum steps. */
 void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
                           float amount = 1.0f, bool applyVelocity = true);
+
+/** The other direction: read the feel back OUT of a lane that already has one.
+
+    `laneId` empty takes the first note, chord or drum lane, because those are the lanes a feel
+    is heard in; a cc or parameter lane has microtiming but nobody means it when they say groove.
+
+    The template takes the LANE'S OWN `stepsPerBeat`, which is what makes it exact: applying the
+    result to a lane at that rate scales by laneRate/grooveRate == 1, so the microtiming that
+    comes back is the microtiming that went in.
+
+    VELOCITY IS NOT SYMMETRIC and cannot be. Multipliers are read as each active step's velocity
+    over the mean of the active steps, because that is what a multiplier means — but
+    `applyGrooveTemplate` MULTIPLIES, so feeding this straight back into the same pattern squares
+    each velocity about that mean rather than reproducing it. That is correct for what a groove
+    is for (wearing one pattern's feel on a different pattern) and wrong for anything that
+    expects a round trip, so it is stated here rather than discovered. Fewer than two active
+    steps yields no multipliers at all, which the struct already defines as "keep dynamics".
+
+    Returns a template with empty `timingOffsets` when there is nothing to read — no such lane,
+    or a lane with no steps — so a caller can refuse instead of storing a groove that does
+    nothing. `grooveId` is left empty for the caller to mint. */
+GrooveTemplate grooveFromLane (const Pattern& pattern,
+                               const juce::String& laneId = {},
+                               const juce::String& name = {});
+
+/** Reads the shape of a hand movement out of a lane, so a gesture becomes something reusable.
+
+    The counterpart of `grooveFromLane`, and it answers the same way: with an EMPTY shape when
+    there was nothing to read, so a caller can refuse rather than store a gesture that does
+    nothing. Nothing to read means a lane that is not a parameter or cc lane — a note lane has
+    velocities, not a curve — or one with fewer than two active steps, because a single value is
+    a position and not a movement.
+
+    Only ACTIVE steps carry a value; the rest are what the lane's glide passes through. So the
+    curve is built by interpolating between the active steps and sampling that at
+    `gestureShapePoints` even positions. */
+GestureShape gestureFromLane (const Pattern& pattern,
+                              const juce::String& laneId = {},
+                              const juce::String& name = {});
+
+/** Writes a gesture shape onto one parameter or cc lane, at any length.
+
+    The lane's own step count decides the resolution: the shape is sampled at each step's
+    position, so a one-bar wobble put on a four-bar lane is one wobble across four bars rather
+    than a wobble that stops after a quarter of it. Point-sampled rather than averaged over each
+    step's span, which is right for a hand movement — they are smooth — and means a deliberately
+    jagged shape on a coarse lane loses the detail between its steps.
+
+    `amount` scales the shape's deviation from ITS OWN MEAN, not a blend with whatever the lane
+    held. A gesture at half depth is the same movement, half as deep, centred where the movement
+    was centred — which is what "the same wobble but gentler" means. Blending toward the lane's
+    existing values would make the result depend on what happened to be there, and an inactive
+    step's value is not a value at all.
+
+    Every step it writes becomes active and the lane is set to glide, because a gesture is a
+    continuous movement: left stepping, it is a staircase rather than a sweep. Returns false when
+    the lane is not one a gesture can live on, or the shape is empty. */
+bool applyGestureShape (Pattern& pattern, const GestureShape& shape,
+                        const juce::String& laneId, float amount = 1.0f);
 
 /** A clip is a launchable reference to a pattern (§18.8.8): what plays, when it may start,
     whether it loops, and what follows it. */
@@ -218,7 +308,56 @@ struct Scene
     bool stopOtherClips = true;     // a scene is a state, so by default it silences what it omits
     double tempo = 0.0;             // 0 = keep the current tempo
     double morphBeats = 0.0;        // 0 = cut; continuous values may morph for up to 32 beats
+
+    // Scene Variations, the same bookkeeping Pattern carries: A is the authored source, B/C/D
+    // are generated and then editable, and the group is what makes the family traceable after
+    // somebody has renamed all four.
+    juce::String variationGroupId;
+    juce::String variationLabel;         // "A" | "B" | "C" | "D"; empty on a plain scene
+    juce::String variationSourceSceneId;
+    float variationAmount = 0.0f;
 };
+
+/** Whether a scene parameter's value has a midpoint at all — the question `morphPolicyFor` in
+    `CE/web/src/CE_Application/utils/snapshotModel.js` answers for panel parameters, asked here
+    for a plug-in's own. A `SceneParameterValue` is a bare normalized float with no kind beside
+    it, so only the caller (which can reach the parameter inventory) knows.
+
+    Returning false is always safe: a parameter left where it was is never wrong, and a
+    five-way waveform selector moved four tenths of the way to somewhere is a byte the synth
+    does not recognise. So an unknown parameter is held, not nudged. */
+using SceneParameterIsContinuous = std::function<bool (const juce::String& targetId,
+                                                       const juce::String& parameterId)>;
+
+/** A B / C / D version of a whole scene, at a given intensity.
+
+    `makePatternVariation` does this for one pattern; what a performer wants on stage is a
+    variation of the THING THEY ARE PLAYING, which is heterogeneous — clips, mixer levels, macro
+    values and plug-in parameters — so "forty per cent different" has to mean something
+    different per kind, and does:
+
+      - **Clips** get the matching variation of their pattern. An existing B/C/D in the
+        pattern's own variation group is reused rather than regenerated, so a scene variation
+        and `createPatternVariations` agree instead of minting rival patterns; the new clips are
+        appended to `clips`, since a clip is how a pattern is launched.
+      - **Continuous values** — macro values, slot volume and pan — are nudged deterministically,
+        seeded from the scene and the label so the same request twice is the same scene.
+      - **Booleans are not touched at all.** There is no such thing as forty per cent muted. A
+        mute is a decision somebody made and a variation that silently flipped it would be the
+        program overruling them, which is the same rule `snapshotModel.js` states for a stepped
+        parameter: a midpoint that does not exist must not be invented.
+      - **Plug-in parameters** are nudged only where `isContinuous` says they have a midpoint.
+        Anything it cannot classify is held.
+      - **Tempo, quantization, focus and the page** are the scene's structure, not its sound,
+        and are copied unchanged.
+
+    The source scene keeps its clips; nothing is moved out from under a set that is playing.
+    `out` receives the new scene, and any patterns and clips it had to mint are appended to
+    `patterns` and `clips`. */
+void makeSceneVariation (const Scene& source, char label, float amount,
+                         juce::Array<Pattern>& patterns, juce::Array<Clip>& clips,
+                         Scene& out,
+                         const SceneParameterIsContinuous& isContinuous = {});
 
 struct SetlistItem
 {
@@ -516,6 +655,9 @@ bool patternFromVar (const juce::var& stored, Pattern& out);
 
 juce::var grooveTemplateToVar (const GrooveTemplate& groove);
 bool grooveTemplateFromVar (const juce::var& stored, GrooveTemplate& out);
+
+juce::var gestureShapeToVar (const GestureShape& shape);
+bool gestureShapeFromVar (const juce::var& stored, GestureShape& out);
 
 juce::var clipToVar (const Clip& clip);
 bool clipFromVar (const juce::var& stored, Clip& out);

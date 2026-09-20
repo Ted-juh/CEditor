@@ -1,11 +1,22 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
   import { hostState, hostScanLog, hostLibrary, scanForInstruments, scanLibrary,
-    requestLibrary, browseLibraryPath, removeLibraryPath, hostAnalysis, analyseLibrary, cancelAnalysis } from '../stores/instrumentHost.js';
+    requestLibrary, browseLibraryPath, removeLibraryPath, hostAnalysis, analyseLibrary, cancelAnalysis,
+    mergeDuplicateSet } from '../stores/instrumentHost.js';
   let { onShowSounds = () => {} } = $props();
   let pendingDestructive = $state('');
   let destructiveTimer;
   let updateIssues = $derived($hostLibrary.scanReport.filter(row => row.reason || row.unavailable > 0).length);
+  // The refusal causes C++ reports (RefusalCause in Library.h), in the order somebody would act
+  // on them: the one a re-run can fix, then the ones it cannot, then anything unrecognised —
+  // which appears only when a refusal string has moved and nothing classifies it any more.
+  const REFUSAL_ROWS = [
+    { cause: 'crashed',     retryable: true,  label: 'the plug-in crashed or stopped responding' },
+    { cause: 'unreadable',  retryable: false, label: 'the saved state is damaged or unreadable' },
+    { cause: 'mismatch',    retryable: false, label: 'the plug-in no longer accepts this preset' },
+    { cause: 'unsupported', retryable: false, label: 'this build cannot load that kind of preset' },
+    { cause: 'other',       retryable: false, label: 'for a reason this build does not recognise' },
+  ];
   onMount(() => requestLibrary($hostLibrary.request));
   function guardedAction(key, action) {
     if (pendingDestructive === key) { clearTimeout(destructiveTimer); pendingDestructive = ''; action(); return; }
@@ -91,6 +102,23 @@
                     title="Ask every sound again, including the ones that refused"
                     onclick={() => analyseLibrary(true)}>MEASURE EVERYTHING AGAIN</button>
           </div>
+          <!-- Split by what could be done about it, because the button above cannot help all of
+               them: a crash may well pass on a second run, and a damaged state will fail the same
+               way for ever. Without the split one number invites the same fruitless re-run. -->
+          <div class="refusal-causes" data-testid="refusal-causes">
+            {#each REFUSAL_ROWS as row (row.cause)}
+              {@const n = $hostLibrary.counts.refusedByCause?.[row.cause] ?? 0}
+              {#if n > 0}
+                <div class="refusal-row" data-testid={`refusal-${row.cause}`}>
+                  <span class="rn">{n}</span>
+                  <span class="rt">{row.label}</span>
+                  <span class="rf" class:worth={row.retryable}>
+                    {row.retryable ? 'asking again may work' : 'asking again will not help'}
+                  </span>
+                </div>
+              {/if}
+            {/each}
+          </div>
         {/if}
         {#if $hostAnalysis.what}
           <span class="listen-what">{$hostAnalysis.what}</span>
@@ -107,12 +135,24 @@
           </span>
         </div>
         {#each $hostLibrary.duplicates.slice(0, 6) as set (set.keyRecordId)}
-          <button type="button" class="rail-item" data-testid="duplicate-set"
-                  title={set.identical ? 'The same bytes, filed more than once'
-                                       : 'The same name, plug-in and measurement'}
-                  onclick={() => onShowSounds(set.name)}>
-            <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
-          </button>
+          <div class="rail-pair">
+            <button type="button" class="rail-item" data-testid="duplicate-set"
+                    title={set.identical ? 'The same bytes, filed more than once'
+                                         : 'The same name, plug-in and measurement'}
+                    onclick={() => onShowSounds(set.name)}>
+              <span>{set.name}</span><span class="n">×{set.recordIds.length}</span>
+            </button>
+            <!-- Only the same bytes can be folded. A measured resemblance is the auditioner's
+                 opinion, and the difference between two patches that merely sound alike is
+                 somebody's edit — folding those would be the program deciding it did not count.
+                 The native side refuses it too; this only stops the button offering it. -->
+            <button type="button" class="rail-fold" data-testid="fold-duplicates"
+                    disabled={!set.identical}
+                    title={set.identical
+                             ? 'Gather their tags, rating and notes onto one and fold the rest away. Nothing is deleted.'
+                             : 'These only sound alike. Folding is for files that are the same bytes.'}
+                    onclick={() => mergeDuplicateSet(set.keyRecordId)}>Fold</button>
+          </div>
         {/each}
       {/if}
 
@@ -142,4 +182,13 @@
   .bar i { display: block; height: 100%; background: var(--host-accent); }
   .listen-progress, .listen-refused { margin-bottom: 6px; }
   .rail-item { display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+  .rail-pair { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .rail-pair .rail-item { flex: 1; min-width: 0; }
+  button.rail-fold { padding: 3px 7px; font-size: 10.5px; }
+  .refusal-causes { display: flex; flex-direction: column; gap: 2px; padding: 0 0 6px 10px; font-size: 11px; }
+  .refusal-row { display: flex; align-items: baseline; gap: 6px; }
+  .refusal-row .rn { color: var(--host-pending); min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+  .refusal-row .rt { color: var(--host-text-soft); }
+  .refusal-row .rf { color: var(--host-text-dim); font-style: italic; margin-left: auto; }
+  .refusal-row .rf.worth { color: #7f9d6a; }
 </style>

@@ -906,6 +906,405 @@ void testFollowActions()
            "Stop ends the clip after its loop count without launching another");
 }
 
+// A VARIATION OF THE THING YOU ARE PLAYING. makePatternVariation does one pattern; what a
+// performer wants on stage is a B version of the whole scene. A scene is heterogeneous, so
+// "forty per cent different" has to mean something different per kind — and the kinds where it
+// means NOTHING are the ones worth pinning, because inventing a midpoint that does not exist is
+// silent and wrong.
+
+// A GESTURE LIBRARY. There was a groove library for the timing of notes and no equivalent for the
+// shape of a movement, though they are the same kind of reusable human artefact. What makes one
+// possible is that a shape is stored against NORMALISED TIME rather than steps: read a wobble off
+// a sixteen-step lane and it has to land on a thirty-two-step one meaning the same thing.
+
+void testGestureLibrary()
+{
+    std::cout << "\ngestures: a movement you can keep and put somewhere else" << std::endl;
+
+    const auto parameterLane = [] (const juce::String& laneId, int stepCount,
+                                   std::initializer_list<std::pair<int, float>> values)
+    {
+        Lane lane;
+        lane.laneId = laneId;
+        lane.type = LaneType::parameter;
+        lane.name = "Cutoff";
+        lane.targetId = "p1";
+        lane.parameterId = "cutoff";
+        lane.stepCount = stepCount;
+        lane.stepsPerBeat = 4;
+        lane.resizeSteps();
+        for (const auto& [index, value] : values)
+        {
+            auto& step = lane.steps.getReference (index);
+            step.active = true;
+            step.value = value;
+        }
+        return lane;
+    };
+
+    // -- reading one out --------------------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Sweep");
+        pattern.lanes.add (parameterLane ("l1", 16, { { 0, 0.0f }, { 8, 1.0f }, { 15, 0.0f } }));
+
+        const auto shape = gestureFromLane (pattern, "l1", "My sweep");
+        check (shape.points.size() == gestureShapePoints,
+               "a shape is a fixed curve over normalised time, whatever the lane's length");
+        check (shape.name == "My sweep" && shape.source == "imported", "named as asked, and its own");
+        check (shape.points.getFirst() < 0.1f, "it starts where the movement started");
+        check (shape.points[gestureShapePoints / 2] > 0.8f, "peaks where the movement peaked");
+        check (shape.points.getLast() < 0.4f, "and comes back down");
+
+        // Only ACTIVE steps carry a value; the rest are what the lane's glide passes through.
+        // Reading them would read zeroes nobody ever heard.
+        auto sparse = Pattern::create ("Two");
+        sparse.lanes.add (parameterLane ("l1", 16, { { 0, 0.2f }, { 15, 0.9f } }));
+        const auto rising = gestureFromLane (sparse, "l1");
+        check (rising.points.getFirst() < rising.points.getLast(),
+               "two active steps twelve apart still describe going somewhere");
+    }
+
+    // -- and what has nothing to read ---------------------------------------------------------
+    {
+        // FOUR active steps, deliberately: with only one, this would pass because a single
+        // value is not a movement, and the assertion would be testing the wrong rule while
+        // reading as though it tested this one.
+        auto notes = Pattern::create ("Beat");
+        notes.lanes.add (makeNoteLane ("n1", "p1", 8, 4, 2));
+        check (gestureFromLane (notes, "n1").points.isEmpty(),
+               "a note lane has velocities, not a curve, and answers with nothing");
+        check (gestureFromLane (notes).points.isEmpty(),
+               "and asking a pattern with no curve lane at all is the same answer");
+
+        auto single = Pattern::create ("One");
+        single.lanes.add (parameterLane ("l1", 16, { { 4, 0.7f } }));
+        check (gestureFromLane (single, "l1").points.isEmpty(),
+               "one value is a position, not a movement — so there is nothing to keep");
+
+        auto none = Pattern::create ("Empty");
+        none.lanes.add (parameterLane ("l1", 16, {}));
+        check (gestureFromLane (none, "l1").points.isEmpty(), "and a lane nothing moved on is empty");
+    }
+
+    // -- putting one on ------------------------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Target");
+        pattern.lanes.add (parameterLane ("l1", 32, {}));
+        pattern.lanes.add (makeNoteLane ("n1", "p1", 4, 4, 4));
+
+        GestureShape rise;
+        rise.gestureId = "g1";
+        rise.name = "Rise";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            rise.points.add ((float) i / (float) gestureShapePoints);
+
+        check (applyGestureShape (pattern, rise, "l1", 1.0f), "a curve lane takes a gesture");
+        const auto& lane = pattern.lanes.getReference (0);
+        check (lane.glide, "and glides, because a gesture left stepping is a staircase");
+        check (lane.steps.getFirst().value < 0.1f && lane.steps.getLast().value > 0.9f,
+               "the shape is stretched across the lane's own length, not truncated to its own");
+        bool allActive = true;
+        for (const auto& step : lane.steps)
+            allActive = allActive && step.active;
+        check (allActive, "every step it writes sounds — a curve in inactive steps plays nothing");
+
+        // A note lane is not somewhere a gesture can live, and saying so beats writing values
+        // into a lane that has no use for them.
+        check (! applyGestureShape (pattern, rise, "n1", 1.0f), "a note lane refuses");
+        check (! applyGestureShape (pattern, rise, "nope", 1.0f), "so does a lane that is not there");
+        check (! applyGestureShape (pattern, GestureShape{}, "l1", 1.0f), "and an empty shape does nothing");
+    }
+
+    // -- depth, which is not a blend -------------------------------------------------------
+    {
+        auto pattern = Pattern::create ("Depth");
+        pattern.lanes.add (parameterLane ("l1", 16, {}));
+        for (auto& step : pattern.lanes.getReference (0).steps)
+            step.value = 0.9f;   // whatever happened to be in the lane
+
+        // Low for the first half of the pass, high for the second: mean 0.5, and a period the
+        // lane's sixteen steps can actually see. A shape that alternated every point would be
+        // sampled only on the even ones here, which is aliasing rather than a depth bug.
+        GestureShape wobble;
+        wobble.gestureId = "g2";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            wobble.points.add (i < gestureShapePoints / 2 ? 0.2f : 0.8f);
+
+        applyGestureShape (pattern, wobble, "l1", 0.5f);
+        const auto& lane = pattern.lanes.getReference (0);
+
+        float low = 1.0f, high = 0.0f;
+        for (const auto& step : lane.steps)
+        {
+            low = juce::jmin (low, step.value);
+            high = juce::jmax (high, step.value);
+        }
+        // Half depth around the shape's OWN mean of 0.5, so 0.35..0.65 — not dragged toward the
+        // 0.9 that happened to be in the lane, which would make the result depend on history.
+        check (low > 0.3f && low < 0.4f && high > 0.6f && high < 0.7f,
+               "depth scales the movement around its own centre, not toward what the lane held");
+
+        // Zero depth is the movement flattened to its own centre, which is what "no movement"
+        // means for a shape — and every value lands there rather than wherever it was.
+        auto flatPattern = Pattern::create ("Flat");
+        flatPattern.lanes.add (parameterLane ("l1", 16, {}));
+        applyGestureShape (flatPattern, wobble, "l1", 0.0f);
+        for (const auto& step : flatPattern.lanes.getReference (0).steps)
+            check (std::abs (step.value - 0.5f) < 1.0e-5f, "no depth is flat at the centre");
+    }
+
+    // -- a shape repeats rather than running out ---------------------------------------------
+    {
+        GestureShape shape;
+        for (int i = 0; i < gestureShapePoints; ++i)
+            shape.points.add ((float) i / (float) gestureShapePoints);
+
+        check (std::abs (shape.at (0.0f) - shape.at (1.0f)) < 1.0e-5f,
+               "one full pass wraps to the start, so a shape on a longer lane repeats");
+        check (shape.at (1.25f) > shape.at (1.0f), "and keeps going round rather than holding");
+        check (shape.at (-0.25f) > 0.5f, "a negative phase wraps too rather than clamping to zero");
+    }
+
+    // -- the round trip, which is the whole promise ------------------------------------------
+    {
+        auto source = Pattern::create ("Source");
+        source.lanes.add (parameterLane ("l1", 16, { { 0, 0.1f }, { 8, 0.9f }, { 15, 0.3f } }));
+        const auto read = gestureFromLane (source, "l1");
+
+        // Onto a lane of a DIFFERENT length: the point of storing against normalised time.
+        auto longer = Pattern::create ("Longer");
+        longer.lanes.add (parameterLane ("l2", 32, {}));
+        check (applyGestureShape (longer, read, "l2", 1.0f), "a sixteen-step move lands on thirty-two");
+
+        const auto& written = longer.lanes.getReference (0);
+        check (written.steps.getFirst().value < 0.3f, "starting where it started");
+        check (written.steps[16].value > 0.7f, "peaking half way through, not a quarter of the way");
+        check (written.steps.getLast().value < 0.6f, "and ending where it ended");
+    }
+
+    // -- factory shapes, and what survives being written down ---------------------------------
+    {
+        const auto factory = GestureShape::factoryShapes();
+        check (factory.size() == 4, "somebody with an empty library still has something to try");
+        for (const auto& shape : factory)
+        {
+            check (shape.source == "factory" && shape.gestureId.isNotEmpty(), "each is a factory shape");
+            check (shape.points.size() == gestureShapePoints, "at the stored resolution");
+            for (const auto point : shape.points)
+                check (point >= 0.0f && point <= 1.0f, "inside the scale it will be written to");
+        }
+
+        GestureShape restored;
+        check (gestureShapeFromVar (gestureShapeToVar (factory.getFirst()), restored),
+               "a shape serialises");
+        check (restored.gestureId == factory.getFirst().gestureId
+                 && restored.source == "factory"
+                 && restored.points.size() == factory.getFirst().points.size(),
+               "with its identity and its curve");
+
+        GestureShape refused;
+        check (! gestureShapeFromVar (gestureShapeToVar (GestureShape{}), refused),
+               "and a shape with no id is refused rather than loaded as a nameless row");
+
+        auto tooShort = gestureShapeToVar (factory.getFirst());
+        tooShort.getDynamicObject()->setProperty ("points", juce::Array<juce::var> { 0.5 });
+        check (! gestureShapeFromVar (tooShort, refused),
+               "so is one point, which is a position and not a movement");
+    }
+}
+
+void testSceneVariations()
+{
+    std::cout << "\nscenes: a B version of the thing you are playing" << std::endl;
+
+    auto pattern = Pattern::create ("Beat");
+    pattern.lanes.add (makeNoteLane ("l1", "p1", 4, 4, 4));
+    juce::Array<Pattern> patterns; patterns.add (pattern);
+
+    juce::Array<Clip> clips;
+    Clip clip; clip.clipId = "clip-a"; clip.name = "Riff"; clip.patternId = pattern.patternId;
+    clip.launchQuantize = Quantize::bar; clip.loop = true;
+    clip.followAction = "clip"; clip.followClipId = "clip-b"; clip.followAfterLoops = 2;
+    clips.add (clip);
+    Clip other; other.clipId = "clip-b"; other.patternId = pattern.patternId;
+    clips.add (other);
+
+    Scene source;
+    source.sceneId = "scene-1";
+    source.name = "Verse";
+    source.clipIds.add ("clip-a");
+    source.tempo = 124.0;
+    source.morphBeats = 4.0;
+    source.launchQuantize = Quantize::bar;
+
+    SceneSlot slot;
+    slot.partId = "p1";
+    slot.volume = 1.0f;  slot.applyVolume = true;
+    slot.pan = 0.0f;     slot.applyPan = true;
+    slot.mute = true;    slot.enabled = false;
+    source.slots.add (slot);
+
+    SceneMacroValue macro; macro.macroId = "m1"; macro.value = 0.5f;
+    source.macros.add (macro);
+
+    SceneParameterValue cutoff;  cutoff.targetId = "p1";  cutoff.parameterId = "cutoff";
+    cutoff.value = 0.5f;
+    SceneParameterValue wave;    wave.targetId = "p1";    wave.parameterId = "wave";
+    wave.value = 0.25f;
+    source.parameters.add (cutoff);
+    source.parameters.add (wave);
+
+    // Only `cutoff` has a midpoint. A five-way waveform selector does not, and the caller is the
+    // only thing that knows — a SceneParameterValue is a bare float with no kind beside it.
+    const SceneParameterIsContinuous isContinuous =
+        [] (const juce::String&, const juce::String& parameterId) { return parameterId == "cutoff"; };
+
+    Scene b;
+    makeSceneVariation (source, 'B', 0.5f, patterns, clips, b, isContinuous);
+
+    check (b.sceneId != source.sceneId && b.name == "Verse B",
+           "a variation is a new scene, named after the one it came from");
+    check (b.variationLabel == "B" && b.variationGroupId == "scene-1"
+             && b.variationSourceSceneId == "scene-1",
+           "and the family is traceable after somebody renames all four");
+
+    // -- the clips ------------------------------------------------------------------------
+    check (b.clipIds.size() == 1 && b.clipIds[0] != "clip-a",
+           "the variation launches its own clip, not the source's");
+    check (clips.size() == 3, "which was appended rather than moved out from under the source");
+    check (source.clipIds.size() == 1 && source.clipIds[0] == "clip-a",
+           "and the source scene is untouched — nothing is taken from a set that is playing");
+
+    const Clip* made = nullptr;
+    for (const auto& candidate : clips)
+        if (candidate.clipId == b.clipIds[0])
+            made = &candidate;
+    check (made != nullptr && made->name == "Riff B", "the new clip says which variation it is");
+    check (made != nullptr && made->patternId != pattern.patternId,
+           "and plays the varied pattern rather than the original");
+    check (made != nullptr && made->launchQuantize == Quantize::bar && made->loop,
+           "launch behaviour is inherited: the B section starts the way the A section does");
+    // A follow names a clip in the SOURCE scene. Carrying it over would make the variation hand
+    // off into the section it is a variation of, which is never what was meant.
+    check (made != nullptr && made->followAction == "none" && made->followClipId.isEmpty()
+             && made->followAfterLoops == 0,
+           "but the follow does not come with it");
+
+    const Pattern* varied = nullptr;
+    for (const auto& candidate : patterns)
+        if (made != nullptr && candidate.patternId == made->patternId)
+            varied = &candidate;
+    check (varied != nullptr && varied->variationLabel == "B"
+             && varied->variationGroupId == pattern.patternId,
+           "the pattern it plays is that pattern's own B, in the same variation group");
+
+    // -- what a percentage means, per kind ---------------------------------------------------
+    check (! b.slots.isEmpty() && b.slots.getReference (0).volume != slot.volume,
+           "a level moves, because a level has a midpoint");
+    check (b.slots.getReference (0).pan != slot.pan, "so does pan");
+    check (b.slots.getReference (0).mute == true && b.slots.getReference (0).enabled == false,
+           "a mute does NOT — there is no such thing as forty per cent muted, and flipping it "
+           "would be the program overruling a decision somebody made");
+    check (b.macros.getReference (0).value != macro.value, "a macro value moves");
+    check (b.parameters.getReference (0).value != cutoff.value, "a continuous parameter moves");
+    check (b.parameters.getReference (1).value == wave.value,
+           "and a stepped one is held: a waveform four tenths of the way to somewhere is a byte "
+           "the synth cannot read");
+
+    check (b.tempo == 124.0 && b.morphBeats == 4.0 && b.launchQuantize == Quantize::bar,
+           "structure is copied, not varied — a variation is of the sound, not of the set");
+
+    // Levels stay inside their scales however hard it is pushed.
+    {
+        Scene extreme;
+        Scene loud = source;
+        loud.slots.getReference (0).volume = 2.0f;
+        loud.slots.getReference (0).pan = 1.0f;
+        loud.macros.getReference (0).value = 1.0f;
+        juce::Array<Pattern> p2 = patterns; juce::Array<Clip> c2 = clips;
+        makeSceneVariation (loud, 'D', 1.0f, p2, c2, extreme, isContinuous);
+        check (extreme.slots.getReference (0).volume <= 2.0f
+                 && extreme.slots.getReference (0).volume >= 0.0f,
+               "a nudge cannot push a level off its own scale");
+        check (std::abs (extreme.slots.getReference (0).pan) <= 1.0f, "nor pan off its");
+        check (extreme.macros.getReference (0).value <= 1.0f
+                 && extreme.macros.getReference (0).value >= 0.0f, "nor a macro off its");
+    }
+
+    // -- deterministic, because a variation you cannot rehearse is not a variation ----------
+    {
+        juce::Array<Pattern> p3 = patterns; juce::Array<Clip> c3 = clips;
+        Scene again;
+        makeSceneVariation (source, 'B', 0.5f, p3, c3, again, isContinuous);
+        check (std::abs (again.slots.getReference (0).volume - b.slots.getReference (0).volume) < 1.0e-6f
+                 && std::abs (again.macros.getReference (0).value - b.macros.getReference (0).value) < 1.0e-6f,
+               "asking twice gives the same scene");
+
+        Scene c;
+        juce::Array<Pattern> p4 = patterns; juce::Array<Clip> c4 = clips;
+        makeSceneVariation (source, 'C', 0.5f, p4, c4, c, isContinuous);
+        check (std::abs (c.macros.getReference (0).value - b.macros.getReference (0).value) > 1.0e-6f,
+               "and B and C are different scenes rather than the same one twice");
+    }
+
+    // -- agreeing with createPatternVariations ----------------------------------------------
+    // Both address a variation by its group and its label, so B is B whichever made it. Minting
+    // a rival B would leave two patterns claiming the same slot in one family.
+    {
+        juce::Array<Pattern> p5 = patterns;
+        juce::Array<Clip> c5 = clips;
+        const auto before = p5.size();
+        Scene second;
+        makeSceneVariation (source, 'B', 0.5f, p5, c5, second, isContinuous);
+        check (p5.size() == before,
+               "a pattern variation that already exists is reused, not generated again");
+        check (second.clipIds[0] != b.clipIds[0],
+               "though the clip that launches it is this scene's own");
+    }
+
+    // A scene naming a clip that has since been removed varies what it actually launches now.
+    {
+        Scene stale = source;
+        stale.clipIds.add ("clip-gone");
+        juce::Array<Pattern> p6 = patterns; juce::Array<Clip> c6 = clips;
+        Scene out;
+        makeSceneVariation (stale, 'B', 0.5f, p6, c6, out, isContinuous);
+        check (! out.clipIds.contains ("clip-gone") && out.clipIds.size() == 1,
+               "a clip the performance no longer has is skipped rather than carried");
+    }
+
+    // With no classifier at all, every plug-in parameter is held. Unknown means hold, and
+    // holding is always safe.
+    {
+        juce::Array<Pattern> p7 = patterns; juce::Array<Clip> c7 = clips;
+        Scene cautious;
+        makeSceneVariation (source, 'B', 0.5f, p7, c7, cautious, {});
+        check (cautious.parameters.getReference (0).value == cutoff.value
+                 && cautious.parameters.getReference (1).value == wave.value,
+               "without a way to tell continuous from stepped, nothing is moved");
+        check (cautious.macros.getReference (0).value != macro.value,
+               "but a macro is continuous by construction and still moves");
+    }
+
+    // Written down and read back.
+    {
+        Scene restored;
+        check (sceneFromVar (sceneToVar (b), restored), "a varied scene serialises");
+        check (restored.variationLabel == "B" && restored.variationGroupId == "scene-1"
+                 && restored.variationSourceSceneId == "scene-1"
+                 && std::abs (restored.variationAmount - 0.5f) < 1.0e-6f,
+               "with its family intact");
+
+        auto damaged = sceneToVar (b);
+        damaged.getDynamicObject()->setProperty ("variationLabel", "Q");
+        Scene odd;
+        sceneFromVar (damaged, odd);
+        check (odd.variationLabel.isEmpty(),
+               "and a label outside A-D reads as a plain scene rather than a family nobody can "
+               "find the rest of");
+    }
+}
+
 void testSongSwapWhilePlaying()
 {
     std::cout << "\nedits: a new song swaps without corrupting the old one" << std::endl;
@@ -1723,6 +2122,115 @@ void testScalesAndSerialization()
              && grooved.appliedGrooveId == factoryGrooves[1].grooveId
              && std::abs (grooved.appliedGrooveAmount - 0.5f) < 1.0e-6f,
            "a groove commits scaled timing and accents into editable pattern steps");
+
+    // -- reading a feel back out ----------------------------------------------------------
+    //
+    // The property that makes extraction trustworthy: a groove read from a lane at that lane's
+    // own rate scales by laneRate/grooveRate == 1 on the way back in, so the timing that comes
+    // out is the timing that went in. Everything else here is a guard on the edges.
+    {
+        auto worn = Pattern::create ("Worn");
+        auto wornLane = makeNoteLane ("worn-lane", "p1", 16, 4, 4, 60);
+        for (auto& step : wornLane.steps)
+            step.active = true;
+        worn.lanes.add (wornLane);
+        applyGrooveTemplate (worn, factoryGrooves[0], 1.0f, false);
+
+        const auto stolen = grooveFromLane (worn, {}, "Stolen");
+        check (stolen.timingOffsets.size() == 16 && stolen.stepsPerBeat == 4,
+               "a feel reads back as one offset per step, at the lane's own rate");
+
+        bool timingMatches = stolen.timingOffsets.size() == factoryGrooves[0].timingOffsets.size();
+        for (int i = 0; timingMatches && i < stolen.timingOffsets.size(); ++i)
+            timingMatches = std::abs (stolen.timingOffsets[i]
+                                        - factoryGrooves[0].timingOffsets[i]) < 1.0e-6f;
+        check (timingMatches, "and it is the same timing that was applied — the round trip is exact");
+
+        // Applying what came out reproduces the steps it came from, which is the whole claim.
+        auto again = Pattern::create ("Again");
+        auto againLane = makeNoteLane ("again-lane", "p1", 16, 4, 4, 60);
+        for (auto& step : againLane.steps)
+            step.active = true;
+        again.lanes.add (againLane);
+        applyGrooveTemplate (again, stolen, 1.0f, false);
+        bool sameSteps = true;
+        for (int i = 0; sameSteps && i < 16; ++i)
+            sameSteps = std::abs (again.lanes[0].steps[i].microtiming
+                                    - worn.lanes[0].steps[i].microtiming) < 1.0e-6f;
+        check (sameSteps, "so wearing the stolen feel lands every step where the original sat");
+
+        check (stolen.grooveId.isEmpty(), "the id is the caller's to mint, not the reader's");
+        check (stolen.source == "imported", "and a read groove is never marked factory");
+    }
+
+    // Velocity is a MULTIPLIER, so it is read relative to the mean of the active steps and does
+    // NOT round trip — applyGrooveTemplate multiplies, so feeding it back would square each
+    // velocity about that mean. Asserted rather than left to be discovered.
+    {
+        auto dynamics = Pattern::create ("Dynamics");
+        Lane lane;
+        lane.laneId = "dyn";
+        lane.type = LaneType::note;
+        lane.stepCount = 4;
+        lane.stepsPerBeat = 4;
+        lane.resizeSteps();
+        const int velocities[] { 50, 150, 100, 100 };   // mean of the active pair is 100
+        for (int i = 0; i < 4; ++i)
+        {
+            auto& step = lane.steps.getReference (i);
+            step.active = i < 2;
+            step.velocity = velocities[i];
+        }
+        dynamics.lanes.add (lane);
+
+        const auto read = grooveFromLane (dynamics);
+        check (read.velocityMultipliers.size() == 4
+                 && std::abs (read.velocityMultipliers[0] - 0.5f) < 1.0e-6f
+                 && std::abs (read.velocityMultipliers[1] - 1.5f) < 1.0e-6f,
+               "velocity reads as each active step over the mean of the active steps");
+        check (std::abs (read.velocityMultipliers[2] - 1.0f) < 1.0e-6f,
+               "and a step that never sounds keeps 1.0 rather than silencing what lands on it");
+    }
+
+    {
+        auto quiet = Pattern::create ("Quiet");
+        auto oneHit = makeNoteLane ("one", "p1", 8, 4, 8, 60);   // a single active step
+        quiet.lanes.add (oneHit);
+        const auto read = grooveFromLane (quiet);
+        check (read.timingOffsets.size() == 8 && read.velocityMultipliers.isEmpty(),
+               "one active step has no dynamics to describe, so no multipliers are invented");
+    }
+
+    {
+        // A cc lane has microtiming and nobody means it when they say groove, so an unnamed
+        // read skips it and takes the notes.
+        auto mixed = Pattern::create ("Mixed");
+        Lane cc;
+        cc.laneId = "cc";
+        cc.type = LaneType::cc;
+        cc.stepCount = 4;
+        cc.stepsPerBeat = 2;
+        cc.resizeSteps();
+        mixed.lanes.add (cc);
+        mixed.lanes.add (makeNoteLane ("notes-after", "p1", 16, 4, 4, 60));
+        check (grooveFromLane (mixed).stepsPerBeat == 4,
+               "an unnamed read takes the first note lane, not a cc lane that happens to be first");
+        check (grooveFromLane (mixed, "cc").stepsPerBeat == 2,
+               "but a named lane is taken as asked, cc or not");
+
+        check (grooveFromLane (Pattern::create ("Bare")).timingOffsets.isEmpty(),
+               "a pattern with no lanes reads as nothing, for the caller to refuse");
+        check (grooveFromLane (mixed, "no-such-lane").timingOffsets.isEmpty(),
+               "and so does a lane id that is not there");
+    }
+
+    {
+        // The service stores at most 64 offsets; reading more would be silently truncated.
+        auto longPattern = Pattern::create ("Long");
+        longPattern.lanes.add (makeNoteLane ("long", "p1", 96, 4, 4, 60));
+        check (grooveFromLane (longPattern).timingOffsets.size() == 64,
+               "a lane longer than the stored cap stops at the cap rather than being truncated later");
+    }
 
     Pattern source = Pattern::create ("Pulse");
     source.seed = 12345;
@@ -2907,6 +3415,8 @@ int main()
     testFrozenMidiUsesPostFxStaging();
     testParameterLanesAndGlide();
     testFollowActions();
+    testSceneVariations();
+    testGestureLibrary();
     testSongSwapWhilePlaying();
     testArpeggiator();
     testMidiFxChain();

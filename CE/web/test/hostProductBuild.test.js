@@ -15,7 +15,7 @@ import path from 'node:path';
 
 import {
   normalizeProject, sanitizeBaseName, artifactCandidateDirs, resolveArtifacts,
-  stagePlan, privateSymbolPlan, isccArgs, TEMPLATE_DEFINES,
+  stagePlan, privateSymbolPlan, isccArgs, TEMPLATE_DEFINES, factoryPerformance,
 } from '../../../tools/scripts/build-host-product.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -179,12 +179,81 @@ test('the template pins identity to the manifest appId, braces escaped for Inno'
 test('a factory performance stages beside the exe and into the bundle resources', () => {
   const { project } = normalizeProject(goodProject);
   const { ops } = stagePlan({
-    project, artifacts: foundArtifacts, stageDir: '/s', performanceFile: '/author/session-performance.json',
+    project, artifacts: foundArtifacts, stageDir: '/s', performanceJson: '{"name":"Rack"}\n',
   });
-  const targets = ops.map((op) => op.to);
+  const staged = ops.filter((op) => op.to.includes('factory-performance.json'));
+  const targets = staged.map((op) => op.to);
   assert.ok(targets.includes(path.join('/s', 'Standalone', 'factory-performance.json')));
   assert.ok(targets.includes(path.join('/s', 'VST3', 'Hostage.vst3',
     'Contents', 'Resources', 'factory-performance.json')));
+
+  // WRITTEN, not copied. Copying the author's own session file across is exactly how their
+  // stage notes would reach the product with the strip in place but bypassed.
+  assert.ok(staged.every((op) => op.kind === 'writeFile' && op.from === undefined),
+    'the shipped rack is content this build produced, never the author\'s file');
+  assert.ok(staged.every((op) => op.contents === '{"name":"Rack"}\n'));
+});
+
+// CURATION AND WHAT TRAVELS. Nothing about a library record can leave this machine at all —
+// there is no export command, the support bundle is an allowlist that does not name library.json,
+// and a built product ships the rack manifest rather than the library. The one thing that does
+// travel is the authored rack, and it carries the single piece of personal prose in a
+// Performance: a setlist item's notes, "what the player needs to read on stage".
+
+test('stage notes are stripped from the rack a product ships', () => {
+  const authored = {
+    name: 'Friday',
+    setlist: {
+      currentIndex: 0,
+      items: [
+        { itemId: 'a', name: 'Opener', sceneId: 's1', tempo: 124,
+          notes: 'Wait for Dave. Second verse is a semitone up.' },
+        { itemId: 'b', name: 'Closer', sceneId: 's2', notes: '' },
+      ],
+    },
+    patterns: [{ patternId: 'p1', name: 'Beat' }],
+  };
+
+  const shipped = factoryPerformance(authored);
+  assert.equal(shipped.setlist.items[0].notes, '', 'the prose goes');
+  assert.equal(shipped.setlist.items[0].name, 'Opener', 'the song name stays — the set is what it plays');
+  assert.equal(shipped.setlist.items[0].sceneId, 's1');
+  assert.equal(shipped.setlist.items[0].tempo, 124);
+  assert.deepEqual(shipped.patterns, authored.patterns, 'nothing else is touched');
+  assert.equal(shipped.setlist.currentIndex, 0);
+
+  // The author's own object is not modified — the build must not edit the session it read.
+  assert.match(authored.setlist.items[0].notes, /Wait for Dave/,
+    'stripping produces a copy; the editor\'s live session is not rewritten by a build');
+});
+
+test('stage notes travel only when the project asks for them', () => {
+  const authored = { setlist: { items: [{ itemId: 'a', notes: 'Capo 3' }] } };
+
+  assert.equal(factoryPerformance(authored, { includeStageNotes: true })
+                 .setlist.items[0].notes, 'Capo 3');
+  assert.equal(factoryPerformance(authored, { includeStageNotes: false })
+                 .setlist.items[0].notes, '');
+
+  // The default is the asymmetry, and it is the whole decision: a build that published somebody's
+  // notes cannot be taken back, and one that left them out can be run again.
+  assert.equal(factoryPerformance(authored).setlist.items[0].notes, '');
+  assert.equal(normalizeProject(goodProject).project.includeStageNotes, false,
+    'a project that never mentions the field means no');
+  assert.equal(normalizeProject({ ...goodProject, includeStageNotes: true }).project.includeStageNotes,
+    true, 'and one that asks for them gets them');
+});
+
+test('a rack with no setlist, or none at all, survives the strip', () => {
+  assert.equal(factoryPerformance(null), null, 'no rack is no rack, not a crash');
+  assert.equal(factoryPerformance('nonsense'), null);
+  assert.deepEqual(factoryPerformance({ patterns: [] }), { patterns: [] },
+    'a rack with no setlist passes through whole');
+  assert.deepEqual(factoryPerformance({ setlist: { items: [] } }), { setlist: { items: [] } });
+
+  // An item with no notes field is left exactly as it was rather than gaining an empty one.
+  const bare = { setlist: { items: [{ itemId: 'a', name: 'Song' }] } };
+  assert.deepEqual(factoryPerformance(bare), bare);
 });
 
 test('no factory performance stages none — the product starts empty, not broken', () => {

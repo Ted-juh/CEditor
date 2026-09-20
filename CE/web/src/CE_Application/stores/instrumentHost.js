@@ -48,6 +48,8 @@ import {
   onInstrumentHostAudition,
   onInstrumentHostVersionDiff,
   onInstrumentHostSimilar,
+  onInstrumentHostUnplayed,
+  onInstrumentHostRecordFamily,
   onInstrumentHostSubstitutes,
   onInstrumentHostSurfaceBrowse,
 } from '../bridge/bridge.js';
@@ -113,6 +115,26 @@ export const hostAudition = writable({ recordId: '', stage: '', detail: '',
 export const hostVersionDiff = writable(null);
 /** The closest measured sounds to whatever last asked. */
 export const hostSimilar = writable({ recordId: '', measured: false, matches: [] });
+
+/** What you own and have never played, nearest first to what you actually reach for. `enough`
+    is false when there is not yet a habit to recommend from, and that is an answer rather than
+    an empty list to be drawn as "nothing matches". */
+export const hostUnplayed = writable({ enough: false, from: 0, matches: [] });
+/** The selected record's whole line, root first and breadth-first after, so a parent always
+    precedes its children and the tree draws in one pass. */
+export const hostRecordFamily = writable({ recordId: '', rootRecordId: '', truncated: false, nodes: [] });
+
+export const normalizeRecordFamily = (p) => ({
+  recordId: String(p?.recordId ?? ''),
+  rootRecordId: String(p?.rootRecordId ?? ''),
+  truncated: p?.truncated === true,
+  nodes: (Array.isArray(p?.nodes) ? p.nodes : []).map((n) => ({
+    recordId: String(n?.recordId ?? ''),
+    name: String(n?.name ?? ''),
+    parentRecordId: String(n?.parentRecordId ?? ''),
+    depth: Math.max(0, Number(n?.depth ?? 0) || 0),
+  })).filter((n) => n.recordId),
+});
 /** What a captured rack needs before it can play on this machine. null until asked. */
 export const hostSubstitutes = writable(null);
 
@@ -182,6 +204,18 @@ export function normalizeSimilar(payload) {
   return {
     recordId: String(p.recordId ?? ''),
     measured: p.measured === true,
+    matches: (Array.isArray(p.matches) ? p.matches : []).map(normalizeMatch)
+               .filter((m) => m.recordId !== ''),
+  };
+}
+
+export function normalizeUnplayed(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  return {
+    // Whether there was enough played to have an opinion at all. Distinct from an empty match
+    // list, which means "you have opened everything that sounds like this".
+    enough: p.enough === true,
+    from: Number(p.from ?? 0),
     matches: (Array.isArray(p.matches) ? p.matches : []).map(normalizeMatch)
                .filter((m) => m.recordId !== ''),
   };
@@ -570,6 +604,15 @@ export function emptyLibraryQuery() {
     favouritesOnly: false,
     minRating: 0,
     availableOnly: false,
+    // Zero is off. A record with no arrival time never matches a live filter — see
+    // recordAddedWithin in CE/src/InstrumentHost/Library.cpp, which is the authority.
+    addedWithinDays: 0,
+    // Folded duplicates are out of the browse until something asks for them. Off by default,
+    // because the point of folding is not to see them.
+    includeHidden: false,
+    // Only what has never been loaded. A library you cannot filter down to the part you have
+    // never opened is a library you cannot explore.
+    neverLoadedOnly: false,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, { include: [], exclude: [] }])),
     // A measured range is inactive until somebody moves a handle, because a range that defaults
     // to "all of it" would still refuse every record the auditioner has not reached yet.
@@ -593,6 +636,9 @@ export function normalizeLibraryQuery(payload) {
     favouritesOnly: p.favouritesOnly === true,
     minRating: Math.min(5, Math.max(0, Number(p.minRating ?? 0))),
     availableOnly: p.availableOnly === true,
+    addedWithinDays: Math.min(365, Math.max(0, Math.floor(Number(p.addedWithinDays ?? 0)) || 0)),
+    includeHidden: p.includeHidden === true,
+    neverLoadedOnly: p.neverLoadedOnly === true,
     facets: Object.fromEntries(LIBRARY_FACETS.map((f) => [f, {
       include: strings(facets[f]?.include),
       exclude: strings(facets[f]?.exclude),
@@ -611,7 +657,8 @@ export function normalizeLibraryQuery(payload) {
 export function libraryQueryIsEmpty(query) {
   const q = normalizeLibraryQuery(query);
   return q.text === '' && q.type === '' && q.collection === '' && !q.favouritesOnly
-    && q.minRating === 0 && !q.availableOnly && !q.measuredOnly
+    && q.minRating === 0 && !q.availableOnly && !q.measuredOnly && q.addedWithinDays === 0
+    && !q.includeHidden && !q.neverLoadedOnly
     && MEASURED_AXES.every((a) => !q.ranges[a].active)
     && LIBRARY_FACETS.every((f) => q.facets[f].include.length === 0 && q.facets[f].exclude.length === 0);
 }
@@ -643,7 +690,9 @@ export function emptyHostLibrary() {
     scanReport: [],
     records: [],
     counts: { total: 0, presets: 0, racks: 0, chains: 0, missing: 0, matched: 0,
-              measured: 0, measurable: 0, refused: 0, snapshots: 0, snapshotBytes: 0 },
+              measured: 0, measurable: 0, refused: 0, refusedByCause: refusedByCause(null),
+              addedRecently: 0, hidden: 0, everLoaded: 0, neverLoaded: 0,
+              snapshots: 0, snapshotBytes: 0 },
     duplicates: [],
     facets: Object.fromEntries(['types', ...LIBRARY_FACETS].map((f) => [f, []])),
     smartCollections: [],
@@ -653,6 +702,21 @@ export function emptyHostLibrary() {
     query: '',
     type: '',
   };
+}
+
+/** The five causes C++ can report (RefusalCause in Library.h), always all present so the browser
+    never has to test for a key. Anything unrecognised lands in `other` there, not here — a row
+    nobody expected is the signal that a refusal string moved, and it should be visible rather
+    than dropped.
+
+    A function declaration with the list inside it, deliberately: `emptyHostLibrary()` runs while
+    this module is still evaluating, so a `const` above would be in its temporal dead zone and
+    every import of this store would throw. */
+function refusedByCause(raw) {
+  const out = {};
+  for (const cause of ['crashed', 'unreadable', 'mismatch', 'unsupported', 'other'])
+    out[cause] = Number(raw?.[cause] ?? 0) || 0;
+  return out;
 }
 
 export function normalizeHostLibrary(payload) {
@@ -722,6 +786,17 @@ export function normalizeHostLibrary(payload) {
       // Why there is no measurement, when the auditioner tried and got none. A crashing preset
       // is not a preset nobody has got to yet, and the browser says which it is looking at.
       sonicRefusal: String(r?.sonicRefusal ?? ''),
+      // 0 for every record written before the field existed, which is the right answer: a
+      // library that has always been there is not new.
+      addedAtMs: Number(r?.addedAtMs ?? 0) || 0,
+      // Folded into another record. Only ever true when the query asked for hidden rows, so a
+      // row that says so is a row the page should offer to unfold rather than one to draw plain.
+      hidden: r?.hidden === true,
+      // How often this sound has been reached for, and when last. Auditions are counted apart:
+      // browsing forty pads to pick one is not using forty pads.
+      loadCount: Number(r?.loadCount ?? 0) || 0,
+      lastLoadedAtMs: Number(r?.lastLoadedAtMs ?? 0) || 0,
+      auditionCount: Number(r?.auditionCount ?? 0) || 0,
     })),
     counts: {
       total: Number(p.counts?.total ?? 0),
@@ -735,6 +810,18 @@ export function normalizeHostLibrary(payload) {
       // Tried and it would not. Not part of `measurable`, so it needs its own count or three
       // sounds nobody can hear disappear from the arithmetic entirely.
       refused: Number(p.counts?.refused ?? 0),
+      // The same refusals split by what could be done about them. Classified in C++ beside the
+      // count above (RefusalCause in Library.h), so the rows add up to `refused` rather than to
+      // whatever the current query happens to match.
+      refusedByCause: refusedByCause(p.counts?.refusedByCause),
+      addedRecently: Number(p.counts?.addedRecently ?? 0),
+      // Folded away, counted over the whole library rather than over the query — `total` stays
+      // the whole library, so this is how the page says how many rows it is not showing.
+      hidden: Number(p.counts?.hidden ?? 0),
+      // What you own versus what you play. Two numbers, because "you own 12,000 and have played
+      // 40" is the whole sentence and neither half is worth saying alone.
+      everLoaded: Number(p.counts?.everLoaded ?? 0),
+      neverLoaded: Number(p.counts?.neverLoaded ?? 0),
       snapshots: Number(p.counts?.snapshots ?? 0),
       snapshotBytes: Number(p.counts?.snapshotBytes ?? 0),
     },
@@ -790,9 +877,18 @@ const admits = (selection, values) => {
 
 export function matchesLibraryQuery(record, query) {
   const q = normalizeLibraryQuery(query);
+  if (record.hidden === true && !q.includeHidden) return false;
+  if (q.neverLoadedOnly && Number(record.loadCount ?? 0) > 0) return false;
   if (q.type && record.type !== q.type) return false;
   if (q.favouritesOnly && record.favourite !== true) return false;
   if (q.minRating > 0 && Number(record.rating ?? 0) < q.minRating) return false;
+  if (q.addedWithinDays > 0) {
+    // The same three rules as recordAddedWithin: never-counted does not pass, the boundary is
+    // inclusive, and a future stamp stays visible rather than falling out of every view.
+    const addedAtMs = Number(record.addedAtMs ?? 0);
+    if (!(addedAtMs > 0)) return false;
+    if (Date.now() - addedAtMs > q.addedWithinDays * 86400000) return false;
+  }
   if (q.collection && !(record.collections ?? []).includes(q.collection)) return false;
   if (q.availableOnly && record.available !== true) return false;
 
@@ -909,17 +1005,48 @@ let mockLibraryView = emptyLibraryQuery();
 let mockMeasuredEverything = false;
 let mockVersions = {};
 let mockBranches = [];
+// Which demo records have been folded away, and the curation each fold gathered onto its
+// survivor. Module state rather than store state, because every rail click re-asks for the
+// library — a fold that the next answer undid would be a fold nobody could demonstrate.
+let mockHiddenRecords = new Set();
+let mockMergedCuration = {};
+// How often the demo has reached for each record. Module state for the same reason the folds
+// are: the browse re-asks for the library on every click, and a count the next answer forgot
+// would be a count nobody could demonstrate.
+let mockUsage = {};
 
-export function mockHostLibrary(query = '', type = '') {
+/** The demo library, before any query is applied. Its own function because folding needs the
+    whole of it — the members of a set are the records being folded, and most of them are not
+    in whatever the current query happens to match. */
+function mockLibraryRecords() {
   const all = [
     { recordId: 'lib-1', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Pad', factory: true, available: true, favourite: true, rating: 5,
-      tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10) },
+      tags: ['warm', 'wide'], sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10),
+      addedAtMs: Date.now() - 3 * 86400000, mockFingerprint: 'fp-warm',
+      loadCount: 9, lastLoadedAtMs: Date.now() - 86400000 },
+    // The same bytes in a second folder — what anybody who has ever backed a preset folder up
+    // already has. It carries a tag of its own so folding it visibly moves something rather
+    // than just making a row disappear.
+    { recordId: 'lib-11', type: 'preset', sourceType: 'vstpreset', name: 'Warm Pad (backup)',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', factory: true, available: true, tags: ['backup'],
+      sonic: mockSonic(0.30, 0.72, 0.66, 0.84, 0.10), mockFingerprint: 'fp-warm',
+      loadCount: 2, lastLoadedAtMs: Date.now() - 20 * 86400000 },
+    // Measured, playable and never once opened — the record the recommendation exists to find.
+    // Five distinct records have been loaded above, which is the minimum for having a habit at
+    // all, so the preview shows the working answer rather than the honest refusal. The refusal
+    // has fixtures of its own in the tests.
+    { recordId: 'lib-12', type: 'preset', sourceType: 'vstpreset', name: 'Deep Hall',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', factory: true, available: true, tags: ['warm', 'wide'],
+      sonic: mockSonic(0.26, 0.70, 0.71, 0.82, 0.11) },
     { recordId: 'lib-2', type: 'preset', sourceType: 'userState', name: 'My Growl',
       manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
       category: 'Bass', available: true, rating: 4, tags: ['bass', 'distorted'],
-      sonic: mockSonic(0.62, 0.08, 0.24, 0.05, 0.35) },
+      sonic: mockSonic(0.62, 0.08, 0.24, 0.05, 0.35),
+      loadCount: 4, lastLoadedAtMs: Date.now() - 5 * 86400000 },
     { recordId: 'lib-6', type: 'preset', sourceType: 'vstpreset', name: 'Never Heard',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
       category: 'Keys', factory: true, available: true, tags: ['glassy'],
@@ -929,7 +1056,22 @@ export function mockHostLibrary(query = '', type = '') {
     { recordId: 'lib-7', type: 'preset', sourceType: 'vstpreset', name: 'Broken Choir',
       manufacturer: 'Mock Audio', instrument: 'Stage Keys', category: 'Pad', factory: true,
       available: true, tags: ['choir'], sonic: null,
-      sonicRefusal: 'The plug-in crashed while playing this sound.' },
+      sonicRefusal: 'The plug-in crashed while playing this sound.', mockRefusalCause: 'crashed' },
+    { recordId: 'lib-10', type: 'preset', sourceType: 'userState', name: 'Half a Save',
+      manufacturer: 'Mock Audio', instrument: 'Analog One', targetCeId: 'mock-keys',
+      category: 'Bass', available: true, tags: ['broken'], sonic: null,
+      sonicRefusal: 'That saved state could not be read back.', mockRefusalCause: 'unreadable',
+      addedAtMs: Date.now() - 2 * 86400000 },
+    { recordId: 'lib-8', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-1',
+      branchedFromName: 'Warm Pad', sonic: mockSonic(0.18, 0.74, 0.70, 0.80, 0.09),
+      loadCount: 3, lastLoadedAtMs: Date.now() - 2 * 86400000 },
+    { recordId: 'lib-9', type: 'preset', sourceType: 'userState', name: 'Warm Pad Darker, Longer',
+      manufacturer: 'Mock Audio', instrument: 'Stage Keys', targetCeId: 'mock-keys',
+      category: 'Pad', available: true, tags: ['warm'], branchedFrom: 'lib-8',
+      branchedFromName: 'Warm Pad Darker', sonic: mockSonic(0.17, 0.75, 0.92, 0.81, 0.08),
+      loadCount: 1, lastLoadedAtMs: Date.now() - 9 * 86400000 },
     { recordId: 'lib-3', type: 'preset', sourceType: 'vstpreset', name: 'Lost Lead',
       manufacturer: 'Someone', instrument: 'Uninstalled Synth', category: 'Lead', factory: true,
       available: false, tags: ['bright'],
@@ -941,9 +1083,6 @@ export function mockHostLibrary(query = '', type = '') {
       rating: 3, tags: ['bright', 'wide'], collections: ['Friday'] },
   ];
 
-  // Both call shapes: the older (text, type) pair and the whole query object.
-  const request = normalizeLibraryQuery(
-    typeof query === 'object' && query !== null ? query : { text: query, type });
   all.push(...mockBranches.map((b) => ({ ...b, sonic: mockSonic(0.45, 0.30, 0.50, 0.20, 0.12) })));
 
   // In the demo a measured sound is an instant one, which is what the native side arranges too:
@@ -951,7 +1090,136 @@ export function mockHostLibrary(query = '', type = '') {
   for (const record of all) {
     record.instant = Boolean(record.sonic) && record.sonic.silent !== true;
     record.versions = record.versions ?? mockVersions[record.recordId] ?? [];
+    record.hidden = mockHiddenRecords.has(record.recordId);
+    const usage = mockUsage[record.recordId];
+    record.loadCount = (record.loadCount ?? 0) + (usage?.loadCount ?? 0);
+    record.auditionCount = (record.auditionCount ?? 0) + (usage?.auditionCount ?? 0);
+    if (usage?.lastLoadedAtMs) record.lastLoadedAtMs = usage.lastLoadedAtMs;
+    if (mockMergedCuration[record.recordId])
+      Object.assign(record, mockMergedCuration[record.recordId]);
   }
+
+  return all;
+}
+
+/** Whichever member of a set carries the most user metadata is the one to keep. The weights
+    mirror libraryDuplicates in CE/src/InstrumentHost/Library.cpp, which is the authority. */
+const mockCurationWeight = (r) =>
+  (r.favourite ? 4 : 0) + (Number(r.rating ?? 0) > 0 ? 3 : 0)
+  + (String(r.notes ?? '') !== '' ? 2 : 0) + ((r.tags ?? []).length ? 2 : 0)
+  + ((r.collections ?? []).length ? 1 : 0) + (r.factory ? 0 : 1);
+
+/** The demo's duplicate sets, over whatever is not already folded. The native side measures as
+    well as fingerprints; the demo only has the fingerprints, so every set it finds is identical
+    and the non-identical case is exercised by the C++ tests rather than here. */
+function mockLibraryDuplicates(all) {
+  const byFingerprint = new Map();
+  for (const record of all) {
+    if (!record.mockFingerprint || record.hidden) continue;
+    byFingerprint.set(record.mockFingerprint,
+                      [...(byFingerprint.get(record.mockFingerprint) ?? []), record]);
+  }
+
+  const sets = [];
+  for (const members of byFingerprint.values()) {
+    if (members.length < 2) continue;
+    // Stable sort, so a tie goes to the first — which is library order, as it is in C++.
+    const key = [...members].sort((a, b) => mockCurationWeight(b) - mockCurationWeight(a))[0];
+    sets.push({ keyRecordId: key.recordId, name: key.name, identical: true,
+                recordIds: members.map((r) => r.recordId) });
+  }
+  return sets;
+}
+
+/** What folding a set would put on its survivor: tags and collections unioned, the highest
+    rating, favourite if any member is, and the notes kept with the name of the sound each came
+    from. Mirrors mergedDuplicateMetadata in CE/src/InstrumentHost/Library.cpp. Pure and
+    exported, because the rule is worth testing without a store to mutate. */
+export function mergedDuplicateCuration(records, set) {
+  const byId = new Map(records.map((r) => [r.recordId, r]));
+  const key = byId.get(set.keyRecordId);
+  if (!key) return null;
+
+  const merged = {
+    favourite: key.favourite === true,
+    rating: Number(key.rating ?? 0),
+    tags: [...(key.tags ?? [])],
+    collections: [...(key.collections ?? [])],
+    notes: String(key.notes ?? ''),
+  };
+  const noteParts = merged.notes ? [merged.notes] : [];
+
+  for (const id of set.recordIds) {
+    if (id === set.keyRecordId) continue;
+    const other = byId.get(id);
+    if (!other) continue;
+    merged.favourite = merged.favourite || other.favourite === true;
+    merged.rating = Math.max(merged.rating, Number(other.rating ?? 0));
+    for (const tag of other.tags ?? []) if (!merged.tags.includes(tag)) merged.tags.push(tag);
+    for (const c of other.collections ?? [])
+      if (!merged.collections.includes(c)) merged.collections.push(c);
+    if (String(other.notes ?? '') !== '') noteParts.push(`${other.name}: ${other.notes}`);
+  }
+
+  merged.notes = noteParts.join('\n');
+  return merged;
+}
+
+/** The average of what has actually been reached for — the demo's mirror of habitualProfile in
+    CE/src/InstrumentHost/Library.cpp, which is the authority.
+
+    Weighted by how often each record was loaded, because a sound played fifty times says more
+    about a habit than one played once. Returns null when there are fewer than `minimumRecords`
+    DISTINCT records to go on: one pad opened fifty times is one data point repeated, and a
+    recommendation built on it is confident nonsense — the one outcome that stops anybody
+    trusting the feature again. */
+export function mockHabitualProfile(records, minimumRecords = 5) {
+  const axes = ['brightness', 'centroidHz', 'attack', 'attackSeconds', 'tail', 'tailSeconds',
+                'width', 'noisiness', 'dynamics', 'cost'];
+  const centre = Object.fromEntries(axes.map((a) => [a, 0]));
+  let weight = 0;
+  let contributors = 0;
+
+  for (const record of records ?? []) {
+    // A folded duplicate is the same sound under another name, so counting it weighs one sound
+    // twice. A silent measurement is a measurement of nothing.
+    if (record.hidden || !(Number(record.loadCount ?? 0) > 0)) continue;
+    if (!record.sonic || record.sonic.silent) continue;
+
+    const w = Number(record.loadCount);
+    weight += w;
+    contributors += 1;
+    for (const axis of axes) centre[axis] += w * Number(record.sonic[axis] ?? 0);
+  }
+
+  if (contributors < Math.max(1, minimumRecords) || !(weight > 0)) return null;
+  for (const axis of axes) centre[axis] /= weight;
+  return centre;
+}
+
+/** What you own and have never played, nearest first to what you actually reach for. */
+export function mockUnplayedLikeHabits(records, count = 20, minimumRecords = 5) {
+  const centre = mockHabitualProfile(records, minimumRecords);
+  if (!centre || count <= 0) return { enough: false, from: 0, matches: [] };
+
+  const from = (records ?? []).filter((r) => !r.hidden && Number(r.loadCount ?? 0) > 0
+                                             && r.sonic && !r.sonic.silent).length;
+  const matches = (records ?? [])
+    .filter((r) => !(Number(r.loadCount ?? 0) > 0) && !r.hidden
+                   && r.sonic && !r.sonic.silent && r.available !== false)
+    .map((r) => ({ record: r, distance: mockSonicDistance(centre, r.sonic) }))
+    .sort((x, y) => x.distance - y.distance)
+    .slice(0, count);
+
+  return { enough: true, from, matches };
+}
+
+export function mockHostLibrary(query = '', type = '') {
+  const all = mockLibraryRecords();
+
+  // Both call shapes: the older (text, type) pair and the whole query object.
+  const request = normalizeLibraryQuery(
+    typeof query === 'object' && query !== null ? query : { text: query, type });
 
   const records = all.filter((r) => matchesLibraryQuery(r, request));
 
@@ -962,7 +1230,11 @@ export function mockHostLibrary(query = '', type = '') {
 
   return normalizeHostLibrary({
     records,
-    counts: { total: all.length, presets: 5, racks: 1, chains: 1, missing: 0,
+    counts: { total: all.length,
+              presets: all.filter((r) => r.type === 'preset').length,
+              racks: all.filter((r) => r.type === 'rack').length,
+              chains: all.filter((r) => r.type === 'chain').length,
+              missing: 0,
               matched: records.length,
               snapshots: all.filter((r) => r.sonic && !r.sonic.silent).length,
               snapshotBytes: all.filter((r) => r.sonic).length * 35000,
@@ -970,7 +1242,18 @@ export function mockHostLibrary(query = '', type = '') {
               measurable: all.filter((r) => !r.sonic && r.type === 'preset'
                                               && r.available !== false
                                               && !r.sonicRefusal).length,
-              refused: all.filter((r) => !r.sonic && r.sonicRefusal).length },
+              refused: all.filter((r) => !r.sonic && r.sonicRefusal).length,
+              addedRecently: all.filter((r) =>
+                Number(r.addedAtMs ?? 0) > 0
+                  && Date.now() - Number(r.addedAtMs) <= 14 * 86400000).length,
+              hidden: all.filter((r) => r.hidden).length,
+              everLoaded: all.filter((r) => !r.hidden && Number(r.loadCount ?? 0) > 0).length,
+              neverLoaded: all.filter((r) => !r.hidden && !(Number(r.loadCount ?? 0) > 0)).length,
+              refusedByCause: all.reduce((acc, r) => {
+                if (!r.sonic && r.sonicRefusal) acc[r.mockRefusalCause ?? 'other'] += 1;
+                return acc;
+              }, refusedByCause(null)) },
+    duplicates: mockLibraryDuplicates(all),
     facets: computeLibraryFacets(all, request),
     smartCollections: mockSmartCollections.map((c) => ({
       ...c, count: all.filter((r) => matchesLibraryQuery(r, c.query)).length })),
@@ -1001,6 +1284,9 @@ export function resetMockLibraryState() {
   mockMeasuredEverything = false;
   mockVersions = {};
   mockBranches = [];
+  mockHiddenRecords = new Set();
+  mockMergedCuration = {};
+  mockUsage = {};
   hostVersionDiff.set(null);
   mockLibraryView = emptyLibraryQuery();
   hostAudition.set({ recordId: '', stage: '', detail: '', phrase: 'recent', bars: 4 });
@@ -1015,6 +1301,10 @@ export function emptyHostProject() {
     appId: '',
     includeStandalone: true,
     includeVst3: true,
+    // A setlist item's notes are somebody's own words about their own gig, and the authored rack
+    // ships inside every built product. Off by default: a build that quietly published them
+    // cannot be taken back, and one that left them out can be run again.
+    includeStageNotes: false,
   };
 }
 
@@ -1027,6 +1317,9 @@ export function normalizeHostProject(payload) {
     appId: String(p.appId ?? ''),
     includeStandalone: p.includeStandalone !== false,
     includeVst3: p.includeVst3 !== false,
+    // Opposite default to the two above: an absent field means "do not publish my notes", which
+    // is what every project written before the field existed meant whether it knew it or not.
+    includeStageNotes: p.includeStageNotes === true,
   };
 }
 
@@ -1697,6 +1990,7 @@ export function emptyPerformance() {
       defaultQuantize: 'bar',
     },
     grooves: [],
+    gestureShapes: [],
     patterns: [],
     clips: [],
     scenes: [],
@@ -1768,6 +2062,129 @@ export const factoryGrooveTemplates = [
   },
 ];
 
+/** How many points a stored gesture shape carries. Fixed, mirroring gestureShapePoints in
+    CE/src/Performance/PatternModel.h: a shape read off a sixteen-step lane has to land on a
+    thirty-two-step one, so it is stored over normalised time rather than as steps. */
+export const GESTURE_SHAPE_POINTS = 32;
+
+/** The four movements a hand actually makes. Somebody with an empty library still has something
+    to put on a filter and hear what this does, which is the same reason the grooves ship. */
+export const factoryGestureShapes = (() => {
+  const build = (gestureId, name, curve) => ({
+    gestureId, name, source: 'factory',
+    points: Array.from({ length: GESTURE_SHAPE_POINTS },
+      (_unused, i) => Math.max(0, Math.min(1, curve(i / GESTURE_SHAPE_POINTS)))),
+  });
+  return [
+    build('@hostage-rise', 'Rise', (t) => t),
+    build('@hostage-fall', 'Fall', (t) => 1 - t),
+    // Up and back down inside one pass — the build-and-release every filter sweep is.
+    build('@hostage-swell', 'Swell', (t) => (t < 0.5 ? t * 2 : (1 - t) * 2)),
+    // Four cycles around the middle: deep enough to hear, not so deep it flattens at both ends.
+    build('@hostage-wobble', 'Wobble', (t) => 0.5 + 0.45 * Math.sin(t * 4 * 2 * Math.PI)),
+  ];
+})();
+
+export const normalizeGestureShape = (shape) => ({
+  gestureId: String(shape?.gestureId ?? ''),
+  name: String(shape?.name ?? 'Imported gesture').trim().slice(0, 80) || 'Imported gesture',
+  source: shape?.source === 'factory' ? 'factory' : 'imported',
+  points: (Array.isArray(shape?.points) ? shape.points : [])
+    .slice(0, GESTURE_SHAPE_POINTS).map((value) => clampNumber(value, 0, 1, 0)),
+});
+
+/** The value a shape has at `phase` (0..1 of one pass). Wrapped, not clamped: a shape put on a
+    lane longer than itself repeats, because running out and holding would turn a wobble into a
+    wobble followed by silence. */
+export function gestureValueAt(shape, phase) {
+  const points = shape?.points ?? [];
+  if (points.length === 0) return 0;
+  if (points.length === 1) return points[0];
+  let wrapped = Number(phase) % 1;
+  if (wrapped < 0) wrapped += 1;
+  const scaled = wrapped * points.length;
+  const lower = Math.floor(scaled);
+  const fraction = scaled - lower;
+  const a = points[lower % points.length];
+  const b = points[(lower + 1) % points.length];
+  return a + (b - a) * fraction;
+}
+
+/** Reads the shape of a hand movement out of a lane — the browser mirror of gestureFromLane in
+    CE/src/Performance/PatternModel.cpp, which is the authority.
+
+    Answers with NO points when there was nothing to read: a lane that is not a parameter or cc
+    lane (a note lane has velocities, not a curve), or one with fewer than two active steps,
+    because a single value is a position and not a movement. Only active steps carry a value;
+    the rest are what the lane's glide passes through. */
+export function gestureFromPatternLane(pattern, laneId = '', name = '') {
+  const shape = {
+    gestureId: '',
+    source: 'imported',
+    name: String(name ?? '').trim().slice(0, 80)
+          || `${String(pattern?.name ?? '')} move`.trim().slice(0, 80),
+    points: [],
+  };
+
+  const carriesACurve = (lane) => lane?.type === 'parameter' || lane?.type === 'cc';
+  const lanes = pattern?.lanes ?? [];
+  const source = laneId
+    ? lanes.find((lane) => lane.laneId === laneId && carriesACurve(lane))
+    : lanes.find((lane) => carriesACurve(lane) && !lane.lockSourceLaneId);
+  if (!source || !(source.steps?.length > 0)) return shape;
+
+  const active = source.steps
+    .map((step, index) => ({ step, index }))
+    .filter(({ step }) => step.active);
+  if (active.length < 2) return shape;
+
+  const steps = source.steps.length;
+  for (let i = 0; i < GESTURE_SHAPE_POINTS; i += 1) {
+    const position = (i / GESTURE_SHAPE_POINTS) * steps;
+    // Before the first active step and after the last, hold the nearest: the lane had no
+    // movement out there to describe.
+    let before = active[0];
+    let after = active[active.length - 1];
+    for (const candidate of active) {
+      if (candidate.index <= position) before = candidate;
+      if (candidate.index >= position) { after = candidate; break; }
+    }
+    const span = after.index - before.index;
+    const fraction = span > 0
+      ? Math.max(0, Math.min(1, (position - before.index) / span)) : 0;
+    const a = Number(before.step.value ?? 0);
+    const b = Number(after.step.value ?? 0);
+    shape.points.push(Math.max(0, Math.min(1, a + (b - a) * fraction)));
+  }
+
+  return shape;
+}
+
+/** Writes a gesture onto one parameter or cc lane, at any length. Mirrors applyGestureShape.
+
+    `amount` scales the shape's deviation from ITS OWN MEAN rather than blending with whatever
+    the lane held: a gesture at half depth is the same movement, half as deep, centred where the
+    movement was centred. Every step it writes becomes active and the lane is set to glide,
+    because a gesture left stepping is a staircase rather than a sweep. */
+export function applyGestureToLane(pattern, shape, laneId, amount = 1) {
+  if (!(shape?.points?.length > 0)) return false;
+  const lane = (pattern?.lanes ?? []).find((candidate) => candidate.laneId === laneId
+    && (candidate.type === 'parameter' || candidate.type === 'cc'));
+  if (!lane || !(lane.steps?.length > 0)) return false;
+
+  const depth = Math.max(0, Math.min(1, Number(amount ?? 1)));
+  const mean = shape.points.reduce((sum, value) => sum + value, 0) / shape.points.length;
+
+  const steps = lane.steps.length;
+  for (let i = 0; i < steps; i += 1) {
+    const sampled = gestureValueAt(shape, i / steps);
+    lane.steps[i].value = Math.max(0, Math.min(1, mean + (sampled - mean) * depth));
+    lane.steps[i].active = true;
+  }
+  lane.glide = true;
+  return true;
+}
+
 export const normalizeGrooveTemplate = (groove) => ({
   grooveId: String(groove?.grooveId ?? ''),
   name: String(groove?.name ?? 'Imported groove').trim().slice(0, 80) || 'Imported groove',
@@ -1808,12 +2225,212 @@ export function applyGrooveToPattern(pattern, template, amount = 1, applyVelocit
   return target;
 }
 
+/** Read a feel back out of a lane — the mirror of `applyGrooveToPattern`, and of
+    `grooveFromLane` in CE/src/Performance/PatternModel.cpp, which is the authority. The rules
+    that matter are the same ones the C++ header states:
+
+      - the template takes the LANE'S own stepsPerBeat, which is what makes timing exact on the
+        way back in (the laneRate/grooveRate scale becomes 1);
+      - velocity is a MULTIPLIER over the mean of the active steps and therefore does not round
+        trip, because applying multiplies rather than sets;
+      - fewer than two active steps yields no multipliers, which means "keep dynamics";
+      - 64 offsets is the cap the service stores, so stop there rather than be truncated later.
+
+    Returns empty timingOffsets when there is nothing to read, so the caller refuses. */
+export function grooveFromPatternLane(pattern, laneId = '', name = '') {
+  const lanes = pattern?.lanes ?? [];
+  const source = laneId
+    ? lanes.find((lane) => lane.laneId === laneId)
+    : lanes.find((lane) => ['note', 'chord', 'drum'].includes(lane.type));
+
+  const groove = {
+    grooveId: '',
+    name: String(name ?? '').trim().slice(0, 80)
+      || `${String(pattern?.name ?? 'Pattern')} feel`.slice(0, 80),
+    source: 'imported',
+    stepsPerBeat: Math.max(1, Math.min(16, Number(source?.stepsPerBeat) || 4)),
+    timingOffsets: [],
+    velocityMultipliers: [],
+  };
+
+  const steps = (source?.steps ?? []).slice(0, 64);
+  if (!steps.length) return groove;
+
+  groove.timingOffsets = steps.map((step) =>
+    Math.max(-.5, Math.min(.5, Number(step.microtiming) || 0)));
+
+  const active = steps.filter((step) => step.active);
+  if (active.length < 2) return groove;
+  const mean = active.reduce((sum, step) => sum + (Number(step.velocity) || 0), 0) / active.length;
+  if (!(mean > 0)) return groove;
+
+  // An inactive step keeps 1.0: it has no velocity of its own, and a zero would silence
+  // whatever step it later lands on.
+  groove.velocityMultipliers = steps.map((step) =>
+    Math.max(.25, Math.min(2, step.active ? (Number(step.velocity) || 0) / mean : 1)));
+
+  return groove;
+}
+
 const normalizeFollowAction = (clip) => {
   const action = String(clip?.followAction ?? '');
   if (['none', 'clip', 'next', 'random', 'stop'].includes(action)) return action;
   if (clip?.followClipId) return 'clip';
   return Number(clip?.followAfterLoops ?? 0) > 0 ? 'stop' : 'none';
 };
+
+/** THE FOLLOW GRAPH. A clip's `followAction` is a song form expressed as five dropdowns, which
+    means the shape of a set exists only in the user's head. This turns the clip list into nodes
+    and edges so it can be drawn — and, more to the point, so the arrows that will never fire can
+    be named before a gig rather than during one.
+
+    Every rule below was established by driving PerformanceEngine rather than by reading it, and
+    the engine (PerformanceEngine.cpp, the `doneLooping || doneFollowing` block) is the authority:
+
+      - A follow needs `followAfterLoops > 0`. With zero the action is set and never comes round.
+      - A clip that does not loop ends at its first pass, so it only ever reaches loop 1 — a
+        non-looping clip with a follow count above 1 stops instead of following.
+      - `clip` with no target chosen does not carry on; it STOPS. The dropdown reads
+        "Choose clip…" and the behaviour is Stop, which is the one that surprises people.
+      - `next` is the next clip in DOCUMENT ORDER and wraps from the last to the first, so the
+        order of the list is part of the meaning and this graph must not reorder it.
+      - `random` chooses among every other clip, not a designated set. It is reproducible from
+        the clip's id and its loop count, but it is not predictable to somebody reading the
+        screen, so it is drawn as a fan rather than as one arrow.
+      - With only one clip in the song, `next` and `random` have nothing to choose and stop.
+
+    Pure, and it takes the clip array rather than the store, so the rules can be tested without
+    a performance to mutate. */
+export function clipFollowGraph(clips) {
+  const list = (Array.isArray(clips) ? clips : []).filter((c) => c && c.clipId);
+  const indexOf = new Map(list.map((c, i) => [c.clipId, i]));
+
+  const nodes = list.map((clip, index) => {
+    const action = normalizeFollowAction(clip);
+    const afterLoops = Math.max(0, Math.floor(Number(clip.followAfterLoops ?? 0)) || 0);
+    const loops = clip.loop !== false;
+
+    // Whether the configured action can ever fire at all. Both boundaries are decided at the
+    // same moment in the engine, so a one-shot only ever satisfies a follow count of exactly 1.
+    let deadReason = '';
+    if (action !== 'none') {
+      if (afterLoops <= 0)
+        deadReason = 'the loop count is zero, so this never comes round';
+      else if (!loops && afterLoops > 1)
+        deadReason = `Loop is off, so this clip ends after one pass and never reaches loop ${afterLoops}`;
+    }
+    const live = action !== 'none' && deadReason === '';
+
+    return { clipId: clip.clipId, name: String(clip.name ?? ''), index,
+             action, afterLoops, loop: loops, live, deadReason,
+             // Filled in below, once every node exists.
+             kind: 'open', target: '', fanOut: 0, stopNote: '',
+             reachable: false, reachesRest: false };
+  });
+
+  const edges = [];
+  for (const node of nodes) {
+    if (!node.live) {
+      // A clip with no live follow either loops until something stops it, or plays once.
+      node.kind = node.loop ? 'open' : 'terminal';
+      if (node.kind === 'terminal') node.stopNote = 'plays once and stops';
+      continue;
+    }
+
+    if (node.action === 'stop') {
+      node.kind = 'terminal';
+      node.stopNote = `stops after ${node.afterLoops} loop${node.afterLoops === 1 ? '' : 's'}`;
+      continue;
+    }
+
+    if (node.action === 'clip') {
+      const target = String(list[node.index].followClipId ?? '');
+      // No target, or one the performance no longer has: the engine finds nothing to launch and
+      // the clip simply stops. Drawn as an end, because that is what it is.
+      if (!target || !indexOf.has(target)) {
+        node.kind = 'terminal';
+        node.stopNote = target ? 'stops — the clip it names is gone' : 'stops — no clip chosen';
+        continue;
+      }
+      node.kind = 'follow';
+      node.target = target;
+      edges.push({ fromClipId: node.clipId, toClipId: target, kind: 'clip' });
+      continue;
+    }
+
+    if (nodes.length < 2) {
+      // Nothing to move to. The engine leaves the clip stopped at its boundary.
+      node.kind = 'terminal';
+      node.stopNote = 'stops — there is no other clip to go to';
+      continue;
+    }
+
+    if (node.action === 'next') {
+      const target = nodes[(node.index + 1) % nodes.length].clipId;
+      node.kind = 'follow';
+      node.target = target;
+      edges.push({ fromClipId: node.clipId, toClipId: target, kind: 'next' });
+      continue;
+    }
+
+    // random
+    node.kind = 'fan';
+    node.fanOut = nodes.length - 1;
+    for (const other of nodes)
+      if (other.clipId !== node.clipId)
+        edges.push({ fromClipId: node.clipId, toClipId: other.clipId, kind: 'random' });
+  }
+
+  const byId = new Map(nodes.map((n) => [n.clipId, n]));
+  for (const edge of edges) byId.get(edge.toClipId).reachable = true;
+
+  // Does this clip ever come to rest? Worked backwards from every resting place over the live
+  // edges — one pass instead of a search per clip.
+  //
+  // A rest is a clip that STOPS or one that simply loops with no follow, and counting the second
+  // one matters: almost every real set ends on a clip looping until the player stops it, and
+  // warning about that would put a complaint on the screen the moment anybody made two clips.
+  // What is worth saying is the ring — clips that only ever hand on to each other, so the set
+  // arrives nowhere and never lands.
+  const into = new Map(nodes.map((n) => [n.clipId, []]));
+  for (const edge of edges) into.get(edge.toClipId).push(edge.fromClipId);
+
+  const queue = nodes.filter((n) => n.kind === 'terminal' || n.kind === 'open');
+  for (const node of queue) node.reachesRest = true;
+  while (queue.length) {
+    const node = queue.shift();
+    for (const fromId of into.get(node.clipId)) {
+      const from = byId.get(fromId);
+      if (from.reachesRest) continue;
+      from.reachesRest = true;
+      queue.push(from);
+    }
+  }
+
+  const warnings = [];
+  for (const node of nodes) {
+    if (node.deadReason)
+      warnings.push({ code: 'dead-follow', clipId: node.clipId, name: node.name,
+                      text: `${node.name} is set to follow, but ${node.deadReason}.` });
+    else if (node.kind === 'terminal' && node.action === 'clip')
+      warnings.push({ code: 'silent-stop', clipId: node.clipId, name: node.name,
+                      text: node.stopNote === 'stops — no clip chosen'
+                              ? `${node.name} is set to "Target clip" with nothing chosen, which ends the set rather than carrying on.`
+                              : `${node.name} names a clip the performance no longer has, so it ends the set.` });
+  }
+
+  // One warning for the whole knot, not one per clip in it: a three-clip ring that never lands
+  // is a single mistake, and three copies of the same sentence reads like three of them.
+  const stranded = nodes.filter((n) => n.live && !n.reachesRest);
+  if (stranded.length > 0)
+    warnings.push({ code: 'no-way-out', clipId: stranded[0].clipId, name: stranded[0].name,
+                    clipIds: stranded.map((n) => n.clipId),
+                    text: stranded.length === 1
+                            ? `${stranded[0].name} hands back to itself for ever — the set never lands.`
+                            : `${stranded.map((n) => n.name).join(' → ')} only ever hand on to each other, so the set never lands.` });
+
+  return { nodes, edges, warnings };
+}
 
 const normalizeArp = (a) => ({
   enabled: a?.enabled === true,
@@ -2164,6 +2781,10 @@ export function normalizePerformance(payload) {
     },
     grooves: (Array.isArray(p.grooves) ? p.grooves : [])
       .map(normalizeGrooveTemplate).filter((groove) => groove.grooveId && groove.timingOffsets.length >= 2),
+    // Named apart from the recorder's own `gestures` on purpose: two different things under one
+    // key on one object is a bug waiting to be found by somebody else.
+    gestureShapes: (Array.isArray(p.gestureShapes) ? p.gestureShapes : [])
+      .map(normalizeGestureShape).filter((shape) => shape.gestureId && shape.points.length >= 2),
     patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((pattern) => ({
       patternId: String(pattern?.patternId ?? ''),
       name: String(pattern?.name ?? ''),
@@ -2258,6 +2879,13 @@ export function normalizePerformance(payload) {
       numMacros: Number(s?.numMacros ?? (Array.isArray(s?.macros) ? s.macros.length : 0)),
       numParameters: Number(s?.numParameters
         ?? (Array.isArray(s?.parameters) ? s.parameters.length : 0)),
+      // Scene Variations, the same bookkeeping a pattern carries. Only the four labels exist;
+      // anything else reads as a plain scene rather than a family nobody can find the rest of.
+      variationGroupId: String(s?.variationGroupId ?? ''),
+      variationLabel: ['A', 'B', 'C', 'D'].includes(String(s?.variationLabel ?? '').toUpperCase())
+        ? String(s.variationLabel).toUpperCase() : '',
+      variationSourceSceneId: String(s?.variationSourceSceneId ?? ''),
+      variationAmount: Math.max(0, Math.min(1, Number(s?.variationAmount ?? 0))),
     })),
     snapshotMorph: {
       active: snapshotMorph.active === true,
@@ -2370,6 +2998,115 @@ export function normalizePerformance(payload) {
     },
     scales: (Array.isArray(p.scales) ? p.scales : []).map(String),
   };
+}
+
+/** A deterministic signed nudge in -1..+1, mirroring sceneNudge in
+    CE/src/Performance/PatternModel.cpp. Seeded from the scene, the label and the name, so asking
+    for "B at 40%" twice gives the same scene — which is what makes a variation rehearsable. */
+function sceneNudge(sceneId, label, key, salt) {
+  const hash = (text) => {
+    let value = 0x811c9dc5;
+    for (const character of String(text)) {
+      value ^= character.charCodeAt(0);
+      value = Math.imul(value, 0x01000193) >>> 0;
+    }
+    return value || 1;
+  };
+  let mixed = (hash(sceneId) ^ (label.charCodeAt(0) << 24) ^ salt ^ hash(key)) >>> 0;
+  mixed ^= mixed >>> 16; mixed = Math.imul(mixed, 0x7feb352d) >>> 0;
+  mixed ^= mixed >>> 15; mixed = Math.imul(mixed, 0x846ca68b) >>> 0;
+  mixed = (mixed ^ (mixed >>> 16)) >>> 0;
+  return 2 * ((mixed & 0x00ffffff) / 0x01000000) - 1;
+}
+
+/** A B / C / D version of a whole SCENE, mirroring makeSceneVariation in
+    CE/src/Performance/PatternModel.cpp, which is the authority.
+
+    A scene is heterogeneous — clips, mixer levels, macro values, plug-in parameters — so "forty
+    per cent different" means something different per kind:
+
+      - clips get the matching variation of their pattern, reusing one that already exists in
+        that pattern's variation group rather than minting a rival;
+      - continuous values (volume, pan, macros) are nudged deterministically;
+      - **booleans are not touched at all** — there is no such thing as forty per cent muted,
+        and flipping one would be the program overruling a decision somebody made;
+      - plug-in parameters move only where `isContinuous` says they have a midpoint, and
+        anything it cannot classify is held, because holding is never wrong.
+
+    Mutates `patterns` and `clips` by appending what it had to mint, as the native side does, and
+    leaves the source scene alone: nothing is taken from a set that is playing. */
+export function makeSceneVariation(source, label, amount, patterns, clips,
+                                   isContinuous = null, mintId = null) {
+  const normalizedLabel = ['B', 'C', 'D'].includes(label) ? label : 'B';
+  const intensity = Math.max(0, Math.min(1, Number(amount ?? 0.55)));
+  const id = mintId ?? ((prefix) => nextMockId(prefix));
+
+  const out = JSON.parse(JSON.stringify(source));
+  out.sceneId = id(`mock-scene-variation-${source.sceneId}-${normalizedLabel}`);
+  out.name = `${source.name} ${normalizedLabel}`;
+  out.variationGroupId = source.variationGroupId || source.sceneId;
+  out.variationLabel = normalizedLabel;
+  out.variationSourceSceneId = source.variationSourceSceneId || source.sceneId;
+  out.variationAmount = intensity;
+  out.clipIds = [];
+
+  for (const clipId of source.clipIds ?? []) {
+    const sourceClip = clips.find((c) => c.clipId === clipId);
+    // A scene can name a clip that has since been removed; the variation is of what it launches
+    // NOW. A clip with no pattern is launchable and plays nothing, so it comes across as it is.
+    if (!sourceClip) continue;
+    const sourcePattern = patterns.find((p) => p.patternId === sourceClip.patternId);
+    if (!sourcePattern) { out.clipIds.push(clipId); continue; }
+
+    const groupId = sourcePattern.variationGroupId || sourcePattern.patternId;
+    let variation = patterns.find((p) => p.variationGroupId === groupId
+                                         && p.variationLabel === normalizedLabel);
+    if (!variation) {
+      variation = makePatternVariation(sourcePattern, normalizedLabel, intensity,
+        id(`mock-variation-${sourcePattern.patternId}-${normalizedLabel}`));
+      variation.variationGroupId = groupId;
+      variation.variationSourcePatternId = sourcePattern.patternId;
+      patterns.push(variation);
+    }
+
+    const madeClip = {
+      ...JSON.parse(JSON.stringify(sourceClip)),
+      clipId: id(`mock-clip-variation-${sourceClip.clipId}-${normalizedLabel}`),
+      name: `${sourceClip.name} ${normalizedLabel}`,
+      patternId: variation.patternId,
+      // A follow names a clip in the SOURCE scene; carrying it over would make the variation
+      // hand off into the section it is a variation of, which is never what was meant.
+      followClipId: '', followAction: 'none', followAfterLoops: 0,
+      // A freeze is a rendering of the source clip's output, so it does not describe this one.
+      frozenMidi: false, frozenFromClipId: '', frozenNoteCount: 0,
+      active: false, pending: false, phase: 0,
+    };
+    out.clipIds.push(madeClip.clipId);
+    clips.push(madeClip);
+  }
+
+  for (const slot of out.slots ?? []) {
+    if (slot.applyVolume)
+      slot.volume = Math.max(0, Math.min(2, slot.volume + 0.5 * intensity
+        * sceneNudge(source.sceneId, normalizedLabel, `${slot.partId}/vol`, 0x51ed270b)));
+    if (slot.applyPan)
+      slot.pan = Math.max(-1, Math.min(1, slot.pan + 0.35 * intensity
+        * sceneNudge(source.sceneId, normalizedLabel, `${slot.partId}/pan`, 0x2545f491)));
+    // slot.mute and slot.enabled are deliberately untouched.
+  }
+
+  for (const macro of out.macros ?? [])
+    macro.value = Math.max(0, Math.min(1, macro.value + 0.4 * intensity
+      * sceneNudge(source.sceneId, normalizedLabel, macro.macroId, 0x9e3779b9)));
+
+  for (const parameter of out.parameters ?? []) {
+    if (!isContinuous || !isContinuous(parameter.targetId, parameter.parameterId)) continue;
+    parameter.value = Math.max(0, Math.min(1, parameter.value + 0.4 * intensity
+      * sceneNudge(source.sceneId, normalizedLabel,
+                   `${parameter.targetId}/${parameter.parameterId}`, 0x85ebca6b)));
+  }
+
+  return out;
 }
 
 const variationPatternSeed = (pattern) => {
@@ -3350,6 +4087,18 @@ export function filterEffects(effects, query) {
 }
 
 /** The browser-only demo catalogue and rack. */
+/** A stable, non-zero seed derived from a pattern id, mirroring how the native side mints one.
+    The value is not expected to equal native's — nothing compares them — but the properties are
+    the ones that matter: distinct per pattern, the same on every reload, and never zero. */
+function mockPatternSeed(patternId) {
+  let h = 2166136261;
+  for (let i = 0; i < patternId.length; i += 1) {
+    h ^= patternId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (Math.abs(h) % 0x7ffffffe) + 1;
+}
+
 export function mockHostState() {
   return normalizeHostState({
     instruments: [
@@ -3460,8 +4209,10 @@ export function mockHostState() {
     performance: {
       transport: { tempo: 120, numerator: 4, denominator: 4, defaultQuantize: 'bar' },
       grooves: factoryGrooveTemplates,
+      gestureShapes: factoryGestureShapes,
       patterns: [{
         patternId: 'mock-pattern-1',
+        seed: mockPatternSeed('mock-pattern-1'),
         name: 'Riff',
         lanes: [{
           laneId: 'mock-lane-1',
@@ -3477,8 +4228,22 @@ export function mockHostState() {
           })),
         }],
       }],
-      clips: [{ clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
-                 launchQuantize: 'bar', loop: true }],
+      // A small song form rather than a single clip, so the follow graph has something to draw
+      // and every edge kind is in the preview: a named target, a Next that walks document
+      // order, a Random fan, and an end. It is deliberately a CORRECT form — the graph's
+      // warnings are exercised by tests with fixtures of their own, not by shipping a broken
+      // demo for people to copy.
+      clips: [
+        { clipId: 'mock-clip-1', name: 'Riff', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true,
+          followAction: 'clip', followClipId: 'mock-clip-2', followAfterLoops: 2 },
+        { clipId: 'mock-clip-2', name: 'Verse', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'next', followAfterLoops: 4 },
+        { clipId: 'mock-clip-3', name: 'Chorus', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'random', followAfterLoops: 2 },
+        { clipId: 'mock-clip-4', name: 'Outro', patternId: 'mock-pattern-1',
+          launchQuantize: 'bar', loop: true, followAction: 'stop', followAfterLoops: 1 },
+      ],
       scenes: [],
       setlist: { items: [], currentIndex: -1 },
       arrangement: {
@@ -5161,6 +5926,7 @@ export function applyMockCommand(state, payload) {
     ...next.rack.buses.flatMap((candidate) => candidate.effects)]
     .find((candidate) => candidate.effectId === id);
 
+
   if (cmd === 'transportPlay' || cmd === 'transportStop' || cmd === 'transportContinue') {
     perf.transport.playing = cmd !== 'transportStop';
     if (cmd === 'transportPlay') { perf.transport.positionPpq = 0; perf.transport.bar = 1; perf.transport.beat = 1; }
@@ -5196,6 +5962,15 @@ export function applyMockCommand(state, payload) {
     if (imported.timingOffsets.length >= 2) perf.grooves.push(imported);
     return next;
   }
+  if (cmd === 'extractGrooveTemplate') {
+    if (perf.grooves.length >= 32) return next;
+    const target = pattern(payload.patternId);
+    if (!target) return next;
+    const read = grooveFromPatternLane(target, payload.laneId, payload.name);
+    if (read.timingOffsets.length < 2) return next;
+    perf.grooves.push(normalizeGrooveTemplate({ ...read, grooveId: nextMockId('mock-groove') }));
+    return next;
+  }
   if (cmd === 'removeGrooveTemplate') {
     perf.grooves = perf.grooves.filter((groove) =>
       groove.grooveId !== payload.grooveId || groove.source === 'factory');
@@ -5208,10 +5983,44 @@ export function applyMockCommand(state, payload) {
       applyGrooveToPattern(target, groove, payload.amount, payload.applyVelocity !== false);
     return next;
   }
+  if (cmd === 'importGestureShape') {
+    if (perf.gestureShapes.length >= 32) return next;
+    const imported = normalizeGestureShape({
+      gestureId: nextMockId('mock-gesture'),
+      name: payload.name,
+      source: 'imported',
+      points: payload.points,
+    });
+    if (imported.points.length >= 2) perf.gestureShapes.push(imported);
+    return next;
+  }
+  if (cmd === 'extractGestureShape') {
+    if (perf.gestureShapes.length >= 32) return next;
+    const target = pattern(payload.patternId);
+    if (!target) return next;
+    const read = gestureFromPatternLane(target, payload.laneId, payload.name);
+    if (read.points.length < 2) return next;
+    perf.gestureShapes.push(normalizeGestureShape({ ...read, gestureId: nextMockId('mock-gesture') }));
+    return next;
+  }
+  if (cmd === 'removeGestureShape') {
+    perf.gestureShapes = perf.gestureShapes.filter((shape) =>
+      shape.gestureId !== payload.gestureId || shape.source === 'factory');
+    return next;
+  }
+  if (cmd === 'applyGestureShape') {
+    const target = pattern(payload.patternId);
+    const shape = perf.gestureShapes.find((candidate) => candidate.gestureId === payload.gestureId);
+    // A gesture goes on ONE named lane, unlike a groove, which is the timing of a whole pattern:
+    // a filter sweep is a movement of one thing.
+    if (target && shape) applyGestureToLane(target, shape, payload.laneId, payload.amount);
+    return next;
+  }
   if (cmd === 'addPattern') {
     const patternId = nextMockId('mock-pattern');
     perf.patterns.push(normalizePerformance({ patterns: [{
       patternId,
+      seed: mockPatternSeed(patternId),
       name: payload.name || `Pattern ${perf.patterns.length + 1}`,
       lanes: [{ laneId: `${patternId}-lane-1`, type: 'note', name: 'Notes',
                 targetPartId: next.rack.focusedPartId, resolved: true,
@@ -5253,6 +6062,44 @@ export function applyMockCommand(state, payload) {
         clip.fillPatternId = defaultFill?.patternId ?? '';
     return next;
   }
+  if (cmd === 'createSceneVariations') {
+    const source = perf.scenes.find((scene) => scene.sceneId === payload.sceneId);
+    if (!source) return next;
+
+    const amount = Math.max(0, Math.min(1, Number(payload.amount ?? 0.55)));
+    const groupId = source.variationGroupId || source.sceneId;
+    source.variationGroupId = groupId;
+    source.variationLabel = 'A';
+    source.variationSourceSceneId = groupId;
+    source.variationAmount = amount;
+    const authored = JSON.parse(JSON.stringify(source));
+
+    // Whether a plug-in parameter has a midpoint, from whatever inventory the browser is
+    // currently holding. Everything else is held — a parameter left where it was is never wrong.
+    const inventory = get(hostParameters);
+    const isContinuous = (targetId, parameterId) => {
+      if (targetId !== inventory.partId) return false;
+      const descriptor = inventory.parameters.find((d) => d.id === parameterId);
+      return Boolean(descriptor) && !descriptor.discrete && !descriptor.boolean;
+    };
+
+    for (const label of ['B', 'C', 'D']) {
+      const existingIndex = perf.scenes.findIndex((scene) =>
+        scene.variationGroupId === groupId && scene.variationLabel === label);
+      const variation = makeSceneVariation(authored, label, amount,
+        perf.patterns, perf.clips, isContinuous);
+      variation.variationGroupId = groupId;
+      variation.variationSourceSceneId = groupId;
+      if (existingIndex >= 0) {
+        // Keep the id, so a setlist item or an arranger block naming this scene still names it.
+        variation.sceneId = perf.scenes[existingIndex].sceneId;
+        perf.scenes[existingIndex] = variation;
+      } else {
+        perf.scenes.push(variation);
+      }
+    }
+    return next;
+  }
   if (cmd === 'removePattern') {
     perf.patterns = perf.patterns.filter((p) => p.patternId !== payload.patternId);
     perf.clips = perf.clips.filter((c) => c.patternId !== payload.patternId);
@@ -5272,6 +6119,11 @@ export function applyMockCommand(state, payload) {
     const target = pattern(payload.patternId);
     if (target && payload.swing !== undefined)
       target.swing = Math.min(0.75, Math.max(0, Number(payload.swing)));
+    // Clamped exactly as the native side does (jmax (1, ...) in setPatternOptions): a seed of
+    // zero would roll every event the same way, so the two must agree or the browser build
+    // rehearses a performance the app will not reproduce.
+    if (target && payload.seed !== undefined)
+      target.seed = Math.max(1, Math.floor(Number(payload.seed)) || 1);
     return next;
   }
   if (cmd === 'addLane') {
@@ -6199,6 +7051,8 @@ export function initInstrumentHostBridge() {
   onInstrumentHostLibrary((payload) => hostLibrary.set(normalizeHostLibrary(payload)));
   onInstrumentHostVersionDiff((payload) => hostVersionDiff.set(normalizeVersionDiff(payload)));
   onInstrumentHostSimilar((payload) => hostSimilar.set(normalizeSimilar(payload)));
+  onInstrumentHostUnplayed((payload) => hostUnplayed.set(normalizeUnplayed(payload)));
+  onInstrumentHostRecordFamily((payload) => hostRecordFamily.set(normalizeRecordFamily(payload)));
   onInstrumentHostSubstitutes((payload) => hostSubstitutes.set(normalizeSubstitutes(payload)));
   onInstrumentHostSurfaceBrowse((payload) => hostSurfaceBrowse.set(normalizeSurfaceBrowse(payload)));
   onInstrumentHostAudition((payload) => hostAudition.update((was) => ({
@@ -6539,7 +7393,7 @@ function send(payload) {
         const next = { ...project };
         for (const key of ['productName', 'version', 'publisher'])
           if (payload[key] !== undefined) next[key] = String(payload[key]).trim();
-        for (const key of ['includeStandalone', 'includeVst3'])
+        for (const key of ['includeStandalone', 'includeVst3', 'includeStageNotes'])
           if (payload[key] !== undefined) next[key] = payload[key] === true;
         return next;
       });
@@ -6775,6 +7629,55 @@ function send(payload) {
           name: r.name.length > 12 ? `${r.name.slice(0, 11)}.` : r.name, available: r.available })),
         surface: caps,
       }));
+      return;
+    }
+    if (payload?.cmd === 'recordFamily') {
+      const all = get(hostLibrary).records;
+      const start = all.find((r) => r.recordId === payload.recordId);
+      if (!start) { hostLastError.set('Unknown library record.'); return; }
+
+      // Mirrors recordFamily in CE/src/InstrumentHost/Library.cpp, which is the authority —
+      // including the guards, because the browser build reads the same kind of file the app
+      // does and a malformed one must truncate here too rather than hang the tab.
+      const byId = new Map(all.map((r) => [r.recordId, r]));
+      let truncated = false;
+
+      let root = start;
+      const seen = new Set([root.recordId]);
+      for (let step = 0; step < 64; step += 1) {
+        const parent = root.branchedFrom && byId.get(root.branchedFrom);
+        if (!parent) break;
+        if (seen.has(parent.recordId)) { truncated = true; break; }
+        seen.add(parent.recordId);
+        root = parent;
+      }
+      if (root.branchedFrom && byId.get(root.branchedFrom) && !seen.has(root.branchedFrom))
+        truncated = true;
+
+      const childrenOf = new Map();
+      for (const r of all)
+        if (r.branchedFrom)
+          childrenOf.set(r.branchedFrom, [...(childrenOf.get(r.branchedFrom) ?? []), r]);
+
+      const nodes = [];
+      const placed = new Set();
+      const queue = [{ record: root, parentRecordId: '', depth: 0 }];
+      while (queue.length) {
+        const { record, parentRecordId, depth } = queue.shift();
+        if (placed.has(record.recordId)) { truncated = true; continue; }
+        if (nodes.length >= 200) { truncated = true; break; }
+        placed.add(record.recordId);
+        nodes.push({ recordId: record.recordId, name: record.name, parentRecordId, depth });
+        if (depth >= 64) {
+          if (childrenOf.has(record.recordId)) truncated = true;
+          continue;
+        }
+        for (const child of childrenOf.get(record.recordId) ?? [])
+          queue.push({ record: child, parentRecordId: record.recordId, depth: depth + 1 });
+      }
+
+      hostRecordFamily.set(normalizeRecordFamily({
+        recordId: start.recordId, rootRecordId: root.recordId, truncated, nodes }));
       return;
     }
     if (payload?.cmd === 'similarSounds') {
@@ -7066,6 +7969,46 @@ function send(payload) {
       }));
       return;
     }
+    if (payload?.cmd === 'unplayedLikeHabits') {
+      const all = mockLibraryRecords();
+      const { enough, from, matches } = mockUnplayedLikeHabits(all, payload.count ?? 20);
+      hostUnplayed.set(normalizeUnplayed({
+        enough,
+        from,
+        matches: matches.map(({ record, distance }) => ({
+          recordId: record.recordId, name: record.name, instrument: record.instrument,
+          sourceType: record.sourceType, distance, percent: Math.round(100 * (1 - distance)),
+        })),
+      }));
+      return;
+    }
+    if (payload?.cmd === 'mergeDuplicateSet') {
+      // The set is re-derived here rather than taken from the payload, as the native side does
+      // it: the page's copy of the sets is as old as its last answer, and folding a stale one
+      // would hide sounds that are no longer duplicates of anything.
+      const all = mockLibraryRecords();
+      const set = mockLibraryDuplicates(all).find((d) => d.keyRecordId === payload.keyRecordId);
+      if (!set) { hostLastError.set('Those sounds are no longer a duplicate set.'); return; }
+      if (!set.identical) {
+        hostLastError.set('Only sounds that are byte-for-byte identical can be folded.');
+        return;
+      }
+
+      mockMergedCuration = { ...mockMergedCuration,
+                             [set.keyRecordId]: mergedDuplicateCuration(all, set) };
+      mockHiddenRecords = new Set([...mockHiddenRecords,
+                                   ...set.recordIds.filter((id) => id !== set.keyRecordId)]);
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
+    if (payload?.cmd === 'setLibraryRecordHidden') {
+      const next = new Set(mockHiddenRecords);
+      if (payload.hidden === false) next.delete(payload.recordId);
+      else next.add(payload.recordId);
+      mockHiddenRecords = next;
+      hostLibrary.set(mockHostLibrary(mockLibraryView));
+      return;
+    }
     if (payload?.cmd === 'removeLibraryRecord') {
       hostLibrary.update((lib) => ({
         ...lib,
@@ -7154,6 +8097,18 @@ function send(payload) {
       // Mirrors the visible half: an added part appears; a focused load leaves structure alone.
       const record = get(hostLibrary).records.find((r) => r.recordId === payload.recordId);
       if (!record?.available) return;
+
+      // Counted where the load is accepted, as the native side counts it: reaching for a sound
+      // is the signal, and an audition is counted apart because browsing is not playing.
+      const audition = payload.cmd === 'auditionLibraryRecord';
+      const seen = mockUsage[record.recordId] ?? { loadCount: 0, auditionCount: 0, lastLoadedAtMs: 0 };
+      mockUsage = { ...mockUsage, [record.recordId]: audition
+        ? { ...seen, auditionCount: seen.auditionCount + 1 }
+        : { ...seen, loadCount: seen.loadCount + 1, lastLoadedAtMs: Date.now() } };
+      // The rows on screen are NOT refreshed here, and the native side does not refresh them
+      // either: loading a sound emits state, not the library. Recomputing every facet of a
+      // twelve-thousand-record library on each preset load is work nobody wants during a gig,
+      // so the count arrives with the next browse.
       if ((record.type === 'preset' || record.type === 'chain') && payload.action === 'add') {
         const next = applyMockCommand(get(hostState), { cmd: 'addPart' });
         const added = next.rack.parts.at(-1);
@@ -7538,6 +8493,37 @@ export const diffVersions = (recordId, versionIdA, versionIdB) =>
 /** The closest measured sounds to this one. */
 export const similarSounds = (recordId, count) =>
   send(count ? { cmd: 'similarSounds', recordId, count } : { cmd: 'similarSounds', recordId });
+export const recordFamily = (recordId) => send({ cmd: 'recordFamily', recordId });
+
+/** Asks for sounds you own and have never opened, nearest first to what you keep loading. */
+export const unplayedLikeHabits = (count = 20) => send({ cmd: 'unplayedLikeHabits', count });
+
+/** A B / C / D version of a whole scene at a given intensity. The pattern half reuses whatever
+    createPatternVariations already made, so the two agree rather than minting rival patterns. */
+export const createSceneVariations = (sceneId, amount = 0.55) =>
+  send({ cmd: 'createSceneVariations', sceneId, amount });
+
+/** The gesture library: the same idea for the shape of a hand movement that the groove library
+    is for the timing of notes. */
+export const importGestureShape = (name, points) =>
+  send({ cmd: 'importGestureShape', name, points });
+export const removeGestureShape = (gestureId) => send({ cmd: 'removeGestureShape', gestureId });
+/** Reads a movement out of one lane so it can be kept and put somewhere else. */
+export const extractGestureShape = (patternId, laneId, name) =>
+  send({ cmd: 'extractGestureShape', patternId, ...(laneId ? { laneId } : {}),
+         ...(name ? { name } : {}) });
+/** Writes one onto a parameter or cc lane at any length; `amount` is its depth. */
+export const applyGestureShape = (patternId, gestureId, laneId, amount = 1) =>
+  send({ cmd: 'applyGestureShape', patternId, gestureId, laneId, amount });
+
+/** Folds a duplicate set onto its survivor: the curation of every member is gathered there and
+    the rest go quiet. Nothing is deleted — see setLibraryRecordHidden for the way back. */
+export const mergeDuplicateSet = (keyRecordId) => send({ cmd: 'mergeDuplicateSet', keyRecordId });
+
+/** Folds one record away, or brings it back. The way back matters: a fold nobody can undo is a
+    delete with better manners. */
+export const setLibraryRecordHidden = (recordId, hidden) =>
+  send({ cmd: 'setLibraryRecordHidden', recordId, hidden: hidden !== false });
 /** What a captured rack needs before it can play here, and the nearest things you do own. */
 export const rackSubstitutes = (recordId) => send({ cmd: 'rackSubstitutes', recordId });
 /** Chooses (or with an empty recordId, un-chooses) the substitute for one wanted sound. The
@@ -7613,6 +8599,8 @@ export const createPatternVariations = (patternId, amount = 0.55) =>
   send({ cmd: 'createPatternVariations', patternId, amount });
 export const importGrooveTemplate = (fields) => send({ cmd: 'importGrooveTemplate', ...fields });
 export const removeGrooveTemplate = (grooveId) => send({ cmd: 'removeGrooveTemplate', grooveId });
+export const extractGrooveTemplate = (patternId, laneId = '', name = '') =>
+  send({ cmd: 'extractGrooveTemplate', patternId, ...(laneId ? { laneId } : {}), ...(name ? { name } : {}) });
 export const applyGrooveTemplate = (patternId, grooveId, amount = 1, applyVelocity = true) =>
   send({ cmd: 'applyGrooveTemplate', patternId, grooveId, amount, applyVelocity });
 export const addLane = (patternId, fields = {}) => send({ cmd: 'addLane', patternId, ...fields });

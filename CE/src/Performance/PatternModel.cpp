@@ -350,6 +350,250 @@ juce::Array<GrooveTemplate> GrooveTemplate::factoryTemplates()
     };
 }
 
+GrooveTemplate grooveFromLane (const Pattern& pattern,
+                               const juce::String& laneId,
+                               const juce::String& name)
+{
+    GrooveTemplate groove;
+    groove.source = "imported";
+    groove.name = name.trim().isNotEmpty() ? name.trim().substring (0, 80)
+                                           : (pattern.name + " feel").substring (0, 80);
+
+    const Lane* source = nullptr;
+    for (const auto& lane : pattern.lanes)
+    {
+        if (laneId.isNotEmpty())
+        {
+            if (lane.laneId == laneId)
+                source = &lane;
+        }
+        else if (lane.type == LaneType::note || lane.type == LaneType::chord
+                   || lane.type == LaneType::drum)
+        {
+            source = &lane;
+        }
+
+        if (source != nullptr)
+            break;
+    }
+
+    if (source == nullptr || source->steps.isEmpty())
+        return groove;   // empty timingOffsets: nothing to read, and the caller can say so
+
+    groove.stepsPerBeat = juce::jlimit (1, 16, source->stepsPerBeat);
+
+    // The service caps a stored groove at 64 offsets, so stop there rather than build something
+    // that would be silently truncated on the way in.
+    const auto count = juce::jmin (64, source->steps.size());
+    for (int i = 0; i < count; ++i)
+        groove.timingOffsets.add (juce::jlimit (-0.5f, 0.5f, source->steps[i].microtiming));
+
+    // Velocity is only meaningful where notes actually sound, and only relative to something.
+    // One active step has no dynamics to describe — its own velocity IS the mean — so two is
+    // the floor.
+    int activeCount = 0;
+    double velocitySum = 0.0;
+    for (int i = 0; i < count; ++i)
+        if (source->steps[i].active)
+        {
+            ++activeCount;
+            velocitySum += (double) source->steps[i].velocity;
+        }
+
+    if (activeCount < 2)
+        return groove;
+
+    const auto mean = velocitySum / (double) activeCount;
+    if (mean <= 0.0)
+        return groove;
+
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& step = source->steps[i];
+        // An inactive step keeps 1.0: it has no velocity of its own, and a zero here would
+        // silence whatever step it later lands on.
+        const auto multiplier = step.active ? (double) step.velocity / mean : 1.0;
+        groove.velocityMultipliers.add (juce::jlimit (0.25f, 2.0f, (float) multiplier));
+    }
+
+    return groove;
+}
+
+float GestureShape::at (float phase) const
+{
+    if (points.isEmpty())
+        return 0.0f;
+    if (points.size() == 1)
+        return points[0];
+
+    // Wrapped, not clamped: a shape put on a lane longer than itself repeats. Running out and
+    // holding the last value would turn a wobble into a wobble followed by silence.
+    auto wrapped = std::fmod ((double) phase, 1.0);
+    if (wrapped < 0.0)
+        wrapped += 1.0;
+
+    const auto scaled = wrapped * (double) points.size();
+    const auto lower = (int) std::floor (scaled);
+    const auto fraction = (float) (scaled - (double) lower);
+    const auto a = points[lower % points.size()];
+    const auto b = points[(lower + 1) % points.size()];
+    return a + (b - a) * fraction;
+}
+
+juce::Array<GestureShape> GestureShape::factoryShapes()
+{
+    const auto make = [] (const juce::String& id, const juce::String& name,
+                          const std::function<float (float)>& curve)
+    {
+        GestureShape shape;
+        shape.gestureId = id;
+        shape.name = name;
+        shape.source = "factory";
+        for (int i = 0; i < gestureShapePoints; ++i)
+            shape.points.add (juce::jlimit (0.0f, 1.0f,
+                                            curve ((float) i / (float) gestureShapePoints)));
+        return shape;
+    };
+
+    // The four movements a hand actually makes, which is the point of shipping any: somebody
+    // with an empty library still has something to put on a filter and hear what this does.
+    return {
+        make ("@hostage-rise", "Rise",   [] (float t) { return t; }),
+        make ("@hostage-fall", "Fall",   [] (float t) { return 1.0f - t; }),
+        // Up and back down inside one pass — the build-and-release every filter sweep is.
+        make ("@hostage-swell", "Swell", [] (float t)
+              { return t < 0.5f ? t * 2.0f : (1.0f - t) * 2.0f; }),
+        // Four cycles around the middle: the wobble, deep enough to hear and not so deep that
+        // it hits both ends and flattens there.
+        make ("@hostage-wobble", "Wobble", [] (float t)
+              { return 0.5f + 0.45f * std::sin (t * 4.0f * juce::MathConstants<float>::twoPi); }),
+    };
+}
+
+GestureShape gestureFromLane (const Pattern& pattern,
+                              const juce::String& laneId,
+                              const juce::String& name)
+{
+    GestureShape shape;
+    shape.source = "imported";
+    shape.name = name.trim().isNotEmpty() ? name.trim().substring (0, 80)
+                                          : (pattern.name + " move").substring (0, 80);
+
+    const auto carriesACurve = [] (const Lane& lane)
+    {
+        // A note lane has velocities, not a curve. Only these two have a value per step.
+        return lane.type == LaneType::parameter || lane.type == LaneType::cc;
+    };
+
+    const Lane* source = nullptr;
+    for (const auto& lane : pattern.lanes)
+    {
+        if (laneId.isNotEmpty())
+        {
+            if (lane.laneId == laneId && carriesACurve (lane))
+                source = &lane;
+        }
+        else if (carriesACurve (lane) && lane.lockSourceLaneId.isEmpty())
+        {
+            source = &lane;
+        }
+
+        if (source != nullptr)
+            break;
+    }
+
+    if (source == nullptr || source->steps.isEmpty())
+        return shape;   // empty points: nothing to read, and the caller can say so
+
+    // Only active steps carry a value. The rest are what the lane's glide passes through, so
+    // reading them would read zeroes that nobody ever heard.
+    juce::Array<int> activeIndices;
+    for (int i = 0; i < source->steps.size(); ++i)
+        if (source->steps[i].active)
+            activeIndices.add (i);
+
+    // One value is a position, not a movement. Two is the least that can describe going
+    // somewhere, which is the same floor grooveFromLane puts on dynamics.
+    if (activeIndices.size() < 2)
+        return shape;
+
+    const auto steps = (double) source->steps.size();
+    for (int i = 0; i < gestureShapePoints; ++i)
+    {
+        const auto position = ((double) i / (double) gestureShapePoints) * steps;
+
+        // Between which two active steps does this position fall? Before the first and after
+        // the last, hold the nearest — the lane had no movement out there to describe.
+        int before = activeIndices.getFirst();
+        int after = activeIndices.getLast();
+        for (int k = 0; k < activeIndices.size(); ++k)
+        {
+            if ((double) activeIndices[k] <= position)
+                before = activeIndices[k];
+            if ((double) activeIndices[k] >= position)
+            {
+                after = activeIndices[k];
+                break;
+            }
+        }
+
+        const auto a = source->steps[before].value;
+        const auto b = source->steps[after].value;
+        const auto span = (double) (after - before);
+        const auto fraction = span > 0.0 ? juce::jlimit (0.0, 1.0, (position - (double) before) / span)
+                                         : 0.0;
+        shape.points.add (juce::jlimit (0.0f, 1.0f, a + (b - a) * (float) fraction));
+    }
+
+    return shape;
+}
+
+bool applyGestureShape (Pattern& pattern, const GestureShape& shape,
+                        const juce::String& laneId, float amount)
+{
+    if (shape.points.isEmpty())
+        return false;
+
+    Lane* target = nullptr;
+    for (auto& lane : pattern.lanes)
+        if (lane.laneId == laneId
+            && (lane.type == LaneType::parameter || lane.type == LaneType::cc))
+        {
+            target = &lane;
+            break;
+        }
+
+    if (target == nullptr || target->steps.isEmpty())
+        return false;
+
+    const auto depth = juce::jlimit (0.0f, 1.0f, amount);
+
+    // The shape's own mean is its neutral. Scaling toward it keeps "the same wobble, gentler"
+    // centred where the wobble was, instead of dragging it toward whatever the lane held — an
+    // inactive step's value is not a value, and blending with it would make the result depend
+    // on history nobody can see.
+    double sum = 0.0;
+    for (const auto point : shape.points)
+        sum += (double) point;
+    const auto mean = (float) (sum / (double) shape.points.size());
+
+    const auto steps = target->steps.size();
+    for (int i = 0; i < steps; ++i)
+    {
+        auto& step = target->steps.getReference (i);
+        const auto sampled = shape.at ((float) i / (float) steps);
+        step.value = juce::jlimit (0.0f, 1.0f, mean + (sampled - mean) * depth);
+        // A gesture is a movement, so every step it writes sounds. A curve written into
+        // inactive steps is a curve nothing plays.
+        step.active = true;
+    }
+
+    // Without glide the lane steps between values, which is a staircase rather than a sweep —
+    // and the gesture recorder sets it for the same reason on the lanes it writes.
+    target->glide = true;
+    return true;
+}
+
 void applyGrooveTemplate (Pattern& pattern, const GrooveTemplate& groove,
                           float amount, bool applyVelocity)
 {
@@ -608,6 +852,159 @@ Pattern makePatternVariation (const Pattern& source, char label, float amount)
     return variation;
 }
 
+namespace
+{
+    /** A deterministic signed nudge in -1..+1 for one named thing in one scene variation.
+        Seeded from the scene, the label and the name, so asking for "B at 40%" twice gives the
+        same scene — which is what makes a variation something you can rehearse. */
+    float sceneNudge (const juce::String& sceneId, char label, const juce::String& key,
+                      juce::uint32 salt) noexcept
+    {
+        const auto seed = (juce::uint32) juce::jmax (1, std::abs (sceneId.hashCode()))
+                          ^ ((juce::uint32) label << 24);
+        const auto mixed = variationHash (seed ^ salt
+                                          ^ (juce::uint32) juce::jmax (1, std::abs (key.hashCode())));
+        return 2.0f * ((float) (mixed & 0x00ffffffu) / (float) 0x01000000u) - 1.0f;
+    }
+}
+
+void makeSceneVariation (const Scene& source, char label, float amount,
+                         juce::Array<Pattern>& patterns, juce::Array<Clip>& clips,
+                         Scene& out,
+                         const SceneParameterIsContinuous& isContinuous)
+{
+    const auto normalizedLabel = label == 'B' || label == 'C' || label == 'D' ? label : 'B';
+    const auto intensity = juce::jlimit (0.0f, 1.0f, amount);
+    const auto labelText = juce::String::charToString ((juce::juce_wchar) normalizedLabel);
+
+    out = source;
+    out.sceneId = juce::Uuid().toDashedString();
+    out.name = source.name + " " + labelText;
+    out.variationGroupId = source.variationGroupId.isNotEmpty() ? source.variationGroupId
+                                                                : source.sceneId;
+    out.variationLabel = labelText;
+    out.variationSourceSceneId = source.variationSourceSceneId.isNotEmpty()
+                                   ? source.variationSourceSceneId : source.sceneId;
+    out.variationAmount = intensity;
+    out.clipIds.clear();
+
+    // -- the clips ------------------------------------------------------------------------
+    for (const auto& clipId : source.clipIds)
+    {
+        const Clip* sourceClip = nullptr;
+        for (const auto& candidate : clips)
+            if (candidate.clipId == clipId)
+            {
+                sourceClip = &candidate;
+                break;
+            }
+
+        // A scene can name a clip that has since been removed. Skipping it is right: the
+        // variation is of what the scene actually launches now.
+        if (sourceClip == nullptr)
+            continue;
+
+        const Pattern* sourcePattern = nullptr;
+        for (const auto& candidate : patterns)
+            if (candidate.patternId == sourceClip->patternId)
+            {
+                sourcePattern = &candidate;
+                break;
+            }
+
+        // A clip with no pattern still belongs to the scene — it is launchable and it plays
+        // nothing — so it is carried across rather than dropped.
+        if (sourcePattern == nullptr)
+        {
+            out.clipIds.add (clipId);
+            continue;
+        }
+
+        // Reuse the pattern variation that already exists rather than minting a rival. This is
+        // what makes a scene variation and createPatternVariations agree: both address a
+        // variation by its group and its label, so B is B whichever of them made it.
+        const auto groupId = sourcePattern->variationGroupId.isNotEmpty()
+                               ? sourcePattern->variationGroupId : sourcePattern->patternId;
+        juce::String variationPatternId;
+        for (const auto& candidate : patterns)
+            if (candidate.variationGroupId == groupId && candidate.variationLabel == labelText)
+            {
+                variationPatternId = candidate.patternId;
+                break;
+            }
+
+        if (variationPatternId.isEmpty())
+        {
+            auto minted = makePatternVariation (*sourcePattern, normalizedLabel, intensity);
+            minted.variationGroupId = groupId;
+            minted.variationSourcePatternId = sourcePattern->patternId;
+            variationPatternId = minted.patternId;
+            patterns.add (std::move (minted));
+        }
+
+        // A clip is how a pattern is launched, so a varied pattern needs one of its own. It
+        // inherits the source clip's launch behaviour — quantization, looping, fill — because
+        // the B section of a set should start the way the A section does.
+        Clip variationClip = *sourceClip;
+        variationClip.clipId = juce::Uuid().toDashedString();
+        variationClip.name = sourceClip->name + " " + labelText;
+        variationClip.patternId = variationPatternId;
+        // Follow actions name clips by id, and the source's target is a clip in the SOURCE
+        // scene. Carrying it over would make the variation hand off into the section it is a
+        // variation of, which is never what was meant.
+        variationClip.followClipId.clear();
+        variationClip.followAction = "none";
+        variationClip.followAfterLoops = 0;
+        // Freeze is a rendering of the source clip's output, so it does not describe this one.
+        variationClip.frozenMidi = false;
+        variationClip.frozenFromClipId.clear();
+        variationClip.frozenNoteCount = 0;
+
+        out.clipIds.add (variationClip.clipId);
+        clips.add (std::move (variationClip));
+    }
+
+    // -- the continuous half --------------------------------------------------------------
+    // Levels move by up to a quarter of the scale at full intensity. A variation that swung a
+    // fader end to end would not be a variation of the thing you are playing, it would be a
+    // different mix.
+    for (auto& slot : out.slots)
+    {
+        if (slot.applyVolume)
+            slot.volume = juce::jlimit (0.0f, 2.0f,
+                                        slot.volume + 0.5f * intensity
+                                          * sceneNudge (source.sceneId, normalizedLabel,
+                                                        slot.partId + "/vol", 0x51ed270bu));
+        if (slot.applyPan)
+            slot.pan = juce::jlimit (-1.0f, 1.0f,
+                                     slot.pan + 0.35f * intensity
+                                       * sceneNudge (source.sceneId, normalizedLabel,
+                                                     slot.partId + "/pan", 0x2545f491u));
+        // slot.mute and slot.enabled are deliberately untouched: there is no such thing as
+        // forty per cent muted, and flipping one would be the program overruling a decision.
+    }
+
+    for (auto& macro : out.macros)
+        macro.value = juce::jlimit (0.0f, 1.0f,
+                                    macro.value + 0.4f * intensity
+                                      * sceneNudge (source.sceneId, normalizedLabel,
+                                                    macro.macroId, 0x9e3779b9u));
+
+    for (auto& parameter : out.parameters)
+    {
+        // Unknown means hold. A parameter left where it was is never wrong; a five-way waveform
+        // selector moved four tenths of the way to somewhere is a byte the synth cannot read.
+        if (! isContinuous || ! isContinuous (parameter.targetId, parameter.parameterId))
+            continue;
+
+        parameter.value = juce::jlimit (0.0f, 1.0f,
+                                        parameter.value + 0.4f * intensity
+                                          * sceneNudge (source.sceneId, normalizedLabel,
+                                                        parameter.targetId + "/" + parameter.parameterId,
+                                                        0x85ebca6bu));
+    }
+}
+
 // -- serialization ---------------------------------------------------------------------------
 
 static juce::var stepToVar (const PatternStep& step)
@@ -781,6 +1178,44 @@ juce::var grooveTemplateToVar (const GrooveTemplate& groove)
     return juce::var (g);
 }
 
+juce::var gestureShapeToVar (const GestureShape& shape)
+{
+    juce::Array<juce::var> points;
+    for (const auto value : shape.points)
+        points.add (value);
+
+    auto* g = new juce::DynamicObject();
+    g->setProperty ("gestureId", shape.gestureId);
+    g->setProperty ("name",      shape.name);
+    g->setProperty ("source",    shape.source);
+    g->setProperty ("points",    points);
+    return juce::var (g);
+}
+
+bool gestureShapeFromVar (const juce::var& stored, GestureShape& out)
+{
+    out = GestureShape();
+    out.gestureId = stored.getProperty ("gestureId", {}).toString();
+    out.name = stored.getProperty ("name", {}).toString().trim().substring (0, 80);
+    if (out.gestureId.isEmpty())
+        return false;
+
+    out.source = stored.getProperty ("source", "imported").toString() == "factory" ? "factory"
+                                                                                   : "imported";
+    if (const auto* points = stored.getProperty ("points", {}).getArray())
+        for (const auto& value : *points)
+        {
+            // A shape longer than the fixed table is truncated rather than refused: a file from
+            // a build with more resolution should still be playable here, just coarser.
+            if (out.points.size() >= gestureShapePoints)
+                break;
+            out.points.add (juce::jlimit (0.0f, 1.0f, (float) (double) value));
+        }
+
+    // One point is a position, not a movement — the same floor gestureFromLane applies.
+    return out.points.size() >= 2;
+}
+
 bool grooveTemplateFromVar (const juce::var& stored, GrooveTemplate& out)
 {
     out = GrooveTemplate();
@@ -924,6 +1359,10 @@ juce::var sceneToVar (const Scene& scene)
     s->setProperty ("stopOtherClips", scene.stopOtherClips);
     s->setProperty ("tempo",          scene.tempo);
     s->setProperty ("morphBeats",     scene.morphBeats);
+    s->setProperty ("variationGroupId",       scene.variationGroupId);
+    s->setProperty ("variationLabel",         scene.variationLabel);
+    s->setProperty ("variationSourceSceneId", scene.variationSourceSceneId);
+    s->setProperty ("variationAmount",        scene.variationAmount);
     return juce::var (s);
 }
 
@@ -941,6 +1380,14 @@ bool sceneFromVar (const juce::var& stored, Scene& out)
     out.stopOtherClips = (bool) stored.getProperty ("stopOtherClips", true);
     out.tempo          = juce::jlimit (0.0, 300.0, (double) stored.getProperty ("tempo", 0.0));
     out.morphBeats     = juce::jlimit (0.0, 32.0, (double) stored.getProperty ("morphBeats", 0.0));
+    out.variationGroupId       = stored.getProperty ("variationGroupId", {}).toString();
+    out.variationSourceSceneId = stored.getProperty ("variationSourceSceneId", {}).toString();
+    out.variationAmount        = floatOf (stored, "variationAmount", 0.0f, 0.0f, 1.0f);
+    // Only the four labels exist; anything else read back is a plain scene rather than a member
+    // of a family nobody can find the rest of.
+    out.variationLabel = stored.getProperty ("variationLabel", {}).toString().toUpperCase();
+    if (! juce::StringArray { "A", "B", "C", "D" }.contains (out.variationLabel))
+        out.variationLabel.clear();
 
     if (const auto* clips = stored.getProperty ("clipIds", {}).getArray())
         for (const auto& clipId : *clips)

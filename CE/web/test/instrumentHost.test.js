@@ -70,6 +70,26 @@ import {
   clearMorph,
   normalizeSubstitutes,
   similarSounds,
+  recordFamily,
+  hostRecordFamily,
+  clipFollowGraph,
+  gestureFromPatternLane,
+  applyGestureToLane,
+  gestureValueAt,
+  factoryGestureShapes,
+  GESTURE_SHAPE_POINTS,
+  extractGestureShape,
+  applyGestureShape,
+  removeGestureShape,
+  makeSceneVariation,
+  createSceneVariations,
+  mockHabitualProfile,
+  mockUnplayedLikeHabits,
+  hostUnplayed,
+  unplayedLikeHabits,
+  mergedDuplicateCuration,
+  mergeDuplicateSet,
+  setLibraryRecordHidden,
   rackSubstitutes,
   rememberSubstitute,
   mockSonicDistance,
@@ -601,16 +621,17 @@ test('Sound Comparison Mode walks up to 20 presets, then keeps or restores', () 
 test('mock reducer: the library round trip — search, capture, favourite, load-as-part', () => {
   hostStateStore.set(mockHostState());
   requestLibrary('', '');
-  assert.equal(get(hostLibrary).records.length, 7);
+  assert.equal(get(hostLibrary).records.length, 12);
 
   requestLibrary('warm', '');
-  assert.equal(get(hostLibrary).records.length, 1, 'search narrows');
+  assert.equal(get(hostLibrary).records.length, 5,
+    'search narrows — to Warm Pad, its copy, the two branched from it and one tagged warm');
   requestLibrary('', 'rack');
   assert.equal(get(hostLibrary).records[0].type, 'rack', 'the type filter holds');
 
   requestLibrary('', '');
   saveUserPreset('mock-part-1');
-  assert.equal(get(hostLibrary).records.length, 8, 'a capture joins the library');
+  assert.equal(get(hostLibrary).records.length, 13, 'a capture joins the library');
 
   setLibraryUserMetadata('lib-2', { favourite: true });
   assert.equal(get(hostLibrary).records.find((r) => r.recordId === 'lib-2').favourite, true);
@@ -727,7 +748,7 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).counts.matched, 7);
+  assert.equal(get(hostLibrary).counts.matched, 12);
 
   // The search the product this succeeds could not run: everything except what you captured.
   const noCaptures = cycleLibraryFacet(emptyLibraryQuery(), 'sources', 'userState', true);
@@ -742,13 +763,13 @@ test('mock reducer: browsing by facet, refusing a chip, and saving the view as a
   const saved = get(hostLibrary).smartCollections;
   assert.equal(saved.length, 1);
   assert.equal(saved[0].name, 'Not mine');
-  assert.equal(saved[0].count, 6, 'a saved search reports its own count, run fresh');
+  assert.equal(saved[0].count, 8, 'a saved search reports its own count, run fresh');
 
   // Running it again reproduces the view, exclusion included.
   requestLibrary(emptyLibraryQuery());
-  assert.equal(get(hostLibrary).records.length, 7);
+  assert.equal(get(hostLibrary).records.length, 12);
   requestLibrary(saved[0].query);
-  assert.equal(get(hostLibrary).records.length, 6, 'and re-running it restores the view');
+  assert.equal(get(hostLibrary).records.length, 8, 'and re-running it restores the view');
 
   removeSmartCollection(saved[0].collectionId);
   assert.equal(get(hostLibrary).smartCollections.length, 0);
@@ -759,10 +780,10 @@ test('mock reducer: the view is remembered, so a favourite does not clear your f
   hostStateStore.set(mockHostState());
   setMockSmartCollections([]);
   requestLibrary({ ...emptyLibraryQuery(), type: 'preset' });
-  assert.equal(get(hostLibrary).records.length, 5);
+  assert.equal(get(hostLibrary).records.length, 10);
 
   setLibraryUserMetadata('lib-2', { favourite: true });
-  assert.equal(get(hostLibrary).records.length, 5,
+  assert.equal(get(hostLibrary).records.length, 10,
     'a mutation answers with the view you were looking at, not the whole library');
   requestLibrary(emptyLibraryQuery());
 });
@@ -830,16 +851,826 @@ test('normalizeHostLibrary keeps "not measured" apart from "measured and flat"',
   assert.equal(shaped.duplicates.length, 1, 'a duplicate set with no key is not a set');
 });
 
+test('a record answers with its whole line, root first', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  // Asked from the DEEPEST of the three, so the answer has to climb before it descends.
+  recordFamily('lib-9');
+  const family = get(hostRecordFamily);
+
+  assert.equal(family.recordId, 'lib-9');
+  assert.equal(family.rootRecordId, 'lib-1', 'a leaf finds the top of its line');
+  assert.deepEqual(family.nodes.map((n) => n.recordId), ['lib-1', 'lib-8', 'lib-9'],
+    'and the whole line comes back, root first');
+  assert.deepEqual(family.nodes.map((n) => n.depth), [0, 1, 2]);
+  assert.equal(family.truncated, false);
+
+  // A parent always precedes its children, which is what lets the tree draw in one pass.
+  const placed = new Set();
+  for (const node of family.nodes) {
+    if (node.parentRecordId) assert.ok(placed.has(node.parentRecordId),
+      `${node.name} arrived before its parent`);
+    placed.add(node.recordId);
+  }
+
+  // Asking from the root gives the same family, not just the root.
+  recordFamily('lib-1');
+  assert.equal(get(hostRecordFamily).nodes.length, 3, 'the family is the same from either end');
+
+  // A sound nobody branched is a family of one, not an error.
+  recordFamily('lib-4');
+  assert.equal(get(hostRecordFamily).nodes.length, 1);
+
+  resetMockLibraryState();
+});
+
+// FOLDING A DUPLICATE. The rule that makes this worth having is that folding is not deleting:
+// the row stays, its curation is gathered onto the survivor first, and anyone can put it back.
+// The C++ tests pin the part the browser cannot see — that a rescan does not undo the fold —
+// because a rescan is what undid deleting.
+
+test('what folding a set would gather onto its survivor', () => {
+  const records = [
+    { recordId: 'a', name: 'Warm Pad', favourite: true, rating: 5, notes: 'Best pad I have',
+      tags: ['pad'], collections: ['Live set'] },
+    { recordId: 'b', name: 'Warm Pad (backup)', favourite: false, rating: 3,
+      notes: 'Came off the old drive', tags: ['warm', 'pad'], collections: ['Archive'] },
+  ];
+  const merged = mergedDuplicateCuration(records, { keyRecordId: 'a', recordIds: ['a', 'b'] });
+
+  assert.equal(merged.favourite, true, 'favourite if either member was');
+  assert.equal(merged.rating, 5, 'the higher rating, never the survivor\'s by default');
+  assert.deepEqual(merged.tags, ['pad', 'warm'], 'tags unioned, and a shared one not doubled');
+  assert.deepEqual(merged.collections, ['Live set', 'Archive']);
+  assert.equal(merged.notes, 'Best pad I have\nWarm Pad (backup): Came off the old drive',
+    'both notes kept, each labelled with the sound it came from');
+
+  // The survivor's own note is already on the record being looked at; labelling it with its own
+  // name would read as though it arrived from somewhere else.
+  assert.ok(!merged.notes.startsWith('Warm Pad:'));
+
+  // A member the library no longer has is skipped rather than crashing the fold.
+  const partial = mergedDuplicateCuration(records, { keyRecordId: 'a', recordIds: ['a', 'gone'] });
+  assert.equal(partial.rating, 5);
+  assert.equal(mergedDuplicateCuration(records, { keyRecordId: 'gone', recordIds: ['gone'] }), null,
+    'and a set whose survivor is gone is no set at all');
+});
+
+test('mock reducer: folding hides the copy, keeps its curation, and can be undone', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const before = get(hostLibrary);
+  assert.equal(before.duplicates.length, 1, 'the demo ships one duplicate set');
+  const set = before.duplicates[0];
+  assert.equal(set.identical, true, 'and it is the same bytes, not a resemblance');
+  assert.equal(set.keyRecordId, 'lib-1', 'the member carrying the curation is the one to keep');
+  assert.equal(before.counts.hidden, 0);
+
+  mergeDuplicateSet('lib-1');
+  const after = get(hostLibrary);
+
+  assert.equal(after.records.length, before.records.length - 1, 'the browse is one row shorter');
+  assert.equal(after.counts.total, before.counts.total,
+    'the library is not — nothing was deleted');
+  assert.equal(after.counts.hidden, 1, 'and the page is told how many rows it is not showing');
+  assert.equal(after.duplicates.length, 0, 'the set is no longer offered');
+
+  const survivor = after.records.find((r) => r.recordId === 'lib-1');
+  assert.ok(survivor.tags.includes('backup'),
+    'the folded copy\'s tag arrived on the survivor rather than going quiet with it');
+  assert.equal(survivor.rating, 5, 'and the survivor kept its own rating');
+
+  // The way back. A fold nobody can undo is a delete with better manners.
+  requestLibrary({ ...emptyLibraryQuery(), includeHidden: true });
+  const shown = get(hostLibrary);
+  assert.equal(shown.records.length, before.records.length, 'hidden rows can be asked for');
+  assert.equal(shown.records.find((r) => r.recordId === 'lib-11').hidden, true,
+    'and each says it is folded, so the page can offer to unfold it');
+
+  setLibraryRecordHidden('lib-11', false);
+  requestLibrary(emptyLibraryQuery());
+  assert.equal(get(hostLibrary).records.length, before.records.length, 'unfolding puts it back');
+  assert.equal(get(hostLibrary).counts.hidden, 0);
+  assert.equal(get(hostLibrary).duplicates.length, 1, 'and it is a set again');
+
+  resetMockLibraryState();
+});
+
+test('mock reducer: a stale duplicate set is refused rather than guessed at', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+  const before = get(hostLibrary).records.length;
+
+  hostLastError.set('');
+  mergeDuplicateSet('lib-11');   // a member, not the key of any current set
+  assert.ok(get(hostLastError).includes('no longer a duplicate set'),
+    'the page\'s copy of the sets is as old as its last answer, so the key is re-checked');
+  assert.equal(get(hostLibrary).records.length, before, 'and the refusal changed nothing');
+  assert.equal(get(hostLibrary).counts.hidden, 0);
+
+  hostLastError.set('');
+  resetMockLibraryState();
+});
+
+test('a folded record is out of every view that did not ask for it', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+  mergeDuplicateSet('lib-1');
+
+  // Not just the record list: the facet counts predict the click, so a chip that promises a
+  // folded row is a chip that lies.
+  const sources = get(hostLibrary).facets.sources.find((v) => v.value === 'vstpreset');
+  requestLibrary({ ...emptyLibraryQuery(), includeHidden: true });
+  const withHidden = get(hostLibrary).facets.sources.find((v) => v.value === 'vstpreset');
+  assert.equal(withHidden.count, sources.count + 1,
+    'the folded row is counted only in the view that asked for it');
+
+  // And it is a query field like any other, so "Clear" is offered when it is on.
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), includeHidden: true }), false);
+  assert.equal(libraryQueryIsEmpty(emptyLibraryQuery()), true);
+
+  resetMockLibraryState();
+});
+
+// THE FOLLOW GRAPH. Every rule below was established by driving PerformanceEngine rather than by
+// reading it — six probes, and three of them contradicted what the dropdowns imply. The engine is
+// the authority and this function is the browser's copy of its arithmetic, so if the two ever
+// disagree these assertions are the record of what was measured.
+
+const clip = (clipId, fields = {}) => ({ clipId, name: clipId, loop: true, ...fields });
+
+test('a well-formed song is nodes, edges and an end', () => {
+  const graph = clipFollowGraph([
+    clip('a', { name: 'Riff', followAction: 'clip', followClipId: 'b', followAfterLoops: 2 }),
+    clip('b', { name: 'Verse', followAction: 'next', followAfterLoops: 4 }),
+    clip('c', { name: 'Outro', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+
+  assert.deepEqual(graph.edges, [
+    { fromClipId: 'a', toClipId: 'b', kind: 'clip' },
+    { fromClipId: 'b', toClipId: 'c', kind: 'next' },
+  ], 'a named target is one edge, and Next is the edge document order implies');
+  assert.equal(graph.nodes[2].kind, 'terminal');
+  assert.equal(graph.nodes[2].stopNote, 'stops after 1 loop');
+  assert.deepEqual(graph.warnings, [], 'and a form that works is not warned about');
+
+  // Nothing leads to the first clip, which is not a mistake — it is how a set starts.
+  assert.equal(graph.nodes[0].reachable, false, 'the entry is marked as hand-launched');
+  assert.equal(graph.nodes[1].reachable, true);
+});
+
+test('Next walks document order and wraps from the last clip to the first', () => {
+  const graph = clipFollowGraph([
+    clip('a', { followAction: 'next', followAfterLoops: 1 }),
+    clip('b'),
+    clip('c', { followAction: 'next', followAfterLoops: 1 }),
+  ]);
+
+  assert.equal(graph.edges.find((e) => e.fromClipId === 'a').toClipId, 'b');
+  assert.equal(graph.edges.find((e) => e.fromClipId === 'c').toClipId, 'a',
+    'the last clip wraps to the first, which is how a ring gets built by accident');
+});
+
+test('Random fans to every other clip, which is what makes it reachability and not an arrow', () => {
+  const graph = clipFollowGraph([
+    clip('a', { followAction: 'random', followAfterLoops: 1 }),
+    clip('b'), clip('c'), clip('d'),
+  ]);
+
+  assert.equal(graph.nodes[0].kind, 'fan');
+  assert.equal(graph.nodes[0].fanOut, 3, 'every clip except itself');
+  assert.deepEqual(graph.edges.map((e) => e.toClipId), ['b', 'c', 'd']);
+  assert.ok(graph.edges.every((e) => e.kind === 'random'));
+
+  // The edges are returned even though the view draws a stub instead of four arrows: they are
+  // what makes the reachability true, and a fan that reached nothing would be a different claim.
+  assert.ok(graph.nodes.slice(1).every((n) => n.reachable));
+});
+
+test('a follow that can never fire is named, not drawn as though it works', () => {
+  // Loop off. Both boundaries are decided at the same moment in the engine, so a one-shot only
+  // ever reaches loop 1 — measured, not assumed (probe Q1).
+  const oneShot = clipFollowGraph([
+    clip('a', { name: 'Hit', loop: false, followAction: 'clip', followClipId: 'b',
+                followAfterLoops: 4 }),
+    clip('b'),
+  ]);
+  assert.equal(oneShot.edges.length, 0, 'no edge, because no hand-off happens');
+  assert.equal(oneShot.nodes[0].kind, 'terminal', 'the clip just ends');
+  assert.equal(oneShot.warnings[0].code, 'dead-follow');
+  assert.match(oneShot.warnings[0].text, /Loop is off/);
+  assert.match(oneShot.warnings[0].text, /never reaches loop 4/);
+
+  // The same clip at a count of 1 does follow — the two boundaries agree there (probe Q2).
+  const atOne = clipFollowGraph([
+    clip('a', { loop: false, followAction: 'clip', followClipId: 'b', followAfterLoops: 1 }),
+    clip('b'),
+  ]);
+  assert.deepEqual(atOne.warnings, []);
+  assert.equal(atOne.edges.length, 1, 'a one-shot following after exactly one loop works');
+
+  // A follow count of zero never comes round (probe Q3). The panel cannot produce this, but a
+  // saved file or a script can, and it reads as configured.
+  const never = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: 'b', followAfterLoops: 0 }),
+    clip('b'),
+  ]);
+  assert.equal(never.edges.length, 0);
+  assert.equal(never.nodes[0].kind, 'open', 'it simply loops for ever');
+  assert.match(never.warnings[0].text, /loop count is zero/);
+});
+
+test('"Target clip" with nothing to go to is a Stop, and says so', () => {
+  // Probe Q4: the engine finds nothing to launch and the clip stops at its boundary. The
+  // dropdown reads "Choose clip…", which is the one that surprises people.
+  const empty = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: '', followAfterLoops: 2 }),
+    clip('b'),
+  ]);
+  assert.equal(empty.nodes[0].kind, 'terminal');
+  assert.equal(empty.nodes[0].stopNote, 'stops — no clip chosen');
+  assert.equal(empty.warnings[0].code, 'silent-stop');
+  assert.match(empty.warnings[0].text, /ends the set rather than carrying on/);
+
+  // A target the performance no longer has behaves identically and is a different sentence,
+  // because the two have different fixes.
+  const gone = clipFollowGraph([
+    clip('a', { name: 'Hit', followAction: 'clip', followClipId: 'deleted', followAfterLoops: 2 }),
+    clip('b'),
+  ]);
+  assert.equal(gone.nodes[0].kind, 'terminal');
+  assert.match(gone.warnings[0].text, /no longer has/);
+});
+
+test('a set that never ends is one warning, not one per clip in the ring', () => {
+  const ring = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'next', followAfterLoops: 1 }),
+    clip('b', { name: 'B', followAction: 'next', followAfterLoops: 1 }),
+    clip('c', { name: 'C', followAction: 'next', followAfterLoops: 1 }),
+  ]);
+
+  assert.equal(ring.warnings.length, 1, 'three copies of one sentence reads like three mistakes');
+  assert.equal(ring.warnings[0].code, 'no-way-out');
+  assert.deepEqual(ring.warnings[0].clipIds, ['a', 'b', 'c']);
+  assert.match(ring.warnings[0].text, /A → B → C/);
+  assert.ok(ring.nodes.every((n) => !n.reachesRest));
+
+  // One clip pointed at a stop is enough to clear the whole ring, which is the fix somebody
+  // would make and must be reflected immediately.
+  const fixed = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'next', followAfterLoops: 1 }),
+    clip('b', { name: 'B', followAction: 'next', followAfterLoops: 1 }),
+    clip('c', { name: 'C', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+  assert.deepEqual(fixed.warnings, []);
+  assert.ok(fixed.nodes.every((n) => n.reachesRest));
+});
+
+test('a set that lands on a looping clip is not a mistake', () => {
+  // The ordinary ending: the last clip has no follow and loops until the player stops it. If
+  // that counted as "never lands", every performance with two clips in it would open with a
+  // complaint, and a panel that cries wolf is a panel nobody reads.
+  const graph = clipFollowGraph([
+    clip('a', { name: 'Intro', loop: false, followAction: 'clip', followClipId: 'b',
+                followAfterLoops: 1 }),
+    clip('b', { name: 'Groove' }),
+  ]);
+
+  assert.deepEqual(graph.warnings, []);
+  assert.equal(graph.nodes[1].kind, 'open');
+  assert.ok(graph.nodes.every((n) => n.reachesRest), 'a clip that just loops is a resting place');
+});
+
+test('a clip that follows itself is a ring of one', () => {
+  const graph = clipFollowGraph([
+    clip('a', { name: 'A', followAction: 'clip', followClipId: 'a', followAfterLoops: 2 }),
+    clip('b', { name: 'B', followAction: 'stop', followAfterLoops: 1 }),
+  ]);
+
+  assert.deepEqual(graph.edges, [{ fromClipId: 'a', toClipId: 'a', kind: 'clip' }]);
+  assert.equal(graph.warnings.length, 1);
+  assert.match(graph.warnings[0].text, /hands back to itself for ever/);
+  assert.equal(graph.nodes[0].reachable, true, 'it reaches itself, so it is not an entry');
+});
+
+test('the shapes with nothing to say say nothing', () => {
+  assert.deepEqual(clipFollowGraph([]), { nodes: [], edges: [], warnings: [] });
+  assert.deepEqual(clipFollowGraph(null).nodes, [], 'an absent clip list is not a crash');
+
+  // A clip with no follow at all loops until something stops it. That is the normal case and
+  // must not be warned about, or every new performance opens with a complaint.
+  const plain = clipFollowGraph([clip('a'), clip('b')]);
+  assert.deepEqual(plain.warnings, []);
+  assert.ok(plain.nodes.every((n) => n.kind === 'open'));
+
+  // With nothing to move to, Next and Random have no choice and the engine stops the clip.
+  const alone = clipFollowGraph([clip('a', { followAction: 'next', followAfterLoops: 1 })]);
+  assert.equal(alone.nodes[0].kind, 'terminal');
+  assert.equal(alone.nodes[0].stopNote, 'stops — there is no other clip to go to');
+});
+
+// WHAT YOU OWN VERSUS WHAT YOU PLAY. The statistic is easy; the recommendation built from it is
+// the feature, and it has exactly one way of being worthless — a centre averaged from too little
+// to mean anything, stated with the same confidence as a real one. That refusal is pinned first.
+
+test('mock reducer: loading counts, and auditioning is counted apart', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const before = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(before.loadCount, 0, 'the demo ships one measured sound nobody has opened');
+
+  auditionLibraryRecord('lib-6');
+  requestLibrary(emptyLibraryQuery());
+  const heard = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(heard.auditionCount, 1, 'browsing is counted');
+  assert.equal(heard.loadCount, 0, 'and does not make the record look played');
+  assert.equal(heard.lastLoadedAtMs, 0, 'nor claim a load time');
+
+  loadLibraryRecord('lib-6', 'add');
+  requestLibrary(emptyLibraryQuery());
+  const played = get(hostLibrary).records.find((r) => r.recordId === 'lib-6');
+  assert.equal(played.loadCount, 1, 'loading counts');
+  assert.ok(played.lastLoadedAtMs > 0, 'with when');
+
+  resetMockLibraryState();
+});
+
+test('never loaded is a filter over what you own', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  const everything = get(hostLibrary).records.length;
+  const { everLoaded, neverLoaded, total } = get(hostLibrary).counts;
+  assert.ok(everLoaded > 0 && neverLoaded > 0, 'the demo ships some of each');
+  assert.equal(everLoaded + neverLoaded, total,
+    'the two halves are the whole library — a statistic that does not add up is two questions');
+
+  requestLibrary({ ...emptyLibraryQuery(), neverLoadedOnly: true });
+  const unplayed = get(hostLibrary).records;
+  assert.equal(unplayed.length, neverLoaded);
+  assert.ok(unplayed.every((r) => r.loadCount === 0));
+  assert.ok(unplayed.length < everything, 'it is a filter, not the whole list');
+
+  // A query field like any other, so "Clear" is offered while it is on.
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), neverLoadedOnly: true }), false);
+
+  resetMockLibraryState();
+});
+
+test('a taste needs more than one sound to be a taste', () => {
+  const sound = (recordId, brightness, tail, loadCount = 0) => ({
+    recordId, name: recordId, available: true, loadCount,
+    sonic: { brightness, tail, attack: 0.5, width: 0.3, noisiness: 0.1, dynamics: 0.4,
+             centroidHz: 0, attackSeconds: 0, tailSeconds: 0, cost: 0, silent: false },
+  });
+
+  assert.equal(mockHabitualProfile([]), null, 'nothing played is no taste at all');
+
+  const four = [sound('a', 0.2, 0.8, 1), sound('b', 0.21, 0.8, 1),
+                sound('c', 0.22, 0.8, 1), sound('d', 0.23, 0.8, 1)];
+  assert.equal(mockHabitualProfile(four), null,
+    'four distinct records is under the bar, and the bar is refused rather than bent');
+
+  // Fifty loads of ONE sound is one data point repeated. It may weigh a centre — that is what a
+  // habit is — but it must not on its own be enough to have one.
+  assert.equal(mockHabitualProfile([sound('a', 0.9, 0.1, 50)]), null,
+    'one sound opened fifty times is still one sound');
+
+  const five = [...four, sound('e', 0.24, 0.8, 1)];
+  const centre = mockHabitualProfile(five);
+  assert.ok(centre, 'five distinct played records is enough');
+  assert.ok(centre.brightness > 0.19 && centre.brightness < 0.25,
+    'and the centre sits among what was played');
+
+  // Weighted: a sound loaded many times pulls the centre toward itself.
+  const weighted = mockHabitualProfile([...four, sound('bright', 0.9, 0.1, 40)]);
+  assert.ok(weighted.brightness > 0.6,
+    'a sound played forty times says more about a habit than one played once');
+});
+
+test('mock reducer: what you own, have never opened, and would probably like', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+  requestLibrary(emptyLibraryQuery());
+
+  unplayedLikeHabits(20);
+  const answer = get(hostUnplayed);
+
+  assert.equal(answer.enough, true, 'the demo has enough of a history to have an opinion');
+  assert.ok(answer.from >= 5, 'and says how many sounds that opinion came from');
+  assert.ok(answer.matches.length > 0);
+  assert.equal(answer.matches[0].recordId, 'lib-12',
+    'the nearest never-opened sound to what you keep loading comes first');
+
+  const shown = new Set(get(hostLibrary).records.map((r) => r.recordId));
+  for (const match of answer.matches) {
+    const record = get(hostLibrary).records.find((r) => r.recordId === match.recordId);
+    assert.equal(record.loadCount, 0, 'nothing already played is offered as a discovery');
+    assert.ok(shown.has(match.recordId));
+  }
+
+  resetMockLibraryState();
+});
+
+test('an empty history is told, not guessed at', () => {
+  // The whole risk of this feature in one assertion: a recommendation from nothing, stated as
+  // confidently as a real one, is how it stops being believed.
+  const bare = mockUnplayedLikeHabits([
+    { recordId: 'a', available: true, loadCount: 0, sonic: { brightness: 0.5, silent: false } },
+  ]);
+  assert.deepEqual(bare, { enough: false, from: 0, matches: [] });
+
+  // And a folded duplicate is a sound you already own under another name, on both sides of it.
+  const played = (recordId, loadCount, hidden = false) => ({
+    recordId, name: recordId, available: true, loadCount, hidden,
+    sonic: { brightness: 0.2, tail: 0.8, attack: 0.5, width: 0.3, noisiness: 0.1,
+             dynamics: 0.4, silent: false },
+  });
+  const withFold = mockUnplayedLikeHabits([
+    played('a', 1), played('b', 1), played('c', 1), played('d', 1), played('e', 1),
+    played('copy', 0, true),
+  ]);
+  assert.equal(withFold.enough, true);
+  assert.deepEqual(withFold.matches, [], 'a folded copy is not a discovery');
+});
+
+// A VARIATION OF THE THING YOU ARE PLAYING. A scene is heterogeneous, so "forty per cent
+// different" has to mean something different per kind — and the kinds where it means NOTHING are
+// the ones worth pinning, because inventing a midpoint that does not exist is silent and wrong.
+
+test('mock reducer: B, C and D versions of a whole scene', () => {
+  let state = mockHostState();
+  const patternId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state, { cmd: 'addScene', name: 'Verse' });
+  const sceneId = state.performance.scenes[0].sceneId;
+  const scenesBefore = state.performance.scenes.length;
+
+  state = applyMockCommand(state, { cmd: 'createSceneVariations', sceneId, amount: 0.5 });
+  const perf = state.performance;
+
+  assert.equal(perf.scenes.length, scenesBefore + 3, 'three variations, not one');
+  assert.equal(perf.scenes[0].variationLabel, 'A', 'the source becomes the authored A');
+
+  const family = perf.scenes.filter((s) => s.variationGroupId === sceneId);
+  assert.deepEqual(family.map((s) => s.variationLabel), ['A', 'B', 'C', 'D']);
+  assert.ok(family.slice(1).every((s) => s.variationSourceSceneId === sceneId),
+    'and every one of them can be traced back after somebody renames all four');
+
+  // The pattern half agrees with createPatternVariations: both address a variation by its group
+  // and its label, so B is B whichever of them made it.
+  const b = family[1];
+  assert.ok(b.clipIds.length > 0 || perf.scenes[0].clipIds.length === 0);
+  const madeClips = perf.clips.filter((c) => b.clipIds.includes(c.clipId));
+  for (const clip of madeClips) {
+    assert.notEqual(clip.patternId, patternId, 'a variation clip plays a varied pattern');
+    const played = perf.patterns.find((p) => p.patternId === clip.patternId);
+    assert.equal(played.variationLabel, 'B');
+    // A follow names a clip in the SOURCE scene, so it must not come across.
+    assert.equal(clip.followAction, 'none');
+    assert.equal(clip.followClipId, '');
+  }
+
+  // Regenerating replaces rather than adding a second B, because a set that already launches B
+  // must keep launching the same thing.
+  const bId = b.sceneId;
+  const after = applyMockCommand(state, { cmd: 'createSceneVariations', sceneId, amount: 0.8 });
+  assert.equal(after.performance.scenes.length, perf.scenes.length, 'no rival B appears');
+  assert.equal(after.performance.scenes.find((s) => s.variationGroupId === sceneId
+                                                    && s.variationLabel === 'B').sceneId, bId,
+    'and it keeps its id, so a setlist item naming it still names it');
+});
+
+test('what a percentage means depends on the kind, and for some kinds it means nothing', () => {
+  const patterns = [{ patternId: 'p1', name: 'Beat', seed: 7, lanes: [] }];
+  const clips = [{ clipId: 'c1', name: 'Riff', patternId: 'p1', loop: true,
+                   launchQuantize: 'bar', followAction: 'clip', followClipId: 'c2',
+                   followAfterLoops: 2 }];
+  const source = {
+    sceneId: 's1', name: 'Verse', clipIds: ['c1'], tempo: 124, morphBeats: 4,
+    launchQuantize: 'bar', stopOtherClips: true, focusPartId: 'p1', pageId: '',
+    slots: [{ partId: 'p1', enabled: false, mute: true, volume: 1, applyVolume: true,
+              pan: 0, applyPan: true }],
+    macros: [{ macroId: 'm1', value: 0.5 }],
+    parameters: [{ targetId: 'p1', parameterId: 'cutoff', value: 0.5 },
+                 { targetId: 'p1', parameterId: 'wave', value: 0.25 }],
+  };
+
+  let n = 0;
+  const mint = (prefix) => `${prefix}-${++n}`;
+  const isContinuous = (_target, parameterId) => parameterId === 'cutoff';
+  const b = makeSceneVariation(source, 'B', 0.5, patterns, clips, isContinuous, mint);
+
+  assert.notEqual(b.slots[0].volume, 1, 'a level moves, because a level has a midpoint');
+  assert.notEqual(b.slots[0].pan, 0, 'so does pan');
+  assert.equal(b.slots[0].mute, true,
+    'a mute does NOT — there is no such thing as forty per cent muted');
+  assert.equal(b.slots[0].enabled, false, 'and nor does enabled');
+  assert.notEqual(b.macros[0].value, 0.5, 'a macro value moves');
+  assert.notEqual(b.parameters[0].value, 0.5, 'a continuous parameter moves');
+  assert.equal(b.parameters[1].value, 0.25,
+    'a stepped one is held: a waveform four tenths of the way to somewhere is not a waveform');
+
+  assert.equal(b.tempo, 124, 'structure is copied, not varied');
+  assert.equal(b.morphBeats, 4);
+  assert.equal(b.launchQuantize, 'bar');
+
+  // Nothing is taken from a set that is playing.
+  assert.deepEqual(source.clipIds, ['c1']);
+  assert.equal(source.slots[0].volume, 1);
+
+  // With no way to tell continuous from stepped, nothing is moved. Holding is never wrong.
+  const cautious = makeSceneVariation(source, 'C', 0.5, patterns, clips, null, mint);
+  assert.equal(cautious.parameters[0].value, 0.5);
+  assert.equal(cautious.parameters[1].value, 0.25);
+  assert.notEqual(cautious.macros[0].value, 0.5, 'but a macro is continuous by construction');
+});
+
+test('a scene variation is deterministic, and stays on its own scales', () => {
+  const source = {
+    sceneId: 's1', name: 'Verse', clipIds: [],
+    slots: [{ partId: 'p1', volume: 2, applyVolume: true, pan: 1, applyPan: true,
+              mute: false, enabled: true }],
+    macros: [{ macroId: 'm1', value: 1 }],
+    parameters: [],
+  };
+  let n = 0;
+  const mint = (prefix) => `${prefix}-${++n}`;
+
+  const first = makeSceneVariation(source, 'B', 0.5, [], [], null, mint);
+  const again = makeSceneVariation(source, 'B', 0.5, [], [], null, mint);
+  assert.equal(first.slots[0].volume, again.slots[0].volume,
+    'asking twice gives the same scene — a variation you cannot rehearse is not a variation');
+  assert.equal(first.macros[0].value, again.macros[0].value);
+
+  const c = makeSceneVariation(source, 'C', 0.5, [], [], null, mint);
+  assert.notEqual(c.macros[0].value, first.macros[0].value,
+    'and B and C are different scenes rather than the same one twice');
+
+  // Pushed as hard as it goes, from the top of every scale.
+  const hard = makeSceneVariation(source, 'D', 1, [], [], null, mint);
+  assert.ok(hard.slots[0].volume >= 0 && hard.slots[0].volume <= 2);
+  assert.ok(Math.abs(hard.slots[0].pan) <= 1);
+  assert.ok(hard.macros[0].value >= 0 && hard.macros[0].value <= 1);
+});
+
+test('a scene naming a clip that is gone varies what it actually launches', () => {
+  const patterns = [{ patternId: 'p1', name: 'Beat', seed: 7, lanes: [] }];
+  const clips = [{ clipId: 'c1', name: 'Riff', patternId: 'p1', loop: true }];
+  const source = { sceneId: 's1', name: 'Verse', clipIds: ['c1', 'gone'],
+                   slots: [], macros: [], parameters: [] };
+  let n = 0;
+  const b = makeSceneVariation(source, 'B', 0.5, patterns, clips, null,
+                               (prefix) => `${prefix}-${++n}`);
+
+  assert.equal(b.clipIds.length, 1, 'a clip the performance no longer has is skipped');
+  assert.ok(!b.clipIds.includes('gone'));
+
+  // A clip with no pattern is launchable and plays nothing, so it comes across as it is rather
+  // than being dropped from the scene.
+  const orphan = { sceneId: 's2', name: 'Bare', clipIds: ['c2'],
+                   slots: [], macros: [], parameters: [] };
+  const withOrphan = makeSceneVariation(orphan, 'B', 0.5, patterns,
+    [...clips, { clipId: 'c2', name: 'Empty', patternId: 'missing' }], null,
+    (prefix) => `${prefix}-${++n}`);
+  assert.deepEqual(withOrphan.clipIds, ['c2']);
+});
+
+// A GESTURE LIBRARY. The groove library keeps the timing of notes; there was nothing keeping the
+// shape of a movement, though they are the same kind of reusable human artefact. What makes one
+// possible is storing a shape against NORMALISED TIME rather than steps — a wobble read off a
+// sixteen-step lane has to land on a thirty-two-step one meaning the same thing.
+
+const curveLane = (laneId, stepCount, values) => ({
+  laneId, type: 'parameter', name: 'Cutoff', targetId: 'p1', parameterId: 'cutoff',
+  stepCount, stepsPerBeat: 4, glide: false,
+  steps: Array.from({ length: stepCount }, (_unused, i) => ({
+    active: values[i] !== undefined, value: values[i] ?? 0,
+  })),
+});
+
+test('a movement can be read out of a lane', () => {
+  const pattern = { patternId: 'p', name: 'Sweep',
+                    lanes: [curveLane('l1', 16, { 0: 0, 8: 1, 15: 0 })] };
+  const shape = gestureFromPatternLane(pattern, 'l1', 'My sweep');
+
+  assert.equal(shape.points.length, GESTURE_SHAPE_POINTS,
+    'a shape is a fixed curve over normalised time, whatever the lane length was');
+  assert.equal(shape.name, 'My sweep');
+  assert.ok(shape.points[0] < 0.1, 'it starts where the movement started');
+  assert.ok(shape.points[GESTURE_SHAPE_POINTS / 2] > 0.8, 'peaks where it peaked');
+  assert.ok(shape.points.at(-1) < 0.4, 'and comes back down');
+});
+
+test('what has nothing to read says so rather than keeping an empty gesture', () => {
+  // FOUR active steps, deliberately: with one, this would pass because a single value is not a
+  // movement, and the assertion would be testing the wrong rule while reading as though it
+  // tested this one.
+  const notes = { patternId: 'p', name: 'Beat',
+                  lanes: [{ laneId: 'n1', type: 'note',
+                            steps: Array.from({ length: 4 },
+                                              () => ({ active: true, velocity: 100 })) }] };
+  assert.deepEqual(gestureFromPatternLane(notes, 'n1').points, [],
+    'a note lane has velocities, not a curve');
+  assert.deepEqual(gestureFromPatternLane(notes).points, [],
+    'and a pattern with no curve lane at all is the same answer');
+
+  const single = { patternId: 'p', name: 'One', lanes: [curveLane('l1', 16, { 4: 0.7 })] };
+  assert.deepEqual(gestureFromPatternLane(single, 'l1').points, [],
+    'one value is a position, not a movement');
+
+  const nothing = { patternId: 'p', name: 'Empty', lanes: [curveLane('l1', 16, {})] };
+  assert.deepEqual(gestureFromPatternLane(nothing, 'l1').points, []);
+});
+
+test('a movement can be put on any lane, at any length', () => {
+  const rise = { gestureId: 'g1', name: 'Rise',
+                 points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                    (_unused, i) => i / GESTURE_SHAPE_POINTS) };
+  const pattern = { patternId: 'p', name: 'Target',
+                    lanes: [curveLane('l1', 32, {}),
+                            { laneId: 'n1', type: 'note', steps: [{ active: true }] }] };
+
+  assert.equal(applyGestureToLane(pattern, rise, 'l1', 1), true);
+  const lane = pattern.lanes[0];
+  assert.equal(lane.glide, true, 'a gesture left stepping is a staircase, not a sweep');
+  assert.ok(lane.steps[0].value < 0.1);
+  assert.ok(lane.steps.at(-1).value > 0.9,
+    'the shape is stretched across the lane, not truncated to its own length');
+  assert.ok(lane.steps.every((step) => step.active),
+    'every step it writes sounds — a curve in inactive steps plays nothing');
+
+  assert.equal(applyGestureToLane(pattern, rise, 'n1', 1), false, 'a note lane refuses');
+  assert.equal(applyGestureToLane(pattern, rise, 'nope', 1), false);
+  assert.equal(applyGestureToLane(pattern, { points: [] }, 'l1', 1), false);
+});
+
+test('depth scales the movement around its own centre, not toward what the lane held', () => {
+  // Low for the first half of the pass, high for the second: mean 0.5, and a period sixteen
+  // steps can see. A shape alternating every point would be sampled only on the even ones, which
+  // is aliasing rather than anything about depth.
+  const wobble = { gestureId: 'g2',
+                   points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                      (_unused, i) => (i < GESTURE_SHAPE_POINTS / 2 ? 0.2 : 0.8)) };
+  const pattern = { patternId: 'p', name: 'Depth', lanes: [curveLane('l1', 16, {})] };
+  for (const step of pattern.lanes[0].steps) step.value = 0.9;   // whatever was there
+
+  applyGestureToLane(pattern, wobble, 'l1', 0.5);
+  const values = pattern.lanes[0].steps.map((step) => step.value);
+  assert.ok(Math.min(...values) > 0.3 && Math.min(...values) < 0.4);
+  assert.ok(Math.max(...values) > 0.6 && Math.max(...values) < 0.7,
+    'half depth around the shape\'s own mean of 0.5, not dragged toward the 0.9 in the lane');
+
+  // Zero depth is the movement flattened to its own centre, which is what no movement means for
+  // a shape — every value lands there rather than wherever it happened to be.
+  const flat = { patternId: 'p', name: 'Flat', lanes: [curveLane('l1', 16, {})] };
+  applyGestureToLane(flat, wobble, 'l1', 0);
+  assert.ok(flat.lanes[0].steps.every((step) => Math.abs(step.value - 0.5) < 1e-6));
+});
+
+test('a shape repeats rather than running out', () => {
+  const shape = { points: Array.from({ length: GESTURE_SHAPE_POINTS },
+                                     (_unused, i) => i / GESTURE_SHAPE_POINTS) };
+  assert.ok(Math.abs(gestureValueAt(shape, 0) - gestureValueAt(shape, 1)) < 1e-9,
+    'one full pass wraps to the start');
+  assert.ok(gestureValueAt(shape, 1.25) > gestureValueAt(shape, 1),
+    'and keeps going round rather than holding its last value');
+  assert.ok(gestureValueAt(shape, -0.25) > 0.5, 'a negative phase wraps too');
+});
+
+test('the round trip: read off sixteen steps, land on thirty-two', () => {
+  const source = { patternId: 'p', name: 'Source',
+                   lanes: [curveLane('l1', 16, { 0: 0.1, 8: 0.9, 15: 0.3 })] };
+  const read = gestureFromPatternLane(source, 'l1');
+
+  const longer = { patternId: 'q', name: 'Longer', lanes: [curveLane('l2', 32, {})] };
+  assert.equal(applyGestureToLane(longer, read, 'l2', 1), true);
+
+  const written = longer.lanes[0].steps.map((step) => step.value);
+  assert.ok(written[0] < 0.3, 'starting where it started');
+  assert.ok(written[16] > 0.7, 'peaking half way through, not a quarter of the way');
+  assert.ok(written.at(-1) < 0.6, 'and ending where it ended');
+});
+
+test('mock reducer: keeping a movement, putting it on a lane, and throwing it away', () => {
+  let state = mockHostState();
+  assert.equal(state.performance.gestureShapes.length, factoryGestureShapes.length,
+    'somebody with an empty library still has something to try');
+  assert.ok(state.performance.gestureShapes.every((s) => s.source === 'factory'));
+
+  // Give the demo pattern a curve lane with a movement on it.
+  const patternId = state.performance.patterns[0].patternId;
+  state = applyMockCommand(state, { cmd: 'addLane', patternId, type: 'parameter' });
+  const lane = state.performance.patterns[0].lanes.at(-1);
+  for (const [index, value] of [[0, 0.1], [4, 0.9], [8, 0.2]])
+    state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId: lane.laneId,
+                                      index, active: true, value });
+
+  const before = state.performance.gestureShapes.length;
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId,
+                                    laneId: lane.laneId, name: 'My move' });
+  assert.equal(state.performance.gestureShapes.length, before + 1);
+  const kept = state.performance.gestureShapes.at(-1);
+  assert.equal(kept.name, 'My move');
+  assert.equal(kept.source, 'imported');
+  assert.equal(kept.points.length, GESTURE_SHAPE_POINTS);
+
+  // Put a factory shape onto that same lane.
+  const rise = state.performance.gestureShapes.find((s) => s.gestureId === '@hostage-rise');
+  state = applyMockCommand(state, { cmd: 'applyGestureShape', patternId,
+                                    gestureId: rise.gestureId, laneId: lane.laneId, amount: 1 });
+  const written = state.performance.patterns[0].lanes.find((l) => l.laneId === lane.laneId);
+  assert.equal(written.glide, true);
+  assert.ok(written.steps[0].value < written.steps.at(-1).value, 'it rises');
+  assert.ok(written.steps.every((step) => step.active));
+
+  // A factory shape is not somebody's to delete; an imported one is.
+  state = applyMockCommand(state, { cmd: 'removeGestureShape', gestureId: '@hostage-rise' });
+  assert.ok(state.performance.gestureShapes.some((s) => s.gestureId === '@hostage-rise'),
+    'factory shapes stay');
+  state = applyMockCommand(state, { cmd: 'removeGestureShape', gestureId: kept.gestureId });
+  assert.ok(!state.performance.gestureShapes.some((s) => s.gestureId === kept.gestureId),
+    'and one you kept can be thrown away');
+});
+
+test('mock reducer: a lane with nothing to read keeps nothing', () => {
+  let state = mockHostState();
+  const patternId = state.performance.patterns[0].patternId;
+  const noteLaneId = state.performance.patterns[0].lanes[0].laneId;
+  const before = state.performance.gestureShapes.length;
+
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId, laneId: noteLaneId });
+  assert.equal(state.performance.gestureShapes.length, before,
+    'a note lane has velocities, not a curve, and nothing is kept');
+
+  state = applyMockCommand(state, { cmd: 'extractGestureShape', patternId: 'nope' });
+  assert.equal(state.performance.gestureShapes.length, before);
+});
+
+test('a recency filter refuses what the library has always had', () => {
+  hostStateStore.set(mockHostState());
+  resetMockLibraryState();
+
+  requestLibrary(emptyLibraryQuery());
+  const everything = get(hostLibrary).records.length;
+  const recentCount = get(hostLibrary).counts.addedRecently;
+  assert.ok(recentCount > 0, 'the preview ships something that arrived lately');
+  assert.ok(recentCount < everything, 'and something that has always been there');
+
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 14 });
+  const recent = get(hostLibrary).records;
+  assert.equal(recent.length, recentCount, 'the row and the filter agree on the number');
+  assert.ok(recent.every((r) => r.addedAtMs > 0),
+    'a record with no arrival time is not recent — an unknown arrival is not a recent one');
+
+  // The window is a window, not a synonym for "has a timestamp".
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 1 });
+  assert.equal(get(hostLibrary).records.length, 0,
+    'nothing in the preview arrived in the last day');
+
+  requestLibrary({ ...emptyLibraryQuery(), addedWithinDays: 0 });
+  assert.equal(get(hostLibrary).records.length, everything, 'and zero days is the filter off');
+
+  resetMockLibraryState();
+});
+
+test('a recency filter is a filter, so an empty query is not empty with one set', () => {
+  // libraryQueryIsEmpty decides whether the browser thinks you are filtering at all; missing the
+  // clause here would show "no filters" over a filtered list.
+  assert.equal(libraryQueryIsEmpty(emptyLibraryQuery()), true);
+  assert.equal(libraryQueryIsEmpty({ ...emptyLibraryQuery(), addedWithinDays: 14 }), false);
+  assert.equal(normalizeLibraryQuery({ addedWithinDays: 9000 }).addedWithinDays, 365,
+    'and a year is the cap, past which "recently" has stopped meaning anything');
+  assert.equal(normalizeLibraryQuery({ addedWithinDays: -5 }).addedWithinDays, 0);
+});
+
 test('mock reducer: a sound that refused is counted apart from one nobody has got to', () => {
   hostStateStore.set(mockHostState());
   resetMockLibraryState();
   requestLibrary(emptyLibraryQuery());
 
   const counts = get(hostLibrary).counts;
-  assert.equal(counts.refused, 1, 'a refused sound has its own count');
+  assert.equal(counts.refused, 2, 'refused sounds have their own count');
   assert.ok(counts.measurable > 0, 'and there is still something left to measure');
 
-  const refused = get(hostLibrary).records.find((r) => r.sonicRefusal);
+  // Split by what could be done about it. The total above cannot say that one of these two will
+  // pass on a re-run and the other will fail the same way for ever, and that is the difference
+  // between a useful button and a fruitless one.
+  assert.deepEqual(counts.refusedByCause,
+    { crashed: 1, unreadable: 1, mismatch: 0, unsupported: 0, other: 0 },
+    'and are split by what could be done about them');
+  assert.equal(Object.values(counts.refusedByCause).reduce((a, b) => a + b, 0), counts.refused,
+    'the split adds up to the total it sits under');
+
+  const refused = get(hostLibrary).records.find((r) => /crashed/.test(r.sonicRefusal ?? ''));
   assert.equal(refused.sonic, null, 'it carries no measurement');
   assert.match(refused.sonicRefusal, /crashed/, 'and says why');
 
@@ -2857,6 +3688,61 @@ test('mock reducer: patterns, lanes and steps', () => {
   state = applyMockCommand(state, { cmd: 'clearLane', patternId, laneId });
   assert.equal(state.performance.patterns[1].lanes[0].steps.some((s) => s.active), false);
 
+  // The seed decides how every probability rolls, and the browser build has to agree with the
+  // native clamp (jmax (1, ...) in setPatternOptions) or a performance rehearsed in the preview
+  // would not reproduce in the app.
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 42 });
+  assert.equal(state.performance.patterns[1].seed, 42, 'a seed can be typed in');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 0 });
+  assert.equal(state.performance.patterns[1].seed, 1, 'zero clamps to one, as the native side does');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: -5 });
+  assert.equal(state.performance.patterns[1].seed, 1, 'so does a negative');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, seed: 7.9 });
+  assert.equal(state.performance.patterns[1].seed, 7, 'and a fraction is floored rather than refused');
+
+  state = applyMockCommand(state, { cmd: 'setPatternOptions', patternId, swing: 0.5 });
+  assert.equal(state.performance.patterns[1].seed, 7, 'setting swing leaves the seed alone');
+
+  // Reading a feel back out. The property that matters is the one the C++ header states and
+  // PerformanceEngineTests pins: applying a groove and then reading it returns the same timing,
+  // because the template takes the lane's own rate and the scale on the way back in is 1.
+  const feelLane = state.performance.patterns[1].lanes[0];
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId, laneId: feelLane.laneId, stepCount: 16 });
+  for (let i = 0; i < 16; i += 1)
+    state = applyMockCommand(state, { cmd: 'setStep', patternId, laneId: feelLane.laneId, index: i,
+                                      active: true, velocity: 100 });
+  const factory = state.performance.grooves.find((g) => g.source === 'factory');
+  state = applyMockCommand(state, { cmd: 'applyGrooveTemplate', patternId,
+                                    grooveId: factory.grooveId, amount: 1, applyVelocity: false });
+
+  const before = state.performance.grooves.length;
+  state = applyMockCommand(state, { cmd: 'extractGrooveTemplate', patternId, name: 'Stolen' });
+  assert.equal(state.performance.grooves.length, before + 1, 'a stolen feel is kept as a groove');
+
+  const stolen = state.performance.grooves[state.performance.grooves.length - 1];
+  assert.equal(stolen.source, 'imported', 'and is never marked factory');
+  assert.equal(stolen.stepsPerBeat, factory.stepsPerBeat, "at the lane's own rate");
+  assert.deepEqual(stolen.timingOffsets.map((v) => Math.round(v * 1e6) / 1e6),
+                   factory.timingOffsets.map((v) => Math.round(v * 1e6) / 1e6),
+                   'and carries back exactly the timing that was applied');
+
+  // A pattern with nothing worth reading is refused rather than stored empty.
+  state = applyMockCommand(state, { cmd: 'addPattern', name: 'Bare' });
+  const bareId = state.performance.patterns[state.performance.patterns.length - 1].patternId;
+  state = applyMockCommand(state, { cmd: 'setLaneOptions', patternId: bareId,
+                                    laneId: state.performance.patterns.at(-1).lanes[0].laneId, stepCount: 1 });
+  const kept = state.performance.grooves.length;
+  state = applyMockCommand(state, { cmd: 'extractGrooveTemplate', patternId: bareId });
+  assert.equal(state.performance.grooves.length, kept,
+    'one step is not a feel, so nothing is stored');
+
+  // Put the fixture back as it was found: the assertion below counts what is left, and a
+  // scratch pattern from this block is not something the tests after it should have to know.
+  state = applyMockCommand(state, { cmd: 'removePattern', patternId: bareId });
+
   state = applyMockCommand(state, { cmd: 'removePattern', patternId });
   assert.equal(state.performance.patterns.length, 1);
 });
@@ -3042,12 +3928,15 @@ test('mock reducer: parameter locks stay linked to their source step', () => {
 test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   let state = mockHostState();
   const patternId = state.performance.patterns[0].patternId;
+  const before = state.performance.clips.length;
   state = applyMockCommand(state, { cmd: 'addClip', patternId, name: 'Second' });
-  assert.equal(state.performance.clips.length, 2);
+  assert.equal(state.performance.clips.length, before + 1);
 
-  const clipId = state.performance.clips[1].clipId;
+  // The new clip is the last one, whatever the demo song already had in it.
+  const added = state.performance.clips.length - 1;
+  const clipId = state.performance.clips[added].clipId;
   state = applyMockCommand(state, { cmd: 'launchClip', clipId });
-  assert.equal(state.performance.clips[1].active, true);
+  assert.equal(state.performance.clips[added].active, true);
 
   state = applyMockCommand(state, { cmd: 'setPartMixer', partId: 'mock-part-1',
                                     mute: true, volume: 1.4, pan: -0.35 });
@@ -3070,7 +3959,7 @@ test('mock reducer: clips, scenes and the setlist recovery rule', () => {
   state = applyMockCommand(state, { cmd: 'setMacroValue', macroId, value: 0.1 });
   state = applyMockCommand(state, { cmd: 'setSceneOptions', sceneId, morphBeats: 4 });
   state = applyMockCommand(state, { cmd: 'launchScene', sceneId });
-  assert.equal(state.performance.clips[1].active, true, 'recalling the scene starts its clips');
+  assert.equal(state.performance.clips[added].active, true, 'recalling the scene starts its clips');
   assert.equal(state.performance.clips[0].active, false, 'and stops the ones it omits');
   assert.equal(state.rack.parts[0].mute, true, 'the scene restores discrete mixer state');
   assert.equal(state.rack.parts[0].volume, 1.4, 'and its captured continuous level');

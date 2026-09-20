@@ -3356,6 +3356,742 @@ void testAuditioner()
 // could say "pads" and never "pads, but nothing distorted" — plus the two things that make a
 // faceted browser trustworthy rather than merely present: a chip's count says what clicking it
 // would give you, and a chip you have already used never disappears from the list.
+void testRefusalCauses()
+{
+    using ceditor::host::RefusalCause;
+    using ceditor::host::refusalCause;
+    using ceditor::host::refusalCauseId;
+
+    // Every sentence that can reach `sonicRefusal`, copied from its producer. If one of these
+    // fails, the producing string has moved and the browser's breakdown has quietly lost a row
+    // to `other` — which is the failure this test exists to make loud. Producers:
+    //   InstrumentHostService::applyStateBlob / ::applyRecordState
+    //   ScannerWorkerMain's applyState lambda
+    //   SonicAnalysisWorker's timeout/crash branch
+    check (refusalCause ("The plug-in crashed while playing this sound.") == RefusalCause::crashed,
+           "a crash is retry-worthy");
+    check (refusalCause ("The plug-in stopped responding while playing this sound.") == RefusalCause::crashed,
+           "a hang is retry-worthy");
+    check (refusalCause ("That saved state could not be read back.") == RefusalCause::unreadable,
+           "an undecodable state is unreadable");
+    check (refusalCause ("The captured state for Big Pad is damaged.") == RefusalCause::unreadable,
+           "a damaged capture is unreadable, name and all");
+    check (refusalCause ("The vendor preset could not be read: Big Pad") == RefusalCause::unreadable,
+           "an unreadable vendor file is unreadable, name and all");
+    check (refusalCause ("The plug-in refused this preset: Big Pad") == RefusalCause::mismatch,
+           "a refused preset is a mismatch, name and all");
+    check (refusalCause ("The plug-in no longer has this program: Big Pad") == RefusalCause::mismatch,
+           "a vanished program is a mismatch, name and all");
+    check (refusalCause ("Vendor preset loading is not available in this build.") == RefusalCause::unsupported,
+           "a build limitation is unsupported");
+
+    // Nothing is forced into one of the four. An unknown sentence gets its own row rather than
+    // being miscounted as retry-worthy, which would put it behind a button that cannot help it.
+    check (refusalCause ("Something nobody has written yet.") == RefusalCause::other,
+           "an unrecognised sentence is other, not a guess");
+    check (refusalCause ({}) == RefusalCause::other, "an empty refusal is other");
+    check (refusalCause ("   ") == RefusalCause::other, "whitespace is other");
+
+    // A stem must not swallow a longer sentence that means something else.
+    check (refusalCause ("The plug-in refused this preset: The plug-in crashed while playing this sound.")
+             == RefusalCause::mismatch,
+           "a preset named after another message still matches its own stem");
+
+    check (refusalCauseId (RefusalCause::crashed) == "crashed"
+             && refusalCauseId (RefusalCause::unreadable) == "unreadable"
+             && refusalCauseId (RefusalCause::mismatch) == "mismatch"
+             && refusalCauseId (RefusalCause::unsupported) == "unsupported"
+             && refusalCauseId (RefusalCause::other) == "other",
+           "every cause has its stable wire name");
+}
+
+// A LIBRARY THAT MOVED. The three-pass identity match in mergeVendorScan was written to keep a
+// renamed file's record; these are the two shapes a user actually meets, and neither was pinned.
+//
+// It matters that this is automatic. There is no relink button and there does not need to be:
+// the scan that finds the files at their new home is the repair. What a user must still do is
+// add the new folder as a scan root — configuration, not a missing feature — and if these ever
+// stop holding, "my ratings vanished when I reorganised my presets" is the bug report.
+
+void testMovedLibraryRelinks()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+
+    std::cout << "\na library that moved" << std::endl;
+
+    const auto preset = [] (const juce::String& path, const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = juce::File (path).getFileNameWithoutExtension();
+        r.fingerprint = fingerprint;
+        return r;
+    };
+
+    // The whole folder moves and the next scan finds everything somewhere else.
+    {
+        Library library;
+        library.mergeVendorScan ("vstpreset", { preset ("/old/a.vstpreset", "fp-a"),
+                                                preset ("/old/b.vstpreset", "fp-b") });
+        const auto keptId = library.allRecords().getReference (0).recordId;
+        library.find (keptId)->user.rating = 5;
+
+        library.mergeVendorScan ("vstpreset", { preset ("/new/a.vstpreset", "fp-a"),
+                                                preset ("/new/b.vstpreset", "fp-b") });
+
+        check (library.allRecords().size() == 2,
+               "a moved folder relinks rather than doubling the library");
+        const auto* moved = library.find (keptId);
+        check (moved != nullptr && moved->sourceLocator == "/new/a.vstpreset",
+               "the record follows its file to the new path");
+        check (moved != nullptr && ! moved->missing, "and is not left marked missing");
+        check (moved != nullptr && moved->user.rating == 5,
+               "with the rating intact, which is the whole reason identity follows content");
+    }
+
+    // The sequence somebody actually lives through: the folder vanishes, a scan marks everything
+    // missing, and only later does the new location get scanned. A long-missing record is the
+    // rename candidate of last resort — it still has to be one.
+    {
+        Library library;
+        library.mergeVendorScan ("vstpreset", { preset ("/old/c.vstpreset", "fp-c") });
+        const auto cId = library.allRecords().getReference (0).recordId;
+        library.find (cId)->user.rating = 4;
+
+        library.mergeVendorScan ("vstpreset", {});
+        check (library.find (cId) != nullptr && library.find (cId)->missing,
+               "a scan that cannot find the file marks the record missing and keeps it");
+
+        library.mergeVendorScan ("vstpreset", { preset ("/new/c.vstpreset", "fp-c") });
+        check (library.allRecords().size() == 1,
+               "and finding it again elsewhere heals that record rather than minting a second");
+        const auto* healed = library.find (cId);
+        check (healed != nullptr && healed->sourceLocator == "/new/c.vstpreset"
+                 && ! healed->missing && healed->user.rating == 4,
+               "path updated, missing cleared, rating kept");
+    }
+}
+
+// FOLDING A DUPLICATE. Deleting the extra row does not work, and the probe said so plainly: two
+// vendor records, delete one, rescan, and there are two again — because the file is still on disk
+// and finding it is what a scan is for. So a fold hides rather than deletes, and the hiding has to
+// survive the very rescan that undid the deletion. That is the assertion this test exists for.
+//
+// The other half is that folding must never be the thing that loses somebody's work: the curation
+// of every member arrives on the survivor before the rest go quiet.
+
+void testDuplicateFold()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::libraryDuplicates;
+    using ceditor::host::mergedDuplicateMetadata;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nfolding a duplicate" << std::endl;
+
+    // One preset copied into a second folder: the same bytes at two paths, which is what anybody
+    // who has ever backed a preset folder up already has.
+    const auto twin = [] (const juce::String& path, const juce::String& name)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = name;
+        r.targetCeId = "VST3-good-synth";
+        r.fingerprint = "fp-same";
+        r.factory = true;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", { twin ("/presets/warm.vstpreset", "Warm Pad"),
+                                            twin ("/backup/warm.vstpreset", "Warm Pad copy") });
+    const auto aId = library.allRecords().getReference (0).recordId;
+    const auto bId = library.allRecords().getReference (1).recordId;
+
+    {
+        auto* a = library.find (aId);
+        a->user.favourite = true;
+        a->user.rating = 5;
+        a->user.notes = "Best pad I have";
+        a->user.tags = { "pad" };
+        a->user.collections = { "Live set" };
+
+        auto* b = library.find (bId);
+        b->user.rating = 3;
+        b->user.notes = "Came off the old drive";
+        b->user.tags = { "warm", "pad" };
+        b->user.collections = { "Archive" };
+    }
+
+    const auto sets = libraryDuplicates (library);
+    check (sets.size() == 1 && sets.getReference (0).identical,
+           "the same bytes at two paths are one duplicate set, matched on fingerprint");
+    check (sets.getReference (0).keyRecordId == aId,
+           "and the member carrying the most curation is the one to keep");
+
+    // -- what folding would do, worked out before anything is folded ----------------------
+    const auto merged = mergedDuplicateMetadata (library, sets.getReference (0));
+    check (merged.favourite && merged.rating == 5,
+           "the survivor takes the higher rating, and is a favourite if either member was");
+    check (merged.tags.size() == 2 && merged.tags.contains ("pad") && merged.tags.contains ("warm"),
+           "tags are unioned rather than replaced, and a tag both carried is not doubled");
+    check (merged.collections.size() == 2 && merged.collections.contains ("Live set")
+             && merged.collections.contains ("Archive"),
+           "so are collections");
+    check (merged.notes == "Best pad I have\nWarm Pad copy: Came off the old drive",
+           "and both notes survive, each labelled with the sound it came from");
+    // The survivor's own note is not prefixed: it is already on the record being looked at, and
+    // labelling it with its own name reads as though it arrived from somewhere else.
+    check (! merged.notes.startsWith ("Warm Pad:"), "except the survivor's own, which is already home");
+
+    // -- and then the fold itself ---------------------------------------------------------
+    library.setUserMetadata (aId, merged);
+    library.setRecordHidden (bId, true);
+
+    check (library.allRecords().size() == 2,
+           "nothing is deleted — the folded record is still there, id and all");
+    check (searchLibrary (library, LibraryQuery{}).size() == 1, "but a browse no longer shows it");
+
+    LibraryQuery withHidden;
+    withHidden.includeHidden = true;
+    check (searchLibrary (library, withHidden).size() == 2,
+           "and asking for hidden rows brings it back, which is what makes this undoable");
+
+    check (libraryDuplicates (library).isEmpty(),
+           "the set stops being offered, because it has been dealt with");
+
+    // -- the load-bearing part -------------------------------------------------------------
+    // Both files are still on disk, so the next scan finds both. This is the exact sequence that
+    // undid deleting the row; if it undoes hiding as well then the feature is a lie.
+    library.mergeVendorScan ("vstpreset", { twin ("/presets/warm.vstpreset", "Warm Pad"),
+                                            twin ("/backup/warm.vstpreset", "Warm Pad copy") });
+    check (library.allRecords().size() == 2, "a rescan finds both files, as it always did");
+    check (library.find (bId) != nullptr && library.find (bId)->hidden,
+           "and the fold survives it — which deleting the row never did");
+    check (library.find (aId) != nullptr && library.find (aId)->user.rating == 5
+             && library.find (aId)->user.tags.contains ("warm"),
+           "with the merged curation still on the survivor");
+
+    // Written down and read back, because a fold that lives only in memory lasts until the
+    // program closes.
+    const auto reloaded = Library::fromVar (library.toVar());
+    check (reloaded.find (bId) != nullptr && reloaded.find (bId)->hidden,
+           "hidden is serialised, so the fold outlives the session");
+
+    // Undoing it is the same switch the other way, and the offer comes back with the row.
+    library.setRecordHidden (bId, false);
+    check (searchLibrary (library, LibraryQuery{}).size() == 2
+             && libraryDuplicates (library).size() == 1,
+           "unfolding restores the row, and the set is a set again");
+}
+
+// The same rule over the bridge: what the browser may ask for, and the two things it may not.
+
+void testDuplicateFoldCommands()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::libraryDuplicates;
+
+    std::cout << "\nfolding a duplicate, over the bridge" << std::endl;
+
+    const auto dir = freshDataDir ("duplicate-fold");
+    seedCatalog (dir);
+
+    const auto vendorPreset = [] (const juce::String& path, const juce::String& name,
+                                  const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = name;
+        r.targetCeId = "VST3-good-synth";
+        r.fingerprint = fingerprint;
+        r.factory = true;
+        return r;
+    };
+
+    juce::String keyId, foldedId;
+    {
+        Library seeded;
+        seeded.mergeVendorScan ("vstpreset",
+                                { vendorPreset ("/presets/warm.vstpreset", "Warm Pad", "fp-same"),
+                                  vendorPreset ("/backup/warm.vstpreset", "Warm Pad copy", "fp-same"),
+                                  vendorPreset ("/presets/lead.vstpreset", "Bright Lead", "fp-lead") });
+        keyId = seeded.allRecords().getReference (0).recordId;
+        foldedId = seeded.allRecords().getReference (1).recordId;
+        seeded.find (keyId)->user.rating = 4;
+        seeded.find (foldedId)->user.tags = { "warm" };
+        seeded.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    Harness h (dir);
+    const auto library = [&h] { return h.emits.last ("instrumentHostLibrary"); };
+    const auto counts = [&library] (const juce::String& name)
+    {
+        return (int) library()->getProperty ("counts", {}).getProperty (name, -1);
+    };
+    const auto rowFor = [&library] (const juce::String& recordId)
+    {
+        juce::var found;
+        for (const auto& r : *library()->getProperty ("records", {}).getArray())
+            if (r.getProperty ("recordId", {}).toString() == recordId)
+                found = r;
+        return found;
+    };
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("duplicates", {}).size() == 1, "the browser is offered the one set");
+    check (counts ("hidden") == 0, "and nothing is folded yet");
+
+    // The browser's copy of the sets is as old as its last answer, so a key that is not the key of
+    // any set the library currently has is refused rather than guessed at. Folding a stale list
+    // would hide sounds that are no longer duplicates of anything.
+    h.emits.clear();
+    h.cmd ("mergeDuplicateSet", { { "keyRecordId", foldedId } });
+    check (h.emits.lastError().contains ("no longer a duplicate set"),
+           "folding a set the library does not currently have is refused");
+    check (h.emits.last ("instrumentHostDuplicatesMerged") == nullptr, "and nothing is folded");
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (counts ("hidden") == 0, "the refusal changed nothing");
+
+    h.emits.clear();
+    h.cmd ("mergeDuplicateSet", { { "keyRecordId", keyId } });
+    const auto* done = h.emits.last ("instrumentHostDuplicatesMerged");
+    check (done != nullptr && (int) done->getProperty ("folded", 0) == 1,
+           "folding the set says how many rows went quiet");
+
+    h.emits.clear();
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("records", {}).size() == 2, "the browse is one row shorter");
+    check (counts ("total") == 3 && counts ("hidden") == 1,
+           "the library is not — the row is hidden, and counted, so it can be found again");
+    check (library()->getProperty ("duplicates", {}).size() == 0, "and the set is no longer offered");
+    check (rowFor (keyId).getProperty ("tags", {}).size() == 1
+             && rowFor (keyId).getProperty ("tags", {})[0].toString() == "warm",
+           "the folded member's tag arrived on the survivor rather than going quiet with it");
+
+    h.emits.clear();
+    h.cmd ("getLibrary", { { "includeHidden", true } });
+    check (library()->getProperty ("records", {}).size() == 3, "hidden rows can be asked for");
+    check ((bool) rowFor (foldedId).getProperty ("hidden", false),
+           "and each says that it is folded, so the page can offer to unfold it");
+
+    h.emits.clear();
+    h.cmd ("setLibraryRecordHidden", { { "recordId", foldedId }, { "hidden", false } });
+    h.cmd ("getLibrary");
+    check (library()->getProperty ("records", {}).size() == 3 && counts ("hidden") == 0,
+           "unfolding puts it back in the browse");
+    check (library()->getProperty ("duplicates", {}).size() == 1,
+           "and the set is offered again, because it is a set again");
+
+    // A measured resemblance is not the same bytes, and the difference between them is somebody's
+    // edit. Folding on measurement would be the program deciding that edit did not count.
+    juce::String nearId;
+    {
+        Library nearby;
+        nearby.mergeVendorScan ("vstpreset", { vendorPreset ("/a.vstpreset", "Init", "fp-a"),
+                                               vendorPreset ("/b.vstpreset", "Init", "fp-b") });
+        for (int i = 0; i < 2; ++i)
+        {
+            auto* record = nearby.find (nearby.allRecords().getReference (i).recordId);
+            record->sonic.measured = true;
+            record->sonic.brightness = 0.5f;
+        }
+        const auto near = libraryDuplicates (nearby);
+        check (near.size() == 1 && ! near.getReference (0).identical,
+               "two presets of one plug-in that measure alike are a set, but not an identical one");
+        nearId = near.getReference (0).keyRecordId;
+        nearby.saveTo (dir.getChildFile ("library.json"));
+    }
+
+    Harness h2 (dir);
+    h2.emits.clear();
+    h2.cmd ("mergeDuplicateSet", { { "keyRecordId", nearId } });
+    check (h2.emits.lastError().contains ("byte-for-byte"),
+           "and a set that is only a resemblance cannot be folded at all");
+    h2.emits.clear();
+    h2.cmd ("getLibrary");
+    check ((int) h2.emits.last ("instrumentHostLibrary")->getProperty ("counts", {})
+                   .getProperty ("hidden", -1) == 0,
+           "nothing was hidden on the way to refusing");
+}
+
+// WHAT YOU OWN VERSUS WHAT YOU PLAY. A twelve-thousand-preset library is mostly a library nobody
+// has opened. The statistic on its own is something to feel bad about; the recommendation built
+// from it is the feature. Both halves have a way of being confidently wrong, and both are pinned
+// here: a count that a rescan resets, and a centre averaged from too little to mean anything.
+
+void testUsageCounters()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::LibraryQuery;
+    using ceditor::host::searchLibrary;
+
+    std::cout << "\nwhat you own versus what you play" << std::endl;
+
+    const auto preset = [] (const juce::String& path, const juce::String& fingerprint)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = path;
+        r.name = juce::File (path).getFileNameWithoutExtension();
+        r.fingerprint = fingerprint;
+        r.factory = true;
+        return r;
+    };
+
+    Library library;
+    library.mergeVendorScan ("vstpreset", { preset ("/p/a.vstpreset", "fp-a"),
+                                            preset ("/p/b.vstpreset", "fp-b") });
+    const auto aId = library.allRecords().getReference (0).recordId;
+    const auto bId = library.allRecords().getReference (1).recordId;
+
+    check (library.find (aId)->loadCount == 0 && library.find (aId)->lastLoadedAtMs == 0,
+           "a library nobody has opened counts nothing, which is the honest starting point");
+
+    library.noteRecordUsed (aId, false, 1000);
+    library.noteRecordUsed (aId, false, 2000);
+    check (library.find (aId)->loadCount == 2 && library.find (aId)->lastLoadedAtMs == 2000,
+           "loading counts, and the last time is the last one");
+
+    // Browsing is not playing. Auditioning forty pads to pick one is not using forty pads, and
+    // one number for both would let somebody who only ever scrolled read as somebody who plays.
+    library.noteRecordUsed (bId, true, 3000);
+    check (library.find (bId)->auditionCount == 1 && library.find (bId)->loadCount == 0,
+           "an audition is counted apart, and does not make a record look played");
+    check (library.find (bId)->lastLoadedAtMs == 0, "nor does it claim a load time");
+
+    check (! library.noteRecordUsed ("nope", false, 4000),
+           "an unknown record is a miss a caller can see, not a silent no-op");
+
+    // The filter the whole feature exists for.
+    LibraryQuery unplayed;
+    unplayed.neverLoadedOnly = true;
+    const auto never = searchLibrary (library, unplayed);
+    check (never.size() == 1 && never.getFirst()->recordId == bId,
+           "never loaded keeps exactly what has never been loaded");
+    check (searchLibrary (library, LibraryQuery{}).size() == 2, "and is a filter, not a deletion");
+
+    // The load-bearing part, and the same trap as the ratings: a rescan must not reset it.
+    library.mergeVendorScan ("vstpreset", { preset ("/p/a.vstpreset", "fp-a"),
+                                            preset ("/p/b.vstpreset", "fp-b") });
+    check (library.find (aId) != nullptr && library.find (aId)->loadCount == 2
+             && library.find (aId)->lastLoadedAtMs == 2000,
+           "a rescan keeps the count — how often you reached for a sound is a fact about you");
+    check (library.find (bId) != nullptr && library.find (bId)->auditionCount == 1,
+           "auditions survive it too");
+
+    const auto reloaded = Library::fromVar (library.toVar());
+    check (reloaded.find (aId) != nullptr && reloaded.find (aId)->loadCount == 2
+             && reloaded.find (aId)->lastLoadedAtMs == 2000
+             && reloaded.find (bId)->auditionCount == 1,
+           "and it is written down, so a session is not the unit of memory");
+
+    // Nothing to write is nothing written: a library of twelve thousand untouched records must
+    // not grow three zeroes per row on disk.
+    Library plain;
+    plain.mergeVendorScan ("vstpreset", { preset ("/p/c.vstpreset", "fp-c") });
+    check (! juce::JSON::toString (plain.toVar()).contains ("loadCount"),
+           "an unplayed record carries no usage fields at all");
+}
+
+void testHabitualProfile()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::habitualProfile;
+    using ceditor::host::unplayedLikeHabits;
+
+    std::cout << "\nwhat you reach for, and what you have never opened" << std::endl;
+
+    const auto measured = [] (const juce::String& name, float brightness, float tail)
+    {
+        LibraryRecord r;
+        r.type = "preset";
+        r.sourceType = "vstpreset";
+        r.sourceLocator = "/p/" + name + ".vstpreset";
+        r.name = name;
+        r.fingerprint = "fp-" + name;
+        r.factory = true;
+        r.sonic.measured = true;
+        r.sonic.brightness = brightness;
+        r.sonic.tail = tail;
+        return r;
+    };
+
+    Library library;
+    juce::Array<LibraryRecord> scanned;
+    // Five dark, long sounds to be played, and two bright short ones that never are.
+    for (int i = 0; i < 5; ++i)
+        scanned.add (measured ("dark" + juce::String (i), 0.20f + 0.01f * (float) i, 0.80f));
+    scanned.add (measured ("bright-unplayed", 0.90f, 0.10f));
+    scanned.add (measured ("dark-unplayed", 0.22f, 0.78f));
+    library.mergeVendorScan ("vstpreset", scanned);
+
+    // Nothing played yet: there is no centre, and saying so is the answer.
+    check (! habitualProfile (library).measured,
+           "an untouched library has no taste to report, and does not invent one");
+    check (unplayedLikeHabits (library, 5).isEmpty(),
+           "so there is nothing to recommend from, and nothing is recommended");
+
+    juce::StringArray played;
+    for (const auto& record : library.allRecords())
+        if (record.name.startsWith ("dark") && record.name != "dark-unplayed")
+            played.add (record.recordId);
+
+    // Four of the five: one short of the bar, deliberately.
+    for (int i = 0; i < 4; ++i)
+        library.noteRecordUsed (played[i], false, 1000);
+    check (! habitualProfile (library).measured,
+           "four records is not a taste — the minimum is distinct records, so a centre built on "
+           "too little is refused rather than guessed at");
+
+    library.noteRecordUsed (played[4], false, 1000);
+    const auto centre = habitualProfile (library);
+    check (centre.measured, "five distinct played records is enough to go on");
+    check (centre.brightness > 0.15f && centre.brightness < 0.30f,
+           "and the centre sits among the dark sounds that were actually played");
+    check (centre.tail > 0.70f, "long, like the things being reached for");
+
+    // Fifty loads of one record is one data point repeated, not fifty. It may weigh the centre
+    // — that is what a habit is — but it must not on its own clear the bar for having one.
+    {
+        Library one;
+        one.mergeVendorScan ("vstpreset", { measured ("only", 0.9f, 0.1f) });
+        const auto onlyId = one.allRecords().getReference (0).recordId;
+        for (int i = 0; i < 50; ++i)
+            one.noteRecordUsed (onlyId, false, 1000);
+        check (! habitualProfile (one).measured,
+               "one sound opened fifty times is still one sound, and is not a recommendation");
+    }
+
+    const auto offered = unplayedLikeHabits (library, 5);
+    check (offered.size() == 2, "only what has never been opened is offered");
+    check (offered.getReference (0).record->name == "dark-unplayed",
+           "nearest to what you reach for comes first, which is the recommendation");
+    check (offered.getReference (1).record->name == "bright-unplayed",
+           "and the one that sounds nothing like it comes last, rather than not at all");
+
+    for (const auto& match : offered)
+        check (match.record->loadCount == 0, "nothing already played is offered as a discovery");
+
+    // A folded duplicate is a sound you already have under another name, on both sides.
+    {
+        Library folded;
+        juce::Array<LibraryRecord> twins;
+        for (int i = 0; i < 5; ++i)
+            twins.add (measured ("dark" + juce::String (i), 0.20f, 0.80f));
+        twins.add (measured ("copy", 0.20f, 0.80f));
+        folded.mergeVendorScan ("vstpreset", twins);
+
+        juce::String copyId;
+        for (const auto& record : folded.allRecords())
+        {
+            if (record.name == "copy") copyId = record.recordId;
+            else folded.noteRecordUsed (record.recordId, false, 1000);
+        }
+        check (habitualProfile (folded).measured, "five played records is still five");
+        folded.setRecordHidden (copyId, true);
+        check (unplayedLikeHabits (folded, 5).isEmpty(),
+               "a folded copy is not a discovery — you already own that sound");
+    }
+}
+
+void testRecordFamily()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::recordFamily;
+
+    // A small dynasty: root -> a, b;  a -> a1.  Plus an unrelated record that must stay out.
+    Library library;
+    const auto add = [&library] (const juce::String& name, const juce::String& parentId)
+    {
+        LibraryRecord record;
+        record.type = "preset";
+        record.sourceType = "userState";
+        record.name = name;
+        record.branchedFromRecordId = parentId;
+        return library.addCapturedRecord (record);
+    };
+
+    const auto rootId = add ("Root", {});
+    const auto aId    = add ("A", rootId);
+    const auto bId    = add ("B", rootId);
+    const auto a1Id   = add ("A1", aId);
+    add ("Stranger", {});
+
+    const auto names = [] (const ceditor::host::RecordFamily& family)
+    {
+        juce::StringArray out;
+        for (const auto& node : family.nodes) out.add (node.name);
+        return out.joinIntoString (", ");
+    };
+
+    // Asked from a LEAF, the answer is still the whole family: climb to the root, then descend.
+    const auto fromLeaf = recordFamily (library, a1Id);
+    check (fromLeaf.rootRecordId == rootId, "a leaf finds the top of its line");
+    check (names (fromLeaf) == "Root, A, B, A1",
+           "and the whole family comes back, root first and breadth-first after");
+    check (! fromLeaf.truncated, "with nothing left out");
+
+    // Breadth-first is the contract the UI draws on: a parent always precedes its children.
+    bool parentsFirst = true;
+    juce::StringArray placed;
+    for (const auto& node : fromLeaf.nodes)
+    {
+        if (node.parentRecordId.isNotEmpty() && ! placed.contains (node.parentRecordId))
+            parentsFirst = false;
+        placed.add (node.recordId);
+    }
+    check (parentsFirst, "every node arrives after its parent, so a tree draws in one pass");
+
+    check (recordFamily (library, rootId).nodes.size() == 4,
+           "asking from the root gives the same family");
+    check (recordFamily (library, "no-such-record").nodes.isEmpty(),
+           "and an unknown record has no family rather than a made-up one");
+
+    // A lone record is its own family of one, not an error.
+    const auto alone = recordFamily (library, library.allRecords().getReference (4).recordId);
+    check (alone.nodes.size() == 1 && alone.nodes[0].depth == 0,
+           "a sound nobody branched is a family of one");
+
+    // A parent id pointing at a record that is gone: the climb stops at what can be NAMED.
+    {
+        Library orphaned;
+        LibraryRecord child;
+        child.type = "preset";
+        child.name = "Orphan";
+        child.branchedFromRecordId = "a-record-that-was-deleted";
+        const auto childId = orphaned.addCapturedRecord (child);
+
+        const auto family = recordFamily (orphaned, childId);
+        check (family.rootRecordId == childId && family.nodes.size() == 1,
+               "a parent that is gone leaves the child as the root of what can be found");
+    }
+
+    // THE CASES THE CAPS EXIST FOR. Nothing the program offers can produce these — a branch
+    // always points at a record that already exists — but a library file is a file, and a walk
+    // that trusted it would hang the message thread rather than answer.
+    {
+        Library looped;
+        LibraryRecord one, two;
+        one.type = two.type = "preset";
+        one.name = "One"; two.name = "Two";
+        const auto oneId = looped.addCapturedRecord (one);
+        const auto twoId = looped.addCapturedRecord (two);
+        looped.find (oneId)->branchedFromRecordId = twoId;
+        looped.find (twoId)->branchedFromRecordId = oneId;   // only a hand-edited file says this
+
+        const auto family = recordFamily (looped, oneId);
+        check (family.truncated, "a cycle is reported as truncated rather than followed");
+        check (family.nodes.size() <= 2, "and answers with what it could place, not for ever");
+    }
+
+    {
+        // A chain longer than the depth cap answers with the cap's worth and says so.
+        Library deep;
+        juce::String previous;
+        for (int i = 0; i < 40; ++i)
+            previous = [&] { LibraryRecord r; r.type = "preset";
+                             r.name = "Gen" + juce::String (i);
+                             r.branchedFromRecordId = previous;
+                             return deep.addCapturedRecord (r); }();
+
+        const auto shallow = recordFamily (deep, previous, 200, 5);
+        check (shallow.truncated, "a family deeper than the cap says it was cut short");
+        check (shallow.nodes.size() <= 6, "and stops at the depth it was given");
+
+        const auto narrow = recordFamily (deep, previous, 3, 64);
+        check (narrow.truncated && narrow.nodes.size() == 3,
+               "a node cap is obeyed exactly, and reported");
+    }
+}
+
+void testRecordRecency()
+{
+    using ceditor::host::Library;
+    using ceditor::host::LibraryRecord;
+    using ceditor::host::recordAddedWithin;
+
+    const juce::int64 now = 1'700'000'000'000LL;
+    const juce::int64 day = 24LL * 60LL * 60LL * 1000LL;
+
+    LibraryRecord record;
+    record.addedAtMs = now - 3 * day;
+
+    check (recordAddedWithin (record, 0, now), "a filter of zero days is off and passes everything");
+    check (recordAddedWithin (record, 7, now), "three days ago is inside a week");
+    check (! recordAddedWithin (record, 2, now), "and outside two days");
+    check (recordAddedWithin (record, 3, now), "the boundary is inclusive — exactly N days still counts");
+
+    LibraryRecord never;
+    check (never.addedAtMs == 0, "a record defaults to never having been counted");
+    check (! recordAddedWithin (never, 7, now),
+           "an unknown arrival is not a recent one, the way an unknown brightness is not a dark one");
+    check (recordAddedWithin (never, 0, now),
+           "but it is not hidden when the filter is off");
+
+    LibraryRecord future;
+    future.addedAtMs = now + 5 * day;
+    check (recordAddedWithin (future, 1, now),
+           "a clock that ran fast leaves a sound visible rather than hiding it from every view");
+
+    // The two ways in, and the stamps that separate them from everything already there.
+    {
+        Library library;
+        LibraryRecord scanned;
+        scanned.type = "preset";
+        scanned.sourceType = "vstpreset";
+        scanned.sourceLocator = "/presets/one.vstpreset";
+        scanned.name = "One";
+        scanned.fingerprint = "fp-one";
+        library.mergeVendorScan ("vstpreset", { scanned });
+
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs > 0,
+               "a genuinely new scanned preset is stamped when it arrives");
+        const auto firstStamp = library.allRecords().getReference (0).addedAtMs;
+
+        // A second scan of the same file is the same record, not a new arrival — which is what
+        // stops a rescan making the whole library look new every time.
+        library.mergeVendorScan ("vstpreset", { scanned });
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs == firstStamp,
+               "and a rescan of the same file does not restamp it");
+
+        // A move keeps the record by design (the three-pass match protects ratings), so the
+        // preset is correctly not new at its new path.
+        auto moved = scanned;
+        moved.sourceLocator = "/elsewhere/one.vstpreset";
+        library.mergeVendorScan ("vstpreset", { moved });
+        check (library.allRecords().size() == 1
+                 && library.allRecords().getReference (0).addedAtMs == firstStamp,
+               "nor does moving the file, because the record it keeps is the one it already had");
+
+        LibraryRecord captured;
+        captured.type = "preset";
+        captured.sourceType = "userState";
+        captured.name = "Mine";
+        const auto capturedId = library.addCapturedRecord (captured);
+        const auto* mine = library.find (capturedId);
+        check (mine != nullptr && mine->addedAtMs > 0, "a captured sound is stamped too");
+    }
+}
+
 void testLibraryBrowsing()
 {
     std::cout << "\nfacets, exclusion and counts that predict the click" << std::endl;
@@ -11317,6 +12053,14 @@ int main (int argc, char* argv[])
     testZebra3ProgramNames();
     testSubstitutes();
     testBrowseOnSurface();
+    testRefusalCauses();
+    testRecordRecency();
+    testRecordFamily();
+    testMovedLibraryRelinks();
+    testDuplicateFold();
+    testDuplicateFoldCommands();
+    testUsageCounters();
+    testHabitualProfile();
     testLibraryBrowsing();
     testTwinPresetsKeepTheirOwnRecords();
     testFactoryPerformance();

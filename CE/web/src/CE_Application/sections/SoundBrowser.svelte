@@ -13,7 +13,10 @@
     hostAudition, auditionRecord, stopAudition, setAuditionPhrase, auditionLibraryRecord,
     hostVersionDiff, commitVersion, applyVersion, diffVersions, morphVersions,
     setMorph, clearMorph, setParameter,
-    hostSimilar, similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
+    hostSimilar, hostRecordFamily, recordFamily,
+    similarSounds, hostSubstitutes, rackSubstitutes, rememberSubstitute,
+    setLibraryRecordHidden,
+    hostUnplayed, unplayedLikeHabits,
     hostSurfaceBrowse, browseOnSurface, browseTurn, browsePad,
     MEASURED_AXES, measuredLabel,
   } from '../stores/instrumentHost.js';
@@ -29,15 +32,20 @@
     auditionOn = false,
     onToggleAudition = () => {},
     onManageLibrary = () => {},
+    // The filter row and the inspector start closed unless the caller asks otherwise — a render
+    // test does, and so may a caller landing somebody on a filter. Details otherwise starts as it
+    // was last left.
+    showFilters = false,
+    showDetails = null,
   } = $props();
 
   const preferencesKey = 'ceditor.instrumentHost.soundsView.v1';
   const preferences = readStoredJson(preferencesKey, {}) ?? {};
   let query = $state(untrack(() => normalizeLibraryQuery($hostLibrary.request)));
   let presetKind = $state(['instrument', 'effect'].includes(preferences.kind) ? preferences.kind : 'all');
-  let detailsOpen = $state(preferences.details === true);
+  let detailsOpen = $state(untrack(() => showDetails ?? preferences.details === true));
   let comfortable = $state(preferences.comfortable === true);
-  let filtersOpen = $state(false);
+  let filtersOpen = $state(untrack(() => showFilters === true));
   let listElement = $state(null);
   let listHeight = $state(240);
   let scrollTop = $state(0);
@@ -253,7 +261,24 @@
     if (recordId && recordId !== lastAskedSimilar) {
       lastAskedSimilar = recordId;
       similarSounds(recordId);
+      recordFamily(recordId);
     }
+  }
+
+  // Walking to a relative must LAND on it. `selected` falls back to records[0] when the id is
+  // not in the current result, so a click on an ancestor that the filter happens to exclude
+  // would quietly select something else — worse than no link at all. So: if it is not in view,
+  // clear the filter to reveal it, and say so rather than changing the view behind their back.
+  let revealedNote = $state('');
+  function revealRecord(recordId) {
+    if (!recordId || recordId === selectedId) return;
+    if (!records.some((r) => r.recordId === recordId)) {
+      revealedNote = 'Filters cleared to show it.';
+      ask(emptyLibraryQuery());
+    } else {
+      revealedNote = '';
+    }
+    selectRecord(recordId);
   }
 
   // Two sounds of the focused part's plug-in become the ends of its morph: the selected one
@@ -443,7 +468,62 @@
               onclick={() => ask({ ...query, measuredOnly: !query.measuredOnly })}>
         <span>Measured</span><span class="n">{$hostLibrary.counts.measured}</span>
       </button>
+      <button type="button" class="rail-item" class:on={query.addedWithinDays > 0}
+              data-testid="added-recently"
+              title="Only what arrived in the last fortnight. A sound the library has always had has no arrival time and is not recent; a file that merely moved keeps the record it already had, so it is not new either."
+              onclick={() => ask({ ...query, addedWithinDays: query.addedWithinDays > 0 ? 0 : 14 })}>
+        <span>Added recently</span><span class="n">{$hostLibrary.counts.addedRecently}</span>
+      </button>
 
+      <!-- What the browse is not showing. A fold nobody can count is a fold nobody can undo,
+           so the number is here whether or not there is a set left to fold. Folding itself is
+           offered beside the auditioner, in the library panel. -->
+      {#if $hostLibrary.counts.hidden > 0}
+        <button type="button" class="rail-item" class:on={query.includeHidden}
+                data-testid="folded-away"
+                title="Folded duplicates. They were never deleted — show them and any one can be put back."
+                onclick={() => ask({ ...query, includeHidden: !query.includeHidden })}>
+          <span>Folded away</span><span class="n">{$hostLibrary.counts.hidden}</span>
+        </button>
+      {/if}
+
+      <!-- WHAT YOU OWN VERSUS WHAT YOU PLAY. The statistic on its own is something to feel bad
+           about; it earns its place because the row beside it is a way in. Nothing else in the
+           product has ever told you which part of your library you have never opened. -->
+      {#if $hostLibrary.counts.total > 0}
+        <div class="rail-head">What you play</div>
+        <span class="play-note" data-testid="play-note">
+          {$hostLibrary.counts.everLoaded} of {$hostLibrary.counts.total} ever loaded
+        </span>
+        <button type="button" class="rail-item" class:on={query.neverLoadedOnly}
+                data-testid="never-loaded"
+                title="Sounds you own and have never once loaded. Auditioning one while browsing does not count as playing it."
+                onclick={() => ask({ ...query, neverLoadedOnly: !query.neverLoadedOnly })}>
+          <span>Never loaded</span><span class="n">{$hostLibrary.counts.neverLoaded}</span>
+        </button>
+        <button type="button" class="rail-item" data-testid="suggest-unplayed"
+                title="Measure what you keep reaching for, then find what you own that sounds like it and have never opened"
+                onclick={() => unplayedLikeHabits(20)}><span>Find what I'd like</span></button>
+
+        {#if $hostUnplayed.matches.length > 0}
+          <span class="play-note" data-testid="unplayed-from">
+            from the {$hostUnplayed.from} you keep loading
+          </span>
+          {#each $hostUnplayed.matches.slice(0, 8) as match (match.recordId)}
+            <button type="button" class="rail-item" data-testid="unplayed-match"
+                    title={`${match.percent}% like what you reach for, and you have never opened it`}
+                    onclick={() => revealRecord(match.recordId)}>
+              <span>{match.name}</span><span class="n">{match.percent}%</span>
+            </button>
+          {/each}
+        {:else if !$hostUnplayed.enough}
+          <!-- Refused rather than guessed. A centre averaged from one or two sounds is confident
+               nonsense, and one wrong recommendation is all it takes to stop being believed. -->
+          <span class="play-note dim" data-testid="unplayed-not-enough">
+            Load a few more and this can tell you what you'd like.
+          </span>
+        {/if}
+      {/if}
 </div>
         {#each FACET_LABELS as [facet, label] (facet)}
           {#if facets[facet].length > 0}
@@ -633,10 +713,18 @@
               <button type="button" class="preset-pick" aria-pressed={record.recordId === selected?.recordId}
                       title={record.available ? `${record.name} — ${record.instrument}` : record.reason}
                       onkeydown={walkPresets} onclick={() => selectRecord(record.recordId)} ondblclick={() => loadInto(record, 'focused')}>
-                <span class="preset-name">{record.name}</span><span>{record.instrument || '—'}</span>
+                <span class="preset-name">{record.name}{#if record.hidden}<span class="badge folded">FOLDED</span>{/if}</span><span>{record.instrument || '—'}</span>
                 <span class="preset-category">{record.category || '—'}</span>
                 <span class="preset-kind">{!record.available ? 'Missing' : record.isEffect ? 'FX' : record.type === 'rack' ? 'Rack' : record.type === 'chain' ? 'Chain' : record.sourceType === 'hardwarePatch' ? 'HW' : 'Inst'}</span>
               </button>
+              <!-- A folded row is only ever in the list because the browse was asked to show
+                   them, and the way back belongs on the row itself: the fold is undone where
+                   it is seen. -->
+              {#if record.hidden}
+                <button type="button" class="preset-unfold" data-testid="unfold-record"
+                        title="Put this back in the browse"
+                        onclick={() => setLibraryRecordHidden(record.recordId, false)}>Unfold</button>
+              {/if}
             </div>
           {/each}
           <div style={`height:${windowRows.after}px`} aria-hidden="true"></div>
@@ -691,7 +779,13 @@
                   {#if record.isEffect}<span class="badge">FX</span>{/if}
                   {#if record.sourceType === 'userState'}<span class="badge mine">MINE</span>{/if}
                   {#if !record.available}<span class="badge miss">NEEDS</span>{/if}
+                  {#if record.hidden}<span class="badge folded">FOLDED</span>{/if}
                 </span>
+                {#if record.hidden}
+                  <button type="button" data-testid="unfold-record"
+                          title="Put this back in the browse"
+                          onclick={() => setLibraryRecordHidden(record.recordId, false)}>Unfold</button>
+                {/if}
                 {#if record.type === 'rack'}
                   <button type="button" disabled={!record.available}
                           onclick={() => loadLibraryRecord(record.recordId)}>Restore</button>
@@ -976,8 +1070,36 @@
             </div>
           {/if}
 
-          {#if selected.branchedFromName}
+          {#if selected.branchedFromName && $hostRecordFamily.nodes.length < 2}
+            <!-- The family has not answered yet (or this record stands alone in it). Name the
+                 parent rather than showing nothing, which is what this line always did. -->
             <div class="branched">branched from <b>{selected.branchedFromName}</b></div>
+          {/if}
+          {#if $hostRecordFamily.recordId === selected.recordId && $hostRecordFamily.nodes.length > 1}
+            <div class="family" data-testid="record-family">
+              <div class="insp-head">
+                Its line
+                {#if $hostRecordFamily.truncated}
+                  <span class="fmore" data-testid="family-truncated">and more than fits here</span>
+                {/if}
+              </div>
+              {#each $hostRecordFamily.nodes as node (node.recordId)}
+                <button type="button"
+                        class="fnode"
+                        class:here={node.recordId === selected.recordId}
+                        data-testid={node.recordId === selected.recordId ? 'family-here' : 'family-node'}
+                        style={`padding-left:${6 + node.depth * 12}px`}
+                        title={node.recordId === selected.recordId
+                          ? 'The sound you are looking at'
+                          : 'Show this one'}
+                        onclick={() => revealRecord(node.recordId)}>
+                  {node.name || 'an unnamed sound'}
+                </button>
+              {/each}
+              {#if revealedNote}
+                <div class="fnote" data-testid="family-note">{revealedNote}</div>
+              {/if}
+            </div>
           {/if}
 
           <div class="vsave">
@@ -1347,6 +1469,19 @@
   .thumb polygon { fill: #6fb0c9; fill-opacity: 0.85; }
   .thumb line { stroke: #7fb4e0; stroke-opacity: 0.3; stroke-width: 0.4; }
 
+  .family { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
+  .family .fmore { color: #b08a3d; font-size: 9.5px; margin-left: 6px; font-style: italic; }
+  .fnode {
+    text-align: left; background: none; border: 0; color: var(--host-text-soft); font-size: 10.5px;
+    padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  }
+  .fnode:hover { background: var(--host-surface-raised); color: var(--host-text); }
+  /* The one you are on is marked, not made unclickable: clicking it is simply a no-op, and a
+     disabled row in a list of links reads as broken rather than as "you are here". */
+  .fnode.here { color: var(--host-text); background: var(--host-surface-hover); }
+  .fnote { color: var(--host-text-dim); font-size: 9.5px; font-style: italic; padding: 2px 6px; }
+  .play-note { color: var(--host-text-soft); font-size: 10.5px; padding: 2px 0; }
+  .play-note.dim { color: var(--host-text-dim); }
   .hint { color: var(--host-text-dim); font-size: 10.5px; margin-right: auto; }
   .flabel {
     color: var(--host-text-dim); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
@@ -1411,6 +1546,9 @@
   .badge.chain { color: #a98bd6; border-color: #a98bd666; }
   .badge.rack { color: #35c46f; border-color: #35c46f66; }
   .badge.miss { color: #e05656; border-color: #e0565666; }
+  /* Amber, the colour this view already uses for housekeeping — a folded row is tidied away,
+     not broken, and it must not read like the red one that says a plug-in is missing. */
+  .badge.folded { color: #d9a13c; border-color: #d9a13c66; }
   button.star { color: #566372; font-size: 13px; padding: 1px 3px; }
   button.star.on { color: #d9a13c; }
 
@@ -1678,6 +1816,8 @@
                 box-sizing: border-box; border-bottom: 1px solid var(--host-line-soft, #2b333d); padding: 0 10px; }
   .preset-row.sel { background: var(--host-selection, #243b37); box-shadow: inset 3px 0 var(--host-accent, #80d8bc); }
   .preset-row.unavailable .preset-name { color: var(--host-text-dim, #7d8894); }
+  .preset-name .badge.folded { margin-left: 6px; vertical-align: 1px; }
+  .preset-unfold { flex: none; align-self: center; padding: 1px 7px; font-size: 10.5px; }
   .browser.browser.browser.browser button.preset-star { width: 30px; flex: 0 0 30px; padding: 0; background: none; border: 0; border-radius: 0; color: var(--host-text-soft, #9aa5b1); }
   .browser.browser.browser.browser button.preset-star[aria-pressed="true"] { color: var(--host-accent, #80d8bc); }
   .browser.browser.browser.browser button.preset-pick { display: grid; grid-template-columns: minmax(100px, 1.7fr) minmax(90px, 1fr) minmax(70px, .8fr) 60px;

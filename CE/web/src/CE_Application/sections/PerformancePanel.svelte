@@ -18,7 +18,8 @@
   import {
     hostState, hostParameters, hostLibrary, requestParameters, requestLibrary,
     addPattern, removePattern, renamePattern, setPatternOptions, createPatternVariations,
-    importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate,
+    importGrooveTemplate, removeGrooveTemplate, applyGrooveTemplate, extractGrooveTemplate,
+    removeGestureShape, applyGestureShape, extractGestureShape, importGestureShape,
     addLane, removeLane, setLaneOptions, clearLane, euclidFill,
     setStep, toggleStep, setStepParameterLock, setStepCcLock,
     removeStepLock, clearStepLocks,
@@ -38,6 +39,7 @@
     importScalaTuning, parseScalaTuning, resetMicrotuning, setMicrotuning,
     setPartMicrotuning, sendMicrotuning,
     addScene, removeScene, renameScene, captureScene, setSceneOptions, setSceneClip, launchScene,
+    createSceneVariations,
     addSetlistItem, removeSetlistItem, moveSetlistItem, setSetlistItem, setSetlistOptions,
     setlistGo, setlistNext, setlistPrev,
     checkSetlistSoundcheck, startSoundcheck, finishSoundcheck,
@@ -47,6 +49,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { PERFORMANCE_GROUPS, performanceGroupFor, restorePerformanceNavigation,
     storePerformanceNavigation, selectPerformanceTool } from '../utils/performanceNavigation.js';
+  import FollowGraph from './FollowGraph.svelte';
 
   let { onShowMixer = () => {} } = $props();
   const stopMeasurement = () => { if ($hostState.soundcheck.activeItemId) finishSoundcheck(); };
@@ -336,6 +339,28 @@
   const followTargetsFor = (clip) => performance.clips.filter((candidate) =>
     candidate.clipId !== clip.clipId);
   const beatLabel = (beats) => `${Number(beats || 0).toFixed(Number.isInteger(beats) ? 0 : 2)} beats`;
+  // Every lane a gesture can live on: a parameter or cc lane carries a value per step, and a
+  // note lane carries velocities, which are not a curve. One picker drives both directions —
+  // reading a movement out of a lane and putting one back on it — so there is never a question
+  // of which lane a button meant.
+  let gestureLanes = $derived(patterns.flatMap((p) =>
+    (p.lanes ?? [])
+      .filter((lane) => (lane.type === 'parameter' || lane.type === 'cc')
+                        && !lane.lockSourceLaneId)
+      .map((lane) => ({ patternId: p.patternId, laneId: lane.laneId,
+                        label: `${p.name} · ${lane.name || lane.parameterId || 'lane'}` }))));
+  let gestureLaneKey = $state('');
+  let gestureDepth = $state(1);
+  let gestureTarget = $derived(gestureLanes.find((l) => `${l.patternId}/${l.laneId}` === gestureLaneKey)
+                               ?? gestureLanes[0] ?? null);
+
+  /** A shape drawn small enough to recognise at a glance, which is the whole reason to keep a
+      library rather than a list of names. */
+  const gesturePath = (points) => (points ?? [])
+    .map((value, i, all) =>
+      `${i === 0 ? 'M' : 'L'} ${(i / Math.max(1, all.length - 1) * 100).toFixed(2)} ${((1 - value) * 20).toFixed(2)}`)
+    .join(' ');
+
   const gestureLaneCount = (clip) =>
     patternForClip(clip)?.lanes.filter((lane) => lane.type === 'parameter'
       && !lane.lockSourceLaneId).length ?? 0;
@@ -646,6 +671,24 @@
     const seed = (Math.floor(Date.now() + Math.random() * 0x3fffffff) % 0x7ffffffe) + 1;
     setRandomModulator(random.randomId, { seed });
   }
+
+  // A pattern's seed decides how every probability rolls, on every loop, for ever — same seed,
+  // same performance, across runs and machines (deterministicRoll in CompiledPattern.h). Minted
+  // in the same range the native side uses, and never zero: setPatternOptions clamps to 1 and a
+  // field that silently corrects what you typed is worse than one that will not take it.
+  const newPatternSeed = () =>
+    (Math.floor(Date.now() + Math.random() * 0x3fffffff) % 0x7ffffffe) + 1;
+
+  function setPatternSeed(pattern, value) {
+    const seed = Math.max(1, Math.floor(Number(value)) || 1);
+    if (seed !== pattern.seed) setPatternOptions(pattern.patternId, { seed });
+  }
+
+  // It only does anything where a step's probability is between 1 and 99: a condition is loop
+  // arithmetic rather than a roll, and 0 or 100 answers before the dice are reached. Saying so
+  // is the difference between "this control is broken" and "nothing in here rolls yet".
+  const patternRolls = (pattern) => (pattern?.lanes ?? []).some(
+    (lane) => (lane.steps ?? []).some((step) => step.probability > 0 && step.probability < 100));
 
   const msegDisplayPoints = (mseg) => msegDrag?.msegId === mseg.msegId
     ? msegDrag.points : mseg.points;
@@ -985,6 +1028,21 @@
                      onchange={(e) => setPatternOptions(selectedPattern.patternId,
                                                        { swing: Number(e.currentTarget.value) })} />
             </label>
+            <label class="mini-field seed-field"
+                   title={patternRolls(selectedPattern)
+                     ? 'Which way every probability rolls. The same seed plays the same performance, every run and every machine — write it down and you can rehearse it.'
+                     : 'Which way every probability rolls — but no step in this pattern has a probability between 1 and 99, so nothing here rolls yet and the seed changes nothing.'}>
+              Seed
+              <span class="seed-row">
+                <input type="number" min="1" max="2147483646" step="1" data-testid="pattern-seed"
+                       class:inert={!patternRolls(selectedPattern)}
+                       value={selectedPattern.seed}
+                       onchange={(e) => setPatternSeed(selectedPattern, e.currentTarget.value)} />
+                <button type="button" class="ghost" data-testid="pattern-reseed"
+                        title="Roll a different performance out of the same steps"
+                        onclick={() => setPatternSeed(selectedPattern, newPatternSeed())}>NEW</button>
+              </span>
+            </label>
             <select value="" aria-label="Add a lane"
                     onchange={(e) => { if (e.currentTarget.value) addLane(selectedPattern.patternId, { type: e.currentTarget.value }); e.currentTarget.value = ''; }}>
               <option value="" disabled>+ Add lane…</option>
@@ -1012,6 +1070,14 @@
                                                        selectedGroove.grooveId,
                                                        Number(grooveAmount), grooveVelocity)}>
               Apply
+            </button>
+            <button type="button" data-testid="steal-groove"
+                    disabled={!selectedPattern || grooves.length >= 32}
+                    title={grooves.length >= 32
+                      ? 'Remove a groove before keeping another one'
+                      : "Read this pattern's own feel into a groove you can wear on other patterns. Timing comes back exactly; velocity is kept as a multiplier, so it shapes another pattern's dynamics rather than reproducing these."}
+                    onclick={() => extractGrooveTemplate(selectedPattern.patternId)}>
+              Steal this feel
             </button>
             <label class="groove-picker">
               <span>Import JSON…</span>
@@ -1557,6 +1623,81 @@
           {/each}
         </div>
       {/if}
+
+      <!-- THE GESTURE LIBRARY. There was a groove library for the timing of notes and no
+           equivalent for the shape of a movement, though they are the same kind of reusable
+           human artefact: the sweep you do at the end of a build, the wobble you always put on
+           the filter. A recorded gesture was a performance of one lane and nothing more. -->
+      <div class="gesture-library" data-testid="gesture-library">
+        <div class="looper-toolbar">
+          <div>
+            <strong>Gesture library</strong>
+            <div class="looper-hint">
+              Shapes you can put on any parameter or CC lane, at any length.
+            </div>
+          </div>
+          <span class="perf-spacer"></span>
+          <label class="mini-field" title="Which lane a shape is read from, and put onto">
+            Lane
+            <select value={gestureLaneKey} aria-label="Gesture lane"
+                    disabled={gestureLanes.length === 0}
+                    onchange={(e) => (gestureLaneKey = e.currentTarget.value)}>
+              {#each gestureLanes as lane (`${lane.patternId}/${lane.laneId}`)}
+                <option value={`${lane.patternId}/${lane.laneId}`}>{lane.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="mini-field" title="How deep the movement goes. The same shape, gentler — not a blend with whatever the lane held.">
+            Depth
+            <select value={String(gestureDepth)} aria-label="Gesture depth"
+                    onchange={(e) => (gestureDepth = Number(e.currentTarget.value))}>
+              <option value="1">Full</option>
+              <option value="0.6">Gentle</option>
+              <option value="0.3">Barely</option>
+            </select>
+          </label>
+          <button type="button" class="ghost" data-testid="keep-gesture"
+                  disabled={!gestureTarget}
+                  title="Read the movement out of this lane and keep it. Needs at least two steps that moved something — one value is a position, not a movement."
+                  onclick={() => extractGestureShape(gestureTarget.patternId, gestureTarget.laneId)}>
+            Keep this movement
+          </button>
+        </div>
+
+        {#if gestureLanes.length === 0}
+          <div class="looper-empty">
+            No parameter or CC lanes yet. Record a gesture, or add a parameter lane to a pattern —
+            a note lane carries velocities, which are not a curve.
+          </div>
+        {/if}
+
+        <div class="gesture-shapes">
+          {#each performance.gestureShapes as shape (shape.gestureId)}
+            <div class="gesture-shape" data-testid="gesture-shape">
+              <svg class="shape-thumb" viewBox="0 0 100 20" preserveAspectRatio="none"
+                   aria-hidden="true" data-testid="gesture-thumb">
+                <path d={gesturePath(shape.points)} />
+              </svg>
+              <span class="shape-name">{shape.name}</span>
+              {#if shape.source === 'factory'}<span class="badge">FACTORY</span>{/if}
+              <button type="button" class="ghost" data-testid="apply-gesture"
+                      disabled={!gestureTarget}
+                      title={gestureTarget
+                        ? `Write ${shape.name} onto ${gestureTarget.label}, stretched to its length`
+                        : 'Pick a parameter or CC lane first'}
+                      onclick={() => applyGestureShape(gestureTarget.patternId, shape.gestureId,
+                                                      gestureTarget.laneId, gestureDepth)}>
+                Put on lane
+              </button>
+              {#if shape.source !== 'factory'}
+                <button type="button" class="ghost danger" data-testid="remove-gesture"
+                        title="Remove this gesture"
+                        onclick={() => removeGestureShape(shape.gestureId)}>×</button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -2576,6 +2717,12 @@
         {#if performance.clips.length === 0}
           <div class="empty-hint">No clips yet — make one from a pattern.</div>
         {/if}
+
+        <!-- The song form as a map. The rows below stay the editor; a follow action is five
+             dropdowns, and on a row of dropdowns an arrow that will never fire looks exactly
+             like one that will. -->
+        <FollowGraph clips={performance.clips} />
+
         {#each performance.clips as clip (clip.clipId)}
           <div class="clip-row" class:active={clip.active} class:pending={clip.pending}
                data-testid="perf-clip">
@@ -2733,6 +2880,14 @@
             <input type="text" class="clip-name scene-name-input" value={scene.name}
                    aria-label="Scene name" title="Rename scene"
                    onchange={(e) => renameScene(scene.sceneId, e.currentTarget.value)} />
+            {#if scene.variationLabel}
+              <span class="variation-badge" data-testid="scene-variation-label"
+                    title={scene.variationLabel === 'A'
+                      ? 'Authored source scene'
+                      : `Generated from scene A at ${Math.round(scene.variationAmount * 100)}%`}>
+                {scene.variationLabel}
+              </span>
+            {/if}
             <span class="scene-detail">{scene.clipIds.length} clips · {scene.numSlots} slots · {scene.numMacros} macros · {scene.numParameters} mapped</span>
             <select value={scene.launchQuantize} aria-label={`${scene.name} launch quantization`}
                     onchange={(e) => setSceneOptions(scene.sceneId, { launchQuantize: e.currentTarget.value })}>
@@ -2763,6 +2918,14 @@
             </label>
             <button type="button" class="ghost" title="Replace this scene's contents with the rig as it stands"
                     onclick={() => captureScene(scene.sceneId)}>Capture</button>
+            <!-- A variation of the thing you are PLAYING, not of one lane of it. Each clip gets
+                 its pattern's B/C/D (reusing one that already exists), levels and macros move,
+                 and a mute does not — there is no such thing as forty per cent muted. -->
+            <button type="button" class="ghost" data-testid="scene-variations"
+                    title="Make B, C and D versions of this whole scene: varied patterns with clips of their own, nudged levels and macros, and mutes left alone"
+                    onclick={() => createSceneVariations(scene.sceneId, variationAmount)}>
+              {scene.variationLabel ? 'Regen B/C/D' : 'B/C/D'}
+            </button>
             <button type="button" class="ghost" title="Add to the setlist"
                     onclick={() => addSetlistItem(scene.sceneId)}>+ Set</button>
             <button type="button" class="ghost" title="Add a four-bar block to the song arranger"
@@ -3735,6 +3898,11 @@
     padding-top: 6px;
   }
   .mini-field { display: flex; flex-direction: column; gap: 4px; color: #aab4bd; font-size: 12px; }
+  .seed-field .seed-row { display: flex; align-items: center; gap: 4px; }
+  .seed-field input { width: 96px; font-variant-numeric: tabular-nums; }
+  /* Dimmed, not disabled: the seed is still real and still saved, it simply has nothing to
+     decide until a step carries a probability. Disabling it would hide a number worth keeping. */
+  .seed-field input.inert { opacity: 0.55; }
   .mini-field input[type='number'] { width: 62px; }
   .mini-field input[type='range'] { width: 90px; }
 
@@ -3783,6 +3951,24 @@
   .freeze-cycles { display: inline-flex; align-items: center; gap: 4px; color: #98a4ae; font-size: 11px; }
   .freeze-cycles select { width: auto; min-width: 46px; }
   .freeze-button { white-space: nowrap; border-color: #456579; color: #a9ccdf; }
+  /* --- the gesture library --------------------------------------------------------------- */
+  .gesture-library { margin-top: 14px; border-top: 1px solid #262c33; padding-top: 10px; }
+  .gesture-shapes { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .gesture-shape {
+    display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 12px;
+    padding: 2px 4px; border-radius: 4px;
+  }
+  .gesture-shape:hover { background: #1c2126; }
+  .shape-thumb { width: 84px; height: 20px; flex: none; background: #12161a; border-radius: 2px; }
+  .shape-thumb path { fill: none; stroke: #7fb4e0; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+  .shape-name { color: #d6dbe0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gesture-shape .badge {
+    font-size: 8.5px; letter-spacing: 0.06em; padding: 2px 4px; border-radius: 2px;
+    border: 1px solid #3b4652; color: #7d8894;
+  }
+  .gesture-shape .ghost { margin-left: auto; }
+  .gesture-shape .ghost + .ghost { margin-left: 0; }
+
   .clip-row, .scene-row { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 12px; }
   .clip-launch { padding: 2px 8px; }
   .clip-row.active .clip-launch { color: #9fd6a3; border-color: #4a7a52; }

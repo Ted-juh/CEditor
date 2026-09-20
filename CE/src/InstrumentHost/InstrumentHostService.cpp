@@ -2038,6 +2038,10 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             for (const auto* key : { "includeStandalone", "includeVst3" })
                 if (fields->hasProperty (key))
                     project->setProperty (key, (bool) payload.getProperty (key, true));
+            // Its default is the opposite of the two above, so it is read with a false fallback.
+            if (fields->hasProperty ("includeStageNotes"))
+                project->setProperty ("includeStageNotes",
+                                      (bool) payload.getProperty ("includeStageNotes", false));
         }
 
         hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
@@ -3961,6 +3965,44 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     // -- Stage 6: patterns, lanes and steps -------------------------------------------------
 
+    if (cmd == "extractGrooveTemplate")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (performance.grooves.size() >= 32)
+        {
+            emitError ("Remove a groove before keeping another one.");
+            return;
+        }
+
+        const auto* pattern = performance.findPattern (
+            payload.getProperty ("patternId", {}).toString());
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        auto groove = perf::grooveFromLane (*pattern,
+                                            payload.getProperty ("laneId", {}).toString(),
+                                            payload.getProperty ("name", {}).toString());
+        // Same floor as an imported groove: two offsets is the least that can describe a feel,
+        // and grooveFromLane answers with none when there was nothing to read.
+        if (groove.timingOffsets.size() < 2)
+        {
+            emitError ("That lane has no feel to read — it needs at least two steps.");
+            return;
+        }
+
+        groove.grooveId = juce::Uuid().toDashedString();
+        performance.grooves.add (std::move (groove));
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "importGrooveTemplate" || cmd == "removeGrooveTemplate"
         || cmd == "applyGrooveTemplate")
     {
@@ -4046,6 +4088,136 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                     juce::jlimit (0.0f, 1.0f,
                         (float) (double) payload.getProperty ("amount", 1.0)),
                     (bool) payload.getProperty ("applyVelocity", true));
+                recompilePerformance();
+            }
+        }
+
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "extractGestureShape")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (performance.gestureShapes.size() >= 32)
+        {
+            emitError ("Remove a gesture before keeping another one.");
+            return;
+        }
+
+        const auto* pattern = performance.findPattern (
+            payload.getProperty ("patternId", {}).toString());
+        if (pattern == nullptr)
+        {
+            emitError ("Unknown pattern.");
+            return;
+        }
+
+        auto shape = perf::gestureFromLane (*pattern,
+                                            payload.getProperty ("laneId", {}).toString(),
+                                            payload.getProperty ("name", {}).toString());
+        // gestureFromLane answers with nothing when there was nothing to read: a lane that is
+        // not a parameter or cc lane, or one with fewer than two moves in it.
+        if (shape.points.size() < 2)
+        {
+            emitError ("That lane has no movement to read — it needs at least two steps that "
+                       "moved something.");
+            return;
+        }
+
+        shape.gestureId = juce::Uuid().toDashedString();
+        performance.gestureShapes.add (std::move (shape));
+        savePerformance();
+        emitState();
+        return;
+    }
+
+    if (cmd == "importGestureShape" || cmd == "removeGestureShape"
+        || cmd == "applyGestureShape")
+    {
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        if (cmd == "importGestureShape")
+        {
+            if (performance.gestureShapes.size() >= 32)
+            {
+                emitError ("Remove a gesture before importing another one.");
+                return;
+            }
+
+            perf::GestureShape shape;
+            shape.gestureId = juce::Uuid().toDashedString();
+            shape.name = payload.getProperty ("name", "Imported gesture").toString()
+                             .trim().substring (0, 80);
+            if (shape.name.isEmpty())
+                shape.name = "Imported gesture";
+            shape.source = "imported";
+            if (const auto* values = payload.getProperty ("points", {}).getArray())
+                for (const auto& value : *values)
+                {
+                    if (shape.points.size() >= perf::gestureShapePoints)
+                        break;
+                    shape.points.add (juce::jlimit (0.0f, 1.0f, (float) (double) value));
+                }
+            if (shape.points.size() < 2)
+            {
+                emitError ("A gesture needs at least two points — one value is a position, "
+                           "not a movement.");
+                return;
+            }
+            performance.gestureShapes.add (std::move (shape));
+        }
+        else
+        {
+            const auto gestureId = payload.getProperty ("gestureId", {}).toString();
+            int gestureIndex = -1;
+            for (int i = 0; i < performance.gestureShapes.size(); ++i)
+                if (performance.gestureShapes.getReference (i).gestureId == gestureId)
+                {
+                    gestureIndex = i;
+                    break;
+                }
+            if (gestureIndex < 0)
+            {
+                emitError ("Unknown gesture shape.");
+                return;
+            }
+
+            if (cmd == "removeGestureShape")
+            {
+                if (performance.gestureShapes.getReference (gestureIndex).source == "factory")
+                {
+                    emitError ("Factory gestures cannot be removed.");
+                    return;
+                }
+                performance.gestureShapes.remove (gestureIndex);
+            }
+            else
+            {
+                auto* pattern = performance.findPattern (
+                    payload.getProperty ("patternId", {}).toString());
+                if (pattern == nullptr)
+                {
+                    emitError ("Unknown pattern.");
+                    return;
+                }
+                // A gesture goes on ONE named lane, unlike a groove, which is the timing of a
+                // whole pattern. A filter sweep is a movement of one thing.
+                if (! perf::applyGestureShape (*pattern,
+                                               performance.gestureShapes.getReference (gestureIndex),
+                                               payload.getProperty ("laneId", {}).toString(),
+                                               juce::jlimit (0.0f, 1.0f,
+                                                   (float) (double) payload.getProperty ("amount", 1.0))))
+                {
+                    emitError ("A gesture goes on a parameter or CC lane — pick one of those.");
+                    return;
+                }
                 recompilePerformance();
             }
         }
@@ -4927,6 +5099,97 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
     // -- Stage 6: scenes ---------------------------------------------------------------------
 
+    if (cmd == "createSceneVariations")
+    {
+        if (! requireFeature (licensing::Feature::scenesAndSetlists))
+            return;
+        if (! requireFeature (licensing::Feature::patternEngine))
+            return;
+
+        auto& performance = const_cast<Performance&> (rack.getPerformance());
+        const auto sceneId = payload.getProperty ("sceneId", {}).toString();
+        perf::Scene* source = nullptr;
+        for (auto& candidate : performance.scenes)
+            if (candidate.sceneId == sceneId)
+            {
+                source = &candidate;
+                break;
+            }
+
+        if (source == nullptr)
+        {
+            emitError ("Unknown scene.");
+            return;
+        }
+
+        const auto amount = juce::jlimit (0.0f, 1.0f, (float) (double) payload.getProperty ("amount", 0.55));
+        const auto groupId = source->variationGroupId.isNotEmpty() ? source->variationGroupId
+                                                                   : source->sceneId;
+        source->variationGroupId = groupId;
+        source->variationLabel = "A";
+        source->variationSourceSceneId = groupId;
+        source->variationAmount = amount;
+        const auto authored = *source;
+
+        // Whether a plug-in parameter has a midpoint at all, answered from the inventory the
+        // service already holds for each loaded target. Everything it cannot classify — an
+        // effect that is not loaded, an address that is not a plug-in parameter — is held, and
+        // holding is always safe: a parameter left where it was is never wrong.
+        const perf::SceneParameterIsContinuous isContinuous =
+            [this] (const juce::String& targetId, const juce::String& parameterId)
+            {
+                const auto found = partParameters.find (targetId);
+                if (found == partParameters.end())
+                    return false;
+                const auto* descriptor = found->second.inventory.find (parameterId);
+                return descriptor != nullptr && ! descriptor->discrete && ! descriptor->boolean;
+            };
+
+        juce::StringArray made;
+        for (const auto label : { 'B', 'C', 'D' })
+        {
+            const auto labelText = juce::String::charToString ((juce::juce_wchar) label);
+
+            // Regenerating replaces the scene that already carries this label rather than
+            // adding a second B — the same rule createPatternVariations follows, and for the
+            // same reason: a set that already launches B must keep launching the same thing.
+            int existingIndex = -1;
+            for (int i = 0; i < performance.scenes.size(); ++i)
+                if (performance.scenes.getReference (i).variationGroupId == groupId
+                    && performance.scenes.getReference (i).variationLabel == labelText)
+                {
+                    existingIndex = i;
+                    break;
+                }
+
+            perf::Scene variation;
+            perf::makeSceneVariation (authored, label, amount,
+                                      performance.patterns, performance.clips, variation,
+                                      isContinuous);
+            variation.variationGroupId = groupId;
+            variation.variationSourceSceneId = groupId;
+
+            if (existingIndex >= 0)
+            {
+                // Keep the id so anything naming this scene — a setlist item, the arranger —
+                // still names it after a regeneration.
+                const auto keptId = performance.scenes.getReference (existingIndex).sceneId;
+                variation.sceneId = keptId;
+                performance.scenes.getReference (existingIndex) = std::move (variation);
+            }
+            else
+            {
+                made.add (variation.sceneId);
+                performance.scenes.add (std::move (variation));
+            }
+        }
+
+        recompilePerformance();
+        savePerformance();
+        emitState();
+        return;
+    }
+
     if (cmd == "addScene")
     {
         if (! requireFeature (licensing::Feature::scenesAndSetlists))
@@ -5758,6 +6021,66 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                                            record->sonic));
         if (options.emit != nullptr)
             options.emit ("instrumentHostSimilar", juce::var (answer));
+        return;
+    }
+
+    if (cmd == "unplayedLikeHabits")
+    {
+        ensureLibrary();
+        const auto count = juce::jlimit (1, 200, (int) payload.getProperty ("count", 20));
+
+        // The centre is answered too, and not only as a curiosity: "here are twenty you have
+        // never opened" is a recommendation somebody has to be able to disagree with, and the
+        // only way to disagree is to be told what it thinks you like.
+        const auto centre = habitualProfile (library);
+        const auto matches = unplayedLikeHabits (library, count, libraryAvailability());
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("enough",  centre.measured);
+        answer->setProperty ("matches", matchesToVar (matches, centre));
+        answer->setProperty ("from",    [this] { int n = 0;
+                                                 for (const auto& r : library.allRecords())
+                                                     if (! r.hidden && r.loadCount > 0
+                                                         && r.sonic.measured && ! r.sonic.silent)
+                                                         ++n;
+                                                 return n; }());
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostUnplayed", juce::var (answer));
+        return;
+    }
+
+    if (cmd == "recordFamily")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Answered on demand for the ONE record somebody is looking at, the way similarSounds
+        // is, rather than carried on every row of a browse: a family is read when a family is
+        // asked about, and most rows are never asked.
+        const auto family = ceditor::host::recordFamily (library, record->recordId);
+        juce::Array<juce::var> nodeVars;
+        for (const auto& node : family.nodes)
+        {
+            auto* n = new juce::DynamicObject();
+            n->setProperty ("recordId", node.recordId);
+            n->setProperty ("name",     node.name);
+            n->setProperty ("parentRecordId", node.parentRecordId);
+            n->setProperty ("depth",    node.depth);
+            nodeVars.add (juce::var (n));
+        }
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("recordId",      record->recordId);
+        answer->setProperty ("rootRecordId",  family.rootRecordId);
+        answer->setProperty ("truncated",     family.truncated);
+        answer->setProperty ("nodes",         nodeVars);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostRecordFamily", juce::var (answer));
         return;
     }
 
@@ -6694,6 +7017,76 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         return;
     }
 
+    if (cmd == "mergeDuplicateSet")
+    {
+        ensureLibrary();
+        const auto keyRecordId = payload.getProperty ("keyRecordId", {}).toString();
+
+        // The set is re-derived here rather than trusted from the payload. The browser's copy is
+        // as old as its last answer, and by now a measurement or a rescan may have dissolved the
+        // set — folding on a stale list would hide sounds that are no longer duplicates of
+        // anything, and that is unrecoverable by anyone who does not know to look for hidden rows.
+        LibraryDuplicateSet set;
+        bool found = false;
+        for (const auto& candidate : libraryDuplicates (library))
+            if (candidate.keyRecordId == keyRecordId)
+            {
+                set = candidate;
+                found = true;
+                break;
+            }
+
+        if (! found)
+        {
+            emitError ("Those sounds are no longer a duplicate set.");
+            return;
+        }
+
+        // Only the same bytes. A near match is the measurement's opinion, and the measurement is
+        // a tolerance away from being wrong — two patches that merely sound alike are two patches,
+        // and folding them would be the program quietly deciding somebody's edit did not count.
+        if (! set.identical)
+        {
+            emitError ("Only sounds that are byte-for-byte identical can be folded.");
+            return;
+        }
+
+        library.setUserMetadata (set.keyRecordId, mergedDuplicateMetadata (library, set));
+
+        int folded = 0;
+        for (const auto& id : set.recordIds)
+            if (id != set.keyRecordId && library.setRecordHidden (id, true))
+                ++folded;
+
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+
+        auto* answer = new juce::DynamicObject();
+        answer->setProperty ("keyRecordId", set.keyRecordId);
+        answer->setProperty ("folded",      folded);
+        if (options.emit != nullptr)
+            options.emit ("instrumentHostDuplicatesMerged", juce::var (answer));
+        return;
+    }
+
+    if (cmd == "setLibraryRecordHidden")
+    {
+        ensureLibrary();
+        const auto* record = library.find (payload.getProperty ("recordId", {}).toString());
+        if (record == nullptr)
+        {
+            emitError ("Unknown library record.");
+            return;
+        }
+
+        // Both directions on one command, because a fold nobody can undo is a delete with better
+        // manners. The browse query's `includeHidden` is how somebody finds the row again.
+        library.setRecordHidden (record->recordId, (bool) payload.getProperty ("hidden", true));
+        library.saveTo (libraryFile());
+        emitLibrary (libraryView);
+        return;
+    }
+
     if (cmd == "removeLibraryRecord")
     {
         ensureLibrary();
@@ -6806,6 +7199,16 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
+        // Counted here, where the load is ACCEPTED, rather than when the plug-in finishes
+        // instantiating. Reaching for a sound is the signal this records; a plug-in that then
+        // fails to start does not mean it was not wanted, and counting on success would make a
+        // flaky plug-in's presets look unloved.
+        const auto noteUsed = [this, recordId = record->recordId, shouldAudition]
+        {
+            library.noteRecordUsed (recordId, shouldAudition, juce::Time::currentTimeMillis());
+            library.saveTo (libraryFile());
+        };
+
         if (record->type == "rack")
         {
             if (shouldAudition)
@@ -6813,6 +7216,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 emitError ("Preset audition plays presets, not whole racks.");
                 return;
             }
+            noteUsed();
             loadRackRecord (*record);
             return;
         }
@@ -6858,6 +7262,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                 emitError ("Preset audition plays presets; load a chain normally.");
                 return;
             }
+            noteUsed();
             loadChainRecord (*record, partId);
         }
         else
@@ -6865,6 +7270,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             std::function<void()> afterLoaded;
             if (shouldAudition)
                 afterLoaded = [this, partId] { startPresetAudition (partId); };
+            noteUsed();
             loadPresetRecord (*record, partId, std::move (afterLoaded));
         }
         return;
@@ -8079,6 +8485,13 @@ void InstrumentHostService::ensureHostProject()
     }
     for (const auto* key : { "includeStandalone", "includeVst3" })
         if (! project->hasProperty (key))         { project->setProperty (key, true);                 changed = true; }
+
+    // A setlist item's notes are "what the player needs to read on stage" — somebody's own
+    // words, and the only personal free text anywhere in a Performance. The authored rack ships
+    // inside every built product, so without this they would go to whoever gets the installer.
+    // Defaulted OFF, because a surprise is worse than a missing option: a build that quietly
+    // published your notes cannot be taken back, and one that left them out can be rebuilt.
+    if (! project->hasProperty ("includeStageNotes")) { project->setProperty ("includeStageNotes", false); changed = true; }
 
     if (changed)
         hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
@@ -10454,6 +10867,12 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
         r->setProperty ("category",     record->category);
         r->setProperty ("factory",      record->factory);
         r->setProperty ("missing",      record->missing);
+        // Only ever true when the query asked for hidden rows, so the page can mark the folded
+        // ones and offer to unfold them rather than showing them as ordinary sounds.
+        r->setProperty ("hidden",       record->hidden);
+        r->setProperty ("loadCount",    record->loadCount);
+        r->setProperty ("lastLoadedAtMs", (double) record->lastLoadedAtMs);
+        r->setProperty ("auditionCount", record->auditionCount);
         r->setProperty ("available",    reason.isEmpty());
         r->setProperty ("reason",       reason);
         r->setProperty ("favourite",    record->user.favourite);
@@ -10558,6 +10977,46 @@ void InstrumentHostService::emitLibrary (const LibraryQuery& query)
                                                  if (! r.sonic.measured && r.sonicRefusal.isNotEmpty())
                                                      ++n;
                                              return n; }());
+    // The same refusals split by what could be done about them (see RefusalCause in Library.h).
+    // Counted over every record rather than over the query's matches, because this sits beside
+    // `refused` above and has to add up to it — a breakdown of whatever happens to be filtered
+    // would be a different number under the same heading.
+    counts->setProperty ("refusedByCause", [this]
+    {
+        auto* byCause = new juce::DynamicObject();
+        for (const auto& r : library.allRecords())
+            if (! r.sonic.measured && r.sonicRefusal.isNotEmpty())
+            {
+                const auto id = refusalCauseId (refusalCause (r.sonicRefusal));
+                byCause->setProperty (id, (int) byCause->getProperty (id) + 1);
+            }
+        return juce::var (byCause);
+    }());
+    // What arrived in the same fortnight the rail's own row offers, so the number on the row is
+    // the number of records that row would show.
+    counts->setProperty ("addedRecently", [this] { int n = 0;
+                                                   const auto now = juce::Time::currentTimeMillis();
+                                                   for (const auto& r : library.allRecords())
+                                                       if (recordAddedWithin (r, 14, now))
+                                                           ++n;
+                                                   return n; }());
+    // Folded away. Counted separately from `total` — which stays the whole library, because
+    // that is what it has always meant — so the page can say how many rows the default browse
+    // is not showing. A fold nobody can count is a fold nobody can undo.
+    counts->setProperty ("hidden", [this] { int n = 0;
+                                            for (const auto& r : library.allRecords())
+                                                if (r.hidden) ++n;
+                                            return n; }());
+    // WHAT YOU OWN VERSUS WHAT YOU PLAY. Two numbers rather than one, because "you own 12,000
+    // and have played 40" is the whole sentence, and either half alone is not worth saying.
+    counts->setProperty ("everLoaded", [this] { int n = 0;
+                                                for (const auto& r : library.allRecords())
+                                                    if (! r.hidden && r.loadCount > 0) ++n;
+                                                return n; }());
+    counts->setProperty ("neverLoaded", [this] { int n = 0;
+                                                 for (const auto& r : library.allRecords())
+                                                     if (! r.hidden && r.loadCount <= 0) ++n;
+                                                 return n; }());
     counts->setProperty ("snapshots", snapshots != nullptr ? snapshots->count() : 0);
     counts->setProperty ("snapshotBytes", (double) (snapshots != nullptr ? snapshots->bytes() : 0));
 
@@ -17739,6 +18198,10 @@ juce::var InstrumentHostService::performancePayload() const
     for (const auto& groove : performance.grooves)
         grooves.add (perf::grooveTemplateToVar (groove));
 
+    juce::Array<juce::var> gestureShapes;
+    for (const auto& gesture : performance.gestureShapes)
+        gestureShapes.add (perf::gestureShapeToVar (gesture));
+
     juce::Array<juce::var> clips;
     for (int i = 0; i < performance.clips.size(); ++i)
     {
@@ -17983,6 +18446,7 @@ juce::var InstrumentHostService::performancePayload() const
     auto* root = new juce::DynamicObject();
     root->setProperty ("transport", juce::var (transportObj));
     root->setProperty ("grooves",    grooves);
+    root->setProperty ("gestureShapes", gestureShapes);
     root->setProperty ("patterns",  patterns);
     root->setProperty ("clips",     clips);
     root->setProperty ("scenes",    scenes);
