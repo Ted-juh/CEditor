@@ -12,6 +12,7 @@
     sequencerTracks, cellRect,
   } from '../utils/stepSequencerLayout.js';
 
+  import PerformanceCell from './PerformanceCell.svelte';
   let { control = null, width = 0, height = 0 } = $props();
 
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
@@ -59,11 +60,17 @@
     {#each Array.from({ length: steps }, (_, step) => step) as step (step)}
       {@const rect = cellRect(geom, trackIndex, step)}
       {@const cell = pattern[cellKey(track.id, step)]}
+      {#if geom.form !== 'rect'}
+        <g opacity={track.muted ? 0.35 : (cell?.on ? Math.max(0.35, (cell.velocity ?? 100) / 127) : 1)}>
+        <PerformanceCell form={geom.form} x={rect.x} y={rect.y} w={rect.w} h={rect.h} face={cellCss} ink={labelCss} accent={track.colour ? css(track.colour,onCss) : onCss} active={cell?.on === true} />
+        </g>
+      {:else}
       <rect
         x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx={2}
         fill={cell?.on ? (track.colour ? css(track.colour, onCss) : onCss) : cellCss}
         opacity={track.muted ? 0.35 : (cell?.on ? Math.max(0.35, (cell.velocity ?? 100) / 127) : 1)}
       />
+      {/if}
     {/each}
   {/each}
 

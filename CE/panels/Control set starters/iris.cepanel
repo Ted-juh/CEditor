@@ -1,0 +1,4152 @@
+{
+  "panelGuid": "2b575ab4-ea3d-82a2-ba77-916ef1ab75d0",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Iris — starter",
+  "scriptId": "panel_20",
+  "author": "",
+  "version": "1.0.0",
+  "description": "Variable aperture, shutter keys, shutter pads and triangular focus steppers.",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 880,
+  "height": 636,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF333333",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Knob_1789883153395.value",
+      "label": "Knob_1789883153395",
+      "controlName": "Knob_1789883153395",
+      "path": "Knob_1789883153395.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.63,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob_1789883153396.value",
+      "label": "Knob_1789883153396",
+      "controlName": "Knob_1789883153396",
+      "path": "Knob_1789883153396.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789883153397.value",
+      "label": "Slider_1789883153397",
+      "controlName": "Slider_1789883153397",
+      "path": "Slider_1789883153397.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.66,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Crossfader_1789883153398.value",
+      "label": "Crossfader_1789883153398",
+      "controlName": "Crossfader_1789883153398",
+      "path": "Crossfader_1789883153398.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789883153400.value",
+      "label": "ToggleButton_1789883153400",
+      "controlName": "ToggleButton_1789883153400",
+      "path": "ToggleButton_1789883153400.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CyclicButton_1789883153401.value",
+      "label": "CyclicButton_1789883153401",
+      "controlName": "CyclicButton_1789883153401",
+      "path": "CyclicButton_1789883153401.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Combobox_1789883153402.value",
+      "label": "Combobox_1789883153402",
+      "controlName": "Combobox_1789883153402",
+      "path": "Combobox_1789883153402.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Number_1789883153403.value",
+      "label": "Number_1789883153403",
+      "controlName": "Number_1789883153403",
+      "path": "Number_1789883153403.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Ribbon_1789883153409.value",
+      "label": "Ribbon_1789883153409",
+      "controlName": "Ribbon_1789883153409",
+      "path": "Ribbon_1789883153409.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Ribbon",
+      "field": "value",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789883153412.x",
+      "label": "VectorJoystick_1789883153412 X",
+      "controlName": "VectorJoystick_1789883153412",
+      "path": "VectorJoystick_1789883153412.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789883153412.y",
+      "label": "VectorJoystick_1789883153412 Y",
+      "controlName": "VectorJoystick_1789883153412",
+      "path": "VectorJoystick_1789883153412.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "StepSequencer_1789883153413.bpm",
+      "label": "StepSequencer_1789883153413 Tempo",
+      "controlName": "StepSequencer_1789883153413",
+      "path": "StepSequencer_1789883153413.bpm",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "StepSequencer",
+      "field": "bpm",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "StepSequencer_1789883153413.run",
+      "label": "StepSequencer_1789883153413 Run",
+      "controlName": "StepSequencer_1789883153413",
+      "path": "StepSequencer_1789883153413.run",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "section": "StepSequencer",
+      "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "iris"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153391",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153391",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 16,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "IRIS",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 24,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153392",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153392",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 48,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Optical / shutter",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153393",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153393",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 82,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TURN / SLIDE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153394",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153394",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 580,
+          "y": 82,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PRESS / SELECT",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789883153395",
+          "controlSetId": "iris",
+          "controlForm": "new-iris",
+          "formFaceColour": "FF4F6081",
+          "formHousingColour": "FF171C26",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFECBA68",
+          "id": "ctrl_1789883153395",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 112,
+          "width": 190,
+          "height": 190
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.63,
+          "minorTickCount": 0,
+          "majorTickLength": 6,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF171C26"
+                    },
+                    "Border": {
+                      "colour": "55020304"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFECBA68"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB58CFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 70,
+                  "height": 70
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF161A21"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    },
+                    "Effects": {
+                      "_type": "Effects",
+                      "_children": {
+                        "Shadows": {
+                          "_type": "Shadows",
+                          "items": [
+                            {
+                              "enabled": false,
+                              "type": "drop",
+                              "offsetX": 0,
+                              "offsetY": 2,
+                              "blur": 4,
+                              "spread": 0,
+                              "colour": "66000000"
+                            }
+                          ]
+                        },
+                        "Bevel": {
+                          "_type": "Bevel",
+                          "enabled": false,
+                          "style": "outer-bevel",
+                          "depth": 100,
+                          "size": 5,
+                          "softness": 0,
+                          "angle": 135,
+                          "highlightColour": "FFFFFF",
+                          "highlightOpacity": 75,
+                          "shadowColour": "000000",
+                          "shadowOpacity": 75
+                        },
+                        "Filters": {
+                          "_type": "Filters",
+                          "blur": 0,
+                          "brightness": 100,
+                          "contrast": 100,
+                          "saturation": 100,
+                          "hueRotate": 0,
+                          "grayscale": 0,
+                          "sepia": 0,
+                          "invert": 0
+                        },
+                        "Blend": {
+                          "_type": "Blend",
+                          "mode": "normal"
+                        },
+                        "Material": {
+                          "_type": "Material",
+                          "enabled": true,
+                          "kind": "glass",
+                          "strength": 80,
+                          "shine": 160,
+                          "grain": 100,
+                          "lampFollowsSet": true,
+                          "lampAzimuth": 225,
+                          "lampElevation": 48
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 2.5,
+                  "height": 84,
+                  "offsetX": 30
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              },
+              "kind": "line"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1.3,
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC5A6270"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "885A6270"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFC4A3FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF2D3137"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFECBA68"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789883153396",
+          "controlSetId": "iris",
+          "controlForm": "new-iris",
+          "formFaceColour": "FF4F6081",
+          "formHousingColour": "FF171C26",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFECBA68",
+          "id": "ctrl_1789883153396",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 220,
+          "y": 125,
+          "width": 128,
+          "height": 158
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.35,
+          "minorTickCount": 0,
+          "majorTickLength": 6,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF171C26"
+                    },
+                    "Border": {
+                      "colour": "55020304"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFECBA68"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB58CFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 70,
+                  "height": 70
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF161A21"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    },
+                    "Effects": {
+                      "_type": "Effects",
+                      "_children": {
+                        "Shadows": {
+                          "_type": "Shadows",
+                          "items": [
+                            {
+                              "enabled": false,
+                              "type": "drop",
+                              "offsetX": 0,
+                              "offsetY": 2,
+                              "blur": 4,
+                              "spread": 0,
+                              "colour": "66000000"
+                            }
+                          ]
+                        },
+                        "Bevel": {
+                          "_type": "Bevel",
+                          "enabled": false,
+                          "style": "outer-bevel",
+                          "depth": 100,
+                          "size": 5,
+                          "softness": 0,
+                          "angle": 135,
+                          "highlightColour": "FFFFFF",
+                          "highlightOpacity": 75,
+                          "shadowColour": "000000",
+                          "shadowOpacity": 75
+                        },
+                        "Filters": {
+                          "_type": "Filters",
+                          "blur": 0,
+                          "brightness": 100,
+                          "contrast": 100,
+                          "saturation": 100,
+                          "hueRotate": 0,
+                          "grayscale": 0,
+                          "sepia": 0,
+                          "invert": 0
+                        },
+                        "Blend": {
+                          "_type": "Blend",
+                          "mode": "normal"
+                        },
+                        "Material": {
+                          "_type": "Material",
+                          "enabled": true,
+                          "kind": "glass",
+                          "strength": 80,
+                          "shine": 160,
+                          "grain": 100,
+                          "lampFollowsSet": true,
+                          "lampAzimuth": 225,
+                          "lampElevation": 48
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 2.5,
+                  "height": 84,
+                  "offsetX": 30
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              },
+              "kind": "line"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1.3,
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC5A6270"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "885A6270"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFC4A3FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF2D3137"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFECBA68"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789883153397",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153397",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 364,
+          "y": 133,
+          "width": 190,
+          "height": 78
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.66,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF040606"
+                    },
+                    "Border": {
+                      "colour": "FF222424"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5FE3FF"
+                    }
+                  }
+                }
+              },
+              "glow": true
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFB58CFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Border": {
+                      "colour": "990B0D10"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 22,
+                  "height": 22
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Border": {
+                      "thickness": 0.8,
+                      "colour": "FF0D1014"
+                    }
+                  }
+                }
+              },
+              "kind": "lens",
+              "grooveColour": "FF5FE3FF",
+              "glow": true,
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 22,
+                  "height": 22
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF161A21"
+                    },
+                    "Border": {
+                      "thickness": 0.8,
+                      "colour": "FF0D1014"
+                    }
+                  }
+                }
+              },
+              "kind": "lens",
+              "grooveColour": "FF5FE3FF",
+              "glow": true,
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 22,
+                  "height": 22
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Border": {
+                      "thickness": 0.8,
+                      "colour": "FF0D1014"
+                    }
+                  }
+                }
+              },
+              "kind": "lens",
+              "grooveColour": "FF5FE3FF",
+              "glow": true,
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC5A6270"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "885A6270"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "LEVEL",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Space Grotesk",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFC4A3FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF2D3137"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFECBA68"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Crossfader_1789883153398",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153398",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 364,
+          "y": 234,
+          "width": 190,
+          "height": 62
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Crossfader": {
+          "handleSize": 22,
+          "handleStyle": "block",
+          "trackSize": 8,
+          "trackColour": "FF171C26",
+          "fillAColour": "FFECBA68",
+          "fillBColour": "FFB58CFF",
+          "handleColour": "FF4F6081",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789883153399",
+          "controlSetId": "iris",
+          "controlForm": "new-iris",
+          "formFaceColour": "FF4F6081",
+          "formHousingColour": "FF171C26",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFECBA68",
+          "id": "ctrl_1789883153399",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 576,
+          "y": 118,
+          "width": 124,
+          "height": 84
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF161A21",
+              "gradientEnabled": true,
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 7
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "TRIGGER",
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "ToggleButton_1789883153400",
+          "controlSetId": "iris",
+          "controlForm": "new-iris",
+          "formFaceColour": "FF4F6081",
+          "formHousingColour": "FF171C26",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFECBA68",
+          "id": "ctrl_1789883153400",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 716,
+          "y": 118,
+          "height": 84
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF161A21",
+              "gradientEnabled": true,
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 7
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "HOLD",
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lamp": "led",
+          "lampSize": 7,
+          "lampColour": "FFFFFFFF",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        },
+        "Behavior": {
+          "defaultValue": true
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68",
+                  "_removed": [
+                    "Background.Fill.colour",
+                    "Text.Fill.colour"
+                  ]
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081",
+                  "Background.Border.colour": "FFC98A2A",
+                  "Text.Fill.colour": "FFF7F4EC"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "CyclicButton_1789883153401",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153401",
+          "controlType": "CyclicButton"
+        },
+        "Transform": {
+          "x": 576,
+          "y": 220,
+          "width": 124,
+          "height": 36
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF161A21",
+              "gradientEnabled": true,
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 7
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "CYCLE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68",
+                  "Text.Fill.colour": "FFF2F2F2",
+                  "_removed": [
+                    "Background.Fill.colour"
+                  ]
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF4F6081",
+                  "Background.Border.colour": "FFC98A2A",
+                  "Text.Fill.colour": "FFF7F4EC"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Combobox_1789883153402",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153402",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 716,
+          "y": 220,
+          "width": 136,
+          "height": 36
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF161A21",
+              "gradientEnabled": true,
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 7
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF1E232B"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF0B0D11"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Number_1789883153403",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153403",
+          "controlType": "Number"
+        },
+        "Transform": {
+          "x": 576,
+          "y": 265,
+          "width": 124,
+          "height": 46
+        },
+        "Parts": {
+          "_children": {
+            "decrement": {
+              "_children": {
+                "Layout": {
+                  "y": 15,
+                  "width": 28,
+                  "height": 70,
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Border": {
+                      "colour": "FFECBA68"
+                    },
+                    "Corners": {
+                      "radius": 20
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "triangle"
+            },
+            "valueField": {
+              "_children": {
+                "Layout": {
+                  "x": 30,
+                  "y": 18,
+                  "width": 40,
+                  "height": 64,
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF171C26"
+                    },
+                    "Border": {
+                      "colour": "FFECBA68"
+                    },
+                    "Corners": {
+                      "radius": 3
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono"
+                    }
+                  }
+                }
+              },
+              "kind": "rect"
+            },
+            "increment": {
+              "_children": {
+                "Layout": {
+                  "x": 72,
+                  "y": 15,
+                  "width": 28,
+                  "height": 70,
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF4F6081"
+                    },
+                    "Border": {
+                      "colour": "FFECBA68"
+                    },
+                    "Corners": {
+                      "radius": 20
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "triangle"
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FF4F6081"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FF4F6081"
+                  },
+                  "valueField": {
+                    "Background.Fill.colour": "FF121319"
+                  }
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FF4F6081"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FF4F6081"
+                  }
+                }
+              }
+            },
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Fill.colour": "FF1F4754",
+                    "Background.Border.colour": "FFECBA68"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Border.colour": "FFECBA68"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "TextInput_1789883153404",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153404",
+          "controlType": "TextInput"
+        },
+        "Transform": {
+          "x": 716,
+          "y": 273,
+          "width": 136
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientEnabled": true,
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 7
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "Studio A",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF1E232B"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FF0B0D11"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FFECBA68"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153405",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153405",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PLAY / SHAPE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153406",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153406",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 310,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "MEASURE / ROUTE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "DrumPads_1789883153407",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153407",
+          "controlType": "DrumPads"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 348,
+          "width": 228,
+          "height": 214
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "DrumPads": {
+          "rows": 2,
+          "cols": 2,
+          "showNotes": false,
+          "showHeader": false,
+          "padForm": "shutter",
+          "padAppearance": "raised",
+          "padRadius": 4,
+          "fieldColour": "FF171C26",
+          "padColour": "FF4F6081",
+          "accentColour": "FFECBA68",
+          "hitColour": "FFECBA68",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Envelope_1789883153408",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153408",
+          "controlType": "Envelope"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 348,
+          "width": 220,
+          "height": 70
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Envelope": {
+          "lineWidth": 3,
+          "nodeRadius": 3,
+          "lineColour": "FFECBA68",
+          "fillColour": "20000000",
+          "nodeColour": "FF4F6081",
+          "gridColour": "660D1014",
+          "sustainColour": "FFB58CFF",
+          "playheadColour": "FFECBA68"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Ribbon_1789883153409",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153409",
+          "controlType": "Ribbon"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 427,
+          "width": 220,
+          "height": 30
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Ribbon": {
+          "orientation": "horizontal",
+          "style": "wheel3d",
+          "showGlow": false,
+          "indicatorSize": 8,
+          "trackColour": "FF171C26",
+          "fillColour": "FFECBA68",
+          "indicatorColour": "FF4F6081",
+          "glowColour": "FFECBA68",
+          "wheelColour": "FF161A21",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Meter_1789883153410",
+          "controlSetId": "iris",
+          "controlForm": "new-iris",
+          "formFaceColour": "FF4F6081",
+          "formHousingColour": "FF171C26",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFECBA68",
+          "id": "ctrl_1789883153410",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 342,
+          "width": 312,
+          "height": 108
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Meter": {
+          "value": 0.7,
+          "segments": 12,
+          "segmentGap": 3,
+          "trackColour": "FF171C26",
+          "fillColour": "FFECBA68",
+          "thickness": 16,
+          "rounded": false,
+          "peakColour": "FFECBA68",
+          "showTicks": true,
+          "valuePrecision": 2
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789883153411",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153411",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 466,
+          "width": 166,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ],
+          "cellStyle": "dot",
+          "rowHeaderW": 42,
+          "cellBg": "FF171C26",
+          "gridColour": "660D1014",
+          "posColour": "FFECBA68",
+          "negColour": "FFB58CFF",
+          "labelColour": "FFF2F2F2",
+          "activeColour": "FFECBA68"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789883153412",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153412",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 466,
+          "width": 124,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF171C26",
+              "gradientOpacity": 22,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 100,
+                "stops": [
+                  {
+                    "color": "FFFFFF",
+                    "position": 0
+                  },
+                  {
+                    "color": "FFFFFF",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 48
+                  },
+                  {
+                    "color": "161A21",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "AA8B8D90"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": true,
+                  "kind": "glass",
+                  "strength": 50,
+                  "shine": 120,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Joystick": {
+          "puckRadius": 7,
+          "padColour": "FF171C26",
+          "gridColour": "660D1014",
+          "crosshairColour": "FFECBA68",
+          "puckColour": "FF4F6081",
+          "cornerColour": "FFF7F4EC",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "66000000"
+                },
+                {
+                  "enabled": true,
+                  "type": "outer-glow",
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "55FFFFFF"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "StepSequencer_1789883153413",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153413",
+          "controlType": "StepSequencer"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 466,
+          "width": 220,
+          "height": 100
+        },
+        "StepSequencer": {
+          "cellForm": "shutter",
+          "steps": 8,
+          "trackHeaderWidth": 38,
+          "tracks": [
+            {
+              "id": "kick",
+              "label": "Kick",
+              "note": 36,
+              "channel": 10
+            },
+            {
+              "id": "hat",
+              "label": "Hat",
+              "note": 42,
+              "channel": 10
+            }
+          ],
+          "pattern": {
+            "kick:0": {
+              "on": true,
+              "velocity": 100
+            },
+            "kick:4": {
+              "on": true,
+              "velocity": 100
+            },
+            "hat:0": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:2": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:4": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:6": {
+              "on": true,
+              "velocity": 70
+            }
+          },
+          "cellColour": "FF4F6081",
+          "cellOnColour": "FFECBA68",
+          "playheadColour": "FFECBA68",
+          "gridColour": "660D1014",
+          "labelColour": "FFF7F4EC"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789883153414",
+          "controlSetId": "iris",
+          "id": "ctrl_1789883153414",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 590,
+          "width": 820,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Copy a control into your panel. Its pinned design travels with it.",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Space Grotesk",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFECBA68",
+          "lampOffColour": "FF171C26",
+          "lampBezelColour": "AA0B0D10"
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

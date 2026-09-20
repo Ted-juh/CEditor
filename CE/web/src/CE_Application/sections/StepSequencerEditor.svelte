@@ -22,6 +22,7 @@
   import Rows3 from 'lucide-svelte/icons/rows-3';
   import Palette from 'lucide-svelte/icons/palette';
 
+  import { PERFORMANCE_FORMS } from '../utils/performanceShapes.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -58,6 +59,7 @@
 
 {#if q}
   <PropertySection title="Sequence" icon={Grid3x3} tools={openDesignerTab}>
+    <PropertyCell label="Cell shape" span={2}><select class="val" value={q.cellForm ?? 'rect'} onchange={(e)=>set('cellForm',e.target.value)}>{#each PERFORMANCE_FORMS as [id,name]}<option value={id}>{name}</option>{/each}</select></PropertyCell>
     <NumberCell label="Steps" min={1} max={64} step={1} value={q.steps ?? 16} onchange={(v) => set('steps', v)} />
     <PropertyCell label="Follow transport" span={2} hint="Take the tempo and the step boundaries from the panel's shared transport, the way the Arp and the Phrase do. Off, this sequence runs on its own BPM below.">
       <PropertyToggle value={q.syncToTransport === true} onchange={(next) => set('syncToTransport', next)} />

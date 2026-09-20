@@ -173,7 +173,9 @@ export function chokedBy(pads, pad) {
 }
 
 // --- Geometry -----------------------------------------------------------------
-export function drumGeometry(width, height, rows, cols, pad = 8, headerH = 22, gap = 5) {
+import { performanceContains } from './performanceShapes.js';
+
+export function drumGeometry(width, height, rows, cols, pad = 8, headerH = 22, gap = 5, options = {}) {
   const p = Math.max(0, num(pad, 8));
   const y0 = p + Math.max(0, num(headerH, 0));
   const r = clampInt(rows, 1, 8);
@@ -182,6 +184,8 @@ export function drumGeometry(width, height, rows, cols, pad = 8, headerH = 22, g
   const w = Math.max(1, num(width, 0) - p * 2);
   const h = Math.max(1, num(height, 0) - y0 - p);
   return {
+    form: options.zones ? 'rect' : options.padForm ?? 'rect',
+    layout: options.zones ? 'grid' : options.padLayout ?? 'grid',
     x0: p, y0, w, h, rows: r, cols: c, gap: g,
     cellW: Math.max(2, (w - g * (c - 1)) / c),
     cellH: Math.max(2, (h - g * (r - 1)) / r),
@@ -200,6 +204,17 @@ export function padCell(index, rows, cols, origin = 'bottomLeft') {
 }
 export function padRect(geom, index, origin = 'bottomLeft') {
   const { row, col } = padCell(index, geom.rows, geom.cols, origin);
+  if (geom.layout === 'orbit' && geom.rows * geom.cols > 1) {
+    const n=geom.rows*geom.cols, order=row*geom.cols+col, a=-Math.PI/2+order*2*Math.PI/n;
+    // Fit the cells' entire square bounds, so even broad pods never overlap a neighbour.
+    const diameter=Math.min(geom.w,geom.h), cell=Math.max(2,diameter/(1+Math.SQRT2/Math.sin(Math.PI/n))*.94);
+    const radius=(diameter-cell)/2;
+    return {x:geom.x0+geom.w/2+Math.cos(a)*radius-cell/2,y:geom.y0+geom.h/2+Math.sin(a)*radius-cell/2,w:cell,h:cell};
+  }
+  if (geom.layout === 'stagger') {
+    const w=(geom.w-geom.gap*(geom.cols-1))/(geom.cols+.5);
+    return {x:geom.x0+col*(w+geom.gap)+(row%2?w/2:0),y:geom.y0+row*(geom.cellH+geom.gap),w,h:geom.cellH};
+  }
   return {
     x: geom.x0 + col * (geom.cellW + geom.gap),
     y: geom.y0 + row * (geom.cellH + geom.gap),
@@ -213,7 +228,7 @@ export function padHit(geom, px, py, origin = 'bottomLeft') {
   const y = num(py, -1);
   for (let i = 0; i < geom.rows * geom.cols; i += 1) {
     const r = padRect(geom, i, origin);
-    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i;
+    if (performanceContains(geom.form, (x-r.x)/r.w, (y-r.y)/r.h)) return i;
   }
   return -1;
 }

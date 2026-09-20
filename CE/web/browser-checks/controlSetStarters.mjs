@@ -23,7 +23,39 @@ try {
   await page.waitForFunction(() => !!window.__controlSetShot);
   if (out) await mkdir(out, { recursive:true });
   const ids=await page.evaluate(() => window.__controlSetShot.starterIds);
-  assert.equal(ids.length,12);
+  assert.equal(ids.length,24);
+  async function checkPerformance(id) {
+    const number=page.locator('[data-control-id][role="spinbutton"]').first();
+    const field=number.locator('input').first();
+    const before=Number(await field.inputValue());
+    const increment=number.locator('.interactive-part').filter({hasText:/^\s*\+\s*$/}).first();
+    const plus=await increment.boundingBox();
+    await page.mouse.click(plus.x+plus.width/2,plus.y+plus.height/2);
+    await page.waitForTimeout(30);
+    assert.ok(Number(await field.inputValue())>before,`${id}: reshaped increment hit region`);
+    const decrement=number.locator('.interactive-part').filter({hasText:/^\s*-\s*$/}).first();
+    const minus=await decrement.boundingBox();
+    await page.mouse.click(minus.x+minus.width/2,minus.y+minus.height/2);
+    await page.waitForTimeout(30);
+    assert.equal(Number(await field.inputValue()),before,`${id}: relocated decrement reverses increment`);
+    const pad=page.locator('.drumpads [data-performance-form]').first();
+    assert.equal(await page.locator('.drumpads [data-performance-form]').count(),4);
+    const box=await pad.boundingBox();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+    await page.mouse.down();
+    await page.waitForTimeout(35);
+    assert.equal(await pad.getAttribute('data-active'),'true',`${id}: visible pad centre triggers`);
+    await page.mouse.up();
+    await page.waitForTimeout(35);
+    assert.equal(await pad.getAttribute('data-active'),'false',`${id}: released pad stops`);
+    await page.mouse.move(box.x+1,box.y+1);
+    await page.mouse.down();
+    await page.waitForTimeout(25);
+    assert.equal(await page.locator('.drumpads [data-active="true"]').count(),0,`${id}: empty pad corner does not trigger`);
+    await page.mouse.up();
+    assert.equal(await page.locator('.seq [data-performance-form]').count(),16,`${id}: shaped sequence cells`);
+    assert.equal(await page.locator('.seq [data-active="true"]').count(),6,`${id}: authored pattern retained`);
+  }
   for (const id of ids) {
     const size=await page.evaluate(id => window.__controlSetShot.showStarter(id), id);
     await page.evaluate(() => document.fonts.ready);
@@ -57,6 +89,7 @@ try {
     // The new cap geometry keeps the original hit/drag behavior.
     const fader=page.locator('.xfader').first();
     assert.ok(await fader.count());
+    if(ids.indexOf(id)>=12) await checkPerformance(id);
     if(out) await page.screenshot({ path:join(out,`${id}.png`),clip:{x:0,y:0,width:size.width,height:size.height} });
     if(out) {
       await page.locator('.frame').evaluate(el=>el.style.filter='grayscale(1)');
@@ -73,6 +106,9 @@ try {
     await page.mouse.up();
     console.log(`${id}: ${size.controls} rendered editor controls`);
   }
+  await page.evaluate(() => window.__controlSetShot.showStarter('satellite',{materialize:false}));
+  await page.waitForTimeout(100);
+  await checkPerformance('satellite following set without materialization');
   await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{disabled:true}));
   const disabledKnob=page.locator('svg.anatomy').first();
   await disabledKnob.waitFor();
@@ -86,7 +122,7 @@ try {
   await page.evaluate(() => window.__controlSetShot.gallery());
   const dialog=page.getByRole('dialog',{name:'Control set gallery'});
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),12);
+  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),24);
   await dialog.getByRole('button',{name:/Machined Precision/}).click();
   await dialog.getByRole('checkbox',{name:'Compare shapes in grayscale'}).check();
   assert.equal(await dialog.locator('.viewport').evaluate(el=>getComputedStyle(el).filter),'grayscale(1)');
@@ -102,5 +138,5 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog[open]'));
   assert.deepEqual(errors,[]);
-  console.log('gallery: twelve choices, new editable panel, portable designs and Escape passed');
+  console.log('gallery: twenty-four choices, new editable panel, portable designs and Escape passed');
 } finally { await browser?.close(); server.close(); }

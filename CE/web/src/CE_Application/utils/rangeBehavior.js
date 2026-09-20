@@ -1,5 +1,7 @@
 import { numberOr, clamp } from './primitives.js';
 import { displayScale, displayPrecision, toDisplay, fromDisplay } from './valueDisplayScale.js';
+import { resolvePartPixelRect } from './customComponentLayout.js';
+import { polygonPoints } from './shapeGeometry.js';
 
 // Re-exported so existing `from './rangeBehavior.js'` importers keep working.
 export { numberOr, clamp };
@@ -180,8 +182,45 @@ export function normalizedRangePointerValue(behavior = null, rect = null, client
   return direction === 'rtl' ? 1 - localX : localX;
 }
 
-export function resolveRangeZone(behavior = null, rect = null, clientX = 0, clientY = 0) {
+export function resolveNumberPartZone(control, rect, clientX, clientY) {
+  const parts=Object.values(control?._children?.Parts?._children ?? {}).filter(p=>p.visible!==false && ['decrement','increment','valueField'].includes(p.role));
+  if (!rect || !parts.length) return null;
+  const size=control?._children?.Transform ?? {};
+  const w=Number(size.width)||rect.width, h=Number(size.height)||rect.height;
+  const px=(clientX-rect.left)*w/Math.max(1,rect.width), py=(clientY-rect.top)*h/Math.max(1,rect.height);
+  for(const part of parts.sort((a,b)=>(b.zIndex??0)-(a.zIndex??0))) {
+    const r=resolvePartPixelRect(part._children?.Layout,w,h);
+    if(!r || r.width<=0 || r.height<=0)continue;
+    const x=(px-r.x)/r.width,y=(py-r.y)/r.height;
+    if(x<0||y<0||x>1||y>1)continue;
+    const kind=String(part.kind??'').toLowerCase();
+    if(['circle','ring','capsule'].includes(kind)) {
+      const radius=Math.min(r.width,r.height)/2;
+      const localX=x*r.width,localY=y*r.height;
+      const cx=Math.max(radius,Math.min(r.width-radius,localX));
+      const cy=Math.max(radius,Math.min(r.height-radius,localY));
+      if((localX-cx)**2+(localY-cy)**2>radius**2)continue;
+    }
+    const polygon=polygonPoints(kind);
+    if(polygon) {
+      let inside=false;
+      for(let i=0,j=polygon.length-1;i<polygon.length;j=i++) {
+        const [ax,ay]=polygon[i],[bx,by]=polygon[j];
+        if((ay>y)!==(by>y) && x<(bx-ax)*(y-ay)/(by-ay)+ax)inside=!inside;
+      }
+      if(!inside)continue;
+    }
+    return part.role==='valueField'?'value':part.role;
+  }
+  return 'none';
+}
+
+export function resolveRangeZone(behavior = null, rect = null, clientX = 0, clientY = 0, control = null) {
   if (!rect) return 'value';
+  if(control?._children?.Core?.controlType==='Number') {
+    const zone=resolveNumberPartZone(control,rect,clientX,clientY);
+    if(zone!==null)return zone;
+  }
 
   const orientation = getRangeOrientation(behavior);
   const direction = getRangeDirection(behavior);
@@ -201,4 +240,3 @@ export function resolveRangeZone(behavior = null, rect = null, clientX = 0, clie
 
   return 'value';
 }
-

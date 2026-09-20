@@ -422,7 +422,7 @@ export const EDITOR_PATHS = [
   /^Background\.Effects\.Material\.(enabled|kind|strength|shine|grain)$/,
   /^Effects\.Shadows\.items$/,
   /^Effects\.Bevel\.(enabled|style|size|softness|depth|angle|highlightOpacity|shadowOpacity)$/,
-  /^Layout\.(width|height|offsetX|offsetY)$/,
+  /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
   /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement)$/,
@@ -440,7 +440,8 @@ export const EDITOR_PATHS = [
   /^Ribbon\.(style|showGlow|indicatorSize|trackColour|fillColour|indicatorColour|glowColour|wheelColour|labelColour)$/,
   /^Core\.(controlForm|formSize|formDepth|formDivisions|formShowValue|formFaceColour|formHousingColour|formInkColour|formLabelColour|formAccentColour)$/,
   /^Crossfader\.(handleStyle|trackSize|handleSize|showGains|trackColour|fillAColour|fillBColour|handleColour|labelColour)$/,
-  /^DrumPads\.(padAppearance|padRadius|fieldColour|padColour|accentColour|hitColour|labelColour)$/,
+  /^DrumPads\.(padForm|padLayout|padAppearance|padRadius|fieldColour|padColour|accentColour|hitColour|labelColour)$/,
+  /^StepSequencer\.(cellForm|cellColour|cellOnColour|labelColour|gridColour|playheadColour)$/,
   /^Numpad\.(gap|keyColour|keyDownColour|keyLabelColour|actionColour|displayColour|displayTextColour|borderColour)$/,
   /^Matrix\.(cellStyle|cellBg|rowHeaderW|gridColour|posColour|negColour|labelColour|activeColour)$/,
   /^Envelope\.(fillUnder|lineWidth|nodeRadius|lineColour|fillColour|nodeColour|gridColour|sustainColour|playheadColour)$/,

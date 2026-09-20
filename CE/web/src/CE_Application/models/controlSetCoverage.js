@@ -1,3 +1,4 @@
+import { ADDITIONAL_DIRECTIONS, additionalNumberFamily } from './additionalControlSets.js';
 import { setAnatomy } from './controlAnatomy.js';
 // Visual properties only. Musical values, routing, gestures and authored edits remain local.
 // Each row is a design direction, not a new name for a palette.
@@ -14,6 +15,7 @@ export const STARTER_CONTROL_SETS = [
   { id: 'tolex', title: 'Vintage / bakelite', detail: 'Radio tuning windows, typewriter keys, Bakelite levers and arched needle meters.', pad: 'raised', radius: 10, handle: 'block', meter: 10, ribbon: 'wheel3d', matrix: 'dot' },
   { id: 'field', title: 'Field / instrument', detail: 'Scalloped selectors, guarded keys and toggles, and flag-style indicators.', pad: 'chamfer', radius: 8, handle: 'block', meter: 12, ribbon: 'wheel', matrix: 'bar' },
   { id: 'phosphor', title: 'Signal / LED', detail: 'Segment encoders, pixel keys, binary switch cells and dot-array meters.', pad: 'outline', radius: 3, handle: 'ring', meter: 32, ribbon: 'strip', matrix: 'dot' },
+  ...ADDITIONAL_DIRECTIONS,
 ];
 
 const DIRECTIONS = new Map(STARTER_CONTROL_SETS.map((entry) => [entry.id, entry]));
@@ -101,6 +103,11 @@ export function extendControlSet(set) {
       'Core.formHousingColour': '{control.track}',
       'Core.formDivisions': ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12,
     } };
+  }
+  if (d.padForm) {
+    Object.assign(families.DrumPads.component, { 'DrumPads.padForm': d.padForm, 'DrumPads.padLayout': d.padLayout });
+    families.Number = additionalNumberFamily(d.id);
+    families.StepSequencer = { component: { 'StepSequencer.cellForm': d.padForm, 'StepSequencer.cellColour': '{surface}', 'StepSequencer.cellOnColour': '{accent}', 'StepSequencer.labelColour': '{text.primary}', 'StepSequencer.gridColour': '{border}', 'StepSequencer.playheadColour': '{accent}' } };
   }
   return { ...set, families };
 }

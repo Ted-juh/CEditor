@@ -1439,6 +1439,8 @@ export const SECTION_DEFAULTS = {
     // colour (AARRGGBB), choke (0 = none) and roll. Anything omitted falls back
     // to the generated map, so renaming one pad doesn't mean writing all sixteen.
     pads: [],
+    padForm: 'rect',
+    padLayout: 'grid',
     padAppearance: 'flat',
     padRadius: 6,
     // Colours.
@@ -2068,6 +2070,7 @@ export const SECTION_DEFAULTS = {
    * than discovered later.
    */
   StepSequencer: {
+    cellForm: 'rect',
     _type: 'StepSequencer',
     steps: 16,
     bpm: 120,

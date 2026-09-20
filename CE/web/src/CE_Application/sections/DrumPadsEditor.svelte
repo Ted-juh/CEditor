@@ -22,6 +22,7 @@
   import Table from 'lucide-svelte/icons/table';
   import Palette from 'lucide-svelte/icons/palette';
 
+  import { PERFORMANCE_FORMS } from '../utils/performanceShapes.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -63,6 +64,8 @@
 
 {#if d}
   <PropertySection title="Pad design" icon={Palette}>
+    <PropertyCell label="Shape" span={2} hint="Outline and hit area. Corner zones use the rectangular grid so all four zones stay reachable."><select class="val" value={d.padForm ?? 'rect'} onchange={(e)=>set('padForm',e.target.value)}>{#each PERFORMANCE_FORMS as [id,name]}<option value={id}>{name}</option>{/each}</select></PropertyCell>
+    <PropertyCell label="Arrangement" span={2}><select class="val" value={d.padLayout ?? 'grid'} onchange={(e)=>set('padLayout',e.target.value)}>{#each ['grid','stagger','orbit'] as layout}<option value={layout}>{layout}</option>{/each}</select></PropertyCell>
     <PropertyCell label="Face" span={2}>
       <select class="val" value={d.padAppearance ?? 'flat'} onchange={(e) => set('padAppearance', e.target.value)}>
         {#each ['flat', 'outline', 'raised', 'inset', 'glass', 'chamfer'] as style}<option value={style}>{style}</option>{/each}

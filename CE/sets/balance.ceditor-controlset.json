@@ -1,0 +1,687 @@
+{
+  "format": "ceditor-controlset",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-18T00:00:00.000Z",
+  "metadata": {
+    "id": "balance",
+    "name": "Balance",
+    "description": "Tilting beam, counterweight keys, shield pads and balanced number paddles.",
+    "version": "1.0.0",
+    "author": "CEditor",
+    "license": "MIT",
+    "homepage": ""
+  },
+  "fingerprint": "96414a66",
+  "set": {
+    "id": "balance",
+    "name": "Balance",
+    "description": "Tilting beam, counterweight keys, shield pads and balanced number paddles.",
+    "tokens": {
+      "surface": "FF29403E",
+      "surface.hover": "FF29403E",
+      "surface.pressed": "FF29403E",
+      "surface.checked": "FF29403E",
+      "surface.mixed": "FF29403E",
+      "control.button": "FF29403E",
+      "control.button.hover": "FF29403E",
+      "control.button.pressed": "FF29403E",
+      "control.field": "FFEEECE4",
+      "control.field.hover": "FFFFFFFF",
+      "control.field.active": "FFE3EEF7",
+      "control.select": "FFF7F3EC",
+      "control.select.hover": "FFFFFFFF",
+      "control.select.pressed": "FFE7E1D6",
+      "control.track": "FFEEECE4",
+      "control.track.edge": "55A39B8E",
+      "control.fill": "FFB65A42",
+      "control.fill.hot": "FF3E8FD0",
+      "control.range": "FF7FB5E6",
+      "control.range.hot": "FFA9CCEE",
+      "control.body": "FF22201C",
+      "control.cap": "FF29403E",
+      "control.cap.hot": "FFFFFFFF",
+      "control.cap.edge": "99555555",
+      "control.cap.start": "FFD99A1E",
+      "control.cap.end": "FF2E9E6E",
+      "control.marker": "FF22201C",
+      "control.tick": "CC333333",
+      "control.tick.minor": "99333333",
+      "accent": "FFB65A42",
+      "accent.hot": "FFB65A42",
+      "text.primary": "FF202529",
+      "text.label": "FF202529",
+      "text.muted": "FF202529",
+      "text.focus": "FF202529",
+      "text.inverse": "FFF7F4EC",
+      "display.lit": "FF8FE3B0",
+      "display.unlit": "248FE3B0",
+      "display.screen": "FF1D2A22",
+      "display.backlight": "FF2A3B30",
+      "border": "66807A6E",
+      "border.surface": "66403A30",
+      "border.field": "66807A6E",
+      "border.mixed": "FFB98A00"
+    },
+    "lamp": {
+      "azimuth": 225,
+      "elevation": 48
+    },
+    "families": {
+      "Knob": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickLength": 5,
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1.5,
+            "Layout.height": 5
+          },
+          "bodyCap": {
+            "visible": true,
+            "Layout.width": 77,
+            "Layout.height": 77,
+            "Background.Fill.colour": "{control.body}",
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.cap.edge}",
+            "Background.Border.thickness": 1
+          },
+          "pointerCurrent": {
+            "kind": "line",
+            "Layout.width": 4,
+            "Layout.height": 100,
+            "Layout.offsetX": 70,
+            "Background.Fill.colour": "{control.marker}",
+            "Background.Border.enabled": false
+          },
+          "bodyTrackBase": {
+            "Layout.height": 4
+          },
+          "bodyTrackFill": {
+            "Layout.height": 4
+          }
+        }
+      },
+      "Button": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "MomentaryButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "ToggleButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "Combobox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2"
+        }
+      },
+      "Slider": {
+        "component": {
+          "Behavior.showMinMaxLabels": false,
+          "Behavior.labelTitlePlacement": "topLeft",
+          "Behavior.labelReadoutPlacement": "topRight",
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 6,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.tickNumerals": "value"
+        },
+        "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 6,
+            "kind": "numeral",
+            "Background.Fill.colour": "CC22201C"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "5522201C"
+          },
+          "pointerCurrent": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "FF22201C",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "pointerStart": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.start}",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "pointerEnd": {
+            "kind": "ring",
+            "Layout.width": 16,
+            "Layout.height": 8,
+            "Background.Fill.colour": "{control.cap.end}",
+            "Background.Border.colour": "FFEFEAE0",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackBase": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "9922201C",
+            "Background.Border.colour": "FF22201C",
+            "Background.Border.thickness": 0
+          },
+          "bodyTrackFill": {
+            "Layout.height": 2,
+            "Background.Corners.radius": 0,
+            "Background.Fill.colour": "FF2F6F9A"
+          }
+        }
+      },
+      "Label": {
+        "component": {
+          "Text.Fill.colour": "{text.primary}"
+        }
+      },
+      "CyclicButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}",
+                "Text.Fill.colour": "FFF2F2F2"
+              },
+              "parts": {}
+            }
+          },
+          "Text.Fill.colour": "FFF2F2F2"
+        }
+      },
+      "TimedButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "OneShotButton": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "FFF2F2F2",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "RadioButtonGroup": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "States.Selected": {
+            "_type": "State",
+            "name": "Selected",
+            "group": "interaction",
+            "description": "",
+            "enabled": true,
+            "when": {
+              "checked": true
+            },
+            "patches": {
+              "component": {
+                "Background.Border.colour": "{accent.hot}",
+                "Text.Fill.colour": "FFF2F2F2"
+              },
+              "parts": {}
+            }
+          },
+          "Text.Fill.colour": "FFF2F2F2"
+        }
+      },
+      "TextInput": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.colour": "{control.field}"
+        }
+      },
+      "Listbox": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.colour": "{control.field}",
+          "Listbox.cardRows": false,
+          "Listbox.rowHeight": 24,
+          "Listbox.selectionStyle": "bar",
+          "Listbox.zebra": false,
+          "Listbox.accentColour": "{accent}"
+        }
+      },
+      "Group": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}"
+        }
+      },
+      "Container": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}"
+        }
+      },
+      "TabContainer": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "TabContainer.appearance": "hardware",
+          "TabContainer.accentColour": "{accent}",
+          "TabContainer.stripColour": "{control.field}",
+          "TabContainer.tabColour": "{surface}",
+          "TabContainer.activeTabColour": "{surface.checked}",
+          "TabContainer.labelColour": "{text.primary}",
+          "TabContainer.activeLabelColour": "{text.inverse}"
+        }
+      },
+      "ScrollArea": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "ScrollArea.scrollbarSize": 10,
+          "ScrollArea.trackColour": "{control.track}",
+          "ScrollArea.thumbColour": "{control.cap}"
+        }
+      },
+      "Meter": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "FF202020",
+          "Text.Font.family": "DM Sans",
+          "Meter.segments": 12,
+          "Meter.segmentGap": 3,
+          "Meter.rounded": false,
+          "Meter.thickness": 16,
+          "Meter.showTicks": true,
+          "Meter.trackColour": "{control.track}",
+          "Meter.fillColour": "{control.fill}",
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "ProgressBar": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "FF202020",
+          "Text.Font.family": "DM Sans",
+          "Meter.segments": 12,
+          "Meter.segmentGap": 3,
+          "Meter.rounded": false,
+          "Meter.thickness": 16,
+          "Meter.showTicks": true,
+          "Meter.trackColour": "{control.track}",
+          "Meter.fillColour": "{control.fill}",
+          "Meter.peakColour": "{accent.hot}",
+          "Core.controlForm": "new-balance",
+          "Core.formFaceColour": "{surface}",
+          "Core.formInkColour": "FFF2F2F2",
+          "Core.formLabelColour": "{text.primary}",
+          "Core.formAccentColour": "{accent}",
+          "Core.formHousingColour": "{control.track}",
+          "Core.formDivisions": 12
+        }
+      },
+      "Ribbon": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Ribbon.style": "wheel3d",
+          "Ribbon.showGlow": false,
+          "Ribbon.indicatorSize": 8,
+          "Ribbon.trackColour": "{control.track}",
+          "Ribbon.fillColour": "{control.fill}",
+          "Ribbon.indicatorColour": "{control.cap}",
+          "Ribbon.glowColour": "{accent}",
+          "Ribbon.wheelColour": "{control.body}",
+          "Ribbon.labelColour": "FF202020"
+        }
+      },
+      "PitchWheel": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Ribbon.style": "wheel3d",
+          "Ribbon.showGlow": false,
+          "Ribbon.indicatorSize": 8,
+          "Ribbon.trackColour": "{control.track}",
+          "Ribbon.fillColour": "{control.fill}",
+          "Ribbon.indicatorColour": "{control.cap}",
+          "Ribbon.glowColour": "{accent}",
+          "Ribbon.wheelColour": "{control.body}",
+          "Ribbon.labelColour": "FF202020"
+        }
+      },
+      "ModWheel": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Ribbon.style": "wheel3d",
+          "Ribbon.showGlow": false,
+          "Ribbon.indicatorSize": 8,
+          "Ribbon.trackColour": "{control.track}",
+          "Ribbon.fillColour": "{control.fill}",
+          "Ribbon.indicatorColour": "{control.cap}",
+          "Ribbon.glowColour": "{accent}",
+          "Ribbon.wheelColour": "{control.body}",
+          "Ribbon.labelColour": "FF202020"
+        }
+      },
+      "Crossfader": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Crossfader.handleStyle": "block",
+          "Crossfader.trackSize": 8,
+          "Crossfader.handleSize": 22,
+          "Crossfader.showGains": false,
+          "Crossfader.trackColour": "{control.track}",
+          "Crossfader.fillAColour": "{control.fill}",
+          "Crossfader.fillBColour": "{control.range}",
+          "Crossfader.handleColour": "{control.cap}",
+          "Crossfader.labelColour": "FF202020"
+        }
+      },
+      "DrumPads": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "DrumPads.padAppearance": "raised",
+          "DrumPads.padRadius": 4,
+          "DrumPads.fieldColour": "{control.field}",
+          "DrumPads.padColour": "{surface}",
+          "DrumPads.accentColour": "{accent}",
+          "DrumPads.hitColour": "{accent.hot}",
+          "DrumPads.labelColour": "FFF2F2F2",
+          "DrumPads.padForm": "shield",
+          "DrumPads.padLayout": "grid"
+        }
+      },
+      "Numpad": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Numpad.gap": 3,
+          "Numpad.keyColour": "{surface}",
+          "Numpad.keyDownColour": "{surface.pressed}",
+          "Numpad.keyLabelColour": "{text.primary}",
+          "Numpad.actionColour": "{accent}",
+          "Numpad.displayColour": "{control.field}",
+          "Numpad.displayTextColour": "{text.primary}",
+          "Numpad.borderColour": "{border}"
+        }
+      },
+      "Matrix": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Matrix.cellStyle": "dot",
+          "Matrix.rowHeaderW": 42,
+          "Matrix.gridColour": "{border}",
+          "Matrix.posColour": "{accent}",
+          "Matrix.negColour": "{control.range}",
+          "Matrix.labelColour": "FF202020",
+          "Matrix.activeColour": "{accent.hot}",
+          "Matrix.cellBg": "{control.field}"
+        }
+      },
+      "Envelope": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Envelope.fillUnder": true,
+          "Envelope.lineWidth": 3,
+          "Envelope.nodeRadius": 3,
+          "Envelope.lineColour": "{accent}",
+          "Envelope.fillColour": "20000000",
+          "Envelope.nodeColour": "{control.cap}",
+          "Envelope.gridColour": "{border}",
+          "Envelope.sustainColour": "{control.range}",
+          "Envelope.playheadColour": "{accent.hot}"
+        }
+      },
+      "VectorJoystick": {
+        "component": {
+          "Background.Corners.radius": 4,
+          "Background.Border.thickness": 1,
+          "Background.Fill.gradientEnabled": false,
+          "Background.Fill.colour": "{control.field}",
+          "Text.Fill.colour": "{text.primary}",
+          "Text.Font.family": "DM Sans",
+          "Joystick.puckRadius": 7,
+          "Joystick.showGrid": true,
+          "Joystick.gridDiv": 4,
+          "Joystick.padColour": "{control.field}",
+          "Joystick.gridColour": "{border}",
+          "Joystick.crosshairColour": "{accent}",
+          "Joystick.puckColour": "{control.cap}",
+          "Joystick.cornerColour": "{text.muted}",
+          "Joystick.labelColour": "FF202020"
+        }
+      },
+      "Number": {
+        "parts": {
+          "decrement": {
+            "kind": "trapezoid",
+            "Layout.x": 0,
+            "Layout.y": 45,
+            "Layout.width": 28,
+            "Layout.height": 52,
+            "Layout.xUnit": "percent",
+            "Layout.yUnit": "percent",
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Layout.anchorX": "left",
+            "Layout.anchorY": "top",
+            "Background.Corners.radius": 20,
+            "Background.Fill.colour": "{surface}",
+            "Background.Border.enabled": true,
+            "Background.Border.thickness": 1,
+            "Background.Border.colour": "{accent}",
+            "Text.Fill.colour": "FFF7F4EC"
+          },
+          "valueField": {
+            "kind": "rect",
+            "Layout.x": 32,
+            "Layout.y": 8,
+            "Layout.width": 36,
+            "Layout.height": 66,
+            "Layout.xUnit": "percent",
+            "Layout.yUnit": "percent",
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Layout.anchorX": "left",
+            "Layout.anchorY": "top",
+            "Background.Corners.radius": 3,
+            "Background.Fill.colour": "{control.field}",
+            "Background.Border.enabled": true,
+            "Background.Border.thickness": 1,
+            "Background.Border.colour": "{accent}",
+            "Text.Fill.colour": "{text.primary}"
+          },
+          "increment": {
+            "kind": "trapezoid",
+            "Layout.x": 72,
+            "Layout.y": 45,
+            "Layout.width": 28,
+            "Layout.height": 52,
+            "Layout.xUnit": "percent",
+            "Layout.yUnit": "percent",
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Layout.anchorX": "left",
+            "Layout.anchorY": "top",
+            "Background.Corners.radius": 20,
+            "Background.Fill.colour": "{surface}",
+            "Background.Border.enabled": true,
+            "Background.Border.thickness": 1,
+            "Background.Border.colour": "{accent}",
+            "Text.Fill.colour": "FFF7F4EC"
+          }
+        }
+      },
+      "StepSequencer": {
+        "component": {
+          "StepSequencer.cellForm": "shield",
+          "StepSequencer.cellColour": "{surface}",
+          "StepSequencer.cellOnColour": "{accent}",
+          "StepSequencer.labelColour": "{text.primary}",
+          "StepSequencer.gridColour": "{border}",
+          "StepSequencer.playheadColour": "{accent}"
+        }
+      }
+    },
+    "panel": {
+      "colour": "FFEEECE4"
+    },
+    "type": {
+      "label": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.9
+      },
+      "legend": {
+        "family": "DM Sans",
+        "weight": 700,
+        "letterSpacing": 0.7
+      },
+      "field": {
+        "family": "JetBrains Mono",
+        "weight": 600,
+        "letterSpacing": 0
+      }
+    }
+  }
+}

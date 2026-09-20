@@ -12,6 +12,7 @@
 
   let { control = null, width = 0, height = 0 } = $props();
 
+  import PerformanceCell from './PerformanceCell.svelte';
   const PAD = 8;
   function css(hex, fallback = 'rgba(255,255,255,0.9)') {
     const s = String(hex ?? '').replace(/^#/, '').trim();
@@ -61,7 +62,7 @@
 
   let showHeader = $derived(cfg.showHeader !== false);
   let headerH = $derived(showHeader ? 22 : 0);
-  let geom = $derived(drumGeometry(width, height, drumRows(control), drumCols(control), PAD, headerH, 5));
+  let geom = $derived(drumGeometry(width, height, drumRows(control), drumCols(control), PAD, headerH, 5, cfg));
 
   let cells = $derived(pads.map((p) => ({ p, r: padRect(geom, p.index, origin) })));
   // Text drops out on small pads rather than overflowing them.
@@ -94,6 +95,9 @@
     {@const isHit = hits.has(c.p.id)}
     {@const accent = c.p.colour ? css(c.p.colour, accentCss) : accentCss}
     {@const isEcho = echoSet.has(c.p.note)}
+    {#if geom.form !== 'rect'}
+      <PerformanceCell form={geom.form} x={c.r.x} y={c.r.y} w={c.r.w} h={c.r.h} face={padCss} ink={labelCss} accent={isHit?hitCss:accent} active={isHit} echo={isEcho} />
+    {:else}
     {#if isHit}
       <rect x={c.r.x - 3} y={c.r.y - 3} width={c.r.w + 6} height={c.r.h + 6} rx="9" fill={hitCss} opacity="0.22" />
     {:else if isEcho}
@@ -117,12 +121,13 @@
     <!-- the pad's own accent stripe: its per-pad colour, or the section accent -->
     <rect x={c.r.x + 6} y={c.r.y + 6} width={Math.max(2, c.r.w - 12)} height="3" rx="1.5"
           fill={isHit ? hitCss : accent} opacity={isHit ? 1 : 0.7} />
-    {#if labelFits}
+    {/if}
+    {#if labelFits && c.r.w>=34 && c.r.h>=26}
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h / 2 + (noteFits ? 1 : 4)}
             font-size={Math.max(8, Math.min(12, c.r.w * 0.19))}
-            fill={face === 'flat' ? (isHit ? '#fff' : 'rgba(232,232,238,1)') : labelCss} text-anchor="middle" style="font-weight:600">{c.p.label}</text>
+            fill={geom.form === 'rect' && face === 'flat' ? (isHit ? '#fff' : 'rgba(232,232,238,1)') : labelCss} text-anchor="middle" style="font-weight:600">{c.p.label}</text>
     {/if}
-    {#if noteFits}
+    {#if noteFits && c.r.w>=26 && c.r.h>=34}
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h - 7} font-size="8.5"
             fill={isHit ? hitCss : labelCss} text-anchor="middle" opacity={isHit ? 1 : 0.6}>{c.p.note}</text>
     {/if}

@@ -3881,10 +3881,11 @@
     return String(control?._children?.Core?.controlType ?? '') === 'DrumPads';
   }
   function drumGeomFor(control) {
-    const t = control?._children?.Transform ?? {};
-    const headerH = drumConfig(control).showHeader !== false ? 22 : 0;
+    const drawing = resolveControlFamily(control, controlSetForPanel(panel));
+    const t = drawing?._children?.Transform ?? {};
+    const headerH = drumConfig(drawing).showHeader !== false ? 22 : 0;
     return drumGeometry(numberOr(t.width, 0), numberOr(t.height, 0),
-      drumRows(control), drumCols(control), DRUM_PAD, headerH, 5);
+      drumRows(drawing), drumCols(drawing), DRUM_PAD, headerH, 5, drumConfig(drawing));
   }
   function syncDrumSession(control, last) {
     const id = getControlId(control);
@@ -7217,7 +7218,7 @@
       return;
     }
 
-    const zone = resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
+    const zone = resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY, resolvedPreviewFor(control)?.control);
     if (zone !== pointerDownZone) return;
     if (zone === 'decrement') {
       setRangeValue(control, adjustRangeValue(getBehavior(control), currentRangeValue(control), -1));
@@ -7719,7 +7720,7 @@
       const rect = pointerActiveElement?.getBoundingClientRect?.();
       pointerDownZone = isTwoValueSpinner(control)
         ? resolveSpinnerZone(rect, event.clientX)
-        : resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
+        : resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY, resolvedPreviewFor(control)?.control);
     }
 
     let nextSliderHandle = '';

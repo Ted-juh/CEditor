@@ -15,4 +15,4 @@ for (const { id } of STARTER_CONTROL_SETS) {
   panel.filePath = null;
   writeFileSync(new URL(`${id}.cepanel`, dir), serializePanel(panel) + '\n');
 }
-console.log(`Exported twelve editable starters to ${fileURLToPath(dir)}`);
+console.log(`Exported ${STARTER_CONTROL_SETS.length} editable starters to ${fileURLToPath(dir)}`);

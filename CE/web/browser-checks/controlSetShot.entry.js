@@ -44,9 +44,9 @@ function specimenPanel(setId) {
 let mounted = null;
 window.__controlSetShot = {
   starterIds: STARTER_CONTROL_SETS.map(s => s.id),
-  showStarter(id, { disabled = false, original = false } = {}) {
+  showStarter(id, { disabled = false, original = false, materialize = true } = {}) {
     if (mounted) unmount(mounted);
-    const panel = createControlSetStarter(id);
+    const panel = createControlSetStarter(id, { materialize });
     if (disabled || original) for (const control of panel.controls) {
       if (disabled) control._children.Core.enabled = false;
       if (original) control._children.Core.controlForm = 'original';

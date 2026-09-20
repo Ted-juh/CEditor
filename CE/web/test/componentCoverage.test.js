@@ -44,6 +44,8 @@ const GEOMETRY = new Set([
  */
 const EXEMPT = {
   'drumpads.padAppearance': 'authoring: the pad face design, editable in Pad design and by set()',
+  'drumpads.padForm': 'authoring: outline and matching hit area, editable in Pad design and by set()',
+  'drumpads.padLayout': 'authoring: spatial arrangement, editable in Pad design and by set()',
   'crossfader.handleStyle': 'authoring: the cap shape, editable in Handle design and by set()',
   // Authoring surfaces: what the inspector is FOR. A script that rewrote a display's page layout
   // mid-song is not a performance, it is a different panel.

@@ -1,4 +1,5 @@
 <script>
+  import AdditionalAnatomy from './AdditionalAnatomy.svelte';
   import { anatomyValue } from '../models/controlAnatomy.js';
   import { meterConfig, meterPosition } from '../utils/meterLayout.js';
   import { formatSliderNumericValue } from '../utils/sliderBehavior.js';
@@ -42,7 +43,9 @@
       <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke={legend} stroke-width={i%3?1:2}/>
     {/each}
   {/snippet}
-  {#if knob}
+  {#if String(form).startsWith('new-')}
+    <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} />
+  {:else if knob}
     <g transform={`translate(80 76) scale(${size}) translate(-80 -76)`}>
     {#if form==='disc'}
       <path d="M39 117 A58 58 0 1 1 121 117" fill="none" stroke={ink} stroke-opacity=".2" stroke-width="5"/>

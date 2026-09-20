@@ -245,6 +245,8 @@ export function gateMs(control, bpm = null) {
 }
 
 /** Grid geometry: a row per track, a column per step, with a lane for the track headers. */
+import { performanceContains } from './performanceShapes.js';
+
 export function sequencerGeometry(width, height, control) {
   const config = sequencerConfig(control);
   const pad = num(config.padding, 6);
@@ -260,6 +262,7 @@ export function sequencerGeometry(width, height, control) {
   return {
     pad,
     headerW,
+    form: config.cellForm ?? 'rect',
     x0: gridX,
     y0: gridY,
     width: gridW,
@@ -290,6 +293,10 @@ export function cellAtPoint(geom, px, py) {
   const step = Math.floor((x - geom.x0) / geom.cellW);
   const trackIndex = Math.floor((y - geom.y0) / geom.cellH);
   if (step < 0 || step >= geom.steps || trackIndex < 0 || trackIndex >= geom.tracks) return null;
+  if (geom.form && geom.form !== 'rect') {
+    const r=cellRect(geom,trackIndex,step);
+    if (!performanceContains(geom.form,(x-r.x)/r.w,(y-r.y)/r.h)) return null;
+  }
   return { step, trackIndex };
 }
 

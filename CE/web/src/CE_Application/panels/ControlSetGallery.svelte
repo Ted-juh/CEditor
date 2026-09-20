@@ -19,7 +19,7 @@
 </script>
 
 <dialog bind:this={dialog} onclose={onclose} oncancel={(e) => { e.preventDefault(); onclose(); }} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onclose(); } }} aria-label="Control set gallery">
-  <header><div><small>CEDITOR / CONTROL LIBRARY</small><h2>Twelve ways to start.</h2></div><button class="close" aria-label="Close gallery" onclick={onclose}>×</button></header>
+  <header><div><small>CEDITOR / CONTROL LIBRARY</small><h2>{STARTER_CONTROL_SETS.length} ways to start.</h2></div><button class="close" aria-label="Close gallery" onclick={onclose}>×</button></header>
   <div class="body">
     <nav aria-label="Starter designs">
       {#each STARTER_CONTROL_SETS as entry, index}

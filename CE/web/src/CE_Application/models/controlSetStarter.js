@@ -34,7 +34,7 @@ export function createControlSetStarter(setId, { materialize = true } = {}) {
   place('ToggleButton', 716, 118, 136, 84, { Text: { content: 'HOLD' }, Behavior: { defaultValue: true } });
   place('CyclicButton', 576, 220, 124, 36, { Text: { content: 'CYCLE' } });
   place('Combobox', 716, 220, 136, 36);
-  place('Number', 576, 273, 124, 32);
+  place('Number', 576, direction?.padForm ? 265 : 273, 124, direction?.padForm ? 46 : 32);
   place('TextInput', 716, 273, 136, 32, { Text: { content: 'Studio A' } });
   label('PLAY / SHAPE', 26, 310);
   label('MEASURE / ROUTE', 540, 310);
@@ -44,6 +44,16 @@ export function createControlSetStarter(setId, { materialize = true } = {}) {
   place('Meter', 540, 342, 312, 108, { Meter: { orientation: 'horizontal', value: 0.7, valuePrecision: 2 } });
   place('Matrix', 540, 466, 166, 100, { Matrix: { rows: ['LFO', 'ENV', 'VEL'], cols: ['OSC', 'FLT', 'AMP'], amounts: [.6, 0, -.4, 0, .7, 0, 0, .4, .8] } });
   place('VectorJoystick', 728, 466, 124, 100);
+  if (direction?.padForm) {
+    // A compact, stopped rhythm is editable immediately; no notes start on opening.
+    place('StepSequencer', 284, 466, 220, 100, { StepSequencer: { steps: 8, trackHeaderWidth: 38, running: false,
+      tracks: [{id:'kick',label:'Kick',note:36,channel:10},{id:'hat',label:'Hat',note:42,channel:10}],
+      pattern: {'kick:0':{on:true,velocity:100},'kick:4':{on:true,velocity:100},'hat:0':{on:true,velocity:70},'hat:2':{on:true,velocity:70},'hat:4':{on:true,velocity:70},'hat:6':{on:true,velocity:70}} } });
+    const ribbon=controls.find(c=>c._children.Core.controlType==='Ribbon');
+    ribbon._children.Transform={...ribbon._children.Transform,x:284,y:427,width:220,height:30};
+    const envelope=controls.find(c=>c._children.Core.controlType==='Envelope');
+    envelope._children.Transform.height=70;
+  }
   label('Copy a control into your panel. Its pinned design travels with it.', 26, 590, 820, 12);
   return { ...createPanel(), name: `${set.name} — starter`, width: 880, height: 636,
     description: direction?.detail ?? set.description, controls, controlSet: { id: setId }, modified: true };

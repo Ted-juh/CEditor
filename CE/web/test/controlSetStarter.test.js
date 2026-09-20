@@ -9,8 +9,8 @@ import { shrinkControl, expandControl } from '../src/CE_Application/stores/docum
 import { serializePanel, deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { sceneryMarkupKey } from '../src/CE_Application/utils/sceneryMarkupCache.js';
 
-test('twelve editable starters round-trip with portable design pins and finite bounds', () => {
-  assert.equal(STARTER_CONTROL_SETS.length, 12);
+test('twenty-four editable starters round-trip with portable design pins and finite bounds', () => {
+  assert.equal(STARTER_CONTROL_SETS.length, 24);
   for (const { id } of STARTER_CONTROL_SETS) {
     const panel = createControlSetStarter(id);
     const restored = deserializePanel(serializePanel(panel));
