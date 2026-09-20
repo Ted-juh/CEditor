@@ -18,7 +18,7 @@ export const ADDITIONAL_DIRECTIONS = [
 
 function physicalFinish(d, inset=false) {
   const colour=inset?d.panel:d.face;
-  return {'Background.Fill.gradientEnabled':!['flat','digital','future'].includes(d.style),'Background.Fill.gradient':{type:'linear',angle:180,edge:0,stops:[{color:inset?darken(colour,.65):lighten(colour,.5),position:0},{color:colour,position:inset?35:45},{color:inset?lighten(colour,.12):darken(colour,.45),position:100}]},'Background.Effects.Material.enabled':!inset&&['console','modular','precision'].includes(d.style),'Background.Effects.Material.kind':d.material,'Background.Effects.Material.strength':8,'Background.Effects.Material.shine':65,'Effects.Bevel.enabled':!['flat','digital','future'].includes(d.style),'Effects.Bevel.style':inset?'inner-bevel':'outer-bevel','Effects.Bevel.size':2,'Effects.Bevel.softness':1,'Effects.Bevel.depth':120,'Effects.Bevel.highlightOpacity':75,'Effects.Bevel.shadowOpacity':70};
+  return {'Background.Fill.gradientEnabled':d.finish!=='flat'&&!['flat','digital','future'].includes(d.style),'Background.Fill.gradient':{type:'linear',angle:180,edge:0,stops:[{color:inset?darken(colour,.65):lighten(colour,.5),position:0},{color:colour,position:inset?35:45},{color:inset?lighten(colour,.12):darken(colour,.45),position:100}]},'Background.Effects.Material.enabled':!inset&&(d.finish==='metal'||['console','modular','precision'].includes(d.style)),'Background.Effects.Material.kind':d.material,'Background.Effects.Material.strength':8,'Background.Effects.Material.shine':65,'Effects.Bevel.enabled':d.finish!=='flat'&&!['flat','digital','future'].includes(d.style),'Effects.Bevel.style':inset?'inner-bevel':'outer-bevel','Effects.Bevel.size':2,'Effects.Bevel.softness':1,'Effects.Bevel.depth':120,'Effects.Bevel.highlightOpacity':75,'Effects.Bevel.shadowOpacity':70};
 }
 function ink(hex) { const [r,g,b]=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)); return .2126*r+.7152*g+.0722*b>145?'FF202529':'FFF7F4EC'; }
 export function makeAdditionalControlSets(bases) {
@@ -37,14 +37,20 @@ export function makeAdditionalControlSets(bases) {
     }
     if(d.physical) {
       const common={slot:'0E1215',slotEdge:lighten(d.panel,.2),track:'11171B',fill:d.accent,cap:d.face,groove:ink(d.face).slice(2),tick:ink(d.panel).slice(2),plate:lighten(d.face,.15),rail:'555752',light:d.accent,lit:d.style==='future'};
-      const recipe=['precision','modular','future'].includes(d.style)?'billet':d.style==='vintage'?'vintage':['rubber','workstation'].includes(d.style)?'rubber':'fader';
+      const recipe=d.slider?.recipe??(['precision','modular','future'].includes(d.style)?'billet':d.style==='vintage'?'vintage':['rubber','workstation'].includes(d.style)?'rubber':'fader');
       families.Slider=SLIDER_DESIGNS[recipe](common).Slider;
       const capWidths={vintage:14,poly:16,console:18,compact:14,modular:12,rubber:21,digital:12,precision:20,workstation:22,flat:9,glass:12,future:14};
-      for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{'Layout.width':capWidths[d.style],'Layout.height':d.style==='compact'?28:d.style==='workstation'?44:36});
+      for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{'Layout.width':d.slider?.width??capWidths[d.style],'Layout.height':d.slider?.height??(d.style==='compact'?28:d.style==='workstation'?44:36)});
+      if(d.slider) {
+        Object.assign(families.Slider.component,{'Behavior.majorTickCount':d.slider.ticks,'Behavior.minorTickCount':0});
+        for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{kind:d.slider.cap,'Background.Fill.gradientEnabled':d.finish!=='flat',shadow:d.finish!=='flat','Background.Corners.radius':d.numberRadius});
+        for(const part of ['bodyTrackBase','bodyTrackFill']) Object.assign(families.Slider.parts[part],{'Layout.height':d.slider.track,'Background.Corners.radius':d.finish==='glass'?3:1});
+        if(d.style==='edge-light') families.Slider.parts.bodyTrackFill.glow=true;
+      }
       if(['flat','glass','digital'].includes(d.style)) for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{kind:'bar',shadow:d.style!=='flat','Background.Fill.gradientEnabled':d.style==='glass','Background.Corners.radius':d.style==='glass'?4:1});
     }
     // Physical sets supply their own restrained panel material.
-    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:['console','modular','precision'].includes(d.style),kind:d.material,strength:8,shine:15,grain:40,lampFollowsSet:true}}:{})},families};
+    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:(d.finish==='metal'||['console','modular','precision'].includes(d.style)),kind:d.material,strength:8,shine:15,grain:40,lampFollowsSet:true}}:{})},families};
   });
 }
 
@@ -80,7 +86,7 @@ export function additionalNumberFamily(id) {
   if(index<0) return null;
   const d=ADDITIONAL_DIRECTIONS[index];
   return {parts:Object.fromEntries(['decrement','valueField','increment'].map((name,i)=>{
-    const [x,y,width,height]=NUMBER_LAYOUTS[index][i];
-    return [name,{...(d.physical?physicalFinish(d,i===1):{}),kind:i===1?'rect':d.stepKind,'Layout.x':x,'Layout.y':y,'Layout.width':width,'Layout.height':height,'Layout.xUnit':'percent','Layout.yUnit':'percent','Layout.widthUnit':'percent','Layout.heightUnit':'percent','Layout.anchorX':'left','Layout.anchorY':'top','Background.Corners.radius':i===1?3:d.physical?[4,14,2,12,2,8,20,3,1,0,6,10][index-12]:20,'Background.Fill.colour':i===1?'{control.field}':'{surface}','Background.Border.enabled':true,'Background.Border.thickness':1,'Background.Border.colour':'{accent}','Text.Fill.colour':i===1?'{text.primary}':ink(d.face)}];
+    const [x,y,width,height]=(d.numberLayout??NUMBER_LAYOUTS[index])[i];
+    return [name,{...(d.physical?physicalFinish(d,i===1):{}),kind:i===1?'rect':d.stepKind,'Layout.x':x,'Layout.y':y,'Layout.width':width,'Layout.height':height,'Layout.xUnit':'percent','Layout.yUnit':'percent','Layout.widthUnit':'percent','Layout.heightUnit':'percent','Layout.anchorX':'left','Layout.anchorY':'top','Background.Corners.radius':i===1?3:d.physical?(d.numberRadius??[4,14,2,12,2,8,20,3,1,0,6,10][index-12]):20,'Background.Fill.colour':i===1?'{control.field}':'{surface}','Background.Border.enabled':true,'Background.Border.thickness':1,'Background.Border.colour':'{accent}','Text.Fill.colour':i===1?'{text.primary}':ink(d.face)}];
   }))};
 }

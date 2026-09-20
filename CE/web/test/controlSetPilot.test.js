@@ -99,9 +99,9 @@ test('Tolex and Machined are built in, define every role, and carry what colour 
   assert.equal(BUILT_IN_CONTROL_SETS.filter((set) => ['tolex', 'machined'].includes(set.id)).length, 2);
 });
 
-test('the catalogue: fifty-four built-in sets, each id once, every family patch landing on a real control', () => {
+test('the catalogue: sixty-six built-in sets, each id once, every family patch landing on a real control', () => {
   const ids = BUILT_IN_CONTROL_SETS.map((set) => set.id);
-  assert.equal(ids.length, 54);
+  assert.equal(ids.length, 66);
   assert.equal(new Set(ids).size, ids.length, 'ids are unique');
   assert.equal(ids[0], 'graphite', 'the default set comes first');
   for (const set of BUILT_IN_CONTROL_SETS) {

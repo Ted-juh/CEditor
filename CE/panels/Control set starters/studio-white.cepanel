@@ -1,0 +1,5003 @@
+{
+  "panelGuid": "258c53bf-d1a5-bfcf-2c85-ebc870183173",
+  "exportSettings": {
+    "pluginName": "",
+    "vendor": "Tedjuh",
+    "manufacturerCode": "Tdjh",
+    "version": "1.0.0",
+    "embedPython": "auto",
+    "compileNativeHandlers": "auto",
+    "exportClap": false,
+    "exportLv2": false,
+    "restoreHardware": "ask"
+  },
+  "name": "Studio White — starter",
+  "scriptId": "panel_44",
+  "author": "",
+  "version": "1.0.0",
+  "description": "Low pale caps with open dual scales, slim console faders and clearly inset status indicators.",
+  "enabled": true,
+  "locked": false,
+  "filePath": null,
+  "width": 880,
+  "height": 636,
+  "resizable": false,
+  "panicShortcut": "Escape",
+  "minWidth": 0,
+  "minHeight": 0,
+  "maxWidth": 0,
+  "maxHeight": 0,
+  "lockAspectRatio": false,
+  "bgLayerOrder": [
+    "solid",
+    "gradient",
+    "image",
+    "texture"
+  ],
+  "bgSolid": true,
+  "bgColour": "FF333333",
+  "bgGradientEnabled": false,
+  "bgGradientOpacity": 100,
+  "bgGradientName": "",
+  "bgGradient": {
+    "type": "linear",
+    "angle": 90,
+    "centerX": 50,
+    "centerY": 50,
+    "radiusX": 50,
+    "radiusY": 50,
+    "edge": 0,
+    "stops": [
+      {
+        "color": "FF0000",
+        "position": 0
+      },
+      {
+        "color": "0000FF",
+        "position": 100
+      }
+    ]
+  },
+  "bgImageEnabled": false,
+  "bgImage": "",
+  "bgImageOpacity": 100,
+  "bgImageFit": "fill",
+  "bgImageAlign": "center",
+  "bgImageOffsetX": 0,
+  "bgImageOffsetY": 0,
+  "bgImageBlend": "normal",
+  "bgImageBlur": 0,
+  "bgImageTint": "FFFFFF",
+  "bgImageFlipH": false,
+  "bgImageFlipV": false,
+  "bgImageRotation": 0,
+  "bgImageGrayscale": false,
+  "bgImageSaturation": 100,
+  "bgImageBrightness": 100,
+  "bgImageContrast": 100,
+  "bgImageTileScale": 1,
+  "bgTextureEnabled": false,
+  "bgTexture": "",
+  "bgTextureOpacity": 100,
+  "bgTextureFit": "tile",
+  "bgTextureAlign": "center",
+  "bgTextureOffsetX": 0,
+  "bgTextureOffsetY": 0,
+  "bgTextureBlend": "normal",
+  "bgTextureBlur": 0,
+  "bgTextureTint": "FFFFFF",
+  "bgTextureFlipH": false,
+  "bgTextureFlipV": false,
+  "bgTextureRotation": 0,
+  "bgTextureGrayscale": false,
+  "bgTextureSaturation": 100,
+  "bgTextureBrightness": 100,
+  "bgTextureContrast": 100,
+  "bgTextureTileScale": 1,
+  "gridEnabled": true,
+  "gridSize": 10,
+  "gridColour": "33FFFFFF",
+  "gridLineWidth": 1,
+  "gridType": "lines",
+  "gridSubdivision": 1,
+  "gridSubColour": "55FFFFFF",
+  "gridCentered": false,
+  "gridOriginX": 0,
+  "gridOriginY": 0,
+  "snapToGrid": true,
+  "guides": {
+    "horizontal": [],
+    "vertical": []
+  },
+  "notepad": {
+    "notes": [
+      {
+        "name": "Note 1",
+        "content": ""
+      }
+    ],
+    "activeNoteIndex": 0
+  },
+  "viewer": {
+    "images": [],
+    "activeImageIndex": 0
+  },
+  "requiredProfiles": [],
+  "parameterSnapshots": {},
+  "exportParameters": [
+    {
+      "id": "Knob_1789892552104.value",
+      "label": "Knob_1789892552104",
+      "controlName": "Knob_1789892552104",
+      "path": "Knob_1789892552104.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.63,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Knob_1789892552105.value",
+      "label": "Knob_1789892552105",
+      "controlName": "Knob_1789892552105",
+      "path": "Knob_1789892552105.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789892552108.value",
+      "label": "Slider_1789892552108",
+      "controlName": "Slider_1789892552108",
+      "path": "Slider_1789892552108.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789892552109.value",
+      "label": "Slider_1789892552109",
+      "controlName": "Slider_1789892552109",
+      "path": "Slider_1789892552109.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.55,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789892552110.value",
+      "label": "Slider_1789892552110",
+      "controlName": "Slider_1789892552110",
+      "path": "Slider_1789892552110.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.7,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789892552111.value",
+      "label": "Slider_1789892552111",
+      "controlName": "Slider_1789892552111",
+      "path": "Slider_1789892552111.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789892552113.value",
+      "label": "ToggleButton_1789892552113",
+      "controlName": "ToggleButton_1789892552113",
+      "path": "ToggleButton_1789892552113.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "CyclicButton_1789892552114.value",
+      "label": "CyclicButton_1789892552114",
+      "controlName": "CyclicButton_1789892552114",
+      "path": "CyclicButton_1789892552114.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "State 1",
+        "State 2",
+        "State 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Combobox_1789892552115.value",
+      "label": "Combobox_1789892552115",
+      "controlName": "Combobox_1789892552115",
+      "path": "Combobox_1789892552115.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "Option 1",
+        "Option 2",
+        "Option 3"
+      ],
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Number_1789892552116.value",
+      "label": "Number_1789892552116",
+      "controlName": "Number_1789892552116",
+      "path": "Number_1789892552116.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Crossfader_1789892552122.value",
+      "label": "Crossfader_1789892552122",
+      "controlName": "Crossfader_1789892552122",
+      "path": "Crossfader_1789892552122.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Crossfader",
+      "field": "mix",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "StepSequencer_1789892552123.bpm",
+      "label": "StepSequencer_1789892552123 Tempo",
+      "controlName": "StepSequencer_1789892552123",
+      "path": "StepSequencer_1789892552123.bpm",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 1,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "StepSequencer",
+      "field": "bpm",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "StepSequencer_1789892552123.run",
+      "label": "StepSequencer_1789892552123 Run",
+      "controlName": "StepSequencer_1789892552123",
+      "path": "StepSequencer_1789892552123.run",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "bool",
+      "section": "StepSequencer",
+      "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789892552126.x",
+      "label": "VectorJoystick_1789892552126 X",
+      "controlName": "VectorJoystick_1789892552126",
+      "path": "VectorJoystick_1789892552126.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789892552126.y",
+      "label": "VectorJoystick_1789892552126 Y",
+      "controlName": "VectorJoystick_1789892552126",
+      "path": "VectorJoystick_1789892552126.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    }
+  ],
+  "scripts": [],
+  "scripting": {
+    "enabled": true,
+    "runInPreview": true,
+    "runOnExport": true
+  },
+  "controlSet": {
+    "id": "studio-white"
+  },
+  "controls": [
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552099",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552099",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 16,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "STUDIO WHITE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 24,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552100",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552100",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 48,
+          "width": 650,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Current / light studio",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552101",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552101",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 85,
+          "width": 300,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "OSCILLATOR / FILTER",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552102",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552102",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 356,
+          "y": 85,
+          "width": 210,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "ENVELOPE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552103",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552103",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 85,
+          "width": 250,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PERFORMANCE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789892552104",
+          "controlSetId": "studio-white",
+          "controlForm": "new-studio-white",
+          "formFaceColour": "FFF1F1E9",
+          "formHousingColour": "FFE1E3DE",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF202529",
+          "formAccentColour": "FF3D7983",
+          "id": "ctrl_1789892552104",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 120,
+          "width": 150,
+          "height": 164
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.63,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE1E3DE"
+                    },
+                    "Border": {
+                      "colour": "55D3D7DE"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF4F5F7"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 3,
+                  "height": 92,
+                  "offsetX": 30
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              },
+              "kind": "line"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC7C8290"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "887C8290"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Knob_1789892552105",
+          "controlSetId": "studio-white",
+          "controlForm": "new-studio-white",
+          "formFaceColour": "FFF1F1E9",
+          "formHousingColour": "FFE1E3DE",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF202529",
+          "formAccentColour": "FF3D7983",
+          "id": "ctrl_1789892552105",
+          "controlType": "Knob"
+        },
+        "Transform": {
+          "x": 194,
+          "y": 120,
+          "width": 150,
+          "height": 164
+        },
+        "Behavior": {
+          "defaultCurrentValue": 0.35,
+          "showTicks": false,
+          "showMinMaxLabels": false,
+          "labelReadoutPlacement": "bottom"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE1E3DE"
+                    },
+                    "Border": {
+                      "colour": "55D3D7DE"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "visible": true,
+              "_children": {
+                "Layout": {
+                  "width": 77,
+                  "height": 77
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF4F5F7"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 3,
+                  "height": 92,
+                  "offsetX": 30
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              },
+              "kind": "line"
+            },
+            "pointerEnd": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMajor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC7C8290"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "887C8290"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552106",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552106",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TUNE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552107",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552107",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 194,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "CUTOFF",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789892552108",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552108",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 356,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.2,
+          "majorTickCount": 6,
+          "minorTickCount": 0,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FFE7E9E5"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC202529"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66202529"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "A",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789892552109",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552109",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 406,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.55,
+          "majorTickCount": 6,
+          "minorTickCount": 0,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FFE7E9E5"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC202529"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66202529"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "D",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789892552110",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552110",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 456,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.7,
+          "majorTickCount": 6,
+          "minorTickCount": 0,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FFE7E9E5"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC202529"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66202529"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "S",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789892552111",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552111",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 506,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.35,
+          "majorTickCount": 6,
+          "minorTickCount": 0,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FFE7E9E5"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 4
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFA9A9F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Border": {
+                      "colour": "99FFFFFF"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5B5BD6"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 16,
+                  "height": 32
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F7F7F2",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 55
+                          },
+                          {
+                            "color": "9D9D97",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF797975"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    }
+                  }
+                }
+              },
+              "kind": "console",
+              "grooveColour": "FF202529",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CC202529"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66202529"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE39A2E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF3BAF7E"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "R",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "Nunito Sans",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF7B7BEC"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FFB6B6F2"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FF3E3EC4"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF3D7983"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FF202529"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789892552112",
+          "controlSetId": "studio-white",
+          "controlForm": "new-studio-white",
+          "formFaceColour": "FFF1F1E9",
+          "formHousingColour": "FFE1E3DE",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF202529",
+          "formAccentColour": "FF3D7983",
+          "id": "ctrl_1789892552112",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 126,
+          "width": 116,
+          "height": 76
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F8FA"
+            },
+            "Border": {
+              "thickness": 0,
+              "colour": "66DFE2E8"
+            },
+            "Corners": {
+              "radius": 12
+            }
+          }
+        },
+        "Text": {
+          "content": "TRIGGER",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "ToggleButton_1789892552113",
+          "controlSetId": "studio-white",
+          "controlForm": "new-studio-white",
+          "formFaceColour": "FFF1F1E9",
+          "formHousingColour": "FFE1E3DE",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF202529",
+          "formAccentColour": "FF3D7983",
+          "id": "ctrl_1789892552113",
+          "controlType": "ToggleButton"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 126,
+          "width": 124,
+          "height": 76
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F8FA"
+            },
+            "Border": {
+              "thickness": 0,
+              "colour": "66DFE2E8"
+            },
+            "Corners": {
+              "radius": 12
+            }
+          }
+        },
+        "Text": {
+          "content": "HOLD",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        },
+        "ContentLayout": {
+          "lamp": "led",
+          "lampSize": 7,
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        },
+        "Behavior": {
+          "defaultValue": true
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983",
+                  "_removed": [
+                    "Background.Fill.colour",
+                    "Text.Fill.colour"
+                  ]
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9",
+                  "Background.Border.colour": "FFE39A2E",
+                  "Text.Fill.colour": "FF202529"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "CyclicButton_1789892552114",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552114",
+          "controlType": "CyclicButton"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 218,
+          "width": 116,
+          "height": 34
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF1F1E9",
+              "gradientEnabled": true,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "F8F8F4",
+                    "position": 0
+                  },
+                  {
+                    "color": "F1F1E9",
+                    "position": 45
+                  },
+                  {
+                    "color": "858580",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "thickness": 0,
+              "colour": "66DFE2E8"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": false,
+                  "kind": "rubber",
+                  "strength": 8,
+                  "shine": 65,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "MODE",
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "depth": 120,
+              "size": 2,
+              "softness": 1,
+              "shadowOpacity": 70
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983"
+                }
+              }
+            },
+            "Selected": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983",
+                  "Text.Fill.colour": "FF202020",
+                  "_removed": [
+                    "Background.Fill.colour"
+                  ]
+                }
+              }
+            },
+            "Mixed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFF1F1E9",
+                  "Background.Border.colour": "FFE39A2E",
+                  "Text.Fill.colour": "FF202529"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Combobox_1789892552115",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552115",
+          "controlType": "Combobox"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 218,
+          "width": 124
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF1F1E9",
+              "gradientEnabled": true,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "F8F8F4",
+                    "position": 0
+                  },
+                  {
+                    "color": "F1F1E9",
+                    "position": 45
+                  },
+                  {
+                    "color": "858580",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "thickness": 0,
+              "colour": "66DFE2E8"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": false,
+                  "kind": "rubber",
+                  "strength": 8,
+                  "shine": 65,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.7
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "depth": 120,
+              "size": 2,
+              "softness": 1,
+              "shadowOpacity": 70
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFEBEBEB"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Number_1789892552116",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552116",
+          "controlType": "Number"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 267,
+          "width": 116,
+          "height": 42
+        },
+        "Parts": {
+          "_children": {
+            "decrement": {
+              "_children": {
+                "Layout": {
+                  "y": 53,
+                  "width": 28.1,
+                  "height": 43,
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F8F8F4",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 45
+                          },
+                          {
+                            "color": "858580",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    },
+                    "Effects": {
+                      "_type": "Effects",
+                      "_children": {
+                        "Shadows": {
+                          "_type": "Shadows",
+                          "items": [
+                            {
+                              "enabled": false,
+                              "type": "drop",
+                              "offsetX": 0,
+                              "offsetY": 2,
+                              "blur": 4,
+                              "spread": 0,
+                              "colour": "66000000"
+                            }
+                          ]
+                        },
+                        "Bevel": {
+                          "_type": "Bevel",
+                          "enabled": false,
+                          "style": "outer-bevel",
+                          "depth": 100,
+                          "size": 5,
+                          "softness": 0,
+                          "angle": 135,
+                          "highlightColour": "FFFFFF",
+                          "highlightOpacity": 75,
+                          "shadowColour": "000000",
+                          "shadowOpacity": 75
+                        },
+                        "Filters": {
+                          "_type": "Filters",
+                          "blur": 0,
+                          "brightness": 100,
+                          "contrast": 100,
+                          "saturation": 100,
+                          "hueRotate": 0,
+                          "grayscale": 0,
+                          "sepia": 0,
+                          "invert": 0
+                        },
+                        "Blend": {
+                          "_type": "Blend",
+                          "mode": "normal"
+                        },
+                        "Material": {
+                          "_type": "Material",
+                          "enabled": false,
+                          "kind": "rubber",
+                          "strength": 8,
+                          "shine": 65,
+                          "grain": 100,
+                          "lampFollowsSet": true,
+                          "lampAzimuth": 225,
+                          "lampElevation": 48
+                        }
+                      }
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    }
+                  }
+                },
+                "Effects": {
+                  "Bevel": {
+                    "_type": "Bevel",
+                    "enabled": true,
+                    "style": "outer-bevel",
+                    "depth": 120,
+                    "size": 2,
+                    "softness": 1,
+                    "angle": 135,
+                    "highlightColour": "FFFFFF",
+                    "highlightOpacity": 75,
+                    "shadowColour": "000000",
+                    "shadowOpacity": 70
+                  }
+                }
+              },
+              "kind": "rect"
+            },
+            "valueField": {
+              "_children": {
+                "Layout": {
+                  "x": 34.1,
+                  "y": 4,
+                  "width": 65.9,
+                  "height": 92,
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE1E3DE",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "4F4F4E",
+                            "position": 0
+                          },
+                          {
+                            "color": "E1E3DE",
+                            "position": 35
+                          },
+                          {
+                            "color": "E5E6E2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 3
+                    },
+                    "Effects": {
+                      "_type": "Effects",
+                      "_children": {
+                        "Shadows": {
+                          "_type": "Shadows",
+                          "items": [
+                            {
+                              "enabled": false,
+                              "type": "drop",
+                              "offsetX": 0,
+                              "offsetY": 2,
+                              "blur": 4,
+                              "spread": 0,
+                              "colour": "66000000"
+                            }
+                          ]
+                        },
+                        "Bevel": {
+                          "_type": "Bevel",
+                          "enabled": false,
+                          "style": "outer-bevel",
+                          "depth": 100,
+                          "size": 5,
+                          "softness": 0,
+                          "angle": 135,
+                          "highlightColour": "FFFFFF",
+                          "highlightOpacity": 75,
+                          "shadowColour": "000000",
+                          "shadowOpacity": 75
+                        },
+                        "Filters": {
+                          "_type": "Filters",
+                          "blur": 0,
+                          "brightness": 100,
+                          "contrast": 100,
+                          "saturation": 100,
+                          "hueRotate": 0,
+                          "grayscale": 0,
+                          "sepia": 0,
+                          "invert": 0
+                        },
+                        "Blend": {
+                          "_type": "Blend",
+                          "mode": "normal"
+                        },
+                        "Material": {
+                          "_type": "Material",
+                          "enabled": false,
+                          "kind": "rubber",
+                          "strength": 8,
+                          "shine": 65,
+                          "grain": 100,
+                          "lampFollowsSet": true,
+                          "lampAzimuth": 225,
+                          "lampElevation": 48
+                        }
+                      }
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono"
+                    }
+                  }
+                },
+                "Effects": {
+                  "Bevel": {
+                    "_type": "Bevel",
+                    "enabled": true,
+                    "style": "inner-bevel",
+                    "depth": 120,
+                    "size": 2,
+                    "softness": 1,
+                    "angle": 135,
+                    "highlightColour": "FFFFFF",
+                    "highlightOpacity": 75,
+                    "shadowColour": "000000",
+                    "shadowOpacity": 70
+                  }
+                }
+              },
+              "kind": "rect"
+            },
+            "increment": {
+              "_children": {
+                "Layout": {
+                  "x": 0,
+                  "y": 4,
+                  "width": 28.1,
+                  "height": 43,
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF1F1E9",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "F8F8F4",
+                            "position": 0
+                          },
+                          {
+                            "color": "F1F1E9",
+                            "position": 45
+                          },
+                          {
+                            "color": "858580",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3D7983"
+                    },
+                    "Corners": {
+                      "radius": 6
+                    },
+                    "Effects": {
+                      "_type": "Effects",
+                      "_children": {
+                        "Shadows": {
+                          "_type": "Shadows",
+                          "items": [
+                            {
+                              "enabled": false,
+                              "type": "drop",
+                              "offsetX": 0,
+                              "offsetY": 2,
+                              "blur": 4,
+                              "spread": 0,
+                              "colour": "66000000"
+                            }
+                          ]
+                        },
+                        "Bevel": {
+                          "_type": "Bevel",
+                          "enabled": false,
+                          "style": "outer-bevel",
+                          "depth": 100,
+                          "size": 5,
+                          "softness": 0,
+                          "angle": 135,
+                          "highlightColour": "FFFFFF",
+                          "highlightOpacity": 75,
+                          "shadowColour": "000000",
+                          "shadowOpacity": 75
+                        },
+                        "Filters": {
+                          "_type": "Filters",
+                          "blur": 0,
+                          "brightness": 100,
+                          "contrast": 100,
+                          "saturation": 100,
+                          "hueRotate": 0,
+                          "grayscale": 0,
+                          "sepia": 0,
+                          "invert": 0
+                        },
+                        "Blend": {
+                          "_type": "Blend",
+                          "mode": "normal"
+                        },
+                        "Material": {
+                          "_type": "Material",
+                          "enabled": false,
+                          "kind": "rubber",
+                          "strength": 8,
+                          "shine": 65,
+                          "grain": 100,
+                          "lampFollowsSet": true,
+                          "lampAzimuth": 225,
+                          "lampElevation": 48
+                        }
+                      }
+                    }
+                  }
+                },
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF202529"
+                    }
+                  }
+                },
+                "Effects": {
+                  "Bevel": {
+                    "_type": "Bevel",
+                    "enabled": true,
+                    "style": "outer-bevel",
+                    "depth": 120,
+                    "size": 2,
+                    "softness": 1,
+                    "angle": 135,
+                    "highlightColour": "FFFFFF",
+                    "highlightOpacity": 75,
+                    "shadowColour": "000000",
+                    "shadowOpacity": 70
+                  }
+                }
+              },
+              "kind": "rect"
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FFF1F1E9"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FFF1F1E9"
+                  },
+                  "valueField": {
+                    "Background.Fill.colour": "FFFFFFFF"
+                  }
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "parts": {
+                  "decrement": {
+                    "Background.Fill.colour": "FFF1F1E9"
+                  },
+                  "increment": {
+                    "Background.Fill.colour": "FFF1F1E9"
+                  }
+                }
+              }
+            },
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Fill.colour": "FFCECEF3",
+                    "Background.Border.colour": "FF3D7983"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "valueField": {
+                    "Background.Border.colour": "FF3D7983"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "TextInput_1789892552117",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552117",
+          "controlType": "TextInput"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 267,
+          "width": 124,
+          "height": 36
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE",
+              "gradientEnabled": true,
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "4F4F4E",
+                    "position": 0
+                  },
+                  {
+                    "color": "E1E3DE",
+                    "position": 35
+                  },
+                  {
+                    "color": "E5E6E2",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "thickness": 0,
+              "colour": "66DFE2E8"
+            },
+            "Corners": {
+              "radius": 4
+            },
+            "Effects": {
+              "_type": "Effects",
+              "_children": {
+                "Shadows": {
+                  "_type": "Shadows",
+                  "items": [
+                    {
+                      "enabled": false,
+                      "type": "drop",
+                      "offsetX": 0,
+                      "offsetY": 2,
+                      "blur": 4,
+                      "spread": 0,
+                      "colour": "66000000"
+                    }
+                  ]
+                },
+                "Bevel": {
+                  "_type": "Bevel",
+                  "enabled": false,
+                  "style": "outer-bevel",
+                  "depth": 100,
+                  "size": 5,
+                  "softness": 0,
+                  "angle": 135,
+                  "highlightColour": "FFFFFF",
+                  "highlightOpacity": 75,
+                  "shadowColour": "000000",
+                  "shadowOpacity": 75
+                },
+                "Filters": {
+                  "_type": "Filters",
+                  "blur": 0,
+                  "brightness": 100,
+                  "contrast": 100,
+                  "saturation": 100,
+                  "hueRotate": 0,
+                  "grayscale": 0,
+                  "sepia": 0,
+                  "invert": 0
+                },
+                "Blend": {
+                  "_type": "Blend",
+                  "mode": "normal"
+                },
+                "Material": {
+                  "_type": "Material",
+                  "enabled": false,
+                  "kind": "rubber",
+                  "strength": 8,
+                  "shine": 65,
+                  "grain": 100,
+                  "lampFollowsSet": true,
+                  "lampAzimuth": 225,
+                  "lampElevation": 48
+                }
+              }
+            }
+          }
+        },
+        "Text": {
+          "content": "Init patch",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "style": "inner-bevel",
+              "depth": 120,
+              "size": 2,
+              "softness": 1,
+              "shadowOpacity": 70
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        },
+        "States": {
+          "_children": {
+            "Hover": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFFFFFFF"
+                }
+              }
+            },
+            "Pressed": {
+              "patches": {
+                "component": {
+                  "Background.Fill.colour": "FFEBEBEB"
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "component": {
+                  "Background.Border.colour": "FF3D7983"
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552118",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552118",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 318,
+          "width": 360,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "PADS / MODULATION",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552119",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552119",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 318,
+          "width": 300,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "OUTPUT / ROUTING",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "DrumPads_1789892552120",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552120",
+          "controlType": "DrumPads"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 356,
+          "width": 228,
+          "height": 206
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "DrumPads": {
+          "rows": 2,
+          "cols": 2,
+          "showNotes": false,
+          "showHeader": false,
+          "padForm": "physical-studio-white",
+          "padAppearance": "inset",
+          "padRadius": 4,
+          "fieldColour": "FFE1E3DE",
+          "padColour": "FFF1F1E9",
+          "accentColour": "FF3D7983",
+          "hitColour": "FF3D7983",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Envelope_1789892552121",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552121",
+          "controlType": "Envelope"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 356,
+          "width": 220,
+          "height": 70
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Envelope": {
+          "lineWidth": 3,
+          "nodeRadius": 3,
+          "lineColour": "FF3D7983",
+          "fillColour": "20000000",
+          "nodeColour": "FFF1F1E9",
+          "gridColour": "66DFE2E8",
+          "sustainColour": "FFA9A9F0",
+          "playheadColour": "FF3D7983"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Crossfader_1789892552122",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552122",
+          "controlType": "Crossfader"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 435,
+          "width": 220,
+          "height": 42
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Crossfader": {
+          "showGains": true,
+          "handleSize": 34,
+          "handleStyle": "blade",
+          "trackSize": 8,
+          "trackColour": "FFE1E3DE",
+          "fillAColour": "FF3D7983",
+          "fillBColour": "FFA9A9F0",
+          "handleColour": "FFF1F1E9",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "StepSequencer_1789892552123",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552123",
+          "controlType": "StepSequencer"
+        },
+        "Transform": {
+          "x": 284,
+          "y": 489,
+          "width": 220,
+          "height": 77
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            }
+          }
+        },
+        "StepSequencer": {
+          "cellForm": "physical-studio-white",
+          "steps": 8,
+          "trackHeaderWidth": 38,
+          "tracks": [
+            {
+              "id": "kick",
+              "label": "Kick",
+              "note": 36,
+              "channel": 10
+            },
+            {
+              "id": "hat",
+              "label": "Hat",
+              "note": 42,
+              "channel": 10
+            }
+          ],
+          "pattern": {
+            "kick:0": {
+              "on": true,
+              "velocity": 100
+            },
+            "kick:4": {
+              "on": true,
+              "velocity": 100
+            },
+            "hat:0": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:2": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:4": {
+              "on": true,
+              "velocity": 70
+            },
+            "hat:6": {
+              "on": true,
+              "velocity": 70
+            }
+          },
+          "cellColour": "FFF1F1E9",
+          "cellOnColour": "FF3D7983",
+          "playheadColour": "FF3D7983",
+          "gridColour": "66DFE2E8",
+          "labelColour": "FF202529"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Meter_1789892552124",
+          "controlSetId": "studio-white",
+          "controlForm": "new-studio-white",
+          "formFaceColour": "FFF1F1E9",
+          "formHousingColour": "FFE1E3DE",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FF202529",
+          "formAccentColour": "FF3D7983",
+          "id": "ctrl_1789892552124",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 352,
+          "width": 312,
+          "height": 92
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Meter": {
+          "value": 0.7,
+          "segments": 16,
+          "segmentGap": 3,
+          "trackColour": "FFE1E3DE",
+          "fillColour": "FF3D7983",
+          "thickness": 10,
+          "rounded": false,
+          "peakColour": "FF3D7983",
+          "showTicks": true,
+          "valuePrecision": 2
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202020"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789892552125",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552125",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 466,
+          "width": 166,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ],
+          "cellStyle": "dot",
+          "rowHeaderW": 42,
+          "cellBg": "FFE1E3DE",
+          "gridColour": "66DFE2E8",
+          "posColour": "FF3D7983",
+          "negColour": "FFA9A9F0",
+          "labelColour": "FF202020",
+          "activeColour": "FF3D7983"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789892552126",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552126",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 466,
+          "width": 124,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FFE1E3DE"
+            },
+            "Border": {
+              "thickness": 0
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Joystick": {
+          "puckRadius": 7,
+          "padColour": "FFE1E3DE",
+          "gridColour": "66DFE2E8",
+          "crosshairColour": "FF3D7983",
+          "puckColour": "FFF1F1E9",
+          "cornerColour": "FF202529",
+          "labelColour": "FF202020"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": -3,
+                  "offsetY": -3,
+                  "blur": 6,
+                  "spread": 0,
+                  "colour": "E6FFFFFF"
+                },
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 4,
+                  "offsetY": 4,
+                  "blur": 8,
+                  "spread": 0,
+                  "colour": "33000000"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789892552127",
+          "controlSetId": "studio-white",
+          "id": "ctrl_1789892552127",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 590,
+          "width": 820,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "Editable synthesizer controls — copy individual controls into your panel.",
+          "_children": {
+            "Fill": {
+              "colour": "FF202529"
+            },
+            "Font": {
+              "family": "Nunito Sans",
+              "weight": "Bold",
+              "weightValue": 700,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF3D7983",
+          "lampOffColour": "FFE1E3DE",
+          "lampBezelColour": "66DFE2E8"
+        }
+      },
+      "_type": "Control"
+    }
+  ],
+  "layers": [
+    {
+      "_type": "Layer",
+      "kind": "controls",
+      "visible": true,
+      "locked": false,
+      "name": "Main"
+    }
+  ]
+}

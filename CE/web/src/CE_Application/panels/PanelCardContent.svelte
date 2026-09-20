@@ -640,7 +640,7 @@
           {#if activeSet}{activeSet.description}{:else}This panel names a set that is not installed here; it renders with Graphite until that set is imported.{/if}
         </p>
         <div class="set-tools">
-          <button type="button" class="set-tool-btn" onclick={() => galleryOpen = true}>Browse 12 synthesizer designs…</button>
+          <button type="button" class="set-tool-btn" onclick={() => galleryOpen = true}>Browse 24 synthesizer designs…</button>
           <button type="button" class="set-tool-btn" title="Import a .ceditor-controlset.json file into your library and this panel"
                   onclick={() => setFileInput?.click()}>Import set…</button>
           <button type="button" class="set-tool-btn" disabled={!activeSet} title="Save this set as a file others can import"

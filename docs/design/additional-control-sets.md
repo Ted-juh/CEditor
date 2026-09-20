@@ -29,7 +29,7 @@ are unchanged by a cell's appearance. Edit the pattern in the existing Designer 
 ## Editing and interaction
 
 The experimental collection is retained for existing panels. The current gallery presents
-twelve synthesizer designs instead; see [Synthesizer control designs](physical-control-sets.md).
+twenty-four synthesizer designs instead; see [Synthesizer control designs](physical-control-sets.md).
 The gallery has a grayscale
 switch. Open a starter to copy its pinned controls into a panel.
 

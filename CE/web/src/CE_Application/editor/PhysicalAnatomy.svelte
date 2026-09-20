@@ -1,4 +1,5 @@
 <script>
+  import SynthExpansionAnatomy from './SynthExpansionAnatomy.svelte';
   import {PHYSICAL_DIRECTIONS} from '../models/physicalControlSets.js';
   let {design,knob,meter,toggle,p,active,face,ink,accent,housing,legend,depth,size,detail,readout,label,showValue}=$props();
   const uid=$props.id(), paint=name=>`url(#${uid}-${name})`;
@@ -20,7 +21,9 @@
   {#each Array.from({length:count+1}) as _,i}<path d={`M80 ${76-radius}v${i%2===0?5:2.5}`} transform={`rotate(${-135+i*270/count} 80 76)`} stroke={legend} stroke-opacity={modern?.45:.8} stroke-width={i%2===0?1.4:.75}/>{/each}
   {#if numbers}{#each [0,2,4,6,8,10] as n}{@const v=pt(-135+n*27,radius+12)}<text x={v[0]} y={v[1]+3} fill={legend} text-anchor="middle" font-size="7">{n}</text>{/each}{/if}
 {/snippet}
-{#if knob}
+{#if PHYSICAL_DIRECTIONS.find(d=>d.id===design)?.series===2}
+  <SynthExpansionAnatomy {design} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} {showValue}/>
+{:else if knob}
   <g transform={`translate(${80*(1-size)} ${76*(1-size)}) scale(${size})`} data-synth-profile={style}>
   {#if style==='vintage'}
     {@render scale(63,20,true)}<circle cx="80" cy="81" r="49" fill="#080b0d"/><circle cx="80" cy="76" r="49" fill={paint('edge')} stroke="#0a0c0d" stroke-width="2"/>
