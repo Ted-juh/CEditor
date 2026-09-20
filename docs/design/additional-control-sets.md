@@ -28,7 +28,9 @@ are unchanged by a cell's appearance. Edit the pattern in the existing Designer 
 
 ## Editing and interaction
 
-Use Panel properties → Control set → Browse 36 starter designs. The gallery has a grayscale
+The experimental collection is retained for existing panels. The current gallery presents
+twelve synthesizer designs instead; see [Synthesizer control designs](physical-control-sets.md).
+The gallery has a grayscale
 switch. Open a starter to copy its pinned controls into a panel.
 
 Rotary controls, keys, switches and meters expose their form under Core → Control design.

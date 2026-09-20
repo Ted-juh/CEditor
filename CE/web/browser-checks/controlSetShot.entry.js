@@ -52,7 +52,7 @@ window.__controlSetShot = {
       if (original) control._children.Core.controlForm = 'original';
     }
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
-    return { width: panel.width, height: panel.height, controls: panel.controls.length };
+    return { width: panel.width, height: panel.height, controls: panel.controls.length, faders: panel.controls.filter(c=>c._children.Core.controlType==='Slider').map(c=>c._children.Core.id) };
   },
   gallery() {
     if (mounted) unmount(mounted);

@@ -21,6 +21,34 @@ export function createControlSetStarter(setId, { materialize = true } = {}) {
   function label(title, x, y, width = 250, size = 13) {
     place('Label', x, y, width, 26, { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } }, Text: { content: title, _children: { Font: { size } } } });
   }
+  if(direction?.physical) {
+    label(set.name.toUpperCase(),26,16,650,24);
+    label(direction.title,26,48,650,12);
+    label('OSCILLATOR / FILTER',26,85,300); label('ENVELOPE',356,85,210); label('PERFORMANCE',586,85,250);
+    place('Knob',26,120,150,164,{Behavior:{defaultCurrentValue:.63}});
+    place('Knob',194,120,150,164,{Behavior:{defaultCurrentValue:.35}});
+    label('TUNE',26,280,150,11);label('CUTOFF',194,280,150,11);
+    for(const [i,title] of ['A','D','S','R'].entries()) {
+      const c=place('Slider',356+i*50,120,44,173,{Behavior:{orientation:'vertical',direction:'btt',defaultCurrentValue:[.2,.55,.7,.35][i],showMinMaxLabels:false,showValueReadout:false}});
+      c._children.Parts._children.labelTitle._children.Text.content=title;
+    }
+    place('Button',586,126,116,76,{Text:{content:'TRIGGER'}});
+    place('ToggleButton',728,126,124,76,{Text:{content:'HOLD'},Behavior:{defaultValue:true}});
+    place('CyclicButton',586,218,116,34,{Text:{content:'MODE'}});
+    place('Combobox',728,218,124,34);
+    place('Number',586,267,116,42);
+    place('TextInput',728,267,124,36,{Text:{content:'Init patch'}});
+    label('PADS / MODULATION',26,318,360);label('OUTPUT / ROUTING',540,318,300);
+    place('DrumPads',26,356,228,206,{DrumPads:{rows:2,cols:2,showHeader:false,showNotes:false}});
+    place('Envelope',284,356,220,70);
+    place('Crossfader',284,435,220,42);
+    place('StepSequencer',284,489,220,77,{StepSequencer:{steps:8,trackHeaderWidth:38,running:false,tracks:[{id:'kick',label:'Kick',note:36,channel:10},{id:'hat',label:'Hat',note:42,channel:10}],pattern:{'kick:0':{on:true,velocity:100},'kick:4':{on:true,velocity:100},'hat:0':{on:true,velocity:70},'hat:2':{on:true,velocity:70},'hat:4':{on:true,velocity:70},'hat:6':{on:true,velocity:70}}}});
+    place('Meter',540,352,312,92,{Meter:{orientation:'horizontal',value:.7,valuePrecision:2}});
+    place('Matrix',540,466,166,100,{Matrix:{rows:['LFO','ENV','VEL'],cols:['OSC','FLT','AMP'],amounts:[.6,0,-.4,0,.7,0,0,.4,.8]}});
+    place('VectorJoystick',728,466,124,100);
+    label('Editable synthesizer controls — copy individual controls into your panel.',26,590,820,12);
+    return {...createPanel(),name:`${set.name} — starter`,width:880,height:636,description:direction.detail,controls,controlSet:{id:setId},modified:true};
+  }
   label(set.name.toUpperCase(), 26, 16, 650, 24);
   label(direction?.title ?? 'Control set', 26, 48, 650, 12);
   label('TURN / SLIDE', 26, 82);

@@ -1,4 +1,4 @@
-import { lighten, darken } from './controlSetDesigns.js';
+import { lighten, darken, SLIDER_DESIGNS } from './controlSetDesigns.js';
 import { PHYSICAL_DIRECTIONS } from './physicalControlSets.js';
 // Twelve constructions. Palettes are secondary to their moving geometry and performance surfaces.
 export const ADDITIONAL_DIRECTIONS = [
@@ -18,7 +18,7 @@ export const ADDITIONAL_DIRECTIONS = [
 
 function physicalFinish(d, inset=false) {
   const colour=inset?d.panel:d.face;
-  return {'Background.Fill.gradientEnabled':true,'Background.Fill.gradient':{type:'linear',angle:180,edge:0,stops:[{color:inset?darken(colour,.65):lighten(colour,.5),position:0},{color:colour,position:inset?35:45},{color:inset?lighten(colour,.12):darken(colour,.45),position:100}]},'Background.Effects.Material.enabled':!inset,'Background.Effects.Material.kind':d.material,'Background.Effects.Material.strength':30,'Background.Effects.Material.shine':65,'Effects.Bevel.enabled':true,'Effects.Bevel.style':inset?'inner-bevel':'outer-bevel','Effects.Bevel.size':2,'Effects.Bevel.softness':1,'Effects.Bevel.depth':120,'Effects.Bevel.highlightOpacity':75,'Effects.Bevel.shadowOpacity':70};
+  return {'Background.Fill.gradientEnabled':!['flat','digital','future'].includes(d.style),'Background.Fill.gradient':{type:'linear',angle:180,edge:0,stops:[{color:inset?darken(colour,.65):lighten(colour,.5),position:0},{color:colour,position:inset?35:45},{color:inset?lighten(colour,.12):darken(colour,.45),position:100}]},'Background.Effects.Material.enabled':!inset&&['console','modular','precision'].includes(d.style),'Background.Effects.Material.kind':d.material,'Background.Effects.Material.strength':8,'Background.Effects.Material.shine':65,'Effects.Bevel.enabled':!['flat','digital','future'].includes(d.style),'Effects.Bevel.style':inset?'inner-bevel':'outer-bevel','Effects.Bevel.size':2,'Effects.Bevel.softness':1,'Effects.Bevel.depth':120,'Effects.Bevel.highlightOpacity':75,'Effects.Bevel.shadowOpacity':70};
 }
 function ink(hex) { const [r,g,b]=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)); return .2126*r+.7152*g+.0722*b>145?'FF202529':'FFF7F4EC'; }
 export function makeAdditionalControlSets(bases) {
@@ -35,8 +35,16 @@ export function makeAdditionalControlSets(bases) {
       const inset=type==='TextInput';
       families[type]={...families[type],component:{...families[type]?.component,...physicalFinish(d,inset),'Background.Fill.colour':inset?'{control.field}':'{surface}','Text.Fill.colour':ink(inset?d.panel:d.face),'Background.Corners.radius':d.radius}};
     }
+    if(d.physical) {
+      const common={slot:'0E1215',slotEdge:lighten(d.panel,.2),track:'11171B',fill:d.accent,cap:d.face,groove:ink(d.face).slice(2),tick:ink(d.panel).slice(2),plate:lighten(d.face,.15),rail:'555752',light:d.accent,lit:d.style==='future'};
+      const recipe=['precision','modular','future'].includes(d.style)?'billet':d.style==='vintage'?'vintage':['rubber','workstation'].includes(d.style)?'rubber':'fader';
+      families.Slider=SLIDER_DESIGNS[recipe](common).Slider;
+      const capWidths={vintage:14,poly:16,console:18,compact:14,modular:12,rubber:21,digital:12,precision:20,workstation:22,flat:9,glass:12,future:14};
+      for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{'Layout.width':capWidths[d.style],'Layout.height':d.style==='compact'?28:d.style==='workstation'?44:36});
+      if(['flat','glass','digital'].includes(d.style)) for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{kind:'bar',shadow:d.style!=='flat','Background.Fill.gradientEnabled':d.style==='glass','Background.Corners.radius':d.style==='glass'?4:1});
+    }
     // Physical sets supply their own restrained panel material.
-    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:true,kind:d.material,strength:35,shine:30,grain:65,lampFollowsSet:true}}:{})},families};
+    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:['console','modular','precision'].includes(d.style),kind:d.material,strength:8,shine:15,grain:40,lampFollowsSet:true}}:{})},families};
   });
 }
 
@@ -54,18 +62,18 @@ const NUMBER_LAYOUTS = [
   [[0,52,27,45],[31,18,65,64],[0,0,27,45]],
   [[0,20,28,72],[31,28,38,44],[72,5,28,72]],
   [[3,25,26,50],[33,0,34,100],[71,25,26,50]],
-  [[0,12,26,76],[30,20,40,60],[74,12,26,76]],
-  [[0,4,30,42],[34,14,62,72],[0,54,30,42]],
-  [[0,8,22,84],[26,26,48,48],[78,8,22,84]],
-  [[0,20,28,60],[32,5,36,90],[72,20,28,60]],
-  [[75,54,25,42],[0,8,68,84],[75,4,25,42]],
-  [[0,30,29,64],[33,14,34,60],[71,30,29,64]],
-  [[0,4,26,60],[30,22,40,56],[74,36,26,60]],
-  [[0,30,24,40],[28,4,44,92],[76,30,24,40]],
-  [[0,8,26,84],[30,12,40,76],[74,8,26,84]],
-  [[0,5,28,90],[32,25,36,50],[72,5,28,90]],
-  [[0,22,25,56],[29,6,42,88],[75,22,25,56]],
-  [[0,46,25,50],[29,14,42,72],[75,4,25,50]],
+  [[0,12,24,76],[28,12,44,76],[76,12,24,76]],
+  [[76,54,24,42],[0,4,70,92],[76,4,24,42]],
+  [[0,8,22,84],[26,8,48,84],[78,8,22,84]],
+  [[0,16,26,68],[30,16,40,68],[74,16,26,68]],
+  [[78,52,22,46],[0,2,72,96],[78,2,22,46]],
+  [[0,8,28,84],[32,8,36,84],[72,8,28,84]],
+  [[0,52,24,46],[30,2,70,96],[0,2,24,46]],
+  [[0,4,23,92],[27,4,46,92],[77,4,23,92]],
+  [[0,10,25,80],[29,10,42,80],[75,10,25,80]],
+  [[0,12,20,76],[25,12,50,76],[80,12,20,76]],
+  [[0,14,24,72],[28,14,44,72],[76,14,24,72]],
+  [[80,53,20,43],[0,4,74,92],[80,4,20,43]],
 ];
 export function additionalNumberFamily(id) {
   const index=ADDITIONAL_DIRECTIONS.findIndex(d=>d.id===id);

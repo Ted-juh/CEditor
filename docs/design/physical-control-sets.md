@@ -1,40 +1,40 @@
-# Twelve physical constructions
+# Synthesizer control designs
 
-The starter gallery now contains 36 design directions. The catalogue contains 54 sets,
-including the existing related finishes. These twelve add layered physical constructions:
+The default starter gallery contains twelve practical synth directions. These replace the
+previous themed hardware illustrations. All use conventional pointer knobs or encoders,
+linear faders, rectangular performance pads, compact steppers and readable switches.
 
-| Set | Main actuator | Performance surface |
-| --- | --- | --- |
-| Brassworks | Three-spoke valve wheel and sprung piston | Bolted brass drum heads |
-| Bakelite | Moulded chicken-head selector | Fluted resin caps |
-| Hi-Fi | Coaxial turned-metal dial | Bevelled receiver keys |
-| Porcelain | Ribbed ceramic selector and enamel rocker | Glazed scalloped pads |
-| Flightdeck | Twin-rail throttle and guarded switch | Chamfered instrument keys |
-| Stompbox | Ratchet dial and sprung footswitch | Recessed rubber tread pads |
-| Switchboard | Telephone finger plate and hook lever | Saucer contact pads |
-| Chronograph | Fluted watch bezel and crown pusher | Milled radial caps |
-| Cassette Deck | Exposed thumbwheel and latching transport keys | Slotted mechanical pads |
-| Diesel | Cast T-handle and bolted switch block | Heavy tread plates |
-| Gemstone | Faceted crystal dial and prism key | Diamond glass pads |
-| Leatherbound | Stitched strap dial and cushioned keys | Saddle-shaped leather pads |
+| Design | Construction |
+| --- | --- |
+| Vintage Mono | Wide skirts, cream index lines, printed numeric scales and mechanical rockers |
+| Classic Poly | Fluted knob rims, inset faces, rectangular slider grips and recessed keys |
+| Studio Console | Turned aluminium, long pointer lines, console caps and stereo VU meters |
+| Compact Analog | Small pale knobs, dark skirts, contrasting pointers and short fader caps |
+| Modular Metal | Narrow deeply ribbed knobs, calibrated scales and machined faders |
+| Performance | Broad rubber grips, wedge pointers, resilient pads and generous fader caps |
+| Digital 1986 | Low disc encoders, thin indexes, membrane keys and slim sliders |
+| Precision | Fine knurling, inset metal faces, engraved scales and milled faders |
+| Workstation | Grooved broad encoders, coloured index windows and deep fader caps |
+| Modern Flat | Matte discs, continuous value arcs, straight sliders and simple state bars |
+| Glass Signal | Restrained translucent discs, illuminated indexes and glass-edged faders |
+| Future Lab | Recessed encoders, segmented value rings and compact illuminated keys |
 
-The drawings use layered SVG housings, cast shadows, edge highlights, recessed wells,
-reflections and material detail. Knobs, keys, switches and meters have dedicated constructions;
-the remaining controls inherit compatible existing families with matching finishes. They are
-parametric renderers, not individually editable vector drawings. Core exposes form, colours,
-scale, relief and scale divisions. Original Parts remains available for the legacy renderer.
+Each example is a small synth control layout with two knobs, four vertical envelope faders,
+performance switches, pads, sequencing, modulation and output controls. These are generic
+editable controls; labels do not imply a preconfigured synthesizer or MIDI binding.
 
-Drum pad shapes and sequencer cell shapes use the same normalized outlines as their hit tests.
-The twelve physical finishes add a fixed mount and a cap that travels on press. Musical mappings,
-velocity, note identity and sequencer track/step order remain standard. Four-corner pad zones
-retain the rectangular grid so all zones remain reachable. Number steppers have twelve additional
-editable Parts arrangements with matching material, gradients and inset number windows.
+Open **Panel properties → Control set → Browse 12 synthesizer designs**. Copy individual
+controls between panels to combine sets. Core exposes form, colours, size and depth; faders
+and number steppers expose their Parts. The old experimental collections are no longer
+offered in the starter gallery. Their saved documents remain readable. The revised twelve
+keep their internal IDs so pinned references still resolve, while exported set filenames use
+the new display names. The full catalogue retains 54 definitions for compatibility.
 
-Open **Panel properties → Control set → Browse 36 starter designs**, select a set and create
-its starter. Each contains ordinary controls with portable design pins. Individual controls can
-be copied into another panel, and saved starters are in `CE/panels/Control set starters`.
+Pad drawing and hit tests share one rounded-rectangle outline. Pressed pads travel within
+their mounts. Four-corner zones preserve their standard grid, and note identity, velocity,
+sequence order and keyboard access retain the existing behaviour. Knob construction is
+parametric SVG, not an independently editable vector drawing.
 
-Validation covers all 36 starters in the real browser renderer: keyboard values, button presses,
-toggle state, fader drag, moved number steppers, pad press/release, empty corners, sequencer
-pattern retention, gallery selection, save/load and copying across sets. Screenshots are also
-reviewed in colour and grayscale. Native and template-player builds use the same web assets.
+Validation includes save/load, copying and pinning, all 36 historical/revised starter
+definitions, the twelve-choice gallery, each of the four vertical faders, knob values,
+button and toggle state, number steppers, pad press/release and empty-corner hits.

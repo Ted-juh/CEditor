@@ -4,41 +4,41 @@
   "exportedAt": "2026-09-18T00:00:00.000Z",
   "metadata": {
     "id": "gemstone",
-    "name": "Gemstone",
-    "description": "Faceted crystal dial, prismatic keys, refracting column and diamond glass pads.",
+    "name": "Glass Signal",
+    "description": "Restrained translucent dials, illuminated index lines, glass-edged faders and quiet backlighting.",
     "version": "1.0.0",
     "author": "CEditor",
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "b599abab",
+  "fingerprint": "8d63b394",
   "set": {
     "id": "gemstone",
-    "name": "Gemstone",
-    "description": "Faceted crystal dial, prismatic keys, refracting column and diamond glass pads.",
+    "name": "Glass Signal",
+    "description": "Restrained translucent dials, illuminated index lines, glass-edged faders and quiet backlighting.",
     "tokens": {
-      "surface": "FFA9DCD8",
-      "surface.hover": "FFA9DCD8",
-      "surface.pressed": "FFA9DCD8",
-      "surface.checked": "FFA9DCD8",
-      "surface.mixed": "FFA9DCD8",
-      "control.button": "FFA9DCD8",
-      "control.button.hover": "FFA9DCD8",
-      "control.button.pressed": "FFA9DCD8",
-      "control.field": "FF1D303D",
+      "surface": "FF76949F",
+      "surface.hover": "FF76949F",
+      "surface.pressed": "FF76949F",
+      "surface.checked": "FF76949F",
+      "surface.mixed": "FF76949F",
+      "control.button": "FF76949F",
+      "control.button.hover": "FF76949F",
+      "control.button.pressed": "FF76949F",
+      "control.field": "FF1E2A35",
       "control.field.hover": "44FFFFFF",
       "control.field.active": "55FFFFFF",
       "control.select": "38FFFFFF",
       "control.select.hover": "55FFFFFF",
       "control.select.pressed": "22FFFFFF",
-      "control.track": "FF1D303D",
+      "control.track": "FF1E2A35",
       "control.track.edge": "55FFFFFF",
-      "control.fill": "FFF0BCBD",
+      "control.fill": "FFB5D9E1",
       "control.fill.hot": "FFFFFFFF",
       "control.range": "FFFFB6E6",
       "control.range.hot": "FFFFC1EA",
       "control.body": "FFFFFFFF",
-      "control.cap": "FFA9DCD8",
+      "control.cap": "FF76949F",
       "control.cap.hot": "FFFFFFFF",
       "control.cap.edge": "99FFFFFF",
       "control.cap.start": "FFFFE27A",
@@ -46,13 +46,13 @@
       "control.marker": "FFFFFFFF",
       "control.tick": "CCFFFFFF",
       "control.tick.minor": "88FFFFFF",
-      "accent": "FFF0BCBD",
-      "accent.hot": "FFF0BCBD",
+      "accent": "FFB5D9E1",
+      "accent.hot": "FFB5D9E1",
       "text.primary": "FFF7F4EC",
       "text.label": "FFF7F4EC",
       "text.muted": "FFF7F4EC",
       "text.focus": "FFF7F4EC",
-      "text.inverse": "FF202529",
+      "text.inverse": "FFF7F4EC",
       "border": "88FFFFFF",
       "border.surface": "AAFFFFFF",
       "border.field": "88FFFFFF",
@@ -74,7 +74,7 @@
           "Behavior.showTicks": false,
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -126,7 +126,7 @@
           ],
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -153,7 +153,7 @@
           ],
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -199,7 +199,7 @@
           },
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -208,7 +208,7 @@
       },
       "Combobox": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Text.Fill.colour": "FFF2F2F2",
           "Background.Fill.colour": "{surface}",
@@ -231,22 +231,22 @@
             "edge": 0,
             "stops": [
               {
-                "color": "D4EEEC",
+                "color": "BBCACF",
                 "position": 0
               },
               {
-                "color": "A9DCD8",
+                "color": "76949F",
                 "position": 45
               },
               {
-                "color": "5D7977",
+                "color": "415157",
                 "position": 100
               }
             ]
           },
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "glass",
-          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.enabled": false,
+          "Background.Effects.Material.kind": "rubber",
+          "Background.Effects.Material.strength": 8,
           "Background.Effects.Material.shine": 65,
           "Effects.Bevel.enabled": true,
           "Effects.Bevel.style": "outer-bevel",
@@ -267,22 +267,22 @@
               "edge": 0,
               "stops": [
                 {
-                  "color": "D4EEEC",
+                  "color": "BBCACF",
                   "position": 0
                 },
                 {
-                  "color": "A9DCD8",
+                  "color": "76949F",
                   "position": 45
                 },
                 {
-                  "color": "5D7977",
+                  "color": "415157",
                   "position": 100
                 }
               ]
             },
-            "Background.Effects.Material.enabled": true,
-            "Background.Effects.Material.kind": "glass",
-            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.enabled": false,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 8,
             "Background.Effects.Material.shine": 65,
             "Effects.Bevel.enabled": true,
             "Effects.Bevel.style": "outer-bevel",
@@ -293,9 +293,9 @@
             "Effects.Bevel.shadowOpacity": 70,
             "kind": "rect",
             "Layout.x": 0,
-            "Layout.y": 22,
-            "Layout.width": 25,
-            "Layout.height": 56,
+            "Layout.y": 14,
+            "Layout.width": 24,
+            "Layout.height": 72,
             "Layout.xUnit": "percent",
             "Layout.yUnit": "percent",
             "Layout.widthUnit": "percent",
@@ -307,7 +307,7 @@
             "Background.Border.enabled": true,
             "Background.Border.thickness": 1,
             "Background.Border.colour": "{accent}",
-            "Text.Fill.colour": "FF202529"
+            "Text.Fill.colour": "FFF7F4EC"
           },
           "valueField": {
             "Background.Fill.gradientEnabled": true,
@@ -317,22 +317,22 @@
               "edge": 0,
               "stops": [
                 {
-                  "color": "0A1115",
+                  "color": "0B0F13",
                   "position": 0
                 },
                 {
-                  "color": "1D303D",
+                  "color": "1E2A35",
                   "position": 35
                 },
                 {
-                  "color": "384954",
+                  "color": "39444D",
                   "position": 100
                 }
               ]
             },
             "Background.Effects.Material.enabled": false,
-            "Background.Effects.Material.kind": "glass",
-            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 8,
             "Background.Effects.Material.shine": 65,
             "Effects.Bevel.enabled": true,
             "Effects.Bevel.style": "inner-bevel",
@@ -342,10 +342,10 @@
             "Effects.Bevel.highlightOpacity": 75,
             "Effects.Bevel.shadowOpacity": 70,
             "kind": "rect",
-            "Layout.x": 29,
-            "Layout.y": 6,
-            "Layout.width": 42,
-            "Layout.height": 88,
+            "Layout.x": 28,
+            "Layout.y": 14,
+            "Layout.width": 44,
+            "Layout.height": 72,
             "Layout.xUnit": "percent",
             "Layout.yUnit": "percent",
             "Layout.widthUnit": "percent",
@@ -367,22 +367,22 @@
               "edge": 0,
               "stops": [
                 {
-                  "color": "D4EEEC",
+                  "color": "BBCACF",
                   "position": 0
                 },
                 {
-                  "color": "A9DCD8",
+                  "color": "76949F",
                   "position": 45
                 },
                 {
-                  "color": "5D7977",
+                  "color": "415157",
                   "position": 100
                 }
               ]
             },
-            "Background.Effects.Material.enabled": true,
-            "Background.Effects.Material.kind": "glass",
-            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.enabled": false,
+            "Background.Effects.Material.kind": "rubber",
+            "Background.Effects.Material.strength": 8,
             "Background.Effects.Material.shine": 65,
             "Effects.Bevel.enabled": true,
             "Effects.Bevel.style": "outer-bevel",
@@ -392,10 +392,10 @@
             "Effects.Bevel.highlightOpacity": 75,
             "Effects.Bevel.shadowOpacity": 70,
             "kind": "rect",
-            "Layout.x": 75,
-            "Layout.y": 22,
-            "Layout.width": 25,
-            "Layout.height": 56,
+            "Layout.x": 76,
+            "Layout.y": 14,
+            "Layout.width": 24,
+            "Layout.height": 72,
             "Layout.xUnit": "percent",
             "Layout.yUnit": "percent",
             "Layout.widthUnit": "percent",
@@ -407,7 +407,7 @@
             "Background.Border.enabled": true,
             "Background.Border.thickness": 1,
             "Background.Border.colour": "{accent}",
-            "Text.Fill.colour": "FF202529"
+            "Text.Fill.colour": "FFF7F4EC"
           }
         }
       },
@@ -432,44 +432,129 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelTitlePlacement": "topLeft",
           "Behavior.labelReadoutPlacement": "topRight",
-          "Behavior.showTicks": false
+          "Behavior.showTicks": true,
+          "Behavior.majorTickCount": 11,
+          "Behavior.minorTickCount": 1,
+          "Behavior.majorTickLength": 5,
+          "Behavior.tickPlacement": "outside"
         },
         "parts": {
+          "tickMajor": {
+            "Layout.width": 1,
+            "Layout.height": 5,
+            "Background.Fill.colour": "CCF7F4EC"
+          },
+          "tickMinor": {
+            "Background.Fill.colour": "66F7F4EC"
+          },
           "pointerCurrent": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 36,
+            "grooveColour": "FFF7F4EC",
             "shadow": true,
-            "Background.Fill.colour": "E6FFFFFF",
-            "Background.Border.colour": "FFFFE27A",
-            "Background.Border.thickness": 2
+            "Background.Fill.colour": "FF76949F",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "ADBFC5",
+                  "position": 0
+                },
+                {
+                  "color": "76949F",
+                  "position": 55
+                },
+                {
+                  "color": "4D6067",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF3B4A50",
+            "Background.Border.thickness": 1,
+            "Background.Corners.radius": 4
           },
           "pointerStart": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 36,
+            "grooveColour": "FFF7F4EC",
             "shadow": true,
             "Background.Fill.colour": "{control.cap.start}",
-            "Background.Border.colour": "FFFFE27A",
-            "Background.Border.thickness": 2
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "ADBFC5",
+                  "position": 0
+                },
+                {
+                  "color": "76949F",
+                  "position": 55
+                },
+                {
+                  "color": "4D6067",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF3B4A50",
+            "Background.Border.thickness": 1,
+            "Background.Corners.radius": 4
           },
           "pointerEnd": {
-            "Layout.width": 20,
-            "Layout.height": 20,
+            "kind": "bar",
+            "Layout.width": 12,
+            "Layout.height": 36,
+            "grooveColour": "FFF7F4EC",
             "shadow": true,
             "Background.Fill.colour": "{control.cap.end}",
-            "Background.Border.colour": "FFFFE27A",
-            "Background.Border.thickness": 2
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 180,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "ADBFC5",
+                  "position": 0
+                },
+                {
+                  "color": "76949F",
+                  "position": 55
+                },
+                {
+                  "color": "4D6067",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF3B4A50",
+            "Background.Border.thickness": 1,
+            "Background.Corners.radius": 4
           },
           "bodyTrackBase": {
-            "Layout.height": 8,
-            "Background.Corners.radius": 999,
-            "Background.Fill.colour": "55FFFFFF",
-            "Background.Border.colour": "88FFFFFF",
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "slot": true,
+            "Background.Fill.colour": "FF0E1215",
+            "Background.Border.colour": "FF4B555D",
             "Background.Border.thickness": 1
           },
           "bodyTrackFill": {
-            "Layout.height": 8,
-            "Background.Corners.radius": 999,
-            "Background.Fill.colour": "FFFFE27A"
+            "Layout.height": 6,
+            "Background.Corners.radius": 1,
+            "Background.Fill.colour": "FFB5D9E1"
           }
         }
       },
@@ -480,7 +565,7 @@
       },
       "TextInput": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -504,22 +589,22 @@
             "edge": 0,
             "stops": [
               {
-                "color": "0A1115",
+                "color": "0B0F13",
                 "position": 0
               },
               {
-                "color": "1D303D",
+                "color": "1E2A35",
                 "position": 35
               },
               {
-                "color": "384954",
+                "color": "39444D",
                 "position": 100
               }
             ]
           },
           "Background.Effects.Material.enabled": false,
-          "Background.Effects.Material.kind": "glass",
-          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.kind": "rubber",
+          "Background.Effects.Material.strength": 8,
           "Background.Effects.Material.shine": 65,
           "Effects.Bevel.enabled": true,
           "Effects.Bevel.style": "inner-bevel",
@@ -532,7 +617,7 @@
       },
       "CyclicButton": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Text.Fill.colour": "FFF2F2F2",
           "Background.Fill.colour": "{surface}",
@@ -555,22 +640,22 @@
             "edge": 0,
             "stops": [
               {
-                "color": "D4EEEC",
+                "color": "BBCACF",
                 "position": 0
               },
               {
-                "color": "A9DCD8",
+                "color": "76949F",
                 "position": 45
               },
               {
-                "color": "5D7977",
+                "color": "415157",
                 "position": 100
               }
             ]
           },
-          "Background.Effects.Material.enabled": true,
-          "Background.Effects.Material.kind": "glass",
-          "Background.Effects.Material.strength": 30,
+          "Background.Effects.Material.enabled": false,
+          "Background.Effects.Material.kind": "rubber",
+          "Background.Effects.Material.strength": 8,
           "Background.Effects.Material.shine": 65,
           "Effects.Bevel.enabled": true,
           "Effects.Bevel.style": "outer-bevel",
@@ -618,7 +703,7 @@
           ],
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -645,7 +730,7 @@
           ],
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -711,13 +796,13 @@
           "Listbox.cardRows": false,
           "Listbox.rowHeight": 24,
           "Listbox.selectionStyle": "bar",
-          "Listbox.zebra": false,
+          "Listbox.zebra": true,
           "Listbox.accentColour": "{accent}"
         }
       },
       "Group": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -739,7 +824,7 @@
       },
       "Container": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -761,7 +846,7 @@
       },
       "TabContainer": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -790,7 +875,7 @@
       },
       "ScrollArea": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -815,7 +900,7 @@
       },
       "Meter": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -835,15 +920,15 @@
           "Text.Font.family": "Space Grotesk",
           "Meter.segments": 16,
           "Meter.segmentGap": 3,
-          "Meter.rounded": true,
-          "Meter.thickness": 16,
+          "Meter.rounded": false,
+          "Meter.thickness": 10,
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
           "Meter.peakColour": "{accent.hot}",
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -852,7 +937,7 @@
       },
       "ProgressBar": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -872,15 +957,15 @@
           "Text.Font.family": "Space Grotesk",
           "Meter.segments": 16,
           "Meter.segmentGap": 3,
-          "Meter.rounded": true,
-          "Meter.thickness": 16,
+          "Meter.rounded": false,
+          "Meter.thickness": 10,
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
           "Meter.peakColour": "{accent.hot}",
           "Core.controlForm": "new-gemstone",
           "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
+          "Core.formInkColour": "FFF2F2F2",
           "Core.formLabelColour": "{text.primary}",
           "Core.formAccentColour": "{accent}",
           "Core.formHousingColour": "{control.track}",
@@ -889,7 +974,7 @@
       },
       "Ribbon": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -920,7 +1005,7 @@
       },
       "PitchWheel": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -951,7 +1036,7 @@
       },
       "ModWheel": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -982,7 +1067,7 @@
       },
       "Crossfader": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -1000,10 +1085,10 @@
           "Background.Fill.gradientEnabled": false,
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Space Grotesk",
-          "Crossfader.handleStyle": "block",
+          "Crossfader.handleStyle": "blade",
           "Crossfader.trackSize": 8,
-          "Crossfader.handleSize": 22,
-          "Crossfader.showGains": false,
+          "Crossfader.handleSize": 34,
+          "Crossfader.showGains": true,
           "Crossfader.trackColour": "{control.track}",
           "Crossfader.fillAColour": "{control.fill}",
           "Crossfader.fillBColour": "{control.range}",
@@ -1013,7 +1098,7 @@
       },
       "DrumPads": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -1031,13 +1116,13 @@
           "Background.Fill.gradientEnabled": false,
           "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Space Grotesk",
-          "DrumPads.padAppearance": "raised",
-          "DrumPads.padRadius": 7,
+          "DrumPads.padAppearance": "inset",
+          "DrumPads.padRadius": 4,
           "DrumPads.fieldColour": "{control.field}",
           "DrumPads.padColour": "{surface}",
           "DrumPads.accentColour": "{accent}",
           "DrumPads.hitColour": "{accent.hot}",
-          "DrumPads.labelColour": "FF202020",
+          "DrumPads.labelColour": "FFF2F2F2",
           "DrumPads.padForm": "physical-gemstone",
           "DrumPads.padLayout": "grid"
         }
@@ -1073,7 +1158,7 @@
       },
       "Matrix": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -1103,7 +1188,7 @@
       },
       "Envelope": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -1132,7 +1217,7 @@
       },
       "VectorJoystick": {
         "component": {
-          "Background.Corners.radius": 7,
+          "Background.Corners.radius": 4,
           "Background.Border.thickness": 1,
           "Background.Fill.colour": "{control.field}",
           "Background.Border.colour": "AAFFFFFF",
@@ -1163,6 +1248,8 @@
       },
       "StepSequencer": {
         "component": {
+          "Background.Fill.colour": "{control.field}",
+          "Background.Fill.gradientEnabled": false,
           "StepSequencer.cellForm": "physical-gemstone",
           "StepSequencer.cellColour": "{surface}",
           "StepSequencer.cellOnColour": "{accent}",
@@ -1173,13 +1260,13 @@
       }
     },
     "panel": {
-      "colour": "FF1D303D",
+      "colour": "FF1E2A35",
       "material": {
-        "enabled": true,
-        "kind": "glass",
-        "strength": 35,
-        "shine": 30,
-        "grain": 65,
+        "enabled": false,
+        "kind": "rubber",
+        "strength": 8,
+        "shine": 15,
+        "grain": 40,
         "lampFollowsSet": true
       }
     },

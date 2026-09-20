@@ -11,11 +11,11 @@
     "exportLv2": false,
     "restoreHardware": "ask"
   },
-  "name": "Switchboard — starter",
+  "name": "Digital 1986 — starter",
   "scriptId": "panel_31",
   "author": "",
   "version": "1.0.0",
-  "description": "Rotary finger plate, hook levers, moving flag gauge and saucer contact pads.",
+  "description": "Low disc encoders, fine index marks, slim faders and rectangular membrane keys.",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -126,10 +126,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789884551180.value",
-      "label": "Knob_1789884551180",
-      "controlName": "Knob_1789884551180",
-      "path": "Knob_1789884551180.value",
+      "id": "Knob_1789891718648.value",
+      "label": "Knob_1789891718648",
+      "controlName": "Knob_1789891718648",
+      "path": "Knob_1789891718648.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +140,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789884551181.value",
-      "label": "Knob_1789884551181",
-      "controlName": "Knob_1789884551181",
-      "path": "Knob_1789884551181.value",
+      "id": "Knob_1789891718649.value",
+      "label": "Knob_1789891718649",
+      "controlName": "Knob_1789891718649",
+      "path": "Knob_1789891718649.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,13 +154,13 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789884551182.value",
-      "label": "Slider_1789884551182",
-      "controlName": "Slider_1789884551182",
-      "path": "Slider_1789884551182.value",
+      "id": "Slider_1789891718652.value",
+      "label": "Slider_1789891718652",
+      "controlName": "Slider_1789891718652",
+      "path": "Slider_1789891718652.value",
       "min": 0,
       "max": 1,
-      "defaultValue": 0.66,
+      "defaultValue": 0.2,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
@@ -168,26 +168,52 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789884551183.value",
-      "label": "Crossfader_1789884551183",
-      "controlName": "Crossfader_1789884551183",
-      "path": "Crossfader_1789884551183.value",
+      "id": "Slider_1789891718653.value",
+      "label": "Slider_1789891718653",
+      "controlName": "Slider_1789891718653",
+      "path": "Slider_1789891718653.value",
       "min": 0,
       "max": 1,
-      "defaultValue": 0.5,
+      "defaultValue": 0.55,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "section": "Crossfader",
-      "field": "mix",
       "deviceRole": "",
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789884551185.value",
-      "label": "ToggleButton_1789884551185",
-      "controlName": "ToggleButton_1789884551185",
-      "path": "ToggleButton_1789884551185.value",
+      "id": "Slider_1789891718654.value",
+      "label": "Slider_1789891718654",
+      "controlName": "Slider_1789891718654",
+      "path": "Slider_1789891718654.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.7,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789891718655.value",
+      "label": "Slider_1789891718655",
+      "controlName": "Slider_1789891718655",
+      "path": "Slider_1789891718655.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789891718657.value",
+      "label": "ToggleButton_1789891718657",
+      "controlName": "ToggleButton_1789891718657",
+      "path": "ToggleButton_1789891718657.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +224,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789884551186.value",
-      "label": "CyclicButton_1789884551186",
-      "controlName": "CyclicButton_1789884551186",
-      "path": "CyclicButton_1789884551186.value",
+      "id": "CyclicButton_1789891718658.value",
+      "label": "CyclicButton_1789891718658",
+      "controlName": "CyclicButton_1789891718658",
+      "path": "CyclicButton_1789891718658.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +243,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789884551187.value",
-      "label": "Combobox_1789884551187",
-      "controlName": "Combobox_1789884551187",
-      "path": "Combobox_1789884551187.value",
+      "id": "Combobox_1789891718659.value",
+      "label": "Combobox_1789891718659",
+      "controlName": "Combobox_1789891718659",
+      "path": "Combobox_1789891718659.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +262,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789884551188.value",
-      "label": "Number_1789884551188",
-      "controlName": "Number_1789884551188",
-      "path": "Number_1789884551188.value",
+      "id": "Number_1789891718660.value",
+      "label": "Number_1789891718660",
+      "controlName": "Number_1789891718660",
+      "path": "Number_1789891718660.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,58 +276,26 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789884551194.value",
-      "label": "Ribbon_1789884551194",
-      "controlName": "Ribbon_1789884551194",
-      "path": "Ribbon_1789884551194.value",
+      "id": "Crossfader_1789891718666.value",
+      "label": "Crossfader_1789891718666",
+      "controlName": "Crossfader_1789891718666",
+      "path": "Crossfader_1789891718666.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "section": "Ribbon",
-      "field": "value",
+      "section": "Crossfader",
+      "field": "mix",
       "deviceRole": "",
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789884551197.x",
-      "label": "VectorJoystick_1789884551197 X",
-      "controlName": "VectorJoystick_1789884551197",
-      "path": "VectorJoystick_1789884551197.x",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
-      "unit": "",
-      "midiCC": null,
-      "valueKind": "float",
-      "section": "Joystick",
-      "field": "x",
-      "deviceRole": "",
-      "deviceParameterId": ""
-    },
-    {
-      "id": "VectorJoystick_1789884551197.y",
-      "label": "VectorJoystick_1789884551197 Y",
-      "controlName": "VectorJoystick_1789884551197",
-      "path": "VectorJoystick_1789884551197.y",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
-      "unit": "",
-      "midiCC": null,
-      "valueKind": "float",
-      "section": "Joystick",
-      "field": "y",
-      "deviceRole": "",
-      "deviceParameterId": ""
-    },
-    {
-      "id": "StepSequencer_1789884551198.bpm",
-      "label": "StepSequencer_1789884551198 Tempo",
-      "controlName": "StepSequencer_1789884551198",
-      "path": "StepSequencer_1789884551198.bpm",
+      "id": "StepSequencer_1789891718667.bpm",
+      "label": "StepSequencer_1789891718667 Tempo",
+      "controlName": "StepSequencer_1789891718667",
+      "path": "StepSequencer_1789891718667.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -314,10 +308,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789884551198.run",
-      "label": "StepSequencer_1789884551198 Run",
-      "controlName": "StepSequencer_1789884551198",
-      "path": "StepSequencer_1789884551198.run",
+      "id": "StepSequencer_1789891718667.run",
+      "label": "StepSequencer_1789891718667 Run",
+      "controlName": "StepSequencer_1789891718667",
+      "path": "StepSequencer_1789891718667.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -326,6 +320,38 @@
       "valueKind": "bool",
       "section": "StepSequencer",
       "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789891718670.x",
+      "label": "VectorJoystick_1789891718670 X",
+      "controlName": "VectorJoystick_1789891718670",
+      "path": "VectorJoystick_1789891718670.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789891718670.y",
+      "label": "VectorJoystick_1789891718670 Y",
+      "controlName": "VectorJoystick_1789891718670",
+      "path": "VectorJoystick_1789891718670.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
       "deviceRole": "",
       "deviceParameterId": ""
     }
@@ -343,9 +369,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551176",
+          "name": "Label_1789891718643",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551176",
+          "id": "ctrl_1789891718643",
           "controlType": "Label"
         },
         "Transform": {
@@ -366,24 +392,24 @@
           }
         },
         "Text": {
-          "content": "SWITCHBOARD",
+          "content": "DIGITAL 1986",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "size": 24,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -391,9 +417,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551177",
+          "name": "Label_1789891718644",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551177",
+          "id": "ctrl_1789891718644",
           "controlType": "Label"
         },
         "Transform": {
@@ -414,23 +440,23 @@
           }
         },
         "Text": {
-          "content": "Telephone / finger plate",
+          "content": "1980s / digital",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -438,15 +464,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551178",
+          "name": "Label_1789891718645",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551178",
+          "id": "ctrl_1789891718645",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 82,
-          "width": 250,
+          "y": 85,
+          "width": 300,
           "height": 26
         },
         "Background": {
@@ -461,24 +487,24 @@
           }
         },
         "Text": {
-          "content": "TURN / SLIDE",
+          "content": "OSCILLATOR / FILTER",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "size": 13,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -486,14 +512,62 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551179",
+          "name": "Label_1789891718646",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551179",
+          "id": "ctrl_1789891718646",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 580,
-          "y": 82,
+          "x": 356,
+          "y": 85,
+          "width": 210,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "ENVELOPE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718647",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718647",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 85,
           "width": 250,
           "height": 26
         },
@@ -509,24 +583,24 @@
           }
         },
         "Text": {
-          "content": "PRESS / SELECT",
+          "content": "PERFORMANCE",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "size": 13,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -534,22 +608,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789884551180",
+          "name": "Knob_1789891718648",
           "controlSetId": "switchboard",
           "controlForm": "new-switchboard",
-          "formFaceColour": "FFC3B599",
-          "formHousingColour": "FF28262B",
-          "formInkColour": "FF202020",
+          "formFaceColour": "FF505966",
+          "formHousingColour": "FF232932",
+          "formInkColour": "FFF2F2F2",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFDDA06A",
-          "id": "ctrl_1789884551180",
+          "formAccentColour": "FF8CBDAC",
+          "id": "ctrl_1789891718648",
           "controlType": "Knob"
         },
         "Transform": {
           "x": 26,
-          "y": 112,
-          "width": 190,
-          "height": 190
+          "y": 120,
+          "width": 150,
+          "height": 164
         },
         "Behavior": {
           "defaultCurrentValue": 0.63,
@@ -563,15 +637,15 @@
             "bodyTrackBase": {
               "_children": {
                 "Layout": {
-                  "height": 8
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF28262B"
+                      "colour": "FF232932"
                     },
                     "Border": {
-                      "colour": "AA5A3F10"
+                      "colour": "552C312C"
                     }
                   }
                 }
@@ -580,12 +654,12 @@
             "bodyTrackFill": {
               "_children": {
                 "Layout": {
-                  "height": 8
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFDDA06A"
+                      "colour": "FF8CBDAC"
                     }
                   }
                 }
@@ -596,7 +670,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFE2B24A"
+                      "colour": "FF1FA35A"
                     }
                   }
                 }
@@ -606,75 +680,16 @@
               "visible": true,
               "_children": {
                 "Layout": {
-                  "width": 74,
-                  "height": 74
+                  "width": 62,
+                  "height": 62
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF39FF7A"
                     },
                     "Border": {
-                      "thickness": 2,
-                      "colour": "CC6B5A34"
-                    },
-                    "Effects": {
-                      "_type": "Effects",
-                      "_children": {
-                        "Shadows": {
-                          "_type": "Shadows",
-                          "items": [
-                            {
-                              "enabled": false,
-                              "type": "drop",
-                              "offsetX": 0,
-                              "offsetY": 2,
-                              "blur": 4,
-                              "spread": 0,
-                              "colour": "66000000"
-                            }
-                          ]
-                        },
-                        "Bevel": {
-                          "_type": "Bevel",
-                          "enabled": false,
-                          "style": "outer-bevel",
-                          "depth": 100,
-                          "size": 5,
-                          "softness": 0,
-                          "angle": 135,
-                          "highlightColour": "FFFFFF",
-                          "highlightOpacity": 75,
-                          "shadowColour": "000000",
-                          "shadowOpacity": 75
-                        },
-                        "Filters": {
-                          "_type": "Filters",
-                          "blur": 0,
-                          "brightness": 100,
-                          "contrast": 100,
-                          "saturation": 100,
-                          "hueRotate": 0,
-                          "grayscale": 0,
-                          "sepia": 0,
-                          "invert": 0
-                        },
-                        "Blend": {
-                          "_type": "Blend",
-                          "mode": "normal"
-                        },
-                        "Material": {
-                          "_type": "Material",
-                          "enabled": true,
-                          "kind": "glass",
-                          "strength": 60,
-                          "shine": 45,
-                          "grain": 100,
-                          "lampFollowsSet": true,
-                          "lampAzimuth": 225,
-                          "lampElevation": 48
-                        }
-                      }
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -685,7 +700,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF1C1A17"
+                      "colour": "FF5A6A5A"
                     }
                   }
                 }
@@ -696,10 +711,10 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B"
+                      "colour": "FFFFB020"
                     },
                     "Border": {
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -708,32 +723,32 @@
             "pointerCurrent": {
               "_children": {
                 "Layout": {
-                  "width": 9,
-                  "height": 118
+                  "width": 26,
+                  "height": 66
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF1C1A17"
+                      "colour": "FF5A6A5A"
                     },
                     "Border": {
                       "enabled": false,
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
               },
-              "kind": "chicken"
+              "kind": "capdot"
             },
             "pointerEnd": {
               "_children": {
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C"
+                      "colour": "FF39FF7A"
                     },
                     "Border": {
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -748,22 +763,24 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFEFE3C8"
+                      "colour": "CC5A6A5A"
                     }
                   }
                 }
-              }
+              },
+              "kind": "dot"
             },
             "tickMinor": {
               "_children": {
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "99EFE3C8"
+                      "colour": "885A6A5A"
                     }
                   }
                 }
-              }
+              },
+              "kind": "dot"
             },
             "labelMin": {
               "_children": {
@@ -773,7 +790,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -788,7 +805,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -800,10 +817,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B"
+                      "colour": "FFFFB020"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -815,10 +832,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF505966"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -830,10 +847,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C"
+                      "colour": "FF39FF7A"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -848,7 +865,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -863,7 +880,9 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
                       "letterSpacing": 0.9
                     }
                   }
@@ -878,7 +897,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -893,13 +912,13 @@
               "patches": {
                 "parts": {
                   "bodyTrackFill": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FFB8FFD2"
                   },
                   "bodySelectedRange": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FF41B173"
                   },
                   "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFF6E2"
+                    "Background.Fill.colour": "FFB8FFD2"
                   }
                 }
               }
@@ -908,7 +927,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFDDA06A"
+                    "Background.Border.colour": "FF8CBDAC"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -924,22 +943,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789884551181",
+          "name": "Knob_1789891718649",
           "controlSetId": "switchboard",
           "controlForm": "new-switchboard",
-          "formFaceColour": "FFC3B599",
-          "formHousingColour": "FF28262B",
-          "formInkColour": "FF202020",
+          "formFaceColour": "FF505966",
+          "formHousingColour": "FF232932",
+          "formInkColour": "FFF2F2F2",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFDDA06A",
-          "id": "ctrl_1789884551181",
+          "formAccentColour": "FF8CBDAC",
+          "id": "ctrl_1789891718649",
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 220,
-          "y": 125,
-          "width": 128,
-          "height": 158
+          "x": 194,
+          "y": 120,
+          "width": 150,
+          "height": 164
         },
         "Behavior": {
           "defaultCurrentValue": 0.35,
@@ -953,15 +972,15 @@
             "bodyTrackBase": {
               "_children": {
                 "Layout": {
-                  "height": 8
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF28262B"
+                      "colour": "FF232932"
                     },
                     "Border": {
-                      "colour": "AA5A3F10"
+                      "colour": "552C312C"
                     }
                   }
                 }
@@ -970,12 +989,12 @@
             "bodyTrackFill": {
               "_children": {
                 "Layout": {
-                  "height": 8
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFDDA06A"
+                      "colour": "FF8CBDAC"
                     }
                   }
                 }
@@ -986,7 +1005,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFE2B24A"
+                      "colour": "FF1FA35A"
                     }
                   }
                 }
@@ -996,75 +1015,16 @@
               "visible": true,
               "_children": {
                 "Layout": {
-                  "width": 74,
-                  "height": 74
+                  "width": 62,
+                  "height": 62
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF39FF7A"
                     },
                     "Border": {
-                      "thickness": 2,
-                      "colour": "CC6B5A34"
-                    },
-                    "Effects": {
-                      "_type": "Effects",
-                      "_children": {
-                        "Shadows": {
-                          "_type": "Shadows",
-                          "items": [
-                            {
-                              "enabled": false,
-                              "type": "drop",
-                              "offsetX": 0,
-                              "offsetY": 2,
-                              "blur": 4,
-                              "spread": 0,
-                              "colour": "66000000"
-                            }
-                          ]
-                        },
-                        "Bevel": {
-                          "_type": "Bevel",
-                          "enabled": false,
-                          "style": "outer-bevel",
-                          "depth": 100,
-                          "size": 5,
-                          "softness": 0,
-                          "angle": 135,
-                          "highlightColour": "FFFFFF",
-                          "highlightOpacity": 75,
-                          "shadowColour": "000000",
-                          "shadowOpacity": 75
-                        },
-                        "Filters": {
-                          "_type": "Filters",
-                          "blur": 0,
-                          "brightness": 100,
-                          "contrast": 100,
-                          "saturation": 100,
-                          "hueRotate": 0,
-                          "grayscale": 0,
-                          "sepia": 0,
-                          "invert": 0
-                        },
-                        "Blend": {
-                          "_type": "Blend",
-                          "mode": "normal"
-                        },
-                        "Material": {
-                          "_type": "Material",
-                          "enabled": true,
-                          "kind": "glass",
-                          "strength": 60,
-                          "shine": 45,
-                          "grain": 100,
-                          "lampFollowsSet": true,
-                          "lampAzimuth": 225,
-                          "lampElevation": 48
-                        }
-                      }
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -1075,7 +1035,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF1C1A17"
+                      "colour": "FF5A6A5A"
                     }
                   }
                 }
@@ -1086,10 +1046,10 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B"
+                      "colour": "FFFFB020"
                     },
                     "Border": {
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -1098,32 +1058,32 @@
             "pointerCurrent": {
               "_children": {
                 "Layout": {
-                  "width": 9,
-                  "height": 118
+                  "width": 26,
+                  "height": 66
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF1C1A17"
+                      "colour": "FF5A6A5A"
                     },
                     "Border": {
                       "enabled": false,
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
               },
-              "kind": "chicken"
+              "kind": "capdot"
             },
             "pointerEnd": {
               "_children": {
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C"
+                      "colour": "FF39FF7A"
                     },
                     "Border": {
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -1138,22 +1098,24 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFEFE3C8"
+                      "colour": "CC5A6A5A"
                     }
                   }
                 }
-              }
+              },
+              "kind": "dot"
             },
             "tickMinor": {
               "_children": {
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "99EFE3C8"
+                      "colour": "885A6A5A"
                     }
                   }
                 }
-              }
+              },
+              "kind": "dot"
             },
             "labelMin": {
               "_children": {
@@ -1163,7 +1125,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1178,7 +1140,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1190,10 +1152,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B"
+                      "colour": "FFFFB020"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1205,10 +1167,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF505966"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1220,10 +1182,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C"
+                      "colour": "FF39FF7A"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1238,7 +1200,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1253,7 +1215,9 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
                       "letterSpacing": 0.9
                     }
                   }
@@ -1268,7 +1232,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1283,13 +1247,13 @@
               "patches": {
                 "parts": {
                   "bodyTrackFill": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FFB8FFD2"
                   },
                   "bodySelectedRange": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FF41B173"
                   },
                   "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFF6E2"
+                    "Background.Fill.colour": "FFB8FFD2"
                   }
                 }
               }
@@ -1298,7 +1262,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFDDA06A"
+                    "Background.Border.colour": "FF8CBDAC"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -1314,22 +1278,121 @@
     {
       "_children": {
         "Core": {
-          "name": "Slider_1789884551182",
+          "name": "Label_1789891718650",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551182",
+          "id": "ctrl_1789891718650",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TUNE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718651",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718651",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 194,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "CUTOFF",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789891718652",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718652",
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 364,
-          "y": 133,
-          "width": 190,
-          "height": 78
+          "x": 356,
+          "y": 120,
+          "width": 44,
+          "height": 173
         },
         "Behavior": {
-          "defaultCurrentValue": 0.66,
-          "minorTickCount": 0,
-          "majorTickLength": 4,
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.2,
+          "minorTickCount": 1,
+          "majorTickLength": 5,
           "showMinMaxLabels": false,
+          "showValueReadout": false,
           "labelReadoutPlacement": "topRight",
           "labelTitlePlacement": "topLeft"
         },
@@ -1338,55 +1401,36 @@
             "bodyTrackBase": {
               "_children": {
                 "Layout": {
-                  "height": 5
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC9A24A",
-                      "gradientEnabled": true,
-                      "gradient": {
-                        "type": "linear",
-                        "angle": 180,
-                        "edge": 0,
-                        "stops": [
-                          {
-                            "color": "E1CC9B",
-                            "position": 0
-                          },
-                          {
-                            "color": "977A38",
-                            "position": 50
-                          },
-                          {
-                            "color": "E1CC9B",
-                            "position": 100
-                          }
-                        ]
-                      }
+                      "colour": "FF0E1215"
                     },
                     "Border": {
-                      "colour": "FF655125"
+                      "colour": "FF4F545B"
                     },
                     "Corners": {
-                      "radius": 2
+                      "radius": 1
                     }
                   }
                 }
-              }
+              },
+              "slot": true
             },
             "bodyTrackFill": {
               "_children": {
                 "Layout": {
-                  "height": 5
+                  "height": 6
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFD9A83A"
+                      "colour": "FF8CBDAC"
                     },
                     "Corners": {
-                      "radius": 2
+                      "radius": 1
                     }
                   }
                 }
@@ -1397,7 +1441,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFE2B24A"
+                      "colour": "FF1FA35A"
                     }
                   }
                 }
@@ -1408,10 +1452,10 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF505966"
                     },
                     "Border": {
-                      "colour": "CC6B5A34"
+                      "colour": "990B0D0B"
                     }
                   }
                 }
@@ -1422,7 +1466,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF1C1A17"
+                      "colour": "FF5A6A5A"
                     }
                   }
                 }
@@ -1431,145 +1475,142 @@
             "pointerStart": {
               "_children": {
                 "Layout": {
-                  "width": 14,
-                  "height": 34
+                  "width": 12,
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B",
-                      "gradientEnabled": true,
+                      "colour": "FFFFB020",
                       "gradient": {
-                        "type": "radial",
-                        "centerX": 38,
-                        "centerY": 30,
-                        "radiusX": 70,
-                        "radiusY": 70,
+                        "type": "linear",
+                        "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "F7F1E5",
+                            "color": "969BA3",
                             "position": 0
                           },
                           {
-                            "color": "F1E6CF",
+                            "color": "505966",
                             "position": 55
                           },
                           {
-                            "color": "918A7C",
+                            "color": "343A42",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF6C675D"
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
                     }
                   }
                 }
               },
               "kind": "bar",
-              "grooveColour": "FF3A2E1E",
+              "grooveColour": "FFF7F4EC",
               "shadow": true
             },
             "pointerCurrent": {
               "_children": {
                 "Layout": {
-                  "width": 14,
-                  "height": 34
+                  "width": 12,
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFF1E6CF",
-                      "gradientEnabled": true,
+                      "colour": "FF505966",
                       "gradient": {
-                        "type": "radial",
-                        "centerX": 38,
-                        "centerY": 30,
-                        "radiusX": 70,
-                        "radiusY": 70,
+                        "type": "linear",
+                        "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "F7F1E5",
+                            "color": "969BA3",
                             "position": 0
                           },
                           {
-                            "color": "F1E6CF",
+                            "color": "505966",
                             "position": 55
                           },
                           {
-                            "color": "918A7C",
+                            "color": "343A42",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF6C675D"
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
                     }
                   }
                 }
               },
               "kind": "bar",
-              "grooveColour": "FF3A2E1E",
+              "grooveColour": "FFF7F4EC",
               "shadow": true
             },
             "pointerEnd": {
               "_children": {
                 "Layout": {
-                  "width": 14,
-                  "height": 34
+                  "width": 12,
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C",
-                      "gradientEnabled": true,
+                      "colour": "FF39FF7A",
                       "gradient": {
-                        "type": "radial",
-                        "centerX": 38,
-                        "centerY": 30,
-                        "radiusX": 70,
-                        "radiusY": 70,
+                        "type": "linear",
+                        "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "F7F1E5",
+                            "color": "969BA3",
                             "position": 0
                           },
                           {
-                            "color": "F1E6CF",
+                            "color": "505966",
                             "position": 55
                           },
                           {
-                            "color": "918A7C",
+                            "color": "343A42",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF6C675D"
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
                     }
                   }
                 }
               },
               "kind": "bar",
-              "grooveColour": "FF3A2E1E",
+              "grooveColour": "FFF7F4EC",
               "shadow": true
             },
             "tickMajor": {
               "_children": {
                 "Layout": {
                   "width": 1,
-                  "height": 4
+                  "height": 5
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "AAF1E6CF"
+                      "colour": "CCF7F4EC"
                     }
                   }
                 }
@@ -1580,7 +1621,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "55F1E6CF"
+                      "colour": "66F7F4EC"
                     }
                   }
                 }
@@ -1594,7 +1635,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1609,7 +1650,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1621,10 +1662,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC8342B"
+                      "colour": "FFFFB020"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1636,10 +1677,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599"
+                      "colour": "FF505966"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1651,10 +1692,10 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF3F7A4C"
+                      "colour": "FF39FF7A"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1669,7 +1710,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1679,13 +1720,15 @@
             "labelTitle": {
               "_children": {
                 "Text": {
-                  "content": "LEVEL",
+                  "content": "A",
                   "_children": {
                     "Fill": {
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
                       "letterSpacing": 0.9
                     }
                   }
@@ -1700,7 +1743,7 @@
                       "colour": "FFF7F4EC"
                     },
                     "Font": {
-                      "family": "Libre Franklin",
+                      "family": "JetBrains Mono",
                       "letterSpacing": 0.9
                     }
                   }
@@ -1715,13 +1758,13 @@
               "patches": {
                 "parts": {
                   "bodyTrackFill": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FFB8FFD2"
                   },
                   "bodySelectedRange": {
-                    "Background.Fill.colour": "FFF2C85E"
+                    "Background.Fill.colour": "FF41B173"
                   },
                   "pointerCurrent": {
-                    "Background.Fill.colour": "FFFFF6E2"
+                    "Background.Fill.colour": "FFB8FFD2"
                   }
                 }
               }
@@ -1730,7 +1773,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFDDA06A"
+                    "Background.Border.colour": "FF8CBDAC"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -1746,87 +1789,412 @@
     {
       "_children": {
         "Core": {
-          "name": "Crossfader_1789884551183",
+          "name": "Slider_1789891718653",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551183",
-          "controlType": "Crossfader"
+          "id": "ctrl_1789891718653",
+          "controlType": "Slider"
         },
         "Transform": {
-          "x": 364,
-          "y": 234,
-          "width": 190,
-          "height": 62
+          "x": 406,
+          "y": 120,
+          "width": 44,
+          "height": 173
         },
-        "Background": {
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.55,
+          "minorTickCount": 1,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
           "_children": {
-            "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF4F545B"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
                   }
-                ]
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF8CBDAC"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
               }
             },
-            "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Crossfader": {
-          "handleSize": 22,
-          "handleStyle": "block",
-          "trackSize": 8,
-          "trackColour": "FF28262B",
-          "fillAColour": "FFDDA06A",
-          "fillBColour": "FFE2B24A",
-          "handleColour": "FFC3B599",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1FA35A"
+                    }
+                  }
                 }
-              ]
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Border": {
+                      "colour": "990B0D0B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A6A5A"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66F7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "D",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF41B173"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF8CBDAC"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
             }
           }
         }
@@ -1836,57 +2204,863 @@
     {
       "_children": {
         "Core": {
-          "name": "Button_1789884551184",
+          "name": "Slider_1789891718654",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718654",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 456,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.7,
+          "minorTickCount": 1,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF4F545B"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF8CBDAC"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1FA35A"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Border": {
+                      "colour": "990B0D0B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A6A5A"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66F7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "S",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF41B173"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF8CBDAC"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789891718655",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718655",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 506,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.35,
+          "minorTickCount": 1,
+          "majorTickLength": 5,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF4F545B"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Layout": {
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF8CBDAC"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              }
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF1FA35A"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Border": {
+                      "colour": "990B0D0B"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5A6A5A"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 12,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A",
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 180,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "969BA3",
+                            "position": 0
+                          },
+                          {
+                            "color": "505966",
+                            "position": 55
+                          },
+                          {
+                            "color": "343A42",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF282D33"
+                    },
+                    "Corners": {
+                      "radius": 1
+                    }
+                  }
+                }
+              },
+              "kind": "bar",
+              "grooveColour": "FFF7F4EC",
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1,
+                  "height": 5
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "66F7F4EC"
+                    }
+                  }
+                }
+              }
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFFFB020"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF505966"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF39FF7A"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "R",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "JetBrains Mono",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF41B173"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB8FFD2"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FF8CBDAC"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789891718656",
           "controlSetId": "switchboard",
           "controlForm": "new-switchboard",
-          "formFaceColour": "FFC3B599",
-          "formHousingColour": "FF28262B",
-          "formInkColour": "FF202020",
+          "formFaceColour": "FF505966",
+          "formHousingColour": "FF232932",
+          "formInkColour": "FFF2F2F2",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFDDA06A",
-          "id": "ctrl_1789884551184",
+          "formAccentColour": "FF8CBDAC",
+          "id": "ctrl_1789891718656",
           "controlType": "Button"
         },
         "Transform": {
-          "x": 576,
-          "y": 118,
-          "width": 124,
-          "height": 84
+          "x": 586,
+          "y": 126,
+          "width": 116,
+          "height": 76
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFF1E6CF",
-              "gradientEnabled": true,
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
+              "colour": "00000000"
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 5
+              "radius": 2
             }
           }
         },
@@ -1894,58 +3068,41 @@
           "content": "TRIGGER",
           "_children": {
             "Fill": {
-              "colour": "FF202020"
+              "colour": "FFF2F2F2"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "letterSpacing": 0.7
             }
           }
         },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            }
-          }
-        },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         },
         "States": {
           "_children": {
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A"
+                  "Background.Border.colour": "FF8CBDAC"
                 }
               }
             }
@@ -1957,56 +3114,33 @@
     {
       "_children": {
         "Core": {
-          "name": "ToggleButton_1789884551185",
+          "name": "ToggleButton_1789891718657",
           "controlSetId": "switchboard",
           "controlForm": "new-switchboard",
-          "formFaceColour": "FFC3B599",
-          "formHousingColour": "FF28262B",
-          "formInkColour": "FF202020",
+          "formFaceColour": "FF505966",
+          "formHousingColour": "FF232932",
+          "formInkColour": "FFF2F2F2",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFDDA06A",
-          "id": "ctrl_1789884551185",
+          "formAccentColour": "FF8CBDAC",
+          "id": "ctrl_1789891718657",
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 716,
-          "y": 118,
-          "height": 84
+          "x": 728,
+          "y": 126,
+          "width": 124,
+          "height": 76
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFF1E6CF",
-              "gradientEnabled": true,
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
+              "colour": "00000000"
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 5
+              "radius": 2
             }
           }
         },
@@ -2014,39 +3148,22 @@
           "content": "HOLD",
           "_children": {
             "Fill": {
-              "colour": "FF202020"
+              "colour": "FFF2F2F2"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "letterSpacing": 0.7
             }
           }
         },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            }
-          }
-        },
         "ContentLayout": {
-          "lamp": "jewel",
-          "lampSize": 12,
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lamp": "led",
+          "lampSize": 7,
+          "lampColour": "FF39FF7A",
+          "lampOffColour": "00000000",
+          "lampBezelColour": "662C312C"
         },
         "Behavior": {
           "defaultValue": true
@@ -2056,28 +3173,28 @@
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A"
+                  "Background.Border.colour": "FF8CBDAC"
                 }
               }
             },
             "Selected": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A",
+                  "Background.Border.colour": "FF8CBDAC",
                   "_removed": [
                     "Background.Fill.colour",
                     "Text.Fill.colour"
@@ -2088,9 +3205,9 @@
             "Mixed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599",
-                  "Background.Border.colour": "FFC98A2A",
-                  "Text.Fill.colour": "FF202529"
+                  "Background.Fill.colour": "FF505966",
+                  "Background.Border.colour": "FFFFB020",
+                  "Text.Fill.colour": "FFF7F4EC"
                 }
               }
             }
@@ -2102,48 +3219,46 @@
     {
       "_children": {
         "Core": {
-          "name": "CyclicButton_1789884551186",
+          "name": "CyclicButton_1789891718658",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551186",
+          "id": "ctrl_1789891718658",
           "controlType": "CyclicButton"
         },
         "Transform": {
-          "x": 576,
-          "y": 220,
-          "width": 124,
-          "height": 36
+          "x": 586,
+          "y": 218,
+          "width": 116,
+          "height": 34
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFC3B599",
-              "gradientEnabled": true,
+              "colour": "FF505966",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "E1DACC",
+                    "color": "A8ACB3",
                     "position": 0
                   },
                   {
-                    "color": "C3B599",
+                    "color": "505966",
                     "position": 45
                   },
                   {
-                    "color": "6B6454",
+                    "color": "2C3138",
                     "position": 100
                   }
                 ]
               }
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -2192,9 +3307,9 @@
                 },
                 "Material": {
                   "_type": "Material",
-                  "enabled": true,
-                  "kind": "leather",
-                  "strength": 30,
+                  "enabled": false,
+                  "kind": "rubber",
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -2206,30 +3321,16 @@
           }
         },
         "Text": {
-          "content": "CYCLE",
+          "content": "MODE",
           "_children": {
             "Fill": {
-              "colour": "FF202020"
+              "colour": "FFF2F2F2"
             }
           }
         },
         "Effects": {
           "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            },
             "Bevel": {
-              "enabled": true,
               "depth": 120,
               "size": 2,
               "softness": 1,
@@ -2238,38 +3339,38 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         },
         "States": {
           "_children": {
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599"
+                  "Background.Fill.colour": "FF505966"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A"
+                  "Background.Border.colour": "FF8CBDAC"
                 }
               }
             },
             "Selected": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A",
-                  "Text.Fill.colour": "FF202020",
+                  "Background.Border.colour": "FF8CBDAC",
+                  "Text.Fill.colour": "FFF2F2F2",
                   "_removed": [
                     "Background.Fill.colour"
                   ]
@@ -2279,9 +3380,9 @@
             "Mixed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFC3B599",
-                  "Background.Border.colour": "FFC98A2A",
-                  "Text.Fill.colour": "FF202529"
+                  "Background.Fill.colour": "FF505966",
+                  "Background.Border.colour": "FFFFB020",
+                  "Text.Fill.colour": "FFF7F4EC"
                 }
               }
             }
@@ -2293,48 +3394,45 @@
     {
       "_children": {
         "Core": {
-          "name": "Combobox_1789884551187",
+          "name": "Combobox_1789891718659",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551187",
+          "id": "ctrl_1789891718659",
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 716,
-          "y": 220,
-          "width": 136,
-          "height": 36
+          "x": 728,
+          "y": 218,
+          "width": 124
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFC3B599",
-              "gradientEnabled": true,
+              "colour": "FF505966",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "E1DACC",
+                    "color": "A8ACB3",
                     "position": 0
                   },
                   {
-                    "color": "C3B599",
+                    "color": "505966",
                     "position": 45
                   },
                   {
-                    "color": "6B6454",
+                    "color": "2C3138",
                     "position": 100
                   }
                 ]
               }
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -2383,9 +3481,9 @@
                 },
                 "Material": {
                   "_type": "Material",
-                  "enabled": true,
-                  "kind": "leather",
-                  "strength": 30,
+                  "enabled": false,
+                  "kind": "rubber",
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -2399,33 +3497,19 @@
         "Text": {
           "_children": {
             "Fill": {
-              "colour": "FF202020"
+              "colour": "FFF2F2F2"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "letterSpacing": 0.7
             }
           }
         },
         "Effects": {
           "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            },
             "Bevel": {
-              "enabled": true,
               "depth": 120,
               "size": 2,
               "softness": 1,
@@ -2434,30 +3518,30 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         },
         "States": {
           "_children": {
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFF8EEDA"
+                  "Background.Fill.colour": "FF242624"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFD9CBAE"
+                  "Background.Fill.colour": "FF101110"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A"
+                  "Background.Border.colour": "FF8CBDAC"
                 }
               }
             }
@@ -2469,54 +3553,52 @@
     {
       "_children": {
         "Core": {
-          "name": "Number_1789884551188",
+          "name": "Number_1789891718660",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551188",
+          "id": "ctrl_1789891718660",
           "controlType": "Number"
         },
         "Transform": {
-          "x": 576,
-          "y": 265,
-          "width": 124,
-          "height": 46
+          "x": 586,
+          "y": 267,
+          "width": 116,
+          "height": 42
         },
         "Parts": {
           "_children": {
             "decrement": {
               "_children": {
                 "Layout": {
-                  "y": 4,
-                  "width": 26,
-                  "height": 60,
+                  "y": 52,
+                  "height": 46,
                   "anchorY": "top"
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599",
-                      "gradientEnabled": true,
+                      "colour": "FF505966",
                       "gradient": {
                         "type": "linear",
                         "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "E1DACC",
+                            "color": "A8ACB3",
                             "position": 0
                           },
                           {
-                            "color": "C3B599",
+                            "color": "505966",
                             "position": 45
                           },
                           {
-                            "color": "6B6454",
+                            "color": "2C3138",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFDDA06A"
+                      "colour": "FF8CBDAC"
                     },
                     "Corners": {
                       "radius": 20
@@ -2568,9 +3650,9 @@
                         },
                         "Material": {
                           "_type": "Material",
-                          "enabled": true,
-                          "kind": "leather",
-                          "strength": 30,
+                          "enabled": false,
+                          "kind": "rubber",
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2584,14 +3666,14 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF202529"
+                      "colour": "FFF7F4EC"
                     }
                   }
                 },
                 "Effects": {
                   "Bevel": {
                     "_type": "Bevel",
-                    "enabled": true,
+                    "enabled": false,
                     "style": "outer-bevel",
                     "depth": 120,
                     "size": 2,
@@ -2610,39 +3692,38 @@
               "_children": {
                 "Layout": {
                   "x": 30,
-                  "y": 22,
-                  "width": 40,
-                  "height": 56,
+                  "y": 2,
+                  "width": 70,
+                  "height": 96,
                   "anchorX": "left",
                   "anchorY": "top"
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF28262B",
-                      "gradientEnabled": true,
+                      "colour": "FF232932",
                       "gradient": {
                         "type": "linear",
                         "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "0E0D0F",
+                            "color": "0C0E12",
                             "position": 0
                           },
                           {
-                            "color": "28262B",
+                            "color": "232932",
                             "position": 35
                           },
                           {
-                            "color": "424044",
+                            "color": "3D434B",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFDDA06A"
+                      "colour": "FF8CBDAC"
                     },
                     "Corners": {
                       "radius": 3
@@ -2695,8 +3776,8 @@
                         "Material": {
                           "_type": "Material",
                           "enabled": false,
-                          "kind": "leather",
-                          "strength": 30,
+                          "kind": "rubber",
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2720,7 +3801,7 @@
                 "Effects": {
                   "Bevel": {
                     "_type": "Bevel",
-                    "enabled": true,
+                    "enabled": false,
                     "style": "inner-bevel",
                     "depth": 120,
                     "size": 2,
@@ -2738,40 +3819,38 @@
             "increment": {
               "_children": {
                 "Layout": {
-                  "x": 74,
-                  "y": 36,
-                  "width": 26,
-                  "height": 60,
+                  "x": 0,
+                  "y": 2,
+                  "height": 46,
                   "anchorX": "left",
                   "anchorY": "top"
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFC3B599",
-                      "gradientEnabled": true,
+                      "colour": "FF505966",
                       "gradient": {
                         "type": "linear",
                         "angle": 180,
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "E1DACC",
+                            "color": "A8ACB3",
                             "position": 0
                           },
                           {
-                            "color": "C3B599",
+                            "color": "505966",
                             "position": 45
                           },
                           {
-                            "color": "6B6454",
+                            "color": "2C3138",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFDDA06A"
+                      "colour": "FF8CBDAC"
                     },
                     "Corners": {
                       "radius": 20
@@ -2823,9 +3902,9 @@
                         },
                         "Material": {
                           "_type": "Material",
-                          "enabled": true,
-                          "kind": "leather",
-                          "strength": 30,
+                          "enabled": false,
+                          "kind": "rubber",
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2839,14 +3918,14 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF202529"
+                      "colour": "FFF7F4EC"
                     }
                   }
                 },
                 "Effects": {
                   "Bevel": {
                     "_type": "Bevel",
-                    "enabled": true,
+                    "enabled": false,
                     "style": "outer-bevel",
                     "depth": 120,
                     "size": 2,
@@ -2869,13 +3948,13 @@
               "patches": {
                 "parts": {
                   "decrement": {
-                    "Background.Fill.colour": "FFC3B599"
+                    "Background.Fill.colour": "FF505966"
                   },
                   "increment": {
-                    "Background.Fill.colour": "FFC3B599"
+                    "Background.Fill.colour": "FF505966"
                   },
                   "valueField": {
-                    "Background.Fill.colour": "FFFFF8E8"
+                    "Background.Fill.colour": "FF171917"
                   }
                 }
               }
@@ -2884,10 +3963,10 @@
               "patches": {
                 "parts": {
                   "decrement": {
-                    "Background.Fill.colour": "FFC3B599"
+                    "Background.Fill.colour": "FF505966"
                   },
                   "increment": {
-                    "Background.Fill.colour": "FFC3B599"
+                    "Background.Fill.colour": "FF505966"
                   }
                 }
               }
@@ -2896,8 +3975,8 @@
               "patches": {
                 "parts": {
                   "valueField": {
-                    "Background.Fill.colour": "FFFFF3D8",
-                    "Background.Border.colour": "FFDDA06A"
+                    "Background.Fill.colour": "FF19562C",
+                    "Background.Border.colour": "FF8CBDAC"
                   }
                 }
               }
@@ -2906,7 +3985,7 @@
               "patches": {
                 "parts": {
                   "valueField": {
-                    "Background.Border.colour": "FFDDA06A"
+                    "Background.Border.colour": "FF8CBDAC"
                   }
                 }
               }
@@ -2919,47 +3998,46 @@
     {
       "_children": {
         "Core": {
-          "name": "TextInput_1789884551189",
+          "name": "TextInput_1789891718661",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551189",
+          "id": "ctrl_1789891718661",
           "controlType": "TextInput"
         },
         "Transform": {
-          "x": 716,
-          "y": 273,
-          "width": 136
+          "x": 728,
+          "y": 267,
+          "width": 124,
+          "height": 36
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF28262B",
-              "gradientEnabled": true,
+              "colour": "FF232932",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "0E0D0F",
+                    "color": "0C0E12",
                     "position": 0
                   },
                   {
-                    "color": "28262B",
+                    "color": "232932",
                     "position": 35
                   },
                   {
-                    "color": "424044",
+                    "color": "3D434B",
                     "position": 100
                   }
                 ]
               }
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -3009,8 +4087,8 @@
                 "Material": {
                   "_type": "Material",
                   "enabled": false,
-                  "kind": "leather",
-                  "strength": 30,
+                  "kind": "rubber",
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -3022,33 +4100,19 @@
           }
         },
         "Text": {
-          "content": "Studio A",
+          "content": "Init patch",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin"
+              "family": "JetBrains Mono"
             }
           }
         },
         "Effects": {
           "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            },
             "Bevel": {
-              "enabled": true,
               "style": "inner-bevel",
               "depth": 120,
               "size": 2,
@@ -3058,30 +4122,30 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         },
         "States": {
           "_children": {
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFF8EEDA"
+                  "Background.Fill.colour": "FF242624"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFD9CBAE"
+                  "Background.Fill.colour": "FF101110"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFDDA06A"
+                  "Background.Border.colour": "FF8CBDAC"
                 }
               }
             }
@@ -3093,15 +4157,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551190",
+          "name": "Label_1789891718662",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551190",
+          "id": "ctrl_1789891718662",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 310,
-          "width": 250,
+          "y": 318,
+          "width": 360,
           "height": 26
         },
         "Background": {
@@ -3116,24 +4180,24 @@
           }
         },
         "Text": {
-          "content": "PLAY / SHAPE",
+          "content": "PADS / MODULATION",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "size": 13,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -3141,15 +4205,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551191",
+          "name": "Label_1789891718663",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551191",
+          "id": "ctrl_1789891718663",
           "controlType": "Label"
         },
         "Transform": {
           "x": 540,
-          "y": 310,
-          "width": 250,
+          "y": 318,
+          "width": 300,
           "height": 26
         },
         "Background": {
@@ -3164,24 +4228,24 @@
           }
         },
         "Text": {
-          "content": "MEASURE / ROUTE",
+          "content": "OUTPUT / ROUTING",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "size": 13,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"
@@ -3189,50 +4253,27 @@
     {
       "_children": {
         "Core": {
-          "name": "DrumPads_1789884551192",
+          "name": "DrumPads_1789891718664",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551192",
+          "id": "ctrl_1789891718664",
           "controlType": "DrumPads"
         },
         "Transform": {
           "x": 26,
-          "y": 348,
+          "y": 356,
           "width": 228,
-          "height": 214
+          "height": 206
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
+              "colour": "FF232932"
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
@@ -3242,13 +4283,13 @@
           "showNotes": false,
           "showHeader": false,
           "padForm": "physical-switchboard",
-          "padAppearance": "raised",
-          "padRadius": 7,
-          "fieldColour": "FF28262B",
-          "padColour": "FFC3B599",
-          "accentColour": "FFDDA06A",
-          "hitColour": "FFDDA06A",
-          "labelColour": "FF202020"
+          "padAppearance": "inset",
+          "padRadius": 4,
+          "fieldColour": "FF232932",
+          "padColour": "FF505966",
+          "accentColour": "FF8CBDAC",
+          "hitColour": "FF8CBDAC",
+          "labelColour": "FFF2F2F2"
         },
         "Text": {
           "_children": {
@@ -3256,24 +4297,7 @@
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
+              "family": "JetBrains Mono"
             }
           }
         }
@@ -3283,84 +4307,44 @@
     {
       "_children": {
         "Core": {
-          "name": "Envelope_1789884551193",
+          "name": "Envelope_1789891718665",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551193",
+          "id": "ctrl_1789891718665",
           "controlType": "Envelope"
         },
         "Transform": {
           "x": 284,
-          "y": 348,
+          "y": 356,
           "width": 220,
           "height": 70
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
+              "colour": "FF232932"
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
         "Envelope": {
           "lineWidth": 3,
           "nodeRadius": 3,
-          "lineColour": "FFDDA06A",
+          "lineColour": "FF8CBDAC",
           "fillColour": "20000000",
-          "nodeColour": "FFC3B599",
-          "gridColour": "88F1E6CC",
-          "sustainColour": "FFE2B24A",
-          "playheadColour": "FFDDA06A"
+          "nodeColour": "FF505966",
+          "gridColour": "662C312C",
+          "sustainColour": "FF1FA35A",
+          "playheadColour": "FF8CBDAC"
         },
         "Text": {
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
             }
           }
         }
@@ -3370,63 +4354,39 @@
     {
       "_children": {
         "Core": {
-          "name": "Ribbon_1789884551194",
+          "name": "Crossfader_1789891718666",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551194",
-          "controlType": "Ribbon"
+          "id": "ctrl_1789891718666",
+          "controlType": "Crossfader"
         },
         "Transform": {
           "x": 284,
-          "y": 427,
+          "y": 435,
           "width": 220,
-          "height": 30
+          "height": 42
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
+              "colour": "FF232932"
             },
             "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
+              "colour": "FF39FF7A"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
-        "Ribbon": {
-          "orientation": "horizontal",
-          "style": "wheel3d",
-          "showGlow": false,
-          "indicatorSize": 8,
-          "trackColour": "FF28262B",
-          "fillColour": "FFDDA06A",
-          "indicatorColour": "FFC3B599",
-          "glowColour": "FFDDA06A",
-          "wheelColour": "FFF1E6CC",
+        "Crossfader": {
+          "showGains": true,
+          "handleSize": 34,
+          "handleStyle": "blade",
+          "trackSize": 8,
+          "trackColour": "FF232932",
+          "fillAColour": "FF8CBDAC",
+          "fillBColour": "FF1FA35A",
+          "handleColour": "FF505966",
           "labelColour": "FFF2F2F2"
         },
         "Text": {
@@ -3435,24 +4395,7 @@
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
+              "family": "JetBrains Mono"
             }
           }
         }
@@ -3462,314 +4405,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Meter_1789884551195",
+          "name": "StepSequencer_1789891718667",
           "controlSetId": "switchboard",
-          "controlForm": "new-switchboard",
-          "formFaceColour": "FFC3B599",
-          "formHousingColour": "FF28262B",
-          "formInkColour": "FF202020",
-          "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFDDA06A",
-          "id": "ctrl_1789884551195",
-          "controlType": "Meter"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 342,
-          "width": 312,
-          "height": 108
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Meter": {
-          "value": 0.7,
-          "segments": 16,
-          "segmentGap": 3,
-          "trackColour": "FF28262B",
-          "fillColour": "FFDDA06A",
-          "thickness": 16,
-          "rounded": true,
-          "peakColour": "FFDDA06A",
-          "showTicks": true,
-          "valuePrecision": 2
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "Matrix_1789884551196",
-          "controlSetId": "switchboard",
-          "id": "ctrl_1789884551196",
-          "controlType": "Matrix"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 466,
-          "width": 166,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Matrix": {
-          "rows": [
-            "LFO",
-            "ENV",
-            "VEL"
-          ],
-          "cols": [
-            "OSC",
-            "FLT",
-            "AMP"
-          ],
-          "amounts": [
-            0.6,
-            0,
-            -0.4,
-            0,
-            0.7,
-            0,
-            0,
-            0.4,
-            0.8
-          ],
-          "cellStyle": "dot",
-          "rowHeaderW": 42,
-          "cellBg": "FF28262B",
-          "gridColour": "88F1E6CC",
-          "posColour": "FFDDA06A",
-          "negColour": "FFE2B24A",
-          "labelColour": "FFF2F2F2",
-          "activeColour": "FFDDA06A"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "VectorJoystick_1789884551197",
-          "controlSetId": "switchboard",
-          "id": "ctrl_1789884551197",
-          "controlType": "VectorJoystick"
-        },
-        "Transform": {
-          "x": 728,
-          "y": 466,
-          "width": 124,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF28262B",
-              "gradient": {
-                "type": "radial",
-                "centerX": 38,
-                "centerY": 30,
-                "radiusX": 70,
-                "radiusY": 70,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "F6EFE0",
-                    "position": 0
-                  },
-                  {
-                    "color": "F1E6CF",
-                    "position": 55
-                  },
-                  {
-                    "color": "A9A191",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "thickness": 1.5,
-              "colour": "FF3A2E1E"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Joystick": {
-          "puckRadius": 7,
-          "padColour": "FF28262B",
-          "gridColour": "88F1E6CC",
-          "crosshairColour": "FFDDA06A",
-          "puckColour": "FFC3B599",
-          "cornerColour": "FFF7F4EC",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Libre Franklin"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 2,
-                  "spread": 0,
-                  "colour": "88000000"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "StepSequencer_1789884551198",
-          "controlSetId": "switchboard",
-          "id": "ctrl_1789884551198",
+          "id": "ctrl_1789891718667",
           "controlType": "StepSequencer"
         },
         "Transform": {
           "x": 284,
-          "y": 466,
+          "y": 489,
           "width": 220,
-          "height": 100
+          "height": 77
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF232932"
+            }
+          }
         },
         "StepSequencer": {
           "cellForm": "physical-switchboard",
@@ -3815,10 +4467,10 @@
               "velocity": 70
             }
           },
-          "cellColour": "FFC3B599",
-          "cellOnColour": "FFDDA06A",
-          "playheadColour": "FFDDA06A",
-          "gridColour": "88F1E6CC",
+          "cellColour": "FF505966",
+          "cellOnColour": "FF8CBDAC",
+          "playheadColour": "FF8CBDAC",
+          "gridColour": "662C312C",
           "labelColour": "FFF7F4EC"
         },
         "Text": {
@@ -3834,9 +4486,187 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551199",
+          "name": "Meter_1789891718668",
           "controlSetId": "switchboard",
-          "id": "ctrl_1789884551199",
+          "controlForm": "new-switchboard",
+          "formFaceColour": "FF505966",
+          "formHousingColour": "FF232932",
+          "formInkColour": "FFF2F2F2",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FF8CBDAC",
+          "id": "ctrl_1789891718668",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 352,
+          "width": 312,
+          "height": 92
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF232932"
+            },
+            "Border": {
+              "colour": "FF39FF7A"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Meter": {
+          "value": 0.7,
+          "segments": 16,
+          "segmentGap": 3,
+          "trackColour": "FF232932",
+          "fillColour": "FF8CBDAC",
+          "thickness": 10,
+          "rounded": false,
+          "peakColour": "FF8CBDAC",
+          "showTicks": true,
+          "valuePrecision": 2
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "JetBrains Mono"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789891718669",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718669",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 466,
+          "width": 166,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF232932"
+            },
+            "Border": {
+              "colour": "FF39FF7A"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ],
+          "cellStyle": "dot",
+          "rowHeaderW": 42,
+          "cellBg": "FF232932",
+          "gridColour": "662C312C",
+          "posColour": "FF8CBDAC",
+          "negColour": "FF1FA35A",
+          "labelColour": "FFF2F2F2",
+          "activeColour": "FF8CBDAC"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "JetBrains Mono"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789891718670",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718670",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 466,
+          "width": 124,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF232932"
+            },
+            "Border": {
+              "colour": "FF39FF7A"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Joystick": {
+          "puckRadius": 7,
+          "padColour": "FF232932",
+          "gridColour": "662C312C",
+          "crosshairColour": "FF8CBDAC",
+          "puckColour": "FF505966",
+          "cornerColour": "FFF7F4EC",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "JetBrains Mono"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718671",
+          "controlSetId": "switchboard",
+          "id": "ctrl_1789891718671",
           "controlType": "Label"
         },
         "Transform": {
@@ -3857,23 +4687,23 @@
           }
         },
         "Text": {
-          "content": "Copy a control into your panel. Its pinned design travels with it.",
+          "content": "Editable synthesizer controls — copy individual controls into your panel.",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
             },
             "Font": {
-              "family": "Libre Franklin",
-              "weight": "Bold",
-              "weightValue": 700,
+              "family": "JetBrains Mono",
+              "weight": "SemiBold",
+              "weightValue": 600,
               "letterSpacing": 0.9
             }
           }
         },
         "ContentLayout": {
-          "lampColour": "FFDDA06A",
-          "lampOffColour": "FF28262B",
-          "lampBezelColour": "AA1C1A17"
+          "lampColour": "FF8CBDAC",
+          "lampOffColour": "FF232932",
+          "lampBezelColour": "662C312C"
         }
       },
       "_type": "Control"

@@ -51,7 +51,7 @@ export function extendControlSet(set) {
     return brightness > 145 ? 'FF202020' : 'FFF2F2F2';
   }
   const fieldInk = inkOn(set.tokens['control.field']);
-  const surfaceInk = inkOn(face['Background.Fill.colour'] ?? set.tokens.surface);
+  const surfaceInk = inkOn(d.physical ? set.tokens.surface : (face['Background.Fill.colour'] ?? set.tokens.surface));
   const text = { 'Text.Fill.colour': '{text.primary}', 'Text.Font.family': set.type?.legend?.family ?? 'Arial' };
   const frame = Object.fromEntries(Object.entries(face).filter(([path]) => /^(Background|Effects)\./.test(path)));
   const put = (type, component) => { families[type] = { ...families[type], component: { ...component, ...(families[type]?.component ?? {}) } }; };
@@ -107,7 +107,7 @@ export function extendControlSet(set) {
   if (d.padForm) {
     Object.assign(families.DrumPads.component, { 'DrumPads.padForm': d.padForm, 'DrumPads.padLayout': d.padLayout });
     families.Number = additionalNumberFamily(d.id);
-    families.StepSequencer = { component: { 'StepSequencer.cellForm': d.padForm, 'StepSequencer.cellColour': '{surface}', 'StepSequencer.cellOnColour': '{accent}', 'StepSequencer.labelColour': '{text.primary}', 'StepSequencer.gridColour': '{border}', 'StepSequencer.playheadColour': '{accent}' } };
+    families.StepSequencer = { component: { ...(d.physical ? {'Background.Fill.colour':'{control.field}','Background.Fill.gradientEnabled':false} : {}), 'StepSequencer.cellForm': d.padForm, 'StepSequencer.cellColour': '{surface}', 'StepSequencer.cellOnColour': '{accent}', 'StepSequencer.labelColour': '{text.primary}', 'StepSequencer.gridColour': '{border}', 'StepSequencer.playheadColour': '{accent}' } };
   }
   return { ...set, families };
 }

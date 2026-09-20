@@ -11,11 +11,11 @@
     "exportLv2": false,
     "restoreHardware": "ask"
   },
-  "name": "Chronograph — starter",
+  "name": "Precision — starter",
   "scriptId": "panel_32",
   "author": "",
   "version": "1.0.0",
-  "description": "Fluted watch bezel, crown pushers, jewel-bearing gauge and milled radial pads.",
+  "description": "Fine knurling, inset aluminium faces, engraved scales and milled rectangular sliders.",
   "enabled": true,
   "locked": false,
   "filePath": null,
@@ -126,10 +126,10 @@
   "parameterSnapshots": {},
   "exportParameters": [
     {
-      "id": "Knob_1789884551204.value",
-      "label": "Knob_1789884551204",
-      "controlName": "Knob_1789884551204",
-      "path": "Knob_1789884551204.value",
+      "id": "Knob_1789891718677.value",
+      "label": "Knob_1789891718677",
+      "controlName": "Knob_1789891718677",
+      "path": "Knob_1789891718677.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.63,
@@ -140,10 +140,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Knob_1789884551205.value",
-      "label": "Knob_1789884551205",
-      "controlName": "Knob_1789884551205",
-      "path": "Knob_1789884551205.value",
+      "id": "Knob_1789891718678.value",
+      "label": "Knob_1789891718678",
+      "controlName": "Knob_1789891718678",
+      "path": "Knob_1789891718678.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.35,
@@ -154,13 +154,13 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1789884551206.value",
-      "label": "Slider_1789884551206",
-      "controlName": "Slider_1789884551206",
-      "path": "Slider_1789884551206.value",
+      "id": "Slider_1789891718681.value",
+      "label": "Slider_1789891718681",
+      "controlName": "Slider_1789891718681",
+      "path": "Slider_1789891718681.value",
       "min": 0,
       "max": 1,
-      "defaultValue": 0.66,
+      "defaultValue": 0.2,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
@@ -168,26 +168,52 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1789884551207.value",
-      "label": "Crossfader_1789884551207",
-      "controlName": "Crossfader_1789884551207",
-      "path": "Crossfader_1789884551207.value",
+      "id": "Slider_1789891718682.value",
+      "label": "Slider_1789891718682",
+      "controlName": "Slider_1789891718682",
+      "path": "Slider_1789891718682.value",
       "min": 0,
       "max": 1,
-      "defaultValue": 0.5,
+      "defaultValue": 0.55,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "section": "Crossfader",
-      "field": "mix",
       "deviceRole": "",
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1789884551209.value",
-      "label": "ToggleButton_1789884551209",
-      "controlName": "ToggleButton_1789884551209",
-      "path": "ToggleButton_1789884551209.value",
+      "id": "Slider_1789891718683.value",
+      "label": "Slider_1789891718683",
+      "controlName": "Slider_1789891718683",
+      "path": "Slider_1789891718683.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.7,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "Slider_1789891718684.value",
+      "label": "Slider_1789891718684",
+      "controlName": "Slider_1789891718684",
+      "path": "Slider_1789891718684.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.35,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "ToggleButton_1789891718686.value",
+      "label": "ToggleButton_1789891718686",
+      "controlName": "ToggleButton_1789891718686",
+      "path": "ToggleButton_1789891718686.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -198,10 +224,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1789884551210.value",
-      "label": "CyclicButton_1789884551210",
-      "controlName": "CyclicButton_1789884551210",
-      "path": "CyclicButton_1789884551210.value",
+      "id": "CyclicButton_1789891718687.value",
+      "label": "CyclicButton_1789891718687",
+      "controlName": "CyclicButton_1789891718687",
+      "path": "CyclicButton_1789891718687.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -217,10 +243,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1789884551211.value",
-      "label": "Combobox_1789884551211",
-      "controlName": "Combobox_1789884551211",
-      "path": "Combobox_1789884551211.value",
+      "id": "Combobox_1789891718688.value",
+      "label": "Combobox_1789891718688",
+      "controlName": "Combobox_1789891718688",
+      "path": "Combobox_1789891718688.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -236,10 +262,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1789884551212.value",
-      "label": "Number_1789884551212",
-      "controlName": "Number_1789884551212",
-      "path": "Number_1789884551212.value",
+      "id": "Number_1789891718689.value",
+      "label": "Number_1789891718689",
+      "controlName": "Number_1789891718689",
+      "path": "Number_1789891718689.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -250,58 +276,26 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1789884551218.value",
-      "label": "Ribbon_1789884551218",
-      "controlName": "Ribbon_1789884551218",
-      "path": "Ribbon_1789884551218.value",
+      "id": "Crossfader_1789891718695.value",
+      "label": "Crossfader_1789891718695",
+      "controlName": "Crossfader_1789891718695",
+      "path": "Crossfader_1789891718695.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
       "unit": "",
       "midiCC": null,
       "valueKind": "float",
-      "section": "Ribbon",
-      "field": "value",
+      "section": "Crossfader",
+      "field": "mix",
       "deviceRole": "",
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1789884551221.x",
-      "label": "VectorJoystick_1789884551221 X",
-      "controlName": "VectorJoystick_1789884551221",
-      "path": "VectorJoystick_1789884551221.x",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
-      "unit": "",
-      "midiCC": null,
-      "valueKind": "float",
-      "section": "Joystick",
-      "field": "x",
-      "deviceRole": "",
-      "deviceParameterId": ""
-    },
-    {
-      "id": "VectorJoystick_1789884551221.y",
-      "label": "VectorJoystick_1789884551221 Y",
-      "controlName": "VectorJoystick_1789884551221",
-      "path": "VectorJoystick_1789884551221.y",
-      "min": 0,
-      "max": 1,
-      "defaultValue": 0.5,
-      "unit": "",
-      "midiCC": null,
-      "valueKind": "float",
-      "section": "Joystick",
-      "field": "y",
-      "deviceRole": "",
-      "deviceParameterId": ""
-    },
-    {
-      "id": "StepSequencer_1789884551222.bpm",
-      "label": "StepSequencer_1789884551222 Tempo",
-      "controlName": "StepSequencer_1789884551222",
-      "path": "StepSequencer_1789884551222.bpm",
+      "id": "StepSequencer_1789891718696.bpm",
+      "label": "StepSequencer_1789891718696 Tempo",
+      "controlName": "StepSequencer_1789891718696",
+      "path": "StepSequencer_1789891718696.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -314,10 +308,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1789884551222.run",
-      "label": "StepSequencer_1789884551222 Run",
-      "controlName": "StepSequencer_1789884551222",
-      "path": "StepSequencer_1789884551222.run",
+      "id": "StepSequencer_1789891718696.run",
+      "label": "StepSequencer_1789891718696 Run",
+      "controlName": "StepSequencer_1789891718696",
+      "path": "StepSequencer_1789891718696.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -326,6 +320,38 @@
       "valueKind": "bool",
       "section": "StepSequencer",
       "field": "running",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789891718699.x",
+      "label": "VectorJoystick_1789891718699 X",
+      "controlName": "VectorJoystick_1789891718699",
+      "path": "VectorJoystick_1789891718699.x",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "x",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "VectorJoystick_1789891718699.y",
+      "label": "VectorJoystick_1789891718699 Y",
+      "controlName": "VectorJoystick_1789891718699",
+      "path": "VectorJoystick_1789891718699.y",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0.5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "section": "Joystick",
+      "field": "y",
       "deviceRole": "",
       "deviceParameterId": ""
     }
@@ -343,9 +369,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551200",
+          "name": "Label_1789891718672",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551200",
+          "id": "ctrl_1789891718672",
           "controlType": "Label"
         },
         "Transform": {
@@ -366,7 +392,7 @@
           }
         },
         "Text": {
-          "content": "CHRONOGRAPH",
+          "content": "PRECISION",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -381,8 +407,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -391,9 +417,9 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551201",
+          "name": "Label_1789891718673",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551201",
+          "id": "ctrl_1789891718673",
           "controlType": "Label"
         },
         "Transform": {
@@ -414,7 +440,7 @@
           }
         },
         "Text": {
-          "content": "Watch / precision",
+          "content": "Instrument / aluminium",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -428,8 +454,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -438,15 +464,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551202",
+          "name": "Label_1789891718674",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551202",
+          "id": "ctrl_1789891718674",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 82,
-          "width": 250,
+          "y": 85,
+          "width": 300,
           "height": 26
         },
         "Background": {
@@ -461,7 +487,7 @@
           }
         },
         "Text": {
-          "content": "TURN / SLIDE",
+          "content": "OSCILLATOR / FILTER",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -476,8 +502,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -486,14 +512,62 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551203",
+          "name": "Label_1789891718675",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551203",
+          "id": "ctrl_1789891718675",
           "controlType": "Label"
         },
         "Transform": {
-          "x": 580,
-          "y": 82,
+          "x": 356,
+          "y": 85,
+          "width": 210,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "ENVELOPE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Barlow",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 13,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
+          "lampBezelColour": "AA3A3E43"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718676",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718676",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 586,
+          "y": 85,
           "width": 250,
           "height": 26
         },
@@ -509,7 +583,7 @@
           }
         },
         "Text": {
-          "content": "PRESS / SELECT",
+          "content": "PERFORMANCE",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -524,8 +598,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -534,22 +608,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789884551204",
+          "name": "Knob_1789891718677",
           "controlSetId": "chronograph",
           "controlForm": "new-chronograph",
-          "formFaceColour": "FFCBD4DB",
-          "formHousingColour": "FF202A37",
+          "formFaceColour": "FF9EA8AE",
+          "formHousingColour": "FF292D31",
           "formInkColour": "FF202020",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFD6AA65",
-          "id": "ctrl_1789884551204",
+          "formAccentColour": "FFD4BA8E",
+          "id": "ctrl_1789891718677",
           "controlType": "Knob"
         },
         "Transform": {
           "x": 26,
-          "y": 112,
-          "width": 190,
-          "height": 190
+          "y": 120,
+          "width": 150,
+          "height": 164
         },
         "Behavior": {
           "defaultCurrentValue": 0.63,
@@ -568,7 +642,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF202A37"
+                      "colour": "FF292D31"
                     },
                     "Border": {
                       "colour": "AA111214"
@@ -585,7 +659,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFD6AA65"
+                      "colour": "FFD4BA8E"
                     }
                   }
                 }
@@ -612,7 +686,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Border": {
                       "thickness": 1.5,
@@ -817,7 +891,7 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Font": {
                       "family": "Barlow",
@@ -910,7 +984,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFD6AA65"
+                    "Background.Border.colour": "FFD4BA8E"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -926,22 +1000,22 @@
     {
       "_children": {
         "Core": {
-          "name": "Knob_1789884551205",
+          "name": "Knob_1789891718678",
           "controlSetId": "chronograph",
           "controlForm": "new-chronograph",
-          "formFaceColour": "FFCBD4DB",
-          "formHousingColour": "FF202A37",
+          "formFaceColour": "FF9EA8AE",
+          "formHousingColour": "FF292D31",
           "formInkColour": "FF202020",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFD6AA65",
-          "id": "ctrl_1789884551205",
+          "formAccentColour": "FFD4BA8E",
+          "id": "ctrl_1789891718678",
           "controlType": "Knob"
         },
         "Transform": {
-          "x": 220,
-          "y": 125,
-          "width": 128,
-          "height": 158
+          "x": 194,
+          "y": 120,
+          "width": 150,
+          "height": 164
         },
         "Behavior": {
           "defaultCurrentValue": 0.35,
@@ -960,7 +1034,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF202A37"
+                      "colour": "FF292D31"
                     },
                     "Border": {
                       "colour": "AA111214"
@@ -977,7 +1051,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFD6AA65"
+                      "colour": "FFD4BA8E"
                     }
                   }
                 }
@@ -1004,7 +1078,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Border": {
                       "thickness": 1.5,
@@ -1209,7 +1283,7 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Font": {
                       "family": "Barlow",
@@ -1302,7 +1376,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFD6AA65"
+                    "Background.Border.colour": "FFD4BA8E"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -1318,22 +1392,121 @@
     {
       "_children": {
         "Core": {
-          "name": "Slider_1789884551206",
+          "name": "Label_1789891718679",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551206",
+          "id": "ctrl_1789891718679",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 26,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "TUNE",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Barlow",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
+          "lampBezelColour": "AA3A3E43"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718680",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718680",
+          "controlType": "Label"
+        },
+        "Transform": {
+          "x": 194,
+          "y": 280,
+          "width": 150,
+          "height": 26
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "00000000"
+            },
+            "Border": {
+              "enabled": false,
+              "thickness": 0
+            }
+          }
+        },
+        "Text": {
+          "content": "CUTOFF",
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Barlow",
+              "weight": "Bold",
+              "weightValue": 700,
+              "size": 11,
+              "letterSpacing": 0.9
+            }
+          }
+        },
+        "ContentLayout": {
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
+          "lampBezelColour": "AA3A3E43"
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789891718681",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718681",
           "controlType": "Slider"
         },
         "Transform": {
-          "x": 364,
-          "y": 133,
-          "width": 190,
-          "height": 78
+          "x": 356,
+          "y": 120,
+          "width": 44,
+          "height": 173
         },
         "Behavior": {
-          "defaultCurrentValue": 0.66,
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.2,
           "minorTickCount": 0,
           "majorTickLength": 6,
           "showMinMaxLabels": false,
+          "showValueReadout": false,
           "labelReadoutPlacement": "topRight",
           "labelTitlePlacement": "topLeft"
         },
@@ -1344,10 +1517,10 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF0A0C0E"
+                      "colour": "FF0E1215"
                     },
                     "Border": {
-                      "colour": "FF606162"
+                      "colour": "FF626567"
                     },
                     "Corners": {
                       "radius": 2
@@ -1362,7 +1535,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF7DE3FF"
+                      "colour": "FFD4BA8E"
                     },
                     "Corners": {
                       "radius": 2
@@ -1389,7 +1562,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Border": {
                       "colour": "CC3A3E43"
@@ -1412,8 +1585,8 @@
             "pointerStart": {
               "_children": {
                 "Layout": {
-                  "width": 22,
-                  "height": 44
+                  "width": 20,
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
@@ -1426,42 +1599,41 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 0
                           },
                           {
-                            "color": "909499",
+                            "color": "7E868B",
                             "position": 50
                           },
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF484A4C"
+                      "colour": "FF3F4346"
                     }
                   }
                 }
               },
               "kind": "block",
-              "grooveColour": "FF1B1D20",
-              "plateColour": "FFC9CED3",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
               "sheen": true,
               "shadow": true
             },
             "pointerCurrent": {
               "_children": {
                 "Layout": {
-                  "width": 22,
-                  "height": 44
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFB4B9BF",
+                      "colour": "FF9EA8AE",
                       "gradientEnabled": true,
                       "gradient": {
                         "type": "linear",
@@ -1469,37 +1641,37 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 0
                           },
                           {
-                            "color": "909499",
+                            "color": "7E868B",
                             "position": 50
                           },
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF484A4C"
+                      "colour": "FF3F4346"
                     }
                   }
                 }
               },
               "kind": "block",
-              "grooveColour": "FF1B1D20",
-              "plateColour": "FFC9CED3",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
               "sheen": true,
               "shadow": true
             },
             "pointerEnd": {
               "_children": {
                 "Layout": {
-                  "width": 22,
-                  "height": 44
+                  "width": 20,
+                  "height": 36
                 },
                 "Background": {
                   "_children": {
@@ -1512,29 +1684,29 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 0
                           },
                           {
-                            "color": "909499",
+                            "color": "7E868B",
                             "position": 50
                           },
                           {
-                            "color": "C7CBCF",
+                            "color": "B6BEC2",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FF484A4C"
+                      "colour": "FF3F4346"
                     }
                   }
                 }
               },
               "kind": "block",
-              "grooveColour": "FF1B1D20",
-              "plateColour": "FFC9CED3",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
               "sheen": true,
               "shadow": true
             },
@@ -1547,7 +1719,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "CC1B1D20"
+                      "colour": "CCF7F4EC"
                     }
                   }
                 }
@@ -1559,7 +1731,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "771B1D20"
+                      "colour": "77F7F4EC"
                     }
                   }
                 }
@@ -1616,7 +1788,7 @@
                 "Text": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB"
+                      "colour": "FF9EA8AE"
                     },
                     "Font": {
                       "family": "Barlow",
@@ -1659,7 +1831,7 @@
             "labelTitle": {
               "_children": {
                 "Text": {
-                  "content": "LEVEL",
+                  "content": "A",
                   "_children": {
                     "Fill": {
                       "colour": "FFF7F4EC"
@@ -1710,7 +1882,7 @@
               "patches": {
                 "parts": {
                   "pointerCurrent": {
-                    "Background.Border.colour": "FFD6AA65"
+                    "Background.Border.colour": "FFD4BA8E"
                   },
                   "labelValue": {
                     "Text.Fill.colour": "FFF7F4EC"
@@ -1726,90 +1898,407 @@
     {
       "_children": {
         "Core": {
-          "name": "Crossfader_1789884551207",
+          "name": "Slider_1789891718682",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551207",
-          "controlType": "Crossfader"
+          "id": "ctrl_1789891718682",
+          "controlType": "Slider"
         },
         "Transform": {
-          "x": 364,
-          "y": 234,
-          "width": 190,
-          "height": 62
+          "x": 406,
+          "y": 120,
+          "width": 44,
+          "height": 173
         },
-        "Background": {
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.55,
+          "minorTickCount": 0,
+          "majorTickLength": 6,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
           "_children": {
-            "Fill": {
-              "colour": "FF202A37",
-              "gradient": {
-                "type": "linear",
-                "angle": 180,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "CED2D5",
-                    "position": 0
-                  },
-                  {
-                    "color": "B4B9BF",
-                    "position": 55
-                  },
-                  {
-                    "color": "8C9095",
-                    "position": 100
+            "bodyTrackBase": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF626567"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
                   }
-                ]
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFD4BA8E"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
+                  }
+                }
+              },
+              "inset": 3,
+              "glow": false
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5FD3F0"
+                    }
+                  }
+                }
               }
             },
-            "Border": {
-              "colour": "FF4A4F55"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Crossfader": {
-          "handleSize": 22,
-          "handleStyle": "block",
-          "trackSize": 8,
-          "trackColour": "FF202A37",
-          "fillAColour": "FFD6AA65",
-          "fillBColour": "FF5FD3F0",
-          "handleColour": "FFCBD4DB",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Barlow"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 4,
-                  "spread": 0,
-                  "colour": "77000000"
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Border": {
+                      "colour": "CC3A3E43"
+                    }
+                  }
                 }
-              ]
+              }
             },
-            "Bevel": {
-              "enabled": true,
-              "size": 2,
-              "softness": 1,
-              "highlightOpacity": 60,
-              "shadowOpacity": 55
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF4F6F8"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1.3,
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "77F7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "D",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB4B9C0"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFD4BA8E"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
             }
           }
         }
@@ -1819,22 +2308,842 @@
     {
       "_children": {
         "Core": {
-          "name": "Button_1789884551208",
+          "name": "Slider_1789891718683",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718683",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 456,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.7,
+          "minorTickCount": 0,
+          "majorTickLength": 6,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF626567"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFD4BA8E"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
+                  }
+                }
+              },
+              "inset": 3,
+              "glow": false
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5FD3F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Border": {
+                      "colour": "CC3A3E43"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF4F6F8"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1.3,
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "77F7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "S",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB4B9C0"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFD4BA8E"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Slider_1789891718684",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718684",
+          "controlType": "Slider"
+        },
+        "Transform": {
+          "x": 506,
+          "y": 120,
+          "width": 44,
+          "height": 173
+        },
+        "Behavior": {
+          "orientation": "vertical",
+          "direction": "btt",
+          "defaultCurrentValue": 0.35,
+          "minorTickCount": 0,
+          "majorTickLength": 6,
+          "showMinMaxLabels": false,
+          "showValueReadout": false,
+          "labelReadoutPlacement": "topRight",
+          "labelTitlePlacement": "topLeft"
+        },
+        "Parts": {
+          "_children": {
+            "bodyTrackBase": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF0E1215"
+                    },
+                    "Border": {
+                      "colour": "FF626567"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
+                  }
+                }
+              },
+              "slot": true
+            },
+            "bodyTrackFill": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFD4BA8E"
+                    },
+                    "Corners": {
+                      "radius": 2
+                    }
+                  }
+                }
+              },
+              "inset": 3,
+              "glow": false
+            },
+            "bodySelectedRange": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5FD3F0"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCap": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Border": {
+                      "colour": "CC3A3E43"
+                    }
+                  }
+                }
+              }
+            },
+            "bodyCenterMarker": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF4F6F8"
+                    }
+                  }
+                }
+              }
+            },
+            "pointerStart": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerCurrent": {
+              "_children": {
+                "Layout": {
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "pointerEnd": {
+              "_children": {
+                "Layout": {
+                  "width": 20,
+                  "height": 36
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "B6BEC2",
+                            "position": 0
+                          },
+                          {
+                            "color": "7E868B",
+                            "position": 50
+                          },
+                          {
+                            "color": "B6BEC2",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "colour": "FF3F4346"
+                    }
+                  }
+                }
+              },
+              "kind": "block",
+              "grooveColour": "FF202529",
+              "plateColour": "FFADB5BA",
+              "sheen": true,
+              "shadow": true
+            },
+            "tickMajor": {
+              "_children": {
+                "Layout": {
+                  "width": 1.3,
+                  "height": 6
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "CCF7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "tickMinor": {
+              "_children": {
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "77F7F4EC"
+                    }
+                  }
+                }
+              },
+              "kind": "engraved"
+            },
+            "labelMin": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelMax": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelStart": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFE0A43A"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelCurrent": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF9EA8AE"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelEnd": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF5CC492"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelValue": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelTitle": {
+              "_children": {
+                "Text": {
+                  "content": "R",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            },
+            "labelUnit": {
+              "_children": {
+                "Text": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFF7F4EC"
+                    },
+                    "Font": {
+                      "family": "Barlow",
+                      "letterSpacing": 0.9
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "States": {
+          "_children": {
+            "Dragging": {
+              "patches": {
+                "parts": {
+                  "bodyTrackFill": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "bodySelectedRange": {
+                    "Background.Fill.colour": "FF8FE9FF"
+                  },
+                  "pointerCurrent": {
+                    "Background.Fill.colour": "FFB4B9C0"
+                  }
+                }
+              }
+            },
+            "Focused": {
+              "patches": {
+                "parts": {
+                  "pointerCurrent": {
+                    "Background.Border.colour": "FFD4BA8E"
+                  },
+                  "labelValue": {
+                    "Text.Fill.colour": "FFF7F4EC"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Button_1789891718685",
           "controlSetId": "chronograph",
           "controlForm": "new-chronograph",
-          "formFaceColour": "FFCBD4DB",
-          "formHousingColour": "FF202A37",
+          "formFaceColour": "FF9EA8AE",
+          "formHousingColour": "FF292D31",
           "formInkColour": "FF202020",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFD6AA65",
-          "id": "ctrl_1789884551208",
+          "formAccentColour": "FFD4BA8E",
+          "id": "ctrl_1789891718685",
           "controlType": "Button"
         },
         "Transform": {
-          "x": 576,
-          "y": 118,
-          "width": 124,
-          "height": 84
+          "x": 586,
+          "y": 126,
+          "width": 116,
+          "height": 76
         },
         "Background": {
           "_children": {
@@ -1914,8 +3223,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         },
         "States": {
@@ -1923,21 +3232,21 @@
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65"
+                  "Background.Border.colour": "FFD4BA8E"
                 }
               }
             }
@@ -1949,21 +3258,22 @@
     {
       "_children": {
         "Core": {
-          "name": "ToggleButton_1789884551209",
+          "name": "ToggleButton_1789891718686",
           "controlSetId": "chronograph",
           "controlForm": "new-chronograph",
-          "formFaceColour": "FFCBD4DB",
-          "formHousingColour": "FF202A37",
+          "formFaceColour": "FF9EA8AE",
+          "formHousingColour": "FF292D31",
           "formInkColour": "FF202020",
           "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFD6AA65",
-          "id": "ctrl_1789884551209",
+          "formAccentColour": "FFD4BA8E",
+          "id": "ctrl_1789891718686",
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 716,
-          "y": 118,
-          "height": 84
+          "x": 728,
+          "y": 126,
+          "width": 124,
+          "height": 76
         },
         "Background": {
           "_children": {
@@ -2045,8 +3355,8 @@
         "ContentLayout": {
           "lamp": "bat",
           "lampSize": 8,
-          "lampColour": "FFCBD4DB",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FF9EA8AE",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         },
         "Behavior": {
@@ -2057,28 +3367,28 @@
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65"
+                  "Background.Border.colour": "FFD4BA8E"
                 }
               }
             },
             "Selected": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65",
+                  "Background.Border.colour": "FFD4BA8E",
                   "_removed": [
                     "Background.Fill.colour",
                     "Text.Fill.colour"
@@ -2089,7 +3399,7 @@
             "Mixed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB",
+                  "Background.Fill.colour": "FF9EA8AE",
                   "Background.Border.colour": "FFC9A227",
                   "Text.Fill.colour": "FF202529"
                 }
@@ -2103,21 +3413,21 @@
     {
       "_children": {
         "Core": {
-          "name": "CyclicButton_1789884551210",
+          "name": "CyclicButton_1789891718687",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551210",
+          "id": "ctrl_1789891718687",
           "controlType": "CyclicButton"
         },
         "Transform": {
-          "x": 576,
-          "y": 220,
-          "width": 124,
-          "height": 36
+          "x": 586,
+          "y": 218,
+          "width": 116,
+          "height": 34
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFCBD4DB",
+              "colour": "FF9EA8AE",
               "gradientEnabled": true,
               "gradient": {
                 "type": "linear",
@@ -2125,15 +3435,15 @@
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "E5EAED",
+                    "color": "CFD4D7",
                     "position": 0
                   },
                   {
-                    "color": "CBD4DB",
+                    "color": "9EA8AE",
                     "position": 45
                   },
                   {
-                    "color": "707578",
+                    "color": "575C60",
                     "position": 100
                   }
                 ]
@@ -2143,7 +3453,7 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -2194,7 +3504,7 @@
                   "_type": "Material",
                   "enabled": true,
                   "kind": "brushed",
-                  "strength": 30,
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -2206,7 +3516,7 @@
           }
         },
         "Text": {
-          "content": "CYCLE",
+          "content": "MODE",
           "_children": {
             "Fill": {
               "colour": "FF202020"
@@ -2244,8 +3554,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         },
         "States": {
@@ -2253,28 +3563,28 @@
             "Hover": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Pressed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB"
+                  "Background.Fill.colour": "FF9EA8AE"
                 }
               }
             },
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65"
+                  "Background.Border.colour": "FFD4BA8E"
                 }
               }
             },
             "Selected": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65",
+                  "Background.Border.colour": "FFD4BA8E",
                   "Text.Fill.colour": "FF202020",
                   "_removed": [
                     "Background.Fill.colour"
@@ -2285,7 +3595,7 @@
             "Mixed": {
               "patches": {
                 "component": {
-                  "Background.Fill.colour": "FFCBD4DB",
+                  "Background.Fill.colour": "FF9EA8AE",
                   "Background.Border.colour": "FFC9A227",
                   "Text.Fill.colour": "FF202529"
                 }
@@ -2299,21 +3609,20 @@
     {
       "_children": {
         "Core": {
-          "name": "Combobox_1789884551211",
+          "name": "Combobox_1789891718688",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551211",
+          "id": "ctrl_1789891718688",
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 716,
-          "y": 220,
-          "width": 136,
-          "height": 36
+          "x": 728,
+          "y": 218,
+          "width": 124
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FFCBD4DB",
+              "colour": "FF9EA8AE",
               "gradientEnabled": true,
               "gradient": {
                 "type": "linear",
@@ -2321,15 +3630,15 @@
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "E5EAED",
+                    "color": "CFD4D7",
                     "position": 0
                   },
                   {
-                    "color": "CBD4DB",
+                    "color": "9EA8AE",
                     "position": 45
                   },
                   {
-                    "color": "707578",
+                    "color": "575C60",
                     "position": 100
                   }
                 ]
@@ -2339,7 +3648,7 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -2390,7 +3699,7 @@
                   "_type": "Material",
                   "enabled": true,
                   "kind": "brushed",
-                  "strength": 30,
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -2445,8 +3754,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         },
         "States": {
@@ -2468,7 +3777,7 @@
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65"
+                  "Background.Border.colour": "FFD4BA8E"
                 }
               }
             }
@@ -2480,30 +3789,31 @@
     {
       "_children": {
         "Core": {
-          "name": "Number_1789884551212",
+          "name": "Number_1789891718689",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551212",
+          "id": "ctrl_1789891718689",
           "controlType": "Number"
         },
         "Transform": {
-          "x": 576,
-          "y": 265,
-          "width": 124,
-          "height": 46
+          "x": 586,
+          "y": 267,
+          "width": 116,
+          "height": 42
         },
         "Parts": {
           "_children": {
             "decrement": {
               "_children": {
                 "Layout": {
-                  "y": 30,
-                  "height": 40,
+                  "y": 4,
+                  "width": 23,
+                  "height": 92,
                   "anchorY": "top"
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB",
+                      "colour": "FF9EA8AE",
                       "gradientEnabled": true,
                       "gradient": {
                         "type": "linear",
@@ -2511,22 +3821,22 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "E5EAED",
+                            "color": "CFD4D7",
                             "position": 0
                           },
                           {
-                            "color": "CBD4DB",
+                            "color": "9EA8AE",
                             "position": 45
                           },
                           {
-                            "color": "707578",
+                            "color": "575C60",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFD6AA65"
+                      "colour": "FFD4BA8E"
                     },
                     "Corners": {
                       "radius": 3
@@ -2580,7 +3890,7 @@
                           "_type": "Material",
                           "enabled": true,
                           "kind": "brushed",
-                          "strength": 30,
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2619,9 +3929,9 @@
             "valueField": {
               "_children": {
                 "Layout": {
-                  "x": 28,
+                  "x": 27,
                   "y": 4,
-                  "width": 44,
+                  "width": 46,
                   "height": 92,
                   "anchorX": "left",
                   "anchorY": "top"
@@ -2629,7 +3939,7 @@
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FF202A37",
+                      "colour": "FF292D31",
                       "gradientEnabled": true,
                       "gradient": {
                         "type": "linear",
@@ -2637,22 +3947,22 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "0B0F13",
+                            "color": "0E1011",
                             "position": 0
                           },
                           {
-                            "color": "202A37",
+                            "color": "292D31",
                             "position": 35
                           },
                           {
-                            "color": "3B444F",
+                            "color": "43464A",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFD6AA65"
+                      "colour": "FFD4BA8E"
                     },
                     "Corners": {
                       "radius": 3
@@ -2706,7 +4016,7 @@
                           "_type": "Material",
                           "enabled": false,
                           "kind": "brushed",
-                          "strength": 30,
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2748,16 +4058,17 @@
             "increment": {
               "_children": {
                 "Layout": {
-                  "x": 76,
-                  "y": 30,
-                  "height": 40,
+                  "x": 77,
+                  "y": 4,
+                  "width": 23,
+                  "height": 92,
                   "anchorX": "left",
                   "anchorY": "top"
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "FFCBD4DB",
+                      "colour": "FF9EA8AE",
                       "gradientEnabled": true,
                       "gradient": {
                         "type": "linear",
@@ -2765,22 +4076,22 @@
                         "edge": 0,
                         "stops": [
                           {
-                            "color": "E5EAED",
+                            "color": "CFD4D7",
                             "position": 0
                           },
                           {
-                            "color": "CBD4DB",
+                            "color": "9EA8AE",
                             "position": 45
                           },
                           {
-                            "color": "707578",
+                            "color": "575C60",
                             "position": 100
                           }
                         ]
                       }
                     },
                     "Border": {
-                      "colour": "FFD6AA65"
+                      "colour": "FFD4BA8E"
                     },
                     "Corners": {
                       "radius": 3
@@ -2834,7 +4145,7 @@
                           "_type": "Material",
                           "enabled": true,
                           "kind": "brushed",
-                          "strength": 30,
+                          "strength": 8,
                           "shine": 65,
                           "grain": 100,
                           "lampFollowsSet": true,
@@ -2878,10 +4189,10 @@
               "patches": {
                 "parts": {
                   "decrement": {
-                    "Background.Fill.colour": "FFCBD4DB"
+                    "Background.Fill.colour": "FF9EA8AE"
                   },
                   "increment": {
-                    "Background.Fill.colour": "FFCBD4DB"
+                    "Background.Fill.colour": "FF9EA8AE"
                   },
                   "valueField": {
                     "Background.Fill.colour": "FF202327"
@@ -2893,10 +4204,10 @@
               "patches": {
                 "parts": {
                   "decrement": {
-                    "Background.Fill.colour": "FFCBD4DB"
+                    "Background.Fill.colour": "FF9EA8AE"
                   },
                   "increment": {
-                    "Background.Fill.colour": "FFCBD4DB"
+                    "Background.Fill.colour": "FF9EA8AE"
                   }
                 }
               }
@@ -2906,7 +4217,7 @@
                 "parts": {
                   "valueField": {
                     "Background.Fill.colour": "FF1E3238",
-                    "Background.Border.colour": "FFD6AA65"
+                    "Background.Border.colour": "FFD4BA8E"
                   }
                 }
               }
@@ -2915,7 +4226,7 @@
               "patches": {
                 "parts": {
                   "valueField": {
-                    "Background.Border.colour": "FFD6AA65"
+                    "Background.Border.colour": "FFD4BA8E"
                   }
                 }
               }
@@ -2928,20 +4239,21 @@
     {
       "_children": {
         "Core": {
-          "name": "TextInput_1789884551213",
+          "name": "TextInput_1789891718690",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551213",
+          "id": "ctrl_1789891718690",
           "controlType": "TextInput"
         },
         "Transform": {
-          "x": 716,
-          "y": 273,
-          "width": 136
+          "x": 728,
+          "y": 267,
+          "width": 124,
+          "height": 36
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF202A37",
+              "colour": "FF292D31",
               "gradientEnabled": true,
               "gradient": {
                 "type": "linear",
@@ -2949,15 +4261,15 @@
                 "edge": 0,
                 "stops": [
                   {
-                    "color": "0B0F13",
+                    "color": "0E1011",
                     "position": 0
                   },
                   {
-                    "color": "202A37",
+                    "color": "292D31",
                     "position": 35
                   },
                   {
-                    "color": "3B444F",
+                    "color": "43464A",
                     "position": 100
                   }
                 ]
@@ -2967,7 +4279,7 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             },
             "Effects": {
               "_type": "Effects",
@@ -3018,7 +4330,7 @@
                   "_type": "Material",
                   "enabled": false,
                   "kind": "brushed",
-                  "strength": 30,
+                  "strength": 8,
                   "shine": 65,
                   "grain": 100,
                   "lampFollowsSet": true,
@@ -3030,7 +4342,7 @@
           }
         },
         "Text": {
-          "content": "Studio A",
+          "content": "Init patch",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -3066,8 +4378,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         },
         "States": {
@@ -3089,7 +4401,7 @@
             "Focused": {
               "patches": {
                 "component": {
-                  "Background.Border.colour": "FFD6AA65"
+                  "Background.Border.colour": "FFD4BA8E"
                 }
               }
             }
@@ -3101,15 +4413,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551214",
+          "name": "Label_1789891718691",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551214",
+          "id": "ctrl_1789891718691",
           "controlType": "Label"
         },
         "Transform": {
           "x": 26,
-          "y": 310,
-          "width": 250,
+          "y": 318,
+          "width": 360,
           "height": 26
         },
         "Background": {
@@ -3124,7 +4436,7 @@
           }
         },
         "Text": {
-          "content": "PLAY / SHAPE",
+          "content": "PADS / MODULATION",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -3139,8 +4451,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -3149,15 +4461,15 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551215",
+          "name": "Label_1789891718692",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551215",
+          "id": "ctrl_1789891718692",
           "controlType": "Label"
         },
         "Transform": {
           "x": 540,
-          "y": 310,
-          "width": 250,
+          "y": 318,
+          "width": 300,
           "height": 26
         },
         "Background": {
@@ -3172,7 +4484,7 @@
           }
         },
         "Text": {
-          "content": "MEASURE / ROUTE",
+          "content": "OUTPUT / ROUTING",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -3187,8 +4499,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },
@@ -3197,21 +4509,21 @@
     {
       "_children": {
         "Core": {
-          "name": "DrumPads_1789884551216",
+          "name": "DrumPads_1789891718693",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551216",
+          "id": "ctrl_1789891718693",
           "controlType": "DrumPads"
         },
         "Transform": {
           "x": 26,
-          "y": 348,
+          "y": 356,
           "width": 228,
-          "height": 214
+          "height": 206
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF202A37",
+              "colour": "FF292D31",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
@@ -3236,7 +4548,7 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
@@ -3246,12 +4558,12 @@
           "showNotes": false,
           "showHeader": false,
           "padForm": "physical-chronograph",
-          "padAppearance": "raised",
-          "padRadius": 7,
-          "fieldColour": "FF202A37",
-          "padColour": "FFCBD4DB",
-          "accentColour": "FFD6AA65",
-          "hitColour": "FFD6AA65",
+          "padAppearance": "inset",
+          "padRadius": 4,
+          "fieldColour": "FF292D31",
+          "padColour": "FF9EA8AE",
+          "accentColour": "FFD4BA8E",
+          "hitColour": "FFD4BA8E",
           "labelColour": "FF202020"
         },
         "Text": {
@@ -3294,21 +4606,21 @@
     {
       "_children": {
         "Core": {
-          "name": "Envelope_1789884551217",
+          "name": "Envelope_1789891718694",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551217",
+          "id": "ctrl_1789891718694",
           "controlType": "Envelope"
         },
         "Transform": {
           "x": 284,
-          "y": 348,
+          "y": 356,
           "width": 220,
           "height": 70
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF202A37",
+              "colour": "FF292D31",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
@@ -3333,19 +4645,19 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
         "Envelope": {
           "lineWidth": 3,
           "nodeRadius": 3,
-          "lineColour": "FFD6AA65",
+          "lineColour": "FFD4BA8E",
           "fillColour": "20000000",
-          "nodeColour": "FFCBD4DB",
+          "nodeColour": "FF9EA8AE",
           "gridColour": "66303338",
           "sustainColour": "FF5FD3F0",
-          "playheadColour": "FFD6AA65"
+          "playheadColour": "FFD4BA8E"
         },
         "Text": {
           "_children": {
@@ -3384,21 +4696,21 @@
     {
       "_children": {
         "Core": {
-          "name": "Ribbon_1789884551218",
+          "name": "Crossfader_1789891718695",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551218",
-          "controlType": "Ribbon"
+          "id": "ctrl_1789891718695",
+          "controlType": "Crossfader"
         },
         "Transform": {
           "x": 284,
-          "y": 427,
+          "y": 435,
           "width": 220,
-          "height": 30
+          "height": 42
         },
         "Background": {
           "_children": {
             "Fill": {
-              "colour": "FF202A37",
+              "colour": "FF292D31",
               "gradient": {
                 "type": "linear",
                 "angle": 180,
@@ -3423,20 +4735,19 @@
               "colour": "FF4A4F55"
             },
             "Corners": {
-              "radius": 7
+              "radius": 4
             }
           }
         },
-        "Ribbon": {
-          "orientation": "horizontal",
-          "style": "wheel3d",
-          "showGlow": false,
-          "indicatorSize": 8,
-          "trackColour": "FF202A37",
-          "fillColour": "FFD6AA65",
-          "indicatorColour": "FFCBD4DB",
-          "glowColour": "FFD6AA65",
-          "wheelColour": "FFA2A7AE",
+        "Crossfader": {
+          "showGains": true,
+          "handleSize": 34,
+          "handleStyle": "blade",
+          "trackSize": 8,
+          "trackColour": "FF292D31",
+          "fillAColour": "FFD4BA8E",
+          "fillBColour": "FF5FD3F0",
+          "handleColour": "FF9EA8AE",
           "labelColour": "FFF2F2F2"
         },
         "Text": {
@@ -3479,323 +4790,23 @@
     {
       "_children": {
         "Core": {
-          "name": "Meter_1789884551219",
+          "name": "StepSequencer_1789891718696",
           "controlSetId": "chronograph",
-          "controlForm": "new-chronograph",
-          "formFaceColour": "FFCBD4DB",
-          "formHousingColour": "FF202A37",
-          "formInkColour": "FF202020",
-          "formLabelColour": "FFF7F4EC",
-          "formAccentColour": "FFD6AA65",
-          "id": "ctrl_1789884551219",
-          "controlType": "Meter"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 342,
-          "width": 312,
-          "height": 108
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF202A37",
-              "gradient": {
-                "type": "linear",
-                "angle": 180,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "CED2D5",
-                    "position": 0
-                  },
-                  {
-                    "color": "B4B9BF",
-                    "position": 55
-                  },
-                  {
-                    "color": "8C9095",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "colour": "FF4A4F55"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Meter": {
-          "value": 0.7,
-          "segments": 16,
-          "segmentGap": 3,
-          "trackColour": "FF202A37",
-          "fillColour": "FFD6AA65",
-          "thickness": 16,
-          "rounded": true,
-          "peakColour": "FFD6AA65",
-          "showTicks": true,
-          "valuePrecision": 2
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF2F2F2"
-            },
-            "Font": {
-              "family": "Barlow"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 4,
-                  "spread": 0,
-                  "colour": "77000000"
-                }
-              ]
-            },
-            "Bevel": {
-              "enabled": true,
-              "size": 2,
-              "softness": 1,
-              "highlightOpacity": 60,
-              "shadowOpacity": 55
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "Matrix_1789884551220",
-          "controlSetId": "chronograph",
-          "id": "ctrl_1789884551220",
-          "controlType": "Matrix"
-        },
-        "Transform": {
-          "x": 540,
-          "y": 466,
-          "width": 166,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF202A37",
-              "gradient": {
-                "type": "linear",
-                "angle": 180,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "CED2D5",
-                    "position": 0
-                  },
-                  {
-                    "color": "B4B9BF",
-                    "position": 55
-                  },
-                  {
-                    "color": "8C9095",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "colour": "FF4A4F55"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Matrix": {
-          "rows": [
-            "LFO",
-            "ENV",
-            "VEL"
-          ],
-          "cols": [
-            "OSC",
-            "FLT",
-            "AMP"
-          ],
-          "amounts": [
-            0.6,
-            0,
-            -0.4,
-            0,
-            0.7,
-            0,
-            0,
-            0.4,
-            0.8
-          ],
-          "cellStyle": "dot",
-          "rowHeaderW": 42,
-          "cellBg": "FF202A37",
-          "gridColour": "66303338",
-          "posColour": "FFD6AA65",
-          "negColour": "FF5FD3F0",
-          "labelColour": "FFF2F2F2",
-          "activeColour": "FFD6AA65"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Barlow"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 4,
-                  "spread": 0,
-                  "colour": "77000000"
-                }
-              ]
-            },
-            "Bevel": {
-              "enabled": true,
-              "size": 2,
-              "softness": 1,
-              "highlightOpacity": 60,
-              "shadowOpacity": 55
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "VectorJoystick_1789884551221",
-          "controlSetId": "chronograph",
-          "id": "ctrl_1789884551221",
-          "controlType": "VectorJoystick"
-        },
-        "Transform": {
-          "x": 728,
-          "y": 466,
-          "width": 124,
-          "height": 100
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF202A37",
-              "gradient": {
-                "type": "linear",
-                "angle": 180,
-                "edge": 0,
-                "stops": [
-                  {
-                    "color": "CED2D5",
-                    "position": 0
-                  },
-                  {
-                    "color": "B4B9BF",
-                    "position": 55
-                  },
-                  {
-                    "color": "8C9095",
-                    "position": 100
-                  }
-                ]
-              }
-            },
-            "Border": {
-              "colour": "FF4A4F55"
-            },
-            "Corners": {
-              "radius": 7
-            }
-          }
-        },
-        "Joystick": {
-          "puckRadius": 7,
-          "padColour": "FF202A37",
-          "gridColour": "66303338",
-          "crosshairColour": "FFD6AA65",
-          "puckColour": "FFCBD4DB",
-          "cornerColour": "FFF7F4EC",
-          "labelColour": "FFF2F2F2"
-        },
-        "Text": {
-          "_children": {
-            "Fill": {
-              "colour": "FFF7F4EC"
-            },
-            "Font": {
-              "family": "Barlow"
-            }
-          }
-        },
-        "Effects": {
-          "_children": {
-            "Shadows": {
-              "items": [
-                {
-                  "enabled": true,
-                  "type": "drop",
-                  "offsetX": 0,
-                  "offsetY": 2,
-                  "blur": 4,
-                  "spread": 0,
-                  "colour": "77000000"
-                }
-              ]
-            },
-            "Bevel": {
-              "enabled": true,
-              "size": 2,
-              "softness": 1,
-              "highlightOpacity": 60,
-              "shadowOpacity": 55
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "StepSequencer_1789884551222",
-          "controlSetId": "chronograph",
-          "id": "ctrl_1789884551222",
+          "id": "ctrl_1789891718696",
           "controlType": "StepSequencer"
         },
         "Transform": {
           "x": 284,
-          "y": 466,
+          "y": 489,
           "width": 220,
-          "height": 100
+          "height": 77
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF292D31"
+            }
+          }
         },
         "StepSequencer": {
           "cellForm": "physical-chronograph",
@@ -3841,9 +4852,9 @@
               "velocity": 70
             }
           },
-          "cellColour": "FFCBD4DB",
-          "cellOnColour": "FFD6AA65",
-          "playheadColour": "FFD6AA65",
+          "cellColour": "FF9EA8AE",
+          "cellOnColour": "FFD4BA8E",
+          "playheadColour": "FFD4BA8E",
           "gridColour": "66303338",
           "labelColour": "FFF7F4EC"
         },
@@ -3860,9 +4871,316 @@
     {
       "_children": {
         "Core": {
-          "name": "Label_1789884551223",
+          "name": "Meter_1789891718697",
           "controlSetId": "chronograph",
-          "id": "ctrl_1789884551223",
+          "controlForm": "new-chronograph",
+          "formFaceColour": "FF9EA8AE",
+          "formHousingColour": "FF292D31",
+          "formInkColour": "FF202020",
+          "formLabelColour": "FFF7F4EC",
+          "formAccentColour": "FFD4BA8E",
+          "id": "ctrl_1789891718697",
+          "controlType": "Meter"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 352,
+          "width": 312,
+          "height": 92
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF292D31",
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "CED2D5",
+                    "position": 0
+                  },
+                  {
+                    "color": "B4B9BF",
+                    "position": 55
+                  },
+                  {
+                    "color": "8C9095",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "FF4A4F55"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Meter": {
+          "value": 0.7,
+          "segments": 16,
+          "segmentGap": 3,
+          "trackColour": "FF292D31",
+          "fillColour": "FFD4BA8E",
+          "thickness": 10,
+          "rounded": false,
+          "peakColour": "FFD4BA8E",
+          "showTicks": true,
+          "valuePrecision": 2
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF2F2F2"
+            },
+            "Font": {
+              "family": "Barlow"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "77000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "size": 2,
+              "softness": 1,
+              "highlightOpacity": 60,
+              "shadowOpacity": 55
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Matrix_1789891718698",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718698",
+          "controlType": "Matrix"
+        },
+        "Transform": {
+          "x": 540,
+          "y": 466,
+          "width": 166,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF292D31",
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "CED2D5",
+                    "position": 0
+                  },
+                  {
+                    "color": "B4B9BF",
+                    "position": 55
+                  },
+                  {
+                    "color": "8C9095",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "FF4A4F55"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Matrix": {
+          "rows": [
+            "LFO",
+            "ENV",
+            "VEL"
+          ],
+          "cols": [
+            "OSC",
+            "FLT",
+            "AMP"
+          ],
+          "amounts": [
+            0.6,
+            0,
+            -0.4,
+            0,
+            0.7,
+            0,
+            0,
+            0.4,
+            0.8
+          ],
+          "cellStyle": "dot",
+          "rowHeaderW": 42,
+          "cellBg": "FF292D31",
+          "gridColour": "66303338",
+          "posColour": "FFD4BA8E",
+          "negColour": "FF5FD3F0",
+          "labelColour": "FFF2F2F2",
+          "activeColour": "FFD4BA8E"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Barlow"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "77000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "size": 2,
+              "softness": 1,
+              "highlightOpacity": 60,
+              "shadowOpacity": 55
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "VectorJoystick_1789891718699",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718699",
+          "controlType": "VectorJoystick"
+        },
+        "Transform": {
+          "x": 728,
+          "y": 466,
+          "width": 124,
+          "height": 100
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF292D31",
+              "gradient": {
+                "type": "linear",
+                "angle": 180,
+                "edge": 0,
+                "stops": [
+                  {
+                    "color": "CED2D5",
+                    "position": 0
+                  },
+                  {
+                    "color": "B4B9BF",
+                    "position": 55
+                  },
+                  {
+                    "color": "8C9095",
+                    "position": 100
+                  }
+                ]
+              }
+            },
+            "Border": {
+              "colour": "FF4A4F55"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Joystick": {
+          "puckRadius": 7,
+          "padColour": "FF292D31",
+          "gridColour": "66303338",
+          "crosshairColour": "FFD4BA8E",
+          "puckColour": "FF9EA8AE",
+          "cornerColour": "FFF7F4EC",
+          "labelColour": "FFF2F2F2"
+        },
+        "Text": {
+          "_children": {
+            "Fill": {
+              "colour": "FFF7F4EC"
+            },
+            "Font": {
+              "family": "Barlow"
+            }
+          }
+        },
+        "Effects": {
+          "_children": {
+            "Shadows": {
+              "items": [
+                {
+                  "enabled": true,
+                  "type": "drop",
+                  "offsetX": 0,
+                  "offsetY": 2,
+                  "blur": 4,
+                  "spread": 0,
+                  "colour": "77000000"
+                }
+              ]
+            },
+            "Bevel": {
+              "enabled": true,
+              "size": 2,
+              "softness": 1,
+              "highlightOpacity": 60,
+              "shadowOpacity": 55
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "Label_1789891718700",
+          "controlSetId": "chronograph",
+          "id": "ctrl_1789891718700",
           "controlType": "Label"
         },
         "Transform": {
@@ -3883,7 +5201,7 @@
           }
         },
         "Text": {
-          "content": "Copy a control into your panel. Its pinned design travels with it.",
+          "content": "Editable synthesizer controls — copy individual controls into your panel.",
           "_children": {
             "Fill": {
               "colour": "FFF7F4EC"
@@ -3897,8 +5215,8 @@
           }
         },
         "ContentLayout": {
-          "lampColour": "FFD6AA65",
-          "lampOffColour": "FF202A37",
+          "lampColour": "FFD4BA8E",
+          "lampOffColour": "FF292D31",
           "lampBezelColour": "AA3A3E43"
         }
       },

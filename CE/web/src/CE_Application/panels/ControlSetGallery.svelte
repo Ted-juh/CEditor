@@ -1,6 +1,6 @@
 <script>
   import { onMount, untrack } from 'svelte';
-  import { STARTER_CONTROL_SETS } from '../models/controlSetCoverage.js';
+  import { PHYSICAL_DIRECTIONS as STARTER_CONTROL_SETS } from '../models/physicalControlSets.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
   import { getControlSet } from '../models/controlSets.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
@@ -8,7 +8,7 @@
   import { addPanel } from '../stores/panels.js';
   import { setActivePanelControlSet } from '../stores/controlSets.js';
   let { initialId = 'graphite', onclose = () => {} } = $props();
-  let selected = $state(untrack(() => getControlSet(initialId) ? initialId : 'graphite'));
+  let selected = $state(untrack(() => STARTER_CONTROL_SETS.some(d=>d.id===initialId) ? initialId : STARTER_CONTROL_SETS[0].id));
   let dialog;
   let grayscale = $state(false);
   let sample = $derived(createControlSetStarter(selected));
@@ -19,7 +19,7 @@
 </script>
 
 <dialog bind:this={dialog} onclose={onclose} oncancel={(e) => { e.preventDefault(); onclose(); }} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onclose(); } }} aria-label="Control set gallery">
-  <header><div><small>CEDITOR / CONTROL LIBRARY</small><h2>{STARTER_CONTROL_SETS.length} ways to start.</h2></div><button class="close" aria-label="Close gallery" onclick={onclose}>×</button></header>
+  <header><div><small>CEDITOR / CONTROL LIBRARY</small><h2>{STARTER_CONTROL_SETS.length} synthesizer designs.</h2></div><button class="close" aria-label="Close gallery" onclick={onclose}>×</button></header>
   <div class="body">
     <nav aria-label="Starter designs">
       {#each STARTER_CONTROL_SETS as entry, index}

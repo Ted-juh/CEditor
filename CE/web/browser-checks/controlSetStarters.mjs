@@ -90,6 +90,17 @@ try {
     const fader=page.locator('.xfader').first();
     assert.ok(await fader.count());
     if(ids.indexOf(id)>=12) await checkPerformance(id);
+    if(ids.indexOf(id)>=24) {
+      assert.equal(size.faders.length,4,`${id}: four envelope faders`);
+      for(const faderId of size.faders) {
+        const slider=page.locator(`[data-control-id="${faderId}"]`);
+        const value=Number(await slider.getAttribute('aria-valuenow'));
+        await slider.focus();await page.keyboard.press('ArrowUp');
+        assert.ok(Number(await slider.getAttribute('aria-valuenow'))>value,`${id}: vertical fader keyboard value`);
+        await page.keyboard.press('ArrowDown');
+      }
+    }
+    await page.evaluate(()=>document.activeElement?.blur());
     if(out) await page.screenshot({ path:join(out,`${id}.png`),clip:{x:0,y:0,width:size.width,height:size.height} });
     if(out) {
       await page.locator('.frame').evaluate(el=>el.style.filter='grayscale(1)');
@@ -122,21 +133,21 @@ try {
   await page.evaluate(() => window.__controlSetShot.gallery());
   const dialog=page.getByRole('dialog',{name:'Control set gallery'});
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),36);
-  await dialog.getByRole('button',{name:/Machined Precision/}).click();
+  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),12);
+  await dialog.getByRole('button',{name:/Precision Instrument/}).click();
   await dialog.getByRole('checkbox',{name:'Compare shapes in grayscale'}).check();
   assert.equal(await dialog.locator('.viewport').evaluate(el=>getComputedStyle(el).filter),'grayscale(1)');
   await page.evaluate(() => document.fonts.ready);
   if(out) await page.screenshot({path:join(out,'gallery.png')});
   await dialog.getByRole('button',{name:'Open editable starter'}).click();
-  await page.waitForFunction(() => window.__controlSetShot.active().set==='machined');
+  await page.waitForFunction(() => window.__controlSetShot.active().set==='chronograph');
   const state=await page.evaluate(() => window.__controlSetShot.active());
-  assert.ok(state.pins.every(id => id==='machined'));
-  assert.match(state.name,/Machined/);
+  assert.ok(state.pins.every(id => id==='chronograph'));
+  assert.match(state.name,/Precision/);
   await page.evaluate(() => window.__controlSetShot.gallery());
   await page.locator('dialog[open]').waitFor();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog[open]'));
   assert.deepEqual(errors,[]);
-  console.log('gallery: thirty-six choices, new editable panel, portable designs and Escape passed');
+  console.log('gallery: twelve synthesizer choices, new editable panel, portable designs and Escape passed');
 } finally { await browser?.close(); server.close(); }
