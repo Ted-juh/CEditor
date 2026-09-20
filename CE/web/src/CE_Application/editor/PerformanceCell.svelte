@@ -1,10 +1,14 @@
 <script>
+  import PhysicalCell from './PhysicalCell.svelte';
   import { performancePath } from '../utils/performanceShapes.js';
   let { form='rect', x=0,y=0,w=100,h=100,face,ink,accent,active=false,echo=false,depth=.6 }=$props();
   const uid=$props.id();
   let path=$derived(performancePath(form,w,h));
 </script>
 <g transform={`translate(${x} ${y})`} data-performance-form={form} data-active={active}>
+  {#if form.startsWith('physical-')}
+    <PhysicalCell design={form.slice(9)} {path} {w} {h} {face} {ink} {accent} {active} {echo} {depth}/>
+  {:else}
   <defs><radialGradient id={`${uid}-skin`} cx=".3" cy=".2"><stop stop-color="white" stop-opacity={depth*.65}/><stop offset=".7" stop-color={face}/><stop offset="1" stop-color="black" stop-opacity={depth*.4}/></radialGradient></defs>
   {#if !active}<path d={path} transform="translate(0 2)" fill="black" opacity=".35"/>{/if}
   <path d={path} fill={active?accent:face} stroke={echo?accent:ink} stroke-width={echo?3:1.5}/>
@@ -19,4 +23,5 @@
   {:else if form==='shield'}<path d={`M${w*.18} ${h*.18}H${w*.82}M${w*.5} ${h*.78}V${h*.88}`} stroke={accent} stroke-width="3"/>
   {:else if form==='hex'}<path d={`M${w*.3} ${h*.08}H${w*.7}`} stroke={accent} stroke-width="4"/>
   {:else if form==='pod'}<path d={`M${w*.1} ${h*.35}V${h*.65}M${w*.9} ${h*.35}V${h*.65}`} stroke={accent} stroke-width="3"/>{/if}
+  {/if}
 </g>

@@ -66,5 +66,5 @@ test('all additional starters preserve distinct pad and number geometry, rhythm,
     layouts.add(JSON.stringify(Object.values(parts).map(p=>p._children.Layout)));
     assert.equal(parts.decrement.role,'decrement');assert.equal(parts.increment.role,'increment');
   }
-  assert.equal(layouts.size,12);
+  assert.equal(layouts.size,ADDITIONAL_DIRECTIONS.length);
 });

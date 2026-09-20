@@ -1,5 +1,7 @@
+import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
 // The exact same outline drives drawing and pointer tests. Normalized to each cell's bounds.
 export const PERFORMANCE_FORMS = [['rect','Original rectangle'],['porthole','Porthole'],['petal','Petal'],['diamond','Diamond'],['reel','Tape reel'],['hex','Hexagon'],['concertina','Concertina'],['ribbed','Ribbed capsule'],['shutter','Shutter'],['shield','Shield'],['pod','Orbital pod'],['fan','Folded fan'],['gear','Gear']];
+for (const d of PHYSICAL_DIRECTIONS) PERFORMANCE_FORMS.push([d.padForm,d.name]);
 const polygon = {
   rect:[[0,0],[1,0],[1,1],[0,1]],
   diamond:[[.5,0],[1,.5],[.5,1],[0,.5]],
@@ -16,6 +18,7 @@ polygon.reel=radial(48,()=>.49);
 polygon.petal=radial(64,a=>.41+.08*Math.cos(a*4));
 polygon.gear=radial(48,(_,i)=>i%4<2?.49:.41);
 polygon.ribbed=Array.from({length:48},(_,i)=>{const a=i*Math.PI*2/48;return [.5+Math.cos(a)*.49,.5+Math.sin(a)*.49];});
+for (const d of PHYSICAL_DIRECTIONS) polygon[d.padForm]=polygon[d.outline];
 export const performancePoints = form=>polygon[form]??polygon.rect;
 export function performancePath(form,w,h,x=0,y=0) { return performancePoints(form).map(([px,py],i)=>`${i?'L':'M'}${x+px*w} ${y+py*h}`).join(' ')+'Z'; }
 export function performanceContains(form,x,y) {

@@ -1,3 +1,5 @@
+import { lighten, darken } from './controlSetDesigns.js';
+import { PHYSICAL_DIRECTIONS } from './physicalControlSets.js';
 // Twelve constructions. Palettes are secondary to their moving geometry and performance surfaces.
 export const ADDITIONAL_DIRECTIONS = [
   ['atlas','Atlas','Nautical / spokes','Ship wheel, compass needles, porthole pads and split circular steppers.','wheel','porthole','grid','circle','blueprint','172D3B','E3CF98','76CCD0'],
@@ -12,8 +14,12 @@ export const ADDITIONAL_DIRECTIONS = [
   ['satellite','Satellite','Space / articulated','Articulated dish arm, docking keys, orbital pods and stacked navigation steppers.','dish','pod','orbit','circle','frost','162B35','C2DADB','70CFC0'],
   ['fan','Fan','Paper / radial','Opening fan, pleated keys, fan-shaped pads and folded triangular steppers.','foldfan','fan','grid','triangle','pop','F1E6D8','E4A17C','36596A'],
   ['crown','Crown','Clockwork / escapement','Toothed crown, escapement keys, gear pads and inset mechanical steppers.','gear','gear','grid','hexagon','machined','292728','CEAD73','91BEAF'],
-].map(([id,name,title,detail,rotary,padForm,padLayout,stepKind,base,panel,face,accent])=>({id,name,title,detail,rotary,padForm,padLayout,stepKind,base,panel,face,accent,pad:'raised',radius:4,handle:'block',meter:12,ribbon:'wheel3d',matrix:'dot'}));
+].map(([id,name,title,detail,rotary,padForm,padLayout,stepKind,base,panel,face,accent])=>({id,name,title,detail,rotary,padForm,padLayout,stepKind,base,panel,face,accent,pad:'raised',radius:4,handle:'block',meter:12,ribbon:'wheel3d',matrix:'dot'})).concat(PHYSICAL_DIRECTIONS);
 
+function physicalFinish(d, inset=false) {
+  const colour=inset?d.panel:d.face;
+  return {'Background.Fill.gradientEnabled':true,'Background.Fill.gradient':{type:'linear',angle:180,edge:0,stops:[{color:inset?darken(colour,.65):lighten(colour,.5),position:0},{color:colour,position:inset?35:45},{color:inset?lighten(colour,.12):darken(colour,.45),position:100}]},'Background.Effects.Material.enabled':!inset,'Background.Effects.Material.kind':d.material,'Background.Effects.Material.strength':30,'Background.Effects.Material.shine':65,'Effects.Bevel.enabled':true,'Effects.Bevel.style':inset?'inner-bevel':'outer-bevel','Effects.Bevel.size':2,'Effects.Bevel.softness':1,'Effects.Bevel.depth':120,'Effects.Bevel.highlightOpacity':75,'Effects.Bevel.shadowOpacity':70};
+}
 function ink(hex) { const [r,g,b]=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)); return .2126*r+.7152*g+.0722*b>145?'FF202529':'FFF7F4EC'; }
 export function makeAdditionalControlSets(bases) {
   return ADDITIONAL_DIRECTIONS.map(d=>{
@@ -24,8 +30,13 @@ export function makeAdditionalControlSets(bases) {
       if(key.startsWith('text.')) tokens[key]=ink(d.panel);
     }
     Object.assign(tokens,{'accent':'FF'+d.accent,'accent.hot':'FF'+d.accent,'control.field':'FF'+d.panel,'control.track':'FF'+d.panel,'control.fill':'FF'+d.accent,'text.inverse':ink(d.face)});
-    // No inherited texture: each construction has deliberate open space and contrast.
-    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel},families:{...base.families,Label:{component:{...base.families?.Label?.component,'Text.Fill.colour':'{text.primary}'}}}};
+    const families={...base.families,Label:{component:{...base.families?.Label?.component,'Text.Fill.colour':'{text.primary}'}}};
+    if(d.physical) for(const type of ['TextInput','Combobox','CyclicButton']) {
+      const inset=type==='TextInput';
+      families[type]={...families[type],component:{...families[type]?.component,...physicalFinish(d,inset),'Background.Fill.colour':inset?'{control.field}':'{surface}','Text.Fill.colour':ink(inset?d.panel:d.face),'Background.Corners.radius':d.radius}};
+    }
+    // Physical sets supply their own restrained panel material.
+    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:true,kind:d.material,strength:35,shine:30,grain:65,lampFollowsSet:true}}:{})},families};
   });
 }
 
@@ -43,6 +54,18 @@ const NUMBER_LAYOUTS = [
   [[0,52,27,45],[31,18,65,64],[0,0,27,45]],
   [[0,20,28,72],[31,28,38,44],[72,5,28,72]],
   [[3,25,26,50],[33,0,34,100],[71,25,26,50]],
+  [[0,12,26,76],[30,20,40,60],[74,12,26,76]],
+  [[0,4,30,42],[34,14,62,72],[0,54,30,42]],
+  [[0,8,22,84],[26,26,48,48],[78,8,22,84]],
+  [[0,20,28,60],[32,5,36,90],[72,20,28,60]],
+  [[75,54,25,42],[0,8,68,84],[75,4,25,42]],
+  [[0,30,29,64],[33,14,34,60],[71,30,29,64]],
+  [[0,4,26,60],[30,22,40,56],[74,36,26,60]],
+  [[0,30,24,40],[28,4,44,92],[76,30,24,40]],
+  [[0,8,26,84],[30,12,40,76],[74,8,26,84]],
+  [[0,5,28,90],[32,25,36,50],[72,5,28,90]],
+  [[0,22,25,56],[29,6,42,88],[75,22,25,56]],
+  [[0,46,25,50],[29,14,42,72],[75,4,25,50]],
 ];
 export function additionalNumberFamily(id) {
   const index=ADDITIONAL_DIRECTIONS.findIndex(d=>d.id===id);
@@ -50,6 +73,6 @@ export function additionalNumberFamily(id) {
   const d=ADDITIONAL_DIRECTIONS[index];
   return {parts:Object.fromEntries(['decrement','valueField','increment'].map((name,i)=>{
     const [x,y,width,height]=NUMBER_LAYOUTS[index][i];
-    return [name,{kind:i===1?'rect':d.stepKind,'Layout.x':x,'Layout.y':y,'Layout.width':width,'Layout.height':height,'Layout.xUnit':'percent','Layout.yUnit':'percent','Layout.widthUnit':'percent','Layout.heightUnit':'percent','Layout.anchorX':'left','Layout.anchorY':'top','Background.Corners.radius':i===1?3:20,'Background.Fill.colour':i===1?'{control.field}':'{surface}','Background.Border.enabled':true,'Background.Border.thickness':1,'Background.Border.colour':'{accent}','Text.Fill.colour':i===1?'{text.primary}':ink(d.face)}];
+    return [name,{...(d.physical?physicalFinish(d,i===1):{}),kind:i===1?'rect':d.stepKind,'Layout.x':x,'Layout.y':y,'Layout.width':width,'Layout.height':height,'Layout.xUnit':'percent','Layout.yUnit':'percent','Layout.widthUnit':'percent','Layout.heightUnit':'percent','Layout.anchorX':'left','Layout.anchorY':'top','Background.Corners.radius':i===1?3:d.physical?[4,14,2,12,2,8,20,3,1,0,6,10][index-12]:20,'Background.Fill.colour':i===1?'{control.field}':'{surface}','Background.Border.enabled':true,'Background.Border.thickness':1,'Background.Border.colour':'{accent}','Text.Fill.colour':i===1?'{text.primary}':ink(d.face)}];
   }))};
 }

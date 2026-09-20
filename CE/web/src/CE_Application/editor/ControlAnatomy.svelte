@@ -1,4 +1,6 @@
 <script>
+  import PhysicalAnatomy from './PhysicalAnatomy.svelte';
+  import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import AdditionalAnatomy from './AdditionalAnatomy.svelte';
   import { anatomyValue } from '../models/controlAnatomy.js';
   import { meterConfig, meterPosition } from '../utils/meterLayout.js';
@@ -43,7 +45,9 @@
       <line x1={q.x} y1={q.y} x2={z.x} y2={z.y} stroke={legend} stroke-width={i%3?1:2}/>
     {/each}
   {/snippet}
-  {#if String(form).startsWith('new-')}
+  {#if PHYSICAL_DIRECTIONS.some(d=>form===`new-${d.id}`)}
+    <PhysicalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} />
+  {:else if String(form).startsWith('new-')}
     <AdditionalAnatomy design={form.slice(4)} {knob} {meter} {toggle} {p} {active} {face} {ink} {accent} {housing} {legend} {depth} {size} {detail} {readout} {label} showValue={core.formShowValue!==false} />
   {:else if knob}
     <g transform={`translate(80 76) scale(${size}) translate(-80 -76)`}>
