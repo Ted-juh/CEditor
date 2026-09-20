@@ -8,6 +8,11 @@
 > Written in plain English on purpose. It is meant to be read by anyone, not just whoever ends up
 > building it. Where a file is named, it is because that is where the thing you would build on
 > already lives.
+>
+> A later record, [`raising-the-bar.md`](raising-the-bar.md), picks up several threads left open
+> here — §22's per-unit gap, §11's question about whether an emulation is any good, §24's
+> unactionable "this does not match my synth", §29's seeds, and §5's plain-word search — and says
+> what would have to be *measured* to close each one.
 
 ## How to read this
 

@@ -9,6 +9,13 @@
 > *unmatched today*, and [`tier-3-moonshots.md`](tier-3-moonshots.md), which took four bets already
 > on the table. This document deliberately looks past both. Where an idea here overlaps one of
 > those, it says so and adds only the part that is new.
+>
+> **Followed by [`raising-the-bar.md`](raising-the-bar.md)** (2026-09-16), which was asked to
+> raise the bar on this record and defined that as four harder tests. Its own framing is that
+> everything here ends with the program *sending* something, and everything there ends with it
+> checking what came back — spending the audio return the table below names, on a closed loop
+> rather than on a single measurement. It carries a table of every place it overlaps this
+> document, and it corrects one claim it first made about §3.1.
 
 ---
 
