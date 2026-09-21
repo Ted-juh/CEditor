@@ -1,6 +1,6 @@
 # Synthesizer control designs
 
-The default starter gallery contains twenty-four practical synth directions. The first twelve replace the
+The default starter gallery contains thirty-six practical synth directions. The first twelve replace the
 previous themed hardware illustrations. All use conventional pointer knobs or encoders,
 linear faders, rectangular performance pads, compact steppers and readable switches.
 
@@ -40,18 +40,35 @@ The second collection adds these twelve constructions without changing the first
 | Touch Encoder | Central numeric readouts, perimeter dots and thin fader markers |
 | Carbon Pro | Deep rubber finger grips, inset pointers and broad tactile caps |
 
-Open **Panel properties → Control set → Browse 24 synthesizer designs**. Copy individual
+The third collection makes depth and silhouette the primary distinction:
+
+| Design | Construction |
+| --- | --- |
+| Valve Console | High Bakelite domes, stepped brass skirts and sprung piano keys |
+| Chicken Head | Long pointer levers, horseshoe scales and wedge-like controls |
+| Turret Stack | Three concentric machined tiers, bridge faders and guarded keys |
+| Deep Flute | Twelve deep rubber grip channels and shock-mounted pads |
+| Concave Studio | Broad thumb dishes inside raised alloy bezels and saddle faders |
+| Hex Drive | Six-sided bodies, bolt-head centres and bevelled mechanical keys |
+| Coin Edge | Fine perimeter knurling, low caps and engraved rail controls |
+| Gimbal Ring | Nested suspended rings, yoke faders and framed controls |
+| Lever Dial | Raised radial levers over numbered plates and long fader grips |
+| Castellated | Eight tall grip towers, notched caps and protected stage switches |
+| Floating Halo | Suspended encoder bodies, luminous shadow gaps and edge-lit keys |
+| Prism Cap | Faceted translucent bodies, prismatic faders and lens switches |
+
+Open **Panel properties → Control set → Browse 36 synthesizer designs**. Copy individual
 controls between panels to combine sets. Core exposes form, colours, size and depth; faders
 and number steppers expose their Parts. The old experimental collections are no longer
 offered in the starter gallery. Their saved documents remain readable. The revised twelve
 keep their internal IDs so pinned references still resolve, while exported set filenames use
-the new display names. The full catalogue retains 66 definitions for compatibility.
+the new display names. The full catalogue now contains 78 definitions, including compatibility sets.
 
 Pad drawing and hit tests share one rounded-rectangle outline. Pressed pads travel within
 their mounts. Four-corner zones preserve their standard grid, and note identity, velocity,
 sequence order and keyboard access retain the existing behaviour. Knob construction is
 parametric SVG, not an independently editable vector drawing.
 
-Validation includes save/load, copying and pinning, all 48 historical/revised starter
-definitions, the twenty-four-choice gallery, each of the four vertical faders, knob values,
+Validation includes save/load, copying and pinning, all 60 historical/revised starter
+definitions, the thirty-six-choice gallery, each of the four vertical faders, knob values,
 button and toggle state, number steppers, pad press/release and empty-corner hits.

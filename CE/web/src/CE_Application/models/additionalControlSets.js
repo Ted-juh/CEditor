@@ -48,9 +48,11 @@ export function makeAdditionalControlSets(bases) {
         if(d.style==='edge-light') families.Slider.parts.bodyTrackFill.glow=true;
       }
       if(['flat','glass','digital'].includes(d.style)) for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{kind:'bar',shadow:d.style!=='flat','Background.Fill.gradientEnabled':d.style==='glass','Background.Corners.radius':d.style==='glass'?4:1});
+      if(d.series===3) for(const part of ['pointerCurrent','pointerStart','pointerEnd']) Object.assign(families.Slider.parts[part],{shadow:true,sheen:d.finish==='metal','Background.Fill.gradientEnabled':true});
     }
     // Physical sets supply their own restrained panel material.
-    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:(d.finish==='metal'||['console','modular','precision'].includes(d.style)),kind:d.material,strength:8,shine:15,grain:40,lampFollowsSet:true}}:{})},families};
+    if(d.series===3) for(const type of ['Knob','Button','MomentaryButton','ToggleButton','Meter','ProgressBar']) families[type]={...families[type],component:{...families[type]?.component,'Core.formDepth':92}};
+    return {...base,id:d.id,name:d.name,description:d.detail,tokens,panel:{colour:'FF'+d.panel,...(d.physical?{material:{enabled:(d.finish==='metal'||['console','modular','precision'].includes(d.style)),kind:d.material,strength:d.series===3?16:8,shine:d.series===3?35:15,grain:40,lampFollowsSet:true}}:{})},families};
   });
 }
 

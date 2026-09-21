@@ -1,6 +1,6 @@
 # Twelve additional control sets
 
-The starter gallery now has 24 design directions. Atlas, Kiln, Arcade, Spool, Tessera,
+The historical starter collection has 24 design directions. Atlas, Kiln, Arcade, Spool, Tessera,
 Bellows, Helix, Iris, Balance, Satellite, Fan and Crown add 48 rotary/key/switch/meter
 forms, twelve pad outlines and twelve Number stepper arrangements. The existing twelve
 starters remain available. The larger set catalogue contains 42 sets, including its
@@ -29,7 +29,7 @@ are unchanged by a cell's appearance. Edit the pattern in the existing Designer 
 ## Editing and interaction
 
 The experimental collection is retained for existing panels. The current gallery presents
-twenty-four synthesizer designs instead; see [Synthesizer control designs](physical-control-sets.md).
+thirty-six synthesizer designs instead; see [Synthesizer control designs](physical-control-sets.md).
 The gallery has a grayscale
 switch. Open a starter to copy its pinned controls into a panel.
 

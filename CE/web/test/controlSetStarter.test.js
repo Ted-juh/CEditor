@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
+import { PHYSICAL_DIRECTIONS } from '../src/CE_Application/models/physicalControlSets.js';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
@@ -9,8 +10,8 @@ import { shrinkControl, expandControl } from '../src/CE_Application/stores/docum
 import { serializePanel, deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { sceneryMarkupKey } from '../src/CE_Application/utils/sceneryMarkupCache.js';
 
-test('forty-eight editable starters round-trip with portable design pins and finite bounds', () => {
-  assert.equal(STARTER_CONTROL_SETS.length, 48);
+test('sixty editable starters round-trip with portable design pins and finite bounds', () => {
+  assert.equal(STARTER_CONTROL_SETS.length, 60);
   for (const { id } of STARTER_CONTROL_SETS) {
     const panel = createControlSetStarter(id);
     const restored = deserializePanel(serializePanel(panel));
@@ -22,6 +23,19 @@ test('forty-eight editable starters round-trip with portable design pins and fin
     }
     const slider = restored.controls.find(c => c._children.Core.controlType === 'Slider');
     assert.deepEqual(slider._children.Parts, panel.controls.find(c => c._children.Core.controlType === 'Slider')._children.Parts);
+  }
+});
+
+test('the third synth collection has twelve distinct sculpted mechanisms, not palette aliases', () => {
+  const sculpted = PHYSICAL_DIRECTIONS.filter((entry) => entry.series === 3);
+  assert.equal(sculpted.length, 12);
+  assert.equal(new Set(sculpted.map((entry) => entry.rotary)).size, 12, 'every knob selects a different SVG mechanism');
+  assert.equal(new Set(sculpted.map((entry) => entry.padProfile)).size, 12, 'every pad has different relief geometry');
+  assert.ok(new Set(sculpted.map((entry) => entry.slider.cap)).size >= 5, 'faders span several physical cap constructions');
+  for (const entry of sculpted) {
+    const set = getControlSet(entry.id);
+    assert.equal(set.families.Knob.component['Core.formDepth'], 92, `${entry.id}: deep form is visible by default`);
+    assert.equal(set.families.Knob.component['Core.controlForm'], `new-${entry.id}`);
   }
 });
 

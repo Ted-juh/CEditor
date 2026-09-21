@@ -23,7 +23,7 @@ try {
   await page.waitForFunction(() => !!window.__controlSetShot);
   if (out) await mkdir(out, { recursive:true });
   const ids=await page.evaluate(() => window.__controlSetShot.starterIds);
-  assert.equal(ids.length,48);
+  assert.equal(ids.length,60);
   async function checkPerformance(id) {
     const number=page.locator('[data-control-id][role="spinbutton"]').first();
     const field=number.locator('input').first();
@@ -133,7 +133,7 @@ try {
   await page.evaluate(() => window.__controlSetShot.gallery());
   const dialog=page.getByRole('dialog',{name:'Control set gallery'});
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),24);
+  assert.equal(await dialog.getByRole('navigation').getByRole('button').count(),36);
   await dialog.getByRole('button',{name:/Precision Instrument/}).click();
   await dialog.getByRole('checkbox',{name:'Compare shapes in grayscale'}).check();
   assert.equal(await dialog.locator('.viewport').evaluate(el=>getComputedStyle(el).filter),'grayscale(1)');
@@ -149,5 +149,5 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('dialog[open]'));
   assert.deepEqual(errors,[]);
-  console.log('gallery: twenty-four synthesizer choices, new editable panel, portable designs and Escape passed');
+  console.log('gallery: thirty-six synthesizer choices, new editable panel, portable designs and Escape passed');
 } finally { await browser?.close(); server.close(); }
