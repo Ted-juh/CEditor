@@ -27,6 +27,7 @@ import {
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { KNOB_GESTURES, effectProbeScript } from '../../../tools/scripts/gaia-panel/effect-probe.mjs';
 import { controlNamed, idOf, loadScript, mountPanel, moveChannel } from './support/gaiaScriptHarness.mjs';
+import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -257,7 +258,8 @@ test('the printed caveat is gone, and the captions are still addressable', () =>
   // reader not to trust a label that is now correct. It drops away by itself — the generator asks
   // anyEffectHasNames() — and this is what proves the wiring works in that direction too.
   const panel = buildGaiaPanel();
-  const names = new Set(panel.controls.map((c) => c._children?.Core?.name));
+  const allControls = flatControls(panel.controls);
+  const names = new Set(allControls.map((c) => c._children?.Core?.name));
   for (const effect of ['distortion', 'flanger', 'delay', 'reverb']) {
     assert.ok(names.has(`${effect}.type`), `${effect} has no type selector`);
     for (let i = 1; i <= 4; i += 1) {
@@ -266,7 +268,7 @@ test('the printed caveat is gone, and the captions are still addressable', () =>
     }
   }
 
-  const caveats = panel.controls.filter((c) =>
+  const caveats = allControls.filter((c) =>
     String(c._children?.Text?.content ?? '').includes('meaning depends on TYPE'));
   assert.equal(caveats.length, 0, 'the knobs have their real names now — the caveat contradicts them');
 });

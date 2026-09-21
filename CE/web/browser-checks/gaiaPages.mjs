@@ -39,6 +39,11 @@ try {
   assert.equal(await (await control('common.patchName')).count(),0);
   assert.equal(await (await control('system.masterTune')).count(),0);
   if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-controls-arpeggiator.png');
+  await select('bottom_pages',3,5);
+  assert.ok(await (await control('distortion.type')).isVisible(),'the dedicated Effects page shows the processors');
+  assert.ok(await (await control('common.effectsMasterSwitch')).isVisible(),'output controls remain with effects');
+  if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-effects-page.png');
+  await select('bottom_pages',2,5);
   const grid = await control('arp_pattern_grid');
   assert.equal(await page.evaluate(() => window.__gaia.id('arp.endStep')), undefined, 'no separate END STEP knob');
   const initialPattern = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern);
@@ -69,7 +74,7 @@ try {
     console.log('END STEP: staged ruler clicks 1/16/32, drag to 24, guarded inbound update and preserved notes passed.');
     process.exitCode = 0;
   } else {
-  await select('bottom_pages',1,4);
+  await select('bottom_pages',1,5);
   assert.ok(await (await control('common.patchName')).isVisible(),'Patch controls share the bank page');
   for(let i=0;i<4;i++) {
     await select('patch_banks',i,4);
@@ -79,7 +84,7 @@ try {
     assert.equal(buttons,i===3?8:64);
   }
   await select('patch_banks',1,4);
-  await select('bottom_pages',3,4);
+  await select('bottom_pages',4,5);
   assert.equal(await (await control('arp_pattern_grid')).count(),0);
   assert.ok(await (await control('system.masterTune')).isVisible());
   const lock=await control('system.writeProtectH8');
@@ -87,9 +92,9 @@ try {
   await page.waitForTimeout(150);
   const locked=await page.evaluate(()=>window.__gaia.session('system.writeProtectH8'));
   assert.equal(locked.checked,true,'nested write-protection toggle remains interactive');
-  await select('bottom_pages',2,4);
+  await select('bottom_pages',2,5);
   assert.ok(await (await control('arp_pattern_grid')).isVisible());
-  await select('bottom_pages',3,4);
+  await select('bottom_pages',4,5);
   assert.equal((await page.evaluate(()=>window.__gaia.session('system.writeProtectH8'))).checked,true,'switching pages preserves values');
   for(const tone of [1,2,3]) assert.ok(await (await control(`tone${tone}.osc.wave`)).isVisible());
   // Restore the test toggle before showing the neutral preview.
@@ -97,7 +102,7 @@ try {
   await shot('GAIA-banks-system.png');
   const bottom=await (await control('bottom_pages')).boundingBox();
   await shot('GAIA-system-closeup.png',{x:16,y:bottom.y,width:1560,height:320});
-  await select('bottom_pages',1,4);
+  await select('bottom_pages',1,5);
   await shot('GAIA-banks-closeup.png',bottom);
   // Simulated hardware, through the actual generated scripts and inbound dispatcher.
   // These names are TEST DATA, never presented as names fetched from a physical synth.

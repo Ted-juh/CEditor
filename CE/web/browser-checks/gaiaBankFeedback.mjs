@@ -12,6 +12,7 @@ page.on('pageerror',e=>errors.push(String(e)));
 try {
   await page.route('**/gaia-panel.json',async route=>{
     const panel=JSON.parse(await readFile(process.env.GAIA_PANEL_PATH || new URL('../../panels/Roland GAIA SH-01.cepanel',import.meta.url),'utf8'));
+    panel.scripting.settings ??= {};
     panel.scripting.settings['gaia.patchNames.v1:Simulated GAIA input:Simulated GAIA output']=Object.fromEntries(Array.from({length:64},(_,i)=>[i,`CACHED ${i+1}`]));
     await route.fulfill({contentType:'application/json',body:JSON.stringify(panel)});
   });
@@ -25,7 +26,7 @@ try {
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
   async function select(name,index,count){const b=await(await ctl(name)).boundingBox();await page.mouse.click(b.x+(index+0.5)*b.width/count,b.y+12);}
   async function has(name,text){for(let i=0;i<60;i++){if((await(await ctl(name)).textContent()).includes(text))return;await page.waitForTimeout(100);}assert.fail(`${name}: ${await(await ctl(name)).textContent()}`);}
-  await select('bottom_pages',1,4); await select('patch_banks',1,4);
+  await select('bottom_pages',1,5); await select('patch_banks',1,4);
   await has('recall_user_A1','○ A-1  CACHED 1');
   await has('names_status_user','○ 64 cached');
   await(await ctl('recall_user_C3')).click();

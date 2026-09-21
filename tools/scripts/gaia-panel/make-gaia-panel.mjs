@@ -34,6 +34,7 @@ import { applyToneControls } from './tone-controls.mjs';
 import { applyPerformanceLayout } from './performance-layout.mjs';
 import { applyGaiaTabStyle } from './tab-style.mjs';
 import { applyCompactHeader } from './compact-header.mjs';
+import { moveEffectsToPage } from './effects-page.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -870,7 +871,7 @@ export function buildGaiaPanel() {
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
 
-  return applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile)))))));
+  return moveEffectsToPage(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
 }
 
 export function serializeGaiaPanel() {

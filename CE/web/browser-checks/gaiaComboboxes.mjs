@@ -45,8 +45,8 @@ try {
       const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
       const tabs = page.locator(`.canvas-control[data-control-id="${tabsId}"]`);
       const rect = await tabs.boundingBox();
-      const index = combo.name.startsWith('system.') ? 3 : combo.name.startsWith('arp.') ? 2 : 0;
-      await page.mouse.click(rect.x + rect.width * (index+.5)/4, rect.y + 12);
+      const index = combo.name.startsWith('system.') ? 4 : combo.name.startsWith('arp.') ? 2 : 0;
+      await page.mouse.click(rect.x + rect.width * (index+.5)/5, rect.y + 12);
       await control.waitFor({ state: 'visible' });
     }
     assert.ok(await control.isVisible(), `${combo.name} must be exercised`);
@@ -84,7 +84,7 @@ try {
   const dbeam = menus.find(m => m.name === 'common.dBeamAssign');
   const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
   const tabsBox = await page.locator(`.canvas-control[data-control-id="${tabsId}"]`).boundingBox();
-  await page.mouse.click(tabsBox.x + tabsBox.width / 8, tabsBox.y + 12);
+  await page.mouse.click(tabsBox.x + tabsBox.width / 10, tabsBox.y + 12);
   await page.locator('.panel-surface.preview-surface').evaluate(node => node.style.transform = 'scale(0.75)');
   const dbeamControl = page.locator(`.canvas-control[data-control-id="${dbeam.id}"]`);
   await dbeamControl.focus();

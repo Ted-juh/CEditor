@@ -18,9 +18,9 @@ try {
   await page.waitForTimeout(1200);
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
   const lower=await(await ctl('bottom_pages')).boundingBox();
-  assert.deepEqual(await page.evaluate(()=>window.__gaia.controls.find(c=>c._children.Core.name==='bottom_pages')._children.TabContainer.pages.map(p=>p.id)), ['status','banks','arpeggiator','system']);
-  const selectLower=async index=>{await page.mouse.click(lower.x+lower.width*(index+.5)/4,lower.y+12);await page.waitForTimeout(150);};
-  for (const [index,name] of [[1,'common.patchName'],[2,'arp_pattern_grid'],[3,'system.masterTune'],[0,'gaia_status_screen']]) {
+  assert.deepEqual(await page.evaluate(()=>window.__gaia.controls.find(c=>c._children.Core.name==='bottom_pages')._children.TabContainer.pages.map(p=>p.id)), ['status','banks','arpeggiator','effects','system']);
+  const selectLower=async index=>{await page.mouse.click(lower.x+lower.width*(index+.5)/5,lower.y+12);await page.waitForTimeout(150);};
+  for (const [index,name] of [[1,'common.patchName'],[2,'arp_pattern_grid'],[3,'distortion.type'],[4,'system.masterTune'],[0,'gaia_status_screen']]) {
     await selectLower(index);
     await (await ctl(name)).waitFor({state:'visible'});
   }

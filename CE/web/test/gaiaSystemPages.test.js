@@ -55,11 +55,15 @@ test('System block readback preserves nibble values and both ends of write prote
   assert.equal(parsed.values['system.writeProtectA1'],'on');
   assert.equal(parsed.values['system.writeProtectH8'],'on');
 });
-test('the two page switches contain real controls and keep tones outside them', () => {
+test('the lower pages separate effects from the three tone strips', () => {
   assert.equal(byName('top_pages'),undefined);
-  assert.deepEqual(tabPages(byName('bottom_pages')).map(p=>p.id),['status','banks','arpeggiator','system']);
+  assert.deepEqual(tabPages(byName('bottom_pages')).map(p=>p.id),['status','banks','arpeggiator','effects','system']);
   const bottom=byName('bottom_pages');
   assert.ok(getChildControls(bottom).some(c=>c._children.Core.name==='arp_pattern_grid' && isChildOnActivePage(c,bottom)));
+  for(const name of ['box_DISTORTION','box_FLANGER','box_DELAY','box_REVERB','box_EFFECTS / OUTPUT','master.volume']) {
+    assert.ok(getChildControls(bottom).some(c=>c._children.Core.name===name && c._children.Core.tabPageId==='effects'),name);
+    assert.ok(!panel.controls.some(c=>c._children.Core.name===name),name);
+  }
   assert.ok(!isChildOnActivePage(byName('system.masterTune'),bottom));
   for(const tone of [1,2,3]) assert.ok(panel.controls.some(c=>c._children.Core.name===`tone${tone}.osc.wave`));
 });
