@@ -17,7 +17,7 @@
 // document, so the Player and the build — which have no library — find it there.
 
 import { derived, get } from 'svelte/store';
-import { activePanel, updatePanel } from './panels.js';
+import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary, carryControlSetInDocument } from './controlSetLibrary.js';
 import { controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
 
@@ -47,4 +47,17 @@ export function setActivePanelControlSet(id) {
     }
   }
   updatePanel(panel.id, { controlSet: normalized });
+}
+
+/** Set a known panel's visual language, including while the Settings tab is in front. */
+export function setPanelControlSet(panelId, id) {
+  const panel = get(panels).find((entry) => entry.id === panelId);
+  if (!panel) return false;
+  const normalized = normalizeControlSet(id);
+  const librarySet = get(controlSetLibrary).find((set) => set.id === normalized.id);
+  const carried = librarySet
+    ? [librarySet, ...(panel.controlSets ?? []).filter((set) => set.id !== librarySet.id)]
+    : panel.controlSets;
+  updatePanel(panel.id, { controlSet: normalized, controlSets: carried });
+  return true;
 }

@@ -1,5 +1,5 @@
 <script>
-  import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
+  import { panels, activePanel, updatePanel, buildActivePanelVst3, openSettingsTab } from '../stores/panels.js';
   import { createPanel, makeGuid } from '../stores/panelModel.js';
   import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
@@ -36,11 +36,9 @@
   import Scale from 'lucide-svelte/icons/scale';
   import ListMusic from 'lucide-svelte/icons/list-music';
   import Palette from 'lucide-svelte/icons/palette';
-  import ControlSetGallery from './ControlSetGallery.svelte';
   import { DEFAULT_CONTROL_SET_ID, getControlSet } from '../models/controlSets.js';
-  import { controlSetFileName, createControlSetEnvelope } from '../models/controlSetPackage.js';
   import { setActivePanelControlSet } from '../stores/controlSets.js';
-  import { availableControlSets, controlSetLibrary, importControlSetText, adoptDocumentControlSets } from '../stores/controlSetLibrary.js';
+  import { availableControlSets, controlSetLibrary } from '../stores/controlSetLibrary.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
@@ -70,57 +68,12 @@
 
   let { tabId = '' } = $props();
 
-  // --- Control sets: the picker, and the file in and out (stores/controlSetLibrary.js) ---
+  // Control-set creation and file management belong in Settings. The panel property is just the
+  // value this panel uses, consistent with the rest of the property inspector.
   const SET_GROUP_LABELS = { document: 'In this panel', library: 'My library', 'built-in': 'Built in' };
-  let setFileInput = $state(null);
-  let setStatus = $state('');
-  let galleryOpen = $state(false);
   let setGroups = $derived(['document', 'library', 'built-in']
     .map((origin) => ({ origin, label: SET_GROUP_LABELS[origin], sets: $availableControlSets.filter((set) => set.origin === origin) }))
     .filter((group) => group.sets.length));
-
-  function downloadJson(value, filename) {
-    const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportActiveSet(set) {
-    const { origin, ...plain } = set ?? {};
-    const envelope = createControlSetEnvelope(plain, { author: panel?.author ?? '' });
-    if (!envelope) return;
-    downloadJson(envelope, controlSetFileName(plain));
-    setStatus = `Exported ${controlSetFileName(plain)}`;
-  }
-
-  async function importSetFile(event) {
-    const file = event?.target?.files?.[0];
-    if (!file) return;
-    try {
-      const result = importControlSetText(await file.text());
-      if (result.ok) {
-        setActivePanelControlSet(result.set.id);
-        setStatus = `Imported ${result.set.name}${result.replacedBuiltIn ? ' (replaces the built-in set of that name on this panel)' : ''}.`;
-      } else {
-        setStatus = result.error;
-      }
-    } catch (error) {
-      setStatus = error?.message ?? 'Import failed';
-    } finally {
-      if (event?.target) event.target.value = '';
-    }
-  }
-
-  function keepDocumentSets() {
-    const added = adoptDocumentControlSets(panel?.id);
-    setStatus = added.length ? `Kept ${added.map((set) => set.name).join(', ')} in your library.` : 'Already in your library.';
-  }
 
   let panel = $derived($activePanel);
 
@@ -487,8 +440,6 @@
   }
 </script>
 
-{#if galleryOpen}<ControlSetGallery initialId={panel?.controlSet?.id ?? 'graphite'} onclose={() => galleryOpen = false} />{/if}
-
 {#if panel}
   {#if tabId === 'core'}
     <PropertySection title="Identity" icon={IdCard}>
@@ -621,7 +572,6 @@
          docs/design/control-sets.md. -->
     {@const activeSetId = panel.controlSet?.id ?? DEFAULT_CONTROL_SET_ID}
     {@const activeSet = getControlSet(activeSetId, { document: panel.controlSets, library: $controlSetLibrary })}
-    {@const activeSetOrigin = $availableControlSets.find((set) => set.id === activeSetId)?.origin ?? ''}
     <PropertySection title="Control set" icon={Palette}>
       <PropertyCell label="Set" span={4} hint="One visual language every ready-made control draws from: colours, and for some sets the knob's body, the buttons' finish and the panel's material. Switching restyles every control that has not been given a value of its own.">
         <select class="val" value={activeSetId} onchange={(e) => setActivePanelControlSet(e.target.value)}>
@@ -639,21 +589,7 @@
         <p class="set-note">
           {#if activeSet}{activeSet.description}{:else}This panel names a set that is not installed here; it renders with Graphite until that set is imported.{/if}
         </p>
-        <div class="set-tools">
-          <button type="button" class="set-tool-btn" onclick={() => galleryOpen = true}>Browse 36 synthesizer designs…</button>
-          <button type="button" class="set-tool-btn" title="Import a .ceditor-controlset.json file into your library and this panel"
-                  onclick={() => setFileInput?.click()}>Import set…</button>
-          <button type="button" class="set-tool-btn" disabled={!activeSet} title="Save this set as a file others can import"
-                  onclick={() => exportActiveSet(activeSet)}>Export set</button>
-          {#if activeSetOrigin === 'document' && !$controlSetLibrary.some((set) => set.id === activeSetId)}
-            <button type="button" class="set-tool-btn" title="This set came with the panel; keep a copy in your library for other panels"
-                    onclick={keepDocumentSets}>Keep in library</button>
-          {/if}
-          <input bind:this={setFileInput} type="file" accept=".json,application/json" hidden onchange={importSetFile} />
-        </div>
-        {#if setStatus}
-          <p class="set-note">{setStatus}</p>
-        {/if}
+        <button type="button" class="set-manage-link" onclick={() => openSettingsTab('controlSets')}>Manage control sets…</button>
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Background" icon={Layers}>
@@ -1579,22 +1515,15 @@
     line-height: 1.35;
     color: var(--text-muted, #9a9a9a);
   }
-  .set-tools {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 6px;
-  }
-  .set-tool-btn {
+  .set-manage-link {
+    margin-top: 5px;
     font: inherit;
     font-size: 10.5px;
-    padding: 3px 8px;
-    border: 1px solid var(--border-subtle, #3a3a3a);
-    border-radius: 4px;
-    background: var(--bg-elevated, #2a2a2a);
-    color: var(--text-primary, #ddd);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent, #5b9bd5);
     cursor: pointer;
   }
-  .set-tool-btn:hover:not(:disabled) { border-color: var(--accent, #5b9bd5); }
-  .set-tool-btn:disabled { opacity: 0.4; cursor: default; }
+  .set-manage-link:hover { text-decoration: underline; }
 </style>

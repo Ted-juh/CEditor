@@ -7,7 +7,7 @@
   import PanelPreviewSurface from '../editor/PanelPreviewSurface.svelte';
   import { addPanel } from '../stores/panels.js';
   import { setActivePanelControlSet } from '../stores/controlSets.js';
-  let { initialId = 'graphite', onclose = () => {} } = $props();
+  let { initialId = 'graphite', onclose = () => {}, onapply = null } = $props();
   let selected = $state(untrack(() => STARTER_CONTROL_SETS.some(d=>d.id===initialId) ? initialId : STARTER_CONTROL_SETS[0].id));
   let dialog;
   let grayscale = $state(false);
@@ -16,6 +16,11 @@
   let direction = $derived(STARTER_CONTROL_SETS.find(s => s.id === selected));
   onMount(() => { dialog.showModal(); });
   function openStarter() { addPanel(createControlSetStarter(selected)); onclose(); }
+  function applySelected() {
+    if (typeof onapply === 'function') onapply(selected);
+    else setActivePanelControlSet(selected);
+    onclose();
+  }
 </script>
 
 <dialog bind:this={dialog} onclose={onclose} oncancel={(e) => { e.preventDefault(); onclose(); }} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onclose(); } }} aria-label="Control set gallery">
@@ -36,7 +41,7 @@
       </div></div>
       <p class="hint">Open a starter to play and copy controls. Core → Form edits the mechanism, size, depth, scale divisions and inks. Original parts restores the Parts renderer.</p>
       <p class="hint">Apply changes controls set to “Follow panel”. Pinned designs and your property edits stay in place.</p>
-      <footer><button onclick={() => { setActivePanelControlSet(selected); onclose(); }}>Apply to current panel</button><button class="primary" onclick={openStarter}>Open editable starter →</button></footer>
+      <footer><button onclick={applySelected}>Apply to current panel</button><button class="primary" onclick={openStarter}>Open editable starter →</button></footer>
     </section>
   </div>
 </dialog>

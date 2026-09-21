@@ -118,14 +118,40 @@ export function carryControlSetInDocument(value) {
  * Import a set file's text. On success the set is in the library AND in the open document, and
  * the result says which; on failure `error` says why in words a person can act on.
  */
-export function importControlSetText(text) {
+export function importControlSetText(text, { carry = true } = {}) {
   const envelope = normalizeControlSetEnvelope(text);
   if (!envelope) {
     return { ok: false, error: 'Not a control-set file this build can read (expected format "ceditor-controlset", version 1).' };
   }
   const set = addControlSetToLibrary(envelope.set);
-  carryControlSetInDocument(set);
+  if (carry) carryControlSetInDocument(set);
   return { ok: true, set, envelope, replacedBuiltIn: BUILT_IN_CONTROL_SETS.some((entry) => entry.id === set.id) };
+}
+
+function customSetId(name, existing = get(controlSetLibrary)) {
+  const base = String(name ?? 'custom-set').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'custom-set';
+  const occupied = new Set([...BUILT_IN_CONTROL_SETS, ...existing].map((set) => set.id));
+  let id = base;
+  let suffix = 2;
+  while (occupied.has(id)) id = `${base}-${suffix++}`;
+  return id;
+}
+
+/** Make a protected built-in or an existing library set editable under a new, stable id. */
+export function duplicateControlSet(value, name = '') {
+  const source = normalizeControlSetDefinition(value);
+  if (!source) return null;
+  const copyName = String(name || `${source.name} Copy`).trim();
+  return addControlSetToLibrary({ ...deepClone(source), id: customSetId(copyName), name: copyName });
+}
+
+/** Replace a personal set. Its id stays stable so panels that use it keep their reference. */
+export function updateControlSetInLibrary(id, value) {
+  const key = String(id ?? '').trim();
+  if (!key || BUILT_IN_CONTROL_SETS.some((set) => set.id === key)) return null;
+  const set = normalizeControlSetDefinition({ ...value, id: key });
+  return set ? addControlSetToLibrary(set) : null;
 }
 
 /** The file form of a set the picker knows, or null. */

@@ -27,6 +27,9 @@ export const DEFAULT_GENERAL_SETTINGS = {
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,
   keyboardNudgeLarge: 10,
+  // Visual language assigned to newly created panels. Kept as an id so a built-in can be
+  // selected without copying its full definition into the application settings file.
+  defaultControlSetId: 'graphite',
   // OFF, and this one is a default rather than a preference in the usual sense. Checking for
   // updates sends this machine's IP address to GitHub — unremarkable, and still not something a
   // program should do on its own the first time somebody starts it. Help → Check for Updates works
@@ -79,6 +82,7 @@ export const insertOffset = writable(DEFAULT_GENERAL_SETTINGS.insertOffset);
 export const duplicateOffset = writable(DEFAULT_GENERAL_SETTINGS.duplicateOffset);
 export const keyboardNudgeSmall = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall);
 export const keyboardNudgeLarge = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeLarge);
+export const defaultControlSetId = writable(DEFAULT_GENERAL_SETTINGS.defaultControlSetId);
 export const exportVendor = writable(DEFAULT_GENERAL_SETTINGS.exportVendor);
 export const exportManufacturerCode = writable(DEFAULT_GENERAL_SETTINGS.exportManufacturerCode);
 export const exportOutputDir = writable(DEFAULT_GENERAL_SETTINGS.exportOutputDir);
@@ -103,6 +107,7 @@ export function applyGeneralSettingsToRuntime(settings) {
   duplicateOffset.set(settings.duplicateOffset);
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);
   keyboardNudgeLarge.set(settings.keyboardNudgeLarge);
+  defaultControlSetId.set(settings.defaultControlSetId ?? 'graphite');
   exportVendor.set(settings.exportVendor ?? '');
   exportManufacturerCode.set(normalizeManufacturerCode(settings.exportManufacturerCode));
   exportOutputDir.set(settings.exportOutputDir ?? '');

@@ -41,6 +41,11 @@ test('the MIDI section is reachable from the settings sidebar', () => {
   assert.match(body, />MIDI</, 'no MIDI entry in the settings sidebar');
 });
 
+test('control-set management is reachable from the settings sidebar', () => {
+  const { body } = render(SettingsView, { props: {} });
+  assert.match(body, />Control Sets</, 'no Control Sets entry in the settings sidebar');
+});
+
 test('every MIDI port control has a name', () => {
   // Both here and in the Device tab. A select whose only clue is its current value tells you
   // nothing about what it selects, and there are three of them side by side.

@@ -49,13 +49,16 @@ import { createSliderSemanticParts, resolveSliderSemanticParts } from '../src/CE
 import { buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
-import { activeControlSet, setActivePanelControlSet } from '../src/CE_Application/stores/controlSets.js';
+import { activeControlSet, setActivePanelControlSet, setPanelControlSet } from '../src/CE_Application/stores/controlSets.js';
+import { defaultControlSetId } from '../src/CE_Application/stores/runtimePreferences.js';
 import {
   adoptDocumentControlSets,
   availableControlSets,
   controlSetLibrary,
   exportControlSetEnvelope,
   importControlSetText,
+  duplicateControlSet,
+  updateControlSetInLibrary,
   mergeControlSetLists,
 } from '../src/CE_Application/stores/controlSetLibrary.js';
 import { SETS_DIR, SHIPPED_SET_IDS, shippedSetFile } from '../scripts/export-control-sets.mjs';
@@ -228,6 +231,31 @@ test('importing a set file puts it in the library and the open document; choosin
   const exported = exportControlSetEnvelope('parchment');
   assert.equal(exported.set.id, 'parchment');
   assert.equal(exported.set.origin, undefined, 'the provenance stamp is a view, not data');
+});
+
+test('Settings can import without mutating a document and can edit only a personal copy', () => {
+  controlSetLibrary.set([]);
+  openPanel();
+  const custom = { ...ivory, id: 'settings-import', name: 'Settings Import' };
+  const result = importControlSetText(JSON.stringify(createControlSetEnvelope(custom)), { carry: false });
+  assert.equal(result.ok, true);
+  assert.equal(currentPanel().controlSets.length, 0, 'a library import from Settings should not alter the open document');
+
+  const copy = duplicateControlSet(ivory, 'Ivory Workshop');
+  assert.ok(copy.id.startsWith('ivory-workshop'));
+  assert.equal(updateControlSetInLibrary(copy.id, { ...copy, name: 'Ivory Workshop II' }).name, 'Ivory Workshop II');
+  assert.equal(updateControlSetInLibrary('ivory', { ...ivory, name: 'Changed built-in' }), null,
+    'built-in ids stay protected');
+
+  assert.equal(setPanelControlSet(currentPanel().id, copy.id), true);
+  assert.equal(currentPanel().controlSet.id, copy.id);
+  assert.equal(currentPanel().controlSets[0].id, copy.id, 'applying from Settings carries the personal set');
+});
+
+test('the application control-set default is applied to new panels', () => {
+  defaultControlSetId.set('machined');
+  assert.equal(createPanel().controlSet.id, 'machined');
+  defaultControlSetId.set('graphite');
 });
 
 test('choosing a library set copies it into the document; a built-in is not copied; the copy survives a save', () => {

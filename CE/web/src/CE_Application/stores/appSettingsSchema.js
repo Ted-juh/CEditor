@@ -346,6 +346,7 @@ export function normalizeGeneralSettings(general) {
       1,
       400
     ),
+    defaultControlSetId: String(general?.defaultControlSetId ?? DEFAULT_GENERAL_SETTINGS.defaultControlSetId).trim() || 'graphite',
     // Export defaults (plan E5). Empty strings survive as empty: an invented vendor name baked
     // into somebody's plugin is worse than a blank field, because nobody notices the first one.
     exportVendor: String(general?.exportVendor ?? '').slice(0, 120),

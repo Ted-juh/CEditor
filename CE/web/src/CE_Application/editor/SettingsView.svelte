@@ -4,11 +4,14 @@
   import Type from 'lucide-svelte/icons/type';
   import Code2 from 'lucide-svelte/icons/code-2';
   import Piano from 'lucide-svelte/icons/piano';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import GeneralSettings from '../settings/GeneralSettings.svelte';
   import FontsSettings from '../settings/FontsSettings.svelte';
   import IconsSettings from '../settings/IconsSettings.svelte';
   import ToolchainsSettings from '../settings/ToolchainsSettings.svelte';
   import MidiSettings from '../settings/MidiSettings.svelte';
+  import ControlSetsSettings from '../settings/ControlSetsSettings.svelte';
+  import { settingsSection } from '../stores/panels.js';
 
   // Only one of these pages is undoable, and the {#if} chain below is what
   // enforces it: General registers itself as a history context while it is
@@ -19,13 +22,13 @@
   // settings/generalSettingsHistory.js.
   const sections = [
     { id: 'general', label: 'General', icon: Cog, available: true },
+    { id: 'controlSets', label: 'Control Sets', icon: SlidersHorizontal, available: true },
     { id: 'fonts', label: 'Fonts', icon: Type, available: true },
     { id: 'icons', label: 'Icons', icon: Image, available: true },
     { id: 'midi', label: 'MIDI', icon: Piano, available: true },
     { id: 'toolchains', label: 'Scripting Toolchains', icon: Code2, available: true },
   ];
 
-  let activeSection = $state('general');
 </script>
 
 <div class="settings-view">
@@ -34,9 +37,12 @@
     {#each sections as section}
       <button
         class="sidebar-item"
-        class:active={activeSection === section.id}
+        class:active={$settingsSection === section.id}
         class:disabled={!section.available}
-        onclick={() => section.available && (activeSection = section.id)}
+        onclick={() => {
+          if (!section.available) return;
+          settingsSection.set(section.id);
+        }}
       >
         <section.icon size={15} strokeWidth={1.7} />
         <span>{section.label}</span>
@@ -48,15 +54,17 @@
   </aside>
 
   <main class="settings-content">
-    {#if activeSection === 'general'}
+    {#if $settingsSection === 'general'}
       <GeneralSettings />
-    {:else if activeSection === 'fonts'}
+    {:else if $settingsSection === 'controlSets'}
+      <ControlSetsSettings />
+    {:else if $settingsSection === 'fonts'}
       <FontsSettings />
-    {:else if activeSection === 'icons'}
+    {:else if $settingsSection === 'icons'}
       <IconsSettings />
-    {:else if activeSection === 'midi'}
+    {:else if $settingsSection === 'midi'}
       <MidiSettings />
-    {:else if activeSection === 'toolchains'}
+    {:else if $settingsSection === 'toolchains'}
       <ToolchainsSettings />
     {:else}
       <div class="placeholder">

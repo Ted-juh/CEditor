@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
+import { defaultControlSetId, defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 import { normalizeCaptureSession } from '../utils/captureSession.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
@@ -206,7 +206,7 @@ export function createPanel(name = null) {
     // The control set this panel's ready-made controls resolve their colour tokens against
     // (models/controlSets.js). Always present in the model so readers can index into it; written
     // to the file only when it is not the default — see serializePanel.
-    controlSet: { id: DEFAULT_CONTROL_SET_ID },
+    controlSet: { id: get(defaultControlSetId) || DEFAULT_CONTROL_SET_ID },
     // The sets this document carries with it (stores/controlSetLibrary.js): a set chosen from the
     // user's library or imported from a file is copied here so a shared panel arrives with the set
     // it was designed in. Built-ins are never copied. Written only when there is something in it.

@@ -400,6 +400,8 @@ export const activePanelId = writable(null);
 
 /** Whether the global Settings editor tab is open */
 export const settingsTabOpen = writable(false);
+/** Settings page requested by a menu or a contextual "Manage" link. */
+export const settingsSection = writable('general');
 export const instrumentHostTabOpen = writable(false);
 
 /** Open device profile editor tabs */
@@ -578,7 +580,8 @@ export function addPanel(panel = null) {
 }
 
 /** Open the global Settings editor tab and activate it */
-export function openSettingsTab() {
+export function openSettingsTab(section = 'general') {
+  settingsSection.set(String(section || 'general'));
   settingsTabOpen.set(true);
   activeEditorTab.set({ type: 'settings', id: 'settings' });
   editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
