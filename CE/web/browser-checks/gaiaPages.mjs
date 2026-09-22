@@ -115,6 +115,14 @@ try {
   await select('bottom_pages',3,4);
   assert.equal(await (await control('arp_pattern_grid')).count(),0);
   assert.ok(await (await control('system.masterTune')).isVisible());
+  assert.ok(await (await control('common.dBeamAssign')).isVisible(),'D-Beam is on the System page');
+  const beam=await (await control('box_D BEAM')).boundingBox();
+  const systemPages=await (await control('bottom_pages')).boundingBox();
+  assert.ok(Math.abs(beam.x+beam.width-systemPages.x-systemPages.width)<1,'D-Beam sits at the far right');
+  await select('bottom_pages',0,4);
+  assert.equal(await (await control('common.dBeamAssign')).count(),0,'D-Beam is removed from Status Display');
+  await shot('GAIA-status-without-dbeam.png',systemPages);
+  await select('bottom_pages',3,4);
   const lock=await control('system.writeProtectH8');
   await lock.click();
   await page.waitForTimeout(150);
@@ -132,6 +140,7 @@ try {
   await shot('GAIA-system-closeup.png',bottom);
   await select('bottom_pages',1,4);
   await shot('GAIA-banks-closeup.png',bottom);
+  if (!process.env.GAIA_LAYOUT_ONLY) {
   // Simulated hardware, through the actual generated scripts and inbound dispatcher.
   // These names are TEST DATA, never presented as names fetched from a physical synth.
   await (await control('names_read_user')).click();
@@ -152,7 +161,8 @@ try {
   assert.ok(textLeft>=0 && textLeft<=12,'bank names share a left-aligned text inset');
   assert.match(await (await control('names_status_user')).innerText(),/64 patch names read/);
   await shot('GAIA-bank-names-SIMULATED-TEST.png',bottom);
+  }
   assert.deepEqual(errors,[]);
-  console.log('GAIA pages: 4 bank sources, page switches, nested controls and 64 simulated SysEx names rendered through real script dispatch passed.');
+  console.log(process.env.GAIA_LAYOUT_ONLY ? 'GAIA page layout, D-Beam relocation, page switches and nested controls passed.' : 'GAIA pages: 4 bank sources, page switches, nested controls and 64 simulated SysEx names rendered through real script dispatch passed.');
   }
 } finally { await browser.close(); await server.close(); }
