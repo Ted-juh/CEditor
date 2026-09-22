@@ -15,6 +15,7 @@
 
 #include "ScriptRuntime.h"
 #include "NativeHandlerAbi.h"
+#include "NativeHandlerCrashGuard.h"
 
 #include <juce_core/juce_core.h>
 #include <map>
@@ -352,17 +353,28 @@ public:
         CeValue arg = buildCeValue (payload);
         CeValue result {}; result.tag = CE_NULL;
         int rc = -1;
-        // Best-effort crash guard: catches a C++/managed exception escaping the module. It does NOT
-        // catch hardware faults (segfault) — see native-handlers-design.md §5. Windows SEH hardening
-        // is a TODO (needs a C shim with no C++ objects in scope).
+        uint32_t faultCode = 0;
+        // The C++ boundary catches a language exception. The C shim has no objects that require
+        // unwinding, so MSVC can also put SEH around the untrusted call and report hardware faults.
         try {
-            rc = m.dispatch (m.state, borrow (sidS), borrow (fnS), &arg, &result);
+            rc = ce_dispatch_guarded (m.dispatch, m.state, borrow (sidS), borrow (fnS),
+                                      &arg, &result, &faultCode);
         } catch (...) {
             onError (scriptId, "native handler threw across the ABI boundary");
             freeCeValueDeep (&arg);
             return {};
         }
         freeCeValueDeep (&arg);
+        if (faultCode != 0)
+        {
+            // State may be corrupt after an access violation. Refuse every later call into this
+            // module and skip shutdown; continuing to invoke it is the dangerous option.
+            m.ok = false;
+            onError (scriptId, "native handler hardware fault 0x"
+                               + juce::String::toHexString ((int) faultCode)
+                               + "; handler disabled — restart the host");
+            return {};
+        }
         if (rc != 0) { onError (scriptId, "native handler returned error " + juce::String (rc)); freeCeValueDeep (&result); return {}; }
         juce::var v = ceToVar (&result);
         freeCeValueDeep (&result); // handler allocated nested buffers via host->alloc (== malloc)

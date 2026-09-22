@@ -11,10 +11,21 @@
 
 #include "Scripting/ScriptRuntime.h"
 #include "Player/PanelValueModel.h"
+#if defined(CEDITOR_NATIVE_HANDLERS) && defined(_WIN32)
+ #include "Scripting/NativeHandlerCrashGuard.h"
+#endif
 #include <juce_core/juce_core.h>
 #include <iostream>
 
 using namespace ceditor::scripting;
+
+#if defined(CEDITOR_NATIVE_HANDLERS) && defined(_WIN32)
+static int CE_CALL raiseNativeHardwareFault (void*, CeStr, CeStr, const CeValue*, CeValue*)
+{
+    *static_cast<volatile int*> (nullptr) = 1;
+    return 0;
+}
+#endif
 
 // A host that just records what scripts ask it to do.
 class TestHost : public ScriptHostApi
@@ -308,6 +319,18 @@ int main()
         { errors.add (line); std::cout << "  [error] " << line << "\n"; });
     int activityCount = 0;
     runtime.setActivityCallback ([&activityCount] { ++activityCount; });
+
+   #if defined(CEDITOR_NATIVE_HANDLERS) && defined(_WIN32)
+    {
+        CeValue payload {};
+        CeValue result {};
+        uint32_t faultCode = 0;
+        const auto rc = ce_dispatch_guarded (raiseNativeHardwareFault, nullptr, {}, {},
+                                             &payload, &result, &faultCode);
+        check (rc != 0 && faultCode == 0xc0000005u,
+               "Windows hardware faults are caught outside the C++ handler boundary");
+    }
+   #endif
 
     juce::Array<juce::var> scripts;
     scripts.add (makeScript ("lua1", "lua", "panel", "onValueChanged", "*",

@@ -1768,7 +1768,10 @@ ce_configure_test(CEditorPythonScriptTests)
     # Only the loader links into the player; the handler MODULES are built separately at export by
     # tools/scripts/nativeHandlers and loaded at runtime via juce::DynamicLibrary (no extra deps here).
     if (CEDITOR_NATIVE_HANDLERS)
-        target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/NativeHandlerEngine.cpp")
+        target_sources(ceditor_scripting PRIVATE
+            "${CE_ROOT}/src/Scripting/NativeHandlerEngine.cpp"
+            "${CE_ROOT}/src/Scripting/NativeHandlerCrashGuard.c"
+        )
         target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_NATIVE_HANDLERS=1)
         message(STATUS "CEditor: native handler loader ENABLED (C++/C#/Java compiled-at-export modules).")
     endif()

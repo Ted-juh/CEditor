@@ -653,8 +653,7 @@
             <button class="bg-swatch"
                     style="background:#{String(panel.bgColour ?? '333333').slice(-6)}"
                     title="Pick colour"
-                    onclick={() => handleSwatchClick('bgColour', panel.bgColour)}
-                    oncontextmenu={(e) => { e.preventDefault(); /* TODO: add to swatches */ }}></button>
+                    onclick={() => handleSwatchClick('bgColour', panel.bgColour)}></button>
           </PropertyCell>
           <PropertyCell label="" span={2} hint="Hex colour value — type to change">
             <input class="val"

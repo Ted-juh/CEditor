@@ -1,9 +1,4 @@
-/**
- * Bridge between Svelte and C++ JUCE backend via window.__JUCE__
- *
- * C++ registers event listeners for: setProperty, requestFullState, undo, redo
- * C++ emits events: fullState, propUpdate
- */
+/** Bridge between Svelte and the C++ JUCE backend via window.__JUCE__. */
 import { filterOutboundMidi } from '../scripting/midiFilters.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
@@ -12,88 +7,6 @@ export function isJuceAvailable() {
   return typeof window !== 'undefined' &&
          window.__JUCE__ &&
          window.__JUCE__.backend;
-}
-
-let nextSetPropertyRequestId = 1;
-let setPropertyRejectionListenerInstalled = false;
-
-// C++ validates every setProperty path and emits 'setPropertyRejected' when a write did NOT land
-// (malformed or non-existent path). Without this, JS would keep local state the C++ tree never
-// accepted — surface the failure and pull the authoritative state back to resync.
-function ensureSetPropertyRejectionListener() {
-  if (setPropertyRejectionListenerInstalled) return;
-  setPropertyRejectionListenerInstalled = true;
-  window.__JUCE__.backend.addEventListener('setPropertyRejected', (payload) => {
-    console.error(
-      `[bridge] setProperty #${payload?.requestId ?? '?'} rejected: ${payload?.message ?? 'unknown error'}`
-    );
-    requestFullState();
-  });
-}
-
-/** Send a property change to C++ */
-export function setProperty(path, value) {
-  if (!isJuceAvailable()) {
-    console.warn('[bridge] No JUCE backend — setProperty ignored:', path, value);
-    return;
-  }
-  ensureSetPropertyRejectionListener();
-  window.__JUCE__.backend.emitEvent('setProperty', { path, value, requestId: nextSetPropertyRequestId++ });
-}
-
-/** Request the full ValueTree state from C++ */
-export function requestFullState() {
-  if (!isJuceAvailable()) {
-    console.warn('[bridge] No JUCE backend — requestFullState ignored');
-    return;
-  }
-  window.__JUCE__.backend.emitEvent('requestFullState', {});
-}
-
-/** Trigger undo on the C++ UndoManager */
-export function undo() {
-  if (!isJuceAvailable()) return;
-  window.__JUCE__.backend.emitEvent('undo', {});
-}
-
-/** Trigger redo on the C++ UndoManager */
-export function redo() {
-  if (!isJuceAvailable()) return;
-  window.__JUCE__.backend.emitEvent('redo', {});
-}
-
-/** Request the C++ application to close */
-export function closeApplication() {
-  if (!isJuceAvailable()) return;
-  window.__JUCE__.backend.emitEvent('closeApplication', {});
-}
-
-
-/**
- * Listen for a full state push from C++.
- * Returns a removal function.
- */
-export function onFullState(callback) {
-  if (!isJuceAvailable()) {
-    console.warn('[bridge] No JUCE backend — onFullState listener not registered');
-    return () => {};
-  }
-  const token = window.__JUCE__.backend.addEventListener('fullState', callback);
-  return () => window.__JUCE__.backend.removeEventListener(token);
-}
-
-/**
- * Listen for individual property updates from C++.
- * Callback receives { path: string, value: any }
- * Returns a removal function.
- */
-export function onPropUpdate(callback) {
-  if (!isJuceAvailable()) {
-    console.warn('[bridge] No JUCE backend — onPropUpdate listener not registered');
-    return () => {};
-  }
-  const token = window.__JUCE__.backend.addEventListener('propUpdate', callback);
-  return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
 // --- Panel file operations ---

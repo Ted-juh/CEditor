@@ -1,4 +1,5 @@
 /build/
+/tools/verification/probe-synth/build/
 /CE/web/dist/
 /CE/web/dist-scenery/
 /CE/web/dist-acceptance/
