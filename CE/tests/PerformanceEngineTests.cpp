@@ -1758,6 +1758,35 @@ void testMidiInsertRack()
     }
 
     {
+        // Changing a live transform back to its transparent setting must still route the release
+        // through the module: it remembers the pitch it actually emitted before the edit.
+        auto transpose = slot ("transpose");
+        transpose.fx.transpose = 12;
+        MidiInsertRack rack;
+        rack.prepare (blockSize);
+        rack.setSlots ({ transpose });
+
+        Transport clock;
+        juce::MidiBuffer press, output;
+        press.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        rack.process (press, output, clock.advance (blockSize, sampleRate), blockSize);
+
+        transpose.fx.transpose = 0;
+        rack.setSlots ({ transpose });
+        juce::MidiBuffer release;
+        release.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        rack.process (release, output, clock.advance (blockSize, sampleRate), blockSize);
+
+        bool releasedTransposedPitch = false;
+        for (const auto metadata : output)
+            releasedTransposedPitch = releasedTransposedPitch
+                || (metadata.getMessage().isNoteOff()
+                    && metadata.getMessage().getNoteNumber() == 72);
+        check (releasedTransposedPitch,
+               "a transform made transparent mid-note still releases its previously emitted pitch");
+    }
+
+    {
         // An empty chain is a wire, and panic reaches every module.
         MidiInsertRack rack;
         rack.prepare (blockSize);

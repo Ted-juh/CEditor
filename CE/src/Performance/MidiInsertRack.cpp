@@ -234,8 +234,9 @@ void MidiInsertRack::process (const juce::MidiBuffer& in, juce::MidiBuffer& out,
         }
         else if (module->fx != nullptr)
         {
-            if (module->fx->isTransparent())
-                continue;
+            // Even a currently transparent stage must see note-offs. It may have emitted a
+            // transformed note before its settings changed, and only its tracking table knows
+            // which pitch must be released.
             module->fx->process (front, back);
         }
         // The later modules. Every one of them stays in the chain even when it is doing
