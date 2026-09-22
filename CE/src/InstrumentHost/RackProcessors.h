@@ -105,6 +105,7 @@ public:
         scratch.ensureSize (size);
         merged.ensureSize (size);
         afterFx.ensureSize (size);
+        panicEvents.ensureSize (size);
         articulationInput.ensureSize (size);
         articulationStaging.ensureSize (size);
         articulationActions.ensureSize (size);
@@ -158,14 +159,18 @@ public:
         // welded block plus one arpeggiator is a chain now, and the chain decides.
         const auto block = engine != nullptr ? engine->lastBlockTime()
                                              : perf::Transport::BlockTime();
-        inserts.process (scratch, afterFx, block, numSamples);
+        panicEvents.clear();
         if (eventChainPanicRequested.exchange (false))
-            inserts.allNotesOff (afterFx, 0);
+            inserts.allNotesOff (panicEvents, 0);
+        inserts.process (scratch, afterFx, block, numSamples);
         // Generated articulation messages bypass note processors. A keyswitch selected as C0
         // must reach C0 even when this part has transpose, scale and chorder modules enabled.
         // They are merged FIRST: when a sequenced switch and its first note share a sample, the
         // instrument must select the articulation before it sees the note.
         merged.clear();
+        // A reconfiguration panic belongs to the state before this block. Emit its releases
+        // before new notes at the same sample so the first note after a layer edit survives.
+        merged.addEvents (panicEvents, 0, -1, 0);
         merged.addEvents (articulationActions, 0, -1, 0);
         merged.addEvents (stagingActions, 0, -1, 0);
         merged.addEvents (afterFx, 0, -1, 0);
@@ -198,7 +203,7 @@ private:
     perf::PerformanceEngine* engine = nullptr;
     LayerRouter* layerRouter = nullptr;
     int partIndex = -1;
-    juce::MidiBuffer scratch, merged, afterFx;
+    juce::MidiBuffer scratch, merged, afterFx, panicEvents;
     std::atomic<bool> eventChainPanicRequested { false };
     juce::MidiBuffer articulationInput, articulationStaging;
     juce::MidiBuffer articulationActions, stagingActions;
