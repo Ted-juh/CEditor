@@ -1,5 +1,6 @@
 #include "ValueTreeBridge.h"
 #include "AppSettings.h"
+#include "AtomicFileWrite.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "InstrumentHost/InstrumentHostService.h"
 #include "InstrumentHost/PluginInstantiator.h"
@@ -538,12 +539,15 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             return;
 
                         auto file = result.withFileExtension ("cepanel");
-                        file.replaceWithText (jsonData);
 
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("panelId", panelId);
                         obj->setProperty ("filePath", file.getFullPathName());
                         obj->setProperty ("name", file.getFileNameWithoutExtension());
+                        // Reported, not dropped: the editor clears the panel's modified flag on
+                        // this event, so a write that failed and said nothing is how work gets
+                        // closed without a prompt and lost. See the package path below.
+                        obj->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                         browser->emitEventIfBrowserIsVisible ("panelSaved", juce::var (obj));
                     });
@@ -565,11 +569,13 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto jsonData = obj->getProperty ("data").toString();
 
                 juce::File file (filePath);
-                file.replaceWithText (jsonData);
 
                 auto* resp = new juce::DynamicObject();
                 resp->setProperty ("panelId", panelId);
                 resp->setProperty ("filePath", filePath);
+                // A read-only file, a full disk or a folder that went away all used to look
+                // exactly like a save here, and the dirty dot cleared on all three.
+                resp->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                 browser->emitEventIfBrowserIsVisible ("panelSaved", juce::var (resp));
             });
@@ -704,11 +710,12 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("filePath", file.getFullPathName());
                         obj->setProperty ("name", file.getFileNameWithoutExtension());
-                        // replaceWithText's return value is reported rather than dropped: a
-                        // package is the thing you are about to send somebody, so "saved" has to
-                        // mean it. A full disk or a read-only folder should say so here, not when
-                        // the recipient opens nothing.
-                        obj->setProperty ("ok", file.replaceWithText (jsonData));
+                        // The write's result is reported rather than dropped: a package is the
+                        // thing you are about to send somebody, so "saved" has to mean it. A full
+                        // disk or a read-only folder should say so here, not when the recipient
+                        // opens nothing. writeTextAtomically rather than replaceWithText because
+                        // the latter answers the wrong question — see AtomicFileWrite.h.
+                        obj->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                         browser->emitEventIfBrowserIsVisible ("panelPackageSaved", juce::var (obj));
                     });
@@ -860,12 +867,12 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             return;
 
                         auto file = result.withFileExtension ("cescript.json");
-                        file.replaceWithText (jsonData);
 
                         auto* obj = new juce::DynamicObject();
                         obj->setProperty ("documentId", documentId);
                         obj->setProperty ("filePath", file.getFullPathName());
                         obj->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
+                        obj->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                         browser->emitEventIfBrowserIsVisible ("scriptWorkspaceSaved", juce::var (obj));
                     });
@@ -887,12 +894,12 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto jsonData = obj->getProperty ("data").toString();
 
                 juce::File file (filePath);
-                file.replaceWithText (jsonData);
 
                 auto* resp = new juce::DynamicObject();
                 resp->setProperty ("documentId", documentId);
                 resp->setProperty ("filePath", filePath);
                 resp->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
+                resp->setProperty ("ok", ceditor::writeTextAtomically (file, jsonData));
 
                 browser->emitEventIfBrowserIsVisible ("scriptWorkspaceSaved", juce::var (resp));
             });

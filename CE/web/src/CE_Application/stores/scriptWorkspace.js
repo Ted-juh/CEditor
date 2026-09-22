@@ -20,6 +20,7 @@ import {
 } from '../scripting/scriptDocumentModel.js';
 import { confirmDiscardUnsaved } from '../utils/confirmDiscard.js';
 import { rememberRecentFile } from './recentFiles.js';
+import { notify } from './scriptUi.js';
 
 const SCRIPT_WORKSPACE_STORAGE_KEY = 'ce.scriptWorkspaces.v1';
 let bridgeInitialized = false;
@@ -294,16 +295,37 @@ export function persistOpenScriptWorkspacePaths() {
   bridgeUpdateOpenScriptWorkspaces(paths);
 }
 
+/**
+ * What a `scriptWorkspaceSaved` event means for the document, exported so the rule can be tested
+ * without a bridge. Returns whether the save counted.
+ *
+ * Same rule as the panel side (`applyPanelSavedPayload`): `ok === false` is a write that did not
+ * happen, so the workspace stays modified and keeps its old path rather than being marked saved
+ * and quietly closable. A payload with no `ok` is a success, which is what older backends send.
+ */
+export function applyScriptWorkspaceSavedPayload(payload) {
+  if (payload?.ok === false) {
+    const label = String(payload?.name ?? '').trim() || 'this script workspace';
+    notify(
+      `Could not save ${label}. The file may be read-only, open elsewhere, or on a full disk. `
+      + 'Your changes are still here — try saving to a different folder.',
+      { kind: 'error', duration: 0 },
+    );
+    return false;
+  }
+
+  markScriptWorkspaceSaved(String(payload?.documentId ?? ''), {
+    filePath: String(payload?.filePath ?? ''),
+    name: String(payload?.name ?? ''),
+  });
+  return true;
+}
+
 export function initScriptWorkspaceBridge() {
   if (bridgeInitialized) return;
   bridgeInitialized = true;
 
-  onScriptWorkspaceSaved((payload) => {
-    markScriptWorkspaceSaved(String(payload?.documentId ?? ''), {
-      filePath: String(payload?.filePath ?? ''),
-      name: String(payload?.name ?? ''),
-    });
-  });
+  onScriptWorkspaceSaved(applyScriptWorkspaceSavedPayload);
 
   onScriptWorkspaceOpened((payload) => {
     const filePath = String(payload?.filePath ?? '').trim();

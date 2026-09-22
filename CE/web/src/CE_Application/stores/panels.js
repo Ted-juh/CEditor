@@ -1241,30 +1241,58 @@ activeEditorTab.subscribe((tab) => {
 
 // --- Bridge event listeners ---
 
+/**
+ * What a `panelSaved` event means for the document. Exported so the rule below can be tested
+ * without standing up a bridge, and returns whether the save counted.
+ *
+ * `ok === false` is a save that DID NOT HAPPEN — a read-only file, a full disk, a folder that
+ * went away. The flag used to be absent and the event was trusted either way, so the dirty dot
+ * cleared on a failed write, history adopted that state as saved, the unsaved-session snapshot
+ * skipped the panel, and closing the tab asked nothing. The work was gone with no message at any
+ * point. So a failure changes nothing about the document except to say so: the panel stays
+ * modified, keeps its old path, and never reaches Open Recent.
+ *
+ * A payload with no `ok` at all is treated as a success, because that is what every backend
+ * older than this one sends.
+ */
+export function applyPanelSavedPayload(payload) {
+  const label = panelPerfLabel(payload?.name, payload?.filePath);
+
+  if (payload?.ok === false) {
+    cerror('[panel] save failed —', payload?.filePath ?? '(unknown path)');
+    notify(
+      `Could not save "${label}". The file may be read-only, open elsewhere, or on a full disk. `
+      + 'Your changes are still here — try File > Save As to a different folder.',
+      { kind: 'error', duration: 0 },
+    );
+    return false;
+  }
+
+  const panelId = parseInt(payload.panelId, 10);
+  const updates = { filePath: payload.filePath, modified: false };
+  if (payload.name) updates.name = payload.name;
+
+  panels.update(list =>
+    list.map(p => p.id === panelId ? { ...p, ...updates } : p)
+  );
+
+  // No markContextSaved() call here on purpose: history.js imports this module, so importing it
+  // back would close a cycle for something it does not need. Its noteCleanState() adopts this
+  // state as the saved marker the moment the cleared `modified` flag reaches its subscription,
+  // which is this same tick — so undo back to here clears the dirty dot either way.
+  if (updates.filePath) {
+    rememberRecentFile({ kind: 'panel', path: updates.filePath, name: updates.name });
+  }
+
+  // Persist open panel paths now that this panel has a file
+  schedulePanelOpenHousekeeping(label);
+  return true;
+}
+
 /** Initialize bridge listeners. Call once at app startup. */
 export function initPanelBridge() {
-  // Panel saved successfully — update filePath, name, clear modified flag
-  onPanelSaved((payload) => {
-    const label = panelPerfLabel(payload?.name, payload?.filePath);
-    const panelId = parseInt(payload.panelId, 10);
-    const updates = { filePath: payload.filePath, modified: false };
-    if (payload.name) updates.name = payload.name;
-
-    panels.update(list =>
-      list.map(p => p.id === panelId ? { ...p, ...updates } : p)
-    );
-
-    // No markContextSaved() call here on purpose: history.js imports this module, so importing it
-    // back would close a cycle for something it does not need. Its noteCleanState() adopts this
-    // state as the saved marker the moment the cleared `modified` flag reaches its subscription,
-    // which is this same tick — so undo back to here clears the dirty dot either way.
-    if (updates.filePath) {
-      rememberRecentFile({ kind: 'panel', path: updates.filePath, name: updates.name });
-    }
-
-    // Persist open panel paths now that this panel has a file
-    schedulePanelOpenHousekeeping(label);
-  });
+  // Panel saved — update filePath, name and the modified flag, unless the write failed.
+  onPanelSaved(applyPanelSavedPayload);
 
   // Panel opened from file — create panel and make it active
   onPanelOpened(async (payload) => {
