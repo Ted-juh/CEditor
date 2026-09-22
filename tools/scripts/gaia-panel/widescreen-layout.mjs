@@ -245,6 +245,7 @@ export function expandArpeggioWorkspace(panel) {
   const feedback = status.Parts._children.feedback._children;
   Object.assign(feedback.Layout, { x: 0, y: 0, width: 120, height: 60 });
   feedback.Text._children.Font.size = 8.5;
+  feedback.Text._children.Multiline ??= { _type: 'Multiline' };
   Object.assign(feedback.Text._children.Multiline, { maxLines: 6, wrapMode: 'word', lineHeight: 1.1 });
   const output = named('box_EFFECTS / OUTPUT')._children.Transform;
   output.height = t.y + t.height - output.y;
