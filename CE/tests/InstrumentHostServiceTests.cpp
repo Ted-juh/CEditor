@@ -478,6 +478,8 @@ void testCommandFlow()
     const auto dir = freshDataDir ("flow");
     seedCatalog (dir);
     Harness h (dir);
+    check (ceditor::ctrl49::SurfaceProfileRegistry::instance().find ("akai-ctrl49") != nullptr,
+           "service startup registers the built-in CTRL49 profile");
 
     h.cmd ("getState");
     const auto* state = h.emits.lastState();

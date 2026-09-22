@@ -39,6 +39,8 @@ bool prewarmWorkerEditorIfIdle (juce::AudioProcessor* processor, int quietMs)
 InstrumentHostService::InstrumentHostService (Options optionsToUse)
     : options (std::move (optionsToUse))
 {
+    ctrl49::registerCtrl49Profile();
+
     activeMarker = std::make_unique<ActiveHostingMarker> (options.dataDirectory);
     safeMode = std::make_unique<SafeMode> (options.dataDirectory);
     recovery = std::make_unique<SessionRecovery> (options.dataDirectory);
