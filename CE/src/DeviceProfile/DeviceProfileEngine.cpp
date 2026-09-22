@@ -2236,7 +2236,9 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
 
     if (type == "choice")
     {
-        auto requested = inputValue.toString();
+        const auto requested = inputValue.toString();
+        const bool numericInput = inputValue.isInt() || inputValue.isInt64()
+                               || inputValue.isDouble() || inputValue.isBool();
         auto* choices = asArray (parameter.getProperty ("choices"));
         if (choices == nullptr || choices->isEmpty())
             return juce::Result::fail ("Choice parameter has no choices: " + propString (parameter, "id"));
@@ -2255,7 +2257,11 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             auto label = propString (*choice, "label");
             auto value = propInt (*choice, "value");
 
-            if (requested == (matchKind == 0 ? id : matchKind == 1 ? label : juce::String (value)))
+            const bool matched = matchKind == 0 ? requested == id
+                               : matchKind == 1 ? requested == label
+                               : numericInput ? (double) inputValue == (double) value
+                                              : requested == juce::String (value);
+            if (matched)
             {
                 if (! isMidiDataByte (value))
                     return juce::Result::fail ("Choice encoded value outside MIDI data byte range for " + propString (parameter, "id"));

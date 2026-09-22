@@ -78,10 +78,23 @@ int runGaiaNoteChoiceTests (const juce::File& file)
                 }
                 ++checked;
             }
+
+            // AudioProcessor parameters arrive as floating-point values (2.0, not the string
+            // "2"). That representation must select the same wire value while the window is shut.
+            const auto floating = juce::var ((double) (int) choice.getProperty ("value", {}));
+            const auto floatResult = engine.compileSetParameter ("mainSynth", id, floating, true);
+            if (! floatResult.ok || floatResult.transaction.encodedValueHex != expected)
+            {
+                std::cerr << "[FAIL] note choice " << id << " floating=" << floating.toString()
+                          << ": expected " << expected << ", got "
+                          << floatResult.transaction.encodedValueHex << "\n";
+                ++failures;
+            }
+            ++checked;
         }
     }
-    if (checked != 360) ++failures;
-    if (failures == 0) std::cout << "[PASS] GAIA note choices: all 360 ID, label and numeric encodings\n";
+    if (checked != 480) ++failures;
+    if (failures == 0) std::cout << "[PASS] GAIA note choices: all 480 ID, label and numeric encodings\n";
     return failures;
 }
 

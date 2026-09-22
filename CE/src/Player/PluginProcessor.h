@@ -1424,7 +1424,15 @@ private:
             // A bound control: drive the host parameter so the DAW records automation AND the M2 timer
             // transmits it to the synth window-closed. Unbound controls live only in the mirror.
             const auto it = scriptBoundParamByPath.find (path);
-            if (transmit && it != scriptBoundParamByPath.end()) setParamFromUi (it->second, (float) value);
+            if (transmit && it != scriptBoundParamByPath.end())
+            {
+                auto parameterValue = (float) value;
+                if (form == "normalizedValue")
+                    if (auto* parameter = apvts.getParameter (it->second))
+                        parameterValue = parameter->convertFrom0to1 (
+                            juce::jlimit (0.0f, 1.0f, parameterValue));
+                setParamFromUi (it->second, parameterValue);
+            }
            #else
             juce::ignoreUnused (transmit);
            #endif
@@ -2021,7 +2029,12 @@ private:
         // the APVTS; an incoming dump fills the mirror by deviceParameterId. Built once from the panel.
         for (const auto& desc : panelParams)
         {
-            if (desc.path.isNotEmpty()) scriptBoundParamByPath[desc.path] = desc.id;
+            if (desc.path.isNotEmpty())
+            {
+                scriptBoundParamByPath[desc.path] = desc.id;
+                if (desc.path.endsWithIgnoreCase (".value"))
+                    scriptBoundParamByPath[desc.path.dropLastCharacters (6)] = desc.id;
+            }
             if (desc.deviceParameterId.isNotEmpty() && desc.path.isNotEmpty())
                 scriptDumpParamPaths[desc.deviceParameterId] = desc.path;
         }
