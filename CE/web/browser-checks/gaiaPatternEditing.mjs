@@ -42,7 +42,7 @@ try {
   const velocity=page.getByRole('textbox',{name:'Selected note velocity',exact:true});
   await velocity.fill('85'); await velocity.press('Enter');
   const beforeDrag = await values(), block=beforeDrag.arpPattern.find(b=>b.id===beforeDrag.__arpeggiator.selectedBlock);
-  const stepWidth=(box.width-52)/32, rowHeight=(box.height-88)/12;
+  const stepWidth=(box.width-52)/32, rowHeight=(box.height-84)/12;
   const x=box.x+44+(block.step+block.length/2)*stepWidth;
   const y=box.y+24+(beforeDrag.__arpeggiator.viewNote+11-block.note+0.5)*rowHeight;
   await page.mouse.move(x,y); await page.mouse.down();

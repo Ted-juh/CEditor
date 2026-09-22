@@ -18,8 +18,6 @@ try {
   await page.waitForTimeout(1000);
   assert.ok((await page.evaluate(()=>window.__gaia.actions())).includes('gaiaNamesScan'),
     'ordinary preview must initialize embedded panel scripts without a script editor or manual Run');
-  const brandLeft=await page.evaluate(()=>{ const c=window.__gaia.controls.find(c=>c._children.Text?.content==='Roland'); const el=document.querySelector(`[data-control-id="${c._children.Core.id}"] .text-span`); return parseFloat(el.style.left); });
-  assert.ok(brandLeft>=0,'frozen left-aligned brand text must not lose its first letters');
   async function control(name) {
     const id=await page.evaluate(n=>window.__gaia.id(n),name);
     return page.locator(`[data-control-id="${id}"]`).first();
@@ -51,6 +49,19 @@ try {
   assert.equal(await page.evaluate(() => window.__gaia.id('arp.endStep')), undefined, 'no separate END STEP knob');
   const initialPattern = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern);
   const gridRect = await grid.boundingBox();
+  const background = await (await control('box_ARPEGGIO PATTERN')).boundingBox();
+  const output = await (await control('box_EFFECTS / OUTPUT')).boundingBox();
+  assert.ok(gridRect.y + gridRect.height <= background.y + background.height, 'grid and toolbar stay inside their background');
+  assert.ok(Math.abs(output.y + output.height - lowerBounds.y - lowerBounds.height) < 1, 'output aligns with the lower pages');
+  assert.ok(Math.abs(background.y + background.height - lowerBounds.y - lowerBounds.height) < 1, 'arpeggio background fills the page');
+  assert.ok(sendBounds.height <= 18.1, 'compact action row');
+  await page.mouse.click(gridRect.x + gridRect.width - 39, gridRect.y + gridRect.height - 13);
+  await page.getByRole('dialog').waitFor();
+  assert.match(await page.getByRole('dialog').innerText(), /Ruler: click or drag to set END STEP/);
+  await shot('GAIA-arpeggio-help.png');
+  await page.getByRole('button', {name:'Close', exact:true}).click();
+  assert.deepEqual(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern), initialPattern, 'help does not alter notes');
+  await shot('GAIA-arpeggio-compact.png', {x:0,y:lowerBounds.y,width:1920,height:1000-lowerBounds.y});
   const rulerX = step => gridRect.x + 44 + (step - 0.5) * (gridRect.width - 52) / 32;
   for (const end of [16, 1, 32, 16]) {
     await page.mouse.click(rulerX(end), gridRect.y + 12);

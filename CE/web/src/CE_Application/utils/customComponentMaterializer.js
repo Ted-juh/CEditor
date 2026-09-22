@@ -468,7 +468,7 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
       const outside = selected && hasEndStep && selected.step >= endStep;
       const crosses = selected && hasEndStep && selected.step < endStep && selected.step + selected.length > endStep;
       footer.push(['status', 'arpeggiatorSelectionStatus', 848, 144, outside ? 'OUTSIDE LOOP' : crosses ? 'TAIL OUTSIDE LOOP' : selected ? 'IN LOOP' : '', 0]);
-      footer.push(['keys', 'arpeggiatorKeyboardHint', 1000, width - 1008, '[ / ] SELECT · ARROWS MOVE / PITCH', 0]);
+      if (!editing) footer.push(['keys', 'arpeggiatorKeyboardHint', 1000, width - 1008, '[ / ] SELECT · ARROWS MOVE / PITCH', 0]);
     }
     for (const [name, role, x, w, text, offsetY] of footer) {
       const editable = /^arp(Pitch|Start|Length|Velocity)Field$/.test(role);
@@ -488,28 +488,30 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
   if (editing && numericFields) {
     const state = control._children.Designer.patternEditingState ?? {};
     const selected = arpeggiator.blocks.some(b => b.id === arpeggiator.selectedBlock);
-    const y = height - 26;
+    const y = height - 22;
+    const helpX = width - 70;
     const buttons = [
       ['undo', 'UNDO', 44, 62, state.undo], ['redo', 'REDO', 112, 62, state.redo],
       ['duplicate', 'DUPLICATE', 190, 90, selected], ['delete', 'DELETE NOTE', 286, 102, selected],
       ['read', state.busy ? 'CANCEL' : 'READ PATTERN', 412, 122, true],
       ['send', 'SEND PATTERN', 540, 122, !state.busy],
+      ['help', 'HELP', helpX, 62, true],
     ];
     for (const [action, text, x, w, enabled] of buttons) {
       addPart(parts, `arp_edit_${action}`, makeArpRuntimePart(`arp_edit_${action}`, {
-        role: 'arpeggiatorEditButton', x, y, width: w, height: 22, zIndex: 29, text,
+        role: 'arpeggiatorEditButton', x, y, width: w, height: 18, zIndex: 29, text,
         colour: 'FF17222B', textColour: enabled ? (action === 'send' ? 'FFE6C66C' : 'FFD7E1E9') : 'FF626C75',
         borderEnabled: true, borderColour: enabled ? 'FF687684' : 'FF343F48', radius: 3, fontSize: 10,
       }), 'arpeggiator');
       if (enabled) addHitZone(hitZones, `arp_edit_${action}`, {
         shape: 'rectangle', action: 'arpeggiatorCommand', priority: 90, cursor: 'pointer',
-        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(22, height), unit: 'percent' },
+        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(18, height), unit: 'percent' },
         payload: { command: action },
       }, 'arpeggiator');
     }
     if (width > 740) addPart(parts, 'arp_edit_status', makeArpRuntimePart('arp_edit_status', {
-      role: 'arpeggiatorEditStatus', x: 682, y, width: width - 690, height: 22, zIndex: 29,
-      text: state.message || 'LOCAL EDITS · Ctrl+Z / Y undo / redo · Ctrl+D duplicate · Delete note',
+      role: 'arpeggiatorEditStatus', x: 682, y, width: Math.max(0, helpX - 690), height: 18, zIndex: 29,
+      text: state.message || '',
       colour: '00000000', textColour: state.error ? 'FFFF8080' : 'FFAEBAC6', fontSize: 10,
     }), 'arpeggiator');
   }

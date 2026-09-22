@@ -1,4 +1,5 @@
 <script>
+  import { openDialog } from '../stores/scriptUi.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
@@ -6466,6 +6467,15 @@
   }
   function handlePatternCommand(control, command) {
     if (!hasGaiaPatternEditing(control)) return;
+    if (command === 'help') {
+      openDialog({ title: 'Arpeggio pattern — help', buttons: ['Close'], message:
+        'Ruler: click or drag to set END STEP.\n\n' +
+        'Notes: drag the left third to move, the middle third vertically for velocity, or the right third to change length. Hold Shift for fine changes. Click an empty cell to add a note.\n\n' +
+        'Select notes with [ / ]. Arrow keys move the selected note or change its pitch. The Pitch, Start, Length and Velocity fields allow exact edits.\n\n' +
+        'Ctrl+Z / Ctrl+Y: undo / redo. Ctrl+D: duplicate. Delete: remove the selected note.\n\n' +
+        'Notes and END STEP are local edits until SEND PATTERN. READ PATTERN retrieves the current hardware pattern. Arpeggio performance controls send live.' });
+      return;
+    }
     const values = customSessionValues(control), history = patternHistory(control), id = getControlId(control);
     if (['undo', 'redo'].includes(command)) {
       const restored = history.restore(command, control, values);

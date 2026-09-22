@@ -172821,7 +172821,7 @@
                 "Transform": {
                   "x": 253.20574162679426,
                   "width": 1314.7942583732058,
-                  "height": 205.09523809523807
+                  "height": 236.33333333333334
                 },
                 "Background": {
                   "_children": {
@@ -172845,255 +172845,41 @@
                   "name": "tab_ARPEGGIO PATTERN",
                   "id": "gaia_tab_675",
                   "tabPageId": "arpeggiator",
-                  "controlType": "CustomComponent"
-                },
-                "Transform": {
-                  "x": 255.08133971291866,
-                  "y": 1.4047619047619047,
-                  "width": 155.67464114832535,
-                  "height": 14.047619047619047,
-                  "contentScaleMode": "scaleInternals"
-                },
-                "Designer": {
-                  "designWidth": 166,
-                  "designHeight": 20
-                },
-                "Parts": {
-                  "_children": {
-                    "body": {
-                      "name": "body",
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 0,
-                          "width": 166,
-                          "height": 20,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF98A4AE"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 5
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "topRight": {
-                      "name": "topRight",
-                      "zIndex": 1,
-                      "_children": {
-                        "Layout": {
-                          "x": 161,
-                          "y": 0,
-                          "width": 5,
-                          "height": 5,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF98A4AE"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "bottom": {
-                      "name": "bottom",
-                      "zIndex": 1,
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 15,
-                          "width": 166,
-                          "height": 5,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF98A4AE"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "title": {
-                      "name": "title",
-                      "zIndex": 8,
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 1,
-                          "width": 166,
-                          "height": 18,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Text": {
-                          "content": "ARPEGGIO PATTERN",
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF13161A"
-                            },
-                            "Font": {
-                              "weight": "Bold",
-                              "weightValue": 700,
-                              "size": 12.101694915254239,
-                              "letterSpacing": 1
-                            },
-                            "Position": {
-                              "justification": "left"
-                            }
-                          },
-                          "_type": "Text"
-                        }
-                      },
-                      "_type": "Part"
-                    }
-                  }
-                },
-                "ValueChannels": {
-                  "_children": {
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  }
-                },
-                "Behaviors": {
-                  "_children": {
-                    "_removed": [
-                      "mainSlider",
-                      "modeButton"
-                    ]
-                  }
-                },
-                "Bindings": {
-                  "_removed": [
-                    "_type"
-                  ]
-                },
-                "PublishedProperties": {
-                  "inputs": {
-                    "_removed": [
-                      "mainValue",
-                      "mode",
-                      "accentColour"
-                    ]
-                  },
-                  "outputs": {
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  },
-                  "editableProperties": {
-                    "_removed": [
-                      "label",
-                      "variant"
-                    ]
-                  }
-                }
-              },
-              "_type": "Control"
-            },
-            "gaia_lbl_676": {
-              "_children": {
-                "Core": {
-                  "name": "arp_gesture_guide",
-                  "id": "gaia_lbl_676",
-                  "tabPageId": "arpeggiator",
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 264.4593301435407,
-                  "y": 16.154761904761905,
-                  "width": 1292.287081339713,
-                  "height": 11.238095238095237
+                  "x": 255.20574162679426,
+                  "y": 2,
+                  "width": 22,
+                  "height": 232.33333333333334
                 },
                 "Background": {
                   "_children": {
                     "Fill": {
-                      "colour": "00000000"
+                      "colour": "FF98A4AE"
                     },
                     "Border": {
-                      "enabled": false,
-                      "thickness": 0
+                      "enabled": false
+                    },
+                    "Corners": {
+                      "radius": 3
                     }
                   }
                 },
                 "Text": {
-                  "content": "RULER: CLICK / DRAG = END STEP     |     NOTE: LEFT = MOVE   ·   MIDDLE = VELOCITY   ·   RIGHT = LENGTH   ·   SHIFT = FINE",
+                  "content": "ARPEGGIO PATTERN",
                   "_children": {
                     "Fill": {
-                      "colour": "FF7C8894"
+                      "colour": "FF15212A"
                     },
                     "Font": {
-                      "size": 9,
-                      "letterSpacing": 0.3,
-                      "bold": false
-                    },
-                    "Multiline": {
-                      "overflowMode": "shrink",
-                      "maxLines": 1,
-                      "fitMode": "shrink",
-                      "lineHeight": 1.1
+                      "size": 11,
+                      "bold": true
                     },
                     "Position": {
-                      "justification": "left"
+                      "flowAngle": -90
                     }
                   }
-                },
-                "ContentLayout": {
-                  "horizontalAlign": "left",
-                  "paddingLeft": 2,
-                  "paddingRight": 2,
-                  "paddingTop": 1,
-                  "paddingBottom": 1
                 }
               },
               "_type": "Control"
@@ -173107,10 +172893,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 264.4593301435407,
-                  "y": 29.499999999999996,
-                  "width": 1292.287081339713,
-                  "height": 184
+                  "x": 283.2057416267943,
+                  "y": 18,
+                  "width": 1276.7942583732058,
+                  "height": 214.33333333333334
                 },
                 "Designer": {
                   "arpeggiator": {
@@ -173192,8 +172978,8 @@
                         "Layout": {
                           "x": 0,
                           "y": 0,
-                          "width": 1292.287081339713,
-                          "height": 184,
+                          "width": 1276.7942583732058,
+                          "height": 214.33333333333334,
                           "xUnit": "px",
                           "yUnit": "px",
                           "anchorX": "left",
@@ -173576,10 +173362,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 437.0143540669857,
-                  "y": 1.4047619047619047,
-                  "width": 1115.9808612440193,
-                  "height": 12.642857142857142,
+                  "x": 283.2057416267943,
+                  "y": 2,
+                  "width": 1276.7942583732058,
+                  "height": 12,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -186620,7 +186406,7 @@
                 },
                 "Transform": {
                   "width": 243.82775119617224,
-                  "height": 205.09523809523807
+                  "height": 236.33333333333334
                 },
                 "Background": {
                   "_children": {

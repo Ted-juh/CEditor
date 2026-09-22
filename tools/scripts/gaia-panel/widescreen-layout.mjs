@@ -1,5 +1,7 @@
 import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
 import { addInstrumentBranding } from './status-display.mjs';
+import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
+import { tabGeometry } from '../../../CE/web/src/CE_Application/utils/tabContainerLayout.js';
 
 // Three horizontal voices on the left, four permanently visible processors on
 // the right. This is document geometry, so 100% preview is exactly 1920 x 1000.
@@ -141,7 +143,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return compactPanelBranding(removeToneFlowStrips(panel));
+  return expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -199,5 +201,36 @@ export function compactPanelBranding(panel) {
   for (const [id, c] of Object.entries(children)) {
     if (c._children.Core.name === 'gaia_display_brand') delete children[id];
   }
+  return panel;
+}
+
+export function expandArpeggioWorkspace(panel) {
+  const all = flatControls(panel.controls);
+  const named = name => all.find(c => c._children.Core.name === name);
+  const bottom = named('bottom_pages'), t = bottom._children.Transform;
+  const page = tabGeometry(t.width, t.height, bottom).page;
+  const children = bottom._children.Children._children;
+  const box = named('box_ARPEGGIO PATTERN')._children.Transform;
+  box.height = page.h;
+  named('box_ARPEGGIO')._children.Transform.height = page.h;
+  const tab = named('tab_ARPEGGIO PATTERN');
+  children[tab._children.Core.id] = createControl('Label', {
+    Core: { ...tab._children.Core, controlType: 'Label' },
+    Transform: { x: box.x + 2, y: 2, width: 22, height: page.h - 4 },
+    Text: { content: 'ARPEGGIO PATTERN', _children: {
+      Font: { size: 11, bold: true }, Fill: { colour: 'FF15212A' },
+      Position: { justification: 'centred', flowMode: 'rotate', flowAngle: -90 },
+    } },
+    Background: { _children: { Fill: { colour: 'FF98A4AE' }, Border: { enabled: false }, Corners: { radius: 3 } } },
+  });
+  const guide = named('arp_gesture_guide');
+  if (guide) delete children[guide._children.Core.id];
+  const grid = named('arp_pattern_grid')._children;
+  Object.assign(grid.Transform, { x: box.x + 30, y: 18, width: box.width - 38, height: page.h - 22 });
+  Object.assign(grid.Parts._children.field._children.Layout, { width: grid.Transform.width, height: grid.Transform.height });
+  const status = named('gaia_hardware_sync_status')._children.Transform;
+  Object.assign(status, { x: grid.Transform.x, y: 2, width: grid.Transform.width, height: 12 });
+  const output = named('box_EFFECTS / OUTPUT')._children.Transform;
+  output.height = t.y + t.height - output.y;
   return panel;
 }
