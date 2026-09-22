@@ -387,6 +387,9 @@ public:
     bool saveTo (const juce::File& file) const;
 
     SaveFailure lastSaveFailure() const                      { return saveFailure; }
+    /** On an external-change conflict, the complete local candidate is preserved here when
+        possible so refusing the overwrite does not merely move the data loss into memory. */
+    juce::File lastConflictCopy() const                      { return conflictCopy; }
 
     /** True when the last load found a file it could not read. Every save refuses until the
         original has been dealt with and `allowSaves` says so. */
@@ -416,6 +419,7 @@ private:
     mutable bool baselineFileExisted = false;
     mutable juce::String baselinePath;
     mutable juce::String baselineText;
+    mutable juce::File conflictCopy;
 };
 
 /** Moves an unreadable index aside, and returns where it went (or an empty File if it could

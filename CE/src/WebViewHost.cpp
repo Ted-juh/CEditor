@@ -1,6 +1,7 @@
 #include "WebViewHost.h"
 
 #include "InstrumentHost/PluginCatalog.h"
+#include "PngResourceValidation.h"
 
 #include <cstring>
 #include <functional>
@@ -241,10 +242,17 @@ std::optional<juce::WebBrowserComponent::Resource> providePluginSnapshot (const 
     const auto token = path.fromFirstOccurrenceOf (snapshotRoutePrefix, false, false);
     const auto file = ceditor::host::PluginSnapshotRegistry::instance().resolve (token);
 
-    if (token.isEmpty() || ! file.existsAsFile())
+    if (token.isEmpty() || ! file.existsAsFile() || ! file.hasFileExtension ("png"))
         return std::nullopt;
 
-    return loadFrontendFile (file);
+    juce::MemoryBlock data;
+    if (! file.loadFileAsData (data)
+        || ! ceditor::isSafePngResource (data.getData(), data.getSize()))
+        return std::nullopt;
+
+    // Never infer this MIME type from vendor input. The route is image-only even if a file is
+    // swapped after publication, so HTML or SVG cannot join the editor page's privileged origin.
+    return makeResource (data.getData(), data.getSize(), "image/png");
 }
 
 std::optional<juce::WebBrowserComponent::Resource> provideFrontendResource (const juce::String& rawPath)

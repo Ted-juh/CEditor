@@ -571,6 +571,20 @@ void testSessionWriteFailureIsReportedAndNonDestructive()
     check (h.emits.count ("instrumentHostError") == errorsAfterFirstFailure,
            "a continuing write failure is reported once rather than on every edit");
 
+    blocked.deleteRecursively();
+    h.cmd ("addPart");
+    check (juce::JSON::parse (blocked.loadFileAsString()).isObject(),
+           "the dirty session saves once the path becomes writable");
+
+    blocked.deleteFile();
+    blocked.createDirectory();
+    h.cmd ("addPart");
+    check (h.emits.count ("instrumentHostError") == errorsAfterFirstFailure + 1,
+           "a later failure streak is reported after a successful save re-arms the notice");
+
+    blocked.deleteRecursively();
+    h.cmd ("addPart");
+
     dir.deleteRecursively();
 }
 
@@ -10664,7 +10678,10 @@ void testPluginSnapshots()
     std::cout << "\nplug-in snapshots" << std::endl;
 
     const auto dir = freshDataDir ("snapshots");
-    const auto png = dir.getChildFile ("good-synth.png");
+    const auto goodBundle = dir.getChildFile ("Good.vst3");
+    const auto png = goodBundle.getChildFile ("Contents").getChildFile ("Resources")
+                               .getChildFile ("Snapshots").getChildFile ("good-synth.png");
+    png.getParentDirectory().createDirectory();
     png.replaceWithText ("stand-in for the vendor's PNG");
 
     // Two instruments; only one of them shipped a picture.
@@ -10673,7 +10690,8 @@ void testPluginSnapshots()
         for (const auto* name : { "Good", "Other" })
         {
             ModuleScanResult module;
-            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.modulePath = juce::String (name) == "Good" ? goodBundle.getFullPathName()
+                                                               : dir.getChildFile ("Other.vst3").getFullPathName();
             module.fingerprint = juce::String ("fp-") + name;
             PluginClassRecord synth;
             synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
@@ -10739,7 +10757,10 @@ void testEditorThumbnails()
     std::cout << "\ncaptured editor thumbnails" << std::endl;
 
     const auto dir = freshDataDir ("thumbnails");
-    const auto vendorPng = dir.getChildFile ("vendor.png");
+    const auto goodBundle = dir.getChildFile ("Good.vst3");
+    const auto vendorPng = goodBundle.getChildFile ("Contents").getChildFile ("Resources")
+                                     .getChildFile ("Snapshots").getChildFile ("vendor.png");
+    vendorPng.getParentDirectory().createDirectory();
     vendorPng.replaceWithText ("stand-in for the vendor's own PNG");
 
     // "Good" ships artwork; "Other" ships none and is the one that wants a capture.
@@ -10748,7 +10769,8 @@ void testEditorThumbnails()
         for (const auto* name : { "Good", "Other" })
         {
             ModuleScanResult module;
-            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.modulePath = juce::String (name) == "Good" ? goodBundle.getFullPathName()
+                                                               : dir.getChildFile ("Other.vst3").getFullPathName();
             module.fingerprint = juce::String ("fp-") + name;
             PluginClassRecord synth;
             synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";
@@ -11014,7 +11036,10 @@ void testCustomArtwork()
     std::cout << "\ncustom plug-in artwork" << std::endl;
 
     const auto dir = freshDataDir ("custom-artwork");
-    const auto vendorPng = dir.getChildFile ("vendor.png");
+    const auto goodBundle = dir.getChildFile ("Good.vst3");
+    const auto vendorPng = goodBundle.getChildFile ("Contents").getChildFile ("Resources")
+                                     .getChildFile ("Snapshots").getChildFile ("vendor.png");
+    vendorPng.getParentDirectory().createDirectory();
     vendorPng.replaceWithText ("stand-in for the vendor's own PNG");
 
     {
@@ -11022,7 +11047,8 @@ void testCustomArtwork()
         for (const auto* name : { "Good", "Other" })
         {
             ModuleScanResult module;
-            module.modulePath = juce::String ("C:\\VST3\\") + name + ".vst3";
+            module.modulePath = juce::String (name) == "Good" ? goodBundle.getFullPathName()
+                                                               : dir.getChildFile ("Other.vst3").getFullPathName();
             module.fingerprint = juce::String ("fp-") + name;
             PluginClassRecord synth;
             synth.ceId = juce::String ("VST3-") + juce::String (name).toLowerCase() + "-synth";

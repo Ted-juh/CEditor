@@ -15,6 +15,7 @@
 
 #include "InstrumentHost/PluginCatalog.h"
 #include "InstrumentHost/PluginSnapshotPath.h"
+#include "PngResourceValidation.h"
 #include <iostream>
 
 namespace
@@ -32,6 +33,7 @@ using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
 using ceditor::host::PluginSnapshotRegistry;
 using ceditor::host::validatedVst3Snapshot;
+using ceditor::host::isSafeVst3SnapshotRelativePath;
 
 juce::File makeTempDir (const juce::String& name)
 {
@@ -343,6 +345,14 @@ void testSnapshotPathsStayInsideTheBundle()
            "a traversal path outside the bundle is rejected");
     check (validatedVst3Snapshot (bundle, "Resources/Snapshots/notes.txt") == juce::File(),
            "a non-PNG file is rejected");
+    check (! isSafeVst3SnapshotRelativePath ("C:\\Windows\\win.ini")
+             && ! isSafeVst3SnapshotRelativePath ("C:win.ini")
+             && ! isSafeVst3SnapshotRelativePath ("\\\\127.0.0.1\\share\\x.png"),
+           "absolute, drive-relative and UNC paths are rejected before filesystem access");
+    check (! isSafeVst3SnapshotRelativePath ("Resources/Snapshots/../x.png")
+             && ! isSafeVst3SnapshotRelativePath ("Resources/Snapshots/x.svg")
+             && ! isSafeVst3SnapshotRelativePath ("Resources/Snapshots/x.png."),
+           "traversal, active content and ambiguous Windows extensions are rejected lexically");
 
     const auto link = snapshots.getChildFile ("linked.png");
     if (secret.createSymbolicLink (link, false))
@@ -350,6 +360,25 @@ void testSnapshotPathsStayInsideTheBundle()
                "a link that redirects outside the bundle is rejected");
 
     dir.deleteRecursively();
+}
+
+void testPublishedSnapshotBytesArePngOnly()
+{
+    std::cout << "\npublished snapshot bytes are PNG only" << std::endl;
+
+    std::uint8_t header[24] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                              0, 0, 0, 13, 'I', 'H', 'D', 'R',
+                              0, 0, 4, 0, 0, 0, 3, 0 };
+    check (ceditor::isSafePngResource (header, sizeof (header)),
+           "a normal PNG signature and IHDR are accepted");
+
+    const char html[] = "<html><script>alert(1)</script></html>";
+    check (! ceditor::isSafePngResource (html, sizeof (html)),
+           "HTML renamed to .png is rejected");
+
+    header[16] = 0x7f; header[17] = 0xff; header[18] = 0xff; header[19] = 0xff;
+    check (! ceditor::isSafePngResource (header, sizeof (header)),
+           "an implausible image dimension is rejected before browser decoding");
 }
 
 void testArchitectureReading()
@@ -493,6 +522,7 @@ int main()
     testArchitectureGating();
     testSnapshots();
     testSnapshotPathsStayInsideTheBundle();
+    testPublishedSnapshotBytesArePngOnly();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;

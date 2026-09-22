@@ -2,6 +2,7 @@
 
 #include "AtomicFileWrite.h"
 #include "PatchDiff.h"
+#include "PluginSnapshotPath.h"
 #include "VendorPresetDiscovery.h"
 #include "SonicProbe.h"
 #include "SonicAnalysisJob.h"
@@ -10864,8 +10865,11 @@ bool InstrumentHostService::saveLibrary()
                        + "\" could not be read at startup and has been left untouched."
                : failure == Library::SaveFailure::changedExternally
                  ? juce::String ("The sound library changed in another CEditor instance. "
-                                 "This instance did not overwrite those newer changes; restart "
-                                 "before editing the library again.")
+                                 "This instance did not overwrite those newer changes.")
+                       + (library.lastConflictCopy() != juce::File()
+                            ? " Its unsaved version was preserved at \""
+                                + library.lastConflictCopy().getFullPathName() + "\"."
+                            : juce::String())
                  : juce::String ("Could not save the sound library index to \"")
                        + libraryFile().getFullPathName() + "\".");
     return false;
@@ -10879,8 +10883,15 @@ juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord rec
     {
         // A failed capture must not remain in memory and appear saved on a later refresh.
         library.removeRecord (recordId);
-        emitError ("Could not save \"" + name + "\" to the library. Could not write: "
-                   + libraryFile().getFullPathName());
+        emitError (library.lastSaveFailure() == Library::SaveFailure::changedExternally
+                     ? "Could not save \"" + name + "\" because the sound library changed "
+                       "in another CEditor instance. The newer index was left untouched."
+                       + (library.lastConflictCopy() != juce::File()
+                            ? " The unsaved version was preserved at \""
+                                + library.lastConflictCopy().getFullPathName() + "\"."
+                            : juce::String())
+                     : "Could not save \"" + name + "\" to the library. Could not write: "
+                         + libraryFile().getFullPathName());
         return {};
     }
     if (options.emit != nullptr)
@@ -16029,8 +16040,18 @@ juce::File InstrumentHostService::artworkFor (const PluginClassRecord& record) c
         if (const auto custom = snapshotOverrideFile (record); custom.existsAsFile())
             return custom;
 
-    if (const juce::File vendor (record.snapshotPath); vendor.existsAsFile())
-        return vendor;
+    // Re-check worker output in the privileged process. A malicious plug-in controls the
+    // disposable scanner, and old catalogues may predate its validation, so neither is a
+    // trust boundary for an absolute path that the WebView can later request.
+    if (record.snapshotPath.isNotEmpty())
+        for (const auto& module : catalog.allModules())
+            for (const auto& candidate : module.classes)
+                if (candidate.ceId == record.ceId
+                    && candidate.snapshotPath == record.snapshotPath)
+                    if (const auto vendor = validatedVst3Snapshot (
+                            juce::File (module.path), record.snapshotPath);
+                        vendor != juce::File())
+                        return vendor;
 
     if (options.dataDirectory == juce::File())
         return {};
@@ -18524,12 +18545,14 @@ juce::var InstrumentHostService::performancePayload() const
 
 void InstrumentHostService::savePerformance()
 {
-    performanceSavePending.store (false);
     ++performanceSaveGeneration;
     if (! options.persistSession)
+    {
+        performanceSavePending.store (false);
         return;
+    }
 
-    writePerformanceDocument (rack.captureState().toVar());
+    performanceSavePending.store (! writePerformanceDocument (rack.captureState().toVar()));
 }
 
 void InstrumentHostService::schedulePerformanceSave()
@@ -18544,7 +18567,6 @@ void InstrumentHostService::schedulePerformanceSave()
     {
         if (! lifetime->load() || generation != performanceSaveGeneration.load())
             return;
-        performanceSavePending.store (false);
         savePerformance();
     });
 }
@@ -18554,7 +18576,7 @@ void InstrumentHostService::savePerformanceModel()
     if (! options.persistSession)
         return;
 
-    writePerformanceDocument (rack.getPerformance().toVar());
+    performanceSavePending.store (! writePerformanceDocument (rack.getPerformance().toVar()));
 }
 
 bool InstrumentHostService::writePerformanceDocument (const juce::var& document)

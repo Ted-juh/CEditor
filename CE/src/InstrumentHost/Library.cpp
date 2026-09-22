@@ -7,6 +7,7 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <utility>
 
 namespace ceditor::host
@@ -548,6 +549,7 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
 
 bool Library::saveTo (const juce::File& file) const
 {
+    conflictCopy = {};
     // The refusal is the point. After a failed read this object is empty because the read
     // failed, not because the library is empty, and writing it out is how a disk hiccup turns
     // into deleted curation.
@@ -562,6 +564,13 @@ bool Library::saveTo (const juce::File& file) const
     // two processes can both load revision A, then save B and C in sequence. Without a lock
     // AND a comparison under that lock, C quietly erases everything B added. Refuse the stale
     // save instead. The caller reports the conflict and the other process's bytes remain safe.
+    // JUCE's InterProcessLock does not exclude two instances inside one process (fcntl locks
+    // are process-scoped on POSIX, and a Windows named mutex is recursive on one thread).
+    // Library saves are infrequent control-thread work, so one process-wide mutex is simpler
+    // and safer than a lifetime-sensitive map of per-path mutexes.
+    static std::mutex inProcessSaveMutex;
+    const std::scoped_lock inProcessLock (inProcessSaveMutex);
+
     auto lockPath = file.getFullPathName();
    #if JUCE_WINDOWS
     lockPath = lockPath.toLowerCase();
@@ -588,6 +597,12 @@ bool Library::saveTo (const juce::File& file) const
         const auto textNow = existsNow ? file.loadFileAsString() : juce::String();
         if (existsNow != baselineFileExisted || (existsNow && textNow != baselineText))
         {
+            const auto stamp = juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S");
+            const auto recovery = file.getSiblingFile (
+                file.getFileName() + ".conflict-" + stamp + "-"
+                + juce::Uuid().toDashedString() + ".json");
+            if (writeTextAtomically (recovery, juce::JSON::toString (toVar())))
+                conflictCopy = recovery;
             saveFailure = SaveFailure::changedExternally;
             return false;
         }

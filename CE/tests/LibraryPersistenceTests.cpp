@@ -209,6 +209,12 @@ void testStaleProcessCannotOverwriteANewerLibrary()
     check (stale.lastSaveFailure() == Library::SaveFailure::changedExternally,
            "the refusal is reported as an external-change conflict");
     check (file.loadFileAsString() == afterFirst, "the newer process's complete index is untouched");
+    check (stale.lastConflictCopy().existsAsFile(), "the stale process's unsaved index is preserved");
+    Library preserved;
+    check (preserved.loadFrom (stale.lastConflictCopy()) == Library::LoadResult::loaded
+             && preserved.allRecords().size() == 1
+             && preserved.allRecords()[0].name == "Stale process preset",
+           "the recovery copy contains the refused edit");
 
     Library reloaded;
     check (reloaded.loadFrom (file) == Library::LoadResult::loaded
