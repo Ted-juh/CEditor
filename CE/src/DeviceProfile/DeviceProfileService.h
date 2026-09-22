@@ -362,5 +362,7 @@ private:
                              const juce::String& semantic,
                              const juce::String& hex,
                              const juce::String& status);
+
+    JUCE_DECLARE_WEAK_REFERENCEABLE (DeviceProfileService)
 };
 }

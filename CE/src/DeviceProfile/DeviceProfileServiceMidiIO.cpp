@@ -480,6 +480,10 @@ void DeviceProfileService::timerCallback()
     auto now = nowMs();
     if (monitorEmitPending && now - lastMonitorEmitMs >= 50.0)
         emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+    // Remove every due item before sending any of them. sendTransactionNow may queue the
+    // remainder of a multi-message transaction; pushing onto a deque invalidates the iterator
+    // used by the old single loop.
+    std::vector<QueuedTransaction> dueTransactions;
     for (auto it = queuedTransactions.begin(); it != queuedTransactions.end();)
     {
         if (it->dueTimeMs > now)
@@ -488,9 +492,12 @@ void DeviceProfileService::timerCallback()
             continue;
         }
 
-        auto queued = *it;
+        dueTransactions.push_back (std::move (*it));
         it = queuedTransactions.erase (it);
+    }
 
+    for (const auto& queued : dueTransactions)
+    {
         juce::String error;
         juce::String status;
         auto sent = sendTransactionNow (queued.deviceRole,
@@ -526,10 +533,12 @@ void DeviceProfileService::handleIncomingMidiMessage (juce::MidiInput* source, c
                                          : (message.isController() ? juce::String ("cc") : juce::String ("midi"));
     auto timestampSeconds = message.getTimeStamp();
 
-    juce::MessageManager::callAsync ([this, role, bytes, hex, messageType, timestampSeconds]()
+    juce::WeakReference<DeviceProfileService> safeThis (this);
+    juce::MessageManager::callAsync ([safeThis, role, bytes, hex, messageType, timestampSeconds]()
     {
         juce::ignoreUnused (hex);
-        ingestIncomingMidiBytes (role, bytes, messageType, timestampSeconds);
+        if (auto* service = safeThis.get())
+            service->ingestIncomingMidiBytes (role, bytes, messageType, timestampSeconds);
     });
 }
 
