@@ -833,6 +833,11 @@ private:
     void ensureHostProject();
     void ensureLibrary();
 
+    /** Writes the library index and SAYS when that failed. Every call site used to drop the
+        result, so a read-only folder, a full disk or an index still blocked after an
+        unreadable load all looked exactly like a save. Returns false on any of those. */
+    bool saveLibrary();
+
     /** One record's worth of work for the auditioner, copied off the library on the controlling
         thread so the job never reads a structure somebody else is editing. */
     struct AnalysisTask
@@ -1348,6 +1353,11 @@ private:
     // substitutionsFile() for why it is not in the library.
     juce::StringPairArray substitutions;
     bool libraryLoaded = false;
+    /** Whether the current run of library write failures has already been reported. Saves
+        happen on favourites, ratings, auditions and every program ingest, so a read-only data
+        directory would otherwise put the same notice on screen dozens of times a minute. Reset
+        by the first save that works. */
+    bool libraryWriteErrorReported = false;
     struct PresetAuditionEvent
     {
         double dueMs = 0.0;

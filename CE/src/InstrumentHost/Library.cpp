@@ -1,5 +1,7 @@
 #include "Library.h"
 
+#include "AtomicFileWrite.h"
+
 #include <algorithm>
 #include <cstring>
 #include <deque>
@@ -509,15 +511,66 @@ Library Library::fromVar (const juce::var& stored)
     return library;
 }
 
-void Library::loadFrom (const juce::File& file)
+Library::LoadResult Library::loadFrom (const juce::File& file)
 {
-    *this = fromVar (juce::JSON::parse (file.loadFileAsString()));
+    *this = Library();
+
+    if (! file.existsAsFile())
+        return LoadResult::absent;
+
+    // Everything below this line is the same question asked three ways: did we actually READ
+    // the library? An empty string is what a locked or unreadable file gives back (JUCE reports
+    // no error for it), a parse failure is a truncated or corrupted document, and a document
+    // that is not an object is not this format at all. None of them is an empty library, and
+    // the difference matters because `saveTo` is about to be asked to write over the original.
+    const auto text = file.loadFileAsString();
+    juce::var parsed;
+
+    if (text.isEmpty()
+        || juce::JSON::parse (text, parsed).failed()
+        || parsed.getDynamicObject() == nullptr)
+    {
+        saveBlocked = true;
+        return LoadResult::unreadable;
+    }
+
+    *this = fromVar (parsed);
+    return LoadResult::loaded;
 }
 
 bool Library::saveTo (const juce::File& file) const
 {
-    return file.getParentDirectory().createDirectory().wasOk()
-        && file.replaceWithText (juce::JSON::toString (toVar()));
+    // The refusal is the point. After a failed read this object is empty because the read
+    // failed, not because the library is empty, and writing it out is how a disk hiccup turns
+    // into deleted curation.
+    if (saveBlocked)
+        return false;
+
+    return writeTextAtomically (file, juce::JSON::toString (toVar()));
+}
+
+juce::File quarantineUnreadableLibrary (const juce::File& file)
+{
+    if (! file.existsAsFile())
+        return {};
+
+    const auto stamp = juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S");
+
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+        const auto suffix = attempt == 0 ? juce::String() : "-" + juce::String (attempt + 1);
+        const auto parked = file.getSiblingFile (file.getFileName() + ".unreadable-" + stamp + suffix);
+
+        if (parked.exists())
+            continue;
+
+        if (file.moveFileTo (parked))
+            return parked;
+
+        return {};
+    }
+
+    return {};
 }
 
 juce::Array<const LibraryRecord*> searchLibrary (const Library& library,

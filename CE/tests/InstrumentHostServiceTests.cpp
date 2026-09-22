@@ -9923,6 +9923,44 @@ void testBuildEditHistory()
     check (bounded.undo.empty() && bounded.redo.empty(), "a new session clears both history directions");
 }
 
+void testUnreadableLibraryIsNotOverwritten()
+{
+    // The loss this prevents needs no user action at all: the index fails to load (a save cut
+    // short by a crash, a file held open by something else), the library comes up empty because
+    // that is what failing to read produces, and the first collection or capture afterwards
+    // writes the emptiness over every favourite, rating, note and captured preset. Nothing on
+    // screen says a word. So startup moves the unreadable file aside FIRST, and only then lets
+    // a new index be written.
+    const auto dir = freshDataDir ("library-unreadable");
+    seedCatalog (dir);
+
+    const auto file = dir.getChildFile ("library.json");
+    const juce::String truncated ("{ \"records\": [ { \"name\": \"Warm Pad\"");
+    file.replaceWithText (truncated);
+
+    Harness h (dir);
+    h.cmd ("getLibrary");
+
+    const auto* error = h.emits.last ("instrumentHostError");
+    check (error != nullptr
+             && error->getProperty ("message", {}).toString().contains ("could not be read"),
+           "an unreadable index is reported rather than passed off as an empty library");
+
+    juce::Array<juce::File> parked;
+    dir.findChildFiles (parked, juce::File::findFiles, false, "library.json.unreadable-*");
+    check (parked.size() == 1 && parked[0].loadFileAsString() == truncated,
+           "the unreadable index is kept whole, beside the data directory");
+
+    // And the host keeps working: the new index is written where the old one was, with the old
+    // one's bytes safe under another name rather than gone.
+    h.cmd ("saveSmartCollection", { { "name", "Pads" } });
+    ceditor::host::Library persisted;
+    check (persisted.loadFrom (file) == ceditor::host::Library::LoadResult::loaded
+             && persisted.allSmartCollections().size() == 1,
+           "a fresh index is written in its place");
+    check (parked[0].loadFileAsString() == truncated, "and the quarantined copy is untouched");
+}
+
 void testLibrarySaveFeedback()
 {
     const auto dir = freshDataDir ("library-save-feedback");
@@ -12038,6 +12076,7 @@ int main (int argc, char* argv[])
     testVendorPresetLoadRoutes();
     testSavedLibraryAndLoadResults();
     testLibrarySaveFeedback();
+    testUnreadableLibraryIsNotOverwritten();
     testBuildEditHistory();
     testLibrary();
     testSonicProbe();

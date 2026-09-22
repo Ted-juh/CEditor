@@ -363,8 +363,32 @@ public:
 
     bool removeSmartCollection (const juce::String& collectionId);
 
-    void loadFrom (const juce::File& file);
+    /** How a load ended, because the three outcomes are not interchangeable.
+     *
+     *  `absent` is a first run: there is no index yet and an empty library IS the truth.
+     *  `unreadable` is the dangerous one — a file exists and could not be read or parsed. It
+     *  must never be treated as `absent`, because the next save would then write an empty
+     *  index over somebody's favourites, ratings, notes and captured presets, and no user
+     *  action anywhere said to delete them. */
+    enum class LoadResult { loaded, absent, unreadable };
+
+    /** Reads the index, replacing whatever this object held. An `unreadable` result BLOCKS
+        saving (see `savesBlocked`) so the unreadable file cannot be overwritten by the
+        emptiness that failing to read it produced. */
+    LoadResult loadFrom (const juce::File& file);
+
+    /** Writes the index, and answers whether the bytes landed. Refuses — returning false
+        without touching the file — while saves are blocked. */
     bool saveTo (const juce::File& file) const;
+
+    /** True when the last load found a file it could not read. Every save refuses until the
+        original has been dealt with and `allowSaves` says so. */
+    bool savesBlocked() const                                 { return saveBlocked; }
+
+    /** Lifts the block. The caller is saying the unreadable file is now safe to leave behind —
+        in practice that it has been moved aside by `quarantineUnreadableLibrary`, so starting
+        a fresh index loses nothing. */
+    void allowSaves()                                         { saveBlocked = false; }
 
     juce::var toVar() const;
     static Library fromVar (const juce::var& stored);
@@ -372,7 +396,14 @@ public:
 private:
     juce::Array<LibraryRecord> records;
     juce::Array<SmartCollection> smartCollections;
+    bool saveBlocked = false;
 };
+
+/** Moves an unreadable index aside, and returns where it went (or an empty File if it could
+    not be moved). Kept rather than deleted: the bytes are the only copy of that curation, and
+    a file somebody can send us beats one we tidied away. The name is unique, so a second bad
+    start does not overwrite the evidence from the first. */
+juce::File quarantineUnreadableLibrary (const juce::File& file);
 
 /** Case-insensitive text search over name, instrument, manufacturer, category and user tags,
     with optional type filter (""=all). Pure; the WebView and the hardware browse the same

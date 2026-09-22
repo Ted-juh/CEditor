@@ -6297,7 +6297,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
 
             const auto newId = library.addCapturedRecord (std::move (branch));
             rack.setPartLastPreset (partId, newId, library.find (newId)->name);
-            library.saveTo (libraryFile());
+            saveLibrary();
             savePerformance();
             emitState();
             emitLibrary (libraryView);
@@ -6316,7 +6316,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         // already reads a record has to learn about versions.
         target->stateBlobBase64 = target->versions.getLast().stateBlobBase64;
 
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -6751,7 +6751,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                                : libraryView;
 
         library.putSmartCollection (std::move (collection));
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -6765,7 +6765,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -7012,7 +7012,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         library.setUserMetadata (record->recordId, user);
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -7058,7 +7058,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (id != set.keyRecordId && library.setRecordHidden (id, true))
                 ++folded;
 
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
 
         auto* answer = new juce::DynamicObject();
@@ -7082,7 +7082,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         // Both directions on one command, because a fold nobody can undo is a delete with better
         // manners. The browse query's `includeHidden` is how somebody finds the row again.
         library.setRecordHidden (record->recordId, (bool) payload.getProperty ("hidden", true));
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -7105,7 +7105,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         library.removeRecord (record->recordId);
-        library.saveTo (libraryFile());
+        saveLibrary();
         emitLibrary (libraryView);
         return;
     }
@@ -7206,7 +7206,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         const auto noteUsed = [this, recordId = record->recordId, shouldAudition]
         {
             library.noteRecordUsed (recordId, shouldAudition, juce::Time::currentTimeMillis());
-            library.saveTo (libraryFile());
+            saveLibrary();
         };
 
         if (record->type == "rack")
@@ -9868,7 +9868,29 @@ void InstrumentHostService::ensureLibrary()
     libraryLoaded = true;
 
     options.dataDirectory.createDirectory();
-    library.loadFrom (libraryFile());
+
+    // An index we could not read is NOT an empty index. Left alone, the first favourite or
+    // captured preset after a failed read would write that emptiness over the real file, so
+    // the original is moved aside first and only then is this fresh library allowed to save.
+    // If it cannot even be moved, saves stay blocked: refusing to save is recoverable, and
+    // overwriting somebody's entire curation is not.
+    if (library.loadFrom (libraryFile()) == Library::LoadResult::unreadable)
+    {
+        if (const auto parked = quarantineUnreadableLibrary (libraryFile()); parked != juce::File())
+        {
+            library.allowSaves();
+            emitError ("The sound library index could not be read. It has been set aside as \""
+                       + parked.getFileName() + "\" and a new one started, so nothing in it was "
+                       "overwritten.");
+        }
+        else
+        {
+            emitError ("The sound library index could not be read, and could not be set aside "
+                       "either. Library changes will not be saved until \""
+                       + libraryFile().getFullPathName() + "\" is repaired or moved.");
+        }
+    }
+
     snapshots = std::make_unique<SnapshotStore> (snapshotDirectory());
 
     loadSubstitutions();
@@ -10341,7 +10363,7 @@ void InstrumentHostService::runAnalysisNow (juce::Array<AnalysisTask> tasks)
         }
 
         if (! findings.empty())
-            library.saveTo (libraryFile());
+            saveLibrary();
 
         // A cache, and it behaves like one. Least recently heard goes first, and a snapshot
         // that goes takes nothing with it: the record, its measurements and its rating stay,
@@ -10817,6 +10839,28 @@ LibraryAvailability InstrumentHostService::libraryAvailability() const
     return [this] (const LibraryRecord& record) { return recordUnavailableReason (record).isEmpty(); };
 }
 
+bool InstrumentHostService::saveLibrary()
+{
+    if (library.saveTo (libraryFile()))
+    {
+        libraryWriteErrorReported = false;
+        return true;
+    }
+
+    // Said once, not once per favourite: see libraryWriteErrorReported.
+    if (libraryWriteErrorReported)
+        return false;
+
+    libraryWriteErrorReported = true;
+    emitError (library.savesBlocked()
+                 ? juce::String ("Library changes are not being saved: the index at \"")
+                       + libraryFile().getFullPathName()
+                       + "\" could not be read at startup and has been left untouched."
+                 : juce::String ("Could not save the sound library index to \"")
+                       + libraryFile().getFullPathName() + "\".");
+    return false;
+}
+
 juce::String InstrumentHostService::saveCapturedLibraryRecord (LibraryRecord record)
 {
     const auto name = record.name;
@@ -11162,7 +11206,7 @@ void InstrumentHostService::scanVstPresets()
                     && isZebra3ProgramSlot (record.instrument, record.manufacturer, record.name))
                     slots.add (record.recordId);
             for (const auto& id : slots) library.removeRecord (id);
-            library.saveTo (libraryFile());
+            saveLibrary();
             scanCataloguePrograms (std::make_shared<juce::Array<PluginClassRecord>> (
                 presetCatalogueClasses (snapshot)), 0);
         };
@@ -11178,7 +11222,7 @@ void InstrumentHostService::scanCataloguePrograms (
 {
     if (index >= classes->size())
     {
-        library.saveTo (libraryFile());
+        saveLibrary();
         libraryScanBusy = false;
         libraryScanFinished = true;
         emitLibrary (libraryView);
@@ -11319,13 +11363,13 @@ bool InstrumentHostService::ingestProcessorPrograms (juce::AudioProcessor& proce
     if (scanned.size() < 2 || distinctNames.size() < 2)
     {
         if (! stale.isEmpty())
-            library.saveTo (libraryFile());
+            saveLibrary();
         return ! stale.isEmpty();
     }
 
     // Scoped to this class so refreshing one plug-in's list never marks another's missing.
     library.mergeVendorScan ("programList", std::move (scanned), scope);
-    library.saveTo (libraryFile());
+    saveLibrary();
     return true;
 }
 

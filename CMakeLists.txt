@@ -1214,6 +1214,20 @@ target_link_libraries(CEditorVendorPresetTests PRIVATE juce::juce_core juce::juc
 add_test(NAME VendorPresets COMMAND CEditorVendorPresetTests)
 ce_configure_test(CEditorVendorPresetTests)
 
+# The library index's read/write contract (§18.6.5). Separate from the vendor tests above
+# because it proves a rule about FAILURE rather than about any format: an index that could not
+# be read is never written over by the empty library that failing to read it produced. juce_core
+# only — files and JSON are the whole surface.
+add_executable(CEditorLibraryPersistenceTests
+    "${CE_ROOT}/src/InstrumentHost/Library.cpp"
+    "${CE_ROOT}/tests/LibraryPersistenceTests.cpp"
+)
+target_compile_features(CEditorLibraryPersistenceTests PRIVATE cxx_std_23)
+target_include_directories(CEditorLibraryPersistenceTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorLibraryPersistenceTests PRIVATE juce::juce_core)
+add_test(NAME LibraryPersistence COMMAND CEditorLibraryPersistenceTests)
+ce_configure_test(CEditorLibraryPersistenceTests)
+
 # The licence document, its signature and the edition table (§19 "Trust", §20, §26.2, §27).
 # juce_cryptography is the only module beyond juce_core: RSAKey and SHA256, the two primitives
 # an offline signature check needs. No network, and nothing to link that could introduce one.
