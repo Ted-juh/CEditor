@@ -71,7 +71,9 @@ test('1920 by 1000 panel keeps a vertical effects column beside three horizontal
     assert.equal(byName(`tone${tone}.signalFlow`),undefined);
     assert.equal(byName(`tone${tone}.lamp`),undefined);
     const row=['lfo.rate','osc.pitch','filter.cutoff','amp.level','modLfo.rate'].map(n=>byName(`tone${tone}.${n}`)._children.Transform);
-    assert.ok(row.every((r,i)=>r.y===row[0].y && r.x+r.width<fx[0].x && (!i || r.x>row[i-1].x)));
+    assert.ok(row.every((r,i)=>r.x+r.width<fx[0].x && (!i || r.x>row[i-1].x)));
+    assert.ok(row.slice(1,4).every(r=>r.y===row[1].y),'the three tone faders share their baseline');
+    assert.equal(row[0].y,row[4].y,'the two compact rate knobs share their higher row');
   }
   assert.ok(!isChildOnActivePage(byName('system.masterTune'),bottom));
   for(const tone of [1,2,3]) assert.ok(panel.controls.some(c=>c._children.Core.name===`tone${tone}.osc.wave`));

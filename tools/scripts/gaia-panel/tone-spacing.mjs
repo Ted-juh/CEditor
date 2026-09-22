@@ -32,9 +32,8 @@ export function refineToneSpacing(panel) {
     for (const [kind, title] of [['osc.pitchEnv', 'OSC'], ['filter.env', 'FILTER'], ['amp.env', 'AMP']]) {
       const view = named(`tone${tone}.${kind}.view`), v = rect(view), b = rect(section(title, tone));
       const children = Object.values(view._children.Children._children);
-      // Widen only the transparent container, keeping each envelope's horizontal placement.
-      for (const c of children) rect(c).x += v.x - b.x;
-      Object.assign(v, { x: b.x, width: b.width });
+      // Keep the transparent live container on the envelope itself. Widening it across the
+      // section overlaps the captions and prevents the scenery compiler from baking them.
       Object.assign(view._children.TabContainer, { appearance: 'buttons',
         buttonGroupWidth: 66, buttonGap: 8, buttonHeight: 16, labelSize: 9 });
       for (const c of children) {
