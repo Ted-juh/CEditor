@@ -83,7 +83,8 @@ export function tabGeometry(width, height, control) {
       return { strip: { x: w - strip, y: 0, w: strip, h }, page: { x: 0, y: 0, w: w - strip, h }, edge, vertical: true };
     default:
       return { strip: { x: 0, y: 0, w, h: strip }, page: { x: 0, y: strip, w, h: h - strip }, edge, vertical: false,
-        ...(config.appearance === 'buttons' ? { buttons: true } : {}) };
+        ...(config.appearance === 'buttons' ? { buttons: true, buttonGroupWidth: config.buttonGroupWidth,
+          buttonHeight: config.buttonHeight, buttonGap: config.buttonGap } : {}) };
   }
 }
 
@@ -96,8 +97,12 @@ export function tabRect(geom, index, count) {
   }
   const each = geom.strip.w / total;
   if (geom.buttons) {
-    const w = Math.max(1, Math.min(180, each - 12)), h = Math.max(1, Math.min(20, geom.strip.h - 8));
-    return { x: geom.strip.x + index * each + (each - w) / 2, y: geom.strip.y + (geom.strip.h - h) / 2, w, h };
+    const groupWidth = Math.min(geom.strip.w, Math.max(1, num(geom.buttonGroupWidth, geom.strip.w)));
+    const cell = groupWidth / total;
+    const w = Math.max(1, Math.min(180, cell - num(geom.buttonGap, 12)));
+    const h = Math.max(1, Math.min(num(geom.buttonHeight, 20), geom.strip.h - (geom.buttonHeight ? 0 : 8)));
+    return { x: geom.strip.x + geom.strip.w - groupWidth + index * cell + (cell - w) / 2,
+      y: geom.strip.y + (geom.strip.h - h) / 2, w, h };
   }
   return { x: geom.strip.x + index * each, y: geom.strip.y, w: each, h: geom.strip.h };
 }

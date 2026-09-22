@@ -57,7 +57,7 @@
       <text
         x={rect.x + rect.w / 2} y={rect.y + rect.h / 2 + 3.5}
         fill={index === active ? activeLabelCss : labelCss}
-        font-size={Math.min(11, rect.h * 0.5)}
+        font-size={cfg.labelSize ?? Math.min(11, rect.h * 0.5)}
         font-weight={instrument ? 600 : undefined}
         letter-spacing={instrument ? '1.2' : undefined}
         style:font-family={instrument ? 'Arial, sans-serif' : undefined}
