@@ -3061,8 +3061,15 @@ void testInstantAudition()
         held.add (0.5, juce::MidiMessage::noteOn (1, 48, (juce::uint8) 90));
         const auto hung = held.phrase (4.0, 1, 4.0);
         check (hung.size() == 2 && hung.getLast().message.isNoteOff()
-                 && hung.getLast().message.getNoteNumber() == 48,
+                  && hung.getLast().message.getNoteNumber() == 48,
                "a note still sounding at the end of the window is released at the end of it");
+
+        RecentPlay heldOnAnotherChannel;
+        heldOnAnotherChannel.add (0.5, juce::MidiMessage::noteOn (7, 49, (juce::uint8) 90));
+        const auto channelSeven = heldOnAnotherChannel.phrase (4.0, 1, 4.0);
+        check (channelSeven.size() == 2 && channelSeven.getLast().message.isNoteOff()
+                  && channelSeven.getLast().message.getChannel() == 7,
+               "a held note is released on the channel on which it was played");
 
         // An off whose on fell outside the window would silence a note the instrument is not
         // playing — or one it is.

@@ -20,14 +20,20 @@ DeviceProfileService::DeviceProfileService()
 
 DeviceProfileService::~DeviceProfileService()
 {
-    const juce::ScopedLock lock (midiInputLock);
-    for (auto& [role, input] : midiInputsByRole)
+    // MidiInput::stop waits for an in-flight callback. The callback resolves its role under
+    // midiInputLock, so stopping while holding that lock can deadlock with it. Detach first.
+    decltype (midiInputsByRole) inputsToStop;
+    {
+        const juce::ScopedLock lock (midiInputLock);
+        inputsToStop.swap (midiInputsByRole);
+    }
+
+    for (auto& [role, input] : inputsToStop)
     {
         juce::ignoreUnused (role);
         if (input != nullptr)
             input->stop();
     }
-    midiInputsByRole.clear();
 }
 
 void DeviceProfileService::setEventCallback (EventCallback callback)

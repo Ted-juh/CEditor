@@ -2884,7 +2884,11 @@ public:
                        const juce::var& payload, const ScriptErrorSink& onError) override
     {
         const Watchdog guard (*this);
-        for (auto& l : listeners)
+        // A handler may call on()/off(). Iterating the live vector would let push_back reallocate
+        // it or erase invalidate the current iterator. A delivery sees the subscription set that
+        // existed when it began; mutations take effect on the next event.
+        const auto listenersAtStart = listeners;
+        for (const auto& l : listenersAtStart)
         {
             if (l.event != event) continue;
             if (l.target != target && l.target != "*" && ! (l.target == "self")) continue;

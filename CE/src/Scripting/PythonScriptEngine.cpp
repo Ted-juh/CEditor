@@ -3147,14 +3147,26 @@ public:
         PyObject* arg = varToPy (payload);              // convert ONCE; the call borrows it
         if (arg == nullptr) { onError ("on:" + event, "failed to convert payload: " + fetchPyError()); return; }
         const WatchdogScope guard (*this);
-        for (auto& l : listeners)
+
+        // Handlers may add or remove listeners. Keep an owned snapshot: off() decrements the live
+        // record's callable, so copying only the raw pointer would still leave this dispatch with a
+        // dangling reference.
+        auto listenersAtStart = listeners;
+        for (auto& l : listenersAtStart)
+            Py_XINCREF (l.fn);
+
+        for (auto& l : listenersAtStart)
         {
             if (l.event != event) continue;
             if (l.target != target && l.target != "*" && l.target != "self") continue;
+            currentScriptId = l.scriptId;
             PyObject* r = PyObject_CallFunctionObjArgs (l.fn, arg, nullptr);
+            currentScriptId = {};
             if (r == nullptr) onError ("on:" + event, fetchPyError());
             else Py_DECREF (r);
         }
+        for (auto& l : listenersAtStart)
+            Py_XDECREF (l.fn);
         Py_DECREF (arg);                                // release the single owned ref
     }
 

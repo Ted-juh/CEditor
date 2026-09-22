@@ -294,16 +294,19 @@ void DeviceProfileService::syncMidiInputForRole (const juce::String& role)
     if (mapping == roleMappings.end())
         return;
 
+    std::unique_ptr<juce::MidiInput> inputToStop;
     {
         const juce::ScopedLock lock (midiInputLock);
         auto existing = midiInputsByRole.find (role);
         if (existing != midiInputsByRole.end())
         {
-            if (existing->second != nullptr)
-                existing->second->stop();
+            inputToStop = std::move (existing->second);
             midiInputsByRole.erase (existing);
         }
     }
+    // See the destructor: stop may wait for a callback that needs midiInputLock.
+    if (inputToStop != nullptr)
+        inputToStop->stop();
 
     if (mapping->second.input.type != "hardwareInput")
     {

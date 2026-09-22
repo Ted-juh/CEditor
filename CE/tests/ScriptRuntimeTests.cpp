@@ -495,6 +495,27 @@ int main()
     runtime.dispatchEvent ("shared", "panel", juce::var());
     check (host.logs.contains ("keeper heard"), "off(): only removes the calling script's listeners");
 
+    // Mutating subscriptions from inside a callback must not invalidate the listener iteration.
+    juce::Array<juce::var> mutatingScripts;
+    mutatingScripts.add (makeScript ("mutating", "lua", "panel", "onArmMutating", "*",
+        "function onArmMutating()\n"
+        "  on(\"*\", \"mutate\", function()\n"
+        "    log(\"original listener\")\n"
+        "    off(\"*\", \"mutate\")\n"
+        "    on(\"*\", \"mutate\", function() log(\"replacement listener\") end)\n"
+        "  end)\n"
+        "end\n"));
+    runtime.loadScripts (juce::var (mutatingScripts));
+    runtime.dispatchEvent ("onArmMutating", "panel", juce::var());
+    host.logs.clear();
+    runtime.dispatchEvent ("mutate", "panel", juce::var());
+    check (host.logs.contains ("original listener") && ! host.logs.contains ("replacement listener"),
+           "on/off during dispatch takes effect on the next event");
+    host.logs.clear();
+    runtime.dispatchEvent ("mutate", "panel", juce::var());
+    check (host.logs.contains ("replacement listener"),
+           "the replacement listener is present for the next event");
+
     // 11) the ce.* module namespace ------------------------------------------------------------
     // Generated into each prelude from panelApi.js by tools/scripts/gen-script-modules.mjs. Every
     // member keeps its flat name as an alias, so both spellings must reach the same function.

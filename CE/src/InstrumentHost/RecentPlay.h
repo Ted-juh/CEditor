@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <mutex>
 
 // RecentPlay — the last few bars you played, kept so a preset can be auditioned with them.
 //
@@ -38,9 +39,23 @@ public:
         this is several times that, and it is a fixed cost rather than a growing one. */
     static constexpr int capacity = 2048;
 
-    void clear()                            { notes.clear(); }
-    int size() const                        { return notes.size(); }
-    bool isEmpty() const                    { return notes.isEmpty(); }
+    void clear()
+    {
+        const std::scoped_lock lock (notesLock);
+        notes.clear();
+    }
+
+    int size() const
+    {
+        const std::scoped_lock lock (notesLock);
+        return notes.size();
+    }
+
+    bool isEmpty() const
+    {
+        const std::scoped_lock lock (notesLock);
+        return notes.isEmpty();
+    }
 
     /** Records one message at an absolute beat position. Anything that is not a note is
         dropped: a phrase is what you played, and a stream of controller traffic replayed into a
@@ -50,6 +65,7 @@ public:
         if (! message.isNoteOnOrOff())
             return;
 
+        const std::scoped_lock lock (notesLock);
         notes.add ({ beat, message });
         if (notes.size() > capacity)
             notes.removeRange (0, notes.size() - capacity);
@@ -65,7 +81,18 @@ public:
     juce::Array<RecentNote> phrase (double now, int bars, double beatsPerBar) const
     {
         juce::Array<RecentNote> out;
-        if (bars <= 0 || beatsPerBar <= 0.0 || notes.isEmpty())
+        if (bars <= 0 || beatsPerBar <= 0.0)
+            return out;
+
+        // MIDI input writes this ring while the message thread asks for an audition. Copy under
+        // the short lock and do the windowing work afterwards so the MIDI callback never waits on
+        // the rest of phrase construction.
+        juce::Array<RecentNote> snapshot;
+        {
+            const std::scoped_lock lock (notesLock);
+            snapshot = notes;
+        }
+        if (snapshot.isEmpty())
             return out;
 
         // End at the last bar line crossed, so the phrase starts on a downbeat and loops.
@@ -74,37 +101,41 @@ public:
         if (! (lastLine > start))
             return out;
 
+        // Channel is part of note identity. Closing every held pitch on channel 1 leaves notes
+        // from channels 2..16 sounding in a multi-timbral instrument.
         juce::Array<int> sounding;
-        for (const auto& note : notes)
+        for (const auto& note : snapshot)
         {
             if (note.beat < start || note.beat >= lastLine)
                 continue;
 
             const auto pitch = note.message.getNoteNumber();
+            const auto noteKey = (note.message.getChannel() - 1) * 128 + pitch;
             if (note.message.isNoteOn())
             {
-                sounding.addIfNotAlreadyThere (pitch);
+                sounding.addIfNotAlreadyThere (noteKey);
             }
             else
             {
                 // An off for something this window never started would silence a note the
                 // instrument is not playing, or worse, one it is.
-                if (! sounding.contains (pitch))
+                if (! sounding.contains (noteKey))
                     continue;
-                sounding.removeFirstMatchingValue (pitch);
+                sounding.removeFirstMatchingValue (noteKey);
             }
 
             out.add ({ note.beat - start, note.message });
         }
 
-        for (const auto pitch : sounding)
+        for (const auto noteKey : sounding)
             out.add ({ lastLine - start,
-                       juce::MidiMessage::noteOff (1, pitch) });
+                       juce::MidiMessage::noteOff (noteKey / 128 + 1, noteKey % 128) });
 
         return out;
     }
 
 private:
+    mutable std::mutex notesLock;
     juce::Array<RecentNote> notes;
 };
 
