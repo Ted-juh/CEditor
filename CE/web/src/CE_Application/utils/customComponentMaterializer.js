@@ -232,10 +232,10 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
   const rulerHeight = 24;
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
-  const gridWidth = Math.max(1, width - labelWidth - 8);
   const numericFields = control?._children?.Designer?.arpeggiator?.numericFields === true;
   const editing = control?._children?.Designer?.patternEditing?.kind === 'gaia';
   const inspector = arpeggiatorInspectorLayout(width, editing);
+  const gridWidth = Math.max(1, inspector.contentWidth - labelWidth - 8);
   const gridHeight = Math.max(1, height - rulerHeight - 8 - (numericFields ? inspector.height : 0));
   const rowHeight = gridHeight / 12;
   const stepWidth = gridWidth / Math.max(1, arpeggiator.stepCount);
@@ -474,13 +474,13 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
       const editable = /^arp(Pitch|Start|Length|Velocity)Field$/.test(role);
       const navigation = role === 'arpeggiatorNavigation';
       addPart(parts, `arp_numeric_${name}`, makeArpRuntimePart(`arp_numeric_${name}`, {
-        role, x, y: y + offsetY, width: w, height: 22, zIndex: 29, text, fontSize: role === 'arpeggiatorKeyboardHint' ? 9 : 11,
+        role, x, y: y + offsetY, width: w, height: inspector.fieldHeight, zIndex: 29, text, fontSize: role === 'arpeggiatorKeyboardHint' ? 9 : 11,
         colour: editable || navigation ? 'FF11181E' : '00000000', textColour: editable || role === 'arpeggiatorSelectionStatus' ? 'FFE6C66C' : 'FFAEBAC6',
         borderEnabled: editable || navigation, borderColour: 'FF58616A', radius: 3,
       }), 'arpeggiator');
       if (navigation && ordered.length) addHitZone(hitZones, `arp_select_${name}`, {
         shape: 'rectangle', action: 'arpeggiatorSelect', priority: 80, cursor: 'pointer',
-        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(22, height), unit: 'percent' },
+        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(inspector.fieldHeight, height), unit: 'percent' },
         payload: { direction: name },
       }, 'arpeggiator');
     }
@@ -489,7 +489,7 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
     const state = control._children.Designer.patternEditingState ?? {};
     const selected = arpeggiator.blocks.some(b => b.id === arpeggiator.selectedBlock);
     const y = height - 22;
-    const helpX = width - 70;
+    const helpX = inspector.contentWidth - 70;
     const buttons = [
       ['undo', 'UNDO', 44, 62, state.undo], ['redo', 'REDO', 112, 62, state.redo],
       ['duplicate', 'DUPLICATE', 190, 90, selected], ['delete', 'DELETE NOTE', 286, 102, selected],
@@ -497,23 +497,36 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
       ['send', 'SEND PATTERN', 540, 122, !state.busy],
       ['help', 'HELP', helpX, 62, true],
     ];
-    for (const [action, text, x, w, enabled] of buttons) {
+    for (const [index, [action, text, originalX, originalWidth, enabled]] of buttons.entries()) {
+      const sideButton = inspector.sideWidth && action !== 'help';
+      const x = sideButton ? inspector.contentWidth + 4 : originalX;
+      const w = sideButton ? 120 : originalWidth;
+      const buttonY = sideButton ? 4 + index * 26 : y;
+      const buttonHeight = sideButton ? 22 : 18;
       addPart(parts, `arp_edit_${action}`, makeArpRuntimePart(`arp_edit_${action}`, {
-        role: 'arpeggiatorEditButton', x, y, width: w, height: 18, zIndex: 29, text,
+        role: 'arpeggiatorEditButton', x, y: buttonY, width: w, height: buttonHeight, zIndex: 29, text,
         colour: 'FF17222B', textColour: enabled ? (action === 'send' ? 'FFE6C66C' : 'FFD7E1E9') : 'FF626C75',
         borderEnabled: true, borderColour: enabled ? 'FF687684' : 'FF343F48', radius: 3, fontSize: 10,
       }), 'arpeggiator');
       if (enabled) addHitZone(hitZones, `arp_edit_${action}`, {
         shape: 'rectangle', action: 'arpeggiatorCommand', priority: 90, cursor: 'pointer',
-        bounds: { x: percent(x, width), y: percent(y, height), width: percent(w, width), height: percent(18, height), unit: 'percent' },
+        bounds: { x: percent(x, width), y: percent(buttonY, height), width: percent(w, width), height: percent(buttonHeight, height), unit: 'percent' },
         payload: { command: action },
       }, 'arpeggiator');
     }
-    if (width > 740) addPart(parts, 'arp_edit_status', makeArpRuntimePart('arp_edit_status', {
-      role: 'arpeggiatorEditStatus', x: 682, y, width: Math.max(0, helpX - 690), height: 18, zIndex: 29,
-      text: state.message || '',
-      colour: '00000000', textColour: state.error ? 'FFFF8080' : 'FFAEBAC6', fontSize: 10,
-    }), 'arpeggiator');
+    if (width > 740) {
+      const statusPart = makeArpRuntimePart('arp_edit_status', {
+        role: 'arpeggiatorEditStatus', x: inspector.sideWidth ? inspector.contentWidth + 4 : 682,
+        y: inspector.sideWidth ? 164 : y, width: inspector.sideWidth ? 120 : Math.max(0, helpX - 690),
+        height: inspector.sideWidth ? height - 168 : 18, zIndex: 29,
+        text: state.message || '',
+        colour: '00000000', textColour: state.error ? 'FFFF8080' : 'FFAEBAC6', fontSize: inspector.sideWidth ? 9 : 10,
+      });
+      if (inspector.sideWidth && statusPart._children.Text) {
+        Object.assign(statusPart._children.Text._children.Multiline, { maxLines: 4, wrapMode: 'word', fitMode: 'shrink', lineHeight: 1.1 });
+      }
+      addPart(parts, 'arp_edit_status', statusPart, 'arpeggiator');
+    }
   }
 }
 

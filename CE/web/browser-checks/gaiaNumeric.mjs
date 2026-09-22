@@ -25,14 +25,14 @@ try {
   }
   const grid = await control('arp_pattern_grid');
   const ruler = await grid.boundingBox();
-  await page.mouse.click(ruler.x + 44 + 15.5 * (ruler.width - 52) / 32, ruler.y + 12);
+  await page.mouse.click(ruler.x + 44 + 15.5 * (ruler.width - 184) / 32, ruler.y + 12);
   await grid.getByText('END 16', { exact: true }).waitFor();
   const length = page.getByRole('textbox', { name: 'Selected note length in steps', exact: true });
   assert.equal(await length.isDisabled(), true);
   const box = await grid.boundingBox();
   const first = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.blocks[0]);
-  await page.mouse.click(box.x + 44 + first.step * (box.width - 52) / 32 + 3,
-    box.y + 24 + (71 - first.note + 0.5) * (box.height - 88) / 12);
+  await page.mouse.click(box.x + 44 + first.step * (box.width - 184) / 32 + 3,
+    box.y + 24 + (71 - first.note + 0.5) * (box.height - 56) / 12);
   await length.waitFor();
   assert.equal(await length.isDisabled(), false);
   const before = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern);

@@ -64,7 +64,7 @@ try {
     await mkdir(process.env.GAIA_PAGES_OUT, { recursive: true });
     await page.screenshot({ path: join(process.env.GAIA_PAGES_OUT, 'GAIA-sync-VERIFIED-SIMULATED.png'), clip: { x: 16, y: box.y - 44, width: 1560, height: box.height + 52 } });
   }
-  await page.mouse.click(box.x + 44 + 15.5 * (box.width - 52) / 32, box.y + 12);
+  await page.mouse.click(box.x + 44 + 15.5 * (box.width - 184) / 32, box.y + 12);
   assert.doesNotMatch(await status.innerText(), /SYNCED/);
   await page.mouse.click(box.x + 601, box.y + box.height - 15);
   await has('529 PENDING / UNVERIFIED');

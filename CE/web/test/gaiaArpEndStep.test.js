@@ -25,7 +25,7 @@ test('ruler stages loop length, scales with zoom, and ignores non-atomic hardwar
     const width = grid._children.Transform.width;
     const patch = resolveCustomInteractionPatch(grid, { customValues: original }, { name: 'arp_end_step_ruler', zone }, {
       rect: { left: 100, top: 50, width: width * scale, height: 240 * scale },
-      clientX: 100 + (44 + (end - 0.5) * (width - 52) / 32) * scale, clientY: 55,
+      clientX: 100 + (44 + (end - 0.5) * (width - 184) / 32) * scale, clientY: 55,
     });
     assert.deepEqual(patch.customValues, { arpEndStep: end });
     assert.equal(patch.valueOverride, undefined, 'must not move the playhead');
@@ -42,7 +42,7 @@ test('ruler stages loop length, scales with zoom, and ignores non-atomic hardwar
 test('loop overlay keeps all columns, notes and edit zones; exact boundaries for 1, 16 and 32', () => {
   const grid = controlNamed(buildGaiaPanel(), 'arp_pattern_grid');
   const width = grid._children.Transform.width;
-  const gridWidth = width - 52;
+  const gridWidth = width - 184;
   const original = JSON.stringify(grid);
   for (const end of [1, 16, 32]) {
     const result = materializedCustomComponentSnapshot(grid, { customChannels: { 'channel.arpEndStep.raw': end } });

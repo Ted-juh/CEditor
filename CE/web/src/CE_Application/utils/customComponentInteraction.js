@@ -1,5 +1,6 @@
 import {
   CUSTOM_ARP_RUNTIME_KEY,
+  arpeggiatorInspectorLayout,
   resolveRuntimeArpeggiatorEdit,
   syncCustomArpeggiatorValues,
 } from './customComponentArpeggiator.js';
@@ -868,7 +869,8 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
     const width = Math.max(320, numberOr(control?._children?.Transform?.width, point.rect.width));
     const steps = Math.max(1, numberOr(hitZone?.payload?.steps, 32));
     const x = (point.clientX - point.rect.left) * width / point.rect.width;
-    const end = clamp(Math.floor((x - 44) / ((width - 52) / steps)) + 1, 1, steps);
+    const { contentWidth } = arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia');
+    const end = clamp(Math.floor((x - 44) / ((contentWidth - 52) / steps)) + 1, 1, steps);
     // This is a loop boundary, not a note edit or a playhead change.
     return { customValues: { arpEndStep: snapCustomChannelValue(channel, end) },
       activeCustomBehavior: 'arpeggiator', activeCustomHitZone: hitZoneEntry.name };

@@ -22,10 +22,13 @@ export function noteNameFromMidi(note) {
 
 /** Inspector positions are shared by rendering and pointer-to-grid arithmetic. */
 export function arpeggiatorInspectorLayout(width, toolbar = false) {
-  const columns = width >= 880 ? 4 : width >= 500 ? 2 : 1;
+  const sideWidth = toolbar && width >= 1100 ? 132 : 0;
+  const contentWidth = width - sideWidth;
+  const columns = contentWidth >= 880 ? 4 : contentWidth >= 500 ? 2 : 1;
   const rows = Math.ceil(4 / columns);
   const inline = columns === 4;
-  return { height: (inline ? 28 : 28 * (rows + 1)) + (toolbar ? 24 : 0),
+  return { sideWidth, contentWidth, fieldHeight: sideWidth ? 20 : 22,
+    height: (sideWidth ? 24 : inline ? 28 : 28 * (rows + 1)) + (toolbar && !sideWidth ? 24 : 0),
     fields: ['Pitch', 'Start', 'Length', 'Velocity'].map((name, index) => ({
       name, x: (inline ? 280 : 44) + (index % columns) * 140,
       y: inline ? 0 : 28 * (1 + Math.floor(index / columns)),
@@ -158,8 +161,9 @@ export function resolveRuntimeArpeggiatorEdit(control, values = {}, hitZone = nu
   const rulerHeight = 24;
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
-  const gridWidth = Math.max(1, width - labelWidth - 8);
-  const gridHeight = Math.max(1, height - rulerHeight - 8 - (control?._children?.Designer?.arpeggiator?.numericFields ? arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia').height : 0));
+  const inspector = arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia');
+  const gridWidth = Math.max(1, inspector.contentWidth - labelWidth - 8);
+  const gridHeight = Math.max(1, height - rulerHeight - 8 - (control?._children?.Designer?.arpeggiator?.numericFields ? inspector.height : 0));
   const rowHeight = gridHeight / 12;
   const stepWidth = gridWidth / Math.max(1, arpeggiator.stepCount);
   const localX = clamp(numberOr(point.clientX, point.rect.left) - point.rect.left, 0, point.rect.width);

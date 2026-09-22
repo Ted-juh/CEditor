@@ -211,6 +211,7 @@
 
   let textStyle = $derived.by(() => {
     if (!text) return '';
+    const multiline = Number(text._children?.Multiline?.maxLines) > 1;
 
     return [
       `color:#${String(textFill?.colour ?? 'FFFFFFFF').slice(-6)}`,
@@ -228,10 +229,11 @@
       'position:relative',
       'z-index:2',
       'height:100%',
-      'line-height:1',
-      'padding:0 8px',
+      `line-height:${multiline ? numberOr(text._children.Multiline.lineHeight, 1.1) : 1}`,
+      `padding:0 ${multiline ? 2 : 8}px`,
       'text-align:center',
-      'white-space:nowrap',
+      `white-space:${multiline ? 'normal' : 'nowrap'}`,
+      ...(multiline ? ['overflow-wrap:anywhere'] : []),
       'width:100%',
       'box-sizing:border-box',
       'overflow:hidden',

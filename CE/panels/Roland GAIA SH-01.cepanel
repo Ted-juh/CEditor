@@ -172819,8 +172819,8 @@
                   "controlType": "Background"
                 },
                 "Transform": {
-                  "x": 253.20574162679426,
-                  "width": 1314.7942583732058,
+                  "x": 178,
+                  "width": 1390,
                   "height": 236.33333333333334
                 },
                 "Background": {
@@ -172848,7 +172848,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 255.20574162679426,
+                  "x": 180,
                   "y": 2,
                   "width": 22,
                   "height": 232.33333333333334
@@ -172893,9 +172893,9 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 283.2057416267943,
+                  "x": 208,
                   "y": 18,
-                  "width": 1276.7942583732058,
+                  "width": 1352,
                   "height": 214.33333333333334
                 },
                 "Designer": {
@@ -172978,7 +172978,7 @@
                         "Layout": {
                           "x": 0,
                           "y": 0,
-                          "width": 1276.7942583732058,
+                          "width": 1352,
                           "height": 214.33333333333334,
                           "xUnit": "px",
                           "yUnit": "px",
@@ -173362,9 +173362,9 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 283.2057416267943,
+                  "x": 208,
                   "y": 2,
-                  "width": 1276.7942583732058,
+                  "width": 1352,
                   "height": 12,
                   "contentScaleMode": "scaleInternals"
                 },
@@ -186405,7 +186405,7 @@
                   "controlType": "Background"
                 },
                 "Transform": {
-                  "width": 243.82775119617224,
+                  "width": 168,
                   "height": 236.33333333333334
                 },
                 "Background": {
@@ -186435,7 +186435,7 @@
                 "Transform": {
                   "x": 1.875598086124402,
                   "y": 1.4047619047619047,
-                  "width": 88.1531100478469,
+                  "width": 90,
                   "height": 14.047619047619047,
                   "contentScaleMode": "scaleInternals"
                 },
@@ -186636,9 +186636,9 @@
                   "controlType": "ToggleButton"
                 },
                 "Transform": {
-                  "x": 172.555023923445,
+                  "x": 104,
                   "y": 2.8095238095238093,
-                  "width": 60.01913875598086,
+                  "width": 56,
                   "height": 15.45238095238095
                 },
                 "Background": {
@@ -186753,9 +186753,9 @@
                   "controlType": "Combobox"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 34.416666666666664,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 16.857142857142854
                 },
                 "Text": {
@@ -186947,9 +186947,9 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 25.285714285714285,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 11.238095238095237
                 },
                 "Background": {
@@ -187002,9 +187002,9 @@
                   "controlType": "Combobox"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 68.13095238095238,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 16.857142857142854
                 },
                 "Text": {
@@ -187211,9 +187211,9 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 58.99999999999999,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 11.238095238095237
                 },
                 "Background": {
@@ -187266,9 +187266,9 @@
                   "controlType": "Combobox"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 101.84523809523809,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 16.857142857142854
                 },
                 "Text": {
@@ -187505,9 +187505,9 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 11.253588516746412,
+                  "x": 8,
                   "y": 92.71428571428571,
-                  "width": 221.32057416267943,
+                  "width": 152,
                   "height": 11.238095238095237
                 },
                 "Background": {
@@ -187560,10 +187560,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 186.8767942583732,
+                  "x": 122,
                   "y": 141.88095238095238,
-                  "width": 29.499999999999996,
-                  "height": 29.499999999999996,
+                  "width": 36,
+                  "height": 36,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -188381,9 +188381,9 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 163.17703349282297,
+                  "x": 112,
                   "y": 174.89285714285714,
-                  "width": 78.77511961722487,
+                  "width": 56,
                   "height": 25.285714285714285
                 },
                 "Background": {
@@ -188436,10 +188436,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 25.575358851674643,
+                  "x": 10,
                   "y": 141.88095238095238,
-                  "width": 29.499999999999996,
-                  "height": 29.499999999999996,
+                  "width": 36,
+                  "height": 36,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -189249,9 +189249,8 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 1.875598086124402,
                   "y": 174.89285714285714,
-                  "width": 78.77511961722487,
+                  "width": 56,
                   "height": 25.285714285714285
                 },
                 "Background": {
@@ -189304,10 +189303,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 106.22607655502394,
+                  "x": 66,
                   "y": 141.88095238095238,
-                  "width": 29.499999999999996,
-                  "height": 29.499999999999996,
+                  "width": 36,
+                  "height": 36,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -190120,9 +190119,9 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 82.52631578947368,
+                  "x": 56,
                   "y": 174.89285714285714,
-                  "width": 78.77511961722487,
+                  "width": 56,
                   "height": 25.285714285714285
                 },
                 "Background": {

@@ -211,8 +211,19 @@ export function expandArpeggioWorkspace(panel) {
   const page = tabGeometry(t.width, t.height, bottom).page;
   const children = bottom._children.Children._children;
   const box = named('box_ARPEGGIO PATTERN')._children.Transform;
+  Object.assign(box, { x: 178, width: page.w - 178 });
   box.height = page.h;
-  named('box_ARPEGGIO')._children.Transform.height = page.h;
+  Object.assign(named('box_ARPEGGIO')._children.Transform, { width: 168, height: page.h });
+  Object.assign(named('tab_ARPEGGIO')._children.Transform, { width: 90 });
+  Object.assign(named('common.switch')._children.Transform, { x: 104, width: 56 });
+  for (const name of ['arp.grid', 'arp.duration', 'arp.motif']) {
+    Object.assign(named(name)._children.Transform, { x: 8, width: 152 });
+    Object.assign(named(name + '.caption')._children.Transform, { x: 8, width: 152 });
+  }
+  for (const [i, name] of ['arp.accentRate', 'arp.velocity', 'arp.octaveRange'].entries()) {
+    Object.assign(named(name)._children.Transform, { x: 10 + i * 56, width: 36, height: 36 });
+    Object.assign(named(name + '.caption')._children.Transform, { x: i * 56, width: 56 });
+  }
   const tab = named('tab_ARPEGGIO PATTERN');
   children[tab._children.Core.id] = createControl('Label', {
     Core: { ...tab._children.Core, controlType: 'Label' },

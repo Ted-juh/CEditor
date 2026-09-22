@@ -23,26 +23,26 @@ try {
   const box = await grid.boundingBox();
   const values = () => page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues);
   const sends = () => page.evaluate(() => window.__gaia.feedbackSent().filter(e => e.name === 'setDeviceParameter'));
-  const button = async x => { await page.mouse.click(box.x + x, box.y + box.height - 15); await page.waitForTimeout(100); };
+  const button = async index => { await page.mouse.click(box.x + box.width - 68, box.y + 15 + index * 26); await page.waitForTimeout(100); };
   const initial = await values();
   // Ruler now stages the complete pattern, including loop length.
-  await page.mouse.click(box.x + 44 + 15.5 * (box.width - 52) / 32, box.y + 12);
+  await page.mouse.click(box.x + 44 + 15.5 * (box.width - 184) / 32, box.y + 12);
   assert.equal((await values()).arpEndStep,16);
-  await button(75); assert.equal((await values()).arpEndStep,32);
-  await button(143); assert.equal((await values()).arpEndStep,16);
+  await button(0); assert.equal((await values()).arpEndStep,32);
+  await button(1); assert.equal((await values()).arpEndStep,16);
   await page.evaluate(() => window.__gaia.endStep(8));
   assert.equal((await values()).arpEndStep,16,'individual replies cannot overwrite a staged pattern');
   await grid.focus(); await page.keyboard.press('Home');
   const selected = (await values()).__arpeggiator.selectedBlock;
-  await button(235); assert.equal((await values()).arpPattern.length,initial.arpPattern.length+1);
+  await button(2); assert.equal((await values()).arpPattern.length,initial.arpPattern.length+1);
   await page.keyboard.press('Control+z'); assert.equal((await values()).arpPattern.length,initial.arpPattern.length);
   await page.keyboard.press('Control+y'); assert.equal((await values()).arpPattern.length,initial.arpPattern.length+1);
-  await button(338); assert.equal((await values()).arpPattern.length,initial.arpPattern.length);
+  await button(3); assert.equal((await values()).arpPattern.length,initial.arpPattern.length);
   // Numeric edit and a real multi-move velocity gesture each undo as one operation.
   const velocity=page.getByRole('textbox',{name:'Selected note velocity',exact:true});
   await velocity.fill('85'); await velocity.press('Enter');
   const beforeDrag = await values(), block=beforeDrag.arpPattern.find(b=>b.id===beforeDrag.__arpeggiator.selectedBlock);
-  const stepWidth=(box.width-52)/32, rowHeight=(box.height-84)/12;
+  const stepWidth=(box.width-184)/32, rowHeight=(box.height-56)/12;
   const x=box.x+44+(block.step+block.length/2)*stepWidth;
   const y=box.y+24+(beforeDrag.__arpeggiator.viewNote+11-block.note+0.5)*rowHeight;
   await page.mouse.move(x,y); await page.mouse.down();
@@ -72,29 +72,29 @@ try {
     for(let i=0;i<attempts;i++) { if((await values()).__arpEditState?.message?.includes(text))return; await page.waitForTimeout(100); }
     assert.fail(`${text}: ${JSON.stringify((await values()).__arpEditState)}; sent=${JSON.stringify(await page.evaluate(()=>window.__gaia.feedbackSent().slice(-4)))}`);
   }
-  await button(473); await waitMessage('READ COMPLETE');
+  await button(4); await waitMessage('READ COMPLETE');
   let imported=await values();
   assert.equal(imported.arpEndStep,12); assert.equal(imported.__arpPatternSource.kind,'hardware');
   assert.deepEqual(await sends(),[],'Read must not echo the imported pattern back');
   const status=page.locator('[data-control-id="gaia_hardware_sync_status"]').first();
   assert.match(await status.textContent(),/GAIA-READ PATTERN · SYNCED/);
-  await button(75); assert.deepEqual((await values()).arpPattern,beforeRead.arpPattern); assert.equal((await values()).arpEndStep,16);
-  await button(143); assert.deepEqual((await values()).arpPattern,imported.arpPattern);
-  await button(601); await waitMessage('QUEUED',250);
+  await button(0); assert.deepEqual((await values()).arpPattern,beforeRead.arpPattern); assert.equal((await values()).arpEndStep,16);
+  await button(1); assert.deepEqual((await values()).arpPattern,imported.arpPattern);
+  await button(5); await waitMessage('QUEUED',250);
   const outgoing=await sends(); assert.equal(outgoing.length,529);
   assert.deepEqual(Object.fromEntries(outgoing.map(e=>[e.payload.parameterId,e.payload.value])),imported.__arpPatternSource.raw);
   assert.doesNotMatch(await status.textContent(),/SYNCED/,'queued writes are not readback');
-  await button(473); await waitMessage('READ COMPLETE');
+  await button(4); await waitMessage('READ COMPLETE');
   if(process.env.GAIA_PAGES_OUT){
     await mkdir(process.env.GAIA_PAGES_OUT,{recursive:true});
     await page.screenshot({path:join(process.env.GAIA_PAGES_OUT,'GAIA-pattern-editing-SIMULATED.png'),clip:{x:16,y:box.y-44,width:1560,height:box.height+52}});
   }
   // Cancellation keeps editor data; the timeout path does too.
   await page.evaluate(()=>{window.__gaia.onFeedbackSend=null;});
-  await button(473); await button(473); await waitMessage('READ STOPPED');
+  await button(4); await button(4); await waitMessage('READ STOPPED');
   assert.doesNotMatch(await status.textContent(),/READING/,'cancel must retire the pending read');
   assert.deepEqual((await values()).arpPattern,imported.arpPattern);
-  await button(473); await waitMessage('No complete reply');
+  await button(4); await waitMessage('No complete reply');
   assert.doesNotMatch(await status.textContent(),/READING/,'timeout must retire the pending read');
   assert.deepEqual((await values()).arpPattern,imported.arpPattern);
   assert.deepEqual(errors,[]);

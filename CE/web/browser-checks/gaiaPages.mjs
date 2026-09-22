@@ -54,15 +54,16 @@ try {
   assert.ok(gridRect.y + gridRect.height <= background.y + background.height, 'grid and toolbar stay inside their background');
   assert.ok(Math.abs(output.y + output.height - lowerBounds.y - lowerBounds.height) < 1, 'output aligns with the lower pages');
   assert.ok(Math.abs(background.y + background.height - lowerBounds.y - lowerBounds.height) < 1, 'arpeggio background fills the page');
-  assert.ok(sendBounds.height <= 18.1, 'compact action row');
-  await page.mouse.click(gridRect.x + gridRect.width - 39, gridRect.y + gridRect.height - 13);
+  const undoBounds = await grid.getByText('UNDO', {exact:true}).boundingBox();
+  assert.ok(Math.abs(undoBounds.x - sendBounds.x) < 1 && undoBounds.y < sendBounds.y, 'actions are stacked on the right');
+  await page.mouse.click(gridRect.x + gridRect.width - 171, gridRect.y + gridRect.height - 13);
   await page.getByRole('dialog').waitFor();
   assert.match(await page.getByRole('dialog').innerText(), /Ruler: click or drag to set END STEP/);
   await shot('GAIA-arpeggio-help.png');
   await page.getByRole('button', {name:'Close', exact:true}).click();
   assert.deepEqual(await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern), initialPattern, 'help does not alter notes');
   await shot('GAIA-arpeggio-compact.png', {x:0,y:lowerBounds.y,width:1920,height:1000-lowerBounds.y});
-  const rulerX = step => gridRect.x + 44 + (step - 0.5) * (gridRect.width - 52) / 32;
+  const rulerX = step => gridRect.x + 44 + (step - 0.5) * (gridRect.width - 184) / 32;
   for (const end of [16, 1, 32, 16]) {
     await page.mouse.click(rulerX(end), gridRect.y + 12);
     await grid.getByText(`END ${end}`, { exact: true }).waitFor({ timeout: 10000 });
