@@ -10856,10 +10856,15 @@ bool InstrumentHostService::saveLibrary()
         return false;
 
     libraryWriteErrorReported = true;
-    emitError (library.savesBlocked()
+    const auto failure = library.lastSaveFailure();
+    emitError (failure == Library::SaveFailure::unreadableSource
                  ? juce::String ("Library changes are not being saved: the index at \"")
                        + libraryFile().getFullPathName()
                        + "\" could not be read at startup and has been left untouched."
+               : failure == Library::SaveFailure::changedExternally
+                 ? juce::String ("The sound library changed in another CEditor instance. "
+                                 "This instance did not overwrite those newer changes; restart "
+                                 "before editing the library again.")
                  : juce::String ("Could not save the sound library index to \"")
                        + libraryFile().getFullPathName() + "\".");
     return false;

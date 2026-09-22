@@ -515,7 +515,11 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
 {
     *this = Library();
 
-    if (! file.existsAsFile())
+    baselinePath = file.getFullPathName();
+    hasFileBaseline = true;
+    baselineFileExisted = file.existsAsFile();
+
+    if (! baselineFileExisted)
         return LoadResult::absent;
 
     // Everything below this line is the same question asked three ways: did we actually READ
@@ -535,6 +539,10 @@ Library::LoadResult Library::loadFrom (const juce::File& file)
     }
 
     *this = fromVar (parsed);
+    baselinePath = file.getFullPathName();
+    hasFileBaseline = true;
+    baselineFileExisted = true;
+    baselineText = text;
     return LoadResult::loaded;
 }
 
@@ -544,9 +552,60 @@ bool Library::saveTo (const juce::File& file) const
     // failed, not because the library is empty, and writing it out is how a disk hiccup turns
     // into deleted curation.
     if (saveBlocked)
+    {
+        saveFailure = SaveFailure::unreadableSource;
         return false;
 
-    return writeTextAtomically (file, juce::JSON::toString (toVar()));
+    }
+
+    // Atomic replacement prevents a torn file, but it cannot prevent a complete stale file:
+    // two processes can both load revision A, then save B and C in sequence. Without a lock
+    // AND a comparison under that lock, C quietly erases everything B added. Refuse the stale
+    // save instead. The caller reports the conflict and the other process's bytes remain safe.
+    auto lockPath = file.getFullPathName();
+   #if JUCE_WINDOWS
+    lockPath = lockPath.toLowerCase();
+   #endif
+    juce::InterProcessLock processLock (
+        "CEditorLibrary-" + juce::String::toHexString (lockPath.hashCode64()));
+    if (! processLock.enter (1000))
+    {
+        saveFailure = SaveFailure::lockUnavailable;
+        return false;
+    }
+
+    struct Unlock
+    {
+        explicit Unlock (juce::InterProcessLock& lockToUse) : lock (lockToUse) {}
+        ~Unlock() { lock.exit(); }
+        juce::InterProcessLock& lock;
+    } unlock (processLock);
+
+    const auto fullPath = file.getFullPathName();
+    if (hasFileBaseline && baselinePath == fullPath)
+    {
+        const bool existsNow = file.existsAsFile();
+        const auto textNow = existsNow ? file.loadFileAsString() : juce::String();
+        if (existsNow != baselineFileExisted || (existsNow && textNow != baselineText))
+        {
+            saveFailure = SaveFailure::changedExternally;
+            return false;
+        }
+    }
+
+    const auto text = juce::JSON::toString (toVar());
+    if (! writeTextAtomically (file, text))
+    {
+        saveFailure = SaveFailure::writeFailed;
+        return false;
+    }
+
+    baselinePath = fullPath;
+    hasFileBaseline = true;
+    baselineFileExisted = true;
+    baselineText = text;
+    saveFailure = SaveFailure::none;
+    return true;
 }
 
 juce::File quarantineUnreadableLibrary (const juce::File& file)

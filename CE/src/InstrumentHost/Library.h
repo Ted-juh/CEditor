@@ -372,6 +372,11 @@ public:
      *  action anywhere said to delete them. */
     enum class LoadResult { loaded, absent, unreadable };
 
+    /** Why the most recent save failed. `changedExternally` is deliberately distinct from an
+        I/O failure: another CEditor process saved after this instance loaded the index, so
+        overwriting it would silently discard that process's work. */
+    enum class SaveFailure { none, unreadableSource, lockUnavailable, changedExternally, writeFailed };
+
     /** Reads the index, replacing whatever this object held. An `unreadable` result BLOCKS
         saving (see `savesBlocked`) so the unreadable file cannot be overwritten by the
         emptiness that failing to read it produced. */
@@ -381,6 +386,8 @@ public:
         without touching the file — while saves are blocked. */
     bool saveTo (const juce::File& file) const;
 
+    SaveFailure lastSaveFailure() const                      { return saveFailure; }
+
     /** True when the last load found a file it could not read. Every save refuses until the
         original has been dealt with and `allowSaves` says so. */
     bool savesBlocked() const                                 { return saveBlocked; }
@@ -388,7 +395,14 @@ public:
     /** Lifts the block. The caller is saying the unreadable file is now safe to leave behind —
         in practice that it has been moved aside by `quarantineUnreadableLibrary`, so starting
         a fresh index loses nothing. */
-    void allowSaves()                                         { saveBlocked = false; }
+    void allowSaves()
+    {
+        saveBlocked = false;
+        // The caller has moved the unreadable source aside. The file's intentional absence is
+        // now our baseline, rather than an external deletion that a later save must refuse.
+        baselineFileExisted = false;
+        baselineText.clear();
+    }
 
     juce::var toVar() const;
     static Library fromVar (const juce::var& stored);
@@ -397,6 +411,11 @@ private:
     juce::Array<LibraryRecord> records;
     juce::Array<SmartCollection> smartCollections;
     bool saveBlocked = false;
+    mutable SaveFailure saveFailure = SaveFailure::none;
+    mutable bool hasFileBaseline = false;
+    mutable bool baselineFileExisted = false;
+    mutable juce::String baselinePath;
+    mutable juce::String baselineText;
 };
 
 /** Moves an unreadable index aside, and returns where it went (or an empty File if it could

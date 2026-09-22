@@ -185,6 +185,40 @@ void testWriteFailureLeavesTheGoodFileAlone()
     dir.deleteRecursively();
 }
 
+void testStaleProcessCannotOverwriteANewerLibrary()
+{
+    std::cout << "\na stale process cannot overwrite a newer library" << std::endl;
+
+    const auto dir = makeTempDir ("multi-instance");
+    const auto file = dir.getChildFile ("library.json");
+
+    Library first, stale;
+    check (first.loadFrom (file) == Library::LoadResult::absent, "first process sees a new index");
+    check (stale.loadFrom (file) == Library::LoadResult::absent, "second process sees the same baseline");
+
+    LibraryRecord fromFirst;
+    fromFirst.name = "First process preset";
+    first.addCapturedRecord (std::move (fromFirst));
+    check (first.saveTo (file), "the first process saves its change");
+    const auto afterFirst = file.loadFileAsString();
+
+    LibraryRecord fromStale;
+    fromStale.name = "Stale process preset";
+    stale.addCapturedRecord (std::move (fromStale));
+    check (! stale.saveTo (file), "a stale writer is refused");
+    check (stale.lastSaveFailure() == Library::SaveFailure::changedExternally,
+           "the refusal is reported as an external-change conflict");
+    check (file.loadFileAsString() == afterFirst, "the newer process's complete index is untouched");
+
+    Library reloaded;
+    check (reloaded.loadFrom (file) == Library::LoadResult::loaded
+             && reloaded.allRecords().size() == 1
+             && reloaded.allRecords()[0].name == "First process preset",
+           "the winning process's record survives intact");
+
+    dir.deleteRecursively();
+}
+
 } // namespace
 
 int main()
@@ -193,6 +227,7 @@ int main()
     testUnreadableIndexIsNeverOverwritten();
     testQuarantineThenStartFresh();
     testWriteFailureLeavesTheGoodFileAlone();
+    testStaleProcessCannotOverwriteANewerLibrary();
 
     std::cout << (failures == 0 ? "ALL PASSED" : "FAILED") << '\n';
     return failures == 0 ? 0 : 1;
