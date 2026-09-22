@@ -48,13 +48,58 @@ struct Fixture
     }
 };
 
-juce::AudioBuffer<float> audioBlock (float value)
+juce::AudioBuffer<float> audioBlock (float value, int samples = 16)
 {
-    juce::AudioBuffer<float> audio (2, 16);
+    juce::AudioBuffer<float> audio (2, samples);
     for (int channel = 0; channel < audio.getNumChannels(); ++channel)
         for (int frame = 0; frame < audio.getNumSamples(); ++frame)
             audio.setSample (channel, frame, value);
     return audio;
+}
+
+void testVariableHostBlocksKeepSampleContinuity()
+{
+    std::cout << "\nvariable host block sizes" << std::endl;
+    Fixture fixture;
+    PluginWorkerBlockBridge bridge (fixture.plane, true);
+    bool outputSignal = false;
+    auto poll = [&] { return std::exchange (outputSignal, false); };
+    auto signal = [] { return true; };
+
+    auto firstAudio = audioBlock (0.25f, 8);
+    juce::MidiBuffer firstMidi;
+    firstMidi.addEvent (juce::MidiMessage::noteOn (1, 62, (juce::uint8) 100), 2);
+    bridge.process (firstAudio, firstMidi, poll, signal);
+    fixture.complete (1, 1.0);
+    outputSignal = true;
+
+    auto secondAudio = audioBlock (0.5f, 16);
+    juce::MidiBuffer secondMidi;
+    const auto second = bridge.process (secondAudio, secondMidi, poll, signal);
+    bool firstHalfSilent = true, secondHalfFromFirstBlock = true;
+    for (int frame = 0; frame < 8; ++frame)
+    {
+        firstHalfSilent = firstHalfSilent && std::abs (secondAudio.getSample (0, frame)) < 0.00001f;
+        secondHalfFromFirstBlock = secondHalfFromFirstBlock
+            && std::abs (secondAudio.getSample (0, frame + 8) - 0.25f) < 0.00001f;
+    }
+    check (second.workerOutputUsed && ! second.workerFailed
+             && firstHalfSilent && secondHalfFromFirstBlock,
+           "a short block followed by a long block preserves a fixed sample delay without failure");
+    check (secondMidi.getNumEvents() == 1 && (*secondMidi.begin()).samplePosition == 10,
+           "MIDI crosses a block-size boundary at the same fixed sample delay");
+
+    fixture.complete (2, 1.0);
+    outputSignal = true;
+    auto thirdAudio = audioBlock (0.75f, 4);
+    juce::MidiBuffer thirdMidi;
+    const auto third = bridge.process (thirdAudio, thirdMidi, poll, signal);
+    bool fromSecondBlock = true;
+    for (int frame = 0; frame < thirdAudio.getNumSamples(); ++frame)
+        fromSecondBlock = fromSecondBlock
+            && std::abs (thirdAudio.getSample (0, frame) - 0.5f) < 0.00001f;
+    check (third.workerOutputUsed && ! third.workerFailed && fromSecondBlock,
+           "a following short block continues the worker stream without a dropout or restart");
 }
 
 void testOneBlockPipeline()
@@ -202,6 +247,7 @@ void testNegotiatedChannelShape()
 int main()
 {
     testOneBlockPipeline();
+    testVariableHostBlocksKeepSampleContinuity();
     testDryAndSilentFallback();
     testFailureEdges();
     testNegotiatedChannelShape();

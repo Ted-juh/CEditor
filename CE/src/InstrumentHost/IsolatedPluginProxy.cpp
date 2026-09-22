@@ -539,6 +539,7 @@ IsolatedPluginProxy::IsolatedPluginProxy (Metadata metadataToUse,
         PluginWorkerBlockBridge::ChannelCounts {
             static_cast<juce::uint32> (metadata.inputs),
             static_cast<juce::uint32> (metadata.outputs) });
+    blockBridge->setPipelineLatency (static_cast<juce::uint32> (initialBlockSize));
     remoteParameters.reserve (metadata.parameters.size());
     sentParameterRevisions.resize (metadata.parameters.size());
     pendingParameterEvents.resize (std::min (
@@ -1010,6 +1011,7 @@ void IsolatedPluginProxy::prepareToPlay (double sampleRate, int blockSize)
     object->setProperty ("blockSize", blockSize);
     requestOrThrow (MessageType::prepare, jsonPayload (juce::var (object)),
                     MessageType::prepare, 5000);
+    blockBridge->setPipelineLatency (static_cast<juce::uint32> (blockSize));
     setLatencySamples (metadata.latencySamples + blockSize);
     // Seed the fallback now, while the worker's message thread is certainly free: the first
     // session save can otherwise land while an editor is being built, with nothing to hand

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <utility>
+#include <vector>
 
 // The proxy-side real-time bridge. It is intentionally unaware of processes and Windows
 // handles: callbacks inject a zero-time output poll and an input signal. This keeps the audio
@@ -92,7 +93,29 @@ public:
                                                  config.maxInputChannels);
             activeChannels.outputs = juce::jmin (activeChannelsToUse.outputs,
                                                   config.maxOutputChannels);
+            fifoCapacity = config.maxFrames;
+            fifoChannels = config.maxOutputChannels;
+            audioFifo.assign (static_cast<size_t> (fifoCapacity) * fifoChannels, 0.0);
+            queuedMidi.reserve (config.maxMidiBytes);
+            setPipelineLatency (fifoCapacity);
         }
+    }
+
+    /** Resets the bridge to one prepared-block of latency. Call only while audio processing is
+        stopped, immediately after the worker accepts prepareToPlay. */
+    void setPipelineLatency (juce::uint32 frames) noexcept
+    {
+        if (fifoCapacity == 0)
+            return;
+
+        frames = juce::jlimit<juce::uint32> (1, fifoCapacity, frames);
+        std::fill (audioFifo.begin(), audioFifo.end(), 0.0);
+        queuedMidi.clear();
+        fifoReadFrame = 0;
+        fifoWriteFrame = frames % fifoCapacity;
+        fifoFrames = frames;
+        fifoReadPosition = 0;
+        fifoWritePosition = frames;
     }
 
     bool hasFailed() const noexcept { return failed.load (std::memory_order_acquire); }
@@ -222,7 +245,7 @@ public:
                 if (status == BlockStatus::processed
                     || status == BlockStatus::processedMidiOverflow)
                 {
-                    rendered = copyWorkerOutput (previous, audio, midi, config);
+                    rendered = queueWorkerOutput (previous, config);
                     if (rendered)
                     {
                         result.renderedSequence = expected;
@@ -245,13 +268,15 @@ public:
 
         if (! rendered)
         {
-            applyDelayedFallback (expected, audio, midi, config);
+            queueDelayedFallback (expected, config);
             result.renderedSequence = expected;
             result.fallbackUsed = true;
             if (expected != 0 && ! failed.load (std::memory_order_acquire)
                 && ++consecutiveMisses >= missedBlocksBeforeFailure)
                 trip (FailureReason::missedDeadline);
         }
+
+        popQueuedOutput (audio, midi);
 
         result.workerFailed = failed.load (std::memory_order_acquire);
         result.failureReason = currentFailureReason();
@@ -278,65 +303,125 @@ private:
         }
     }
 
-    template <typename Sample>
-    static bool copyWorkerOutput (const BlockView& block, juce::AudioBuffer<Sample>& audio,
-                                  juce::MidiBuffer& midi,
-                                  const DataPlaneConfig& config) noexcept
+    bool queueWorkerOutput (const BlockView& block, const DataPlaneConfig& config) noexcept
     {
         const auto* header = block.getHeader();
-        if (header == nullptr || header->numFrames != static_cast<juce::uint32> (audio.getNumSamples())
+        if (header == nullptr || header->numFrames > config.maxFrames
             || header->numOutputChannels > config.maxOutputChannels
             || header->outputMidiBytes > config.maxMidiBytes)
             return false;
 
-        for (int channel = 0; channel < audio.getNumChannels(); ++channel)
-            if (channel < static_cast<int> (header->numOutputChannels))
-                for (int frame = 0; frame < audio.getNumSamples(); ++frame)
-                    audio.setSample (channel, frame, static_cast<Sample> (
-                        block.outputChannel (static_cast<juce::uint32> (channel))[frame]));
-            else
-                audio.clear (channel, 0, audio.getNumSamples());
-
         const auto midiBytes = static_cast<size_t> (header->outputMidiBytes);
-        return decodeMidi ({ block.outputMidiCapacity().data(), midiBytes }, midi,
-                           header->numFrames);
+        juce::MidiBuffer decoded;
+        if (! decodeMidi ({ block.outputMidiCapacity().data(), midiBytes }, decoded,
+                          header->numFrames))
+            return false;
+
+        return queueFrames (header->numFrames, header->numOutputChannels,
+                            [&] (juce::uint32 channel, juce::uint32 frame)
+                            {
+                                return block.outputChannel (channel)[frame];
+                            }, decoded);
     }
 
-    template <typename Sample>
-    void applyDelayedFallback (juce::uint64 expected, juce::AudioBuffer<Sample>& audio,
-                               juce::MidiBuffer& midi,
-                               const DataPlaneConfig& config) const noexcept
+    void queueDelayedFallback (juce::uint64 expected,
+                               const DataPlaneConfig& config) noexcept
     {
-        if (! effect || expected == 0)
-        {
-            audio.clear();
-            midi.clear();
+        if (expected == 0)
             return;
-        }
 
         const auto previous = plane.slotForSequence (expected);
         const auto* header = previous.getHeader();
         if (header == nullptr
             || header->inputSequence.load (std::memory_order_acquire) != expected
-            || header->numFrames != static_cast<juce::uint32> (audio.getNumSamples()))
+            || header->numFrames > config.maxFrames)
+            return;
+
+        if (! effect)
         {
-            audio.clear();
-            midi.clear();
+            queueSilence (header->numFrames);
             return;
         }
 
-        for (int channel = 0; channel < audio.getNumChannels(); ++channel)
-            if (channel < static_cast<int> (header->numInputChannels))
-                for (int frame = 0; frame < audio.getNumSamples(); ++frame)
-                    audio.setSample (channel, frame, static_cast<Sample> (
-                        previous.inputChannel (static_cast<juce::uint32> (channel))[frame]));
-            else
-                audio.clear (channel, 0, audio.getNumSamples());
-
         const auto midiBytes = juce::jmin (header->inputMidiBytes, config.maxMidiBytes);
-        if (! decodeMidi ({ previous.inputMidiCapacity().data(), midiBytes }, midi,
+        juce::MidiBuffer decoded;
+        if (! decodeMidi ({ previous.inputMidiCapacity().data(), midiBytes }, decoded,
                           header->numFrames))
-            midi.clear();
+            decoded.clear();
+
+        if (! queueFrames (header->numFrames, header->numInputChannels,
+                           [&] (juce::uint32 channel, juce::uint32 frame)
+                           {
+                               return previous.inputChannel (channel)[frame];
+                           }, decoded))
+            queueSilence (header->numFrames);
+    }
+
+    template <typename ReadSample>
+    bool queueFrames (juce::uint32 frames, juce::uint32 channels,
+                      ReadSample&& readSample, const juce::MidiBuffer& midi) noexcept
+    {
+        if (frames > fifoCapacity || fifoFrames + frames > fifoCapacity)
+            return false;
+
+        for (juce::uint32 frame = 0; frame < frames; ++frame)
+        {
+            for (juce::uint32 channel = 0; channel < fifoChannels; ++channel)
+                audioFifo[static_cast<size_t> (channel) * fifoCapacity + fifoWriteFrame]
+                    = channel < channels ? readSample (channel, frame) : 0.0;
+            fifoWriteFrame = (fifoWriteFrame + 1) % fifoCapacity;
+        }
+
+        for (const auto metadata : midi)
+            queuedMidi.push_back ({ fifoWritePosition + metadata.samplePosition,
+                                    metadata.getMessage() });
+        fifoWritePosition += frames;
+        fifoFrames += frames;
+        return true;
+    }
+
+    void queueSilence (juce::uint32 frames) noexcept
+    {
+        static const juce::MidiBuffer noMidi;
+        queueFrames (frames, 0, [] (juce::uint32, juce::uint32) { return 0.0; }, noMidi);
+    }
+
+    template <typename Sample>
+    void popQueuedOutput (juce::AudioBuffer<Sample>& audio, juce::MidiBuffer& midi) noexcept
+    {
+        const auto frames = static_cast<juce::uint32> (audio.getNumSamples());
+        midi.clear();
+        for (juce::uint32 frame = 0; frame < frames; ++frame)
+        {
+            const bool available = fifoFrames > 0;
+            for (int channel = 0; channel < audio.getNumChannels(); ++channel)
+            {
+                const auto value = available && channel < static_cast<int> (fifoChannels)
+                    ? audioFifo[static_cast<size_t> (channel) * fifoCapacity + fifoReadFrame]
+                    : 0.0;
+                audio.setSample (channel, static_cast<int> (frame), static_cast<Sample> (value));
+            }
+            if (available)
+            {
+                fifoReadFrame = (fifoReadFrame + 1) % fifoCapacity;
+                --fifoFrames;
+            }
+        }
+
+        const auto endPosition = fifoReadPosition + frames;
+        size_t consumedMidi = 0;
+        while (consumedMidi < queuedMidi.size()
+               && queuedMidi[consumedMidi].position < endPosition)
+        {
+            const auto& event = queuedMidi[consumedMidi++];
+            if (event.position >= fifoReadPosition)
+                midi.addEvent (event.message,
+                               static_cast<int> (event.position - fifoReadPosition));
+        }
+        if (consumedMidi != 0)
+            queuedMidi.erase (queuedMidi.begin(),
+                              queuedMidi.begin() + static_cast<std::ptrdiff_t> (consumedMidi));
+        fifoReadPosition = endPosition;
     }
 
     template <typename Sample>
@@ -378,6 +463,20 @@ private:
     const bool effect = false;
     const int missedBlocksBeforeFailure = 4;
     ChannelCounts activeChannels;
+    struct QueuedMidiEvent
+    {
+        juce::int64 position = 0;
+        juce::MidiMessage message;
+    };
+    std::vector<double> audioFifo;
+    std::vector<QueuedMidiEvent> queuedMidi;
+    juce::uint32 fifoCapacity = 0;
+    juce::uint32 fifoChannels = 0;
+    juce::uint32 fifoReadFrame = 0;
+    juce::uint32 fifoWriteFrame = 0;
+    juce::uint32 fifoFrames = 0;
+    juce::int64 fifoReadPosition = 0;
+    juce::int64 fifoWritePosition = 0;
     juce::uint64 nextSequence = 0;
     int consecutiveMisses = 0;
     std::atomic<bool> failed { false };

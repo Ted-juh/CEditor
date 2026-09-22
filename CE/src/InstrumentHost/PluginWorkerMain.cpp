@@ -143,13 +143,17 @@ private:
 class WorkerAudioThread final : public juce::Thread
 {
 public:
-    WorkerAudioThread (juce::AudioProcessor& processorToUse, SharedDataPlaneMapping& mappingToUse)
+    WorkerAudioThread (juce::AudioProcessor& processorToUse, SharedDataPlaneMapping& mappingToUse,
+                       std::atomic<bool>& processorControlActiveToUse)
         : juce::Thread ("Hostage plug-in audio worker"), processor (processorToUse),
           mapping (mappingToUse), config (mapping.dataPlane().getHeader()->config),
           floatBuffer (static_cast<int> (juce::jmax (config.maxInputChannels,
                                                      config.maxOutputChannels)),
                        static_cast<int> (config.maxFrames)),
-          doubleBuffer (floatBuffer.getNumChannels(), floatBuffer.getNumSamples())
+          doubleBuffer (floatBuffer.getNumChannels(), floatBuffer.getNumSamples()),
+          processorControlActive (processorControlActiveToUse),
+          passThroughWhileSuspended (processor.getTotalNumInputChannels() > 0
+                                     || processor.isMidiEffect())
     {
         midi.ensureSize (config.maxMidiBytes + 512);
         processor.setPlayHead (&playHead);
@@ -202,7 +206,20 @@ public:
             }
 
             lastProcessedSequence = sequence;
+            if (processorControlActive.load (std::memory_order_acquire))
+            {
+                publishSuspended (block, *header, sequence);
+                continue;
+            }
+
             const juce::ScopedLock callbackLock (processor.getCallbackLock());
+            // A control operation may have begun after the first check while this thread waited
+            // for a block already inside processBlock to finish.
+            if (processorControlActive.load (std::memory_order_acquire))
+            {
+                publishSuspended (block, *header, sequence);
+                continue;
+            }
             try
             {
                 applyParameterEvents (block, *header);
@@ -337,6 +354,28 @@ private:
         failed.store (true, std::memory_order_release);
     }
 
+    void publishSuspended (const BlockView& block, BlockHeader& header, juce::uint64 sequence)
+    {
+        for (juce::uint32 channel = 0; channel < header.numOutputChannels; ++channel)
+        {
+            auto* output = block.outputChannel (channel);
+            if (passThroughWhileSuspended && channel < header.numInputChannels)
+                std::copy_n (block.inputChannel (channel), header.numFrames, output);
+            else
+                std::fill_n (output, header.numFrames, 0.0);
+        }
+
+        header.outputParameterEvents = 0;
+        juce::uint32 midiBytes = 0;
+        if (passThroughWhileSuspended && header.inputMidiBytes <= block.outputMidiCapacity().size())
+        {
+            std::copy_n (block.inputMidiCapacity().data(), header.inputMidiBytes,
+                         block.outputMidiCapacity().data());
+            midiBytes = header.inputMidiBytes;
+        }
+        publish (block, sequence, midiBytes, BlockStatus::processed);
+    }
+
     juce::AudioProcessor& processor;
     SharedDataPlaneMapping& mapping;
     const DataPlaneConfig config;
@@ -348,6 +387,8 @@ private:
     size_t parameterScanCursor = 0;
     juce::uint64 lastProcessedSequence = 0;
     std::atomic<bool> failed { false };
+    std::atomic<bool>& processorControlActive;
+    const bool passThroughWhileSuspended = false;
 };
 
 class WorkerEditorController
@@ -660,10 +701,12 @@ public:
                          PluginWorkerControlChannel& channelToUse,
                          WorkerEditorController& editorToUse,
                          juce::uint32 generationToUse, juce::uint32 maxFramesToUse,
-                         std::atomic<bool>& quitToUse)
+                         std::atomic<bool>& quitToUse,
+                         std::atomic<bool>& processorControlActiveToUse)
         : juce::Thread ("Hostage plug-in control worker"), processor (processorToUse),
           channel (channelToUse), editor (editorToUse), generation (generationToUse),
-          maxFrames (maxFramesToUse), quit (quitToUse)
+          maxFrames (maxFramesToUse), quit (quitToUse),
+          processorControlActive (processorControlActiveToUse)
     {
     }
 
@@ -712,7 +755,7 @@ public:
         {
             juce::Thread::sleep (25);
             juce::MemoryBlock current;
-            invokeProcessor ([&] { processor.getStateInformation (current); });
+            invokeExclusiveProcessor ([&] { processor.getStateInformation (current); });
             if (! current.isEmpty() && current != beforeState && current == previous)
             {
                 if (++stable >= 4) break;
@@ -760,8 +803,8 @@ public:
                                             "invalid worker state request");
                     else
                     {
-                        invokeProcessor ([&] { captureState (reply.payload); },
-                                         pickUpMs);
+                        invokeExclusiveProcessor ([&] { captureState (reply.payload); },
+                                                  pickUpMs);
                         if (reply.payload.getSize() > maxPayloadBytes)
                             reply = errorReply (generation, received.message.requestId,
                                                 "plug-in state exceeds the 64 MiB worker limit");
@@ -856,7 +899,7 @@ public:
                 {
                     juce::MemoryBlock beforeState;
                     bool deferredState = false;
-                    invokeProcessor ([&]
+                    invokeExclusiveProcessor ([&]
                     {
                         deferredState = processor.getName() == "Massive X" || processor.getName() == "Vanguard";
                         if (deferredState) processor.getStateInformation (beforeState);
@@ -865,7 +908,7 @@ public:
                             static_cast<int> (received.message.payload.getSize()));
                     });
                     if (deferredState) waitForDeferredState (beforeState);
-                    invokeProcessor ([&]
+                    invokeExclusiveProcessor ([&]
                     {
                         restoreSupplementalParameters (received.message.payload);
                         reply = makeJsonMessage (MessageType::setState, generation,
@@ -894,7 +937,7 @@ public:
                                             "invalid worker prepare request");
                     else
                     {
-                        invokeProcessor ([&]
+                        invokeExclusiveProcessor ([&]
                         {
                             processor.releaseResources();
                             processor.setRateAndBufferSizeDetails (sampleRate, blockSize);
@@ -904,7 +947,7 @@ public:
                 }
                 else if (received.message.type == MessageType::release)
                 {
-                    invokeProcessor ([&] { processor.releaseResources(); });
+                    invokeExclusiveProcessor ([&] { processor.releaseResources(); });
                 }
                 else if (received.message.type == MessageType::setNonRealtime)
                 {
@@ -915,7 +958,7 @@ public:
                 }
                 else if (received.message.type == MessageType::getPrograms)
                 {
-                    invokeProcessor ([&]
+                    invokeExclusiveProcessor ([&]
                     {
                         juce::Array<juce::var> names;
                         const auto count = juce::jmax (1, processor.getNumPrograms());
@@ -934,13 +977,13 @@ public:
                     const auto json = decodeJsonPayload (received.message, jsonError);
                     const auto index = (int) json.getProperty ("index", -1);
                     int programCount = 0;
-                    invokeProcessor ([&] { programCount = processor.getNumPrograms(); });
+                    invokeExclusiveProcessor ([&] { programCount = processor.getNumPrograms(); });
                     if (jsonError.isNotEmpty()
                         || ! juce::isPositiveAndBelow (index, programCount))
                         reply = errorReply (generation, received.message.requestId,
                                             "invalid worker program index");
                     else
-                        invokeProcessor ([&]
+                        invokeExclusiveProcessor ([&]
                         {
                             processor.setCurrentProgram (index);
                             reply = makeJsonMessage (MessageType::setProgram, generation,
@@ -954,13 +997,13 @@ public:
                     const auto index = (int) json.getProperty ("index", -1);
                     const auto name = json.getProperty ("name", {}).toString().substring (0, 256);
                     int programCount = 0;
-                    invokeProcessor ([&] { programCount = processor.getNumPrograms(); });
+                    invokeExclusiveProcessor ([&] { programCount = processor.getNumPrograms(); });
                     if (jsonError.isNotEmpty()
                         || ! juce::isPositiveAndBelow (index, programCount))
                         reply = errorReply (generation, received.message.requestId,
                                             "invalid worker program rename");
                     else
-                        invokeProcessor ([&] { processor.changeProgramName (index, name); });
+                        invokeExclusiveProcessor ([&] { processor.changeProgramName (index, name); });
                 }
                 else if (received.message.type == MessageType::applyVstPreset)
                 {
@@ -977,14 +1020,14 @@ public:
                         bool applied = false;
                         juce::MemoryBlock beforeState;
                         const bool deferredState = preset.hasFileExtension ("nksf;fxp");
-                        invokeProcessor ([&]
+                        invokeExclusiveProcessor ([&]
                         {
                             if (deferredState) processor.getStateInformation (beforeState);
                             applied = ceditor::host::applyVendorPresetInWorker (*instance, preset);
                         });
                         if (applied && deferredState) waitForDeferredState (beforeState);
                         if (applied)
-                            invokeProcessor ([&]
+                            invokeExclusiveProcessor ([&]
                             {
                                 reply = makeJsonMessage (MessageType::applyVstPreset, generation,
                                     received.message.requestId, processorSnapshot (processor));
@@ -1150,6 +1193,28 @@ private:
         invokeMessageThread (std::forward<Function> (function), pickUpMs, true);
     }
 
+    /** Runs a potentially slow state/program operation without holding the callback lock for its
+        duration. The lock is used only to establish and clear the hand-off. While the flag is set,
+        the audio worker publishes dry effect blocks or silent instrument blocks, so the host keeps
+        receiving on-time output and does not mistake a healthy worker for a hang. */
+    template <typename Function>
+    void invokeExclusiveProcessor (Function&& function, int pickUpMs = 400)
+    {
+        invokeMessageThread ([&]
+        {
+            {
+                const juce::ScopedLock lock (processor.getCallbackLock());
+                processorControlActive.store (true, std::memory_order_release);
+            }
+            const juce::ScopeGuard resumeAudio { [this]
+            {
+                const juce::ScopedLock lock (processor.getCallbackLock());
+                processorControlActive.store (false, std::memory_order_release);
+            } };
+            function();
+        }, pickUpMs, false);
+    }
+
     void send (const Message& message)
     {
         juce::String ignored;
@@ -1165,6 +1230,7 @@ private:
     const juce::uint32 generation;
     const juce::uint32 maxFrames;
     std::atomic<bool>& quit;
+    std::atomic<bool>& processorControlActive;
 };
 
 #if JUCE_WINDOWS
@@ -1373,10 +1439,11 @@ int main (int argc, char* argv[])
     }
 
     std::atomic<bool> quit { false };
+    std::atomic<bool> processorControlActive { false };
     WorkerEditorController editor (*processor);
-    WorkerAudioThread audio (*processor, mapping);
+    WorkerAudioThread audio (*processor, mapping, processorControlActive);
     WorkerControlThread commands (*processor, control, editor, generation,
-                                  config.maxFrames, quit);
+                                  config.maxFrames, quit, processorControlActive);
     const auto audioStarted = audio.startThread (juce::Thread::Priority::highest);
     const auto commandsStarted = audioStarted
         && commands.startThread (juce::Thread::Priority::normal);
