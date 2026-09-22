@@ -1153,6 +1153,7 @@ export function buildActivePanelVst3({ identityChoice = null } = {}) {
   buildInFlight = true;
   beginRun({
     panelId: String(panel.id),
+    panelPath: panel.filePath ?? '',
     panelName: String(panel.name ?? ''),
     productName,
     guid,

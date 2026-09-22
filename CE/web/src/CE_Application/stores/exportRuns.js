@@ -54,9 +54,10 @@ identityRegistry.subscribe((value) => writeStoredJson(REGISTRY_KEY, value));
 /** True while a build is running — the Export tab disables its button on this. */
 export const buildRunning = derived(activeRun, ($run) => $run !== null && $run.status === 'running');
 
-export function beginRun({ panelId = '', panelName = '', productName = '', guid = '', format = 'VST3', at = null } = {}) {
+export function beginRun({ panelId = '', panelPath = '', panelName = '', productName = '', guid = '', format = 'VST3', at = null } = {}) {
   activeRun.set({
     panelId: String(panelId),
+    panelPath: String(panelPath),
     panelName: String(panelName),
     productName: String(productName),
     guid: String(guid),
@@ -124,6 +125,7 @@ export function finishRun({ ok = false, path = '', message = '', at = null } = {
     identityRegistry.update((registry) => recordExport(registry, {
       guid: finished.guid,
       panelId: finished.panelId,
+      panelPath: finished.panelPath,
       productName: finished.productName,
       at: finished.finishedAt,
     }));

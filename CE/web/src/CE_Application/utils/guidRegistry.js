@@ -17,14 +17,22 @@
 //
 // PURE. The registry is a plain record; the store persists it and the Export tab renders it.
 
-/** A registry entry. `panelId` is the in-session id, `panelPath` the file it was saved from. */
-export function registryEntry({ guid = '', panelId = '', panelPath = '', productName = '', at = '' } = {}) {
+/** Distinguishes a panel id from the same counter value assigned after an app restart. */
+export const REGISTRY_SESSION_ID = globalThis.crypto?.randomUUID?.()
+  ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/** A registry entry. `panelId` is valid only within `sessionId`; `panelPath` survives restarts. */
+export function registryEntry({
+  guid = '', panelId = '', panelPath = '', productName = '', at = '',
+  sessionId = REGISTRY_SESSION_ID,
+} = {}) {
   return {
     guid: String(guid || ''),
     panelId: String(panelId || ''),
     panelPath: String(panelPath || ''),
     productName: String(productName || ''),
     at: String(at || ''),
+    sessionId: String(sessionId || ''),
   };
 }
 
@@ -65,7 +73,8 @@ export function identityDecision({ panel = null, registry = [] } = {}) {
     };
   }
 
-  const samePanel = owner.panelId === String(panel?.id ?? '')
+  const samePanel = (owner.sessionId === REGISTRY_SESSION_ID
+      && owner.panelId === String(panel?.id ?? ''))
     || (owner.panelPath && owner.panelPath === String(panel?.filePath ?? ''));
   if (samePanel) {
     return { action: 'update', guid, owner, reason: 'a new build of this panel\'s own plugin' };
@@ -112,7 +121,16 @@ export function identityDecision({ panel = null, registry = [] } = {}) {
 export function recordExport(registry, entry) {
   const record = registryEntry(entry);
   if (!record.guid) return Array.isArray(registry) ? [...registry] : [];
-  return [...(Array.isArray(registry) ? registry : []).filter((e) => e.guid !== record.guid), record];
+  const existing = ownerOf(registry, record.guid);
+  const merged = existing ? registryEntry({
+    guid: record.guid,
+    panelId: record.panelId || existing.panelId,
+    panelPath: record.panelPath || existing.panelPath,
+    productName: record.productName || existing.productName,
+    at: record.at || existing.at,
+    sessionId: record.sessionId || existing.sessionId,
+  }) : record;
+  return [...(Array.isArray(registry) ? registry : []).filter((e) => e.guid !== record.guid), merged];
 }
 
 /** Forget an identity. For a panel that was deleted, or a registry being cleaned up. */

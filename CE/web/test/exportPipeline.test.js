@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 
 import {
   forgetIdentity, identityDecision, newCopyIdentity, nextCopyName, openPanelCollisions,
-  ownerOf, recordExport, registryEntry,
+  ownerOf, recordExport, registryEntry, REGISTRY_SESSION_ID,
 } from '../src/CE_Application/utils/guidRegistry.js';
 import {
   DEFAULT_GENERAL_SETTINGS, normalizeManufacturerCode,
@@ -49,6 +49,18 @@ test('a panel matched by file path is still its own plugin, even with a new sess
   // Reopening a panel gives it a fresh in-session id; the file is what persists.
   const reopened = panel({ id: 'p9' });
   assert.equal(identityDecision({ panel: reopened, registry: REGISTRY }).action, 'update');
+});
+
+test('a reused panel counter after restart cannot claim another file\'s plugin identity', () => {
+  const fromPreviousSession = [registryEntry({
+    guid: GUID,
+    panelId: 'p1',
+    panelPath: '/panels/bass.cepanel',
+    productName: 'Bass Station',
+    sessionId: `${REGISTRY_SESSION_ID}-previous`,
+  })];
+  const copyOpenedFirst = panel({ id: 'p1', filePath: '/panels/bass-copy.cepanel' });
+  assert.equal(identityDecision({ panel: copyOpenedFirst, registry: fromPreviousSession }).action, 'ask');
 });
 
 test('A COPIED PANEL IS ASKED ABOUT — the whole point of the registry', () => {
@@ -103,6 +115,17 @@ test('the registry answers who owns an identity, and that has exactly one answer
   assert.equal(ownerOf(registry, GUID).productName, 'Second');
   assert.equal(ownerOf(registry, 'nope'), null);
   assert.equal(ownerOf(registry, ''), null);
+});
+
+test('recording a partial export result preserves the owner file path', () => {
+  const claimed = recordExport([], {
+    guid: GUID, panelId: 'p1', panelPath: '/panels/bass.cepanel', productName: 'Bass Station',
+  });
+  const finished = recordExport(claimed, {
+    guid: GUID, panelId: 'p1', productName: 'Bass Station', at: 'later',
+  });
+  assert.equal(ownerOf(finished, GUID).panelPath, '/panels/bass.cepanel');
+  assert.equal(ownerOf(finished, GUID).at, 'later');
 });
 
 test('an entry with no guid is not recorded', () => {
