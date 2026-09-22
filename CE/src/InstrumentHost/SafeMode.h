@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "../AtomicFileWrite.h"
 
 // SafeMode — starting up after the last run did not survive (§17.1, §18.3.3).
 //
@@ -240,7 +241,8 @@ private:
         root->setProperty ("suspects", entries);
 
         dataDirectory.createDirectory();
-        stateFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        (void) ceditor::writeTextAtomically (stateFile(),
+                                             juce::JSON::toString (juce::var (root)));
     }
 
     juce::File dataDirectory;

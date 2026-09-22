@@ -1203,6 +1203,15 @@ target_link_libraries(CEditorPluginCatalogTests PRIVATE juce::juce_core)
 add_test(NAME PluginCatalog COMMAND CEditorPluginCatalogTests)
 ce_configure_test(CEditorPluginCatalogTests)
 
+add_executable(CEditorSharedPropertiesTests
+    "${CE_ROOT}/tests/SharedPropertiesFileTests.cpp"
+)
+target_compile_features(CEditorSharedPropertiesTests PRIVATE cxx_std_23)
+target_include_directories(CEditorSharedPropertiesTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorSharedPropertiesTests PRIVATE juce::juce_data_structures)
+add_test(NAME SharedProperties COMMAND CEditorSharedPropertiesTests)
+ce_configure_test(CEditorSharedPropertiesTests)
+
 add_executable(CEditorVendorPresetTests
     "${CE_ROOT}/src/InstrumentHost/PluginCatalog.cpp"
     "${CE_ROOT}/src/InstrumentHost/Library.cpp"

@@ -4,6 +4,7 @@
 
 #include "DeviceProfileService.h"
 #include "DeviceProfileServiceInternal.h"
+#include "../AtomicFileWrite.h"
 
 namespace ceditor::device
 {
@@ -173,7 +174,7 @@ juce::var DeviceProfileService::saveProfileSource (const juce::var& payload)
     }
 
     auto file = profile->second.file;
-    if (! file.replaceWithText (source))
+    if (! ceditor::writeTextAtomically (file, source))
         return errorResponse (requestId, "Could not save profile: " + file.getFullPathName());
 
     auto savedSource = file.loadFileAsString();
@@ -426,7 +427,7 @@ juce::var DeviceProfileService::saveProfileParameterDetail (const juce::var& pay
     }
 
     auto file = profile->second.file;
-    if (! file.replaceWithText (nextSource))
+    if (! ceditor::writeTextAtomically (file, nextSource))
         return errorResponse (requestId, "Could not save profile: " + file.getFullPathName());
 
     if (! loadProfileFile (file, error))

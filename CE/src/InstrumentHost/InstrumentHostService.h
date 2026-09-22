@@ -837,6 +837,8 @@ private:
         result, so a read-only folder, a full disk or an index still blocked after an
         unreadable load all looked exactly like a save. Returns false on any of those. */
     bool saveLibrary();
+    /** Merges and saves the shared plug-in catalogue, reporting a failure once per streak. */
+    bool saveCatalog();
 
     /** One record's worth of work for the auditioner, copied off the library on the controlling
         thread so the job never reads a structure somebody else is editing. */
@@ -1018,7 +1020,7 @@ private:
         has a layout. */
     void emitSurfaceLayout (const juce::String& requestedProfileId = {});
     void loadUserSurface();
-    void saveUserSurface() const;
+    bool saveUserSurface() const;
     /** Empty name = the owner has not described a controller, and authored profiles decide. */
     juce::String userSurfaceName;
     ctrl49::SurfaceCapabilities userSurfaceCapabilities;
@@ -1028,7 +1030,7 @@ private:
     juce::SortedSet<int> userSurfaceHeard;
 
     void loadParameterFavourites();
-    void saveParameterFavourites() const;
+    bool saveParameterFavouriteClass (const juce::String& ceId);
     /** ceId -> the parameter ids marked on that class. Loaded once, on first use. */
     std::map<juce::String, juce::StringArray> parameterFavourites;
     bool parameterFavouritesLoaded = false;
@@ -1050,7 +1052,7 @@ private:
                                          const juce::String& presetName);
 
     void loadSubstitutions();
-    void saveSubstitutions() const;
+    bool saveSubstitution (const juce::String& key);
     juce::File snapshotDirectory() const { return options.dataDirectory.getChildFile ("snapshots"); }
     juce::File libraryPathsFile() const { return options.dataDirectory.getChildFile ("library-paths.json"); }
     void emitHostProject();
@@ -1293,7 +1295,7 @@ private:
         older than the snapshot interval, and the directory is pruned to a fixed count. A
         crash or a bad edit costs keystrokes, not the last good rig. */
     void maybeSnapshotRevision();
-    void saveScanPaths();
+    bool saveScanPath (const juce::String& path, bool add);
 
     juce::File catalogFile() const      { return options.dataDirectory.getChildFile ("plugin-catalog.json"); }
     juce::File performanceFile() const  { return options.dataDirectory.getChildFile ("session-performance.json"); }
@@ -1362,6 +1364,7 @@ private:
         directory would otherwise put the same notice on screen dozens of times a minute. Reset
         by the first save that works. */
     bool libraryWriteErrorReported = false;
+    bool catalogWriteErrorReported = false;
     struct PresetAuditionEvent
     {
         double dueMs = 0.0;
@@ -1539,6 +1542,7 @@ private:
     juce::String instanceId { juce::Uuid().toDashedString() };
     bool holdsHardwareSurface = false;
     juce::int64 lastHardwareHeartbeat = 0;
+    juce::int64 lastHardwareHeartbeatConfirmed = 0;
     std::unique_ptr<ActiveHostingMarker> activeMarker;
     ActiveHostingMarker::Incident pendingActiveIncident;   // reported once, at the first state
     std::unique_ptr<SafeMode> safeMode;
@@ -1557,6 +1561,7 @@ private:
     // A claim is refreshed this often and considered abandoned after this long, so an
     // instance that crashed frees the surface without anyone having to clean up after it.
     static constexpr juce::int64 hardwareHeartbeatMs = 2000;
+    static constexpr juce::int64 hardwareSendFenceMs = 6000;
     static constexpr juce::int64 hardwareClaimTimeoutMs = 8000;
 
     juce::File hardwareOwnerFile() const { return options.dataDirectory.getChildFile ("hardware-owner.json"); }

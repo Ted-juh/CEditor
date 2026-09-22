@@ -1,4 +1,5 @@
 #include "LicenceStore.h"
+#include "../AtomicFileWrite.h"
 #include <juce_cryptography/juce_cryptography.h>
 
 namespace ceditor::licensing
@@ -80,7 +81,7 @@ juce::String LicenceStore::install (const juce::String& licenceFileText, juce::T
                                              : juce::String ("This licence could not be verified.");
 
     dataDirectory.createDirectory();
-    if (! licenceFile().replaceWithText (juce::JSON::toString (parsed)))
+    if (! ceditor::writeTextAtomically (licenceFile(), juce::JSON::toString (parsed)))
         return "The licence could not be written to " + licenceFile().getFullPathName();
 
     // A new licence is a new entitlement, so the seat record starts again: the machines that
@@ -194,7 +195,8 @@ void LicenceStore::saveActivations() const
     root->setProperty ("activations", entries);
 
     dataDirectory.createDirectory();
-    activationsFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+    (void) ceditor::writeTextAtomically (activationsFile(),
+                                         juce::JSON::toString (juce::var (root)));
 }
 
 } // namespace ceditor::licensing

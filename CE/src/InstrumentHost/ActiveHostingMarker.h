@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "../AtomicFileWrite.h"
 
 // ActiveHostingMarker — startup evidence beside live failover, not process isolation.
 //
@@ -43,7 +44,8 @@ public:
         marker->setProperty ("modulePath", modulePath);
         marker->setProperty ("name", displayName);
         marker->setProperty ("at", juce::Time::currentTimeMillis());
-        markerFile().replaceWithText (juce::JSON::toString (juce::var (marker)));
+        (void) ceditor::writeTextAtomically (markerFile(),
+                                             juce::JSON::toString (juce::var (marker)));
     }
 
     /** The plug-in survived the window we were watching. */
@@ -134,7 +136,8 @@ private:
 
         auto* root = new juce::DynamicObject();
         root->setProperty ("incidents", entries);
-        logFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        (void) ceditor::writeTextAtomically (logFile(),
+                                             juce::JSON::toString (juce::var (root)));
     }
 
     juce::File dataDirectory;

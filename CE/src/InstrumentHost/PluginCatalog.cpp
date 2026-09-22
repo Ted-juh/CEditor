@@ -1,4 +1,7 @@
 #include "PluginCatalog.h"
+#include "AtomicFileWrite.h"
+
+#include <mutex>
 
 namespace ceditor::host
 {
@@ -194,18 +197,40 @@ juce::String ModuleRecord::unavailableReason() const
 bool PluginCatalog::loadFrom (const juce::File& file)
 {
     modules.clear();
+    baselineModules.clear();
+    baselinePath = file.getFullPathName();
+    baselineText.clear();
+    hasFileBaseline = true;
+    baselineFileExisted = file.existsAsFile();
+    saveBlocked = false;
+    saveFailure = SaveFailure::none;
 
-    if (! file.existsAsFile())
+    if (! baselineFileExisted)
         return true;
 
-    const auto parsed = juce::JSON::parse (file.loadFileAsString());
-    if (! parsed.isObject())
+    const auto text = file.loadFileAsString();
+    juce::var parsed;
+    if (text.isEmpty() || juce::JSON::parse (text, parsed).failed() || ! parsed.isObject())
+    {
+        saveBlocked = true;
         return false;
+    }
+
+    const auto version = (int) parsed.getProperty ("version", 1);
+    if (version > 1)
+    {
+        saveBlocked = true;
+        saveFailure = SaveFailure::newerSchema;
+        return false;
+    }
 
     const auto storedModules = parsed.getProperty ("modules", {});
     const auto* arr = storedModules.getArray();
     if (arr == nullptr)
+    {
+        saveBlocked = true;
         return false;
+    }
 
     for (const auto& m : *arr)
     {
@@ -230,45 +255,219 @@ bool PluginCatalog::loadFrom (const juce::File& file)
             modules.add (std::move (rec));
     }
 
+    baselineModules = modules;
+    baselineText = text;
     return true;
 }
 
-bool PluginCatalog::saveTo (const juce::File& file) const
+namespace
+{
+juce::var moduleToVar (const ModuleRecord& rec)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("path",              rec.path);
+    obj->setProperty ("fingerprint",       rec.fingerprint);
+    obj->setProperty ("lastScanned",       rec.lastScanned);
+    obj->setProperty ("missing",           rec.missing);
+    obj->setProperty ("quarantined",       rec.quarantined);
+    obj->setProperty ("failureCount",      rec.failureCount);
+    obj->setProperty ("lastFailureReason", rec.lastFailureReason);
+
+    juce::Array<juce::var> archVars;
+    for (const auto& a : rec.architectures)
+        archVars.add (a);
+    obj->setProperty ("architectures", archVars);
+
+    juce::Array<juce::var> classVars;
+    for (const auto& c : rec.classes)
+        classVars.add (classToVar (c));
+    obj->setProperty ("classes", classVars);
+    return juce::var (obj);
+}
+
+juce::String catalogText (const juce::Array<ModuleRecord>& records)
 {
     juce::Array<juce::var> moduleVars;
-
-    for (const auto& rec : modules)
-    {
-        auto* obj = new juce::DynamicObject();
-        obj->setProperty ("path",              rec.path);
-        obj->setProperty ("fingerprint",       rec.fingerprint);
-        obj->setProperty ("lastScanned",       rec.lastScanned);
-        obj->setProperty ("missing",           rec.missing);
-        obj->setProperty ("quarantined",       rec.quarantined);
-        obj->setProperty ("failureCount",      rec.failureCount);
-        obj->setProperty ("lastFailureReason", rec.lastFailureReason);
-
-        juce::Array<juce::var> archVars;
-        for (const auto& a : rec.architectures)
-            archVars.add (a);
-        obj->setProperty ("architectures", archVars);
-
-        juce::Array<juce::var> classVars;
-        for (const auto& c : rec.classes)
-            classVars.add (classToVar (c));
-        obj->setProperty ("classes", classVars);
-
-        moduleVars.add (juce::var (obj));
-    }
-
+    for (const auto& rec : records)
+        moduleVars.add (moduleToVar (rec));
     auto* root = new juce::DynamicObject();
     root->setProperty ("version", 1);
     root->setProperty ("modules", moduleVars);
+    return juce::JSON::toString (juce::var (root));
+}
+
+juce::String moduleKey (juce::String path)
+{
+    path = path.replaceCharacter ('\\', '/');
+    while (path.endsWithChar ('/')) path = path.dropLastCharacters (1);
+   #if JUCE_WINDOWS || JUCE_MAC
+    path = path.toLowerCase();
+   #endif
+    return path;
+}
+
+const ModuleRecord* findRecord (const juce::Array<ModuleRecord>& records, const juce::String& path)
+{
+    const auto key = moduleKey (path);
+    for (const auto& record : records)
+        if (moduleKey (record.path) == key)
+            return &record;
+    return nullptr;
+}
+
+ModuleRecord* findRecord (juce::Array<ModuleRecord>& records, const juce::String& path)
+{
+    const auto key = moduleKey (path);
+    for (auto& record : records)
+        if (moduleKey (record.path) == key)
+            return &record;
+    return nullptr;
+}
+
+bool sameModule (const ModuleRecord& a, const ModuleRecord& b)
+{
+    return juce::JSON::toString (moduleToVar (a)) == juce::JSON::toString (moduleToVar (b));
+}
+
+void mergeChangedModule (juce::Array<ModuleRecord>& disk, const ModuleRecord& current,
+                         const ModuleRecord* baseline)
+{
+    auto* target = findRecord (disk, current.path);
+    if (target == nullptr)
+    {
+        disk.add (current);
+        return;
+    }
+
+    const bool scanChanged = baseline == nullptr || current.lastScanned != baseline->lastScanned;
+    const bool diskFailureChanged = baseline == nullptr
+                                      ? target->failureCount > 0 || target->quarantined
+                                      : target->failureCount != baseline->failureCount
+                                          || target->quarantined != baseline->quarantined;
+    if (scanChanged && (target->lastScanned.isEmpty()
+                         || current.lastScanned.compare (target->lastScanned) >= 0))
+    {
+        target->path = current.path;
+        target->fingerprint = current.fingerprint;
+        target->lastScanned = current.lastScanned;
+        target->missing = current.missing;
+        target->classes = current.classes;
+        if (! diskFailureChanged)
+        {
+            target->quarantined = current.quarantined;
+            target->failureCount = current.failureCount;
+            target->lastFailureReason = current.lastFailureReason;
+        }
+    }
+
+    if (baseline == nullptr || current.architectures != baseline->architectures)
+        target->architectures = current.architectures;
+    if (baseline == nullptr || current.missing != baseline->missing)
+        target->missing = current.missing;
+
+    const int baselineFailures = baseline != nullptr ? baseline->failureCount : 0;
+    if (current.failureCount > baselineFailures)
+    {
+        target->failureCount += current.failureCount - baselineFailures;
+        target->fingerprint = current.fingerprint;
+        target->missing = false;
+        target->lastFailureReason = current.lastFailureReason;
+        target->quarantined = target->quarantined || current.quarantined;
+    }
+
+    // A falling failure count without a new scan is the explicit clear-quarantine command.
+    // It is the only stale operation allowed to clear a quarantine written by another instance.
+    const bool explicitClear = baseline != nullptr && baseline->quarantined
+                                && ! current.quarantined && ! scanChanged;
+    if (explicitClear)
+    {
+        target->quarantined = false;
+        target->failureCount = 0;
+        target->lastFailureReason.clear();
+        target->fingerprint.clear();
+    }
+}
+}
+
+bool PluginCatalog::saveTo (const juce::File& file)
+{
+    if (saveBlocked)
+    {
+        if (saveFailure != SaveFailure::newerSchema)
+            saveFailure = SaveFailure::unreadableSource;
+        return false;
+    }
+
+    static std::mutex inProcessSaveMutex;
+    const std::scoped_lock inProcessLock (inProcessSaveMutex);
+
+    auto lockPath = file.getFullPathName();
+   #if JUCE_WINDOWS
+    lockPath = lockPath.toLowerCase();
+   #endif
+    juce::InterProcessLock processLock (
+        "CEditorPluginCatalog-" + juce::String::toHexString (lockPath.hashCode64()));
+    if (! processLock.enter (1000))
+    {
+        saveFailure = SaveFailure::lockUnavailable;
+        return false;
+    }
+    struct Unlock { juce::InterProcessLock& lock; ~Unlock() { lock.exit(); } } unlock { processLock };
+
+    juce::Array<ModuleRecord> merged;
+    const bool existsNow = file.existsAsFile();
+    const auto textNow = existsNow ? file.loadFileAsString() : juce::String();
+    const bool sameBaseline = hasFileBaseline && baselinePath == file.getFullPathName()
+                              && existsNow == baselineFileExisted
+                              && (! existsNow || textNow == baselineText);
+
+    if (sameBaseline)
+    {
+        merged = modules;
+    }
+    else if (existsNow)
+    {
+        PluginCatalog disk;
+        if (! disk.loadFrom (file))
+        {
+            saveFailure = disk.lastSaveFailure() == SaveFailure::newerSchema
+                            ? SaveFailure::newerSchema : SaveFailure::unreadableSource;
+            return false;
+        }
+        merged = disk.modules;
+        for (const auto& current : modules)
+        {
+            const auto* baseline = findRecord (baselineModules, current.path);
+            if (baseline == nullptr || ! sameModule (current, *baseline))
+                mergeChangedModule (merged, current, baseline);
+        }
+    }
+    else
+    {
+        merged = modules;
+    }
 
     if (! file.getParentDirectory().createDirectory())
+    {
+        saveFailure = SaveFailure::writeFailed;
         return false;
+    }
 
-    return file.replaceWithText (juce::JSON::toString (juce::var (root)));
+    const auto text = catalogText (merged);
+    if (! ceditor::writeTextAtomically (file, text))
+    {
+        saveFailure = SaveFailure::writeFailed;
+        return false;
+    }
+
+    modules = merged;
+    baselineModules = modules;
+    baselinePath = file.getFullPathName();
+    baselineText = text;
+    hasFileBaseline = true;
+    baselineFileExisted = true;
+    saveFailure = SaveFailure::none;
+    return true;
 }
 
 void PluginCatalog::commitScanResult (const ModuleScanResult& result, juce::Time when)
@@ -376,18 +575,12 @@ void PluginCatalog::markMissingExcept (const juce::StringArray& presentPaths)
 
 const ModuleRecord* PluginCatalog::findModule (const juce::String& modulePath) const
 {
-    for (const auto& rec : modules)
-        if (rec.path == modulePath)
-            return &rec;
-    return nullptr;
+    return findRecord (modules, modulePath);
 }
 
 ModuleRecord* PluginCatalog::find (const juce::String& modulePath)
 {
-    for (auto& rec : modules)
-        if (rec.path == modulePath)
-            return &rec;
-    return nullptr;
+    return findRecord (modules, modulePath);
 }
 
 juce::Array<PluginClassRecord> PluginCatalog::instrumentClasses() const

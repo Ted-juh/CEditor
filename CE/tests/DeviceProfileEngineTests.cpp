@@ -1355,7 +1355,11 @@ int runRealtimeMonitorTests()
     if (lastMonitor.getArray() == nullptr || expected.getArray() == nullptr
         || lastMonitor.getArray()->size() != expected.getArray()->size())
     {
-        std::cerr << "[FAIL] monitor throttle lost the final snapshot\n";
+        std::cerr << "[FAIL] monitor throttle lost the final snapshot (emitted="
+                  << (lastMonitor.getArray() != nullptr ? lastMonitor.getArray()->size() : -1)
+                  << ", expected="
+                  << (expected.getArray() != nullptr ? expected.getArray()->size() : -1)
+                  << ", snapshots=" << monitorSnapshots << ")\n";
         return 1;
     }
     juce::int64 lastId = 0;

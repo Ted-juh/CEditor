@@ -123,12 +123,18 @@ struct ModuleScanResult
 class PluginCatalog
 {
 public:
+    enum class SaveFailure { none, unreadableSource, newerSchema, lockUnavailable, writeFailed };
+
     /** Replaces the in-memory catalogue with the file's contents. A missing file is an empty
         catalogue and returns true; unparseable content returns false and leaves the catalogue
         empty rather than half-loaded. */
     bool loadFrom (const juce::File& file);
 
-    bool saveTo (const juce::File& file) const;
+    /** Merges this instance's module-level changes into the latest on-disk catalogue while a
+        same-process and cross-process lock are held. An unreadable/newer catalogue is never
+        replaced by an empty or downgraded one. */
+    [[nodiscard]] bool saveTo (const juce::File& file);
+    SaveFailure lastSaveFailure() const noexcept { return saveFailure; }
 
     /** Upserts the module and its classes. A successful scan clears failure state, quarantine
         and the missing flag — the module just proved itself. Zero classes is still a success
@@ -192,6 +198,12 @@ private:
     ModuleRecord* find (const juce::String& modulePath);
 
     juce::Array<ModuleRecord> modules;
+    juce::Array<ModuleRecord> baselineModules;
+    juce::String baselinePath, baselineText;
+    bool hasFileBaseline = false;
+    bool baselineFileExisted = false;
+    bool saveBlocked = false;
+    SaveFailure saveFailure = SaveFailure::none;
 };
 
 } // namespace ceditor::host

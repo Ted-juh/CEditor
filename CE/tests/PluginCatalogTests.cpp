@@ -127,6 +127,98 @@ void testPersistenceRoundTrip()
     dir.deleteRecursively();
 }
 
+void testConcurrentCataloguesMerge()
+{
+    std::cout << "\nconcurrent catalogue merge" << std::endl;
+    const auto dir = makeTempDir ("concurrent-merge");
+    const auto file = dir.getChildFile ("plugin-catalog.json");
+
+    PluginCatalog scanner, crashReporter;
+    check (scanner.loadFrom (file) && crashReporter.loadFrom (file),
+           "two instances load the same empty baseline");
+    scanner.commitScanResult (sampleResult ("C:\\VST3\\Scanned.vst3"));
+    crashReporter.recordFailure ("C:\\VST3\\Broken.vst3", "fp-bad", "crashed", true);
+    check (scanner.saveTo (file), "the scan result saves first");
+    check (crashReporter.saveTo (file), "the stale crash reporter merges instead of replacing");
+
+    PluginCatalog merged;
+    check (merged.loadFrom (file) && merged.findModule ("C:\\VST3\\Scanned.vst3") != nullptr,
+           "the independently scanned module survives");
+    const auto* broken = merged.findModule ("C:\\VST3\\Broken.vst3");
+    check (broken != nullptr && broken->quarantined && broken->failureCount == 1,
+           "and the independent quarantine survives");
+
+    dir.deleteRecursively();
+}
+
+void testConcurrentScanCannotClearAQuarantine()
+{
+    std::cout << "\nconcurrent scan versus quarantine" << std::endl;
+    const auto dir = makeTempDir ("scan-quarantine");
+    const auto file = dir.getChildFile ("plugin-catalog.json");
+
+    PluginCatalog seed;
+    seed.commitScanResult (sampleResult ("C:\\VST3\\Shared.vst3"), juce::Time (1000));
+    check (seed.saveTo (file), "the shared module baseline saves");
+
+    PluginCatalog scan, crash;
+    check (scan.loadFrom (file) && crash.loadFrom (file), "both instances load the module");
+    crash.recordFailure ("C:\\VST3\\Shared.vst3", "fp-crash", "crashed", true);
+    check (crash.saveTo (file), "the crash quarantine saves");
+
+    auto rescanned = sampleResult ("C:\\VST3\\Shared.vst3");
+    rescanned.fingerprint = "fp-new";
+    scan.commitScanResult (rescanned, juce::Time (2000));
+    check (scan.saveTo (file), "the overlapping stale scan merges");
+
+    PluginCatalog afterScan;
+    check (afterScan.loadFrom (file)
+             && afterScan.findModule ("C:\\VST3\\Shared.vst3")->quarantined,
+           "a concurrent scan cannot silently clear the newer quarantine");
+
+    afterScan.clearQuarantine ("C:\\VST3\\Shared.vst3");
+    check (afterScan.saveTo (file), "an explicit clear saves");
+    PluginCatalog cleared;
+    check (cleared.loadFrom (file)
+             && ! cleared.findModule ("C:\\VST3\\Shared.vst3")->quarantined,
+           "the explicit clear is the operation that releases quarantine");
+
+    dir.deleteRecursively();
+}
+
+void testUnsafeCataloguesAreNeverOverwritten()
+{
+    std::cout << "\nunsafe catalogue refusal" << std::endl;
+    const auto dir = makeTempDir ("unsafe-save");
+    const auto file = dir.getChildFile ("plugin-catalog.json");
+
+    file.replaceWithText ("{ truncated");
+    PluginCatalog corrupt;
+    check (! corrupt.loadFrom (file), "a corrupt catalogue is reported");
+    corrupt.commitScanResult (sampleResult ("C:\\VST3\\New.vst3"));
+    check (! corrupt.saveTo (file)
+             && corrupt.lastSaveFailure() == PluginCatalog::SaveFailure::unreadableSource,
+           "a failed load blocks the later save");
+    check (file.loadFileAsString() == "{ truncated", "the corrupt evidence is untouched");
+
+    file.replaceWithText ("{\"version\":2,\"modules\":[]}");
+    PluginCatalog newer;
+    check (! newer.loadFrom (file), "a newer schema is refused");
+    check (! newer.saveTo (file)
+             && newer.lastSaveFailure() == PluginCatalog::SaveFailure::newerSchema,
+           "an older build cannot downgrade the newer catalogue");
+
+    const auto blocked = dir.getChildFile ("blocked.json");
+    blocked.createDirectory();
+    PluginCatalog unwritable;
+    unwritable.commitScanResult (sampleResult ("C:\\VST3\\New.vst3"));
+    check (! unwritable.saveTo (blocked)
+             && unwritable.lastSaveFailure() == PluginCatalog::SaveFailure::writeFailed,
+           "an atomic replacement failure reaches the caller");
+
+    dir.deleteRecursively();
+}
+
 void testRescanRules()
 {
     std::cout << "\nneedsRescan" << std::endl;
@@ -515,6 +607,9 @@ int main()
 
     testCommitAndQuery();
     testPersistenceRoundTrip();
+    testConcurrentCataloguesMerge();
+    testConcurrentScanCannotClearAQuarantine();
+    testUnsafeCataloguesAreNeverOverwritten();
     testRescanRules();
     testMissingAndRecovery();
     testFingerprint();

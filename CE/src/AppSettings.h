@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_data_structures/juce_data_structures.h>
+#include "SharedPropertiesFile.h"
 
 /**
  * Persistent application settings stored as a properties file
@@ -17,36 +18,44 @@ public:
         options.folderName          = "CEditor";
         options.osxLibrarySubFolder = "Application Support";
 
-        propertiesFile = std::make_unique<juce::PropertiesFile> (options);
+        propertiesFile = std::make_unique<ceditor::SharedPropertiesFile> (options);
     }
 
     bool hasWindowBounds() const
     {
-        return propertiesFile->containsKey ("windowX");
+        const auto values = propertiesFile->read();
+        return values.has_value() && values->containsKey ("windowX");
     }
 
     juce::Rectangle<int> getWindowBounds() const
     {
-        return { propertiesFile->getIntValue ("windowX"),
-                 propertiesFile->getIntValue ("windowY"),
-                 propertiesFile->getIntValue ("windowWidth",  1280),
-                 propertiesFile->getIntValue ("windowHeight", 720) };
+        const auto values = propertiesFile->read().value_or (juce::StringPairArray());
+        const auto integer = [&] (const char* key, int fallback = 0)
+        {
+            return values.containsKey (key) ? values[key].getIntValue() : fallback;
+        };
+        return { integer ("windowX"), integer ("windowY"),
+                 integer ("windowWidth", 1280), integer ("windowHeight", 720) };
     }
 
     void setWindowBounds (juce::Rectangle<int> bounds)
     {
-        propertiesFile->setValue ("windowX",      bounds.getX());
-        propertiesFile->setValue ("windowY",      bounds.getY());
-        propertiesFile->setValue ("windowWidth",  bounds.getWidth());
-        propertiesFile->setValue ("windowHeight", bounds.getHeight());
-        propertiesFile->save();
+        propertiesFile->update ([&] (juce::PropertySet& values)
+        {
+            values.setValue ("windowX",      bounds.getX());
+            values.setValue ("windowY",      bounds.getY());
+            values.setValue ("windowWidth",  bounds.getWidth());
+            values.setValue ("windowHeight", bounds.getHeight());
+        });
     }
 
     /** Get the list of panel file paths that were open last session */
     juce::StringArray getOpenPanelPaths() const
     {
         juce::StringArray paths;
-        auto stored = propertiesFile->getValue ("openPanelPaths", "");
+        const auto values = propertiesFile->read();
+        const auto stored = values.has_value() && values->containsKey ("openPanelPaths")
+                              ? (*values)["openPanelPaths"] : juce::String();
 
         if (stored.isNotEmpty())
             paths.addTokens (stored, "|", "");
@@ -57,15 +66,19 @@ public:
     /** Store the list of currently open panel file paths */
     void setOpenPanelPaths (const juce::StringArray& paths)
     {
-        propertiesFile->setValue ("openPanelPaths", paths.joinIntoString ("|"));
-        propertiesFile->save();
+        propertiesFile->update ([&] (juce::PropertySet& values)
+        {
+            values.setValue ("openPanelPaths", paths.joinIntoString ("|"));
+        });
     }
 
     /** Get the list of script workspace file paths that were open last session */
     juce::StringArray getOpenScriptWorkspacePaths() const
     {
         juce::StringArray paths;
-        auto stored = propertiesFile->getValue ("openScriptWorkspacePaths", "");
+        const auto values = propertiesFile->read();
+        const auto stored = values.has_value() && values->containsKey ("openScriptWorkspacePaths")
+                              ? (*values)["openScriptWorkspacePaths"] : juce::String();
 
         if (stored.isNotEmpty())
             paths.addTokens (stored, "|", "");
@@ -76,14 +89,18 @@ public:
     /** Store the list of currently open script workspace file paths */
     void setOpenScriptWorkspacePaths (const juce::StringArray& paths)
     {
-        propertiesFile->setValue ("openScriptWorkspacePaths", paths.joinIntoString ("|"));
-        propertiesFile->save();
+        propertiesFile->update ([&] (juce::PropertySet& values)
+        {
+            values.setValue ("openScriptWorkspacePaths", paths.joinIntoString ("|"));
+        });
     }
 
     /** Get persisted app-level UI settings as a JSON-like var object */
     juce::var getAppSettingsData() const
     {
-        auto stored = propertiesFile->getValue ("appSettings", "");
+        const auto values = propertiesFile->read();
+        const auto stored = values.has_value() && values->containsKey ("appSettings")
+                              ? (*values)["appSettings"] : juce::String();
 
         if (stored.isNotEmpty())
         {
@@ -122,10 +139,12 @@ public:
     /** Persist app-level UI settings */
     void setAppSettingsData (const juce::var& data)
     {
-        propertiesFile->setValue ("appSettings", juce::JSON::toString (data));
-        propertiesFile->save();
+        propertiesFile->update ([&] (juce::PropertySet& values)
+        {
+            values.setValue ("appSettings", juce::JSON::toString (data));
+        });
     }
 
 private:
-    std::unique_ptr<juce::PropertiesFile> propertiesFile;
+    std::unique_ptr<ceditor::SharedPropertiesFile> propertiesFile;
 };

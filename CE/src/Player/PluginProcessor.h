@@ -53,6 +53,7 @@ static inline juce::File ceditorPlayerPanelFile()
 
 #if CEDITOR_SCRIPTING
  #include "PanelValueModel.h"
+ #include "SharedPropertiesFile.h"
  #include "Scripting/BridgeScriptHost.h"
  #include "Scripting/TimerManager.h"
 #endif
@@ -2044,8 +2045,11 @@ private:
             localSettings.set (key, value);
             // Written through immediately: a machine-local setting has no "save the project" moment
             // to ride along with, and the DAW may never close this instance politely.
-            localStore()->setValue (localKey (key), juce::JSON::toString (value));
-            localStore()->saveIfNeeded();
+            if (! localStore()->update ([&] (juce::PropertySet& values)
+                {
+                    values.setValue (localKey (key), juce::JSON::toString (value));
+                }))
+                scriptLogLine ("[script] local setting could not be saved");
         };
         cb.loadSetting = [this] (const juce::String& key, const juce::String& store)
         {
@@ -2069,8 +2073,11 @@ private:
             set.remove (key);                            // "there was nothing there"
             if (store == "local")
             {
-                localStore()->removeValue (localKey (key));
-                localStore()->saveIfNeeded();
+                if (! localStore()->update ([&] (juce::PropertySet& values)
+                    {
+                        values.removeValue (localKey (key));
+                    }))
+                    scriptLogLine ("[script] local setting could not be removed");
             }
             return true;
         };
@@ -2189,7 +2196,7 @@ private:
         Lazily, because most panels never touch local scope and opening a file per plugin instance
         for nothing is not free. One file for the plugin as a whole, keys prefixed by panel id, so
         two panels loaded in one session do not read each other's. */
-    juce::PropertiesFile* localStore()
+    ceditor::SharedPropertiesFile* localStore()
     {
         if (localProps == nullptr)
         {
@@ -2198,7 +2205,7 @@ private:
             options.filenameSuffix      = ".scriptlocal";
             options.folderName          = "CEditor";
             options.osxLibrarySubFolder = "Application Support";
-            localProps = std::make_unique<juce::PropertiesFile> (options);
+            localProps = std::make_unique<ceditor::SharedPropertiesFile> (options);
         }
         return localProps.get();
     }
@@ -2224,15 +2231,20 @@ private:
     {
         if (localLoaded) return;
         localLoaded = true;
-        auto* props = localStore();
+        const auto props = localStore()->read();
+        if (! props.has_value())
+        {
+            scriptLogLine ("[script] local settings could not be read");
+            return;
+        }
         const auto prefix = localPanelId() + "/";
-        for (const auto& name : props->getAllProperties().getAllKeys())
+        for (const auto& name : props->getAllKeys())
             if (name.startsWith (prefix))
                 localSettings.set (name.substring (prefix.length()),
-                                   juce::JSON::parse (props->getValue (name)));
+                                   juce::JSON::parse ((*props)[name]));
     }
 
-    std::unique_ptr<juce::PropertiesFile> localProps;
+    std::unique_ptr<ceditor::SharedPropertiesFile> localProps;
     bool localLoaded = false;
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)

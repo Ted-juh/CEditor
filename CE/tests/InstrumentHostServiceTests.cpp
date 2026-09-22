@@ -30,9 +30,12 @@
 #include "ControlSurface/Ctrl49SurfaceBroker.h"
 #include "StubSynthProcessor.h"
 #include <cstring>
+#include <atomic>
+#include <barrier>
 #include <map>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace
@@ -119,7 +122,7 @@ void seedCatalog (const juce::File& dataDir)
     catalog.commitScanResult (broken);
     catalog.recordFailure ("C:\\VST3\\Broken.vst3", "fp-broken", "hung", true);
 
-    catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
+    (void) catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
 }
 
 /** Collects emitted events and offers the usual assertions over them. */
@@ -2078,7 +2081,7 @@ void testSubstitutes()
         synth.descriptionXml = "<PLUGIN name=\"Spare Synth\" ceId=\"VST3-spare-synth\"/>";
         spare.classes.add (synth);
         catalog.commitScanResult (spare);
-        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+        (void) catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
     }
 
     juce::String rackId;
@@ -2824,7 +2827,7 @@ void testZebra3ProgramNames()
     plugin.ceId = "test-zebra"; plugin.name = "Zebra3"; plugin.vendor = "u-he"; plugin.isInstrument = true;
     plugin.descriptionXml = "<PLUGIN name=\"Zebra3\" ceId=\"test-zebra\"/>";
     module.classes.add (plugin); catalog.commitScanResult (module);
-    catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+    (void) catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
     StubSynthProcessor::factoryPrograms = { { "Program 0", 0.5f }, { "Preset01", 0.5f },
                                            { "Glass Keys", 0.3f }, { "Warm Pad", 0.8f } };
     {
@@ -5073,7 +5076,7 @@ void seedTwoSynthCatalog (const juce::File& dataDir)
     multi.classes.add (multiSynth);
     catalog.commitScanResult (multi);
 
-    catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
+    (void) catalog.saveTo (dataDir.getChildFile ("plugin-catalog.json"));
 }
 
 // Neutral pages: named slots over parameter addresses. What must hold is the identity story —
@@ -9567,6 +9570,43 @@ void testGeneratedProduct()
         second.service->releaseHardwareSurface();
     }
 
+    // The decision and write are one transaction. InterProcessLock alone does not serialize
+    // two plugin instances in one DAW process, so race both callers repeatedly on worker threads.
+    {
+        Harness first (dir), second (dir);
+        first.cmd ("getState");
+        second.cmd ("getState");
+        std::barrier gate (3), finished (3);
+        std::atomic<bool> firstWon { false }, secondWon { false };
+        const auto compete = [&] (Harness& h, std::atomic<bool>& result)
+        {
+            for (int round = 0; round < 40; ++round)
+            {
+                gate.arrive_and_wait();
+                result = h.service->claimHardwareSurface();
+                finished.arrive_and_wait();
+            }
+        };
+        std::thread a (compete, std::ref (first), std::ref (firstWon));
+        std::thread b (compete, std::ref (second), std::ref (secondWon));
+        bool exactlyOneEveryTime = true;
+        for (int round = 0; round < 40; ++round)
+        {
+            firstWon = false;
+            secondWon = false;
+            gate.arrive_and_wait();
+            finished.arrive_and_wait();
+            exactlyOneEveryTime = exactlyOneEveryTime
+                                    && (firstWon.load() != secondWon.load());
+            first.service->releaseHardwareSurface();
+            second.service->releaseHardwareSurface();
+        }
+        a.join();
+        b.join();
+        check (exactlyOneEveryTime,
+               "simultaneous same-process claims elect exactly one hardware owner");
+    }
+
     // -- project portability: the same state, and an honest report of what is missing --------
     {
         Harness h (dir);
@@ -10763,7 +10803,7 @@ void testPluginSnapshots()
             module.classes.add (synth);
             catalog.commitScanResult (module);
         }
-        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+        (void) catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
     }
 
     Harness h (dir);
@@ -10843,7 +10883,7 @@ void testEditorThumbnails()
             module.classes.add (synth);
             catalog.commitScanResult (module);
         }
-        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+        (void) catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
     }
 
     // A picture with something in it, and one without. isBlank is what tells them apart, and
@@ -11121,7 +11161,7 @@ void testCustomArtwork()
             module.classes.add (synth);
             catalog.commitScanResult (module);
         }
-        catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
+        (void) catalog.saveTo (dir.getChildFile ("plugin-catalog.json"));
     }
 
     // A real picture on disk, in a format that is not PNG — the copy normalises it, so every
@@ -11634,6 +11674,19 @@ void testScanFolderBrowseAndModuleProjection()
     h2.cmd ("getState");
     check (h2.emits.lastState()->getProperty ("scanPaths", {})[0].toString() == "D:\\Chosen VST3s",
            "and the browsed folder persists like a typed one");
+
+    Harness first (dir), stale (dir);
+    first.cmd ("getState");
+    stale.cmd ("getState");
+    first.cmd ("addScanPath", { { "path", "E:\\First" } });
+    stale.cmd ("addScanPath", { { "path", "F:\\Second" } });
+    Harness merged (dir);
+    merged.cmd ("getState");
+    juce::StringArray paths;
+    for (const auto& path : *merged.emits.lastState()->getProperty ("scanPaths", {}).getArray())
+        paths.add (path.toString());
+    check (paths.contains ("E:\\First") && paths.contains ("F:\\Second"),
+           "stale instances merge distinct scan paths");
 }
 
 // The Host Project manifest and the build command. The manifest is what the generated product
@@ -11682,6 +11735,21 @@ void testHostProject()
         h.cmd ("buildHostProduct");
         check (h.emits.lastError().contains ("not available"),
                "building without a runBuild hook refuses aloud");
+    }
+
+    {
+        Harness first (dir), stale (dir);
+        first.cmd ("getHostProject");
+        stale.cmd ("getHostProject");
+        first.cmd ("setHostProject", { { "publisher", "First Publisher" } });
+        stale.cmd ("setHostProject", { { "version", "3.0.0" } });
+
+        Harness reloaded (dir);
+        reloaded.cmd ("getHostProject");
+        const auto merged = reloaded.emits.entries.back().payload;
+        check (merged.getProperty ("publisher", {}).toString() == "First Publisher"
+                 && merged.getProperty ("version", {}).toString() == "3.0.0",
+               "stale instances merge distinct Host Project fields");
     }
 
     {

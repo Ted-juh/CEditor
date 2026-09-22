@@ -1311,7 +1311,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 auto dir = scriptModulesDirectory();
                 dir.createDirectory();
                 auto file = dir.getChildFile (juce::File::createLegalFileName (id) + ".cemodule");
-                file.replaceWithText (juce::JSON::toString (manifest, false));
+                (void) ceditor::writeTextAtomically (file, juce::JSON::toString (manifest, false));
                 emitScriptModules();
             });
         })
@@ -1363,8 +1363,9 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                         {
                             auto dir = scriptModulesDirectory();
                             dir.createDirectory();
-                            dir.getChildFile (juce::File::createLegalFileName (id) + ".cemodule")
-                               .replaceWithText (file.loadFileAsString());
+                            (void) ceditor::writeTextAtomically (
+                                dir.getChildFile (juce::File::createLegalFileName (id) + ".cemodule"),
+                                file.loadFileAsString());
                         }
                         emitScriptModules();
                     });

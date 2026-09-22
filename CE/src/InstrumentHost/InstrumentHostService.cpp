@@ -1,6 +1,7 @@
 #include "InstrumentHostService.h"
 
 #include "AtomicFileWrite.h"
+#include "SharedJsonFile.h"
 #include "PatchDiff.h"
 #include "PluginSnapshotPath.h"
 #include "VendorPresetDiscovery.h"
@@ -27,6 +28,32 @@
 
 namespace ceditor::host
 {
+
+namespace
+{
+std::mutex& hardwareClaimMutex()
+{
+    static std::mutex mutex;
+    return mutex;
+}
+
+template <typename Callback>
+bool withHardwareClaimLock (const juce::File& file, Callback&& callback)
+{
+    const std::scoped_lock inProcessGuard (hardwareClaimMutex());
+    auto path = file.getFullPathName();
+   #if JUCE_WINDOWS
+    path = path.toLowerCase();
+   #endif
+    juce::InterProcessLock lock (
+        "CEditorHardwareSurface-" + juce::String::toHexString (path.hashCode64()));
+    if (! lock.enter (500))
+        return false;
+    struct Unlock { juce::InterProcessLock& lock; ~Unlock() { lock.exit(); } } unlock { lock };
+    callback();
+    return true;
+}
+}
 
 namespace
 {
@@ -656,7 +683,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
 
         userSurfaceLearning = false;
-        saveUserSurface();
+        if (! saveUserSurface())
+            emitError ("Could not save the controller description.");
         emitSurfaceLayout();
         return;
     }
@@ -667,7 +695,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         userSurfaceName = {};
         userSurfaceCapabilities = {};
         userSurfaceLearning = false;
-        saveUserSurface();
+        if (! saveUserSurface())
+            emitError ("Could not clear the saved controller description.");
         emitSurfaceLayout();
         return;
     }
@@ -710,7 +739,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             userSurfaceName = "My controller";
 
         userSurfaceCapabilities.encoders = juce::jlimit (0, 64, heard);
-        saveUserSurface();
+        if (! saveUserSurface())
+            emitError ("Could not save the learned controller description.");
         emitSurfaceLayout();
         return;
     }
@@ -755,8 +785,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             if (! aliveToken->load() || directory.isEmpty())
                 return;
 
-            userScanPaths.addIfNotAlreadyThere (directory);
-            saveScanPaths();
+            if (! saveScanPath (directory, true))
+                emitError ("Could not save the scan path.");
             emitState();
         });
         return;
@@ -771,12 +801,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        if (cmd == "addScanPath")
-            userScanPaths.addIfNotAlreadyThere (path);
-        else
-            userScanPaths.removeString (path);
-
-        saveScanPaths();
+        if (! saveScanPath (path, cmd == "addScanPath"))
+            emitError ("Could not save the scan path.");
         emitState();
         return;
     }
@@ -787,7 +813,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         {
             const std::scoped_lock lock (catalogLock);
             catalog.clearQuarantine (modulePath);
-            catalog.saveTo (catalogFile());
+            saveCatalog();
         }
         emitState();
         return;
@@ -1929,7 +1955,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         else
             ids.add (parameterId);
 
-        saveParameterFavourites();
+        if (! saveParameterFavouriteClass (ceId))
+            emitError ("Could not save parameter favourites. The existing file was left untouched.");
 
         // Re-answer with the registry rather than emitting a favourites-only event: the list
         // is rendered from one payload, and a second source for one field is a second thing
@@ -2050,7 +2077,28 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
                                       (bool) payload.getProperty ("includeStageNotes", false));
         }
 
-        hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
+        const auto appId = hostProject.getProperty ("appId", {}).toString();
+        const auto saved = updateSharedJsonObject (hostProjectFile(), [&] (juce::DynamicObject& latest)
+        {
+            if (! latest.hasProperty ("appId") || latest.getProperty ("appId").toString().isEmpty())
+                latest.setProperty ("appId", appId);
+            if (fields != nullptr)
+            {
+                for (const auto* key : { "productName", "version", "publisher" })
+                    if (fields->hasProperty (key))
+                        latest.setProperty (key, payload.getProperty (key, {}).toString().trim());
+                for (const auto* key : { "includeStandalone", "includeVst3" })
+                    if (fields->hasProperty (key))
+                        latest.setProperty (key, (bool) payload.getProperty (key, true));
+                if (fields->hasProperty ("includeStageNotes"))
+                    latest.setProperty ("includeStageNotes",
+                                        (bool) payload.getProperty ("includeStageNotes", false));
+            }
+        });
+        if (saved)
+            hostProject = juce::JSON::parse (hostProjectFile().loadFileAsString());
+        else
+            emitError ("Could not save the Host Project. The existing manifest was left untouched.");
         emitHostProject();
         return;
     }
@@ -6211,7 +6259,8 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             substitutions.set (key, recordId);
         }
 
-        saveSubstitutions();
+        if (! saveSubstitution (key))
+            emitError ("Could not save the plug-in substitution. The existing file was left untouched.");
 
         // Answer with the rack's report again where the caller said which rack it was asking
         // about, so the list redraws with the choice in it rather than needing a second round
@@ -6793,16 +6842,20 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             return;
         }
 
-        if (cmd == "addLibraryPath")
-            libraryPaths.addIfNotAlreadyThere (path);
-        else
-            libraryPaths.removeString (path);
-
-        auto* root = new juce::DynamicObject();
-        root->setProperty ("paths", [this] { juce::Array<juce::var> a;
-                                             for (const auto& p : libraryPaths) a.add (p);
-                                             return a; }());
-        libraryPathsFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        juce::StringArray mergedPaths;
+        const auto saved = updateSharedJsonObject (libraryPathsFile(), [&] (juce::DynamicObject& root)
+        {
+            if (const auto* stored = root.getProperty ("paths").getArray())
+                for (const auto& item : *stored)
+                    mergedPaths.addIfNotAlreadyThere (item.toString());
+            if (cmd == "addLibraryPath") mergedPaths.addIfNotAlreadyThere (path);
+            else                          mergedPaths.removeString (path);
+            juce::Array<juce::var> values;
+            for (const auto& item : mergedPaths) values.add (item);
+            root.setProperty ("paths", values);
+        });
+        if (saved) libraryPaths = mergedPaths;
+        else       emitError ("Could not save the preset folder list.");
         emitLibrary (libraryView);
         return;
     }
@@ -7434,7 +7487,9 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
 
     {
         const std::scoped_lock lock (catalogLock);
-        catalog.loadFrom (catalogFile());
+        if (! catalog.loadFrom (catalogFile()))
+            emitError ("The plug-in catalogue could not be read and was left untouched. "
+                       "Scan results will not be saved until that file is repaired.");
 
         // Safe startup, active side (§17.1, §18.3.3): a leftover ACTIVE marker names the plug-in
         // that was live when the process died. Stage 7 recorded it as evidence for the
@@ -7466,7 +7521,7 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
             catalog.recordFailure (suspect, PluginCatalog::fingerprintFor (juce::File (suspect)),
                                    "active during an abnormal termination", true);
             PluginScannerCoordinator::markerFile (options.dataDirectory).deleteFile();
-            catalog.saveTo (catalogFile());
+            saveCatalog();
         }
     }
 
@@ -8520,7 +8575,24 @@ void InstrumentHostService::ensureHostProject()
     if (! project->hasProperty ("includeStageNotes")) { project->setProperty ("includeStageNotes", false); changed = true; }
 
     if (changed)
-        hostProjectFile().replaceWithText (juce::JSON::toString (hostProject));
+    {
+        const auto defaults = hostProject;
+        const auto saved = updateSharedJsonObject (hostProjectFile(), [&] (juce::DynamicObject& latest)
+        {
+            const auto* source = defaults.getDynamicObject();
+            if (source == nullptr) return;
+            for (const auto& property : source->getProperties())
+                if (! latest.hasProperty (property.name)
+                     || (property.value.isString()
+                          && latest.getProperty (property.name).toString().isEmpty()))
+                    latest.setProperty (property.name, property.value);
+        });
+        if (saved)
+            hostProject = juce::JSON::parse (hostProjectFile().loadFileAsString());
+        else
+            emitError ("Could not initialise the Host Project manifest. The existing file was "
+                       "left untouched.");
+    }
 }
 
 void InstrumentHostService::emitHostProject()
@@ -10068,23 +10140,30 @@ void InstrumentHostService::loadSubstitutions()
         }
 }
 
-void InstrumentHostService::saveSubstitutions() const
+bool InstrumentHostService::saveSubstitution (const juce::String& changedKey)
 {
-    // Written as a list of three named fields rather than as the packed key, so somebody
-    // reading the file can see what it says without knowing how the key is built.
-    juce::Array<juce::var> entries;
-    for (const auto& key : substitutions.getAllKeys())
+    const auto replacement = substitutions[changedKey];
+    return updateSharedJsonObject (substitutionsFile(), [&] (juce::DynamicObject& root)
     {
-        auto* entry = new juce::DynamicObject();
-        entry->setProperty ("pluginCeId", key.upToFirstOccurrenceOf ("\n", false, false));
-        entry->setProperty ("presetName", key.fromFirstOccurrenceOf ("\n", false, false));
-        entry->setProperty ("recordId",   substitutions[key]);
-        entries.add (juce::var (entry));
-    }
+        juce::Array<juce::var> entries;
+        if (const auto* stored = root.getProperty ("substitutions").getArray())
+            entries = *stored;
 
-    auto* root = new juce::DynamicObject();
-    root->setProperty ("substitutions", entries);
-    substitutionsFile().replaceWithText (juce::JSON::toString (juce::var (root), false));
+        for (int i = entries.size(); --i >= 0;)
+            if (substitutionKey (entries[i].getProperty ("pluginCeId", {}).toString(),
+                                 entries[i].getProperty ("presetName", {}).toString()) == changedKey)
+                entries.remove (i);
+
+        if (replacement.isNotEmpty())
+        {
+            auto* entry = new juce::DynamicObject();
+            entry->setProperty ("pluginCeId", changedKey.upToFirstOccurrenceOf ("\n", false, false));
+            entry->setProperty ("presetName", changedKey.fromFirstOccurrenceOf ("\n", false, false));
+            entry->setProperty ("recordId", replacement);
+            entries.add (juce::var (entry));
+        }
+        root.setProperty ("substitutions", entries);
+    });
 }
 
 juce::Array<InstrumentHostService::AnalysisTask>
@@ -10892,6 +10971,33 @@ bool InstrumentHostService::saveLibrary()
                             : juce::String())
                  : juce::String ("Could not save the sound library index to \"")
                        + libraryFile().getFullPathName() + "\".");
+    return false;
+}
+
+bool InstrumentHostService::saveCatalog()
+{
+    if (catalog.saveTo (catalogFile()))
+    {
+        catalogWriteErrorReported = false;
+        return true;
+    }
+
+    if (catalogWriteErrorReported)
+        return false;
+    catalogWriteErrorReported = true;
+
+    const auto failure = catalog.lastSaveFailure();
+    emitError (failure == PluginCatalog::SaveFailure::unreadableSource
+                 ? "Plug-in catalogue changes are not being saved because the existing file "
+                   "could not be read. It was left untouched."
+               : failure == PluginCatalog::SaveFailure::newerSchema
+                 ? "This CEditor build cannot save the plug-in catalogue because it was written "
+                   "by a newer version. The newer file was left untouched."
+                 : failure == PluginCatalog::SaveFailure::lockUnavailable
+                 ? "The plug-in catalogue is busy in another CEditor instance. Its changes were "
+                   "left pending in this instance."
+                 : "Could not save the plug-in catalogue to \""
+                     + catalogFile().getFullPathName() + "\".");
     return false;
 }
 
@@ -15162,15 +15268,14 @@ void InstrumentHostService::loadUserSurface()
     userSurfaceCapabilities.pads     = juce::jlimit (0, 64, (int) stored.getProperty ("pads", 0));
 }
 
-void InstrumentHostService::saveUserSurface() const
+bool InstrumentHostService::saveUserSurface() const
 {
     if (options.dataDirectory == juce::File())
-        return;
+        return false;
 
     if (userSurfaceName.isEmpty())
     {
-        userSurfaceFile().deleteFile();      // cleared means gone, not an empty record
-        return;
+        return ! userSurfaceFile().existsAsFile() || userSurfaceFile().deleteFile();
     }
 
     auto* root = new juce::DynamicObject();
@@ -15179,8 +15284,7 @@ void InstrumentHostService::saveUserSurface() const
     root->setProperty ("faders",   userSurfaceCapabilities.faders);
     root->setProperty ("pads",     userSurfaceCapabilities.pads);
 
-    userSurfaceFile().getParentDirectory().createDirectory();
-    userSurfaceFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+    return writeTextAtomically (userSurfaceFile(), juce::JSON::toString (juce::var (root)));
 }
 
 void InstrumentHostService::loadParameterFavourites()
@@ -15206,25 +15310,25 @@ void InstrumentHostService::loadParameterFavourites()
         }
 }
 
-void InstrumentHostService::saveParameterFavourites() const
+bool InstrumentHostService::saveParameterFavouriteClass (const juce::String& ceId)
 {
     if (options.dataDirectory == juce::File())
-        return;
+        return false;
 
-    auto* root = new juce::DynamicObject();
-    for (const auto& [ceId, ids] : parameterFavourites)
+    const auto ids = parameterFavourites[ceId];
+    return updateSharedJsonObject (parameterFavouritesFile(), [&] (juce::DynamicObject& root)
     {
         if (ids.isEmpty())
-            continue;      // a class with nothing marked is absent, not an empty list
+        {
+            root.removeProperty (ceId);
+            return;
+        }
 
         juce::Array<juce::var> values;
         for (const auto& id : ids)
             values.add (id);
-        root->setProperty (ceId, values);
-    }
-
-    parameterFavouritesFile().getParentDirectory().createDirectory();
-    parameterFavouritesFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        root.setProperty (ceId, values);
+    });
 }
 
 void InstrumentHostService::emitParameterLearn (bool armed, const juce::String& pageId,
@@ -15849,10 +15953,23 @@ void InstrumentHostService::drainParameterEvents()
         if (now - lastHardwareHeartbeat > hardwareHeartbeatMs)
         {
             lastHardwareHeartbeat = now;
-            auto* claim = new juce::DynamicObject();
-            claim->setProperty ("instanceId", instanceId);
-            claim->setProperty ("heartbeat", now);
-            hardwareOwnerFile().replaceWithText (juce::JSON::toString (juce::var (claim)));
+            bool stillOwner = false;
+            const auto locked = withHardwareClaimLock (hardwareOwnerFile(), [&]
+            {
+                const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
+                if (stored.getProperty ("instanceId", {}).toString() != instanceId)
+                    return;
+
+                auto* claim = new juce::DynamicObject();
+                claim->setProperty ("instanceId", instanceId);
+                claim->setProperty ("heartbeat", now);
+                stillOwner = writeTextAtomically (hardwareOwnerFile(),
+                                                   juce::JSON::toString (juce::var (claim)));
+            });
+            if (locked && stillOwner)
+                lastHardwareHeartbeatConfirmed = now;
+            else if (now - lastHardwareHeartbeatConfirmed >= hardwareSendFenceMs)
+                holdsHardwareSurface = false;
         }
     }
 
@@ -16171,7 +16288,7 @@ void InstrumentHostService::runScanNow()
     {
         const std::scoped_lock lock (catalogLock);
         catalog = working;
-        catalog.saveTo (catalogFile());
+        saveCatalog();
     }
 
     scanBusy.store (false);
@@ -17416,12 +17533,14 @@ juce::String InstrumentHostService::writeSupportBundle (const juce::File& destin
 
 bool InstrumentHostService::ownsHardwareSurface() const
 {
-    return holdsHardwareSurface;
+    return holdsHardwareSurface
+            && juce::Time::currentTimeMillis() - lastHardwareHeartbeatConfirmed
+                 < hardwareSendFenceMs;
 }
 
 juce::String InstrumentHostService::hardwareSurfaceOwner() const
 {
-    if (holdsHardwareSurface)
+    if (ownsHardwareSurface())
         return "this instance";
 
     const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
@@ -17432,23 +17551,38 @@ juce::String InstrumentHostService::hardwareSurfaceOwner() const
     // A stale claim is nobody's: an instance that crashed must not hold the surface forever.
     const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
     const auto age = juce::Time::currentTimeMillis() - stamp;
-    return age > hardwareClaimTimeoutMs ? "nobody" : "another instance";
+    return age < 0 || age > hardwareClaimTimeoutMs ? "nobody" : "another instance";
 }
 
 bool InstrumentHostService::claimHardwareSurface()
 {
-    if (holdsHardwareSurface)
+    if (ownsHardwareSurface())
         return true;
 
-    if (hardwareSurfaceOwner() == "another instance")
+    bool acquired = false;
+    const auto now = juce::Time::currentTimeMillis();
+    options.dataDirectory.createDirectory();
+    if (! withHardwareClaimLock (hardwareOwnerFile(), [&]
+        {
+            const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
+            const auto owner = stored.getProperty ("instanceId", {}).toString();
+            const auto stamp = (juce::int64) stored.getProperty ("heartbeat", 0);
+            if (owner.isNotEmpty() && owner != instanceId
+                 && now - stamp <= hardwareClaimTimeoutMs && stamp <= now)
+                return;
+
+            auto* claim = new juce::DynamicObject();
+            claim->setProperty ("instanceId", instanceId);
+            claim->setProperty ("heartbeat", now);
+            acquired = writeTextAtomically (hardwareOwnerFile(),
+                                             juce::JSON::toString (juce::var (claim)));
+        }))
         return false;
 
-    options.dataDirectory.createDirectory();
-    auto* claim = new juce::DynamicObject();
-    claim->setProperty ("instanceId", instanceId);
-    claim->setProperty ("heartbeat", juce::Time::currentTimeMillis());
-    hardwareOwnerFile().replaceWithText (juce::JSON::toString (juce::var (claim)));
-
+    if (! acquired)
+        return false;
+    lastHardwareHeartbeat = now;
+    lastHardwareHeartbeatConfirmed = now;
     holdsHardwareSurface = true;
     return true;
 }
@@ -17462,9 +17596,12 @@ void InstrumentHostService::releaseHardwareSurface()
 
     // Only clear the file if it is still OURS: an instance that took over in the meantime
     // must not have its claim deleted by the one it replaced.
-    const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
-    if (stored.getProperty ("instanceId", {}).toString() == instanceId)
-        hardwareOwnerFile().deleteFile();
+    withHardwareClaimLock (hardwareOwnerFile(), [&]
+    {
+        const auto stored = juce::JSON::parse (hardwareOwnerFile().loadFileAsString());
+        if (stored.getProperty ("instanceId", {}).toString() == instanceId)
+            hardwareOwnerFile().deleteFile();
+    });
 }
 
 // -- the generated product's DAW surface (Stage 7) --------------------------------------------
@@ -18720,15 +18857,24 @@ void InstrumentHostService::maybeSnapshotRevision()
     }
 }
 
-void InstrumentHostService::saveScanPaths()
+bool InstrumentHostService::saveScanPath (const juce::String& path, bool add)
 {
-    juce::Array<juce::var> paths;
-    for (const auto& p : userScanPaths)
-        paths.add (p);
+    juce::StringArray mergedPaths;
+    const auto saved = updateSharedJsonObject (scanPathsFile(), [&] (juce::DynamicObject& root)
+    {
+        if (const auto* stored = root.getProperty ("paths").getArray())
+            for (const auto& item : *stored)
+                mergedPaths.addIfNotAlreadyThere (item.toString());
+        if (add) mergedPaths.addIfNotAlreadyThere (path);
+        else     mergedPaths.removeString (path);
 
-    auto* root = new juce::DynamicObject();
-    root->setProperty ("paths", paths);
-    scanPathsFile().replaceWithText (juce::JSON::toString (juce::var (root)));
+        juce::Array<juce::var> values;
+        for (const auto& item : mergedPaths) values.add (item);
+        root.setProperty ("paths", values);
+    });
+    if (saved)
+        userScanPaths = mergedPaths;
+    return saved;
 }
 
 } // namespace ceditor::host

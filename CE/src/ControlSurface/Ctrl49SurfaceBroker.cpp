@@ -276,6 +276,12 @@ void Ctrl49SurfaceBroker::tick()
 
         case State::connected:
         {
+            if (! service.ownsHardwareSurface())
+            {
+                disconnect ("hardware ownership was lost", State::heldElsewhere);
+                return;
+            }
+
             // Transport health first: a dead input or a failed keepalive means the device is
             // gone, and §17.4 says stop sending IMMEDIATELY and mark offline — not "try one
             // more frame".

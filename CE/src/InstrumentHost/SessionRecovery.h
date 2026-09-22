@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "../AtomicFileWrite.h"
 
 // SessionRecovery — what §17.3 asks a session to maintain, and what to do with it after a crash.
 //
@@ -73,7 +74,8 @@ public:
         obj->setProperty ("kind",   kind);
         obj->setProperty ("detail", detail);
         obj->setProperty ("at",     juce::Time::getCurrentTime().toISO8601 (true));
-        operationMarkerFile().replaceWithText (juce::JSON::toString (juce::var (obj)));
+        (void) ceditor::writeTextAtomically (operationMarkerFile(),
+                                             juce::JSON::toString (juce::var (obj)));
     }
 
     /** It finished. Nothing that happens from here is attributable to that operation. */
