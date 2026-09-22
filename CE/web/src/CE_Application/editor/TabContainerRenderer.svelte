@@ -29,7 +29,8 @@
   let activeCss = $derived(css(cfg.activeTabColour, 'rgba(58,90,128,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
   let activeLabelCss = $derived(css(cfg.activeLabelColour, 'rgba(255,255,255,1)'));
-  let instrument = $derived(cfg.appearance === 'instrument');
+  let buttons = $derived(cfg.appearance === 'buttons');
+  let instrument = $derived(cfg.appearance === 'instrument' || buttons);
   let accentCss = $derived(css(cfg.accentColour, 'rgba(226,165,44,1)'));
 </script>
 
@@ -45,7 +46,7 @@
         stroke={instrument ? (index === active ? accentCss : '#48545c') : 'none'}
         stroke-width={instrument ? 1 : 0}
       />
-      {#if instrument}
+      {#if instrument && !buttons}
         <path d={`M ${rect.x + 7} ${rect.y + 3} H ${rect.x + rect.w - 7}`} stroke="#ffffff" stroke-opacity="0.12" />
         <circle cx={rect.x + 13} cy={rect.y + rect.h / 2} r={2.5}
           fill={index === active ? accentCss : '#13191d'} stroke={index === active ? '#ffe1a0' : '#63717a'} stroke-width="0.7" />

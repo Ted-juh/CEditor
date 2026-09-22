@@ -27,8 +27,8 @@ export function arpeggiatorInspectorLayout(width, toolbar = false) {
   const columns = contentWidth >= 880 ? 4 : contentWidth >= 500 ? 2 : 1;
   const rows = Math.ceil(4 / columns);
   const inline = columns === 4;
-  return { sideWidth, contentWidth, fieldHeight: sideWidth ? 20 : 22,
-    height: (sideWidth ? 24 : inline ? 28 : 28 * (rows + 1)) + (toolbar && !sideWidth ? 24 : 0),
+  return { sideWidth, contentWidth, fieldHeight: sideWidth ? 16 : 22,
+    height: (sideWidth ? 20 : inline ? 28 : 28 * (rows + 1)) + (toolbar && !sideWidth ? 24 : 0),
     fields: ['Pitch', 'Start', 'Length', 'Velocity'].map((name, index) => ({
       name, x: (inline ? 280 : 44) + (index % columns) * 140,
       y: inline ? 0 : 28 * (1 + Math.floor(index / columns)),

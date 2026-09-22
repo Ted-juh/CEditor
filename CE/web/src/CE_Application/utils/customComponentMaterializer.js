@@ -488,7 +488,7 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
   if (editing && numericFields) {
     const state = control._children.Designer.patternEditingState ?? {};
     const selected = arpeggiator.blocks.some(b => b.id === arpeggiator.selectedBlock);
-    const y = height - 22;
+    const y = height - (inspector.sideWidth ? 18 : 22);
     const helpX = inspector.contentWidth - 70;
     const buttons = [
       ['undo', 'UNDO', 44, 62, state.undo], ['redo', 'REDO', 112, 62, state.redo],
@@ -501,8 +501,8 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
       const sideButton = inspector.sideWidth && action !== 'help';
       const x = sideButton ? inspector.contentWidth + 4 : originalX;
       const w = sideButton ? 120 : originalWidth;
-      const buttonY = sideButton ? 4 + index * 26 : y;
-      const buttonHeight = sideButton ? 22 : 18;
+      const buttonY = sideButton ? 4 + index * 22 : y;
+      const buttonHeight = sideButton ? 18 : inspector.sideWidth ? 16 : 18;
       addPart(parts, `arp_edit_${action}`, makeArpRuntimePart(`arp_edit_${action}`, {
         role: 'arpeggiatorEditButton', x, y: buttonY, width: w, height: buttonHeight, zIndex: 29, text,
         colour: 'FF17222B', textColour: enabled ? (action === 'send' ? 'FFE6C66C' : 'FFD7E1E9') : 'FF626C75',
@@ -517,8 +517,8 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
     if (width > 740) {
       const statusPart = makeArpRuntimePart('arp_edit_status', {
         role: 'arpeggiatorEditStatus', x: inspector.sideWidth ? inspector.contentWidth + 4 : 682,
-        y: inspector.sideWidth ? 164 : y, width: inspector.sideWidth ? 120 : Math.max(0, helpX - 690),
-        height: inspector.sideWidth ? height - 168 : 18, zIndex: 29,
+        y: inspector.sideWidth ? 198 : y, width: inspector.sideWidth ? 120 : Math.max(0, helpX - 690),
+        height: inspector.sideWidth ? Math.max(18, height - 202) : 18, zIndex: 29,
         text: state.message || '',
         colour: '00000000', textColour: state.error ? 'FFFF8080' : 'FFAEBAC6', fontSize: inspector.sideWidth ? 9 : 10,
       });

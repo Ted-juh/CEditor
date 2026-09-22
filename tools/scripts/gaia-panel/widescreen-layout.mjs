@@ -143,7 +143,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))));
+  return compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -237,13 +237,40 @@ export function expandArpeggioWorkspace(panel) {
   const guide = named('arp_gesture_guide');
   if (guide) delete children[guide._children.Core.id];
   const grid = named('arp_pattern_grid')._children;
-  Object.assign(grid.Transform, { x: box.x + 30, y: 18, width: box.width - 38, height: page.h - 22 });
+  Object.assign(grid.Transform, { x: box.x + 30, y: 4, width: box.width - 38, height: page.h - 8 });
   Object.assign(grid.Parts._children.field._children.Layout, { width: grid.Transform.width, height: grid.Transform.height });
-  const status = named('gaia_hardware_sync_status')._children.Transform;
-  Object.assign(status, { x: grid.Transform.x, y: 2, width: grid.Transform.width, height: 12 });
+  const status = named('gaia_hardware_sync_status')._children;
+  Object.assign(status.Transform, { x: grid.Transform.x + grid.Transform.width - 128, y: grid.Transform.y + 136, width: 120, height: 60 });
+  Object.assign(status.Designer, { designWidth: 120, designHeight: 60 });
+  const feedback = status.Parts._children.feedback._children;
+  Object.assign(feedback.Layout, { x: 0, y: 0, width: 120, height: 60 });
+  feedback.Text._children.Font.size = 8.5;
+  Object.assign(feedback.Text._children.Multiline, { maxLines: 6, wrapMode: 'word', lineHeight: 1.1 });
   const output = named('box_EFFECTS / OUTPUT')._children.Transform;
   output.height = t.y + t.height - output.y;
   return panel;
+}
+
+export function compactPanelRows(panel) {
+  const dividers = panel.controls.filter(c => /^tone[23]\.divider$/.test(c._children.Core.name));
+  if (dividers.length) {
+    panel.controls = panel.controls.filter(c => !dividers.includes(c));
+    const rows = panel.controls.filter(c => c._children.Core.name === 'box_OSC')
+      .map(c => ({ ...c._children.Transform })).sort((a, b) => a.y - b.y);
+    for (const [index, row] of rows.entries()) {
+      for (const c of panel.controls) {
+        const t = c._children.Transform;
+        if (t.x < 1594 && t.y >= row.y && t.y < row.y + row.height) t.y -= index * 4;
+      }
+    }
+  }
+  const bottom = panel.controls.find(c => c._children.Core.name === 'bottom_pages');
+  const t = bottom._children.Transform, end = t.y + t.height;
+  t.y = Math.max(...panel.controls.filter(c => c._children.Core.name === 'box_OSC')
+    .map(c => c._children.Transform.y + c._children.Transform.height));
+  t.height = end - t.y;
+  Object.assign(bottom._children.TabContainer, { appearance: 'buttons', stripSize: 32, stripColour: '00000000' });
+  return expandArpeggioWorkspace(panel);
 }
 
 // The profile exposes one patch-common selector, not three tone parameters.

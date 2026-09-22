@@ -82,7 +82,8 @@ export function tabGeometry(width, height, control) {
     case 'right':
       return { strip: { x: w - strip, y: 0, w: strip, h }, page: { x: 0, y: 0, w: w - strip, h }, edge, vertical: true };
     default:
-      return { strip: { x: 0, y: 0, w, h: strip }, page: { x: 0, y: strip, w, h: h - strip }, edge, vertical: false };
+      return { strip: { x: 0, y: 0, w, h: strip }, page: { x: 0, y: strip, w, h: h - strip }, edge, vertical: false,
+        ...(config.appearance === 'buttons' ? { buttons: true } : {}) };
   }
 }
 
@@ -94,6 +95,10 @@ export function tabRect(geom, index, count) {
     return { x: geom.strip.x, y: geom.strip.y + index * each, w: geom.strip.w, h: each };
   }
   const each = geom.strip.w / total;
+  if (geom.buttons) {
+    const w = Math.max(1, Math.min(180, each - 12)), h = Math.max(1, Math.min(20, geom.strip.h - 8));
+    return { x: geom.strip.x + index * each + (each - w) / 2, y: geom.strip.y + (geom.strip.h - h) / 2, w, h };
+  }
   return { x: geom.strip.x + index * each, y: geom.strip.y, w: each, h: geom.strip.h };
 }
 
@@ -103,6 +108,13 @@ export function tabAtPoint(geom, px, py, count) {
   const y = num(py, -1);
   const { strip } = geom;
   if (x < strip.x || y < strip.y || x > strip.x + strip.w || y > strip.y + strip.h) return null;
+  if (geom.buttons) {
+    for (let i = 0; i < count; i++) {
+      const r = tabRect(geom, i, count);
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i;
+    }
+    return null;
+  }
   const index = geom.vertical
     ? Math.floor(((y - strip.y) / strip.h) * count)
     : Math.floor(((x - strip.x) / strip.w) * count);

@@ -471,6 +471,18 @@ test('a click lands on the tab under it', () => {
   assert.equal(tabAtPoint(geom, 100, 80, 2), null, 'the page area is not the strip');
 });
 
+test('page buttons are centered in the strip and gaps do not switch pages', () => {
+  const tabs = control('TabContainer', 'TabContainer', { appearance: 'buttons', stripSize: 32 });
+  const geom = tabGeometry(1568, 276, tabs);
+  for (let i = 0; i < 4; i++) {
+    const r = tabRect(geom, i, 4);
+    assert.equal(r.y + r.h / 2, 16);
+    assert.equal(tabAtPoint(geom, r.x + r.w / 2, 16, 4), i);
+  }
+  assert.equal(tabAtPoint(geom, 392, 16, 4), null);
+  assert.equal(tabAtPoint(geom, 196, 2, 4), null);
+});
+
 test('the page is a bindable port AND a choice-typed host parameter with real labels', () => {
   // A footswitch changing the page is a real performance gesture. Exported as an anonymous float it
   // would reach a DAW as "0.37", which is not a page.

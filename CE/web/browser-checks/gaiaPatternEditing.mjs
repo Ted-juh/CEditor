@@ -23,7 +23,7 @@ try {
   const box = await grid.boundingBox();
   const values = () => page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues);
   const sends = () => page.evaluate(() => window.__gaia.feedbackSent().filter(e => e.name === 'setDeviceParameter'));
-  const button = async index => { await page.mouse.click(box.x + box.width - 68, box.y + 15 + index * 26); await page.waitForTimeout(100); };
+  const button = async index => { await page.mouse.click(box.x + box.width - 68, box.y + 13 + index * 22); await page.waitForTimeout(100); };
   const initial = await values();
   // Ruler now stages the complete pattern, including loop length.
   await page.mouse.click(box.x + 44 + 15.5 * (box.width - 184) / 32, box.y + 12);
@@ -42,7 +42,7 @@ try {
   const velocity=page.getByRole('textbox',{name:'Selected note velocity',exact:true});
   await velocity.fill('85'); await velocity.press('Enter');
   const beforeDrag = await values(), block=beforeDrag.arpPattern.find(b=>b.id===beforeDrag.__arpeggiator.selectedBlock);
-  const stepWidth=(box.width-184)/32, rowHeight=(box.height-56)/12;
+  const stepWidth=(box.width-184)/32, rowHeight=(box.height-52)/12;
   const x=box.x+44+(block.step+block.length/2)*stepWidth;
   const y=box.y+24+(beforeDrag.__arpeggiator.viewNote+11-block.note+0.5)*rowHeight;
   await page.mouse.move(x,y); await page.mouse.down();

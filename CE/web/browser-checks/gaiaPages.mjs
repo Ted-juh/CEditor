@@ -63,6 +63,10 @@ try {
   assert.ok(gridRect.y + gridRect.height <= background.y + background.height, 'grid and toolbar stay inside their background');
   assert.ok(Math.abs(output.y + output.height - lowerBounds.y - lowerBounds.height) < 1, 'output aligns with the lower pages');
   assert.ok(Math.abs(background.y + background.height - lowerBounds.y - lowerBounds.height) < 1, 'arpeggio background fills the page');
+  const feedback = await (await control('gaia_hardware_sync_status')).boundingBox();
+  assert.ok(feedback.x >= gridRect.x + gridRect.width - 132 && feedback.y > sendBounds.y + sendBounds.height, 'MIDI feedback sits below the side buttons');
+  assert.ok(gridRect.y - background.y <= 5, 'no text row above the grid');
+  for (const index of [0, 1, 3, 2]) await select('bottom_pages', index, 4);
   const undoBounds = await grid.getByText('UNDO', {exact:true}).boundingBox();
   assert.ok(Math.abs(undoBounds.x - sendBounds.x) < 1 && undoBounds.y < sendBounds.y, 'actions are stacked on the right');
   await page.mouse.click(gridRect.x + gridRect.width - 171, gridRect.y + gridRect.height - 13);

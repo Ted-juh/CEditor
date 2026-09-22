@@ -32,7 +32,7 @@ try {
   const box = await grid.boundingBox();
   const first = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.__arpeggiator.blocks[0]);
   await page.mouse.click(box.x + 44 + first.step * (box.width - 184) / 32 + 3,
-    box.y + 24 + (71 - first.note + 0.5) * (box.height - 56) / 12);
+    box.y + 24 + (71 - first.note + 0.5) * (box.height - 52) / 12);
   await length.waitFor();
   assert.equal(await length.isDisabled(), false);
   const before = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern);
