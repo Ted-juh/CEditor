@@ -144,6 +144,20 @@ test('no two captions overlap each other', () => {
   assert.deepEqual(collisions.slice(0, 8), [], `overlapping captions:\n  ${collisions.slice(0, 8).join('\n  ')}`);
 });
 
+test('tone selector captions clear the section titles and their selectors', () => {
+  for (const title of ['LFO', 'OSC', 'FILTER', 'MOD LFO']) {
+    for (const box of panel.controls.filter(c=>c._children.Core.name===`box_${title}`)) {
+      const b=box._children.Transform;
+      const captions=panel.controls.filter(c=>c._children.Core.controlType==='Label'
+        && ['SHAPE','WAVE','VARIATION','MODE','SLOPE'].includes(c._children.Text?.content)
+        && c._children.Transform.x>=b.x && c._children.Transform.x<b.x+b.width
+        && c._children.Transform.y>=b.y && c._children.Transform.y<b.y+b.height);
+      for(const caption of captions)assert.ok(caption._children.Transform.y>=b.y+24,
+        `${title} ${caption._children.Text.content} must clear the title band`);
+    }
+  }
+});
+
 test('every control renders', () => {
   const controls = JSON.parse(serializeGaiaPanel()).controls.map(expandControl);
   const failures = [];

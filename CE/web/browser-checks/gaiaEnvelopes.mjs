@@ -33,6 +33,11 @@ try{
   for(const tone of [1,2,3])for(const kind of ['osc.pitchEnv','filter.env','amp.env']){
     assert.equal(await(await ctl(`tone${tone}_${kind.replaceAll('.','_')}_graph`)).count(),0,'Fader is the default view');
     assert.ok(await(await ctl(`tone${tone}.${kind}AttackTime`)).isVisible());
+    const container=await ctl(`tone${tone}.${kind}.view`), labels=container.locator('svg.tabs').first().locator('text');
+    assert.equal(await labels.count(),1,'exactly one envelope view button is rendered');
+    assert.equal(await labels.textContent(),'Fader');
+    const frame=await container.boundingBox(), label=await labels.boundingBox();
+    assert.ok(Math.abs(label.x+label.width/2-(frame.x+frame.width-33))<1,'button is at the section right edge');
   }
   // Other controls overlap the transparent view container and must stay reachable.
   for(const mode of ['fader','graph']){
@@ -47,6 +52,7 @@ try{
   if(process.env.GAIA_PAGES_OUT){
     await mkdir(process.env.GAIA_PAGES_OUT,{recursive:true});
     await page.screenshot({path:join(process.env.GAIA_PAGES_OUT,'GAIA-envelope-faders.png'),clip:{x:0,y:0,width:1920,height:1000}});
+    await page.screenshot({path:join(process.env.GAIA_PAGES_OUT,'GAIA-tone-header-clearance.png'),clip:{x:120,y:12,width:1466,height:234}});
   }
   await view(1,'filter.env','graph');
   assert.ok(await(await ctl('tone1.osc.pitchEnvAttackTime')).isVisible(),'views switch independently');

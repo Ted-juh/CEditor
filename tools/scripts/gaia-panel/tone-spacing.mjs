@@ -50,7 +50,7 @@ export function refineToneSpacing(panel) {
         : rect(named(`tone${tone}.lfo.filterDepth`)).x + baseline.width / 2;
       Object.assign(rect(rate), { x: rateCenter - 17, y: b.y + 22, width: 34, height: 34 });
       placeCaption(box, 'RATE', { x: rateCenter - 30, y: b.y + 57, width: 60, height: 10 });
-      selector(`tone${tone}.${kind}.shape`, 86);
+      selector(`tone${tone}.${kind}.shape`, 78);
       const sync = named(`tone${tone}.${kind}.tempoSyncSwitch`), note = named(`tone${tone}.${kind}.tempoSyncNote`);
       Object.assign(rect(sync), { x: columnX, y: b.y + (mod ? 70 : 28), width: columnWidth, height: 18 });
       sync._children.Text._children.Font.size = mod ? 9 : 8;
@@ -64,10 +64,24 @@ export function refineToneSpacing(panel) {
         Object.assign(rect(named(`tone${tone}.lfo.keyTrigger`)), { x: columnX, y: b.y + 96, width: columnWidth, height: 18 });
       }
     }
-    selector(`tone${tone}.osc.wave`, 86);
+    selector(`tone${tone}.osc.wave`, 78);
     selector(`tone${tone}.osc.waveVariation`, 42);
     selector(`tone${tone}.filter.mode`, 72);
     selector(`tone${tone}.filter.slope`, 32);
+    // Captions belong below the 18px section title band, with breathing room.
+    // Keep the selectors clear of both their captions and the faders below.
+    for (const [title, labels] of [
+      ['LFO', [['SHAPE', 'lfo.shape']]],
+      ['OSC', [['WAVE', 'osc.wave'], ['VARIATION', 'osc.waveVariation']]],
+      ['FILTER', [['MODE', 'filter.mode'], ['SLOPE', 'filter.slope']]],
+      ['MOD LFO', [['SHAPE', 'modLfo.shape']]],
+    ]) {
+      const box = section(title, tone), top = rect(box).y;
+      for (const [text, name] of labels) {
+        placeCaption(box, text, { y: top + 24, height: 12 });
+        rect(named(`tone${tone}.${name}`)).y = top + 38;
+      }
+    }
   }
   function alignHeaders(controls) {
     for (const c of controls) {
