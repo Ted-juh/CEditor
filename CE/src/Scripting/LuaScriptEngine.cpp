@@ -2976,11 +2976,6 @@ public:
         }
     }
 
-    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink&) override
-    {
-        return runFilters (path, value);
-    }
-
     bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
     {
         auto& chain = inbound ? midiIn : midiOut;

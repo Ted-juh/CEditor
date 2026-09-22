@@ -3205,28 +3205,6 @@ public:
         return true;
     }
 
-    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override
-    {
-        if (! interpreterOk) return true;
-        g_host = host; g_engine = this;
-        for (auto& kv : namespaces)
-        {
-            PyObject* args = Py_BuildValue ("(sO)", path.toRawUTF8(), varToPy (value));
-            if (args == nullptr) { fetchPyError(); continue; }
-            PyObject* out = callPreludeRaw (kv.second, "__applyIntercepts", args, onError, "intercept:" + path);
-            Py_DECREF (args);
-            if (out == nullptr) continue;
-            auto decided = pyToVar (out);
-            Py_DECREF (out);
-            if (auto* o = decided.getDynamicObject())
-            {
-                if (o->hasProperty ("reject")) return false;
-                if (o->hasProperty ("value")) value = o->getProperty ("value");
-            }
-        }
-        return true;
-    }
-
     bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
                      const ScriptErrorSink& onError) override
     {

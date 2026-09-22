@@ -908,8 +908,8 @@ function randomStreamImpl(scriptId, name, fn) {
   try { fn(); } finally { streamOverride = previous; }
 }
 
-/** Drop every generator. Used when a panel is torn down, so a reload starts from the seed again. */
-export function resetRandomStreams() { randomStates.clear(); streamOverride = null; }
+/** Drop every generator. Used when a script set is torn down, so a reload starts from the seed. */
+function resetRandomStreams() { randomStates.clear(); streamOverride = null; }
 
 function randomImpl(scriptId, lo, hi) {
   const r = randomNext(scriptId);
@@ -7521,6 +7521,7 @@ function resetScriptState() {
   routedRole = null;
   stopAllTimers();
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
+  resetRandomStreams();
 }
 
 /** Call a loaded script's handler. Used by dispatch — reuses the cached load. */

@@ -2488,24 +2488,6 @@ public:
         return true;
     }
 
-    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override
-    {
-        for (auto& kv : engines)
-        {
-            juce::Result err = juce::Result::ok();
-            const juce::var args[] = { path, value };
-            auto out = kv.second->callFunction (juce::Identifier ("__applyIntercepts"),
-                                                juce::var::NativeFunctionArgs (juce::var(), args, 2), &err);
-            if (err.failed()) { onError ("intercept:" + path, err.getErrorMessage()); continue; }
-            if (auto* o = out.getDynamicObject())
-            {
-                if (o->hasProperty ("reject")) return false;
-                if (o->hasProperty ("value")) value = o->getProperty ("value");
-            }
-        }
-        return true;
-    }
-
     bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
                      const ScriptErrorSink& onError) override
     {

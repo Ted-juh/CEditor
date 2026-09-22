@@ -1318,12 +1318,6 @@ juce::var ScriptRuntime::matchDeviceDump (const juce::String& role, const juce::
     return {};
 }
 
-void ScriptRuntime::clearDeviceDefinitions()
-{
-    assertMessageThread();
-    deviceDeclarations.clear();
-}
-
 juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& args)
 {
     assertMessageThread();

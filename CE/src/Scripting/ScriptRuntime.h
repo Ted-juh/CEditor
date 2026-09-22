@@ -347,19 +347,6 @@ public:
         are compiled and cannot register a closure at runtime) has nothing to settle. */
     virtual void runReactive (const ScriptErrorSink& onError) { juce::ignoreUnused (onError); }
 
-    /** Run this engine's intercept() filters for `path`.
-
-        Returns false when a filter rejected the write outright; otherwise `value` carries whatever
-        the filters made of it — possibly unchanged. Engine-local, because `set` is bound inside the
-        engine and this has to sit between that binding and the host.
-
-        Default: accept unchanged. An engine with no filters must not be able to block a write. */
-    virtual bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError)
-    {
-        juce::ignoreUnused (path, value, onError);
-        return true;
-    }
-
     /** Call a defineAction()-registered action, if this engine has one by that name.
 
         Returns false when it has not, so the caller can go on looking in the other engines — an
@@ -543,8 +530,8 @@ public:
         to go out from a scripted write and from a bound control's write, and the same layout has to
         decode an arriving dump. One owner, one answer.
 
-        Declarations are script-lifetime — clearDeviceDefinitions() runs before every onPanelBuild,
-        which is what makes a build idempotent and what stops one leaking into the saved document.
+        Declarations are script-lifetime — loadScripts() clears them before loading a replacement
+        script set, which stops declarations from one panel leaking into the next.
 
         `spec` is the same shape the WebView runtime accepts (deviceDefinitions.js); the two are
         pinned against each other by CE/tests/ScriptRuntimeTests.cpp and deviceDefinitions.test.js. */
@@ -571,9 +558,6 @@ public:
         the caller leaves the message alone either way, which is what keeps a panel that never
         called defineDump behaving exactly as it did. */
     juce::var matchDeviceDump (const juce::String& role, const juce::var& bytes) const;
-
-    /** Drop every declaration. Called wherever generated controls are cleared, for the same reason. */
-    void clearDeviceDefinitions();
 
     /** run("target.action" [, args]) — call a named function defined by another script.
         `ref` is "owner.action" (the action on the script attached to `owner`) or a bare "action"

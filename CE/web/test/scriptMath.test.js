@@ -13,7 +13,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import {
+  resetScriptStateForTesting,
+  scriptApiForTesting,
+} from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 
@@ -740,6 +743,17 @@ test('the same seed still means the same sequence within a script', () => {
   const run1 = [a.random(), a.random(), a.random()];
   a.randomSeed(3);
   assert.deepEqual([a.random(), a.random(), a.random()], run1);
+});
+
+test('reloading a script set restarts its default random sequence', () => {
+  const before = scriptApiForTesting('', 'reload-seed');
+  before.randomSeed(0);
+  const first = before.random();
+  before.random();
+
+  resetScriptStateForTesting();
+  const after = scriptApiForTesting('', 'reload-seed');
+  assert.equal(after.random(), first);
 });
 
 test('a stream is independent of the script default, and of other streams', () => {

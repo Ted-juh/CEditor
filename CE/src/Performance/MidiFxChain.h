@@ -229,15 +229,6 @@ public:
         clearVoiceHistory();
     }
 
-    void forgetAll() noexcept
-    {
-        for (auto& channel : emitted)
-            for (auto& note : channel)
-                for (auto& slot : note)
-                    slot = 0;
-        clearVoiceHistory();
-    }
-
 private:
     static float responseAt (float input, MidiFxSettings::ResponseCurve curve,
                              const int* custom) noexcept

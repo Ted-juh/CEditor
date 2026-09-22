@@ -3,7 +3,6 @@ import {
   isJuceAvailable,
   loadAppSettings as bridgeLoadAppSettings,
   updateAppSettings as bridgeUpdateAppSettings,
-  importFonts as bridgeImportFonts,
   requestFileData,
   onFileData,
   onAppSettingsLoaded,
@@ -948,10 +947,6 @@ export function replaceDeviceSessionSettings(session) {
 
   setProjectDeviceSession(get(appSettings).deviceSession);
   persistSettings();
-}
-
-export function importLocalFonts() {
-  bridgeImportFonts();
 }
 
 export async function importLocalFontFiles(fileList) {
