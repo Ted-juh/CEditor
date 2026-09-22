@@ -261,8 +261,9 @@ void testExternalClock()
     juce::MidiBuffer clock;
     clock.addEvent (juce::MidiMessage::midiStart(), 0);
     transport.consumeExternalClock (clock, sampleRate);
-    transport.advance (blockSize, sampleRate);
-    check (transport.isPlaying(), "the master's start starts the slave");
+    auto startBlock = transport.advance (blockSize, sampleRate);
+    check (transport.isPlaying() && startBlock.justStarted,
+           "the master's start starts the slave and reports the edge");
 
     for (int i = 0; i < 48; ++i)
     {
@@ -278,8 +279,20 @@ void testExternalClock()
 
     check (std::abs (transport.getTempo() - 120.0) < 3.0,
            "tempo is derived from the interval between ticks");
-    check (transport.getPositionPpq() > 1.5,
-           "and the position follows the tick count rather than free-running");
+    check (std::abs (transport.getPositionPpq() - 2.0) < 1.0e-9,
+           "and the position advances exactly once per clock tick rather than also free-running");
+
+    juce::MidiBuffer stop;
+    stop.addEvent (juce::MidiMessage::midiStop(), 0);
+    transport.consumeExternalClock (stop, sampleRate);
+    const auto stopBlock = transport.advance (blockSize, sampleRate);
+    check (! stopBlock.playing && stopBlock.justStopped,
+           "the master's stop reports an edge so held notes can be released");
+
+    juce::MidiBuffer resume;
+    resume.addEvent (juce::MidiMessage::midiContinue(), 0);
+    transport.consumeExternalClock (resume, sampleRate);
+    transport.advance (blockSize, sampleRate);
 
     // Clock loss has a defined outcome: stop, and say so.
     for (int b = 0; b < 200; ++b)
@@ -287,8 +300,6 @@ void testExternalClock()
     check (! transport.isPlaying() && transport.hasLostExternalClock(),
            "a master that goes silent stops the slave and is reported, not guessed at");
 
-    juce::MidiBuffer stop;
-    stop.addEvent (juce::MidiMessage::midiStop(), 0);
     transport.setExternalClockEnabled (false);
     transport.consumeExternalClock (stop, sampleRate);
     check (! transport.hasLostExternalClock(),

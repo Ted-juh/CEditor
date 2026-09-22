@@ -319,8 +319,14 @@ public:
 
         // Under host sync the next block's start comes from the host, not from here: writing
         // an integrated position would fight the playhead and drift against it.
-        if (nowPlaying && ! followingHost)
+        if (nowPlaying && ! followingHost && ! externalClock.load())
             positionPpq.store (block.endPpq);
+
+        if (externalClock.load())
+        {
+            block.justStarted = block.justStarted || externalJustStarted.exchange (false);
+            block.justStopped = block.justStopped || externalJustStopped.exchange (false);
+        }
 
         return block;
     }
@@ -367,14 +373,19 @@ public:
             return;
 
         if (isStop)
-            playing.store (false);
+        {
+            if (playing.exchange (false))
+                externalJustStopped.store (true);
+        }
         if (isStart)
         {
             positionPpq.store (0.0);
-            playing.store (true);
+            if (! playing.exchange (true))
+                externalJustStarted.store (true);
         }
         if (isContinue)
-            playing.store (true);
+            if (! playing.exchange (true))
+                externalJustStarted.store (true);
     }
 
     /** Scans a block's MIDI for clock and transport bytes. Cheap, and only when slaved. */
@@ -446,6 +457,8 @@ private:
     std::atomic<bool> haveHostPosition { false };
     std::atomic<bool> hostPlaying { false };
     std::atomic<bool> hostJumped { false };
+    std::atomic<bool> externalJustStarted { false };
+    std::atomic<bool> externalJustStopped { false };
     std::atomic<bool> haveClock { false };
     std::atomic<bool> externalClockLost { false };
     std::atomic<juce::int64> clockSampleCounter { 0 };
