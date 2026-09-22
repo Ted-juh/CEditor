@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include "SonicAnalysisJob.h"
+#include "PluginSnapshotPath.h"
 
 static int runScan (const juce::String& modulePath);
 static int runAudition (const juce::File& jobFile);
@@ -105,11 +106,11 @@ static int runScan (const juce::String& modulePath)
                     {
                         const auto scale = (float) (double) shot.getProperty ("ScaleFactor", 1.0);
                         const auto relative = shot.getProperty ("Path", {}).toString();
-                        if (relative.isEmpty() || scale < best)
+                        const auto snapshot = ceditor::host::validatedVst3Snapshot (moduleFile, relative);
+                        if (snapshot == juce::File() || scale < best)
                             continue;
                         best = scale;
-                        bestPath = bundle.getChildFile ("Contents").getChildFile (relative)
-                                         .getFullPathName();
+                        bestPath = snapshot.getFullPathName();
                     }
                 if (className.isNotEmpty() && bestPath.isNotEmpty())
                     snapshotByClassName.set (className, bestPath);
@@ -137,7 +138,8 @@ static int runScan (const juce::String& modulePath)
             auto artwork = snapshotByClassName.contains (description->name)
                              ? snapshotByClassName[description->name]
                              : loneSnapshot;
-            if (artwork.isNotEmpty() && juce::File (artwork).existsAsFile())
+            if (artwork.isNotEmpty()
+                && juce::ImageFileFormat::loadFrom (juce::File (artwork)).isValid())
                 xml->setAttribute ("ceSnapshot", artwork);
 
             out.addChildElement (xml.release());

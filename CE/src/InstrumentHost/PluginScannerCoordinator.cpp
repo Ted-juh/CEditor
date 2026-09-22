@@ -1,4 +1,5 @@
 #include "PluginScannerCoordinator.h"
+#include "PluginSnapshotPath.h"
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -8,7 +9,8 @@ namespace ceditor::host
 
 namespace
 {
-    PluginClassRecord classFromPluginElement (const juce::XmlElement& e)
+    PluginClassRecord classFromPluginElement (const juce::XmlElement& e,
+                                              const juce::File& module)
     {
         PluginClassRecord c;
         c.ceId         = e.getStringAttribute ("ceId");
@@ -17,7 +19,8 @@ namespace
         c.version      = e.getStringAttribute ("version");
         c.category     = e.getStringAttribute ("category");
         c.isInstrument = e.getBoolAttribute ("isInstrument");
-        c.snapshotPath = e.getStringAttribute ("ceSnapshot");
+        c.snapshotPath = validatedVst3Snapshot (module, e.getStringAttribute ("ceSnapshot"))
+                             .getFullPathName();
         c.descriptionXml = e.toString (juce::XmlElement::TextFormat().singleLine());
         return c;
     }
@@ -129,7 +132,7 @@ PluginScannerCoordinator::JobResult PluginScannerCoordinator::runOneJob (const j
     job.status = JobStatus::ok;
     job.result.modulePath = modulePath;
     for (const auto* plugin : parsed->getChildWithTagNameIterator ("PLUGIN"))
-        job.result.classes.add (classFromPluginElement (*plugin));
+        job.result.classes.add (classFromPluginElement (*plugin, juce::File (modulePath)));
 
     return job;
 }

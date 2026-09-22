@@ -45,6 +45,19 @@ juce::String makeModule (const juce::String& name)
     return f.getFullPathName();
 }
 
+juce::String makeModuleWithSnapshot (const juce::String& name)
+{
+    const auto bundle = testRoot().getChildFile (name);
+    bundle.getChildFile ("Contents").getChildFile ("x86_64-win").createDirectory();
+    bundle.getChildFile ("Contents").getChildFile ("x86_64-win")
+          .getChildFile ("module.vst3").replaceWithText ("pretend module");
+    const auto snapshot = bundle.getChildFile ("Contents").getChildFile ("Resources")
+                                .getChildFile ("Snapshots").getChildFile ("synth.png");
+    snapshot.getParentDirectory().createDirectory();
+    snapshot.replaceWithText ("pretend PNG");
+    return bundle.getFullPathName();
+}
+
 PluginScannerCoordinator makeCoordinator (const juce::File& stub, int timeoutMs = 5000)
 {
     PluginScannerCoordinator::Options options;
@@ -60,7 +73,7 @@ void testJobOutcomes (const juce::File& stub)
 
     auto coordinator = makeCoordinator (stub, 1000);
 
-    const auto ok = coordinator.runOneJob (makeModule ("Fine.vst3"));
+    const auto ok = coordinator.runOneJob (makeModuleWithSnapshot ("Fine.vst3"));
     check (ok.status == Status::ok, "a clean worker run is ok");
     check (ok.result.classes.size() == 2, "and carries every exposed class");
     check (ok.result.classes[0].ceId == "VST3-stub-synth-1"
@@ -69,7 +82,9 @@ void testJobOutcomes (const juce::File& stub)
            "class records read identity, vendor and kind from the worker document");
     // Artwork is optional and per class, so both halves matter: the one that has it keeps it,
     // and the one that does not stays empty rather than borrowing its neighbour's picture.
-    check (ok.result.classes[0].snapshotPath.endsWith ("Snapshots/synth.png"),
+    check (ok.result.classes[0].snapshotPath.isNotEmpty()
+             && ok.result.classes[0].snapshotPath.replaceCharacter ('\\', '/')
+                    .endsWith ("Snapshots/synth.png"),
            "and the vendor's snapshot path when the worker found one");
     check (ok.result.classes[1].snapshotPath.isEmpty(),
            "a class the worker found no artwork for has none");

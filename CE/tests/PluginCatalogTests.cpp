@@ -14,6 +14,7 @@
 // PluginScannerCoordinatorTests.
 
 #include "InstrumentHost/PluginCatalog.h"
+#include "InstrumentHost/PluginSnapshotPath.h"
 #include <iostream>
 
 namespace
@@ -30,6 +31,7 @@ using ceditor::host::PluginCatalog;
 using ceditor::host::PluginClassRecord;
 using ceditor::host::ModuleScanResult;
 using ceditor::host::PluginSnapshotRegistry;
+using ceditor::host::validatedVst3Snapshot;
 
 juce::File makeTempDir (const juce::String& name)
 {
@@ -317,6 +319,39 @@ void testSnapshots()
     dir.deleteRecursively();
 }
 
+void testSnapshotPathsStayInsideTheBundle()
+{
+    std::cout << "\nVST3 snapshot path containment" << std::endl;
+
+    const auto dir = makeTempDir ("snapshot-paths");
+    const auto bundle = dir.getChildFile ("Vendor.vst3");
+    const auto snapshots = bundle.getChildFile ("Contents").getChildFile ("Resources")
+                                 .getChildFile ("Snapshots");
+    snapshots.createDirectory();
+    const auto valid = snapshots.getChildFile ("synth.png");
+    valid.replaceWithText ("fixture bytes");
+    const auto secret = dir.getChildFile ("secret.png");
+    secret.replaceWithText ("private");
+    const auto wrongType = snapshots.getChildFile ("notes.txt");
+    wrongType.replaceWithText ("not artwork");
+
+    check (validatedVst3Snapshot (bundle, "Resources/Snapshots/synth.png") == valid,
+           "a PNG in the bundle snapshot directory is accepted");
+    check (validatedVst3Snapshot (bundle, secret.getFullPathName()) == juce::File(),
+           "an absolute path outside the bundle is rejected");
+    check (validatedVst3Snapshot (bundle, "Resources/Snapshots/../../../../secret.png") == juce::File(),
+           "a traversal path outside the bundle is rejected");
+    check (validatedVst3Snapshot (bundle, "Resources/Snapshots/notes.txt") == juce::File(),
+           "a non-PNG file is rejected");
+
+    const auto link = snapshots.getChildFile ("linked.png");
+    if (secret.createSymbolicLink (link, false))
+        check (validatedVst3Snapshot (bundle, "Resources/Snapshots/linked.png") == juce::File(),
+               "a link that redirects outside the bundle is rejected");
+
+    dir.deleteRecursively();
+}
+
 void testArchitectureReading()
 {
     auto dir = makeTempDir ("architecture");
@@ -457,6 +492,7 @@ int main()
     testArchitectureReading();
     testArchitectureGating();
     testSnapshots();
+    testSnapshotPathsStayInsideTheBundle();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;
