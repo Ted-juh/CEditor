@@ -1818,14 +1818,18 @@ void InstrumentRackHost::connectAudioPair (juce::AudioProcessorGraph::Node* from
 
     if (ins >= 2)
     {
-        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } });
-        graph.addConnection ({ { from->nodeID, sourceRight },  { to->nodeID, 1 } });
+        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } },
+                             juce::AudioProcessorGraph::UpdateKind::none);
+        graph.addConnection ({ { from->nodeID, sourceRight },  { to->nodeID, 1 } },
+                             juce::AudioProcessorGraph::UpdateKind::none);
     }
     else
     {
-        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } });
+        graph.addConnection ({ { from->nodeID, firstChannel }, { to->nodeID, 0 } },
+                             juce::AudioProcessorGraph::UpdateKind::none);
         if (sourceRight != firstChannel)
-            graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 0 } });
+            graph.addConnection ({ { from->nodeID, sourceRight }, { to->nodeID, 0 } },
+                                 juce::AudioProcessorGraph::UpdateKind::none);
     }
 }
 
@@ -1838,8 +1842,10 @@ void InstrumentRackHost::connectAudioToOutputPair (juce::AudioProcessorGraph::No
     const auto outs = juce::jmax (1, from->getProcessor()->getTotalNumOutputChannels());
     const auto sourceRight = outs >= 2 ? 1 : 0;
 
-    graph.addConnection ({ { from->nodeID, 0 },           { audioOutNode->nodeID, first } });
-    graph.addConnection ({ { from->nodeID, sourceRight }, { audioOutNode->nodeID, first + 1 } });
+    graph.addConnection ({ { from->nodeID, 0 },           { audioOutNode->nodeID, first } },
+                         juce::AudioProcessorGraph::UpdateKind::none);
+    graph.addConnection ({ { from->nodeID, sourceRight }, { audioOutNode->nodeID, first + 1 } },
+                         juce::AudioProcessorGraph::UpdateKind::none);
 }
 
 void InstrumentRackHost::destroyAuxNodes (LivePart& lp)
@@ -1987,7 +1993,7 @@ void InstrumentRackHost::rewireAudio()
     // readable place instead of tracking edits wire by wire.
     for (const auto& connection : graph.getConnections())
         if (connection.source.channelIndex != midiChannel)
-            graph.removeConnection (connection);
+            graph.removeConnection (connection, juce::AudioProcessorGraph::UpdateKind::none);
 
     // Master chain first, because everything downstream of the parts needs its head: part
     // gains, extra outs and return tails all sum there (or at the output while it is empty).
@@ -2082,11 +2088,13 @@ void InstrumentRackHost::rewireAudio()
         // A source that is not live (its part gone mid-rebuild) or would loop falls back to
         // the keyboard, which is the only feed that is always there.
         graph.removeConnection ({ { engineNode->nodeID, midiChannel },
-                                  { lp.filterNode->nodeID, midiChannel } });
+                                  { lp.filterNode->nodeID, midiChannel } },
+                                juce::AudioProcessorGraph::UpdateKind::none);
         for (const auto& [otherId, other] : live)
             if (otherId != partId)
                 graph.removeConnection ({ { other.filterNode->nodeID, midiChannel },
-                                          { lp.filterNode->nodeID, midiChannel } });
+                                          { lp.filterNode->nodeID, midiChannel } },
+                                        juce::AudioProcessorGraph::UpdateKind::none);
 
         const LivePart* source = nullptr;
         if (part->midiSourcePartId.isNotEmpty()
@@ -2095,20 +2103,24 @@ void InstrumentRackHost::rewireAudio()
 
         if (source != nullptr && source->filterNode != nullptr)
             graph.addConnection ({ { source->filterNode->nodeID, midiChannel },
-                                   { lp.filterNode->nodeID, midiChannel } });
+                                   { lp.filterNode->nodeID, midiChannel } },
+                                 juce::AudioProcessorGraph::UpdateKind::none);
         else
             graph.addConnection ({ { engineNode->nodeID, midiChannel },
-                                   { lp.filterNode->nodeID, midiChannel } });
+                                   { lp.filterNode->nodeID, midiChannel } },
+                                 juce::AudioProcessorGraph::UpdateKind::none);
 
         if (part->hardware)
         {
             if (lp.midiSendNode != nullptr)
                 graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
-                                       { lp.midiSendNode->nodeID, midiChannel } });
+                                       { lp.midiSendNode->nodeID, midiChannel } },
+                                     juce::AudioProcessorGraph::UpdateKind::none);
         }
         else if (lp.instrumentNode != nullptr)
             graph.addConnection ({ { lp.filterNode->nodeID, midiChannel },
-                                   { lp.instrumentNode->nodeID, midiChannel } });
+                                   { lp.instrumentNode->nodeID, midiChannel } },
+                                 juce::AudioProcessorGraph::UpdateKind::none);
 
         juce::Array<juce::AudioProcessorGraph::Node*> inserts;
         for (const auto& slot : part->effects)
@@ -2207,6 +2219,8 @@ void InstrumentRackHost::rewireAudio()
     if (! masterNodes.isEmpty())
         connectAudio (masterNodes.getLast(), masterGainNode.get());
     connectAudioToOutputPair (masterGainNode.get(), 0);
+
+    graph.rebuild();
 }
 
 void InstrumentRackHost::applyPartToLive (const RackPart& part, LivePart& lp)

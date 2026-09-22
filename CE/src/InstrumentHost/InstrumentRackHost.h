@@ -15,8 +15,9 @@
 // THREADING CONTRACT. Every method here runs on one controlling thread (the message thread in
 // the app; the test's main thread). The audio thread only ever meets this class through the
 // graph's processBlock and the atomics inside the per-part processors. Topology edits use the
-// graph's default UpdateKind::sync, which rebuilds under the graph's own callback lock —
-// legal from the message thread while audio runs.
+// graph's callback lock. A complete rewire batches connection edits with UpdateKind::none and
+// publishes them with one synchronous rebuild, so the audio thread never sees its intermediate
+// topologies and a large rack does not rebuild once per wire.
 //
 // LOAD TRANSACTIONS (baseline §8.6.10). Instantiation is asynchronous and can be slow, so a
 // part hands out a generation ticket: beginLoad() invalidates every earlier ticket for that
