@@ -5,6 +5,17 @@ import { flatControls } from '../../../CE/web/src/CE_Application/utils/containme
 export const DISPLAY_HEIGHT = 160;
 export const SCREEN = 'gaia_status_screen';
 
+export function addInstrumentBranding(display) {
+  if (display.layouts.some(layout => layout.zones.some(zone => zone.id === 'instrument_brand'))) return;
+  display.rows += 1;
+  display.pixelHeight += 8;
+  for (const layout of display.layouts) {
+    for (const zone of layout.zones) zone.row += 1;
+    layout.zones.unshift({ id: 'instrument_brand', row: 1, colStart: 1, colEnd: display.cols,
+      show: 'static', text: 'ROLAND  GAIA  |  SYNTHESIZER SH-01', align: 'center' });
+  }
+}
+
 /** Reuse the lower tab area instead of reserving a separate display header. */
 export function moveStatusDisplayToBottom(panel) {
   const bottom = panel.controls.find(c => c._children.Core.name === 'bottom_pages');
@@ -133,6 +144,7 @@ export function applyStatusDisplay(panel, profile) {
       activeScope: controls.filter(c => c._children.DeviceBindings?.bindings?.length && c._children.Core.name !== 'arp_pattern_grid').map(c => c._children.Core.id),
     },
   });
+  addInstrumentBranding(screen._children.Display);
   if (!named(SCREEN)) {
     for (const c of panel.controls) {
       if (c._children.Core.name === 'plate') c._children.Transform.height += DISPLAY_HEIGHT;

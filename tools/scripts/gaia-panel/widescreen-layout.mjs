@@ -1,4 +1,5 @@
 import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
+import { addInstrumentBranding } from './status-display.mjs';
 
 // Three horizontal voices on the left, four permanently visible processors on
 // the right. This is document geometry, so 100% preview is exactly 1920 x 1000.
@@ -140,7 +141,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return removeToneFlowStrips(panel);
+  return compactPanelBranding(removeToneFlowStrips(panel));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -169,5 +170,34 @@ export function removeToneFlowStrips(panel) {
     }
   }
   panel.controls = panel.controls.filter(c => !removed.has(c));
+  return panel;
+}
+
+// Match the top rim to the bottom and give the recovered space to the lower
+// pages. Accept saved panels too, preserving their values and display state.
+export function compactPanelBranding(panel) {
+  const brandText = new Set(['Roland', 'GAIA', 'SYNTHESIZER  SH-01']);
+  const branding = panel.controls.filter(c => c._children.Core.controlType === 'Label'
+    && brandText.has(c._children.Text?.content) && c._children.Transform.y < 30);
+  if (!branding.length) return panel;
+  panel.controls = panel.controls.filter(c => !branding.includes(c));
+  const all = flatControls(panel.controls);
+  const named = name => all.find(c => c._children.Core.name === name);
+  const plate = named('plate')._children.Transform;
+  const recovered = plate.y - (panel.height - plate.y - plate.height);
+  for (const c of panel.controls) c._children.Transform.y -= recovered;
+  plate.height += recovered;
+  named('bottom_pages')._children.Transform.height += recovered;
+  named('box_EFFECTS / OUTPUT')._children.Transform.height += recovered;
+
+  const screen = named('gaia_status_screen');
+  screen._children.Transform.height += recovered;
+  named('gaia_display_help')._children.Transform.y += recovered;
+  addInstrumentBranding(screen._children.Display);
+  // The instrument name now lives on the matrix, so remove its separate label.
+  const children = named('bottom_pages')._children.Children._children;
+  for (const [id, c] of Object.entries(children)) {
+    if (c._children.Core.name === 'gaia_display_brand') delete children[id];
+  }
   return panel;
 }

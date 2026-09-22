@@ -17,7 +17,8 @@ test('dot-matrix uses four read-only menu pages and an idempotent layout migrati
     assert.equal(layout.zones.filter(z=>z.press).length,4);
     assert.ok(layout.zones.every(z=>z.show!=='edit' && (!z.press || Object.keys(z.press).join()==='layout')));
     const rows=composeLayout(layout.zones,d.rows,d.cols,()=>null);
-    assert.equal(rows.length,6); assert.ok(rows[5].includes(`[${layout.id}]`));
+    assert.equal(rows.length,7); assert.ok(rows[6].includes(`[${layout.id}]`));
+    assert.ok(rows[0].includes('ROLAND  GAIA  |  SYNTHESIZER SH-01'));
   }
   assert.ok(!d.activeScope.includes(controlNamed(p,'arp_pattern_grid')._children.Core.id));
   const before=JSON.stringify(p); applyStatusDisplay(p,profile); assert.equal(JSON.stringify(p),before);
