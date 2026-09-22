@@ -106,6 +106,8 @@ static int runScan (const juce::String& modulePath)
                     {
                         const auto scale = (float) (double) shot.getProperty ("ScaleFactor", 1.0);
                         const auto relative = shot.getProperty ("Path", {}).toString();
+                        if (! ceditor::host::isSafeVst3SnapshotRelativePath (relative))
+                            continue;
                         const auto snapshot = ceditor::host::validatedVst3Snapshot (moduleFile, relative);
                         if (snapshot == juce::File() || scale < best)
                             continue;
