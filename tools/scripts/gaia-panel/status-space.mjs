@@ -7,6 +7,7 @@ export function expandStatusDisplay(panel) {
   }
   const screen = Object.values(children).find(c => c._children.Core.name === 'gaia_status_screen');
   const display = screen._children.Display, previousCols = display.cols;
+  display.parameterEditor = true;
   Object.assign(screen._children.Transform, { x: 0, y: 0, width: pages._children.Transform.width,
     height: pages._children.Transform.height - pages._children.TabContainer.stripSize });
   if (display.cols === 112 && display.rows === 12) return panel;

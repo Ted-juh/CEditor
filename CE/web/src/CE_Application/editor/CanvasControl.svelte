@@ -14,6 +14,8 @@
   import ControlAnatomy from './ControlAnatomy.svelte';
   import { anatomyForm } from '../models/controlAnatomy.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
+  import ParameterStatusEditor from './ParameterStatusEditor.svelte';
+  import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
@@ -144,6 +146,7 @@
     sourceControl = documentControl,
     scale = 1,
     previewSessionOverride = null,
+    previewParameterEditor = null,
     resolvedControlOverride = null,
     interactionRuntimeOverride = null,
     renderIdNamespace = '',
@@ -3337,7 +3340,11 @@
     {/if}
 
     {#if isLcdDisplay}
+      {#if renderControl?._children?.Display?.parameterEditor}
+      <ParameterStatusEditor model={previewParameterEditor ?? parameterStatusDesignModel(allControls)} control={renderControl} {allControls} width={displayW} height={displayH} />
+      {:else}
       <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
+      {/if}
     {/if}
 
     {#if isMeter && !hasAnatomy}

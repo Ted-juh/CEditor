@@ -1,5 +1,6 @@
 <script>
   import { openDialog } from '../stores/scriptUi.js';
+  import { parameterGroup, parameterAccent, parameterFeedback } from '../utils/parameterStatus.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
@@ -1250,9 +1251,79 @@
   // The control most recently clicked / dragged / changed — resolves the
   // reserved "@active" zone source so a zone can follow whatever is touched.
   let lcdActiveId = $state('');
+  let parameterRecent = $state([]);
+  let parameterFocus = $state('');
+  let parameterEditorUi = $state({ info: false, pinned: false, pinnedId: '' });
   // Per-control last-activity time (press or change), for scoped @active. Plain
   // object: reads happen at render, driven reactive by lcdActiveId changing.
   const lcdActiveAt = {};
+
+  function rememberParameter(id, focus = true) {
+    if (!parameterItem(id)) return;
+    if (focus) parameterFocus = id;
+    parameterRecent = [id, ...parameterRecent.filter(other => other !== id)].slice(0, 6);
+  }
+  function parameterItem(id) {
+    const src = controlById(id), s = src?._children;
+    const binding = s?.DeviceBindings?.bindings?.find(b => b.kind === 'deviceParameter');
+    if (!binding || ['trigger', 'text', 'pageIndex'].includes(binding.port) || s.Designer?.arpeggiator?.enabled) return null;
+    const meta = s.Designer?.lcdReadout ?? {}, info = lcdSourceInfo(src);
+    const channel = s.ValueChannels?._children?.[binding.port];
+    const behavior = getBehavior(src), session = sessionFor(src);
+    let value, min = 0, max = 127, step = 1, choices = [];
+    if (channel && channel.type !== 'array') {
+      value = customSessionValues(src)[binding.port]; min = Number(channel.min ?? 0); max = Number(channel.max ?? 127);
+      step = Number(channel.step ?? 1);
+      choices = (meta.choices ?? []).map(c => ({ value: c.value, label: c.label }));
+      if (channel.type === 'bool' && !choices.length) choices = [{ value: false, label: 'Off' }, { value: true, label: 'On' }];
+    } else if (binding.port === 'state') {
+      value = session?.checked ?? behavior.defaultValue ?? false;
+      choices = [{ value: false, label: 'Off' }, { value: true, label: 'On' }];
+    } else if (isComboboxControl(src)) {
+      value = currentComboboxValue(src);
+      choices = getValueRows(src).filter(r => r.enabled !== false).map(r => ({ value: rowValue(r), label: r.displayText }));
+    } else if (isRangeBehavior(behavior)) {
+      value = currentRangeValue(src); min = getRangeMin(behavior); max = getRangeMax(behavior);
+      step = Number(behavior.step ?? 1);
+    } else return null;
+    const wireName = binding.parameterId;
+    const title = String(meta.label ?? wireName).replace(/^TONE \d+\s*\/\s*/i, '');
+    return { id, parameterId: wireName, title, value, min, max, step: step > 0 ? step : 1, choices,
+      displayValue: info?.text || String(info?.value ?? value), displayMin: info?.min ?? min, displayMax: info?.max ?? max,
+      displayNumber: info?.value ?? Number(value), group: parameterGroup(wireName), accent: parameterAccent(wireName),
+      disabled: isDisabled(src) || isReadOnly(src), feedback: parameterFeedback(binding, value, $deviceSyncFeedback) };
+  }
+  function writeParameter(id, requested, dragging = false) {
+    const item = parameterItem(id), src = controlById(id);
+    if (!item || item.disabled) return;
+    const s = src._children, binding = s.DeviceBindings.bindings.find(b => b.kind === 'deviceParameter');
+    let value;
+    if (item.choices.length) {
+      const choice = item.choices.find(c => String(c.value) === String(requested));
+      if (!choice) return;
+      value = choice.value;
+    } else {
+      const n = Number(requested); if (!Number.isFinite(n)) return;
+      value = Math.max(item.min, Math.min(item.max, item.min + Math.round((n - item.min) / item.step) * item.step));
+    }
+    rememberParameter(id, false);
+    if (String(value) === String(item.value) && sessionFor(src)?.dragging !== true) return;
+    if (s.ValueChannels?._children?.[binding.port]) {
+      patchControlSession(id, { customValues: { [binding.port]: value }, valueOverrideEnabled: true, valueOverride: value, dragging });
+    } else if (binding.port === 'state') patchControlSession(id, { checked: !!value, dragging });
+    else patchControlSession(id, { valueOverrideEnabled: true, valueOverride: value, dragging });
+  }
+  function parameterEditorModel(control) {
+    if (!control?._children?.Display?.parameterEditor) return null;
+    const scope = control._children.Display.activeScope ?? [];
+    const items = scope.map(parameterItem).filter(Boolean);
+    const fallback = items.find(i => i.parameterId === 'tone1.filter.cutoff')?.id ?? items[0]?.id;
+    const graphs = allControls.filter(c => linkedEnvelopeConfig(c)).map(c => ({ id: getControlId(c),
+      sources: Object.values(linkedEnvelopeConfig(c)).map(link => link.controlId), points: envWorkingPoints(c) }));
+    return { items, activeId: items.some(i => i.id === parameterFocus) ? parameterFocus : fallback,
+      recent: parameterRecent, graphs, select: rememberParameter, write: writeParameter,
+      ui: parameterEditorUi, updateUi: patch => { parameterEditorUi = { ...parameterEditorUi, ...patch }; } };
+  }
 
   // Resolve "@active" for a display: the most recently active control, optionally
   // restricted to a scope (list of Core.ids). Empty scope = any control.
@@ -1613,6 +1684,7 @@
     patchControlSession(link.controlId, { customValues: { [link.channel]: next },
       valueOverrideEnabled: true, valueOverride: next, dragging });
     lcdActiveAt[link.controlId] = Date.now(); lcdActiveId = link.controlId;
+    rememberParameter(link.controlId);
     return true;
   }
   function finishLinkedEnvDrag(control, cancelled = false) {
@@ -6795,6 +6867,7 @@
 
   function handleRangeFieldFocus(control, event) {
     event.stopPropagation();
+    rememberParameter(getControlId(control));
     beginRangeFieldEdit(control);
   }
 
@@ -7637,6 +7710,7 @@
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
       lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId;
+      rememberParameter(pointerActiveControlId);
     }
     // A SOFT KEY IS RESOLVED FIRST, and the order is the decision. A press and an edit are both
     // clicks on the same screen, and a zone that declares an action is the more specific intent:
@@ -8095,6 +8169,7 @@
   }
 
   function handleFocus(control) {
+    rememberParameter(getControlId(control));
     if (isDisabled(control)) return;
     if (lastInputMode !== 'keyboard') return;
 
@@ -8142,6 +8217,7 @@
   }
 
   function handleKeyDown(control, event) {
+    rememberParameter(getControlId(control));
     // A nested selector owns its keys. Letting them reach the container can
     // focus/activate the parent and close the child's dropdown immediately.
     const keyOwner = event.target?.closest?.('.canvas-control');
@@ -8405,6 +8481,7 @@
       resolvedControlOverride: resolvedPreview?.control ?? control,
       interactionRuntimeOverride: resolvedPreview?.runtime ?? null,
       previewSessionOverride: session,
+      previewParameterEditor: parameterEditorModel(control),
       renderIdNamespace: previewRenderIdNamespace,
       previewRole: previewRoleFor(control),
       previewTabIndex: previewTabIndexFor(control),

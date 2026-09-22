@@ -28,6 +28,7 @@ try {
   await selectLower(0);
   await page.waitForTimeout(150);
   const screen=await ctl('gaia_status_screen');
+  await screen.getByRole('button',{name:'INFO',exact:true}).click();
   const text=()=>screen.locator('canvas.lcd-graphic').getAttribute('aria-label');
   async function has(t){for(let i=0;i<50;i++){if((await text()).includes(t))return;await page.waitForTimeout(100);}assert.fail(`Expected ${t}: ${await text()}`);}
   const b=await screen.boundingBox();

@@ -186799,7 +186799,8 @@
                     "gaia_system_writeProtectH6_800",
                     "gaia_system_writeProtectH7_801",
                     "gaia_system_writeProtectH8_802"
-                  ]
+                  ],
+                  "parameterEditor": true
                 }
               },
               "_type": "Control"
