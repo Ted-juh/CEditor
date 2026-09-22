@@ -140,6 +140,19 @@ test('the header defines the raw-MIDI funnel in every configuration that calls i
   }
 });
 
+test('arming a restore seeds the automation cache before policy resolution', () => {
+  const arm = /void armRestorePush\(\)[\s\S]*?\n\s*}/.exec(SOURCE)?.[0] ?? '';
+  assert.match(arm, /lastSentMidi\.clear\(\)/);
+  assert.match(arm, /lastSentMidi\[desc\.id\]\s*=\s*raw->load\(\)/,
+    'an empty cache would make the first timer tick bypass Never and Ask by sending every value');
+});
+
+test('native script timers stand down while the WebView runtime is open', () => {
+  const timerCallback = /scriptTimers\.setFireCallback[\s\S]*?dispatchEvent \("onTimer"/.exec(SOURCE)?.[0] ?? '';
+  assert.match(timerCallback, /getActiveEditor\(\)\s*!=\s*nullptr/,
+    'the native and WebView runtimes would both fire the same timer handler');
+});
+
 test('every member function called is defined, in all four flag combinations', () => {
   // The general form. What was wrong was not a behaviour but which #if a function sat in, and this
   // is the compiler's own first question asked where the compiler cannot be run.

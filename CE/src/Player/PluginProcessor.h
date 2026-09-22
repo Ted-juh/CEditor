@@ -621,6 +621,13 @@ private:
     /** Called from setStateInformation. Never sends — see the comment there for why. */
     void armRestorePush()
     {
+        // Treat the restored snapshot as the baseline until the restore policy decides what may
+        // be sent. Otherwise the ordinary automation loop sees an empty cache on its first tick
+        // and pushes every parameter even when the policy is Never or still waiting for an answer.
+        lastSentMidi.clear();
+        for (const auto& desc : panelParams)
+            if (auto* raw = apvts.getRawParameterValue (desc.id))
+                lastSentMidi[desc.id] = raw->load();
         restorePending = true;
         restorePromptSent = false;
         restoreArmedAtMs = juce::Time::getMillisecondCounterHiRes();
@@ -2018,7 +2025,9 @@ private:
         // Fire onTimer({ id }) on the message thread when a script timer elapses.
         scriptTimers.setFireCallback ([this] (const juce::String& id)
         {
-            if (scriptRuntime == nullptr) return;
+            // The WebView owns script execution while the editor is open. Dispatching the native
+            // timer too would run the same handler twice and can send duplicate MIDI notes.
+            if (scriptRuntime == nullptr || getActiveEditor() != nullptr) return;
             auto* info = new juce::DynamicObject();
             info->setProperty ("id", id);
             scriptRuntime->dispatchEvent ("onTimer", "", juce::var (info));

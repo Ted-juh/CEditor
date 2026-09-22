@@ -62,7 +62,10 @@ public:
     juce::var compilePresetRecallAction (const juce::var& payload, bool appendToMonitor);
 
     /** The engine backing a role, for a caller that needs to read the profile rather than send. */
-    DeviceProfileEngine* engineForRole (const juce::String& deviceRole) { return resolveEngine ({}, deviceRole); }
+    DeviceProfileEngine* engineForRole (const juce::String& deviceRole)
+    {
+        return resolveEngine ({}, deviceRole.isNotEmpty() ? deviceRole : juce::String ("mainSynth"));
+    }
     juce::var ingestIncomingMidiMessage (const juce::var& payload);
     juce::var startMidiCiDiscovery (const juce::var& payload);
     juce::var setMidiCiProfile (const juce::var& payload);

@@ -1119,6 +1119,12 @@ int runProfileCacheTests()
     mapping->setProperty ("midiDestination", juce::var (destination));
     service.setDeviceRoleMapping (juce::var (mapping));
 
+    if (service.engineForRole ({}) == nullptr)
+    {
+        std::cerr << "[FAIL] DeviceProfileService :: an omitted role did not resolve mainSynth\n";
+        return 1;
+    }
+
     constexpr int messageCount = 50;
     auto start = juce::Time::getMillisecondCounterHiRes();
     for (int index = 0; index < messageCount; ++index)
