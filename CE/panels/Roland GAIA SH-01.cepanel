@@ -50052,6 +50052,7 @@
       "_children": {
         "Core": {
           "name": "label",
+          "visible": false,
           "id": "gaia_lbl_386",
           "controlType": "Label"
         },
@@ -100048,6 +100049,7 @@
       "_children": {
         "Core": {
           "name": "label",
+          "visible": false,
           "id": "gaia_lbl_493",
           "controlType": "Label"
         },
@@ -150044,6 +150046,7 @@
       "_children": {
         "Core": {
           "name": "label",
+          "visible": false,
           "id": "gaia_lbl_600",
           "controlType": "Label"
         },

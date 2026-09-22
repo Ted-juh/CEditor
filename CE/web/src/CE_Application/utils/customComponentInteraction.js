@@ -375,6 +375,9 @@ function payloadNormalized(payload, keys = ['normalized', 'valueNormalized', 'ce
 }
 
 function payloadRawValue(channel, payload) {
+  // Older panels (including GAIA LED selectors) store the choice as a scalar.
+  // Zero and false are real choices, not an absent payload.
+  if (['number', 'string', 'boolean'].includes(typeof payload)) return payload;
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   if (type === 'int') {
     if (payload?.value !== undefined) return payload.value;
@@ -466,7 +469,7 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
       );
       nextValues[channelName] = items;
     }
-  } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
+  } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload != null) {
     applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
   } else if (['dragvalue', 'setvalue', 'slider', 'dial', 'ring'].includes(action) || ['slider', 'dial', 'ring', 'xy-pad'].includes(String(behaviorModule?.type ?? '').trim().toLowerCase())) {
     const normalized = hitZone?.payload?.normalized ?? hitZone?.probeNormalized ?? 0.75;
@@ -930,7 +933,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
       nextValue = items;
       normalized = itemNormalized;
     }
-  } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
+  } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload != null) {
     const result = applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
     nextValue = result?.value ?? nextValue;
     normalized = result?.normalized ?? normalized;

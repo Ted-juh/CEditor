@@ -59,7 +59,11 @@ export function refineToneSpacing(panel) {
       placeCaption(box, 'NOTE', { x: columnX, y: b.y + (mod ? 89 : 57), width: columnWidth, height: 10 });
       if (mod) {
         const tempo = caption(box, 'TEMPO');
-        if (tempo) tempo._children.Text.content = '';
+        if (tempo) {
+          tempo._children.Text.content = '';
+          // The old caption's transparent box otherwise covers the lower shape choices.
+          tempo._children.Core.visible = false;
+        }
       } else {
         Object.assign(rect(named(`tone${tone}.lfo.keyTrigger`)), { x: columnX, y: b.y + 96, width: columnWidth, height: 18 });
       }

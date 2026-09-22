@@ -1,6 +1,7 @@
 <script>
   import { openDialog } from '../stores/scriptUi.js';
   import { parameterGroup, parameterAccent, parameterFeedback } from '../utils/parameterStatus.js';
+  import { rangeResetValue } from '../utils/rangeReset.js';
   import { keyedStoreView } from '../utils/keyedStoreView.js';
   import { onDestroy, setContext, untrack } from 'svelte';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
@@ -443,6 +444,8 @@
   // Transient interaction-event tracking (onDoubleClick timing, onPointerMove throttle).
   let lastPointerDownAt = 0;
   let lastPointerDownId = '';
+  let lastPointerDownPosition = { x: 0, y: 0 };
+  let lastPointerMoved = false;
   let lastPointerMoveDispatchAt = 0;
   let pointerStartValue = $state(0);
   let rangeScrub = null;
@@ -6325,7 +6328,9 @@
     }
 
     const port = String(binding?.port ?? 'value');
-    if (port !== 'value' && control?._children?.ValueChannels?._children?.[port]) return patch.customValues?.[port];
+    // A custom channel named "value" is still a channel. Its native range
+    // override may be stale (selectors don't use it), so read the channel first.
+    if (control?._children?.ValueChannels?._children?.[port]) return patch.customValues?.[port];
     if (['pageIndex', 'scrollX', 'scrollY'].includes(port)) return patch[port];
     if (port === 'trigger') {
       if (String(binding?.parameterType ?? '') === 'momentary') {
@@ -7598,6 +7603,37 @@
     });
   }
 
+  function resetRangeOnDoubleClick(control, event) {
+    const id = getControlId(control);
+    if (isCustomComponent(control)) {
+      const rect = event.currentTarget?.getBoundingClientRect?.();
+      const hit = resolveCustomHitZoneAtPoint(resolvedPreviewFor(control)?.control ?? control,
+        rect, event.clientX, event.clientY, customSessionValues(control));
+      const behavior = getCustomBehaviors(control)[hit?.zone?.targetBehavior];
+      if (!['slider', 'knob', 'dial', 'ring'].includes(String(behavior?.role ?? behavior?.type).toLowerCase())) return false;
+      const channelName = hit?.zone?.targetValueChannel ?? behavior.valueChannel;
+      const channel = getCustomValueChannels(control)[channelName];
+      if (!channel || !['float', 'int'].includes(channel.type)) return false;
+      const meta = control._children.Designer?.lcdReadout ?? {};
+      const value = snapCustomChannelValue(channel, rangeResetValue(channel,
+        !meta.channel || meta.channel === channelName ? meta : {}));
+      patchControlSession(id, { customValues: { [channelName]: value },
+        valueOverrideEnabled: true, valueOverride: value, dragging: false, pressed: false });
+    } else if (isRangeControl(control) && !isTwoValueSpinner(control)) {
+      const behavior = getBehavior(control);
+      const role = isSliderControl(control) ? currentSliderActiveHandle(control) : 'current';
+      const defaultValue = role === 'start' ? behavior.defaultStartValue
+        : role === 'end' ? behavior.defaultEndValue : behavior.defaultCurrentValue ?? behavior.defaultValue;
+      const value = rangeResetValue({ ...behavior, defaultValue }, control._children.Designer?.lcdReadout);
+      if (isSliderControl(control)) setSliderRoleValue(control, role, value, { dragging: false, pressed: false });
+      else patchControlSession(id, { valueOverrideEnabled: true,
+        valueOverride: snapRangeValue(behavior, value), dragging: false, pressed: false });
+    } else return false;
+    lcdActiveAt[id] = Date.now(); lcdActiveId = id; rememberParameter(id);
+    inspectPreviewControl(id);
+    return true;
+  }
+
   function handlePointerDown(control, event) {
     if (event.button !== 0) return;
     if (isDisabled(control)) return;
@@ -7610,10 +7646,20 @@
     const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
+      if (!lastPointerMoved && Math.hypot(event.clientX - lastPointerDownPosition.x,
+        event.clientY - lastPointerDownPosition.y) <= 5 && resetRangeOnDoubleClick(control, event)) {
+        event.preventDefault(); event.stopPropagation();
+        event.currentTarget?.focus?.({ preventScroll: true });
+        lastPointerDownId = ''; lastPointerDownAt = 0;
+        // Do not start another drag: its release would overwrite the reset.
+        return;
+      }
     }
     listboxDoubleTap = isDoubleTap && isListboxControl(control);
     lastPointerDownId = downId;
     lastPointerDownAt = downAt;
+    lastPointerDownPosition = { x: event.clientX, y: event.clientY };
+    lastPointerMoved = false;
     const pointerDownLocal = controlLocalPoint(event);
 
     if (control?._children?.Core?.controlType === 'TabContainer') {
@@ -7876,6 +7922,8 @@
   }
 
   function handleWindowPointerMove(event) {
+    if (pointerActiveControlId && Math.hypot(event.clientX - lastPointerDownPosition.x,
+      event.clientY - lastPointerDownPosition.y) > 5) lastPointerMoved = true;
     if (!pointerActiveControlId) return;
     event.preventDefault?.();
     event.stopPropagation?.();
