@@ -1286,6 +1286,8 @@ private:
     /** Persists Hostage-only metadata using the already-captured plug-in blobs. Use for
         changes such as focus and MIDI zones that must never call into every VST. */
     void savePerformanceModel();
+    /** Atomically writes one session document and reports a run of failures once. */
+    bool writePerformanceDocument (const juce::var& document);
     /** Keeps previous manifest revisions beside the session file: before an overwrite, the
         current file is copied into the revisions directory when the newest copy there is
         older than the snapshot interval, and the directory is pruned to a fixed count. A
@@ -1799,6 +1801,7 @@ private:
     std::shared_ptr<std::atomic<bool>> alive { std::make_shared<std::atomic<bool>> (true) };
     std::atomic<juce::uint64> performanceSaveGeneration { 0 };
     std::atomic<bool> performanceSavePending { false };
+    bool performanceWriteErrorReported = false;
 
     std::thread scanThread;
     std::thread libraryScanThread;

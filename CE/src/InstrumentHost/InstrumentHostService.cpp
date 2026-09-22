@@ -1,5 +1,6 @@
 #include "InstrumentHostService.h"
 
+#include "AtomicFileWrite.h"
 #include "PatchDiff.h"
 #include "VendorPresetDiscovery.h"
 #include "SonicProbe.h"
@@ -18528,8 +18529,7 @@ void InstrumentHostService::savePerformance()
     if (! options.persistSession)
         return;
 
-    maybeSnapshotRevision();
-    performanceFile().replaceWithText (juce::JSON::toString (rack.captureState().toVar()));
+    writePerformanceDocument (rack.captureState().toVar());
 }
 
 void InstrumentHostService::schedulePerformanceSave()
@@ -18554,8 +18554,27 @@ void InstrumentHostService::savePerformanceModel()
     if (! options.persistSession)
         return;
 
+    writePerformanceDocument (rack.getPerformance().toVar());
+}
+
+bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
+{
     maybeSnapshotRevision();
-    performanceFile().replaceWithText (juce::JSON::toString (rack.getPerformance().toVar()));
+
+    if (writeTextAtomically (performanceFile(), juce::JSON::toString (document)))
+    {
+        performanceWriteErrorReported = false;
+        return true;
+    }
+
+    if (! performanceWriteErrorReported)
+    {
+        performanceWriteErrorReported = true;
+        emitError ("Could not save the current session to \""
+                   + performanceFile().getFullPathName()
+                   + "\". The previous complete session file was left untouched.");
+    }
+    return false;
 }
 
 void InstrumentHostService::maybeSnapshotRevision()

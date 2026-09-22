@@ -547,6 +547,33 @@ void testCommandFlow()
            "an unknown command is refused aloud");
 }
 
+void testSessionWriteFailureIsReportedAndNonDestructive()
+{
+    std::cout << "\nsession write failure is reported and non-destructive" << std::endl;
+
+    const auto dir = freshDataDir ("session-write-failure");
+    const auto blocked = dir.getChildFile ("session-performance.json");
+    blocked.createDirectory();
+    blocked.getChildFile ("last-good-session.txt").replaceWithText ("still here");
+
+    Harness h (dir);
+    h.cmd ("getState");
+    h.emits.clear();
+    h.cmd ("addPart");
+
+    check (h.emits.lastError().contains ("Could not save the current session"),
+           "a session write failure is reported to the UI");
+    check (blocked.getChildFile ("last-good-session.txt").loadFileAsString() == "still here",
+           "the failed replacement leaves the previous path untouched");
+
+    const auto errorsAfterFirstFailure = h.emits.count ("instrumentHostError");
+    h.cmd ("addPart");
+    check (h.emits.count ("instrumentHostError") == errorsAfterFirstFailure,
+           "a continuing write failure is reported once rather than on every edit");
+
+    dir.deleteRecursively();
+}
+
 void testStageLock()
 {
     std::cout << "\nstage lock" << std::endl;
@@ -12035,6 +12062,7 @@ int main (int argc, char* argv[])
     std::cout << "InstrumentHostService tests" << std::endl;
 
     testCommandFlow();
+    testSessionWriteFailureIsReportedAndNonDestructive();
     testMixerMeterEvents();
     testStageLock();
     testFirstClickAndTheOnScreenKeyboard();
