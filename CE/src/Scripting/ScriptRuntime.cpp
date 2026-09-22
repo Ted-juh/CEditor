@@ -729,6 +729,7 @@ void ScriptRuntime::onPanelLoad()
 {
     assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelLoad") dispatchTo (s, "onPanelLoad", juce::var());
+    if (activityCallback) activityCallback();
 }
 
 void ScriptRuntime::onPanelReady (bool firstTime)
@@ -738,12 +739,14 @@ void ScriptRuntime::onPanelReady (bool firstTime)
     o->setProperty ("firstTime", firstTime);
     const juce::var info (o);
     for (auto& s : scripts) if (s.event == "onPanelReady") dispatchTo (s, "onPanelReady", info);
+    if (activityCallback) activityCallback();
 }
 
 void ScriptRuntime::onPanelClose()
 {
     assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelClose") dispatchTo (s, "onPanelClose", juce::var());
+    if (activityCallback) activityCallback();
 }
 
 void ScriptRuntime::onPanelDestroy()
@@ -757,6 +760,7 @@ void ScriptRuntime::onPanelDestroy()
     // way (log + onError) and the teardown carries on — a failing teardown handler must not be
     // able to keep the old script set alive.
     for (auto& s : scripts) if (s.event == "onPanelDestroy") dispatchTo (s, "onPanelDestroy", juce::var());
+    if (activityCallback) activityCallback();
 }
 
 void ScriptRuntime::onDawSaveState (juce::var& store)
@@ -784,6 +788,7 @@ void ScriptRuntime::onDawRestoreState (const juce::var& store)
 {
     assertMessageThread();
     for (auto& s : scripts) if (s.event == "onDawRestoreState") dispatchTo (s, "onDawRestoreState", store);
+    if (activityCallback) activityCallback();
 }
 
 // --- Events / phase 3 --------------------------------------------------------------------------
@@ -833,6 +838,7 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
         if (js)     js->runReactive (onError);
         if (python) python->runReactive (onError);
         if (native) native->runReactive (onError);
+        if (activityCallback) activityCallback();
     }
 }
 
@@ -842,7 +848,11 @@ bool ScriptRuntime::filterMidi (bool inbound, juce::var& bytes)
     const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
     for (auto* eng : { lua.get(), js.get(), python.get(), native.get() })
         if (eng != nullptr && ! eng->applyMidiFilter (inbound, bytes, onError))
+        {
+            if (activityCallback) activityCallback();
             return false;                       // the first swallow wins; nothing downstream runs
+        }
+    if (activityCallback) activityCallback();
     return true;
 }
 

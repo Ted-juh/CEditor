@@ -413,6 +413,10 @@ public:
     /** Where caught errors go (editor console / log file). */
     void setErrorLogger (std::function<void (const juce::String&)> logger) { errorLogger = std::move (logger); }
 
+    /** Called after a top-level script event has completely settled. Hosts can use this to
+        refresh thread-safe snapshots without reaching into an engine from another thread. */
+    void setActivityCallback (std::function<void()> callback) { activityCallback = std::move (callback); }
+
     /** Replace the loaded scripts from a JSON array of ScriptDefinitions (from the panel's Scripts
         sections). Re-installs the API and reloads every enabled script. */
     void loadScripts (const juce::var& scriptArray);
@@ -619,6 +623,7 @@ private:
     std::vector<ScriptDefinition> scripts;
     std::vector<FailedScript> failed;
     std::function<void (const juce::String&)> errorLogger;
+    std::function<void()> activityCallback;
     juce::StringArray enabledModuleIds;   // empty = the panel declared nothing = every module on
     juce::var extensionModules;           // ce.ext.* copies the panel carries (void = none)
 

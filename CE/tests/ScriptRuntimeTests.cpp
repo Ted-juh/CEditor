@@ -306,6 +306,8 @@ int main()
     juce::StringArray errors;
     runtime.setErrorLogger ([&errors] (const juce::String& line)
         { errors.add (line); std::cout << "  [error] " << line << "\n"; });
+    int activityCount = 0;
+    runtime.setActivityCallback ([&activityCount] { ++activityCount; });
 
     juce::Array<juce::var> scripts;
     scripts.add (makeScript ("lua1", "lua", "panel", "onValueChanged", "*",
@@ -327,6 +329,7 @@ int main()
 
     // 1) event dispatch -> both Lua and JS handlers fire on the same event
     runtime.dispatchEvent ("onValueChanged", "panel", juce::var (64));
+    check (activityCount == 1, "Activity callback runs once after a top-level event settles");
 
     const double cutoff = (double) host.values["cutoff.value"];
     check (cutoff > 50.0 && cutoff < 51.0, "Lua ran: set(cutoff.value) via scale() => ~50.4 (got " + juce::String (cutoff) + ")");
@@ -336,6 +339,7 @@ int main()
 
     // 2) lifecycle hook with firstTime
     runtime.onPanelReady (true);
+    check (activityCount == 2, "Activity callback includes lifecycle events");
     check (host.logs.contains ("ready-first"), "Lifecycle: onPanelReady(firstTime) fired");
 
     // 3) firstTime=false should NOT re-log (guard works)

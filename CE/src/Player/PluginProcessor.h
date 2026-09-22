@@ -351,17 +351,18 @@ public:
                 root.createNewChildElement ("DeviceDumps")->addTextElement (capturedDumps);
         }
        #if CEDITOR_SCRIPTING
-        if (scriptRuntime != nullptr)
+        if (scriptRuntimeReady.load())
         {
-            juce::var store (new juce::DynamicObject());   // scripts write their persisted state here
-            scriptRuntime->onDawSaveState (store);
-            root.createNewChildElement ("ScriptState")->addTextElement (juce::JSON::toString (store));
+            juce::String stateJson, settingsJson;
+            {
+                const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+                stateJson = cachedScriptStateJson;
+                settingsJson = cachedScriptSettingsJson;
+            }
+            root.createNewChildElement ("ScriptState")->addTextElement (stateJson);
             // ce.storage settings ride along separately: they are the runtime's, not any one
             // script's, so merging them into `store` would let a script overwrite another's key.
-            auto* settings = new juce::DynamicObject();
-            for (int i = 0; i < scriptSettings.size(); ++i)
-                settings->setProperty (scriptSettings.getName (i), scriptSettings.getValueAt (i));
-            root.createNewChildElement ("ScriptSettings")->addTextElement (juce::JSON::toString (juce::var (settings)));
+            root.createNewChildElement ("ScriptSettings")->addTextElement (settingsJson);
         }
        #endif
         copyXmlToBinary (root, destData);
@@ -405,16 +406,22 @@ public:
             // which from the user's chair is the same as not having been saved.
             armRestorePush();
            #if CEDITOR_SCRIPTING
-            // Settings first: a script's onDawRestoreState may well read one back.
-            if (auto* sset = xml->getChildByName ("ScriptSettings"))
             {
-                scriptSettings.clear();
-                if (auto* obj = juce::JSON::parse (sset->getAllSubText()).getDynamicObject())
-                    for (const auto& p : obj->getProperties()) scriptSettings.set (p.name, p.value);
-            }
-            if (scriptRuntime != nullptr)
+                const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+                pendingScriptSettingsPresent = false;
+                pendingScriptStatePresent = false;
+                if (auto* sset = xml->getChildByName ("ScriptSettings"))
+                {
+                    pendingScriptSettingsJson = sset->getAllSubText();
+                    pendingScriptSettingsPresent = true;
+                }
                 if (auto* sx = xml->getChildByName ("ScriptState"))
-                    scriptRuntime->onDawRestoreState (juce::JSON::parse (sx->getAllSubText()));
+                {
+                    pendingScriptStateJson = sx->getAllSubText();
+                    pendingScriptStatePresent = true;
+                }
+            }
+            scriptRestorePending.store (true);
            #endif
         }
         else if (xml->hasTagName (apvts.state.getType())) // backward-compat: APVTS-only state
@@ -464,6 +471,59 @@ private:
     int  lastScriptBar = -1;
     bool lastScriptPlaying = false;
     double lastScriptBpm = 0.0;
+
+    /** Rebuild the DAW-save snapshot while the engines are safely on the message thread. */
+    void refreshScriptStateCache()
+    {
+        if (scriptRuntime == nullptr || refreshingScriptState)
+            return;
+
+        const juce::ScopedValueSetter<bool> guard (refreshingScriptState, true);
+        juce::var store (new juce::DynamicObject());
+        scriptRuntime->onDawSaveState (store);
+
+        auto* settings = new juce::DynamicObject();
+        for (int i = 0; i < scriptSettings.size(); ++i)
+            settings->setProperty (scriptSettings.getName (i), scriptSettings.getValueAt (i));
+
+        auto stateJson = juce::JSON::toString (store);
+        auto settingsJson = juce::JSON::toString (juce::var (settings));
+        const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+        cachedScriptStateJson = std::move (stateJson);
+        cachedScriptSettingsJson = std::move (settingsJson);
+    }
+
+    /** Apply state parsed by a host callback. The timer is the thread handoff. */
+    void servicePendingScriptRestore()
+    {
+        if (scriptRuntime == nullptr || ! scriptRestorePending.exchange (false))
+            return;
+
+        juce::String stateJson, settingsJson;
+        bool hasState = false, hasSettings = false;
+        {
+            const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+            stateJson = std::move (pendingScriptStateJson);
+            settingsJson = std::move (pendingScriptSettingsJson);
+            hasState = pendingScriptStatePresent;
+            hasSettings = pendingScriptSettingsPresent;
+            pendingScriptStatePresent = false;
+            pendingScriptSettingsPresent = false;
+        }
+
+        // Settings first: a script's onDawRestoreState may well read one back.
+        if (hasSettings)
+        {
+            scriptSettings.clear();
+            const auto parsedSettings = juce::JSON::parse (settingsJson);
+            if (auto* obj = parsedSettings.getDynamicObject())
+                for (const auto& p : obj->getProperties())
+                    scriptSettings.set (p.name, p.value);
+        }
+        if (hasState)
+            scriptRuntime->onDawRestoreState (juce::JSON::parse (stateJson));
+        refreshScriptStateCache();
+    }
 
     void dispatchScriptTimeEvents()
     {
@@ -524,6 +584,7 @@ private:
     {
         const bool windowOpen = getActiveEditor() != nullptr;
        #if CEDITOR_SCRIPTING
+        servicePendingScriptRestore();
         if (scriptRuntime != nullptr)
         {
             // GUI lifecycle edges: scripts keep running window-closed; these fire only on open/close.
@@ -534,6 +595,8 @@ private:
             // PlayerHost then clears the callback without an observable open/close edge.
             if (! windowOpen && ! deviceService.hasEventCallback()) installScriptDeviceCallback();
         }
+        if (scriptStateDirty.exchange (false))
+            refreshScriptStateCache();
        #endif
         // The service's existing callback routes to the WebView while open and to the native
         // script runtime while closed. Use that same path for DAW input and device input.
@@ -2021,6 +2084,9 @@ private:
         scriptRuntime = std::make_unique<ScriptRuntime> (*scriptHost);
         scriptHost->attachRuntime (scriptRuntime.get());
         scriptRuntime->setErrorLogger ([] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
+       #if CEDITOR_VALUE_LAYER
+        scriptRuntime->setActivityCallback ([this] { scriptStateDirty.store (true); });
+       #endif
 
         // Fire onTimer({ id }) on the message thread when a script timer elapses.
         scriptTimers.setFireCallback ([this] (const juce::String& id)
@@ -2079,6 +2145,10 @@ private:
             scriptLogLine ("[script-error] script '" + (f.name.isNotEmpty() ? f.name : f.id)
                            + "' (" + f.language + ") is INACTIVE — " + f.message);
         scriptRuntime->onPanelLoad();   // window-closed init phase (before any GUI exists)
+       #if CEDITOR_VALUE_LAYER
+        refreshScriptStateCache();
+        scriptRuntimeReady.store (true);
+       #endif
         const auto failedCount = (int) scriptRuntime->failedScripts().size();
         scriptLogLine ("runtime ready — " + juce::String (scriptRuntime->loadedScriptCount()) + " script(s) loaded"
                        + (failedCount > 0 ? ", " + juce::String (failedCount) + " FAILED" : juce::String())
@@ -2094,6 +2164,20 @@ private:
     // ce.storage settings. The plugin cannot write the .cepanel, so these live here and are saved
     // with the DAW project alongside the scripts' own onDawSaveState data.
     juce::NamedValueSet scriptSettings;
+   #if CEDITOR_VALUE_LAYER
+    // DAWs may call state methods off the message thread. Engines and NamedValueSet stay on the
+    // message thread; host callbacks exchange only immutable JSON under this short lock.
+    juce::SpinLock scriptStateLock;
+    juce::String cachedScriptStateJson { "{}" };
+    juce::String cachedScriptSettingsJson { "{}" };
+    juce::String pendingScriptStateJson, pendingScriptSettingsJson;
+    bool pendingScriptStatePresent = false;
+    bool pendingScriptSettingsPresent = false;
+    bool refreshingScriptState = false;
+    std::atomic<bool> scriptRuntimeReady { false };
+    std::atomic<bool> scriptRestorePending { false };
+    std::atomic<bool> scriptStateDirty { false };
+   #endif
     // …and "local" scope, which is deliberately NOT saved with the project: a session handed to
     // somebody else should carry the patch, not the sender's MIDI port choice. It goes to a
     // properties file beside the app's own preferences instead, so it outlives the instance the way
