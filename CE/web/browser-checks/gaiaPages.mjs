@@ -40,6 +40,15 @@ try {
   assert.deepEqual(size,{width:1920,height:1000});
   assert.ok(await (await control('distortion.type')).isVisible(),'effects are always visible beside the tones');
   assert.ok(await (await control('common.effectsMasterSwitch')).isVisible(),'output controls remain with effects');
+  const sync = await control('common.syncRingSelect');
+  const syncBounds = await sync.boundingBox();
+  await shot('GAIA-osc-sync-ring.png', {x:394,y:10,width:394,height:240});
+  for (const value of [0, 1, 2]) {
+    await page.mouse.click(syncBounds.x + 32, syncBounds.y + 11 + value * 15);
+    await page.waitForFunction(v => window.__gaia.session('common.syncRingSelect').customValues.value === v, value, {timeout:2000});
+  }
+  await page.mouse.click(syncBounds.x + 32, syncBounds.y + 11);
+  await shot('GAIA-osc-sync-ring.png', {x:394,y:10,width:394,height:240});
   if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-1920x1000.png');
   await select('bottom_pages',2,4);
   const grid = await control('arp_pattern_grid');

@@ -2657,6 +2657,20 @@
       "valueKind": "float",
       "deviceRole": "Roland GAIA SH-01",
       "deviceParameterId": "master.volume"
+    },
+    {
+      "id": "common.syncRingSelect.value",
+      "label": "common.syncRingSelect",
+      "controlName": "common.syncRingSelect",
+      "path": "common.syncRingSelect.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland GAIA SH-01",
+      "deviceParameterId": "common.syncRingSelect"
     }
   ],
   "scripts": [
@@ -18057,7 +18071,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 624.2631578947369,
+          "x": 606.622009569378,
           "y": 44,
           "width": 42,
           "height": 42,
@@ -18876,7 +18890,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 606.8133971291866,
+          "x": 589.1722488038276,
           "y": 87,
           "width": 76.89952153110048,
           "height": 12
@@ -18929,7 +18943,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 708.665071770335,
+          "x": 662.622009569378,
           "y": 44,
           "width": 42,
           "height": 42,
@@ -19748,7 +19762,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 691.2153110047847,
+          "x": 645.1722488038276,
           "y": 87,
           "width": 76.89952153110048,
           "height": 12
@@ -67865,7 +67879,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 624.2631578947369,
+          "x": 606.622009569378,
           "y": 282,
           "width": 42,
           "height": 42,
@@ -68684,7 +68698,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 606.8133971291866,
+          "x": 589.1722488038276,
           "y": 325,
           "width": 76.89952153110048,
           "height": 12
@@ -68737,7 +68751,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 708.665071770335,
+          "x": 662.622009569378,
           "y": 282,
           "width": 42,
           "height": 42,
@@ -69556,7 +69570,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 691.2153110047847,
+          "x": 645.1722488038276,
           "y": 325,
           "width": 76.89952153110048,
           "height": 12
@@ -117673,7 +117687,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 624.2631578947369,
+          "x": 606.622009569378,
           "y": 520,
           "width": 42,
           "height": 42,
@@ -118492,7 +118506,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 606.8133971291866,
+          "x": 589.1722488038276,
           "y": 563,
           "width": 76.89952153110048,
           "height": 12
@@ -118545,7 +118559,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 708.665071770335,
+          "x": 662.622009569378,
           "y": 520,
           "width": 42,
           "height": 42,
@@ -119364,7 +119378,7 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 691.2153110047847,
+          "x": 645.1722488038276,
           "y": 563,
           "width": 76.89952153110048,
           "height": 12
@@ -195925,937 +195939,6 @@
               },
               "_type": "Control"
             },
-            "gaia_box_27": {
-              "_children": {
-                "Core": {
-                  "name": "box_SYNC / RING",
-                  "id": "gaia_box_27",
-                  "tabPageId": "status",
-                  "controlType": "Background"
-                },
-                "Transform": {
-                  "x": 1294.1626794258373,
-                  "y": 33.71428571428571,
-                  "width": 140.66985645933013,
-                  "height": 137.66666666666666
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "FF23272B"
-                    },
-                    "Border": {
-                      "colour": "FF8894A0"
-                    },
-                    "Corners": {
-                      "radius": 6
-                    }
-                  }
-                }
-              },
-              "_type": "Control"
-            },
-            "gaia_tab_28": {
-              "_children": {
-                "Core": {
-                  "name": "tab_SYNC / RING",
-                  "id": "gaia_tab_28",
-                  "tabPageId": "status",
-                  "controlType": "CustomComponent"
-                },
-                "Transform": {
-                  "x": 1296.0382775119617,
-                  "y": 35.11904761904761,
-                  "width": 113.47368421052632,
-                  "height": 14.047619047619047,
-                  "contentScaleMode": "scaleInternals"
-                },
-                "Designer": {
-                  "designWidth": 121,
-                  "designHeight": 20
-                },
-                "Parts": {
-                  "_children": {
-                    "body": {
-                      "name": "body",
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 0,
-                          "width": 121,
-                          "height": 20,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF8894A0"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 5
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "topRight": {
-                      "name": "topRight",
-                      "zIndex": 1,
-                      "_children": {
-                        "Layout": {
-                          "x": 116,
-                          "y": 0,
-                          "width": 5,
-                          "height": 5,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF8894A0"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "bottom": {
-                      "name": "bottom",
-                      "zIndex": 1,
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 15,
-                          "width": 121,
-                          "height": 5,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF8894A0"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "title": {
-                      "name": "title",
-                      "zIndex": 8,
-                      "_children": {
-                        "Layout": {
-                          "x": 0,
-                          "y": 1,
-                          "width": 121,
-                          "height": 18,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Text": {
-                          "content": "SYNC / RING",
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF13161A"
-                            },
-                            "Font": {
-                              "weight": "Bold",
-                              "weightValue": 700,
-                              "size": 12.101694915254239,
-                              "letterSpacing": 1
-                            },
-                            "Position": {
-                              "justification": "left"
-                            }
-                          },
-                          "_type": "Text"
-                        }
-                      },
-                      "_type": "Part"
-                    }
-                  }
-                },
-                "ValueChannels": {
-                  "_children": {
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  }
-                },
-                "Behaviors": {
-                  "_children": {
-                    "_removed": [
-                      "mainSlider",
-                      "modeButton"
-                    ]
-                  }
-                },
-                "Bindings": {
-                  "_removed": [
-                    "_type"
-                  ]
-                },
-                "PublishedProperties": {
-                  "inputs": {
-                    "_removed": [
-                      "mainValue",
-                      "mode",
-                      "accentColour"
-                    ]
-                  },
-                  "outputs": {
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  },
-                  "editableProperties": {
-                    "_removed": [
-                      "label",
-                      "variant"
-                    ]
-                  }
-                }
-              },
-              "_type": "Control"
-            },
-            "gaia_common_syncRingSelect_29": {
-              "_children": {
-                "Core": {
-                  "name": "common.syncRingSelect",
-                  "id": "gaia_common_syncRingSelect_29",
-                  "description": "SYNC/RING Select — 10 00 00 1F",
-                  "tabPageId": "status",
-                  "controlType": "CustomComponent"
-                },
-                "Transform": {
-                  "x": 1305.4162679425838,
-                  "y": 66.02380952380952,
-                  "width": 120.03827751196172,
-                  "height": 37.226190476190474,
-                  "contentScaleMode": "scaleInternals"
-                },
-                "Designer": {
-                  "lcdReadout": {
-                    "channel": "value",
-                    "label": "SYNC/RING Select",
-                    "choices": [
-                      {
-                        "value": 0,
-                        "label": "OFF"
-                      },
-                      {
-                        "value": 1,
-                        "label": "SYNC"
-                      },
-                      {
-                        "value": 2,
-                        "label": "RING"
-                      }
-                    ]
-                  },
-                  "designWidth": 128,
-                  "designHeight": 53
-                },
-                "Parts": {
-                  "_children": {
-                    "ledRail": {
-                      "name": "ledRail",
-                      "_children": {
-                        "Layout": {
-                          "x": 5,
-                          "y": 5,
-                          "width": 12,
-                          "height": 42,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF172630",
-                              "gradientEnabled": true,
-                              "gradient": {
-                                "type": "linear",
-                                "angle": 90,
-                                "centerX": 50,
-                                "centerY": 50,
-                                "radiusX": 50,
-                                "radiusY": 50,
-                                "edge": 0,
-                                "stops": [
-                                  {
-                                    "color": "0B141A",
-                                    "position": 0
-                                  },
-                                  {
-                                    "color": "1B2B35",
-                                    "position": 45
-                                  },
-                                  {
-                                    "color": "101B22",
-                                    "position": 100
-                                  }
-                                ]
-                              }
-                            },
-                            "Border": {
-                              "thickness": 1,
-                              "colour": "FF2B3B45"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "bezel0": {
-                      "name": "bezel0",
-                      "zIndex": 2,
-                      "_children": {
-                        "Layout": {
-                          "x": 7.5,
-                          "y": 7.5,
-                          "width": 7,
-                          "height": 7,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF080D11"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "led0": {
-                      "name": "led0",
-                      "zIndex": 3,
-                      "_children": {
-                        "Layout": {
-                          "x": 9,
-                          "y": 9,
-                          "width": 4,
-                          "height": 4,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF2B1718"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "name0": {
-                      "name": "name0",
-                      "zIndex": 8,
-                      "_children": {
-                        "Layout": {
-                          "x": 15,
-                          "y": 5,
-                          "width": 113,
-                          "height": 13,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Text": {
-                          "content": "OFF",
-                          "_children": {
-                            "Fill": {
-                              "colour": "FFC3CDD6"
-                            },
-                            "Font": {
-                              "weight": "SemiBold",
-                              "weightValue": 600,
-                              "size": 12.101694915254239
-                            },
-                            "Position": {
-                              "justification": "left"
-                            }
-                          },
-                          "_type": "Text"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "bezel1": {
-                      "name": "bezel1",
-                      "zIndex": 2,
-                      "_children": {
-                        "Layout": {
-                          "x": 7.5,
-                          "y": 22.5,
-                          "width": 7,
-                          "height": 7,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF080D11"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "led1": {
-                      "name": "led1",
-                      "zIndex": 3,
-                      "_children": {
-                        "Layout": {
-                          "x": 9,
-                          "y": 24,
-                          "width": 4,
-                          "height": 4,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF2B1718"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "name1": {
-                      "name": "name1",
-                      "zIndex": 8,
-                      "_children": {
-                        "Layout": {
-                          "x": 15,
-                          "y": 20,
-                          "width": 113,
-                          "height": 13,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Text": {
-                          "content": "SYNC",
-                          "_children": {
-                            "Fill": {
-                              "colour": "FFC3CDD6"
-                            },
-                            "Font": {
-                              "weight": "SemiBold",
-                              "weightValue": 600,
-                              "size": 12.101694915254239
-                            },
-                            "Position": {
-                              "justification": "left"
-                            }
-                          },
-                          "_type": "Text"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "bezel2": {
-                      "name": "bezel2",
-                      "zIndex": 2,
-                      "_children": {
-                        "Layout": {
-                          "x": 7.5,
-                          "y": 37.5,
-                          "width": 7,
-                          "height": 7,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF080D11"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "led2": {
-                      "name": "led2",
-                      "zIndex": 3,
-                      "_children": {
-                        "Layout": {
-                          "x": 9,
-                          "y": 39,
-                          "width": 4,
-                          "height": 4,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Background": {
-                          "_children": {
-                            "Fill": {
-                              "colour": "FF2B1718"
-                            },
-                            "Border": {
-                              "enabled": false,
-                              "thickness": 0,
-                              "colour": "00000000"
-                            },
-                            "Corners": {
-                              "linked": true,
-                              "radius": 999
-                            }
-                          },
-                          "_type": "Background"
-                        }
-                      },
-                      "_type": "Part"
-                    },
-                    "name2": {
-                      "name": "name2",
-                      "zIndex": 8,
-                      "_children": {
-                        "Layout": {
-                          "x": 15,
-                          "y": 35,
-                          "width": 113,
-                          "height": 13,
-                          "xUnit": "px",
-                          "yUnit": "px",
-                          "anchorX": "left",
-                          "anchorY": "top"
-                        },
-                        "Text": {
-                          "content": "RING",
-                          "_children": {
-                            "Fill": {
-                              "colour": "FFC3CDD6"
-                            },
-                            "Font": {
-                              "weight": "SemiBold",
-                              "weightValue": 600,
-                              "size": 12.101694915254239
-                            },
-                            "Position": {
-                              "justification": "left"
-                            }
-                          },
-                          "_type": "Text"
-                        }
-                      },
-                      "_type": "Part"
-                    }
-                  }
-                },
-                "ValueChannels": {
-                  "_children": {
-                    "value": {
-                      "_type": "ValueChannel",
-                      "name": "value",
-                      "label": "Value",
-                      "type": "int",
-                      "min": 0,
-                      "max": 2,
-                      "step": 1,
-                      "defaultValue": 0,
-                      "currentValue": 0,
-                      "publicInput": true,
-                      "publicOutput": true,
-                      "deviceBindable": true,
-                      "format": {
-                        "precision": 0,
-                        "prefix": "",
-                        "suffix": "",
-                        "unit": ""
-                      },
-                      "snap": {
-                        "enabled": true,
-                        "mode": "step"
-                      },
-                      "curve": {
-                        "mode": "linear",
-                        "deadZone": 0,
-                        "hysteresis": 0
-                      },
-                      "constraints": {
-                        "enabled": true,
-                        "normalizedMin": 0,
-                        "normalizedMax": 1
-                      }
-                    },
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  }
-                },
-                "Behaviors": {
-                  "_children": {
-                    "drive": {
-                      "_type": "BehaviorModule",
-                      "name": "drive",
-                      "type": "selector",
-                      "role": "selector",
-                      "enabled": true,
-                      "valueChannel": "value",
-                      "valueChannels": [
-                        "value"
-                      ],
-                      "geometry": "vertical",
-                      "dragMode": "auto",
-                      "reverseMouseDirection": false,
-                      "interaction": {
-                        "pointer": true,
-                        "keyboard": true,
-                        "wheel": false,
-                        "snap": true
-                      }
-                    },
-                    "_removed": [
-                      "mainSlider",
-                      "modeButton"
-                    ]
-                  }
-                },
-                "HitZones": {
-                  "_children": {
-                    "pick0": {
-                      "_type": "HitZone",
-                      "name": "pick0",
-                      "shape": "rectangle",
-                      "enabled": true,
-                      "visibleInEditor": true,
-                      "priority": 0,
-                      "cursor": "default",
-                      "targetBehavior": "drive",
-                      "targetValueChannel": "value",
-                      "targetValueChannelX": "",
-                      "targetValueChannelY": "",
-                      "action": "setValue",
-                      "bounds": {
-                        "x": 0,
-                        "y": 7.547169811320755,
-                        "width": 100,
-                        "height": 28.30188679245283,
-                        "unit": "percent"
-                      },
-                      "source": "independent",
-                      "inflate": {
-                        "x": 0,
-                        "y": 0,
-                        "unit": "px"
-                      },
-                      "minTouch": 0,
-                      "condition": "",
-                      "meta": {},
-                      "payload": 0
-                    },
-                    "pick1": {
-                      "_type": "HitZone",
-                      "name": "pick1",
-                      "shape": "rectangle",
-                      "enabled": true,
-                      "visibleInEditor": true,
-                      "priority": 0,
-                      "cursor": "default",
-                      "targetBehavior": "drive",
-                      "targetValueChannel": "value",
-                      "targetValueChannelX": "",
-                      "targetValueChannelY": "",
-                      "action": "setValue",
-                      "bounds": {
-                        "x": 0,
-                        "y": 35.84905660377358,
-                        "width": 100,
-                        "height": 28.30188679245283,
-                        "unit": "percent"
-                      },
-                      "source": "independent",
-                      "inflate": {
-                        "x": 0,
-                        "y": 0,
-                        "unit": "px"
-                      },
-                      "minTouch": 0,
-                      "condition": "",
-                      "meta": {},
-                      "payload": 1
-                    },
-                    "pick2": {
-                      "_type": "HitZone",
-                      "name": "pick2",
-                      "shape": "rectangle",
-                      "enabled": true,
-                      "visibleInEditor": true,
-                      "priority": 0,
-                      "cursor": "default",
-                      "targetBehavior": "drive",
-                      "targetValueChannel": "value",
-                      "targetValueChannelX": "",
-                      "targetValueChannelY": "",
-                      "action": "setValue",
-                      "bounds": {
-                        "x": 0,
-                        "y": 64.15094339622641,
-                        "width": 100,
-                        "height": 28.30188679245283,
-                        "unit": "percent"
-                      },
-                      "source": "independent",
-                      "inflate": {
-                        "x": 0,
-                        "y": 0,
-                        "unit": "px"
-                      },
-                      "minTouch": 0,
-                      "condition": "",
-                      "meta": {},
-                      "payload": 2
-                    }
-                  }
-                },
-                "Bindings": {
-                  "_children": {
-                    "led0": {
-                      "_type": "Binding",
-                      "name": "led0",
-                      "enabled": true,
-                      "source": "channel.value.raw",
-                      "mapMode": "enum",
-                      "target": "Parts.led0.Background.Fill.colour",
-                      "outputUnit": "",
-                      "inputMin": 0,
-                      "inputMax": 1,
-                      "outputMin": 0,
-                      "outputMax": 1,
-                      "falseValue": 0,
-                      "trueValue": 1,
-                      "enumMap": {
-                        "0": "FFFF3B30",
-                        "1": "FF2B1718",
-                        "2": "FF2B1718"
-                      },
-                      "clamp": false,
-                      "round": false,
-                      "invert": false
-                    },
-                    "led1": {
-                      "_type": "Binding",
-                      "name": "led1",
-                      "enabled": true,
-                      "source": "channel.value.raw",
-                      "mapMode": "enum",
-                      "target": "Parts.led1.Background.Fill.colour",
-                      "outputUnit": "",
-                      "inputMin": 0,
-                      "inputMax": 1,
-                      "outputMin": 0,
-                      "outputMax": 1,
-                      "falseValue": 0,
-                      "trueValue": 1,
-                      "enumMap": {
-                        "0": "FF2B1718",
-                        "1": "FFFF3B30",
-                        "2": "FF2B1718"
-                      },
-                      "clamp": false,
-                      "round": false,
-                      "invert": false
-                    },
-                    "led2": {
-                      "_type": "Binding",
-                      "name": "led2",
-                      "enabled": true,
-                      "source": "channel.value.raw",
-                      "mapMode": "enum",
-                      "target": "Parts.led2.Background.Fill.colour",
-                      "outputUnit": "",
-                      "inputMin": 0,
-                      "inputMax": 1,
-                      "outputMin": 0,
-                      "outputMax": 1,
-                      "falseValue": 0,
-                      "trueValue": 1,
-                      "enumMap": {
-                        "0": "FF2B1718",
-                        "1": "FF2B1718",
-                        "2": "FFFF3B30"
-                      },
-                      "clamp": false,
-                      "round": false,
-                      "invert": false
-                    }
-                  },
-                  "_removed": [
-                    "_type"
-                  ]
-                },
-                "DeviceBindings": {
-                  "bindings": [
-                    {
-                      "kind": "deviceParameter",
-                      "port": "value",
-                      "deviceRole": "Roland GAIA SH-01",
-                      "parameterId": "common.syncRingSelect",
-                      "parameterType": "choice",
-                      "adoptMetadata": true,
-                      "dryRun": false,
-                      "feedback": {
-                        "receiveUpdates": true,
-                        "ignoreOwnEchoes": true,
-                        "echoWindowMs": 250
-                      }
-                    }
-                  ]
-                },
-                "PublishedProperties": {
-                  "inputs": {
-                    "value": {
-                      "channel": "value",
-                      "label": "Value",
-                      "type": "float"
-                    },
-                    "_removed": [
-                      "mainValue",
-                      "mode",
-                      "accentColour"
-                    ]
-                  },
-                  "outputs": {
-                    "value": {
-                      "channel": "value",
-                      "label": "Value",
-                      "type": "float"
-                    },
-                    "_removed": [
-                      "mainValue",
-                      "mode"
-                    ]
-                  },
-                  "editableProperties": {
-                    "_removed": [
-                      "label",
-                      "variant"
-                    ]
-                  }
-                }
-              },
-              "_type": "Control"
-            },
             "gaia_box_30": {
               "_children": {
                 "Core": {
@@ -213127,6 +212210,710 @@
           "paddingRight": 2,
           "paddingTop": 1,
           "paddingBottom": 1
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "common.syncRingSelect",
+          "id": "gaia_common_syncRingSelect_29",
+          "description": "SYNC/RING Select — 10 00 00 1F",
+          "controlType": "CustomComponent"
+        },
+        "Transform": {
+          "x": 712.622009569378,
+          "y": 44,
+          "width": 66,
+          "height": 53,
+          "contentScaleMode": "scaleInternals"
+        },
+        "Designer": {
+          "lcdReadout": {
+            "channel": "value",
+            "label": "SYNC/RING Select",
+            "choices": [
+              {
+                "value": 0,
+                "label": "OFF"
+              },
+              {
+                "value": 1,
+                "label": "SYNC"
+              },
+              {
+                "value": 2,
+                "label": "RING"
+              }
+            ]
+          },
+          "designWidth": 66,
+          "designHeight": 53
+        },
+        "Parts": {
+          "_children": {
+            "ledRail": {
+              "name": "ledRail",
+              "_children": {
+                "Layout": {
+                  "x": 5,
+                  "y": 5,
+                  "width": 12,
+                  "height": 42,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF172630",
+                      "gradientEnabled": true,
+                      "gradient": {
+                        "type": "linear",
+                        "angle": 90,
+                        "centerX": 50,
+                        "centerY": 50,
+                        "radiusX": 50,
+                        "radiusY": 50,
+                        "edge": 0,
+                        "stops": [
+                          {
+                            "color": "0B141A",
+                            "position": 0
+                          },
+                          {
+                            "color": "1B2B35",
+                            "position": 45
+                          },
+                          {
+                            "color": "101B22",
+                            "position": 100
+                          }
+                        ]
+                      }
+                    },
+                    "Border": {
+                      "thickness": 1,
+                      "colour": "FF2B3B45"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "bezel0": {
+              "name": "bezel0",
+              "zIndex": 2,
+              "_children": {
+                "Layout": {
+                  "x": 7.5,
+                  "y": 7.5,
+                  "width": 7,
+                  "height": 7,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF080D11"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "led0": {
+              "name": "led0",
+              "zIndex": 3,
+              "_children": {
+                "Layout": {
+                  "x": 9,
+                  "y": 9,
+                  "width": 4,
+                  "height": 4,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2B1718"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "name0": {
+              "name": "name0",
+              "zIndex": 8,
+              "_children": {
+                "Layout": {
+                  "x": 15,
+                  "y": 5,
+                  "width": 51,
+                  "height": 13,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Text": {
+                  "content": "OFF",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFC3CDD6"
+                    },
+                    "Font": {
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "size": 9
+                    },
+                    "Position": {
+                      "justification": "left"
+                    }
+                  },
+                  "_type": "Text"
+                }
+              },
+              "_type": "Part"
+            },
+            "bezel1": {
+              "name": "bezel1",
+              "zIndex": 2,
+              "_children": {
+                "Layout": {
+                  "x": 7.5,
+                  "y": 22.5,
+                  "width": 7,
+                  "height": 7,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF080D11"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "led1": {
+              "name": "led1",
+              "zIndex": 3,
+              "_children": {
+                "Layout": {
+                  "x": 9,
+                  "y": 24,
+                  "width": 4,
+                  "height": 4,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2B1718"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "name1": {
+              "name": "name1",
+              "zIndex": 8,
+              "_children": {
+                "Layout": {
+                  "x": 15,
+                  "y": 20,
+                  "width": 51,
+                  "height": 13,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Text": {
+                  "content": "SYNC",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFC3CDD6"
+                    },
+                    "Font": {
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "size": 9
+                    },
+                    "Position": {
+                      "justification": "left"
+                    }
+                  },
+                  "_type": "Text"
+                }
+              },
+              "_type": "Part"
+            },
+            "bezel2": {
+              "name": "bezel2",
+              "zIndex": 2,
+              "_children": {
+                "Layout": {
+                  "x": 7.5,
+                  "y": 37.5,
+                  "width": 7,
+                  "height": 7,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF080D11"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "led2": {
+              "name": "led2",
+              "zIndex": 3,
+              "_children": {
+                "Layout": {
+                  "x": 9,
+                  "y": 39,
+                  "width": 4,
+                  "height": 4,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Background": {
+                  "_children": {
+                    "Fill": {
+                      "colour": "FF2B1718"
+                    },
+                    "Border": {
+                      "enabled": false,
+                      "thickness": 0,
+                      "colour": "00000000"
+                    },
+                    "Corners": {
+                      "linked": true,
+                      "radius": 999
+                    }
+                  },
+                  "_type": "Background"
+                }
+              },
+              "_type": "Part"
+            },
+            "name2": {
+              "name": "name2",
+              "zIndex": 8,
+              "_children": {
+                "Layout": {
+                  "x": 15,
+                  "y": 35,
+                  "width": 51,
+                  "height": 13,
+                  "xUnit": "px",
+                  "yUnit": "px",
+                  "anchorX": "left",
+                  "anchorY": "top"
+                },
+                "Text": {
+                  "content": "RING",
+                  "_children": {
+                    "Fill": {
+                      "colour": "FFC3CDD6"
+                    },
+                    "Font": {
+                      "weight": "SemiBold",
+                      "weightValue": 600,
+                      "size": 9
+                    },
+                    "Position": {
+                      "justification": "left"
+                    }
+                  },
+                  "_type": "Text"
+                }
+              },
+              "_type": "Part"
+            }
+          }
+        },
+        "ValueChannels": {
+          "_children": {
+            "value": {
+              "_type": "ValueChannel",
+              "name": "value",
+              "label": "Value",
+              "type": "int",
+              "min": 0,
+              "max": 2,
+              "step": 1,
+              "defaultValue": 0,
+              "currentValue": 0,
+              "publicInput": true,
+              "publicOutput": true,
+              "deviceBindable": true,
+              "format": {
+                "precision": 0,
+                "prefix": "",
+                "suffix": "",
+                "unit": ""
+              },
+              "snap": {
+                "enabled": true,
+                "mode": "step"
+              },
+              "curve": {
+                "mode": "linear",
+                "deadZone": 0,
+                "hysteresis": 0
+              },
+              "constraints": {
+                "enabled": true,
+                "normalizedMin": 0,
+                "normalizedMax": 1
+              }
+            },
+            "_removed": [
+              "mainValue",
+              "mode"
+            ]
+          }
+        },
+        "Behaviors": {
+          "_children": {
+            "drive": {
+              "_type": "BehaviorModule",
+              "name": "drive",
+              "type": "selector",
+              "role": "selector",
+              "enabled": true,
+              "valueChannel": "value",
+              "valueChannels": [
+                "value"
+              ],
+              "geometry": "vertical",
+              "dragMode": "auto",
+              "reverseMouseDirection": false,
+              "interaction": {
+                "pointer": true,
+                "keyboard": true,
+                "wheel": false,
+                "snap": true
+              }
+            },
+            "_removed": [
+              "mainSlider",
+              "modeButton"
+            ]
+          }
+        },
+        "HitZones": {
+          "_children": {
+            "pick0": {
+              "_type": "HitZone",
+              "name": "pick0",
+              "shape": "rectangle",
+              "enabled": true,
+              "visibleInEditor": true,
+              "priority": 0,
+              "cursor": "default",
+              "targetBehavior": "drive",
+              "targetValueChannel": "value",
+              "targetValueChannelX": "",
+              "targetValueChannelY": "",
+              "action": "setValue",
+              "bounds": {
+                "x": 0,
+                "y": 7.547169811320755,
+                "width": 100,
+                "height": 28.30188679245283,
+                "unit": "percent"
+              },
+              "source": "independent",
+              "inflate": {
+                "x": 0,
+                "y": 0,
+                "unit": "px"
+              },
+              "minTouch": 0,
+              "condition": "",
+              "meta": {},
+              "payload": {
+                "value": 0
+              }
+            },
+            "pick1": {
+              "_type": "HitZone",
+              "name": "pick1",
+              "shape": "rectangle",
+              "enabled": true,
+              "visibleInEditor": true,
+              "priority": 0,
+              "cursor": "default",
+              "targetBehavior": "drive",
+              "targetValueChannel": "value",
+              "targetValueChannelX": "",
+              "targetValueChannelY": "",
+              "action": "setValue",
+              "bounds": {
+                "x": 0,
+                "y": 35.84905660377358,
+                "width": 100,
+                "height": 28.30188679245283,
+                "unit": "percent"
+              },
+              "source": "independent",
+              "inflate": {
+                "x": 0,
+                "y": 0,
+                "unit": "px"
+              },
+              "minTouch": 0,
+              "condition": "",
+              "meta": {},
+              "payload": {
+                "value": 1
+              }
+            },
+            "pick2": {
+              "_type": "HitZone",
+              "name": "pick2",
+              "shape": "rectangle",
+              "enabled": true,
+              "visibleInEditor": true,
+              "priority": 0,
+              "cursor": "default",
+              "targetBehavior": "drive",
+              "targetValueChannel": "value",
+              "targetValueChannelX": "",
+              "targetValueChannelY": "",
+              "action": "setValue",
+              "bounds": {
+                "x": 0,
+                "y": 64.15094339622641,
+                "width": 100,
+                "height": 28.30188679245283,
+                "unit": "percent"
+              },
+              "source": "independent",
+              "inflate": {
+                "x": 0,
+                "y": 0,
+                "unit": "px"
+              },
+              "minTouch": 0,
+              "condition": "",
+              "meta": {},
+              "payload": {
+                "value": 2
+              }
+            }
+          }
+        },
+        "Bindings": {
+          "_children": {
+            "led0": {
+              "_type": "Binding",
+              "name": "led0",
+              "enabled": true,
+              "source": "channel.value.raw",
+              "mapMode": "enum",
+              "target": "Parts.led0.Background.Fill.colour",
+              "outputUnit": "",
+              "inputMin": 0,
+              "inputMax": 1,
+              "outputMin": 0,
+              "outputMax": 1,
+              "falseValue": 0,
+              "trueValue": 1,
+              "enumMap": {
+                "0": "FFFF3B30",
+                "1": "FF2B1718",
+                "2": "FF2B1718"
+              },
+              "clamp": false,
+              "round": false,
+              "invert": false
+            },
+            "led1": {
+              "_type": "Binding",
+              "name": "led1",
+              "enabled": true,
+              "source": "channel.value.raw",
+              "mapMode": "enum",
+              "target": "Parts.led1.Background.Fill.colour",
+              "outputUnit": "",
+              "inputMin": 0,
+              "inputMax": 1,
+              "outputMin": 0,
+              "outputMax": 1,
+              "falseValue": 0,
+              "trueValue": 1,
+              "enumMap": {
+                "0": "FF2B1718",
+                "1": "FFFF3B30",
+                "2": "FF2B1718"
+              },
+              "clamp": false,
+              "round": false,
+              "invert": false
+            },
+            "led2": {
+              "_type": "Binding",
+              "name": "led2",
+              "enabled": true,
+              "source": "channel.value.raw",
+              "mapMode": "enum",
+              "target": "Parts.led2.Background.Fill.colour",
+              "outputUnit": "",
+              "inputMin": 0,
+              "inputMax": 1,
+              "outputMin": 0,
+              "outputMax": 1,
+              "falseValue": 0,
+              "trueValue": 1,
+              "enumMap": {
+                "0": "FF2B1718",
+                "1": "FF2B1718",
+                "2": "FFFF3B30"
+              },
+              "clamp": false,
+              "round": false,
+              "invert": false
+            }
+          },
+          "_removed": [
+            "_type"
+          ]
+        },
+        "DeviceBindings": {
+          "bindings": [
+            {
+              "kind": "deviceParameter",
+              "port": "value",
+              "deviceRole": "Roland GAIA SH-01",
+              "parameterId": "common.syncRingSelect",
+              "parameterType": "choice",
+              "adoptMetadata": true,
+              "dryRun": false,
+              "feedback": {
+                "receiveUpdates": true,
+                "ignoreOwnEchoes": true,
+                "echoWindowMs": 250
+              }
+            }
+          ]
+        },
+        "PublishedProperties": {
+          "inputs": {
+            "value": {
+              "channel": "value",
+              "label": "Value",
+              "type": "float"
+            },
+            "_removed": [
+              "mainValue",
+              "mode",
+              "accentColour"
+            ]
+          },
+          "outputs": {
+            "value": {
+              "channel": "value",
+              "label": "Value",
+              "type": "float"
+            },
+            "_removed": [
+              "mainValue",
+              "mode"
+            ]
+          },
+          "editableProperties": {
+            "_removed": [
+              "label",
+              "variant"
+            ]
+          }
         }
       },
       "_type": "Control"

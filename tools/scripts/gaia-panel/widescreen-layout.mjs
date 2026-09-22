@@ -143,7 +143,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)));
+  return moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
@@ -243,5 +243,44 @@ export function expandArpeggioWorkspace(panel) {
   Object.assign(status, { x: grid.Transform.x, y: 2, width: grid.Transform.width, height: 12 });
   const output = named('box_EFFECTS / OUTPUT')._children.Transform;
   output.height = t.y + t.height - output.y;
+  return panel;
+}
+
+// The profile exposes one patch-common selector, not three tone parameters.
+// Keep its ID, values and bindings while making it visible beside the oscillator.
+export function moveSyncRingIntoOsc(panel) {
+  const all = flatControls(panel.controls);
+  const named = name => all.find(c => c._children.Core.name === name);
+  const bottom = named('bottom_pages')._children.Children._children;
+  const sync = named('common.syncRingSelect');
+  if (!sync._children.Core.tabPageId) return panel;
+  for (const [id, c] of Object.entries(bottom)) {
+    if (['box_SYNC / RING', 'tab_SYNC / RING', 'common.syncRingSelect'].includes(c._children.Core.name)) delete bottom[id];
+  }
+  delete sync._children.Core.tabPageId;
+  const box = named('box_OSC')._children.Transform;
+  for (const tone of [1, 2, 3]) {
+    for (const [key, offset, caption] of [['pitch', 208, 'PITCH'], ['detune', 264, 'DETUNE']]) {
+      const knob = named(`tone${tone}.osc.${key}`)._children.Transform;
+      const delta = box.x + offset - knob.x;
+      const label = panel.controls.find(c => c._children.Core.controlType === 'Label'
+        && c._children.Text?.content === caption && c._children.Transform.y > knob.y
+        && c._children.Transform.y < knob.y + 65
+        && Math.abs(c._children.Transform.x + c._children.Transform.width / 2 - knob.x - knob.width / 2) < 2);
+      knob.x += delta;
+      if (label) label._children.Transform.x += delta;
+    }
+  }
+  Object.assign(sync._children.Transform, { x: box.x + 314, y: box.y + 30, width: 66, height: 53 });
+  Object.assign(sync._children.Designer, { designWidth: 66, designHeight: 53 });
+  for (const part of Object.values(sync._children.Parts._children)) {
+    if (!part._children.Text) continue;
+    part._children.Layout.width = 51;
+    part._children.Text._children.Font.size = 9;
+  }
+  for (const zone of Object.values(sync._children.HitZones._children)) {
+    if (typeof zone.payload === 'number') zone.payload = { value: zone.payload };
+  }
+  panel.controls.push(sync);
   return panel;
 }
