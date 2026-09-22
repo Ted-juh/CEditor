@@ -173,7 +173,7 @@ public:
         if (! hostSync.load())
             return;
 
-        haveHostPosition.store (true);
+        const bool hadHostPosition = haveHostPosition.exchange (true);
 
         if (tempo > 0.0)
             tempoBpm.store (juce::jlimit (20.0, 300.0, tempo));
@@ -184,12 +184,14 @@ public:
         // is what makes a loop jump, a locate or a tempo ramp land in the right place — the
         // same reason external clock follows its tick count.
         const auto position = juce::jmax (0.0, ppqPosition);
-        if (std::abs (position - positionPpq.load()) > 1.0e-9)
-        {
-            positionPpq.store (position);
-            if (hostIsPlaying)
-                hostJumped.store (true);
-        }
+        // Compare the new block with the end of the preceding host block. positionPpq still
+        // contains that block's start while host sync is active, so comparing against it makes
+        // ordinary forward playback look like a locate on every callback.
+        if (hadHostPosition && hostIsPlaying && hostPlaying.load()
+            && std::abs (position - expectedHostPosition.load()) > 1.0e-6)
+            hostJumped.store (true);
+
+        positionPpq.store (position);
 
         hostPlaying.store (hostIsPlaying);
     }
@@ -312,6 +314,9 @@ public:
         block.endPpq = nowPlaying ? block.startPpq + block.ppqPerSample * (double) numSamples
                                   : block.startPpq;
 
+        if (followingHost)
+            expectedHostPosition.store (block.endPpq);
+
         // Under host sync the next block's start comes from the host, not from here: writing
         // an integrated position would fight the playhead and drift against it.
         if (nowPlaying && ! followingHost)
@@ -428,6 +433,7 @@ private:
     std::atomic<int> tsNumerator { 4 };
     std::atomic<int> tsDenominator { 4 };
     std::atomic<double> positionPpq { 0.0 };
+    std::atomic<double> expectedHostPosition { 0.0 };
     std::atomic<double> requestedPosition { 0.0 };
     std::atomic<bool> playing { false };
     std::atomic<bool> startRequested { false };

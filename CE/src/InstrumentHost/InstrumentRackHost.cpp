@@ -393,7 +393,7 @@ void InstrumentRackHost::refreshLayerRouting()
         for (auto& [partId, lp] : live)
         {
             juce::ignoreUnused (partId);
-            lp.filter->getCore().requestPanic();
+            lp.filter->requestPanic();
         }
     }
 }
@@ -1748,7 +1748,7 @@ juce::Array<InstrumentRackHost::UnresolvedPart> InstrumentRackHost::loadModel (P
 void InstrumentRackHost::panicPart (const juce::String& partId)
 {
     if (auto* lp = findLive (partId))
-        lp->filter->getCore().requestPanic();
+        lp->filter->requestPanic();
 }
 
 void InstrumentRackHost::panicAll()
@@ -1760,7 +1760,7 @@ void InstrumentRackHost::panicAll()
     for (auto& [partId, lp] : live)
     {
         juce::ignoreUnused (partId);
-        lp.filter->getCore().requestPanic();
+        lp.filter->requestPanic();
     }
 }
 

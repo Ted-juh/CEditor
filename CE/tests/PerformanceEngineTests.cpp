@@ -322,6 +322,13 @@ void testHostSync()
     transport.applyHostPosition (140.0, 3, 4, 4.0, true);
     block = transport.advance (blockSize, sampleRate);
     check (block.playing && std::abs (block.startPpq - 4.0) < 1.0e-9, "rolling from there");
+    check (! transport.consumeJumped(), "starting at the stopped host position is not a jump");
+
+    const auto expectedNextPpq = block.endPpq;
+    transport.applyHostPosition (140.0, 3, 4, expectedNextPpq, true);
+    block = transport.advance (blockSize, sampleRate);
+    check (! transport.consumeJumped(),
+           "ordinary host progression starts at the preceding block end without a jump");
 
     transport.applyHostPosition (140.0, 3, 4, 4.5, true);
     block = transport.advance (blockSize, sampleRate);

@@ -45,6 +45,14 @@ public:
     PartMidiFilterCore& getCore()                             { return core; }
     perf::MidiInsertRack& getMidiInserts()                    { return inserts; }
 
+    /** Thread-safe panic request. The audio thread releases both the input filter and every
+        MIDI insert on its next block. */
+    void requestPanic() noexcept
+    {
+        core.requestPanic();
+        eventChainPanicRequested.store (true);
+    }
+
     /** Articulations are stored as MIDI slots but are a control stage around the musical
         chain. Keeping this one setter prevents the document, trigger decoder and inserts from
         ever receiving different versions of the chain. */
@@ -61,6 +69,8 @@ public:
 
     void setPartEnabled (bool enabled) noexcept
     {
+        if (core.isEnabled() && ! enabled)
+            eventChainPanicRequested.store (true);
         articulations.setPartEnabled (enabled);
         core.setEnabled (enabled);
     }
@@ -149,6 +159,8 @@ public:
         const auto block = engine != nullptr ? engine->lastBlockTime()
                                              : perf::Transport::BlockTime();
         inserts.process (scratch, afterFx, block, numSamples);
+        if (eventChainPanicRequested.exchange (false))
+            inserts.allNotesOff (afterFx, 0);
         // Generated articulation messages bypass note processors. A keyswitch selected as C0
         // must reach C0 even when this part has transpose, scale and chorder modules enabled.
         // They are merged FIRST: when a sequenced switch and its first note share a sample, the
@@ -162,12 +174,6 @@ public:
         if (engine != nullptr && partIndex >= 0)
             merged.addEvents (engine->postFxStagingFor (partIndex), 0, -1, 0);
         midi.swapWith (merged);
-    }
-
-    /** Releases everything the chain is holding — the panic path reaches every module. */
-    void flushEventChain (juce::MidiBuffer& out, int position)
-    {
-        inserts.allNotesOff (out, position);
     }
 
     const juce::String getName() const override               { return "CEditor Part MIDI Filter"; }
@@ -193,6 +199,7 @@ private:
     LayerRouter* layerRouter = nullptr;
     int partIndex = -1;
     juce::MidiBuffer scratch, merged, afterFx;
+    std::atomic<bool> eventChainPanicRequested { false };
     juce::MidiBuffer articulationInput, articulationStaging;
     juce::MidiBuffer articulationActions, stagingActions;
     juce::SpinLock queuedLock;

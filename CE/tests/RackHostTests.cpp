@@ -996,6 +996,40 @@ void testSoundcheckMeter()
     check (near ((float) reading.seconds, 64.0f / 48000.0f, 0.000001f), "duration counts frames, not stereo samples");
 }
 
+void testPanicReachesMidiInserts()
+{
+    std::cout << "\npanic reaches MIDI inserts" << std::endl;
+    ceditor::host::PartMidiFilterProcessor processor;
+    processor.prepareToPlay (48000.0, 64);
+
+    auto latch = ceditor::perf::MidiSlot::create ("latch", "latch-1");
+    latch.mod.latchOn = true;
+    processor.setMidiChain ({ latch });
+
+    juce::AudioBuffer<float> audio (2, 64);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    midi.addEvent (juce::MidiMessage::noteOff (1, 60), 12);
+    processor.processBlock (audio, midi);
+
+    int noteOns = 0, noteOffs = 0;
+    for (const auto metadata : midi)
+    {
+        noteOns += metadata.getMessage().isNoteOn() ? 1 : 0;
+        noteOffs += metadata.getMessage().isNoteOff() ? 1 : 0;
+    }
+    check (noteOns == 1 && noteOffs == 0, "the latch holds its note after the key is released");
+
+    processor.requestPanic();
+    midi.clear();
+    processor.processBlock (audio, midi);
+    noteOffs = 0;
+    for (const auto metadata : midi)
+        noteOffs += metadata.getMessage().isNoteOff()
+                    && metadata.getMessage().getNoteNumber() == 60 ? 1 : 0;
+    check (noteOffs == 1, "panic releases the note held inside the MIDI insert chain");
+}
+
 int main()
 {
     std::cout << "RackHost tests" << std::endl;
@@ -1014,6 +1048,7 @@ int main()
     testLayerVoiceAllocationAndCrossfade();
     testStereoMeters();
     testSoundcheckMeter();
+    testPanicReachesMidiInserts();
 
     std::cout << (failures == 0 ? "\nALL PASSED" : "\nFAILURES: " + std::to_string (failures)) << std::endl;
     return failures == 0 ? 0 : 1;
