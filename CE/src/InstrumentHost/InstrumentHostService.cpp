@@ -73,6 +73,9 @@ InstrumentHostService::InstrumentHostService (Options optionsToUse)
 
 InstrumentHostService::~InstrumentHostService()
 {
+    if (performanceSavePending.exchange (false))
+        savePerformance();
+    *alive = false;
     if (options.editorWindows.closeAll != nullptr)
         options.editorWindows.closeAll();
     // Hand the hardware back on the way out: a claim outliving its owner is what the heartbeat
@@ -80,7 +83,6 @@ InstrumentHostService::~InstrumentHostService()
     releaseHardwareSurface();
     stopPresetAudition();
     stopAudio();
-    *alive = false;
     if (libraryScanThread.joinable()) libraryScanThread.join();
     stopRequested.store (true);
     if (scanThread.joinable())
@@ -1282,7 +1284,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             }
         }
 
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -3465,7 +3467,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             emitError ("Unknown bus.");
             return;
         }
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -3547,7 +3549,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             emitError ("Unknown return.");
             return;
         }
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -3565,7 +3567,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
         }
         writeTargetBaseValue (partId, "@send:" + returnId, level * 0.5f);
         recordGestureValue (partId, "@send:" + returnId, level * 0.5f);
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -3582,7 +3584,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
             emitError ("Unknown part, or that is not an extra output pair.");
             return;
         }
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -5643,7 +5645,7 @@ void InstrumentHostService::handleCommand (const juce::var& payload)
     if (cmd == "setMasterLevel")
     {
         rack.setMasterLevel ((float) (double) payload.getProperty ("level", 1.0));
-        savePerformance();
+        schedulePerformanceSave();
         emitState();
         return;
     }
@@ -18514,11 +18516,30 @@ juce::var InstrumentHostService::performancePayload() const
 
 void InstrumentHostService::savePerformance()
 {
+    performanceSavePending.store (false);
+    ++performanceSaveGeneration;
     if (! options.persistSession)
         return;
 
     maybeSnapshotRevision();
     performanceFile().replaceWithText (juce::JSON::toString (rack.captureState().toVar()));
+}
+
+void InstrumentHostService::schedulePerformanceSave()
+{
+    if (! options.persistSession)
+        return;
+
+    performanceSavePending.store (true);
+    const auto generation = ++performanceSaveGeneration;
+    const auto lifetime = alive;
+    juce::Timer::callAfterDelay (250, [this, lifetime, generation]
+    {
+        if (! lifetime->load() || generation != performanceSaveGeneration.load())
+            return;
+        performanceSavePending.store (false);
+        savePerformance();
+    });
 }
 
 void InstrumentHostService::savePerformanceModel()

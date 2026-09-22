@@ -1463,6 +1463,7 @@ add_executable(CEditorInstrumentHostServiceTests
     "${CE_ROOT}/src/ControlSurface/SurfaceBrowse.cpp"
     "${CE_ROOT}/tests/InstrumentHostServiceTests.cpp"
 )
+target_compile_definitions(CEditorInstrumentHostServiceTests PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
 target_compile_features(CEditorInstrumentHostServiceTests PRIVATE cxx_std_23)
 target_include_directories(CEditorInstrumentHostServiceTests PRIVATE "${CE_ROOT}/src")
 target_link_libraries(CEditorInstrumentHostServiceTests PRIVATE

@@ -1281,6 +1281,8 @@ private:
     juce::var licencePayload();
 
     void savePerformance();
+    /** Coalesces continuous mixer gestures before capturing and writing the complete rack. */
+    void schedulePerformanceSave();
     /** Persists Hostage-only metadata using the already-captured plug-in blobs. Use for
         changes such as focus and MIDI zones that must never call into every VST. */
     void savePerformanceModel();
@@ -1795,6 +1797,8 @@ private:
     // Cleared in the destructor so an asynchronous instantiate callback that outlives this
     // service returns without touching a corpse — ValueTreeBridge.h documents the pattern.
     std::shared_ptr<std::atomic<bool>> alive { std::make_shared<std::atomic<bool>> (true) };
+    std::atomic<juce::uint64> performanceSaveGeneration { 0 };
+    std::atomic<bool> performanceSavePending { false };
 
     std::thread scanThread;
     std::thread libraryScanThread;

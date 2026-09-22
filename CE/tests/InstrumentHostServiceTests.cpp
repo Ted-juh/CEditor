@@ -505,11 +505,14 @@ void testCommandFlow()
     check (h.lastStub->stateCaptureCount == capturesBeforeFocus,
            "metadata-only focus does not ask the VST to capture its state");
 
+    const auto capturesBeforeMixer = h.lastStub->stateCaptureCount;
     h.cmd ("setPartMixer", { { "partId", partId }, { "mute", true } });
     const auto muted = h.emits.lastState()->getProperty ("rack", {}).getProperty ("parts", {})[0];
     check ((bool) muted.getProperty ("mute", false)
              && juce::approximatelyEqual ((float) (double) muted.getProperty ("volume", 0.0), 1.0f),
            "setPartMixer touches only the fields it names");
+    check (h.lastStub->stateCaptureCount == capturesBeforeMixer,
+           "a mixer gesture does not serialize every hosted plug-in");
 
     const auto capturesBeforeRules = h.lastStub->stateCaptureCount;
     h.cmd ("setPartMidiRules", { { "partId", partId }, { "keyHigh", 59 } });
@@ -8356,6 +8359,7 @@ void testRevisionsAndEngine()
     revisions().getFirst().setLastModificationTime (
         juce::Time::getCurrentTime() - juce::RelativeTime::minutes (11.0));
     h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.8 } });
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (300);
     check (revisions().size() == 2, "a save past the interval snapshots again");
 
     for (int i = 0; i < 14; ++i)
@@ -8365,6 +8369,7 @@ void testRevisionsAndEngine()
     for (auto& file : revisions())
         file.setLastModificationTime (juce::Time::getCurrentTime() - juce::RelativeTime::minutes (11.0));
     h.cmd ("setPartMixer", { { "partId", partId }, { "volume", 0.7 } });
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (300);
     check (revisions().size() == 12, "the revision trail prunes to its cap, oldest first");
 
     // What the part costs is visible in the mixer, whether or not the graph compensates for
