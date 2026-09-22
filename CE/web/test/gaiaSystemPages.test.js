@@ -55,14 +55,21 @@ test('System block readback preserves nibble values and both ends of write prote
   assert.equal(parsed.values['system.writeProtectA1'],'on');
   assert.equal(parsed.values['system.writeProtectH8'],'on');
 });
-test('the lower pages separate effects from the three tone strips', () => {
+test('1920 by 1000 panel keeps a vertical effects column beside three horizontal tone rows', () => {
+  assert.deepEqual([panel.width,panel.height],[1920,1000]);
   assert.equal(byName('top_pages'),undefined);
-  assert.deepEqual(tabPages(byName('bottom_pages')).map(p=>p.id),['status','banks','arpeggiator','effects','system']);
+  assert.deepEqual(tabPages(byName('bottom_pages')).map(p=>p.id),['status','banks','arpeggiator','system']);
   const bottom=byName('bottom_pages');
   assert.ok(getChildControls(bottom).some(c=>c._children.Core.name==='arp_pattern_grid' && isChildOnActivePage(c,bottom)));
   for(const name of ['box_DISTORTION','box_FLANGER','box_DELAY','box_REVERB','box_EFFECTS / OUTPUT','master.volume']) {
-    assert.ok(getChildControls(bottom).some(c=>c._children.Core.name===name && c._children.Core.tabPageId==='effects'),name);
-    assert.ok(!panel.controls.some(c=>c._children.Core.name===name),name);
+    assert.ok(panel.controls.some(c=>c._children.Core.name===name),name);
+    assert.ok(byName(name)._children.Transform.x>=1594,name);
+  }
+  const fx=['DISTORTION','FLANGER','DELAY','REVERB'].map(n=>byName(`box_${n}`)._children.Transform);
+  assert.ok(fx.every((r,i)=>r.x===fx[0].x && (!i || r.y>=fx[i-1].y+fx[i-1].height)));
+  for(const tone of [1,2,3]) {
+    const row=['lfo.rate','osc.pitch','filter.cutoff','amp.level','modLfo.rate'].map(n=>byName(`tone${tone}.${n}`)._children.Transform);
+    assert.ok(row.every((r,i)=>r.y===row[0].y && r.x+r.width<fx[0].x && (!i || r.x>row[i-1].x)));
   }
   assert.ok(!isChildOnActivePage(byName('system.masterTune'),bottom));
   for(const tone of [1,2,3]) assert.ok(panel.controls.some(c=>c._children.Core.name===`tone${tone}.osc.wave`));

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});
 await server.listen();
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
-const page=await browser.newPage({viewport:{width:1800,height:2200}}),errors=[];
+const page=await browser.newPage({viewport:{width:1920,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 try {
   await page.route('**/gaia-panel.json',async route=>route.fulfill({contentType:'application/json',body:await readFile(process.env.GAIA_PANEL_PATH || new URL('../../panels/Roland GAIA SH-01.cepanel',import.meta.url),'utf8')}));
@@ -18,11 +18,12 @@ try {
   await page.waitForTimeout(1200);
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
   const lower=await(await ctl('bottom_pages')).boundingBox();
-  assert.deepEqual(await page.evaluate(()=>window.__gaia.controls.find(c=>c._children.Core.name==='bottom_pages')._children.TabContainer.pages.map(p=>p.id)), ['status','banks','arpeggiator','effects','system']);
-  const selectLower=async index=>{await page.mouse.click(lower.x+lower.width*(index+.5)/5,lower.y+12);await page.waitForTimeout(150);};
-  for (const [index,name] of [[1,'common.patchName'],[2,'arp_pattern_grid'],[3,'distortion.type'],[4,'system.masterTune'],[0,'gaia_status_screen']]) {
+  assert.deepEqual(await page.evaluate(()=>window.__gaia.controls.find(c=>c._children.Core.name==='bottom_pages')._children.TabContainer.pages.map(p=>p.id)), ['status','banks','arpeggiator','system']);
+  const selectLower=async index=>{await page.mouse.click(lower.x+lower.width*(index+.5)/4,lower.y+10);await page.waitForTimeout(150);};
+  for (const [index,name] of [[1,'common.patchName'],[2,'arp_pattern_grid'],[3,'system.masterTune'],[0,'gaia_status_screen']]) {
     await selectLower(index);
     await (await ctl(name)).waitFor({state:'visible'});
+    assert.ok(await (await ctl('distortion.type')).isVisible(),'effects stay visible on every page');
   }
   await selectLower(0);
   await page.waitForTimeout(150);

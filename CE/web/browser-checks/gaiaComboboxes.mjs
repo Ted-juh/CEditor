@@ -10,7 +10,7 @@ const server = process.env.PREVIEW_URL
 await server.listen();
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
 try {
-  const page = await browser.newPage({ viewport: { width: 1800, height: 2450 } });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1000 } });
   const errors = [];
   page.on('pageerror', error => errors.push(String(error)));
   await page.route('**/gaia-panel.json', async route => {
@@ -45,8 +45,8 @@ try {
       const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
       const tabs = page.locator(`.canvas-control[data-control-id="${tabsId}"]`);
       const rect = await tabs.boundingBox();
-      const index = combo.name.startsWith('system.') ? 4 : combo.name.startsWith('arp.') ? 2 : 0;
-      await page.mouse.click(rect.x + rect.width * (index+.5)/5, rect.y + 12);
+      const index = combo.name.startsWith('system.') ? 3 : combo.name.startsWith('arp.') ? 2 : 0;
+      await page.mouse.click(rect.x + rect.width * (index+.5)/4, rect.y + 10);
       await control.waitFor({ state: 'visible' });
     }
     assert.ok(await control.isVisible(), `${combo.name} must be exercised`);

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});
 await server.listen();
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
-const page=await browser.newPage({viewport:{width:1800,height:2000}}),errors=[];
+const page=await browser.newPage({viewport:{width:1920,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 try {
   await page.route('**/gaia-panel.json',async route=>{
@@ -26,7 +26,7 @@ try {
   async function ctl(name){const id=await page.evaluate(n=>window.__gaia.id(n),name);return page.locator(`[data-control-id="${id}"]`).first();}
   async function select(name,index,count){const b=await(await ctl(name)).boundingBox();await page.mouse.click(b.x+(index+0.5)*b.width/count,b.y+12);}
   async function has(name,text){for(let i=0;i<60;i++){if((await(await ctl(name)).textContent()).includes(text))return;await page.waitForTimeout(100);}assert.fail(`${name}: ${await(await ctl(name)).textContent()}`);}
-  await select('bottom_pages',1,5); await select('patch_banks',1,4);
+  await select('bottom_pages',1,4); await select('patch_banks',1,4);
   await has('recall_user_A1','○ A-1  CACHED 1');
   await has('names_status_user','○ 64 cached');
   await(await ctl('recall_user_C3')).click();

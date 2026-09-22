@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const server=await createServer({configFile:fileURLToPath(new URL('./vite.config.mjs',import.meta.url)),server:{host:'127.0.0.1',port:0}});
 await server.listen();
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
-const page=await browser.newPage({viewport:{width:1800,height:2200}});
+const page=await browser.newPage({viewport:{width:1920,height:1000}});
 const errors=[];
 page.on('pageerror', e=>errors.push(String(e)));
 try {
@@ -39,12 +39,15 @@ try {
   assert.equal(await (await control('common.patchName')).count(),0);
   assert.equal(await (await control('system.masterTune')).count(),0);
   if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-controls-arpeggiator.png');
-  await select('bottom_pages',3,5);
-  assert.ok(await (await control('distortion.type')).isVisible(),'the dedicated Effects page shows the processors');
+  assert.deepEqual(size,{width:1920,height:1000});
+  assert.ok(await (await control('distortion.type')).isVisible(),'effects are always visible beside the tones');
   assert.ok(await (await control('common.effectsMasterSwitch')).isVisible(),'output controls remain with effects');
-  if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-effects-page.png');
-  await select('bottom_pages',2,5);
+  if (!process.env.GAIA_END_STEP_ONLY) await shot('GAIA-1920x1000.png');
+  await select('bottom_pages',2,4);
   const grid = await control('arp_pattern_grid');
+  const lowerBounds = await (await control('bottom_pages')).boundingBox();
+  const sendBounds = await grid.getByText('SEND PATTERN',{exact:true}).boundingBox();
+  assert.ok(sendBounds.y+sendBounds.height<=lowerBounds.y+lowerBounds.height,'the pattern toolbar fits inside the lower page');
   assert.equal(await page.evaluate(() => window.__gaia.id('arp.endStep')), undefined, 'no separate END STEP knob');
   const initialPattern = await page.evaluate(() => window.__gaia.session('arp_pattern_grid').customValues.arpPattern);
   const gridRect = await grid.boundingBox();
@@ -74,7 +77,7 @@ try {
     console.log('END STEP: staged ruler clicks 1/16/32, drag to 24, guarded inbound update and preserved notes passed.');
     process.exitCode = 0;
   } else {
-  await select('bottom_pages',1,5);
+  await select('bottom_pages',1,4);
   assert.ok(await (await control('common.patchName')).isVisible(),'Patch controls share the bank page');
   for(let i=0;i<4;i++) {
     await select('patch_banks',i,4);
@@ -84,7 +87,7 @@ try {
     assert.equal(buttons,i===3?8:64);
   }
   await select('patch_banks',1,4);
-  await select('bottom_pages',4,5);
+  await select('bottom_pages',3,4);
   assert.equal(await (await control('arp_pattern_grid')).count(),0);
   assert.ok(await (await control('system.masterTune')).isVisible());
   const lock=await control('system.writeProtectH8');
@@ -92,17 +95,17 @@ try {
   await page.waitForTimeout(150);
   const locked=await page.evaluate(()=>window.__gaia.session('system.writeProtectH8'));
   assert.equal(locked.checked,true,'nested write-protection toggle remains interactive');
-  await select('bottom_pages',2,5);
+  await select('bottom_pages',2,4);
   assert.ok(await (await control('arp_pattern_grid')).isVisible());
-  await select('bottom_pages',4,5);
+  await select('bottom_pages',3,4);
   assert.equal((await page.evaluate(()=>window.__gaia.session('system.writeProtectH8'))).checked,true,'switching pages preserves values');
   for(const tone of [1,2,3]) assert.ok(await (await control(`tone${tone}.osc.wave`)).isVisible());
   // Restore the test toggle before showing the neutral preview.
   await lock.click();
   await shot('GAIA-banks-system.png');
   const bottom=await (await control('bottom_pages')).boundingBox();
-  await shot('GAIA-system-closeup.png',{x:16,y:bottom.y,width:1560,height:320});
-  await select('bottom_pages',1,5);
+  await shot('GAIA-system-closeup.png',bottom);
+  await select('bottom_pages',1,4);
   await shot('GAIA-banks-closeup.png',bottom);
   // Simulated hardware, through the actual generated scripts and inbound dispatcher.
   // These names are TEST DATA, never presented as names fetched from a physical synth.

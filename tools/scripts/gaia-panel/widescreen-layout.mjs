@@ -1,0 +1,144 @@
+import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
+
+// Three horizontal voices on the left, four permanently visible processors on
+// the right. This is document geometry, so 100% preview is exactly 1920 x 1000.
+export function applyWidescreenLayout(panel) {
+  const all = flatControls(panel.controls);
+  const named = name => all.find(c => c._children.Core.name === name);
+  const rect = c => c._children.Transform;
+  const bottom = named('bottom_pages');
+  const oldBottom = { ...rect(bottom) };
+  const oldEffectsY = rect(named('box_DISTORTION')).y;
+  const leftWidth = 1568;
+  const sx = leftWidth / oldBottom.width;
+  const originals = new Map(panel.controls.map(c => [c, { ...rect(c) }]));
+
+  function resize(c, width, height) {
+    const s = c._children, t = rect(c);
+    if (s.Core.controlType === 'CustomComponent' && !s.Designer?.arpeggiator?.enabled) {
+      s.Designer.designWidth ??= t.width;
+      s.Designer.designHeight ??= t.height;
+      t.contentScaleMode = 'scaleInternals';
+      // Keep tiny legends legible when the LED lists become more compact.
+      const scale = Math.min(width / s.Designer.designWidth, height / s.Designer.designHeight);
+      for (const part of Object.values(s.Parts?._children ?? {})) {
+        const font = part._children?.Text?._children?.Font;
+        if (font?.size && font.size * scale < 8.5) font.size = 8.5 / scale;
+      }
+    }
+    Object.assign(t, { width, height });
+  }
+
+  for (const tone of [1, 2, 3]) {
+    const oldY = originals.get(named(`tone${tone}.signalFlow`)).y;
+    const top = 34 + (tone - 1) * 238;
+    for (const c of panel.controls) {
+      const o = originals.get(c), s = c._children, t = rect(c);
+      if (o.y < oldY || o.y >= oldY + 356) continue;
+      const y = o.y - oldY;
+      t.x = 16 + (o.x - 16) * sx;
+      let width = o.width * sx, height = o.height, dy = y;
+      if (o.x < 120) {
+        dy = 48 + (y - 30) * 36 / 46;
+        height = s.Core.controlType === 'Label' ? 50 : 26;
+      } else if (s.Core.name.startsWith('box_')) { dy = 18; height = 212; }
+      else if (s.Core.name.startsWith('tab_')) { dy = 20; height = 18; }
+      else if (s.Core.name.endsWith('.signalFlow')) { dy = 0; height = 16; }
+      else if (s.Core.name.endsWith('.lamp')) { dy = 4; height = width = 7; }
+      else if (s.Core.controlType === 'Envelope') { dy = 108; height = 30; }
+      else if (s.Core.controlType === 'CustomComponent') {
+        if (o.width === o.height) {
+          dy = y > 200 ? 154 : 48;
+          width = height = 42;
+          t.x += (o.width * sx - width) / 2;
+        } else if (o.height === 104 && o.width === 30) { dy = 142; height = 62; }
+        else { dy = 48; height = Math.round(o.height * 0.66); }
+        if (s.Core.name.endsWith('.modLfo.shape')) height = 54;
+      } else if (s.Core.controlType === 'Combobox' || s.Core.controlType === 'ToggleButton') {
+        dy = y === 64 ? 48 : y === 118 ? 90 : 116;
+        height = 20;
+      } else if (s.Core.controlType === 'Label') {
+        if (y <= 2) { dy = 1; height = 14; }
+        else if (y === 50) { dy = 34; height = 13; }
+        else if (y === 105) { dy = 77; height = 12; }
+        else if (y === 123) { dy = 91; height = 12; }
+        else if (y === 164) { dy = 103; height = 12; }
+        else if (y === 289) { dy = 197; height = 14; }
+        else if (y === 320) { dy = 207; height = 22; }
+      }
+      t.y = top + dy;
+      resize(c, width, height);
+    }
+  }
+  for (const tone of [2, 3]) Object.assign(rect(named(`tone${tone}.divider`)), {
+    x: 16, y: 30 + (tone - 1) * 238, width: leftWidth, height: 2,
+  });
+
+  // Effects stay top-level and visible regardless of which lower page is open.
+  for (const [i, title] of ['DISTORTION', 'FLANGER', 'DELAY', 'REVERB'].entries()) {
+    const box = named(`box_${title}`), o = originals.get(box);
+    for (const c of panel.controls) {
+      const source = originals.get(c);
+      if (source.y < oldEffectsY || source.y >= oldBottom.y || source.x < o.x || source.x >= o.x + o.width) continue;
+      const t = rect(c);
+      t.x = 1594 + (source.x - o.x) * 314 / 250;
+      t.y = 34 + i * 198 + source.y - o.y;
+      if (c === box) t.width = 314;
+    }
+  }
+  const output = named('box_EFFECTS / OUTPUT'), outputOld = originals.get(output);
+  const outputControls = panel.controls.filter(c => {
+    const o = originals.get(c);
+    return o.y >= oldEffectsY && o.y < oldBottom.y && o.x >= outputOld.x;
+  });
+  for (const c of outputControls) {
+    rect(c).x = 1594 + originals.get(c).x - outputOld.x;
+    rect(c).y = 828 + originals.get(c).y - outputOld.y;
+  }
+  Object.assign(rect(output), {x:1594,y:828,width:314,height:160});
+  for (const [i, name] of ['effectsDistortionSelect','effectsFlangerSelect','effectsDelaySelect','effectsReverbSelect','lowBoostSwitch','tempoSyncSwitch','effectsMasterSwitch'].entries()) {
+    Object.assign(rect(named(`common.${name}`)), {x:1604+(i%2)*148,y:860+Math.floor(i/2)*28,width:140,height:22});
+  }
+  const volume = named('master.volume');
+  Object.assign(rect(volume), {x:1830,y:940}); resize(volume,34,34);
+  for (const c of outputControls.filter(c=>c._children.Core.controlType==='Label')) {
+    if(c._children.Text?.content==='OUTPUT') Object.assign(rect(c),{x:1806,y:975,width:84,height:13});
+    else Object.assign(rect(c),{x:1604,y:848,width:280,height:10});
+  }
+
+  // Retain the lower pages and their bindings, fitting their content into the
+  // remaining left-hand workspace. Generated arpeggio geometry uses its new box.
+  function compactChildren(parent, fx, fy) {
+    for (const c of Object.values(parent._children.Children?._children ?? {})) {
+      const t = rect(c), old = {...t};
+      t.x *= fx; t.y *= fy;
+      let w = old.width * fx, h = old.height * fy;
+      if(c._children.Designer?.arpeggiator?.enabled) h=184;
+      if(c._children.Core.controlType==='CustomComponent' && old.width===old.height) {
+        w=h=Math.min(w,h); t.x+=(old.width*fx-w)/2;
+      }
+      resize(c,w,h);
+      const tabs=c._children.TabContainer;
+      if(tabs) tabs.stripSize*=fy;
+      if(c._children.Designer?.arpeggiator?.enabled) {
+        const field=c._children.Parts?._children?.field?._children?.Layout;
+        if(field) Object.assign(field,{width:w,height:h});
+      }
+      compactChildren(c,fx,fy);
+    }
+  }
+  compactChildren(bottom,sx,236/oldBottom.height);
+  bottom._children.TabContainer.stripSize*=236/oldBottom.height;
+  Object.assign(rect(bottom),{x:16,y:752,width:leftWidth,height:236});
+  for (const c of panel.controls) {
+    const o=originals.get(c);
+    if(o.y>=oldBottom.y+oldBottom.height) {
+      rect(c).y=4; rect(c).height=24;
+      const font=c._children.Text?._children?.Font;
+      if(font) font.size=Math.min(font.size,20);
+    }
+  }
+  Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
+  panel.width=1920; panel.height=1000;
+  return panel;
+}

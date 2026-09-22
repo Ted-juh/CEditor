@@ -23,8 +23,10 @@ export function applyEditableEnvelopes(panel) {
       sources[stage]={controlId:fader._children.Core.id,channel:'value',min:channel.min,max:channel.max,defaultValue:channel.currentValue??channel.defaultValue};
       values[stage]=sources[stage].defaultValue;
     }
-    const transform={...graph._children.Transform,y:first._children.Transform.y-70,height:66};
-    if(ad)transform.width=146;
+    const alreadyLinked=!!graph._children.Envelope?.stageSources;
+    const transform=alreadyLinked ? {...graph._children.Transform}
+      : {...graph._children.Transform,y:first._children.Transform.y-70,height:66};
+    if(ad && !alreadyLinked)transform.width=146;
     const replacement=createControl('Envelope',{
       Core:{...graph._children.Core,controlType:'Envelope',name:`tone${tone}_${kind.replace(/\W+/g,'_')}_graph`,
         tooltip:`Tone ${tone} ${ad?'pitch AD':kind.startsWith('filter')?'filter ADSR':'amp ADSR'}: A/D${ad?'':'/R'} sideways = stage time.${ad?'':' D up/down = sustain LEVEL. S moves sideways only, at D height: illustrated key-hold duration, not a synth parameter.'} Shift-drag = fine. A/D${ad?'':'/S/R'} keys select a handle; arrows adjust it (D up/down adjusts sustain level). Home/End set time limits; S Home/End changes only the preview hold. Escape cancels the drag. Relative stage settings, not calibrated milliseconds.`,},
