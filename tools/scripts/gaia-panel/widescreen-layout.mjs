@@ -140,5 +140,34 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
+  return removeToneFlowStrips(panel);
+}
+
+// Reuse the decorative header's 18px for the controls: the upper controls move
+// up and the faders get longer, while each tone keeps its existing bottom edge.
+// This also applies to a saved panel without resetting its values or scripts.
+export function removeToneFlowStrips(panel) {
+  const removed = new Set();
+  for (const tone of [1, 2, 3]) {
+    const rail = panel.controls.find(c => c._children.Core.name === `tone${tone}.signalFlow`);
+    if (!rail) continue;
+    const top = rail._children.Transform.y;
+    for (const control of panel.controls) {
+      const s = control._children, t = s.Transform;
+      if (t.y < top || t.y >= top + 230 || t.x >= rail._children.Transform.x + rail._children.Transform.width) continue;
+      if (t.y < top + 18 && t.x >= rail._children.Transform.x) {
+        removed.add(control);
+      } else if (s.Core.name.startsWith('box_')) {
+        t.y -= 18; t.height += 18;
+      } else if (s.Core.controlType === 'CustomComponent' && t.width < 40 && t.height > t.width * 1.5) {
+        t.y -= 18; t.height += 18;
+      } else if (s.Core.name.endsWith('.filter.cutoffKeyfollow') || s.Text?.content === 'KEY FOLLOW') {
+        t.y -= 9;
+      } else if (t.y < top + 207) {
+        t.y -= 18;
+      }
+    }
+  }
+  panel.controls = panel.controls.filter(c => !removed.has(c));
   return panel;
 }

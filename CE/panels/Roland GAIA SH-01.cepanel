@@ -5364,299 +5364,15 @@
     {
       "_children": {
         "Core": {
-          "name": "tone1.signalFlow",
-          "id": "gaia_voice_rail_288",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 121.03349282296651,
-          "y": 34,
-          "width": 1462.9665071770335,
-          "height": 16
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1C2125"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF46515B"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "tone1.lamp",
-          "id": "gaia_voice_lamp_289",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 128.53588516746413,
-          "y": 38,
-          "width": 7,
-          "height": 7
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFF3B30"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF210908"
-            },
-            "Corners": {
-              "radius": 999
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_290",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 141.66507177033492,
-          "y": 35,
-          "width": 76.89952153110048,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "TONE 1",
-          "_children": {
-            "Fill": {
-              "colour": "FFE8EEF4"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 11,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_291",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 222.31578947368422,
-          "y": 35,
-          "width": 131.29186602870814,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "VOICE SIGNAL PATH",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_292",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 379.86602870813397,
-          "y": 35,
-          "width": 844.0191387559809,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "AUDIO: OSC  →  FILTER  →  AMP     ·     LFO: PITCH / FILTER / AMP MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FFC6D0D8"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_293",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1310.1626794258373,
-          "y": 35,
-          "width": 268.2105263157895,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "MOD LFO · MIDI-ONLY VOICE MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "right"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "right",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
           "name": "box_LFO",
           "id": "gaia_box_294",
           "controlType": "Background"
         },
         "Transform": {
           "x": 121.03349282296651,
-          "y": 52,
+          "y": 34,
           "width": 268.2105263157895,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -5683,7 +5399,7 @@
         },
         "Transform": {
           "x": 122.9090909090909,
-          "y": 54,
+          "y": 36,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -5885,7 +5601,7 @@
         },
         "Transform": {
           "x": 130.41148325358853,
-          "y": 82,
+          "y": 64,
           "width": 97.5311004784689,
           "height": 65,
           "contentScaleMode": "scaleInternals"
@@ -7458,7 +7174,7 @@
         },
         "Transform": {
           "x": 133.22488038277513,
-          "y": 68,
+          "y": 50,
           "width": 94.7177033492823,
           "height": 13
         },
@@ -7515,7 +7231,7 @@
         },
         "Transform": {
           "x": 243.51674641148327,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -8326,7 +8042,7 @@
         },
         "Transform": {
           "x": 226.06698564593302,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -8379,7 +8095,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 82,
+          "y": 64,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -8494,7 +8210,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 124,
+          "y": 106,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -8826,7 +8542,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 111,
+          "y": 93,
           "width": 78.77511961722487,
           "height": 12
         },
@@ -8879,7 +8595,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 150,
+          "y": 132,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -8994,9 +8710,9 @@
         },
         "Transform": {
           "x": 137.91387559808612,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -10282,9 +9998,9 @@
         },
         "Transform": {
           "x": 190.4306220095694,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -11578,9 +11294,9 @@
         },
         "Transform": {
           "x": 242.94736842105263,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -12874,9 +12590,9 @@
         },
         "Transform": {
           "x": 295.46411483253587,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -14170,9 +13886,9 @@
         },
         "Transform": {
           "x": 347.98086124401914,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -15465,9 +15181,9 @@
         },
         "Transform": {
           "x": 398.622009569378,
-          "y": 52,
+          "y": 34,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -15494,7 +15210,7 @@
         },
         "Transform": {
           "x": 400.4976076555024,
-          "y": 54,
+          "y": 36,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -15696,7 +15412,7 @@
         },
         "Transform": {
           "x": 552.421052631579,
-          "y": 142,
+          "y": 124,
           "width": 136.91866028708134,
           "height": 30
         },
@@ -15784,7 +15500,7 @@
         },
         "Transform": {
           "x": 409.8755980861244,
-          "y": 82,
+          "y": 64,
           "width": 103.15789473684211,
           "height": 75,
           "contentScaleMode": "scaleInternals"
@@ -17531,7 +17247,7 @@
         },
         "Transform": {
           "x": 412.688995215311,
-          "y": 68,
+          "y": 50,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -17588,7 +17304,7 @@
         },
         "Transform": {
           "x": 522.4114832535886,
-          "y": 82,
+          "y": 64,
           "width": 78.77511961722487,
           "height": 35,
           "contentScaleMode": "scaleInternals"
@@ -18285,7 +18001,7 @@
         },
         "Transform": {
           "x": 525.2248803827752,
-          "y": 68,
+          "y": 50,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -18342,7 +18058,7 @@
         },
         "Transform": {
           "x": 624.2631578947369,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -19161,7 +18877,7 @@
         },
         "Transform": {
           "x": 606.8133971291866,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -19214,7 +18930,7 @@
         },
         "Transform": {
           "x": 708.665071770335,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -20033,7 +19749,7 @@
         },
         "Transform": {
           "x": 691.2153110047847,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -20086,9 +19802,9 @@
         },
         "Transform": {
           "x": 413.6267942583732,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -21374,9 +21090,9 @@
         },
         "Transform": {
           "x": 460.51674641148327,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -22662,9 +22378,9 @@
         },
         "Transform": {
           "x": 561.799043062201,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -23950,9 +23666,9 @@
         },
         "Transform": {
           "x": 608.688995215311,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -25238,9 +24954,9 @@
         },
         "Transform": {
           "x": 715.5980861244019,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -26533,9 +26249,9 @@
         },
         "Transform": {
           "x": 792.4976076555024,
-          "y": 52,
+          "y": 34,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -26562,7 +26278,7 @@
         },
         "Transform": {
           "x": 794.3732057416267,
-          "y": 54,
+          "y": 36,
           "width": 71.27272727272728,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -26764,7 +26480,7 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 142,
+          "y": 124,
           "width": 187.55980861244018,
           "height": 30
         },
@@ -26879,7 +26595,7 @@
         },
         "Transform": {
           "x": 803.7511961722488,
-          "y": 82,
+          "y": 64,
           "width": 103.15789473684211,
           "height": 55,
           "contentScaleMode": "scaleInternals"
@@ -27905,7 +27621,7 @@
         },
         "Transform": {
           "x": 806.5645933014354,
-          "y": 68,
+          "y": 50,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -27962,7 +27678,7 @@
         },
         "Transform": {
           "x": 916.2870813397129,
-          "y": 82,
+          "y": 64,
           "width": 78.77511961722487,
           "height": 25,
           "contentScaleMode": "scaleInternals"
@@ -28497,7 +28213,7 @@
         },
         "Transform": {
           "x": 919.1004784688995,
-          "y": 68,
+          "y": 50,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -28554,7 +28270,7 @@
         },
         "Transform": {
           "x": 1018.1387559808613,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -29365,7 +29081,7 @@
         },
         "Transform": {
           "x": 1000.688995215311,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -29418,7 +29134,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -30229,7 +29945,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -30282,9 +29998,9 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -31570,9 +31286,9 @@
         },
         "Transform": {
           "x": 854.3923444976076,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -32858,9 +32574,9 @@
         },
         "Transform": {
           "x": 901.2822966507177,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -34146,9 +33862,9 @@
         },
         "Transform": {
           "x": 948.1722488038278,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -35434,9 +35150,9 @@
         },
         "Transform": {
           "x": 1006.3157894736842,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -36730,9 +36446,9 @@
         },
         "Transform": {
           "x": 1056.956937799043,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -38026,7 +37742,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 188,
+          "y": 179,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -38845,7 +38561,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 231,
+          "y": 222,
           "width": 76.89952153110048,
           "height": 14
         },
@@ -38897,9 +38613,9 @@
         },
         "Transform": {
           "x": 1186.3732057416269,
-          "y": 52,
+          "y": 34,
           "width": 210.06698564593302,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -38926,7 +38642,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 54,
+          "y": 36,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -39128,7 +38844,7 @@
         },
         "Transform": {
           "x": 1199.5023923444976,
-          "y": 142,
+          "y": 124,
           "width": 183.80861244019138,
           "height": 30
         },
@@ -39243,7 +38959,7 @@
         },
         "Transform": {
           "x": 1205.6985645933014,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -40054,7 +39770,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -40107,7 +39823,7 @@
         },
         "Transform": {
           "x": 1269.468899521531,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -40926,7 +40642,7 @@
         },
         "Transform": {
           "x": 1252.019138755981,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -40979,7 +40695,7 @@
         },
         "Transform": {
           "x": 1333.2392344497607,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -41798,7 +41514,7 @@
         },
         "Transform": {
           "x": 1315.7894736842106,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -41851,9 +41567,9 @@
         },
         "Transform": {
           "x": 1208.8803827751196,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -43139,9 +42855,9 @@
         },
         "Transform": {
           "x": 1255.7703349282297,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -44427,9 +44143,9 @@
         },
         "Transform": {
           "x": 1302.6602870813397,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -45715,9 +45431,9 @@
         },
         "Transform": {
           "x": 1349.5502392344497,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -47002,9 +46718,9 @@
         },
         "Transform": {
           "x": 1405.8181818181818,
-          "y": 52,
+          "y": 34,
           "width": 178.1818181818182,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -47031,7 +46747,7 @@
         },
         "Transform": {
           "x": 1407.6937799043062,
-          "y": 54,
+          "y": 36,
           "width": 79.71291866028709,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -47233,7 +46949,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 82,
+          "y": 64,
           "width": 90.02870813397129,
           "height": 54,
           "contentScaleMode": "scaleInternals"
@@ -48806,7 +48522,7 @@
         },
         "Transform": {
           "x": 1416.1339712918661,
-          "y": 68,
+          "y": 50,
           "width": 87.2153110047847,
           "height": 13
         },
@@ -48863,7 +48579,7 @@
         },
         "Transform": {
           "x": 1522.6746411483252,
-          "y": 82,
+          "y": 64,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -49674,7 +49390,7 @@
         },
         "Transform": {
           "x": 1505.2248803827752,
-          "y": 125,
+          "y": 107,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -49727,7 +49443,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 150,
+          "y": 132,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -50059,7 +49775,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 137,
+          "y": 119,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -50112,7 +49828,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 150,
+          "y": 132,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -50226,7 +49942,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 137,
+          "y": 119,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -50279,9 +49995,9 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -51575,9 +51291,9 @@
         },
         "Transform": {
           "x": 1456.4593301435407,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -52871,9 +52587,9 @@
         },
         "Transform": {
           "x": 1499.598086124402,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -54167,9 +53883,9 @@
         },
         "Transform": {
           "x": 1542.7368421052631,
-          "y": 176,
+          "y": 158,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -55456,299 +55172,15 @@
     {
       "_children": {
         "Core": {
-          "name": "tone2.signalFlow",
-          "id": "gaia_voice_rail_395",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 121.03349282296651,
-          "y": 272,
-          "width": 1462.9665071770335,
-          "height": 16
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1C2125"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF46515B"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "tone2.lamp",
-          "id": "gaia_voice_lamp_396",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 128.53588516746413,
-          "y": 276,
-          "width": 7,
-          "height": 7
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFF3B30"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF210908"
-            },
-            "Corners": {
-              "radius": 999
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_397",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 141.66507177033492,
-          "y": 273,
-          "width": 76.89952153110048,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "TONE 2",
-          "_children": {
-            "Fill": {
-              "colour": "FFE8EEF4"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 11,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_398",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 222.31578947368422,
-          "y": 273,
-          "width": 131.29186602870814,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "VOICE SIGNAL PATH",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_399",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 379.86602870813397,
-          "y": 273,
-          "width": 844.0191387559809,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "AUDIO: OSC  →  FILTER  →  AMP     ·     LFO: PITCH / FILTER / AMP MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FFC6D0D8"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_400",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1310.1626794258373,
-          "y": 273,
-          "width": 268.2105263157895,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "MOD LFO · MIDI-ONLY VOICE MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "right"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "right",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
           "name": "box_LFO",
           "id": "gaia_box_401",
           "controlType": "Background"
         },
         "Transform": {
           "x": 121.03349282296651,
-          "y": 290,
+          "y": 272,
           "width": 268.2105263157895,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -55775,7 +55207,7 @@
         },
         "Transform": {
           "x": 122.9090909090909,
-          "y": 292,
+          "y": 274,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -55977,7 +55409,7 @@
         },
         "Transform": {
           "x": 130.41148325358853,
-          "y": 320,
+          "y": 302,
           "width": 97.5311004784689,
           "height": 65,
           "contentScaleMode": "scaleInternals"
@@ -57550,7 +56982,7 @@
         },
         "Transform": {
           "x": 133.22488038277513,
-          "y": 306,
+          "y": 288,
           "width": 94.7177033492823,
           "height": 13
         },
@@ -57607,7 +57039,7 @@
         },
         "Transform": {
           "x": 243.51674641148327,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -58418,7 +57850,7 @@
         },
         "Transform": {
           "x": 226.06698564593302,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -58471,7 +57903,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 320,
+          "y": 302,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -58586,7 +58018,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 362,
+          "y": 344,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -58918,7 +58350,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 349,
+          "y": 331,
           "width": 78.77511961722487,
           "height": 12
         },
@@ -58971,7 +58403,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 388,
+          "y": 370,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -59086,9 +58518,9 @@
         },
         "Transform": {
           "x": 137.91387559808612,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -60374,9 +59806,9 @@
         },
         "Transform": {
           "x": 190.4306220095694,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -61670,9 +61102,9 @@
         },
         "Transform": {
           "x": 242.94736842105263,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -62966,9 +62398,9 @@
         },
         "Transform": {
           "x": 295.46411483253587,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -64262,9 +63694,9 @@
         },
         "Transform": {
           "x": 347.98086124401914,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -65557,9 +64989,9 @@
         },
         "Transform": {
           "x": 398.622009569378,
-          "y": 290,
+          "y": 272,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -65586,7 +65018,7 @@
         },
         "Transform": {
           "x": 400.4976076555024,
-          "y": 292,
+          "y": 274,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -65788,7 +65220,7 @@
         },
         "Transform": {
           "x": 552.421052631579,
-          "y": 380,
+          "y": 362,
           "width": 136.91866028708134,
           "height": 30
         },
@@ -65876,7 +65308,7 @@
         },
         "Transform": {
           "x": 409.8755980861244,
-          "y": 320,
+          "y": 302,
           "width": 103.15789473684211,
           "height": 75,
           "contentScaleMode": "scaleInternals"
@@ -67623,7 +67055,7 @@
         },
         "Transform": {
           "x": 412.688995215311,
-          "y": 306,
+          "y": 288,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -67680,7 +67112,7 @@
         },
         "Transform": {
           "x": 522.4114832535886,
-          "y": 320,
+          "y": 302,
           "width": 78.77511961722487,
           "height": 35,
           "contentScaleMode": "scaleInternals"
@@ -68377,7 +67809,7 @@
         },
         "Transform": {
           "x": 525.2248803827752,
-          "y": 306,
+          "y": 288,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -68434,7 +67866,7 @@
         },
         "Transform": {
           "x": 624.2631578947369,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -69253,7 +68685,7 @@
         },
         "Transform": {
           "x": 606.8133971291866,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -69306,7 +68738,7 @@
         },
         "Transform": {
           "x": 708.665071770335,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -70125,7 +69557,7 @@
         },
         "Transform": {
           "x": 691.2153110047847,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -70178,9 +69610,9 @@
         },
         "Transform": {
           "x": 413.6267942583732,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -71466,9 +70898,9 @@
         },
         "Transform": {
           "x": 460.51674641148327,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -72754,9 +72186,9 @@
         },
         "Transform": {
           "x": 561.799043062201,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -74042,9 +73474,9 @@
         },
         "Transform": {
           "x": 608.688995215311,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -75330,9 +74762,9 @@
         },
         "Transform": {
           "x": 715.5980861244019,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -76625,9 +76057,9 @@
         },
         "Transform": {
           "x": 792.4976076555024,
-          "y": 290,
+          "y": 272,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -76654,7 +76086,7 @@
         },
         "Transform": {
           "x": 794.3732057416267,
-          "y": 292,
+          "y": 274,
           "width": 71.27272727272728,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -76856,7 +76288,7 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 380,
+          "y": 362,
           "width": 187.55980861244018,
           "height": 30
         },
@@ -76971,7 +76403,7 @@
         },
         "Transform": {
           "x": 803.7511961722488,
-          "y": 320,
+          "y": 302,
           "width": 103.15789473684211,
           "height": 55,
           "contentScaleMode": "scaleInternals"
@@ -77997,7 +77429,7 @@
         },
         "Transform": {
           "x": 806.5645933014354,
-          "y": 306,
+          "y": 288,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -78054,7 +77486,7 @@
         },
         "Transform": {
           "x": 916.2870813397129,
-          "y": 320,
+          "y": 302,
           "width": 78.77511961722487,
           "height": 25,
           "contentScaleMode": "scaleInternals"
@@ -78589,7 +78021,7 @@
         },
         "Transform": {
           "x": 919.1004784688995,
-          "y": 306,
+          "y": 288,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -78646,7 +78078,7 @@
         },
         "Transform": {
           "x": 1018.1387559808613,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -79457,7 +78889,7 @@
         },
         "Transform": {
           "x": 1000.688995215311,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -79510,7 +78942,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -80321,7 +79753,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -80374,9 +79806,9 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -81662,9 +81094,9 @@
         },
         "Transform": {
           "x": 854.3923444976076,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -82950,9 +82382,9 @@
         },
         "Transform": {
           "x": 901.2822966507177,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -84238,9 +83670,9 @@
         },
         "Transform": {
           "x": 948.1722488038278,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -85526,9 +84958,9 @@
         },
         "Transform": {
           "x": 1006.3157894736842,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -86822,9 +86254,9 @@
         },
         "Transform": {
           "x": 1056.956937799043,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -88118,7 +87550,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 426,
+          "y": 417,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -88937,7 +88369,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 469,
+          "y": 460,
           "width": 76.89952153110048,
           "height": 14
         },
@@ -88989,9 +88421,9 @@
         },
         "Transform": {
           "x": 1186.3732057416269,
-          "y": 290,
+          "y": 272,
           "width": 210.06698564593302,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -89018,7 +88450,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 292,
+          "y": 274,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -89220,7 +88652,7 @@
         },
         "Transform": {
           "x": 1199.5023923444976,
-          "y": 380,
+          "y": 362,
           "width": 183.80861244019138,
           "height": 30
         },
@@ -89335,7 +88767,7 @@
         },
         "Transform": {
           "x": 1205.6985645933014,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -90146,7 +89578,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -90199,7 +89631,7 @@
         },
         "Transform": {
           "x": 1269.468899521531,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -91018,7 +90450,7 @@
         },
         "Transform": {
           "x": 1252.019138755981,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -91071,7 +90503,7 @@
         },
         "Transform": {
           "x": 1333.2392344497607,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -91890,7 +91322,7 @@
         },
         "Transform": {
           "x": 1315.7894736842106,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -91943,9 +91375,9 @@
         },
         "Transform": {
           "x": 1208.8803827751196,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -93231,9 +92663,9 @@
         },
         "Transform": {
           "x": 1255.7703349282297,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -94519,9 +93951,9 @@
         },
         "Transform": {
           "x": 1302.6602870813397,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -95807,9 +95239,9 @@
         },
         "Transform": {
           "x": 1349.5502392344497,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -97094,9 +96526,9 @@
         },
         "Transform": {
           "x": 1405.8181818181818,
-          "y": 290,
+          "y": 272,
           "width": 178.1818181818182,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -97123,7 +96555,7 @@
         },
         "Transform": {
           "x": 1407.6937799043062,
-          "y": 292,
+          "y": 274,
           "width": 79.71291866028709,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -97325,7 +96757,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 320,
+          "y": 302,
           "width": 90.02870813397129,
           "height": 54,
           "contentScaleMode": "scaleInternals"
@@ -98898,7 +98330,7 @@
         },
         "Transform": {
           "x": 1416.1339712918661,
-          "y": 306,
+          "y": 288,
           "width": 87.2153110047847,
           "height": 13
         },
@@ -98955,7 +98387,7 @@
         },
         "Transform": {
           "x": 1522.6746411483252,
-          "y": 320,
+          "y": 302,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -99766,7 +99198,7 @@
         },
         "Transform": {
           "x": 1505.2248803827752,
-          "y": 363,
+          "y": 345,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -99819,7 +99251,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 388,
+          "y": 370,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -100151,7 +99583,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 375,
+          "y": 357,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -100204,7 +99636,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 388,
+          "y": 370,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -100318,7 +99750,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 375,
+          "y": 357,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -100371,9 +99803,9 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -101667,9 +101099,9 @@
         },
         "Transform": {
           "x": 1456.4593301435407,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -102963,9 +102395,9 @@
         },
         "Transform": {
           "x": 1499.598086124402,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -104259,9 +103691,9 @@
         },
         "Transform": {
           "x": 1542.7368421052631,
-          "y": 414,
+          "y": 396,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -105548,299 +104980,15 @@
     {
       "_children": {
         "Core": {
-          "name": "tone3.signalFlow",
-          "id": "gaia_voice_rail_502",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 121.03349282296651,
-          "y": 510,
-          "width": 1462.9665071770335,
-          "height": 16
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FF1C2125"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF46515B"
-            },
-            "Corners": {
-              "radius": 4
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "tone3.lamp",
-          "id": "gaia_voice_lamp_503",
-          "controlType": "Background"
-        },
-        "Transform": {
-          "x": 128.53588516746413,
-          "y": 514,
-          "width": 7,
-          "height": 7
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "FFFF3B30"
-            },
-            "Border": {
-              "thickness": 1,
-              "colour": "FF210908"
-            },
-            "Corners": {
-              "radius": 999
-            }
-          }
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_504",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 141.66507177033492,
-          "y": 511,
-          "width": 76.89952153110048,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "TONE 3",
-          "_children": {
-            "Fill": {
-              "colour": "FFE8EEF4"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 11,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_505",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 222.31578947368422,
-          "y": 511,
-          "width": 131.29186602870814,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "VOICE SIGNAL PATH",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "left"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "left",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_506",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 379.86602870813397,
-          "y": 511,
-          "width": 844.0191387559809,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "AUDIO: OSC  →  FILTER  →  AMP     ·     LFO: PITCH / FILTER / AMP MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FFC6D0D8"
-            },
-            "Font": {
-              "weight": "Bold",
-              "weightValue": 700,
-              "size": 9,
-              "letterSpacing": 0.3,
-              "bold": true
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            }
-          }
-        },
-        "ContentLayout": {
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
-          "name": "label",
-          "id": "gaia_lbl_507",
-          "controlType": "Label"
-        },
-        "Transform": {
-          "x": 1310.1626794258373,
-          "y": 511,
-          "width": 268.2105263157895,
-          "height": 14
-        },
-        "Background": {
-          "_children": {
-            "Fill": {
-              "colour": "00000000"
-            },
-            "Border": {
-              "enabled": false,
-              "thickness": 0
-            }
-          }
-        },
-        "Text": {
-          "content": "MOD LFO · MIDI-ONLY VOICE MODULATION",
-          "_children": {
-            "Fill": {
-              "colour": "FF7C8894"
-            },
-            "Font": {
-              "size": 8,
-              "letterSpacing": 0.3,
-              "bold": false
-            },
-            "Multiline": {
-              "overflowMode": "shrink",
-              "maxLines": 1,
-              "fitMode": "shrink",
-              "lineHeight": 1.1
-            },
-            "Position": {
-              "justification": "right"
-            }
-          }
-        },
-        "ContentLayout": {
-          "horizontalAlign": "right",
-          "paddingLeft": 2,
-          "paddingRight": 2,
-          "paddingTop": 1,
-          "paddingBottom": 1
-        }
-      },
-      "_type": "Control"
-    },
-    {
-      "_children": {
-        "Core": {
           "name": "box_LFO",
           "id": "gaia_box_508",
           "controlType": "Background"
         },
         "Transform": {
           "x": 121.03349282296651,
-          "y": 528,
+          "y": 510,
           "width": 268.2105263157895,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -105867,7 +105015,7 @@
         },
         "Transform": {
           "x": 122.9090909090909,
-          "y": 530,
+          "y": 512,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -106069,7 +105217,7 @@
         },
         "Transform": {
           "x": 130.41148325358853,
-          "y": 558,
+          "y": 540,
           "width": 97.5311004784689,
           "height": 65,
           "contentScaleMode": "scaleInternals"
@@ -107642,7 +106790,7 @@
         },
         "Transform": {
           "x": 133.22488038277513,
-          "y": 544,
+          "y": 526,
           "width": 94.7177033492823,
           "height": 13
         },
@@ -107699,7 +106847,7 @@
         },
         "Transform": {
           "x": 243.51674641148327,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -108510,7 +107658,7 @@
         },
         "Transform": {
           "x": 226.06698564593302,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -108563,7 +107711,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 558,
+          "y": 540,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -108678,7 +107826,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 600,
+          "y": 582,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -109010,7 +108158,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 587,
+          "y": 569,
           "width": 78.77511961722487,
           "height": 12
         },
@@ -109063,7 +108211,7 @@
         },
         "Transform": {
           "x": 299.21531100478467,
-          "y": 626,
+          "y": 608,
           "width": 78.77511961722487,
           "height": 20
         },
@@ -109178,9 +108326,9 @@
         },
         "Transform": {
           "x": 137.91387559808612,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -110466,9 +109614,9 @@
         },
         "Transform": {
           "x": 190.4306220095694,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -111762,9 +110910,9 @@
         },
         "Transform": {
           "x": 242.94736842105263,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -113058,9 +112206,9 @@
         },
         "Transform": {
           "x": 295.46411483253587,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -114354,9 +113502,9 @@
         },
         "Transform": {
           "x": 347.98086124401914,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -115649,9 +114797,9 @@
         },
         "Transform": {
           "x": 398.622009569378,
-          "y": 528,
+          "y": 510,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -115678,7 +114826,7 @@
         },
         "Transform": {
           "x": 400.4976076555024,
-          "y": 530,
+          "y": 512,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -115880,7 +115028,7 @@
         },
         "Transform": {
           "x": 552.421052631579,
-          "y": 618,
+          "y": 600,
           "width": 136.91866028708134,
           "height": 30
         },
@@ -115968,7 +115116,7 @@
         },
         "Transform": {
           "x": 409.8755980861244,
-          "y": 558,
+          "y": 540,
           "width": 103.15789473684211,
           "height": 75,
           "contentScaleMode": "scaleInternals"
@@ -117715,7 +116863,7 @@
         },
         "Transform": {
           "x": 412.688995215311,
-          "y": 544,
+          "y": 526,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -117772,7 +116920,7 @@
         },
         "Transform": {
           "x": 522.4114832535886,
-          "y": 558,
+          "y": 540,
           "width": 78.77511961722487,
           "height": 35,
           "contentScaleMode": "scaleInternals"
@@ -118469,7 +117617,7 @@
         },
         "Transform": {
           "x": 525.2248803827752,
-          "y": 544,
+          "y": 526,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -118526,7 +117674,7 @@
         },
         "Transform": {
           "x": 624.2631578947369,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -119345,7 +118493,7 @@
         },
         "Transform": {
           "x": 606.8133971291866,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -119398,7 +118546,7 @@
         },
         "Transform": {
           "x": 708.665071770335,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -120217,7 +119365,7 @@
         },
         "Transform": {
           "x": 691.2153110047847,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -120270,9 +119418,9 @@
         },
         "Transform": {
           "x": 413.6267942583732,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -121558,9 +120706,9 @@
         },
         "Transform": {
           "x": 460.51674641148327,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -122846,9 +121994,9 @@
         },
         "Transform": {
           "x": 561.799043062201,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -124134,9 +123282,9 @@
         },
         "Transform": {
           "x": 608.688995215311,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -125422,9 +124570,9 @@
         },
         "Transform": {
           "x": 715.5980861244019,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -126717,9 +125865,9 @@
         },
         "Transform": {
           "x": 792.4976076555024,
-          "y": 528,
+          "y": 510,
           "width": 384.4976076555024,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -126746,7 +125894,7 @@
         },
         "Transform": {
           "x": 794.3732057416267,
-          "y": 530,
+          "y": 512,
           "width": 71.27272727272728,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -126948,7 +126096,7 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 618,
+          "y": 600,
           "width": 187.55980861244018,
           "height": 30
         },
@@ -127063,7 +126211,7 @@
         },
         "Transform": {
           "x": 803.7511961722488,
-          "y": 558,
+          "y": 540,
           "width": 103.15789473684211,
           "height": 55,
           "contentScaleMode": "scaleInternals"
@@ -128089,7 +127237,7 @@
         },
         "Transform": {
           "x": 806.5645933014354,
-          "y": 544,
+          "y": 526,
           "width": 100.3444976076555,
           "height": 13
         },
@@ -128146,7 +127294,7 @@
         },
         "Transform": {
           "x": 916.2870813397129,
-          "y": 558,
+          "y": 540,
           "width": 78.77511961722487,
           "height": 25,
           "contentScaleMode": "scaleInternals"
@@ -128681,7 +127829,7 @@
         },
         "Transform": {
           "x": 919.1004784688995,
-          "y": 544,
+          "y": 526,
           "width": 75.96172248803828,
           "height": 13
         },
@@ -128738,7 +127886,7 @@
         },
         "Transform": {
           "x": 1018.1387559808613,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -129549,7 +128697,7 @@
         },
         "Transform": {
           "x": 1000.688995215311,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -129602,7 +128750,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -130413,7 +129561,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -130466,9 +129614,9 @@
         },
         "Transform": {
           "x": 807.5023923444976,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -131754,9 +130902,9 @@
         },
         "Transform": {
           "x": 854.3923444976076,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -133042,9 +132190,9 @@
         },
         "Transform": {
           "x": 901.2822966507177,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -134330,9 +133478,9 @@
         },
         "Transform": {
           "x": 948.1722488038278,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -135618,9 +134766,9 @@
         },
         "Transform": {
           "x": 1006.3157894736842,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -136914,9 +136062,9 @@
         },
         "Transform": {
           "x": 1056.956937799043,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -138210,7 +137358,7 @@
         },
         "Transform": {
           "x": 1102.5406698564593,
-          "y": 664,
+          "y": 655,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -139029,7 +138177,7 @@
         },
         "Transform": {
           "x": 1085.090909090909,
-          "y": 707,
+          "y": 698,
           "width": 76.89952153110048,
           "height": 14
         },
@@ -139081,9 +138229,9 @@
         },
         "Transform": {
           "x": 1186.3732057416269,
-          "y": 528,
+          "y": 510,
           "width": 210.06698564593302,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -139110,7 +138258,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 530,
+          "y": 512,
           "width": 60.01913875598086,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -139312,7 +138460,7 @@
         },
         "Transform": {
           "x": 1199.5023923444976,
-          "y": 618,
+          "y": 600,
           "width": 183.80861244019138,
           "height": 30
         },
@@ -139427,7 +138575,7 @@
         },
         "Transform": {
           "x": 1205.6985645933014,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -140238,7 +139386,7 @@
         },
         "Transform": {
           "x": 1188.2488038277513,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -140291,7 +139439,7 @@
         },
         "Transform": {
           "x": 1269.468899521531,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -141110,7 +140258,7 @@
         },
         "Transform": {
           "x": 1252.019138755981,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -141163,7 +140311,7 @@
         },
         "Transform": {
           "x": 1333.2392344497607,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -141982,7 +141130,7 @@
         },
         "Transform": {
           "x": 1315.7894736842106,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -142035,9 +141183,9 @@
         },
         "Transform": {
           "x": 1208.8803827751196,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -143323,9 +142471,9 @@
         },
         "Transform": {
           "x": 1255.7703349282297,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -144611,9 +143759,9 @@
         },
         "Transform": {
           "x": 1302.6602870813397,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -145899,9 +145047,9 @@
         },
         "Transform": {
           "x": 1349.5502392344497,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -147186,9 +146334,9 @@
         },
         "Transform": {
           "x": 1405.8181818181818,
-          "y": 528,
+          "y": 510,
           "width": 178.1818181818182,
-          "height": 212
+          "height": 230
         },
         "Background": {
           "_children": {
@@ -147215,7 +146363,7 @@
         },
         "Transform": {
           "x": 1407.6937799043062,
-          "y": 530,
+          "y": 512,
           "width": 79.71291866028709,
           "height": 18,
           "contentScaleMode": "scaleInternals"
@@ -147417,7 +146565,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 558,
+          "y": 540,
           "width": 90.02870813397129,
           "height": 54,
           "contentScaleMode": "scaleInternals"
@@ -148990,7 +148138,7 @@
         },
         "Transform": {
           "x": 1416.1339712918661,
-          "y": 544,
+          "y": 526,
           "width": 87.2153110047847,
           "height": 13
         },
@@ -149047,7 +148195,7 @@
         },
         "Transform": {
           "x": 1522.6746411483252,
-          "y": 558,
+          "y": 540,
           "width": 42,
           "height": 42,
           "contentScaleMode": "scaleInternals"
@@ -149858,7 +149006,7 @@
         },
         "Transform": {
           "x": 1505.2248803827752,
-          "y": 601,
+          "y": 583,
           "width": 76.89952153110048,
           "height": 12
         },
@@ -149911,7 +149059,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 626,
+          "y": 608,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -150243,7 +149391,7 @@
         },
         "Transform": {
           "x": 1507.1004784688996,
-          "y": 613,
+          "y": 595,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -150296,7 +149444,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 626,
+          "y": 608,
           "width": 73.14832535885168,
           "height": 20
         },
@@ -150410,7 +149558,7 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 613,
+          "y": 595,
           "width": 73.14832535885168,
           "height": 12
         },
@@ -150463,9 +149611,9 @@
         },
         "Transform": {
           "x": 1413.3205741626793,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -151759,9 +150907,9 @@
         },
         "Transform": {
           "x": 1456.4593301435407,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -153055,9 +152203,9 @@
         },
         "Transform": {
           "x": 1499.598086124402,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -154351,9 +153499,9 @@
         },
         "Transform": {
           "x": 1542.7368421052631,
-          "y": 652,
+          "y": 634,
           "width": 28.13397129186603,
-          "height": 62,
+          "height": 80,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -211449,7 +210597,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 82,
+          "y": 64,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -211564,7 +210712,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 118,
+          "y": 100,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -211679,7 +210827,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 154,
+          "y": 136,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -211719,7 +210867,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 188.43478260869566,
+          "y": 170.43478260869566,
           "width": 90.02870813397129,
           "height": 50
         },
@@ -211762,7 +210910,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 320,
+          "y": 302,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -211877,7 +211025,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 356,
+          "y": 338,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -211992,7 +211140,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 392,
+          "y": 374,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -212032,7 +211180,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 426.4347826086956,
+          "y": 408.4347826086956,
           "width": 90.02870813397129,
           "height": 50
         },
@@ -212075,7 +211223,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 558,
+          "y": 540,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -212190,7 +211338,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 594,
+          "y": 576,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -212305,7 +211453,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 630,
+          "y": 612,
           "width": 90.02870813397129,
           "height": 26
         },
@@ -212345,7 +211493,7 @@
         },
         "Transform": {
           "x": 16,
-          "y": 664.4347826086956,
+          "y": 646.4347826086956,
           "width": 90.02870813397129,
           "height": 50
         },

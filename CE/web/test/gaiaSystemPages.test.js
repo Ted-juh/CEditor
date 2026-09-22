@@ -68,6 +68,8 @@ test('1920 by 1000 panel keeps a vertical effects column beside three horizontal
   const fx=['DISTORTION','FLANGER','DELAY','REVERB'].map(n=>byName(`box_${n}`)._children.Transform);
   assert.ok(fx.every((r,i)=>r.x===fx[0].x && (!i || r.y>=fx[i-1].y+fx[i-1].height)));
   for(const tone of [1,2,3]) {
+    assert.equal(byName(`tone${tone}.signalFlow`),undefined);
+    assert.equal(byName(`tone${tone}.lamp`),undefined);
     const row=['lfo.rate','osc.pitch','filter.cutoff','amp.level','modLfo.rate'].map(n=>byName(`tone${tone}.${n}`)._children.Transform);
     assert.ok(row.every((r,i)=>r.y===row[0].y && r.x+r.width<fx[0].x && (!i || r.x>row[i-1].x)));
   }
