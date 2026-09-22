@@ -1,4 +1,7 @@
 #include "PluginScannerCoordinator.h"
+#include <atomic>
+#include <chrono>
+#include <thread>
 
 namespace ceditor::host
 {
@@ -52,15 +55,50 @@ PluginScannerCoordinator::JobResult PluginScannerCoordinator::runOneJob (const j
         return job;
     }
 
-    if (! child.waitForProcessToFinish (options.perModuleTimeoutMs))
+    // Drain while the worker is alive. Waiting first deadlocks on Windows when a module exposes
+    // enough classes to fill the anonymous pipe: the child blocks writing while the parent blocks
+    // waiting for it to exit. A watchdog kills genuinely hung workers so the blocking read below
+    // always receives EOF.
+    std::atomic<bool> readingFinished { false };
+    std::atomic<bool> timedOut { false };
+    std::thread watchdog ([&]
     {
-        child.kill();
+        const auto deadline = juce::Time::currentTimeMillis() + options.perModuleTimeoutMs;
+        while (! readingFinished.load (std::memory_order_acquire))
+        {
+            std::this_thread::sleep_for (std::chrono::milliseconds (25));
+            if (readingFinished.load (std::memory_order_acquire))
+                return;
+            if (juce::Time::currentTimeMillis() >= deadline)
+            {
+                timedOut.store (true, std::memory_order_release);
+                child.kill();
+                return;
+            }
+        }
+    });
+
+    juce::String output;
+    char buffer[8192];
+    for (;;)
+    {
+        const auto bytesRead = child.readProcessOutput (buffer, (int) sizeof (buffer));
+        if (bytesRead <= 0)
+            break;
+        output += juce::String::fromUTF8 (buffer, bytesRead);
+    }
+
+    readingFinished.store (true, std::memory_order_release);
+    watchdog.join();
+    child.waitForProcessToFinish (2000);
+
+    if (timedOut.load (std::memory_order_acquire))
+    {
         job.status = JobStatus::timedOut;
         job.detail = "no result within " + juce::String (options.perModuleTimeoutMs) + " ms";
         return job;
     }
 
-    const auto output   = child.readAllProcessOutput();
     const auto exitCode = (int) child.getExitCode();
 
     const auto parsed = juce::XmlDocument::parse (output);

@@ -74,6 +74,10 @@ void testJobOutcomes (const juce::File& stub)
     check (ok.result.classes[1].snapshotPath.isEmpty(),
            "a class the worker found no artwork for has none");
 
+    const auto many = coordinator.runOneJob (makeModule ("many.vst3"));
+    check (many.status == Status::ok && many.result.classes.size() == 256,
+           "scanner output larger than the Windows pipe buffer is drained without deadlocking");
+
     const auto hung = coordinator.runOneJob (makeModule ("hang.vst3"));
     check (hung.status == Status::timedOut, "a hanging worker is killed and reported as timeout");
 

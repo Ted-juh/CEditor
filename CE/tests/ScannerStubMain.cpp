@@ -9,6 +9,7 @@
 //   path contains "crash"   dies without output, exit 3
 //   path contains "garbage" prints non-XML, exit 0
 //   path contains "error"   prints an ERROR document, exit 2
+//   path contains "many"    prints enough classes to fill a Windows anonymous pipe
 //   anything else           prints a SCANRESULT with one instrument and one effect, exit 0
 //
 // It stands in for the AUDITION worker too (--audition), where the scenarios are per PRESET
@@ -161,6 +162,16 @@ int main (int argc, char* argv[])
         std::printf ("<SCANRESULT module=\"%s\"><ERROR message=\"stub reported error\"/></SCANRESULT>\n",
                      path.c_str());
         return 2;
+    }
+
+    if (has ("many"))
+    {
+        std::printf ("<SCANRESULT module=\"%s\">", path.c_str());
+        for (int i = 0; i < 256; ++i)
+            std::printf ("<PLUGIN name=\"Stub Class %d\" manufacturer=\"Stub Audio\" version=\"1.0\""
+                         " category=\"Fx\" isInstrument=\"0\" ceId=\"VST3-stub-many-%d\"/>", i, i);
+        std::puts ("</SCANRESULT>");
+        return 0;
     }
 
     std::printf ("<SCANRESULT module=\"%s\">"
