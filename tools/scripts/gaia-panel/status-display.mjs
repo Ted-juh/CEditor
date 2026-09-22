@@ -1,6 +1,7 @@
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { createScript } from '../../../CE/web/src/CE_Application/scripting/scriptModel.js';
 import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
+import { expandStatusDisplay } from './status-space.mjs';
 
 export const DISPLAY_HEIGHT = 160;
 export const SCREEN = 'gaia_status_screen';
@@ -162,6 +163,7 @@ export function applyStatusDisplay(panel, profile) {
       label('gaia_display_help', 'TOUCH A MENU ON SCREEN\nPARAM follows your last control.\nReadouts do not change the sound.', 1290, 48, 268, 94, 12, 'FFAEBAC6'));
   } else {
     const old = named(SCREEN);
+    const expanded = old._children.Display?.cols === 112 && old._children.Display?.rows === 12;
     const priorScope = old._children.Display?.activeScope;
     const nextScope = screen._children.Display.activeScope;
     if (priorScope?.length === nextScope.length && priorScope.every(id => nextScope.includes(id))) {
@@ -172,6 +174,7 @@ export function applyStatusDisplay(panel, profile) {
       screen._children.Transform = old._children.Transform;
     }
     Object.assign(old, screen);
+    if (expanded) expandStatusDisplay(panel);
   }
   const script = createScript({ id: 'gaia_status_display', name: 'GAIA dot-matrix status', language: 'javascript', scope: 'panel', event: 'onPanelLoad', target: '*',
     description: 'Read-only MIDI route status. LCD menu/source bindings handle patch, parameter, arp and system readouts.',

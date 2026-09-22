@@ -185895,10 +185895,8 @@
                   "controlType": "LcdDisplay"
                 },
                 "Transform": {
-                  "x": 309.4736842105263,
-                  "y": 58.99999999999999,
-                  "width": 877.7799043062201,
-                  "height": 123.95238095238095
+                  "width": 1568,
+                  "height": 244
                 },
                 "Background": {
                   "_children": {
@@ -185915,11 +185913,11 @@
                 },
                 "Display": {
                   "panelType": "graphic",
-                  "pixelWidth": 336,
-                  "pixelHeight": 56,
+                  "pixelWidth": 672,
+                  "pixelHeight": 96,
                   "palette": "amber",
-                  "rows": 7,
-                  "cols": 56,
+                  "rows": 12,
+                  "cols": 112,
                   "litColour": "FFE9CE91",
                   "unlitColour": "0AE9CE91",
                   "screenColour": "FF151B19",
@@ -185938,57 +185936,57 @@
                           "id": "instrument_brand",
                           "row": 1,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "ROLAND  GAIA  |  SYNTHESIZER SH-01",
                           "align": "center"
                         },
                         {
                           "id": "patch_selection",
-                          "row": 2,
+                          "row": 3,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "PATCH: SELECTION UNKNOWN"
                         },
                         {
                           "id": "patch_name",
-                          "row": 3,
+                          "row": 4,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "NAME: NOT READ"
                         },
                         {
                           "id": "patch_source",
-                          "row": 4,
+                          "row": 6,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "Use PATCH BANKS to read names / check selection."
                         },
                         {
                           "id": "patch_message",
-                          "row": 5,
+                          "row": 8,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "No automatic patch recall or hardware writes.",
                           "scroll": true
                         },
                         {
                           "id": "connection",
-                          "row": 6,
+                          "row": 10,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "MIDI: NOT CHECKED"
                         },
                         {
                           "id": "menu_PATCH",
-                          "row": 7,
+                          "row": 12,
                           "colStart": 1,
-                          "colEnd": 14,
+                          "colEnd": 28,
                           "show": "static",
                           "text": "[PATCH]",
                           "align": "center",
@@ -185998,9 +185996,9 @@
                         },
                         {
                           "id": "menu_PARAM",
-                          "row": 7,
-                          "colStart": 15,
-                          "colEnd": 28,
+                          "row": 12,
+                          "colStart": 29,
+                          "colEnd": 56,
                           "show": "static",
                           "text": "PARAM",
                           "align": "center",
@@ -186010,9 +186008,9 @@
                         },
                         {
                           "id": "menu_ARP",
-                          "row": 7,
-                          "colStart": 29,
-                          "colEnd": 42,
+                          "row": 12,
+                          "colStart": 57,
+                          "colEnd": 84,
                           "show": "static",
                           "text": "ARP",
                           "align": "center",
@@ -186022,9 +186020,9 @@
                         },
                         {
                           "id": "menu_SYSTEM",
-                          "row": 7,
-                          "colStart": 43,
-                          "colEnd": 56,
+                          "row": 12,
+                          "colStart": 85,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "SYSTEM",
                           "align": "center",
@@ -186042,33 +186040,33 @@
                           "id": "instrument_brand",
                           "row": 1,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "ROLAND  GAIA  |  SYNTHESIZER SH-01",
                           "align": "center"
                         },
                         {
                           "id": "param_name",
-                          "row": 2,
+                          "row": 3,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "name",
                           "text": "Touch a synth control to inspect it.",
                           "sourceId": "@active"
                         },
                         {
                           "id": "param_idle",
-                          "row": 3,
+                          "row": 5,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "No parameter touched yet."
                         },
                         {
                           "id": "param_value",
-                          "row": 3,
+                          "row": 5,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "value",
                           "text": "",
                           "sourceId": "@active",
@@ -186076,9 +186074,9 @@
                         },
                         {
                           "id": "param_text",
-                          "row": 3,
+                          "row": 5,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "@active",
@@ -186086,34 +186084,34 @@
                         },
                         {
                           "id": "param_bar",
-                          "row": 4,
+                          "row": 7,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "bar",
                           "text": "",
                           "sourceId": "@active#value"
                         },
                         {
                           "id": "param_local",
-                          "row": 5,
+                          "row": 9,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "PANEL VALUE - not proof of hardware readback"
                         },
                         {
                           "id": "connection",
-                          "row": 6,
+                          "row": 10,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "MIDI: NOT CHECKED"
                         },
                         {
                           "id": "menu_PATCH",
-                          "row": 7,
+                          "row": 12,
                           "colStart": 1,
-                          "colEnd": 14,
+                          "colEnd": 28,
                           "show": "static",
                           "text": "PATCH",
                           "align": "center",
@@ -186123,9 +186121,9 @@
                         },
                         {
                           "id": "menu_PARAM",
-                          "row": 7,
-                          "colStart": 15,
-                          "colEnd": 28,
+                          "row": 12,
+                          "colStart": 29,
+                          "colEnd": 56,
                           "show": "static",
                           "text": "[PARAM]",
                           "align": "center",
@@ -186135,9 +186133,9 @@
                         },
                         {
                           "id": "menu_ARP",
-                          "row": 7,
-                          "colStart": 29,
-                          "colEnd": 42,
+                          "row": 12,
+                          "colStart": 57,
+                          "colEnd": 84,
                           "show": "static",
                           "text": "ARP",
                           "align": "center",
@@ -186147,9 +186145,9 @@
                         },
                         {
                           "id": "menu_SYSTEM",
-                          "row": 7,
-                          "colStart": 43,
-                          "colEnd": 56,
+                          "row": 12,
+                          "colStart": 85,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "SYSTEM",
                           "align": "center",
@@ -186167,16 +186165,16 @@
                           "id": "instrument_brand",
                           "row": 1,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "ROLAND  GAIA  |  SYNTHESIZER SH-01",
                           "align": "center"
                         },
                         {
                           "id": "arp_end",
-                          "row": 2,
+                          "row": 3,
                           "colStart": 1,
-                          "colEnd": 24,
+                          "colEnd": 48,
                           "show": "value",
                           "text": "",
                           "sourceId": "gaia_arp_pattern_grid_677",
@@ -186184,9 +186182,9 @@
                         },
                         {
                           "id": "arp_tempo",
-                          "row": 2,
-                          "colStart": 27,
-                          "colEnd": 56,
+                          "row": 3,
+                          "colStart": 53,
+                          "colEnd": 112,
                           "show": "value",
                           "text": "",
                           "sourceId": "gaia_common_patchTempo_7",
@@ -186195,9 +186193,9 @@
                         },
                         {
                           "id": "arp_grid",
-                          "row": 3,
+                          "row": 5,
                           "colStart": 1,
-                          "colEnd": 30,
+                          "colEnd": 60,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_arp_grid_612",
@@ -186205,9 +186203,9 @@
                         },
                         {
                           "id": "arp_duration",
-                          "row": 3,
-                          "colStart": 32,
-                          "colEnd": 56,
+                          "row": 5,
+                          "colStart": 63,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_arp_duration_614",
@@ -186215,9 +186213,9 @@
                         },
                         {
                           "id": "arp_motif",
-                          "row": 4,
+                          "row": 7,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_arp_motif_616",
@@ -186225,9 +186223,9 @@
                         },
                         {
                           "id": "arp_feedback",
-                          "row": 5,
+                          "row": 9,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_hardware_sync_status",
@@ -186235,17 +186233,17 @@
                         },
                         {
                           "id": "arp_staged",
-                          "row": 6,
+                          "row": 10,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "NOTES + END STEP STAGED | SEND PATTERN TO APPLY"
                         },
                         {
                           "id": "menu_PATCH",
-                          "row": 7,
+                          "row": 12,
                           "colStart": 1,
-                          "colEnd": 14,
+                          "colEnd": 28,
                           "show": "static",
                           "text": "PATCH",
                           "align": "center",
@@ -186255,9 +186253,9 @@
                         },
                         {
                           "id": "menu_PARAM",
-                          "row": 7,
-                          "colStart": 15,
-                          "colEnd": 28,
+                          "row": 12,
+                          "colStart": 29,
+                          "colEnd": 56,
                           "show": "static",
                           "text": "PARAM",
                           "align": "center",
@@ -186267,9 +186265,9 @@
                         },
                         {
                           "id": "menu_ARP",
-                          "row": 7,
-                          "colStart": 29,
-                          "colEnd": 42,
+                          "row": 12,
+                          "colStart": 57,
+                          "colEnd": 84,
                           "show": "static",
                           "text": "[ARP]",
                           "align": "center",
@@ -186279,9 +186277,9 @@
                         },
                         {
                           "id": "menu_SYSTEM",
-                          "row": 7,
-                          "colStart": 43,
-                          "colEnd": 56,
+                          "row": 12,
+                          "colStart": 85,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "SYSTEM",
                           "align": "center",
@@ -186299,16 +186297,16 @@
                           "id": "instrument_brand",
                           "row": 1,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "ROLAND  GAIA  |  SYNTHESIZER SH-01",
                           "align": "center"
                         },
                         {
                           "id": "sys_clock",
-                          "row": 2,
+                          "row": 3,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_system_clockSource_687",
@@ -186316,9 +186314,9 @@
                         },
                         {
                           "id": "sys_tempo",
-                          "row": 3,
+                          "row": 5,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "value",
                           "text": "",
                           "sourceId": "gaia_system_tempo_689",
@@ -186327,9 +186325,9 @@
                         },
                         {
                           "id": "sys_level",
-                          "row": 4,
+                          "row": 7,
                           "colStart": 1,
-                          "colEnd": 25,
+                          "colEnd": 50,
                           "show": "value",
                           "text": "",
                           "sourceId": "gaia_system_masterLevel_681",
@@ -186337,9 +186335,9 @@
                         },
                         {
                           "id": "sys_pedal",
-                          "row": 4,
-                          "colStart": 27,
-                          "colEnd": 56,
+                          "row": 7,
+                          "colStart": 53,
+                          "colEnd": 112,
                           "show": "text",
                           "text": "",
                           "sourceId": "gaia_system_pedalAssign_699",
@@ -186347,25 +186345,25 @@
                         },
                         {
                           "id": "sys_local",
-                          "row": 5,
+                          "row": 9,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "PANEL VALUES | Full controls on SYSTEM layer"
                         },
                         {
                           "id": "connection",
-                          "row": 6,
+                          "row": 10,
                           "colStart": 1,
-                          "colEnd": 56,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "MIDI: NOT CHECKED"
                         },
                         {
                           "id": "menu_PATCH",
-                          "row": 7,
+                          "row": 12,
                           "colStart": 1,
-                          "colEnd": 14,
+                          "colEnd": 28,
                           "show": "static",
                           "text": "PATCH",
                           "align": "center",
@@ -186375,9 +186373,9 @@
                         },
                         {
                           "id": "menu_PARAM",
-                          "row": 7,
-                          "colStart": 15,
-                          "colEnd": 28,
+                          "row": 12,
+                          "colStart": 29,
+                          "colEnd": 56,
                           "show": "static",
                           "text": "PARAM",
                           "align": "center",
@@ -186387,9 +186385,9 @@
                         },
                         {
                           "id": "menu_ARP",
-                          "row": 7,
-                          "colStart": 29,
-                          "colEnd": 42,
+                          "row": 12,
+                          "colStart": 57,
+                          "colEnd": 84,
                           "show": "static",
                           "text": "ARP",
                           "align": "center",
@@ -186399,9 +186397,9 @@
                         },
                         {
                           "id": "menu_SYSTEM",
-                          "row": 7,
-                          "colStart": 43,
-                          "colEnd": 56,
+                          "row": 12,
+                          "colStart": 85,
+                          "colEnd": 112,
                           "show": "static",
                           "text": "[SYSTEM]",
                           "align": "center",
@@ -186694,90 +186692,6 @@
                     "gaia_system_writeProtectH7_801",
                     "gaia_system_writeProtectH8_802"
                   ]
-                }
-              },
-              "_type": "Control"
-            },
-            "gaia_display_caption": {
-              "_children": {
-                "Core": {
-                  "name": "gaia_display_caption",
-                  "id": "gaia_display_caption",
-                  "tabPageId": "status",
-                  "controlType": "Label"
-                },
-                "Transform": {
-                  "x": 609.5693779904307,
-                  "y": 15.45238095238095,
-                  "width": 375.11961722488036,
-                  "height": 38.63095238095238
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "00000000"
-                    },
-                    "Border": {
-                      "enabled": false
-                    }
-                  }
-                },
-                "Text": {
-                  "content": "EDITOR STATUS\nThree independent tones",
-                  "_children": {
-                    "Fill": {
-                      "colour": "FF99A7B0"
-                    },
-                    "Multiline": {
-                      "maxLines": 3,
-                      "lineHeight": 1.3
-                    },
-                    "Position": {
-                      "justification": "left"
-                    }
-                  }
-                }
-              },
-              "_type": "Control"
-            },
-            "gaia_display_help": {
-              "_children": {
-                "Core": {
-                  "name": "gaia_display_help",
-                  "id": "gaia_display_help",
-                  "tabPageId": "status",
-                  "controlType": "Label"
-                },
-                "Transform": {
-                  "x": 309.4736842105263,
-                  "y": 188.57142857142856,
-                  "width": 877.7799043062201,
-                  "height": 36.52380952380952
-                },
-                "Background": {
-                  "_children": {
-                    "Fill": {
-                      "colour": "00000000"
-                    },
-                    "Border": {
-                      "enabled": false
-                    }
-                  }
-                },
-                "Text": {
-                  "content": "TOUCH A MENU ON SCREEN\nPARAM follows your last control.\nReadouts do not change the sound.",
-                  "_children": {
-                    "Fill": {
-                      "colour": "FFAEBAC6"
-                    },
-                    "Multiline": {
-                      "maxLines": 3,
-                      "lineHeight": 1.3
-                    },
-                    "Position": {
-                      "justification": "left"
-                    }
-                  }
                 }
               },
               "_type": "Control"
