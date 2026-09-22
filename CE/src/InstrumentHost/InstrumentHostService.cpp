@@ -7495,6 +7495,17 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         return {};
     }();
 
+    // The standalone's session file is shared by every running instance. Remember its exact
+    // bytes (or its absence) before loading so a later save can detect another instance's
+    // complete write rather than silently replacing it with stale state.
+    if (options.persistSession)
+    {
+        performanceBaselineKnown = true;
+        performanceBaselineExisted = performanceFile().existsAsFile();
+        performanceBaselineText = performanceBaselineExisted
+                                    ? performanceFile().loadFileAsString() : juce::String();
+    }
+
     if (includePerformance && performanceSource != juce::File())
     {
         // Named, so a crash inside a vendor's setStateInformation says "restoring the session"
@@ -7502,11 +7513,20 @@ void InstrumentHostService::restoreSessionImpl (bool includePerformance)
         const SessionRecovery::ScopedOperation operation (recovery.get(), "restoreSession",
                                                           performanceSource.getFileName());
 
+        const auto sourceText = performanceSource == performanceFile()
+                                  ? performanceBaselineText : performanceSource.loadFileAsString();
         Performance restored;
-        if (Performance::fromVar (juce::JSON::parse (performanceSource.loadFileAsString()), restored))
+        if (Performance::fromVar (juce::JSON::parse (sourceText), restored))
             applyPerformance (std::move (restored));
         else
-            emitError ("The saved rack session could not be read; starting empty.");
+        {
+            if (performanceSource == performanceFile())
+                performanceSavesBlocked = true;
+            emitError (performanceSource == performanceFile()
+                         ? "The saved rack session could not be read. It was left untouched, "
+                           "and session saves are blocked so an empty rack cannot overwrite it."
+                         : "The factory rack session could not be read; starting empty.");
+        }
     }
 
     checkStateDigests();
@@ -18581,22 +18601,81 @@ void InstrumentHostService::savePerformanceModel()
 
 bool InstrumentHostService::writePerformanceDocument (const juce::var& document)
 {
-    maybeSnapshotRevision();
-
-    if (writeTextAtomically (performanceFile(), juce::JSON::toString (document)))
+    performanceConflictCopy = {};
+    const auto reportFailure = [this] (const juce::String& message)
     {
+        if (! performanceWriteErrorReported)
+        {
+            performanceWriteErrorReported = true;
+            emitError (message);
+        }
+        return false;
+    };
+
+    if (performanceSavesBlocked)
+        return reportFailure (
+            "Session changes are not being saved because the existing session file could not "
+            "be read and has been left untouched.");
+
+    static std::mutex inProcessSaveMutex;
+    const std::scoped_lock inProcessLock (inProcessSaveMutex);
+
+    auto lockPath = performanceFile().getFullPathName();
+   #if JUCE_WINDOWS
+    lockPath = lockPath.toLowerCase();
+   #endif
+    juce::InterProcessLock processLock (
+        "CEditorPerformance-" + juce::String::toHexString (lockPath.hashCode64()));
+    if (! processLock.enter (1000))
+        return reportFailure ("Could not save the current session because another CEditor "
+                              "instance is writing it. The session remains dirty.");
+
+    struct Unlock
+    {
+        explicit Unlock (juce::InterProcessLock& lockToUse) : lock (lockToUse) {}
+        ~Unlock() { lock.exit(); }
+        juce::InterProcessLock& lock;
+    } unlock (processLock);
+
+    if (performanceBaselineKnown)
+    {
+        const bool existsNow = performanceFile().existsAsFile();
+        const auto textNow = existsNow ? performanceFile().loadFileAsString() : juce::String();
+        if (existsNow != performanceBaselineExisted
+            || (existsNow && textNow != performanceBaselineText))
+        {
+            const auto stamp = juce::Time::getCurrentTime().formatted ("%Y%m%d-%H%M%S");
+            const auto recovery = performanceFile().getSiblingFile (
+                performanceFile().getFileName() + ".conflict-" + stamp + "-"
+                + juce::Uuid().toDashedString() + ".json");
+            if (writeTextAtomically (recovery, juce::JSON::toString (document)))
+                performanceConflictCopy = recovery;
+
+            return reportFailure (
+                "The session changed in another CEditor instance. Its newer file was not "
+                "overwritten."
+                + (performanceConflictCopy != juce::File()
+                     ? " This instance's unsaved session was preserved at \""
+                         + performanceConflictCopy.getFullPathName() + "\"."
+                     : juce::String()));
+        }
+    }
+
+    maybeSnapshotRevision();
+    const auto text = juce::JSON::toString (document);
+
+    if (writeTextAtomically (performanceFile(), text))
+    {
+        performanceBaselineKnown = true;
+        performanceBaselineExisted = true;
+        performanceBaselineText = text;
         performanceWriteErrorReported = false;
         return true;
     }
 
-    if (! performanceWriteErrorReported)
-    {
-        performanceWriteErrorReported = true;
-        emitError ("Could not save the current session to \""
-                   + performanceFile().getFullPathName()
-                   + "\". The previous complete session file was left untouched.");
-    }
-    return false;
+    return reportFailure ("Could not save the current session to \""
+                          + performanceFile().getFullPathName()
+                          + "\". The previous complete session file was left untouched.");
 }
 
 void InstrumentHostService::maybeSnapshotRevision()

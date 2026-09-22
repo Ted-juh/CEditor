@@ -1802,6 +1802,11 @@ private:
     std::atomic<juce::uint64> performanceSaveGeneration { 0 };
     std::atomic<bool> performanceSavePending { false };
     bool performanceWriteErrorReported = false;
+    bool performanceBaselineKnown = false;
+    bool performanceBaselineExisted = false;
+    bool performanceSavesBlocked = false;
+    juce::String performanceBaselineText;
+    juce::File performanceConflictCopy;
 
     std::thread scanThread;
     std::thread libraryScanThread;

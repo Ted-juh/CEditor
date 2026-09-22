@@ -588,6 +588,65 @@ void testSessionWriteFailureIsReportedAndNonDestructive()
     dir.deleteRecursively();
 }
 
+void testUnreadableSessionIsNeverOverwritten()
+{
+    std::cout << "\nan unreadable session is never overwritten" << std::endl;
+
+    const auto dir = freshDataDir ("unreadable-session");
+    const auto file = dir.getChildFile ("session-performance.json");
+    file.replaceWithText ("{ truncated session");
+    const auto original = file.loadFileAsString();
+
+    {
+        Harness h (dir);
+        h.cmd ("getState");
+        check (h.emits.lastError().contains ("left untouched"),
+               "startup reports that the unreadable session is protected");
+
+        h.emits.clear();
+        h.cmd ("addPart");
+        check (h.emits.lastError().contains ("not being saved"),
+               "a later edit reports that session saving remains blocked");
+        check (file.loadFileAsString() == original,
+               "the empty rack produced by a failed read never replaces the original bytes");
+    }
+
+    check (file.loadFileAsString() == original,
+           "shutdown also leaves the unreadable session untouched");
+    dir.deleteRecursively();
+}
+
+void testStaleSessionInstanceCannotOverwriteANewerOne()
+{
+    std::cout << "\na stale session instance cannot overwrite a newer one" << std::endl;
+
+    const auto dir = freshDataDir ("multi-instance-session");
+    {
+        Harness first (dir);
+        Harness stale (dir);
+        first.cmd ("getState");
+        stale.cmd ("getState");
+
+        first.cmd ("addPart");
+        const auto newer = dir.getChildFile ("session-performance.json").loadFileAsString();
+
+        stale.emits.clear();
+        stale.cmd ("addPart");
+        check (stale.emits.lastError().contains ("changed in another CEditor instance"),
+               "the stale instance reports the conflict");
+        check (dir.getChildFile ("session-performance.json").loadFileAsString() == newer,
+               "the newer instance's session is untouched");
+
+        const auto recoveries = dir.findChildFiles (juce::File::findFiles, false,
+                                                     "session-performance.json.conflict-*.json");
+        check (recoveries.size() == 1
+                 && juce::JSON::parse (recoveries[0].loadFileAsString()).isObject(),
+               "the stale instance's complete session is preserved for recovery");
+    }
+
+    dir.deleteRecursively();
+}
+
 void testStageLock()
 {
     std::cout << "\nstage lock" << std::endl;
@@ -12089,6 +12148,8 @@ int main (int argc, char* argv[])
 
     testCommandFlow();
     testSessionWriteFailureIsReportedAndNonDestructive();
+    testUnreadableSessionIsNeverOverwritten();
+    testStaleSessionInstanceCannotOverwriteANewerOne();
     testMixerMeterEvents();
     testStageLock();
     testFirstClickAndTheOnScreenKeyboard();
