@@ -5142,6 +5142,114 @@
       "enabled": true,
       "description": "",
       "group": ""
+    },
+    {
+      "id": "tone1_osc_pitchEnv_view_button_click",
+      "name": "Tone 1 osc.pitchEnv view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone1_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone1_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone1.osc.pitchEnv.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone1_filter_env_view_button_click",
+      "name": "Tone 1 filter.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone1_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_filter_env_view.TabContainer.pageIndex', next); set('tone1_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone1.filter.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone1_amp_env_view_button_click",
+      "name": "Tone 1 amp.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone1_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone1_amp_env_view.TabContainer.pageIndex', next); set('tone1_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone1.amp.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone2_osc_pitchEnv_view_button_click",
+      "name": "Tone 2 osc.pitchEnv view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone2_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone2_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone2.osc.pitchEnv.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone2_filter_env_view_button_click",
+      "name": "Tone 2 filter.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone2_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_filter_env_view.TabContainer.pageIndex', next); set('tone2_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone2.filter.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone2_amp_env_view_button_click",
+      "name": "Tone 2 amp.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone2_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone2_amp_env_view.TabContainer.pageIndex', next); set('tone2_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone2.amp.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone3_osc_pitchEnv_view_button_click",
+      "name": "Tone 3 osc.pitchEnv view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone3_osc_pitchEnv_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_osc_pitchEnv_view.TabContainer.pageIndex', next); set('tone3_osc_pitchEnv_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone3.osc.pitchEnv.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone3_filter_env_view_button_click",
+      "name": "Tone 3 filter.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone3_filter_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_filter_env_view.TabContainer.pageIndex', next); set('tone3_filter_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone3.filter.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
+    },
+    {
+      "id": "tone3_amp_env_view_button_click",
+      "name": "Tone 3 amp.env view",
+      "language": "javascript",
+      "source": "function onClick() { const next = Number(get('tone3_amp_env_view.TabContainer.pageIndex')) === 1 ? 0 : 1; set('tone3_amp_env_view.TabContainer.pageIndex', next); set('tone3_amp_env_view_button.Text.content', next ? 'Graph' : 'Fader'); }",
+      "scope": "panel",
+      "target": "tone3.amp.env.viewButton",
+      "event": "onClick",
+      "enabled": true,
+      "description": "",
+      "group": ""
     }
   ],
   "scripting": {
@@ -15045,6 +15153,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -15064,8 +15173,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -15080,7 +15188,7 @@
                 },
                 "Transform": {
                   "x": 159.9234449760765,
-                  "y": 106,
+                  "y": 124,
                   "width": 148,
                   "height": 80
                 },
@@ -15169,7 +15277,7 @@
                 },
                 "Transform": {
                   "x": 163.177033492823,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -16406,7 +16514,7 @@
                 },
                 "Transform": {
                   "x": 210.06698564593302,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -17642,7 +17750,7 @@
                 },
                 "Transform": {
                   "x": 151.9234449760765,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -17695,7 +17803,7 @@
                 },
                 "Transform": {
                   "x": 198.81339712918663,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -26173,6 +26281,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -26192,8 +26301,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -26208,7 +26316,7 @@
                 },
                 "Transform": {
                   "x": 11.751196172248797,
-                  "y": 106,
+                  "y": 124,
                   "width": 182.81339712918657,
                   "height": 80
                 },
@@ -26324,7 +26432,7 @@
                 },
                 "Transform": {
                   "x": 15.004784688995187,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -27561,7 +27669,7 @@
                 },
                 "Transform": {
                   "x": 61.8947368421052,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -28798,7 +28906,7 @@
                 },
                 "Transform": {
                   "x": 108.78468899521533,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -30035,7 +30143,7 @@
                 },
                 "Transform": {
                   "x": 155.67464114832535,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -31271,7 +31379,7 @@
                 },
                 "Transform": {
                   "x": 3.7511961722487968,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -31324,7 +31432,7 @@
                 },
                 "Transform": {
                   "x": 50.64114832535881,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -31377,7 +31485,7 @@
                 },
                 "Transform": {
                   "x": 97.53110047846894,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -31430,7 +31538,7 @@
                 },
                 "Transform": {
                   "x": 144.42105263157896,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -38601,6 +38709,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -38620,8 +38729,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -38636,7 +38744,7 @@
                 },
                 "Transform": {
                   "x": 19.253588516746277,
-                  "y": 106,
+                  "y": 124,
                   "width": 171.5598086124403,
                   "height": 80
                 },
@@ -38752,7 +38860,7 @@
                 },
                 "Transform": {
                   "x": 22.50717703349278,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -39989,7 +40097,7 @@
                 },
                 "Transform": {
                   "x": 69.3971291866028,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -41226,7 +41334,7 @@
                 },
                 "Transform": {
                   "x": 116.28708133971281,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -42463,7 +42571,7 @@
                 },
                 "Transform": {
                   "x": 163.17703349282283,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -43699,7 +43807,7 @@
                 },
                 "Transform": {
                   "x": 11.253588516746277,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -43752,7 +43860,7 @@
                 },
                 "Transform": {
                   "x": 58.14354066985629,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -43805,7 +43913,7 @@
                 },
                 "Transform": {
                   "x": 105.03349282296654,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -43858,7 +43966,7 @@
                 },
                 "Transform": {
                   "x": 151.92344497607655,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -65041,6 +65149,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -65060,8 +65169,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -65076,7 +65184,7 @@
                 },
                 "Transform": {
                   "x": 159.9234449760765,
-                  "y": 106,
+                  "y": 124,
                   "width": 148,
                   "height": 80
                 },
@@ -65165,7 +65273,7 @@
                 },
                 "Transform": {
                   "x": 163.177033492823,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -66402,7 +66510,7 @@
                 },
                 "Transform": {
                   "x": 210.06698564593302,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -67638,7 +67746,7 @@
                 },
                 "Transform": {
                   "x": 151.9234449760765,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -67691,7 +67799,7 @@
                 },
                 "Transform": {
                   "x": 198.81339712918663,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -76169,6 +76277,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -76188,8 +76297,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -76204,7 +76312,7 @@
                 },
                 "Transform": {
                   "x": 11.751196172248797,
-                  "y": 106,
+                  "y": 124,
                   "width": 182.81339712918657,
                   "height": 80
                 },
@@ -76320,7 +76428,7 @@
                 },
                 "Transform": {
                   "x": 15.004784688995187,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -77557,7 +77665,7 @@
                 },
                 "Transform": {
                   "x": 61.8947368421052,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -78794,7 +78902,7 @@
                 },
                 "Transform": {
                   "x": 108.78468899521533,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -80031,7 +80139,7 @@
                 },
                 "Transform": {
                   "x": 155.67464114832535,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -81267,7 +81375,7 @@
                 },
                 "Transform": {
                   "x": 3.7511961722487968,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -81320,7 +81428,7 @@
                 },
                 "Transform": {
                   "x": 50.64114832535881,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -81373,7 +81481,7 @@
                 },
                 "Transform": {
                   "x": 97.53110047846894,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -81426,7 +81534,7 @@
                 },
                 "Transform": {
                   "x": 144.42105263157896,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -88597,6 +88705,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -88616,8 +88725,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -88632,7 +88740,7 @@
                 },
                 "Transform": {
                   "x": 19.253588516746277,
-                  "y": 106,
+                  "y": 124,
                   "width": 171.5598086124403,
                   "height": 80
                 },
@@ -88748,7 +88856,7 @@
                 },
                 "Transform": {
                   "x": 22.50717703349278,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -89985,7 +90093,7 @@
                 },
                 "Transform": {
                   "x": 69.3971291866028,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -91222,7 +91330,7 @@
                 },
                 "Transform": {
                   "x": 116.28708133971281,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -92459,7 +92567,7 @@
                 },
                 "Transform": {
                   "x": 163.17703349282283,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -93695,7 +93803,7 @@
                 },
                 "Transform": {
                   "x": 11.253588516746277,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -93748,7 +93856,7 @@
                 },
                 "Transform": {
                   "x": 58.14354066985629,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -93801,7 +93909,7 @@
                 },
                 "Transform": {
                   "x": 105.03349282296654,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -93854,7 +93962,7 @@
                 },
                 "Transform": {
                   "x": 151.92344497607655,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -115037,6 +115145,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -115056,8 +115165,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -115072,7 +115180,7 @@
                 },
                 "Transform": {
                   "x": 159.9234449760765,
-                  "y": 106,
+                  "y": 124,
                   "width": 148,
                   "height": 80
                 },
@@ -115161,7 +115269,7 @@
                 },
                 "Transform": {
                   "x": 163.177033492823,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -116398,7 +116506,7 @@
                 },
                 "Transform": {
                   "x": 210.06698564593302,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -117634,7 +117742,7 @@
                 },
                 "Transform": {
                   "x": 151.9234449760765,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -117687,7 +117795,7 @@
                 },
                 "Transform": {
                   "x": 198.81339712918663,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -126165,6 +126273,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -126184,8 +126293,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -126200,7 +126308,7 @@
                 },
                 "Transform": {
                   "x": 11.751196172248797,
-                  "y": 106,
+                  "y": 124,
                   "width": 182.81339712918657,
                   "height": 80
                 },
@@ -126316,7 +126424,7 @@
                 },
                 "Transform": {
                   "x": 15.004784688995187,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -127553,7 +127661,7 @@
                 },
                 "Transform": {
                   "x": 61.8947368421052,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -128790,7 +128898,7 @@
                 },
                 "Transform": {
                   "x": 108.78468899521533,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -130027,7 +130135,7 @@
                 },
                 "Transform": {
                   "x": 155.67464114832535,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -131263,7 +131371,7 @@
                 },
                 "Transform": {
                   "x": 3.7511961722487968,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -131316,7 +131424,7 @@
                 },
                 "Transform": {
                   "x": 50.64114832535881,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -131369,7 +131477,7 @@
                 },
                 "Transform": {
                   "x": 97.53110047846894,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -131422,7 +131530,7 @@
                 },
                 "Transform": {
                   "x": 144.42105263157896,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -138593,6 +138701,7 @@
         },
         "TabContainer": {
           "stripSize": 18,
+          "showStrip": false,
           "pages": [
             {
               "id": "fader",
@@ -138612,8 +138721,7 @@
           "buttonGroupWidth": 66,
           "buttonHeight": 16,
           "buttonGap": 8,
-          "labelSize": 9,
-          "cycleButton": true
+          "labelSize": 9
         },
         "Children": {
           "_children": {
@@ -138628,7 +138736,7 @@
                 },
                 "Transform": {
                   "x": 19.253588516746277,
-                  "y": 106,
+                  "y": 124,
                   "width": 171.5598086124403,
                   "height": 80
                 },
@@ -138744,7 +138852,7 @@
                 },
                 "Transform": {
                   "x": 22.50717703349278,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -139981,7 +140089,7 @@
                 },
                 "Transform": {
                   "x": 69.3971291866028,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -141218,7 +141326,7 @@
                 },
                 "Transform": {
                   "x": 116.28708133971281,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -142455,7 +142563,7 @@
                 },
                 "Transform": {
                   "x": 163.17703349282283,
-                  "y": 106,
+                  "y": 124,
                   "width": 28.13397129186603,
                   "height": 80,
                   "contentScaleMode": "scaleInternals"
@@ -143691,7 +143799,7 @@
                 },
                 "Transform": {
                   "x": 11.253588516746277,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -143744,7 +143852,7 @@
                 },
                 "Transform": {
                   "x": 58.14354066985629,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -143797,7 +143905,7 @@
                 },
                 "Transform": {
                   "x": 105.03349282296654,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -143850,7 +143958,7 @@
                 },
                 "Transform": {
                   "x": 151.92344497607655,
-                  "y": 189,
+                  "y": 207,
                   "width": 46.889952153110045,
                   "height": 22
                 },
@@ -213144,6 +213252,429 @@
               "variant"
             ]
           }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone1.osc.pitchEnv.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone1_osc_pitchEnv_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 721.1196172248804,
+          "y": 16,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone1.filter.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone1_filter_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1114.9952153110048,
+          "y": 16,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone1.amp.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone1_amp_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1334.44019138756,
+          "y": 16,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone2.osc.pitchEnv.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone2_osc_pitchEnv_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 721.1196172248804,
+          "y": 250,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone2.filter.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone2_filter_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1114.9952153110048,
+          "y": 250,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone2.amp.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone2_amp_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1334.44019138756,
+          "y": 250,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone3.osc.pitchEnv.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone3_osc_pitchEnv_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 721.1196172248804,
+          "y": 484,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone3.filter.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone3_filter_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1114.9952153110048,
+          "y": 484,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {
+          "name": "tone3.amp.env.viewButton",
+          "tooltip": "Switch between envelope faders and graph.",
+          "id": "tone3_amp_env_view_button",
+          "controlType": "Button"
+        },
+        "Transform": {
+          "x": 1334.44019138756,
+          "y": 484,
+          "width": 58,
+          "height": 16
+        },
+        "Background": {
+          "_children": {
+            "Fill": {
+              "colour": "FF39372B"
+            },
+            "Border": {
+              "colour": "FFE2A52C"
+            },
+            "Corners": {
+              "radius": 4
+            }
+          }
+        },
+        "Text": {
+          "content": "Fader",
+          "_children": {
+            "Fill": {
+              "colour": "FFFFE1A0"
+            },
+            "Font": {
+              "size": 9
+            }
+          }
+        },
+        "ContentLayout": {
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 0,
+          "paddingBottom": 0
         }
       },
       "_type": "Control"

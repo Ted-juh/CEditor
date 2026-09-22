@@ -23,20 +23,19 @@ try{
   async function until(fn){for(let i=0;i<40;i++){if(await fn())return;await page.waitForTimeout(100);}assert.fail('Timed out checking linked envelope');}
   async function view(tone,kind,mode){
     const before=(await sends()).length;
-    const current=await page.evaluate(n=>window.__gaia.session(n).sectionValues?.TabContainer?.pageIndex ?? 0,`tone${tone}.${kind}.view`);
-    if(current===(mode==='graph'?1:0))return;
-    const r=await(await ctl(`tone${tone}.${kind}.view`)).boundingBox();
-    await page.mouse.click(r.x+r.width-33,r.y+9);
-    await until(async()=>await page.evaluate(n=>window.__gaia.session(n).sectionValues?.TabContainer?.pageIndex,`tone${tone}.${kind}.view`)===(mode==='graph'?1:0));
+    const button=await ctl(`tone${tone}.${kind}.viewButton`), label=mode==='graph'?'Graph':'Fader';
+    if((await button.innerText()).trim()===label)return;
+    await button.click();
+    await until(async()=>(await button.innerText()).trim()===label);
     assert.equal((await sends()).length,before,'changing envelope view sends no MIDI');
   }
   for(const tone of [1,2,3])for(const kind of ['osc.pitchEnv','filter.env','amp.env']){
     assert.equal(await(await ctl(`tone${tone}_${kind.replaceAll('.','_')}_graph`)).count(),0,'Fader is the default view');
     assert.ok(await(await ctl(`tone${tone}.${kind}AttackTime`)).isVisible());
-    const container=await ctl(`tone${tone}.${kind}.view`), labels=container.locator('svg.tabs').first().locator('text');
-    assert.equal(await labels.count(),1,'exactly one envelope view button is rendered');
-    assert.equal(await labels.textContent(),'Fader');
-    const frame=await container.boundingBox(), label=await labels.boundingBox();
+    const container=await ctl(`tone${tone}.${kind}.view`), button=await ctl(`tone${tone}.${kind}.viewButton`);
+    assert.equal(await container.locator('svg.tabs').count(),0,'no tab strip is rendered');
+    assert.equal(await button.innerText(),'Fader');
+    const frame=await container.boundingBox(), label=await button.boundingBox();
     assert.ok(Math.abs(label.x+label.width/2-(frame.x+frame.width-33))<1,'button is at the section right edge');
   }
   // Other controls overlap the transparent view container and must stay reachable.

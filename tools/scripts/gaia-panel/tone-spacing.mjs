@@ -35,11 +35,11 @@ export function refineToneSpacing(panel) {
       // Widen only the transparent container, keeping each envelope's horizontal placement.
       for (const c of children) rect(c).x += v.x - b.x;
       Object.assign(v, { x: b.x, width: b.width });
-      Object.assign(view._children.TabContainer, { appearance: 'buttons', cycleButton: true,
+      Object.assign(view._children.TabContainer, { appearance: 'buttons',
         buttonGroupWidth: 66, buttonGap: 8, buttonHeight: 16, labelSize: 9 });
       for (const c of children) {
         if (c._children.Core.controlType === 'Label') continue;
-        Object.assign(rect(c), { y: baseline.y - v.y - view._children.TabContainer.stripSize, height: baseline.height });
+        Object.assign(rect(c), { y: baseline.y - v.y - (view._children.TabContainer.showStrip === false ? 0 : view._children.TabContainer.stripSize), height: baseline.height });
       }
     }
     for (const [kind, title] of [['lfo', 'LFO'], ['modLfo', 'MOD LFO']]) {
