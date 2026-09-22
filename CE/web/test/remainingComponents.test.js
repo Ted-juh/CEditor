@@ -483,6 +483,18 @@ test('page buttons are centered in the strip and gaps do not switch pages', () =
   assert.equal(tabAtPoint(geom, 196, 2, 4), null);
 });
 
+test('one page button cycles from the current view and ignores the rest of the header', () => {
+  for (const pageIndex of [0, 1]) {
+    const tabs = control('TabContainer', 'TabContainer', { appearance: 'buttons', cycleButton: true,
+      pageIndex, stripSize: 18, buttonGroupWidth: 66, buttonGap: 8, buttonHeight: 16 });
+    const geom = tabGeometry(384, 229, tabs), button = tabRect(geom, pageIndex, 2);
+    assert.deepEqual(button, tabRect(geom, 1 - pageIndex, 2));
+    assert.equal(tabAtPoint(geom, 351, 9, 2), 1 - pageIndex);
+    assert.equal(tabAtPoint(geom, 100, 9, 2), null);
+    assert.equal(tabAtPoint(geom, 351, 40, 2), null);
+  }
+});
+
 test('the page is a bindable port AND a choice-typed host parameter with real labels', () => {
   // A footswitch changing the page is a real performance gesture. Exported as an anonymous float it
   // would reach a DAW as "0.37", which is not a page.

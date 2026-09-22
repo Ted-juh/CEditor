@@ -7545,10 +7545,11 @@
 
     if (control?._children?.Core?.controlType === 'TabContainer') {
       const t = control._children.Transform;
-      const index = tabAtPoint(tabGeometry(t.width, t.height, control), pointerDownLocal.x, pointerDownLocal.y, tabPages(control).length);
+      const sections = sessionFor(control)?.sectionValues ?? {};
+      const liveControl = applySectionValues(control, sections);
+      const index = tabAtPoint(tabGeometry(t.width, t.height, liveControl), pointerDownLocal.x, pointerDownLocal.y, tabPages(liveControl).length);
       if (index !== null) {
         event.preventDefault(); event.stopPropagation();
-        const sections = sessionFor(control)?.sectionValues ?? {};
         patchControlSession(downId, { sectionValues: { ...sections, TabContainer: { ...sections.TabContainer, pageIndex: index } } });
         emitDeviceBindingsForPatch(control, { pageIndex: index });
         return;

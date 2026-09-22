@@ -84,13 +84,15 @@ export function tabGeometry(width, height, control) {
     default:
       return { strip: { x: 0, y: 0, w, h: strip }, page: { x: 0, y: strip, w, h: h - strip }, edge, vertical: false,
         ...(config.appearance === 'buttons' ? { buttons: true, buttonGroupWidth: config.buttonGroupWidth,
-          buttonHeight: config.buttonHeight, buttonGap: config.buttonGap } : {}) };
+          buttonHeight: config.buttonHeight, buttonGap: config.buttonGap,
+          cycleButton: config.cycleButton === true, activeIndex: activePageIndex(control) } : {}) };
   }
 }
 
 /** One tab's rectangle in the strip. Equal widths — a tab strip is not a text layout engine. */
 export function tabRect(geom, index, count) {
-  const total = Math.max(1, count);
+  const total = geom.cycleButton ? 1 : Math.max(1, count);
+  if (geom.cycleButton) index = 0;
   if (geom.vertical) {
     const each = geom.strip.h / total;
     return { x: geom.strip.x, y: geom.strip.y + index * each, w: geom.strip.w, h: each };
@@ -116,7 +118,7 @@ export function tabAtPoint(geom, px, py, count) {
   if (geom.buttons) {
     for (let i = 0; i < count; i++) {
       const r = tabRect(geom, i, count);
-      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i;
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return geom.cycleButton ? (geom.activeIndex + 1) % Math.max(1, count) : i;
     }
     return null;
   }

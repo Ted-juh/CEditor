@@ -3,29 +3,32 @@ import assert from 'node:assert/strict';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { applyEditableEnvelopes } from '../../../tools/scripts/gaia-panel/editable-envelopes.mjs';
 import { applyEnvelopeViews } from '../../../tools/scripts/gaia-panel/envelope-views.mjs';
+import { refineToneSpacing } from '../../../tools/scripts/gaia-panel/tone-spacing.mjs';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { linkedEnvelopeStages, linkedEnvelopePoints, linkedEnvelopeDragValue, resolveLinkedEnvelope } from '../src/CE_Application/utils/linkedEnvelope.js';
 const panel=buildGaiaPanel(), controls=flatControls(panel.controls);
 const graphs=controls.filter(c=>c._children.Envelope?.stageSources);
-test('envelope views reuse the full height inside unchanged tone sections and keep source IDs',()=>{
+test('envelope views match the other faders inside unchanged tone sections and keep source IDs',()=>{
   const views=controls.filter(c=>/^tone\d\.(osc\.pitchEnv|filter\.env|amp\.env)\.view$/.test(c._children.Core.name));
   assert.equal(views.length,9);
   for(const view of views){
     const cfg=view._children.TabContainer,children=Object.values(view._children.Children._children);
     assert.deepEqual(cfg.pages.map(p=>p.label),['Fader','Graph']);
     assert.equal(cfg.pageIndex,0);
+    assert.equal(cfg.cycleButton,true);
     assert.equal(view._children.Transform.height,229);
     const graph=children.find(c=>c._children.Envelope?.stageSources);
     assert.equal(graph._children.Core.tabPageId,'graph');
-    assert.equal(graph._children.Transform.height,135);
+    assert.equal(graph._children.Transform.height,80);
     for(const link of Object.values(graph._children.Envelope.stageSources)){
       const fader=children.find(c=>c._children.Core.id===link.controlId);
       assert.equal(fader._children.Core.tabPageId,'fader');
-      assert.equal(fader._children.Transform.height,114);
+      assert.equal(fader._children.Transform.height,80);
       assert.equal(fader._children.Transform.y,graph._children.Transform.y);
     }
   }
   const before=JSON.stringify(panel);applyEnvelopeViews(panel);assert.equal(JSON.stringify(panel),before);
+  refineToneSpacing(panel);assert.equal(JSON.stringify(panel),before,'spacing migration is idempotent');
 });
 test('nine native graphs link only their own tone faders, without duplicate MIDI bindings',()=>{
   assert.equal(graphs.length,9);

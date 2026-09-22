@@ -38,6 +38,7 @@
   <svg class="tabs" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
     <rect x={geom.strip.x} y={geom.strip.y} width={geom.strip.w} height={geom.strip.h} fill={stripCss} />
     {#each pages as page, index (page.id ?? index)}
+      {#if !cfg.cycleButton || index === active}
       {@const rect = tabRect(geom, index, pages.length)}
       <rect
         x={rect.x + 1} y={rect.y + 1} width={Math.max(1, rect.w - 2)} height={Math.max(1, rect.h - 2)}
@@ -63,6 +64,7 @@
         style:font-family={instrument ? 'Arial, sans-serif' : undefined}
         text-anchor="middle"
       >{page.label ?? `Page ${index + 1}`}</text>
+      {/if}
     {/each}
   </svg>
 {/if}

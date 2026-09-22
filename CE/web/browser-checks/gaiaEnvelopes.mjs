@@ -23,8 +23,10 @@ try{
   async function until(fn){for(let i=0;i<40;i++){if(await fn())return;await page.waitForTimeout(100);}assert.fail('Timed out checking linked envelope');}
   async function view(tone,kind,mode){
     const before=(await sends()).length;
+    const current=await page.evaluate(n=>window.__gaia.session(n).sectionValues?.TabContainer?.pageIndex ?? 0,`tone${tone}.${kind}.view`);
+    if(current===(mode==='graph'?1:0))return;
     const r=await(await ctl(`tone${tone}.${kind}.view`)).boundingBox();
-    await page.mouse.click(r.x+r.width-(mode==='graph'?28:84),r.y+9);
+    await page.mouse.click(r.x+r.width-33,r.y+9);
     await until(async()=>await page.evaluate(n=>window.__gaia.session(n).sectionValues?.TabContainer?.pageIndex,`tone${tone}.${kind}.view`)===(mode==='graph'?1:0));
     assert.equal((await sends()).length,before,'changing envelope view sends no MIDI');
   }

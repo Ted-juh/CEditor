@@ -5217,7 +5217,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 122.9090909090909,
+          "x": 121.03349282296651,
           "y": 16,
           "width": 60.01913875598086,
           "height": 18,
@@ -5422,7 +5422,7 @@
           "x": 130.41148325358853,
           "y": 44,
           "width": 97.5311004784689,
-          "height": 65,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -6496,7 +6496,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.815384615384616
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -7049,10 +7049,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 243.51674641148327,
-          "y": 44,
-          "width": 42,
-          "height": 42,
+          "x": 240.01435406698562,
+          "y": 36,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -7860,10 +7860,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 226.06698564593302,
-          "y": 87,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 227.01435406698562,
+          "y": 71,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -7913,10 +7913,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 44,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 42,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -7931,7 +7931,7 @@
             "Font": {
               "weight": "SemiBold",
               "weightValue": 600,
-              "size": 9
+              "size": 8
             },
             "Multiline": {
               "maxLines": 1,
@@ -7940,10 +7940,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -8028,10 +8028,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 86,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 82,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -8360,10 +8360,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 73,
-          "width": 78.77511961722487,
-          "height": 12
+          "x": 311.244019138756,
+          "y": 71,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -8413,10 +8413,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 112,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 110,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -15028,9 +15028,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 550.5454545454545,
+          "x": 398.622009569378,
           "y": 14,
-          "width": 164,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -15061,10 +15061,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -15078,10 +15079,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 159.9234449760765,
+                  "y": 106,
                   "width": 148,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -15167,10 +15168,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 163.177033492823,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -16404,10 +16405,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 210.06698564593302,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -17640,6 +17641,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 151.9234449760765,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -17692,7 +17694,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.88995215311013,
+                  "x": 198.81339712918663,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -17750,7 +17752,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 400.4976076555024,
+          "x": 398.622009569378,
           "y": 16,
           "width": 60.01913875598086,
           "height": 18,
@@ -17955,7 +17957,7 @@
           "x": 409.8755980861244,
           "y": 44,
           "width": 103.15789473684211,
-          "height": 75,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -19037,7 +19039,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -19139,7 +19141,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -19759,7 +19761,7 @@
           "x": 522.4114832535886,
           "y": 44,
           "width": 78.77511961722487,
-          "height": 35,
+          "height": 42,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -19933,7 +19935,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -20035,7 +20037,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -20137,7 +20139,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -26154,9 +26156,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 796.2488038277512,
+          "x": 792.4976076555024,
           "y": 14,
-          "width": 198.81339712918657,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -26187,10 +26189,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -26204,10 +26207,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 11.751196172248797,
+                  "y": 106,
                   "width": 182.81339712918657,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -26320,10 +26323,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.25358851674639,
-                  "y": 72,
+                  "x": 15.004784688995187,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -27557,10 +27560,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985641,
-                  "y": 72,
+                  "x": 61.8947368421052,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -28794,10 +28797,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 108.78468899521533,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -30031,10 +30034,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 155.67464114832535,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -31267,6 +31270,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 3.7511961722487968,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -31319,7 +31323,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 50.64114832535881,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -31372,7 +31376,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622015,
+                  "x": 97.53110047846894,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -31425,7 +31429,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933016,
+                  "x": 144.42105263157896,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -31483,7 +31487,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 794.3732057416267,
+          "x": 792.4976076555024,
           "y": 16,
           "width": 71.27272727272728,
           "height": 18,
@@ -31688,7 +31692,7 @@
           "x": 803.7511961722488,
           "y": 44,
           "width": 103.15789473684211,
-          "height": 55,
+          "height": 72,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -31870,7 +31874,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -31972,7 +31976,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -32074,7 +32078,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -32175,7 +32179,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -32277,7 +32281,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -32771,7 +32775,7 @@
           "x": 916.2870813397129,
           "y": 44,
           "width": 78.77511961722487,
-          "height": 25,
+          "height": 32,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -32941,7 +32945,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -33043,7 +33047,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -38580,9 +38584,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 1197.6267942583731,
+          "x": 1186.3732057416269,
           "y": 14,
-          "width": 187.5598086124403,
+          "width": 210.06698564593302,
           "height": 229
         },
         "Background": {
@@ -38613,10 +38617,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -38630,10 +38635,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 19.253588516746277,
+                  "y": 106,
                   "width": 171.5598086124403,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -38746,10 +38751,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 22.50717703349278,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -39983,10 +39988,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 69.3971291866028,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -41220,10 +41225,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 116.28708133971281,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -42457,10 +42462,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 163.17703349282283,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -43693,6 +43698,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 11.253588516746277,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -43745,7 +43751,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 58.14354066985629,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -43798,7 +43804,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622026,
+                  "x": 105.03349282296654,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -43851,7 +43857,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933028,
+                  "x": 151.92344497607655,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -43909,7 +43915,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1188.2488038277513,
+          "x": 1186.3732057416269,
           "y": 16,
           "width": 60.01913875598086,
           "height": 18,
@@ -46747,7 +46753,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1407.6937799043062,
+          "x": 1405.8181818181818,
           "y": 16,
           "width": 79.71291866028709,
           "height": 18,
@@ -46952,7 +46958,7 @@
           "x": 1413.3205741626793,
           "y": 44,
           "width": 90.02870813397129,
-          "height": 54,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -48026,7 +48032,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 15.425925925925927
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -48579,10 +48585,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1522.6746411483252,
-          "y": 44,
-          "width": 42,
-          "height": 42,
+          "x": 1523,
+          "y": 36,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -49390,10 +49396,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1505.2248803827752,
-          "y": 87,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 1510,
+          "y": 71,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -49443,10 +49449,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 112,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 114,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -49775,10 +49781,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 99,
-          "width": 73.14832535885168,
-          "height": 12
+          "x": 1506,
+          "y": 103,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -49828,10 +49834,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 1413.3205741626793,
-          "y": 112,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 84,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -49855,10 +49861,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -49959,7 +49965,7 @@
           }
         },
         "Text": {
-          "content": "TEMPO",
+          "content": "",
           "_children": {
             "Fill": {
               "colour": "FFAEBAC6"
@@ -55207,7 +55213,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 122.9090909090909,
+          "x": 121.03349282296651,
           "y": 250,
           "width": 60.01913875598086,
           "height": 18,
@@ -55412,7 +55418,7 @@
           "x": 130.41148325358853,
           "y": 278,
           "width": 97.5311004784689,
-          "height": 65,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -56486,7 +56492,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.815384615384616
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -57039,10 +57045,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 243.51674641148327,
-          "y": 278,
-          "width": 42,
-          "height": 42,
+          "x": 240.01435406698562,
+          "y": 270,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -57850,10 +57856,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 226.06698564593302,
-          "y": 321,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 227.01435406698562,
+          "y": 305,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -57903,10 +57909,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 278,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 276,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -57921,7 +57927,7 @@
             "Font": {
               "weight": "SemiBold",
               "weightValue": 600,
-              "size": 9
+              "size": 8
             },
             "Multiline": {
               "maxLines": 1,
@@ -57930,10 +57936,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -58018,10 +58024,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 320,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 316,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -58350,10 +58356,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 307,
-          "width": 78.77511961722487,
-          "height": 12
+          "x": 311.244019138756,
+          "y": 305,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -58403,10 +58409,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 346,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 344,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -65018,9 +65024,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 550.5454545454545,
+          "x": 398.622009569378,
           "y": 248,
-          "width": 164,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -65051,10 +65057,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -65068,10 +65075,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 159.9234449760765,
+                  "y": 106,
                   "width": 148,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -65157,10 +65164,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 163.177033492823,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -66394,10 +66401,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 210.06698564593302,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -67630,6 +67637,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 151.9234449760765,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -67682,7 +67690,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.88995215311013,
+                  "x": 198.81339712918663,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -67740,7 +67748,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 400.4976076555024,
+          "x": 398.622009569378,
           "y": 250,
           "width": 60.01913875598086,
           "height": 18,
@@ -67945,7 +67953,7 @@
           "x": 409.8755980861244,
           "y": 278,
           "width": 103.15789473684211,
-          "height": 75,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -69027,7 +69035,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -69129,7 +69137,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -69749,7 +69757,7 @@
           "x": 522.4114832535886,
           "y": 278,
           "width": 78.77511961722487,
-          "height": 35,
+          "height": 42,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -69923,7 +69931,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -70025,7 +70033,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -70127,7 +70135,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -76144,9 +76152,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 796.2488038277512,
+          "x": 792.4976076555024,
           "y": 248,
-          "width": 198.81339712918657,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -76177,10 +76185,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -76194,10 +76203,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 11.751196172248797,
+                  "y": 106,
                   "width": 182.81339712918657,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -76310,10 +76319,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.25358851674639,
-                  "y": 72,
+                  "x": 15.004784688995187,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -77547,10 +77556,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985641,
-                  "y": 72,
+                  "x": 61.8947368421052,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -78784,10 +78793,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 108.78468899521533,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -80021,10 +80030,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 155.67464114832535,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -81257,6 +81266,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 3.7511961722487968,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -81309,7 +81319,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 50.64114832535881,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -81362,7 +81372,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622015,
+                  "x": 97.53110047846894,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -81415,7 +81425,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933016,
+                  "x": 144.42105263157896,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -81473,7 +81483,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 794.3732057416267,
+          "x": 792.4976076555024,
           "y": 250,
           "width": 71.27272727272728,
           "height": 18,
@@ -81678,7 +81688,7 @@
           "x": 803.7511961722488,
           "y": 278,
           "width": 103.15789473684211,
-          "height": 55,
+          "height": 72,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -81860,7 +81870,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -81962,7 +81972,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -82064,7 +82074,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -82165,7 +82175,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -82267,7 +82277,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -82761,7 +82771,7 @@
           "x": 916.2870813397129,
           "y": 278,
           "width": 78.77511961722487,
-          "height": 25,
+          "height": 32,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -82931,7 +82941,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -83033,7 +83043,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -88570,9 +88580,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 1197.6267942583731,
+          "x": 1186.3732057416269,
           "y": 248,
-          "width": 187.5598086124403,
+          "width": 210.06698564593302,
           "height": 229
         },
         "Background": {
@@ -88603,10 +88613,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -88620,10 +88631,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 19.253588516746277,
+                  "y": 106,
                   "width": 171.5598086124403,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -88736,10 +88747,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 22.50717703349278,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -89973,10 +89984,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 69.3971291866028,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -91210,10 +91221,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 116.28708133971281,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -92447,10 +92458,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 163.17703349282283,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -93683,6 +93694,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 11.253588516746277,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -93735,7 +93747,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 58.14354066985629,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -93788,7 +93800,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622026,
+                  "x": 105.03349282296654,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -93841,7 +93853,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933028,
+                  "x": 151.92344497607655,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -93899,7 +93911,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1188.2488038277513,
+          "x": 1186.3732057416269,
           "y": 250,
           "width": 60.01913875598086,
           "height": 18,
@@ -96737,7 +96749,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1407.6937799043062,
+          "x": 1405.8181818181818,
           "y": 250,
           "width": 79.71291866028709,
           "height": 18,
@@ -96942,7 +96954,7 @@
           "x": 1413.3205741626793,
           "y": 278,
           "width": 90.02870813397129,
-          "height": 54,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -98016,7 +98028,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 15.425925925925927
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -98569,10 +98581,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1522.6746411483252,
-          "y": 278,
-          "width": 42,
-          "height": 42,
+          "x": 1523,
+          "y": 270,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -99380,10 +99392,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1505.2248803827752,
-          "y": 321,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 1510,
+          "y": 305,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -99433,10 +99445,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 346,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 348,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -99765,10 +99777,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 333,
-          "width": 73.14832535885168,
-          "height": 12
+          "x": 1506,
+          "y": 337,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -99818,10 +99830,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 1413.3205741626793,
-          "y": 346,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 318,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -99845,10 +99857,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -99949,7 +99961,7 @@
           }
         },
         "Text": {
-          "content": "TEMPO",
+          "content": "",
           "_children": {
             "Fill": {
               "colour": "FFAEBAC6"
@@ -105197,7 +105209,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 122.9090909090909,
+          "x": 121.03349282296651,
           "y": 484,
           "width": 60.01913875598086,
           "height": 18,
@@ -105402,7 +105414,7 @@
           "x": 130.41148325358853,
           "y": 512,
           "width": 97.5311004784689,
-          "height": 65,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -106476,7 +106488,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.815384615384616
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -107029,10 +107041,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 243.51674641148327,
-          "y": 512,
-          "width": 42,
-          "height": 42,
+          "x": 240.01435406698562,
+          "y": 504,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -107840,10 +107852,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 226.06698564593302,
-          "y": 555,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 227.01435406698562,
+          "y": 539,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -107893,10 +107905,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 512,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 510,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -107911,7 +107923,7 @@
             "Font": {
               "weight": "SemiBold",
               "weightValue": 600,
-              "size": 9
+              "size": 8
             },
             "Multiline": {
               "maxLines": 1,
@@ -107920,10 +107932,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -108008,10 +108020,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 554,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 550,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -108340,10 +108352,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 541,
-          "width": 78.77511961722487,
-          "height": 12
+          "x": 311.244019138756,
+          "y": 539,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -108393,10 +108405,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 299.21531100478467,
-          "y": 580,
-          "width": 78.77511961722487,
-          "height": 20
+          "x": 311.244019138756,
+          "y": 578,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -115008,9 +115020,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 550.5454545454545,
+          "x": 398.622009569378,
           "y": 482,
-          "width": 164,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -115041,10 +115053,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -115058,10 +115071,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 159.9234449760765,
+                  "y": 106,
                   "width": 148,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -115147,10 +115160,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 163.177033492823,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -116384,10 +116397,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 210.06698564593302,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -117620,6 +117633,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 151.9234449760765,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -117672,7 +117686,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.88995215311013,
+                  "x": 198.81339712918663,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -117730,7 +117744,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 400.4976076555024,
+          "x": 398.622009569378,
           "y": 484,
           "width": 60.01913875598086,
           "height": 18,
@@ -117935,7 +117949,7 @@
           "x": 409.8755980861244,
           "y": 512,
           "width": 103.15789473684211,
-          "height": 75,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -119017,7 +119031,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -119119,7 +119133,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.806666666666667
+                      "size": 11.825581395348838
                     },
                     "Position": {
                       "justification": "left"
@@ -119739,7 +119753,7 @@
           "x": 522.4114832535886,
           "y": 512,
           "width": 78.77511961722487,
-          "height": 35,
+          "height": 42,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -119913,7 +119927,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -120015,7 +120029,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -120117,7 +120131,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.871428571428572
+                      "size": 11.357142857142856
                     },
                     "Position": {
                       "justification": "left"
@@ -126134,9 +126148,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 796.2488038277512,
+          "x": 792.4976076555024,
           "y": 482,
-          "width": 198.81339712918657,
+          "width": 384.4976076555024,
           "height": 229
         },
         "Background": {
@@ -126167,10 +126181,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -126184,10 +126199,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 11.751196172248797,
+                  "y": 106,
                   "width": 182.81339712918657,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -126300,10 +126315,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.25358851674639,
-                  "y": 72,
+                  "x": 15.004784688995187,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -127537,10 +127552,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985641,
-                  "y": 72,
+                  "x": 61.8947368421052,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -128774,10 +128789,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 108.78468899521533,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -130011,10 +130026,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 155.67464114832535,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -131247,6 +131262,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 3.7511961722487968,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -131299,7 +131315,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 50.64114832535881,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -131352,7 +131368,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622015,
+                  "x": 97.53110047846894,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -131405,7 +131421,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933016,
+                  "x": 144.42105263157896,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -131463,7 +131479,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 794.3732057416267,
+          "x": 792.4976076555024,
           "y": 484,
           "width": 71.27272727272728,
           "height": 18,
@@ -131668,7 +131684,7 @@
           "x": 803.7511961722488,
           "y": 512,
           "width": 103.15789473684211,
-          "height": 55,
+          "height": 72,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -131850,7 +131866,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -131952,7 +131968,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -132054,7 +132070,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -132155,7 +132171,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -132257,7 +132273,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.827272727272726
+                      "size": 10.375
                     },
                     "Position": {
                       "justification": "left"
@@ -132751,7 +132767,7 @@
           "x": 916.2870813397129,
           "y": 512,
           "width": 78.77511961722487,
-          "height": 25,
+          "height": 32,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -132921,7 +132937,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -133023,7 +133039,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 12.92
+                      "size": 10.6875
                     },
                     "Position": {
                       "justification": "left"
@@ -138560,9 +138576,9 @@
           "controlType": "TabContainer"
         },
         "Transform": {
-          "x": 1197.6267942583731,
+          "x": 1186.3732057416269,
           "y": 482,
-          "width": 187.5598086124403,
+          "width": 210.06698564593302,
           "height": 229
         },
         "Background": {
@@ -138593,10 +138609,11 @@
           "activeTabColour": "FF39372B",
           "labelColour": "FFB8C3CA",
           "activeLabelColour": "FFFFE1A0",
-          "buttonGroupWidth": 112,
-          "buttonHeight": 14,
-          "buttonGap": 4,
-          "labelSize": 9
+          "buttonGroupWidth": 66,
+          "buttonHeight": 16,
+          "buttonGap": 8,
+          "labelSize": 9,
+          "cycleButton": true
         },
         "Children": {
           "_children": {
@@ -138610,10 +138627,10 @@
                   "controlType": "Envelope"
                 },
                 "Transform": {
-                  "x": 8,
-                  "y": 72,
+                  "x": 19.253588516746277,
+                  "y": 106,
                   "width": 171.5598086124403,
-                  "height": 135
+                  "height": 80
                 },
                 "Background": {
                   "_children": {
@@ -138726,10 +138743,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 11.253588516746504,
-                  "y": 72,
+                  "x": 22.50717703349278,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -139963,10 +139980,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 58.14354066985652,
-                  "y": 72,
+                  "x": 69.3971291866028,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -141200,10 +141217,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 105.03349282296654,
-                  "y": 72,
+                  "x": 116.28708133971281,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -142437,10 +142454,10 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 151.92344497607655,
-                  "y": 72,
+                  "x": 163.17703349282283,
+                  "y": 106,
                   "width": 28.13397129186603,
-                  "height": 114,
+                  "height": 80,
                   "contentScaleMode": "scaleInternals"
                 },
                 "Designer": {
@@ -143673,6 +143690,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
+                  "x": 11.253588516746277,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -143725,7 +143743,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 46.889952153110016,
+                  "x": 58.14354066985629,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -143778,7 +143796,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 93.77990430622026,
+                  "x": 105.03349282296654,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -143831,7 +143849,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 140.66985645933028,
+                  "x": 151.92344497607655,
                   "y": 189,
                   "width": 46.889952153110045,
                   "height": 22
@@ -143889,7 +143907,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1188.2488038277513,
+          "x": 1186.3732057416269,
           "y": 484,
           "width": 60.01913875598086,
           "height": 18,
@@ -146727,7 +146745,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1407.6937799043062,
+          "x": 1405.8181818181818,
           "y": 484,
           "width": 79.71291866028709,
           "height": 18,
@@ -146932,7 +146950,7 @@
           "x": 1413.3205741626793,
           "y": 512,
           "width": 90.02870813397129,
-          "height": 54,
+          "height": 86,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -148006,7 +148024,7 @@
                     "Font": {
                       "weight": "SemiBold",
                       "weightValue": 600,
-                      "size": 15.425925925925927
+                      "size": 10.255813953488373
                     },
                     "Position": {
                       "justification": "left"
@@ -148559,10 +148577,10 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1522.6746411483252,
-          "y": 512,
-          "width": 42,
-          "height": 42,
+          "x": 1523,
+          "y": 504,
+          "width": 34,
+          "height": 34,
           "contentScaleMode": "scaleInternals"
         },
         "Designer": {
@@ -149370,10 +149388,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1505.2248803827752,
-          "y": 555,
-          "width": 76.89952153110048,
-          "height": 12
+          "x": 1510,
+          "y": 539,
+          "width": 60,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -149423,10 +149441,10 @@
           "controlType": "Combobox"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 580,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 582,
+          "width": 68,
+          "height": 18
         },
         "Text": {
           "content": "tempoSyncNote"
@@ -149755,10 +149773,10 @@
           "controlType": "Label"
         },
         "Transform": {
-          "x": 1507.1004784688996,
-          "y": 567,
-          "width": 73.14832535885168,
-          "height": 12
+          "x": 1506,
+          "y": 571,
+          "width": 68,
+          "height": 10
         },
         "Background": {
           "_children": {
@@ -149808,10 +149826,10 @@
           "controlType": "ToggleButton"
         },
         "Transform": {
-          "x": 1413.3205741626793,
-          "y": 580,
-          "width": 73.14832535885168,
-          "height": 20
+          "x": 1506,
+          "y": 552,
+          "width": 68,
+          "height": 18
         },
         "Background": {
           "_children": {
@@ -149835,10 +149853,10 @@
           }
         },
         "ContentLayout": {
-          "paddingLeft": 4,
-          "paddingRight": 4,
-          "paddingTop": 2,
-          "paddingBottom": 2
+          "paddingLeft": 2,
+          "paddingRight": 2,
+          "paddingTop": 1,
+          "paddingBottom": 1
         },
         "States": {
           "_children": {
@@ -149939,7 +149957,7 @@
           }
         },
         "Text": {
-          "content": "TEMPO",
+          "content": "",
           "_children": {
             "Fill": {
               "colour": "FFAEBAC6"
@@ -155187,7 +155205,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1596.512,
+          "x": 1594,
           "y": 16,
           "width": 112,
           "height": 20
@@ -159802,7 +159820,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1596.512,
+          "x": 1594,
           "y": 214,
           "width": 85,
           "height": 20
@@ -164417,7 +164435,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1596.512,
+          "x": 1594,
           "y": 412,
           "width": 67,
           "height": 20
@@ -168869,7 +168887,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1596.512,
+          "x": 1594,
           "y": 610,
           "width": 76,
           "height": 20
@@ -173213,7 +173231,7 @@
                   "controlType": "Label"
                 },
                 "Transform": {
-                  "x": 180,
+                  "x": 178,
                   "y": 2,
                   "width": 22,
                   "height": 240
@@ -173876,7 +173894,6 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 1.875598086124402,
                   "y": 1.4047619047619047,
                   "width": 138.79425837320574,
                   "height": 14.047619047619047,
@@ -174963,7 +174980,7 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 247.57894736842104,
+                  "x": 245.70334928229664,
                   "y": 1.4047619047619047,
                   "width": 113.47368421052632,
                   "height": 14.047619047619047,
@@ -175898,7 +175915,7 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 510.1626794258373,
+                  "x": 508.2870813397129,
                   "y": 1.4047619047619047,
                   "width": 60.01913875598086,
                   "height": 14.047619047619047,
@@ -177241,7 +177258,7 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 782.1244019138757,
+                  "x": 780.2488038277512,
                   "y": 1.4047619047619047,
                   "width": 172.555023923445,
                   "height": 14.047619047619047,
@@ -178194,7 +178211,7 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 1082.22009569378,
+                  "x": 1080.3444976076555,
                   "y": 1.4047619047619047,
                   "width": 223.19617224880383,
                   "height": 14.047619047619047,
@@ -186802,7 +186819,6 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 1.875598086124402,
                   "y": 1.4047619047619047,
                   "width": 90,
                   "height": 14.047619047619047,
@@ -190570,7 +190586,6 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 1.875598086124402,
                   "y": 162.95238095238093,
                   "width": 62.83253588516747,
                   "height": 14.047619047619047,
@@ -196332,7 +196347,6 @@
                   "controlType": "CustomComponent"
                 },
                 "Transform": {
-                  "x": 1.875598086124402,
                   "y": 35.11904761904761,
                   "width": 71.27272727272728,
                   "height": 14.047619047619047,
@@ -210606,7 +210620,7 @@
           "controlType": "CustomComponent"
         },
         "Transform": {
-          "x": 1596,
+          "x": 1594,
           "y": 810,
           "width": 166,
           "height": 20

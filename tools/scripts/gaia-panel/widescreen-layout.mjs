@@ -3,6 +3,7 @@ import { addInstrumentBranding } from './status-display.mjs';
 import { createControl } from '../../../CE/web/src/CE_Application/models/componentTypes.js';
 import { tabGeometry } from '../../../CE/web/src/CE_Application/utils/tabContainerLayout.js';
 import { applyEnvelopeViews } from './envelope-views.mjs';
+import { refineToneSpacing } from './tone-spacing.mjs';
 
 // Three horizontal voices on the left, four permanently visible processors on
 // the right. This is document geometry, so 100% preview is exactly 1920 x 1000.
@@ -144,7 +145,7 @@ export function applyWidescreenLayout(panel) {
   }
   Object.assign(rect(named('plate')),{x:10,y:30,width:1900,height:960});
   panel.width=1920; panel.height=1000;
-  return applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel))))));
+  return refineToneSpacing(applyEnvelopeViews(compactPanelRows(moveSyncRingIntoOsc(expandArpeggioWorkspace(compactPanelBranding(removeToneFlowStrips(panel)))))));
 }
 
 // Reuse the decorative header's 18px for the controls: the upper controls move
