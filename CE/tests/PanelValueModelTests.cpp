@@ -69,6 +69,13 @@ int main()
     check (! model.setValue ("missing.value", juce::var (1)), "setValue on unknown control -> false");
     check (model.getValue ("cutoff.nope").isVoid(), "unknown property -> void");
 
+    // --- a name never contains a dot ----------------------------------------------------------------
+    // The name is a path's first segment and splitScriptPath ends it at the first dot, so a script
+    // renaming a control to "osc.pitch" would make it unreachable by its own new name.
+    check (model.setValue ("cutoff.name", juce::var ("osc.pitch")), "setValue name with a dot");
+    check (model.getValue ("c1.name").toString() == "osc_pitch", "  stored with underscores");
+    check ((int) model.getValue ("osc_pitch.value") == 99, "  and reachable by that name");
+
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;
     return failures == 0 ? 0 : 1;
 }

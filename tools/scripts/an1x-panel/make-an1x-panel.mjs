@@ -26,6 +26,7 @@ import { createScript } from '../../../CE/web/src/CE_Application/scripting/scrip
 import { FEG_POINTS, FEG_TRACKS, fegBridgeScript } from './feg-bridge.mjs';
 import { midiControlBindingFrom } from '../../../CE/web/src/CE_Application/utils/midiControlBindings.js';
 import { COMMON_STRIP, EFFECT_STRIP, PANEL_WIDTH, PATTERN_STRIP, PLAY_STRIP, SCENE_STRIP, SKIN, TINT } from './layout.mjs';
+import { migrateDottedControlNames } from '../../../CE/web/src/CE_Application/utils/controlNames.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -803,7 +804,9 @@ export function buildAn1xPanel({ slim = true } = {}) {
     ),
   })];
 
-  return panel;
+  // Names last: the passes above find controls by their parameter-id names, and the saved panel must
+  // carry none of those dots (utils/controlNames.js).
+  return migrateDottedControlNames(panel);
 }
 
 export function serializeAn1xPanel({ slim = true } = {}) {

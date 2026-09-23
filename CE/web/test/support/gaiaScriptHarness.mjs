@@ -100,7 +100,9 @@ export function drawPattern(control, blocks, { stepCount = 32 } = {}) {
   return values;
 }
 
+// Looked up by the parameter id, which is what these tests think in. A control is named after its
+// parameter with the dots made underscores (utils/controlNames.js), so the id is converted here.
 export const controlNamed = (built, name) =>
-  flatControls(built.controls).find((c) => c._children?.Core?.name === name);
+  flatControls(built.controls).find((c) => c._children?.Core?.name === String(name).replace(/\./g, '_'));
 
 export const idOf = (control) => String(control?._children?.Core?.id ?? '');

@@ -261,9 +261,9 @@ test('the printed caveat is gone, and the captions are still addressable', () =>
   const allControls = flatControls(panel.controls);
   const names = new Set(allControls.map((c) => c._children?.Core?.name));
   for (const effect of ['distortion', 'flanger', 'delay', 'reverb']) {
-    assert.ok(names.has(`${effect}.type`), `${effect} has no type selector`);
+    assert.ok(names.has(`${effect}_type`), `${effect} has no type selector`);
     for (let i = 1; i <= 4; i += 1) {
-      assert.ok(names.has(`${effect}.parameter${i}.caption`),
+      assert.ok(names.has(`${effect}_parameter${i}_caption`),
         `${effect} parameter ${i} has no addressable caption`);
     }
   }

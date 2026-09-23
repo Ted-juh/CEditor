@@ -42,7 +42,7 @@ test('real script runtime updates captions from local and incoming values withou
   const panel=buildGaiaPanel(), mounted=mountPanel(panel);
   const script=loadScript(panel.scripts.find(s=>s.id==='gaia_arpeggio_captions').source);
   script.onPanelLoad();
-  const text=name=>mounted.controls().find(c=>c._children.Core.name===`${name}.caption`)._children.Text.content;
+  const text=name=>mounted.controls().find(c=>c._children.Core.name===`${name.replace(/\./g,'_')}_caption`)._children.Text.content;
   assert.equal(text('arp.velocity'),'VELOCITY\nREAL (played)');
   moveChannel(idOf(controlNamed(panel,'arp.velocity')),{value:96}); script.settle();
   assert.equal(text('arp.velocity'),'VELOCITY\n96 (fixed)');

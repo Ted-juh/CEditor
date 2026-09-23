@@ -19,7 +19,7 @@ test('opening a legacy GAIA panel repairs all six note tables and preserves the 
     delete expected._children.Children;
     const actual = structuredClone(after[i]);
     delete actual._children.Children;
-    if (/^tone[123]\.(lfo|modLfo)\.tempoSyncNote$/.test(expected._children.Core.name)) {
+    if (/^tone[123]_(lfo|modLfo)_tempoSyncNote$/.test(expected._children.Core.name)) {
       repaired++;
       for (const [label, id] of [['1/2', '12_8'], ['1/6', '16_13']]) {
         const row = expected._children.Value.rows.find(row => row.displayText === label);

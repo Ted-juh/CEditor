@@ -14,7 +14,9 @@ import { formatRangeValue, parseRangeInputValue } from '../src/CE_Application/ut
 const profile = buildProfile();
 const panel = buildGaiaPanel();
 const controls = flatControls(panel.controls);
-const byName = name => controls.find(c => c._children.Core.name === name);
+// Looked up by the parameter id, which is what these tests think in. A control is named after its
+// parameter with the dots made underscores (utils/controlNames.js), so the id is converted here.
+const byName = name => controls.find(c => c._children.Core.name === name.replace(/\./g, '_'));
 const system = profile.parameters.filter(p => p.id.startsWith('system.'));
 function dt1(data) {
   const body = [1, 0, 0, 0, ...data];

@@ -19,7 +19,7 @@ try {
     // regression for that rendering crash after the GAIA note migration runs.
     function duplicateDBeamIds(controls) {
       for (const control of controls) {
-        if (control._children?.Core?.name === 'common.dBeamAssign') {
+        if (control._children?.Core?.name === 'common_dBeamAssign') {
           for (const row of control._children.Value.rows) row.id = '';
         }
         duplicateDBeamIds(Object.values(control._children?.Children?._children ?? {}));
@@ -36,7 +36,7 @@ try {
     .map(c => ({ name: c._children.Core.name, id: c._children.Core.id,
       rows: c._children.Value.rows.filter(r => r.enabled !== false && !r.isHeader)
         .map(r => ({ id: r.id, value: r.internalValue ?? r.id ?? '', label: r.displayText ?? r.label ?? r.internalValue ?? r.id ?? '' })) })));
-  assert.ok(menus.some(m => m.name === 'common.dBeamAssign'));
+  assert.ok(menus.some(m => m.name === 'common_dBeamAssign'));
   assert.equal(menus.filter(m => /^(tone[123])\.(modLfo|lfo)\.tempoSyncNote$/.test(m.name)).length, 6);
   let checked = 0;
   for (const combo of menus) {
@@ -45,7 +45,7 @@ try {
       const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
       const tabs = page.locator(`.canvas-control[data-control-id="${tabsId}"]`);
       const rect = await tabs.boundingBox();
-      const index = combo.name.startsWith('system.') ? 3 : combo.name.startsWith('arp.') ? 2 : 0;
+      const index = combo.name.startsWith('system_') ? 3 : combo.name.startsWith('arp_') ? 2 : 0;
       await page.mouse.click(rect.x + rect.width * (index+.5)/4, rect.y + 10);
       await control.waitFor({ state: 'visible' });
     }
@@ -81,7 +81,7 @@ try {
     checked++;
   }
   // The nested D Beam popup must keep its anchor at non-100% zoom too.
-  const dbeam = menus.find(m => m.name === 'common.dBeamAssign');
+  const dbeam = menus.find(m => m.name === 'common_dBeamAssign');
   const tabsId = await page.evaluate(() => window.__gaia.id('bottom_pages'));
   const tabsBox = await page.locator(`.canvas-control[data-control-id="${tabsId}"]`).boundingBox();
   await page.mouse.click(tabsBox.x + tabsBox.width / 10, tabsBox.y + 12);

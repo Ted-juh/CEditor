@@ -36,6 +36,7 @@ import { applyGaiaTabStyle } from './tab-style.mjs';
 import { applyCompactHeader } from './compact-header.mjs';
 import { applyWidescreenLayout } from './widescreen-layout.mjs';
 import { applySectionTree } from './section-tree.mjs';
+import { migrateDottedControlNames } from '../../../CE/web/src/CE_Application/utils/controlNames.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -893,7 +894,10 @@ export function buildGaiaPanel({ sections = true } = {}) {
 
   // Sectioning is last: it works on the finished geometry, so no layout pass has to know about nesting.
   const flat = applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
-  return sections ? applySectionTree(flat) : flat;
+  // Names last of all: every pass above finds controls by their parameter-id names, and the saved
+  // panel must carry none of those dots (utils/controlNames.js). The flat layout stays as the
+  // passes built it, for the idempotence checks that run them again.
+  return sections ? migrateDottedControlNames(applySectionTree(flat)) : flat;
 }
 
 export function serializeGaiaPanel() {

@@ -7,7 +7,9 @@ import { seedCustomValues } from '../src/CE_Application/utils/customComponentInt
 import { classifyParts } from '../src/CE_Application/utils/staticPartBaking.js';
 import { gaiaKnob } from '../../../tools/scripts/gaia-panel/components.mjs';
 const controls = flatControls(buildGaiaPanel().controls);
-const named = name => controls.find(c => c._children.Core.name === name);
+// Looked up by the parameter id, which is what these tests think in. A control is named after its
+// parameter with the dots made underscores (utils/controlNames.js), so the id is converted here.
+const named = name => controls.find(c => c._children.Core.name === name.replace(/\./g, '_'));
 test('numeric inputs fit inside their controls so focusing never scrolls the knob away', () => {
   for (const size of [42, 54]) {
     const control = gaiaKnob({ size, numeric: true });

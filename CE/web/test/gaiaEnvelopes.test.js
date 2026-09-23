@@ -9,7 +9,7 @@ import { linkedEnvelopeStages, linkedEnvelopePoints, linkedEnvelopeDragValue, re
 const panel=buildGaiaPanel(), controls=flatControls(panel.controls);
 const graphs=controls.filter(c=>c._children.Envelope?.stageSources);
 test('envelope views match the other faders inside unchanged tone sections and keep source IDs',()=>{
-  const views=controls.filter(c=>/^tone\d\.(osc\.pitchEnv|filter\.env|amp\.env)\.view$/.test(c._children.Core.name));
+  const views=controls.filter(c=>/^tone\d_(osc_pitchEnv|filter_env|amp_env)_view$/.test(c._children.Core.name));
   assert.equal(views.length,9);
   for(const view of views){
     const cfg=view._children.TabContainer,children=Object.values(view._children.Children._children);
@@ -45,12 +45,13 @@ test('nine native graphs link only their own tone faders, without duplicate MIDI
     for(const stage of stages){
       const link=graph._children.Envelope.stageSources[stage];
       const source=controls.find(c=>c._children.Core.id===link.controlId);
-      assert.ok(source._children.Core.name.startsWith(tone+'.'));
+      assert.ok(source._children.Core.name.startsWith(tone+'_'));
       assert.equal(source._children.DeviceBindings.bindings.length,1);
       assert.equal(link.min,0);assert.equal(link.max,127);
     }
   }
-  const before=JSON.stringify(panel);applyEditableEnvelopes(panel);assert.equal(JSON.stringify(panel),before);
+  // Idempotence of the pass, on the flat layout it runs on.
+  const flat=buildGaiaPanel({sections:false}),before=JSON.stringify(flat);applyEditableEnvelopes(flat);assert.equal(JSON.stringify(flat),before);
 });
 test('stage mapping spans every parameter independently, including all-zero/all-maximum envelopes',()=>{
   for(const graph of graphs)for(const v of [0,1,63,126,127]){

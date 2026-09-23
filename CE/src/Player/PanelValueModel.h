@@ -78,7 +78,14 @@ public:
             if (! rangeOf (control, lo, hi)) return false;
             toWrite = juce::var (lo + juce::jlimit (0.0, 1.0, (double) value) * (hi - lo));
         }
-        return setAtPath (control, resolveModelPath (control, split.second), toWrite);
+        const auto modelPath = resolveModelPath (control, split.second);
+        // A script renaming a control follows the editor's rule: no dots in a name. The name is the
+        // first segment of every script path, and splitScriptPath above ends it at the first dot, so
+        // a dotted name would make the control unreachable by the very path that renamed it.
+        // Mirrors sanitizeControlName in utils/controlNames.js.
+        if (modelPath == "Core.name")
+            toWrite = juce::var (toWrite.toString().replaceCharacter ('.', '_'));
+        return setAtPath (control, modelPath, toWrite);
     }
 
     /** Every control's name, in document order, containers included — what ce.panel.snapshot walks.

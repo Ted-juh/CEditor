@@ -21,7 +21,8 @@ test('dot-matrix uses four read-only menu pages and an idempotent layout migrati
     assert.ok(rows[0].includes('ROLAND  GAIA  |  SYNTHESIZER SH-01'));
   }
   assert.ok(!d.activeScope.includes(controlNamed(p,'arp_pattern_grid')._children.Core.id));
-  const before=JSON.stringify(p); applyStatusDisplay(p,profile); assert.equal(JSON.stringify(p),before);
+  // Idempotence of the pass, on the flat layout it runs on; the finished panel is sectioned and renamed.
+  const flat=buildGaiaPanel({sections:false}), before=JSON.stringify(flat); applyStatusDisplay(flat,profile); assert.equal(JSON.stringify(flat),before);
 });
 test('custom LCD sources report real channel values, LED labels, tone identity and special values',()=>{
   const p=buildGaiaPanel(); const info=(name,v)=>customLcdInfo(controlNamed(p,name),v);
