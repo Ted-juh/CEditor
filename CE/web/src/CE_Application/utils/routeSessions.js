@@ -27,6 +27,7 @@
 // `applyPanelValueRoutes` for what does reach a synth and what does not.
 
 import { flatControls } from './containment.js';
+import { isMeterFamily } from '../models/componentFamilies.js';
 import { panelRoutes } from './routeAdapters.js';
 import { settleRoutes } from './routeModel.js';
 
@@ -46,6 +47,11 @@ export function specForEndpoint(panel, endpoint) {
 
   const channel = control?._children?.ValueChannels?._children?.[endpoint.port];
   if (channel) return { min: channel.min ?? 0, max: channel.max ?? 1, step: channel.step, type: channel.type };
+
+  if ((endpoint.port || 'value') === 'value' && isMeterFamily(control?._children?.Core?.controlType)) {
+    const meter = control._children?.Meter;
+    return { min: meter?.valueMin ?? 0, max: meter?.valueMax ?? 1 };
+  }
 
   const behavior = control?._children?.Behavior;
   if (behavior) return { min: behavior.min ?? 0, max: behavior.max ?? 1, step: behavior.step, type: behavior.valueType };

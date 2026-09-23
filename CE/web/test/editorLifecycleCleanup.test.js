@@ -36,7 +36,8 @@ test('script edits persist to the document that created the designer before clos
     'file import must keep its original target and stop when the designer unmounts');
 
   assert.match(canvas, /documentId=\{\$activeEditorTab\.id\}/);
-  assert.match(canvas, /onChange=\{\(scripts, documentId\) => updateScriptDocument\(documentId, \{ scripts \}\)\}/);
+  assert.match(canvas, /onChange=\{\(scripts, documentId\) => \{[\s\S]*?updateScriptDocument\(documentId, \{ scripts \}\);[\s\S]*?if \(scriptPanel\) updatePanel\(scriptPanel\.id, \{ scripts \}\);/,
+    'the owning workspace and bound panel both receive source edits');
   assert.doesNotMatch(canvas, /onChange=\{\(scripts\) => updateScriptDocument\(\$activeEditorTab\.id/,
     'a delayed callback must never look up whichever tab happens to be active later');
 });

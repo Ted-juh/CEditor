@@ -1654,8 +1654,8 @@
   }
 
   // Inject the meter's live value + peak-hold onto the resolved Meter section:
-  // the value comes from a linked range control (valueSourceId) or the static
-  // config; the peak decays via the ticker. The renderer reads Meter.__value /
+  // the value comes from a routed/session value, a linked range control
+  // (valueSourceId), or the static config; the peak decays via the ticker. The renderer reads Meter.__value /
   // Meter.__peak.
   function applyMeterValueSource(control, resolved) {
     if (!isMeterFamily(control?._children?.Core?.controlType)) return resolved;
@@ -1664,9 +1664,13 @@
     if (!meter) return resolved;
 
     const range = meter.valueSourceId ? lcdRangeForSource(meter.valueSourceId) : null;
-    const value = range && range.value !== undefined ? range.value : numberOr(meter.value, 0);
+    const session = sessionFor(control);
+    const routed = session?.valueOverrideEnabled === true;
+    const value = routed
+      ? numberOr(session.valueOverride, 0)
+      : range && range.value !== undefined ? range.value : numberOr(meter.value, 0);
     const nextMeter = { ...meter, __value: value };
-    if (range) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
+    if (range && !routed) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
 
     // Crossing into a different threshold band, which is what an overload LED is lit from. The
     // zones are the meter's OWN, via meterZoneIndexAt, so the band a script hears about is the

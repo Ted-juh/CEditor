@@ -7,7 +7,7 @@
   // Keep the shell's insert rail below the tabs and any visible horizontal ruler.
   $effect(() => { topInset = tabBarHeight + (rulerCorner ? rulerHeight : 0); });
 
-  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
+  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel, saveActiveEditorDocument } from '../stores/panels.js';
   import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
@@ -805,7 +805,7 @@
   }
 
   function createStandaloneScriptWorkspace() {
-    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name);
+    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name, $activePanel?.scripts);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
@@ -1068,7 +1068,11 @@
             controls={behaviorControls}
             initialScripts={(scriptDoc?.scripts ?? []).filter(isSourceScript)}
             onEnableModule={enableScriptModule}
-            onChange={(scripts, documentId) => updateScriptDocument(documentId, { scripts })} />
+            onSave={() => saveActiveEditorDocument()}
+            onChange={(scripts, documentId) => {
+              updateScriptDocument(documentId, { scripts });
+              if (scriptPanel) updatePanel(scriptPanel.id, { scripts });
+            }} />
         {/key}
       {:else if canvasPanel}
         {#if selectedIsCustomComponent && !$previewModeEnabled}

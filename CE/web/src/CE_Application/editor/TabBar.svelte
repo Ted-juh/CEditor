@@ -228,7 +228,7 @@
   }
 
   function createScriptTab() {
-    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name);
+    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name, $activePanel?.scripts);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 

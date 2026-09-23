@@ -9,8 +9,8 @@ import {
 } from '../src/CE_Application/scripting/scriptDocumentModel.js';
 import { createScript } from '../src/CE_Application/scripting/scriptModel.js';
 import { createPanel, deserializePanel, serializePanel } from '../src/CE_Application/stores/panelModel.js';
-import { activeEditorTab, activePanel, activePanelId, panels, scriptRuntimePanelId } from '../src/CE_Application/stores/panels.js';
-import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel } from '../src/CE_Application/stores/scriptWorkspace.js';
+import { activeEditorTab, activePanel, activePanelId, applyPanelSavedPayload, panels, saveActiveEditorDocument, scriptRuntimePanelId } from '../src/CE_Application/stores/panels.js';
+import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, scriptDocuments, updateScriptDocument } from '../src/CE_Application/stores/scriptWorkspace.js';
 import { panelPreviewSessions } from '../src/CE_Application/stores/interactionPreview.js';
 import {
   latestMidiPreview,
@@ -62,6 +62,58 @@ test('panel serialization preserves attached scripts', () => {
   assert.equal(restored.scripts.length, 1);
   assert.equal(restored.scripts[0].id, 'macroRouting');
   assert.match(restored.scripts[0].source, /function onValueChanged/);
+});
+
+test('a bound script editor saves its current scripts into the panel file', () => {
+  const panel = createPanel('Bound Scripts');
+  panel.filePath = 'C:/tmp/bound.cepanel';
+  const original = createScript({ id: 'bound-script', language: 'javascript', event: 'onPanelReady', source: 'function onPanelReady() {}' });
+  panel.scripts = [original];
+  panels.set([panel]);
+  activePanelId.set(panel.id);
+  const document = getOrCreateScriptDocForPanel(panel.id, panel.name, panel.scripts);
+  assert.equal(document.scripts[0].id, original.id, 'the editor starts from embedded panel scripts');
+  activeEditorTab.set({ type: 'script', id: document.id });
+
+  const edited = { ...document.scripts[0], source: 'function onPanelReady() { log("changed") }' };
+  updateScriptDocument(document.id, { scripts: [edited] });
+  const emitted = [];
+  const previousWindow = globalThis.window;
+  globalThis.window = { __JUCE__: { backend: { emitEvent: (name, payload) => emitted.push({ name, payload }) } } };
+  try {
+    saveActiveEditorDocument();
+  } finally {
+    globalThis.window = previousWindow;
+  }
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].name, 'savePanel');
+  const reopened = deserializePanel(emitted[0].payload.data, 'C:/tmp/bound.cepanel');
+  assert.equal(reopened.scripts[0].source, edited.source);
+  applyPanelSavedPayload({ panelId: panel.id, filePath: panel.filePath, ok: true });
+  assert.equal(get(scriptDocuments).find((entry) => entry.id === document.id)?.modified, false);
+
+  updateScriptDocument(document.id, { scripts: [] });
+  globalThis.window = { __JUCE__: { backend: { emitEvent: (name, payload) => emitted.push({ name, payload }) } } };
+  try {
+    saveActiveEditorDocument();
+  } finally {
+    globalThis.window = previousWindow;
+  }
+  assert.deepEqual(deserializePanel(emitted.at(-1).payload.data, 'C:/tmp/bound.cepanel').scripts, [],
+    'deleting the last script persists rather than restoring the old embedded list');
+});
+
+test('reopening a panel refreshes a clean bound script workspace from its file', () => {
+  const panel = createPanel('Reopened scripts');
+  const oldScript = createScript({ id: 'old', source: 'function onPanelReady() {}' });
+  const newScript = createScript({ id: 'new', source: 'function onPanelReady() { log("new") }' });
+  const first = getOrCreateScriptDocForPanel(panel.id, panel.name, [oldScript]);
+  const reopened = getOrCreateScriptDocForPanel(panel.id, panel.name, [newScript]);
+  assert.equal(reopened.id, first.id);
+  assert.equal(reopened.scripts[0].id, 'new');
+  assert.equal(reopened.modified, false);
+  const cleared = getOrCreateScriptDocForPanel(panel.id, panel.name, []);
+  assert.deepEqual(cleared.scripts, [], 'a reopened file with no scripts clears a clean editor draft');
 });
 
 test('script tab blocks panel-editing commands but keeps the runtime bound to its panel', () => {

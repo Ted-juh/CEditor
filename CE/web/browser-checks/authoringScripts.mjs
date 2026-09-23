@@ -38,7 +38,7 @@ const kit = await boot();
 const led = new Ledger('authoringScripts');
 const S = 'ScriptEditor';
 
-/** The scripts in the panel's document, as the store holds them — not as the editor draws them. */
+/** The scripts in the Behavior Designer's workspace store. */
 const storedScripts = () => kit.page.evaluate(async () => {
   const { scriptDocuments } = await import('/src/CE_Application/stores/scriptWorkspace.js');
   const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
@@ -46,6 +46,14 @@ const storedScripts = () => kit.page.evaluate(async () => {
     id: s.id, event: s.event, language: s.language, enabled: s.enabled !== false,
     source: String(s.source ?? ''),
   })));
+});
+
+const embeddedScripts = () => kit.page.evaluate(async () => {
+  const { panels, activeEditorTab } = await import('/src/CE_Application/stores/panels.js');
+  const { scriptDocuments } = await import('/src/CE_Application/stores/scriptWorkspace.js');
+  const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
+  const document = get(scriptDocuments).find((entry) => entry.id === get(activeEditorTab)?.id);
+  return get(panels).find((panel) => String(panel.id) === String(document?.panelId))?.scripts ?? [];
 });
 
 /** Type into the real CodeEditor: focus its content, select all, and type over it. */
@@ -90,7 +98,7 @@ try {
   await kit.page.locator('.bd-app button.tgnew:not(.folder)').nth(2).click();   // Runtime
   await kit.settle(900);
   const created = await storedScripts();
-  led.check(S, 'creating a script', 'the + on a lifecycle group adds a script to the PANEL DOCUMENT, not to a list the editor keeps to itself — the document is what saves, exports and runs, so a script the editor knows about and the document does not is a script that disappears',
+  led.check(S, 'creating a script', 'the + on a lifecycle group adds a script to the workspace store rather than keeping it only in the view',
     { added: 1, hasEvent: true, hasSource: true },
     { added: created.length - before,
       hasEvent: !!created.at(-1)?.event,
@@ -109,9 +117,25 @@ try {
     : 'set("Cutoff.value", 99);\nlog("authored");\n';
   await typeSource(setValue);
   const typed = (await storedScripts()).at(-1);
-  led.check(S, 'typing reaches the document', 'what is typed into the code pane lands in the stored script — measured in the STORE rather than by reading the editor back, because an editor that shows your text and saves something else is the failure this is for',
-    { carriesTheCall: true, carriesThePrint: true },
-    { carriesTheCall: typed.source.includes('99'), carriesThePrint: typed.source.includes('authored') });
+  const embedded = (await embeddedScripts()).at(-1);
+  led.check(S, 'typing reaches the panel', 'what is typed into the code pane reaches both the editor workspace and the panel document that saves and exports',
+    { carriesTheCall: true, carriesThePrint: true, embeddedInPanel: true },
+    { carriesTheCall: typed.source.includes('99'), carriesThePrint: typed.source.includes('authored'),
+      embeddedInPanel: String(embedded?.source ?? '').includes('authored') });
+
+  await kit.page.evaluate(() => {
+    window.__scriptSavePreviousJuce = window.__JUCE__;
+    window.__scriptSaveEvents = [];
+    window.__JUCE__ = { backend: { emitEvent: (name, payload) => window.__scriptSaveEvents.push({ name, payload }) } };
+  });
+  await kit.page.getByRole('button', { name: 'Save file' }).click();
+  const savedPanel = await kit.page.evaluate(() => {
+    const event = window.__scriptSaveEvents.find((entry) => entry.name === 'savePanelAs' || entry.name === 'savePanel');
+    window.__JUCE__ = window.__scriptSavePreviousJuce;
+    return event ? JSON.parse(event.payload.data) : null;
+  });
+  led.check(S, 'Save file includes the authored script', 'the Behavior Designer Save file button submits a .cepanel containing the script, rather than a separate workspace file',
+    true, String(savedPanel?.scripts?.at(-1)?.source ?? '').includes('authored'));
 
   // ===============================================================================================
   // RUN — the assertion the rest of the suite exists to reach.

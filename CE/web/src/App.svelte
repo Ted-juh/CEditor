@@ -22,14 +22,13 @@
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActivePanel, saveActivePanelAs, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
   import { deleteSelectedGuide } from './CE_Application/stores/guides.js';
   import { applyStyleToSelection, copyControlStyle } from './CE_Application/stores/styleClipboard.js';
   import { previewModeEnabled } from './CE_Application/stores/interactionPreview.js';
-  import { saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from './CE_Application/stores/scriptWorkspace.js';
   import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
   import { isEditableTarget, resolveGlobalShortcut } from './CE_Application/utils/globalShortcuts.js';
   import { isEditorShortcutFocus } from './CE_Application/utils/editorShortcutFocus.js';
@@ -97,11 +96,7 @@
   }
 
   function saveActiveTab({ saveAs = false } = {}) {
-    if (get(activeEditorTab)?.type === 'script') {
-      if (saveAs) saveActiveScriptWorkspaceAs(); else saveActiveScriptWorkspace();
-      return;
-    }
-    if (saveAs) saveActivePanelAs(); else saveActivePanel();
+    saveActiveEditorDocument({ saveAs });
   }
 
   function handleGlobalKeyDown(e) {

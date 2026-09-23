@@ -21,6 +21,7 @@
 import { flatControls } from './containment.js';
 import { ROUTE_CURVE, ROUTE_MODE, makeRoute, normalizeRoute, routeEndpoint } from './routeModel.js';
 import { acceptsFeedback, acceptsInput } from './displayMode.js';
+import { isMeterFamily } from '../models/componentFamilies.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -196,12 +197,15 @@ export function routeEndpointCandidates(panel) {
     const id = controlId(control);
     if (!id) continue;
     const behavior = control?._children?.Behavior ?? null;
+    const meter = isMeterFamily(controlType(control)) ? control?._children?.Meter : null;
     const name = controlName(control);
     const channels = control?._children?.ValueChannels?._children ?? {};
 
     const ports = Object.keys(channels).length
       ? Object.keys(channels).map((port) => ({ port, label: `${name} · ${port}`, spec: channels[port] }))
-      : [{ port: 'value', label: name, spec: behavior }];
+      : [{ port: 'value', label: name, spec: meter
+        ? { min: meter.valueMin ?? 0, max: meter.valueMax ?? 1 }
+        : behavior }];
 
     for (const { port, label, spec } of ports) {
       out.push({

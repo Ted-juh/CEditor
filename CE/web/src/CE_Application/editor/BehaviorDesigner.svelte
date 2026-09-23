@@ -27,12 +27,12 @@
 
   // controls = the live panel's component tree (for the path picker).
   // initialScripts = the panel's existing scripts (empty for a fresh panel; the debug route
-  // passes a demo set). Real persistence back to the panel model is follow-on wiring.
+  // passes a demo set). The parent mirrors edits into the bound panel document.
   // `panel` is the panel document, for the picker's module filtering and for validating a
   // script against the modules the panel declares. Null on the standalone debug route, where
   // there is no document — the picker then shows everything rather than nothing.
   let { panelName = 'Untitled Panel', panelId = null, documentId = null, panel = null, controls = [], initialScripts = [],
-         onEnableModule = null, onChange = null } = $props();
+         onEnableModule = null, onChange = null, onSave = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
   // Right-hand docked panel: one column with Insert / Library / History tabs (default open).
@@ -347,7 +347,7 @@
   // Persist each edit immediately so closing a workspace cannot remove its document before a
   // debounce writes the last change. The debounce only coalesces the saved indicator and version
   // history; the parent store is already current while the tab's close confirmation runs.
-  // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet settled).
+  // saveState tracks draft sync, not a file write. File > Save writes the .cepanel or workspace.
   let saveTimer = null;
   let saveState = $state('saved');
   let firstSnapshot = true;
@@ -361,7 +361,7 @@
     const snap = $state.snapshot(scripts); // deep-reads scripts so the effect tracks every change
     if (firstSnapshot) { firstSnapshot = false; return; } // initial seed isn't an edit
     saveState = 'pending';
-    onChange?.(snap, documentId);
+    untrack(() => onChange?.(snap, documentId));
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -999,13 +999,13 @@
       <span class="caretpos" title="Cursor position">Ln {caret.line}, Col {caret.col}</span>
     {/if}
     <span class="spacer" style="flex:1"></span>
-    <span class={['savestate', saveState]} title={saveState === 'saved' ? 'All changes saved' : 'Saving…'}>
-      {saveState === 'saved' ? '✓ Saved' : '● Unsaved'}
+    <span class={['savestate', saveState]} title={saveState === 'saved' ? 'Draft synced. Use File → Save to write it to disk.' : 'Syncing draft…'}>
+      {saveState === 'saved' ? '✓ Draft synced' : '● Syncing draft'}
     </span>
     <label class="livetoggle" title="Fire onValueChanged scripts as control values change">
       <input type="checkbox" checked={liveOn} onchange={(e) => liveOn = e.target.checked} />
       <span class={['liveled', liveOn && 'on']}></span> Live
     </label>
-    <button class="btn" onclick={saveNow} disabled={saveState === 'saved'}>Save</button>
+    <button class="btn" onclick={() => { saveNow(); onSave?.(); }}>Save file</button>
   </div>
 </div>

@@ -56,6 +56,9 @@ import {
 import {
   activeScriptDocumentId,
   closeScriptWorkspaceDocument,
+  markPanelBoundScriptWorkspaceSaved,
+  saveActiveScriptWorkspace,
+  saveActiveScriptWorkspaceAs,
   scriptDocuments,
   setActiveScriptDocument,
 } from './scriptWorkspace.js';
@@ -183,8 +186,21 @@ function schedulePanelOpenHousekeeping(label) {
   }, 0);
 }
 
+function panelWithBoundScripts(panel) {
+  const document = get(scriptDocuments).find((entry) => String(entry.panelId) === String(panel?.id));
+  if (!document) return panel;
+  const authored = Array.isArray(document.scripts) ? document.scripts : [];
+  const embedded = Array.isArray(panel.scripts) ? panel.scripts : [];
+  // A dirty editor wins, including an intentional deletion of every script.
+  // An old empty workspace must not erase scripts loaded from a .cepanel.
+  if (document.modified) return { ...panel, scripts: authored };
+  // Rescue panel-bound scripts authored before the editor mirrored them into panel documents.
+  if (!embedded.length && authored.length) return { ...panel, scripts: authored };
+  return panel;
+}
+
 function serializePanelDocument(panel) {
-  return serializePanel(panel, {
+  return serializePanel(panelWithBoundScripts(panel), {
     deviceSession: getProjectDeviceSessionSnapshot(),
   });
 }
@@ -198,7 +214,7 @@ function serializePanelDocument(panel) {
  * was elided is simply absent to it. So the build payload is written in full.
  */
 function serializePanelForExport(panel) {
-  return serializePanel(panel, {
+  return serializePanel(panelWithBoundScripts(panel), {
     deviceSession: getProjectDeviceSessionSnapshot(),
     // An in-progress capture is saved in the .cepanel and has no business in a plugin binary: the
     // player's C++ reads Core, Behavior and Scripts and has never heard of a capture session, so
@@ -1054,23 +1070,41 @@ export function updatePanel(id, updates) {
 // --- Save / Open actions ---
 
 /** Save the active panel. If it has no filePath, triggers Save As. */
-export function saveActivePanel() {
-  const panel = get(activePanel);
+export function savePanelById(id, forceSaveAs = false) {
+  const panel = get(panels).find((entry) => String(entry.id) === String(id));
   if (!panel) return;
 
-  if (panel.filePath) {
+  if (panel.filePath && !forceSaveAs) {
     bridgeSavePanel(String(panel.id), panel.filePath, serializePanelDocument(panel));
   } else {
-    saveActivePanelAs();
+    bridgeSavePanelAs(String(panel.id), serializePanelDocument(panel));
   }
+}
+
+export function saveActivePanel() {
+  const panel = get(activePanel);
+  if (panel) savePanelById(panel.id);
 }
 
 /** Save the active panel with a file dialog. */
 export function saveActivePanelAs() {
   const panel = get(activePanel);
-  if (!panel) return;
+  if (panel) savePanelById(panel.id, true);
+}
 
-  bridgeSavePanelAs(String(panel.id), serializePanelDocument(panel));
+/** Save a bound script tab into its panel; an unbound workspace keeps its own file. */
+export function saveActiveEditorDocument({ saveAs = false } = {}) {
+  const tab = get(activeEditorTab);
+  if (tab?.type === 'script') {
+    const document = get(scriptDocuments).find((entry) => entry.id === tab.id);
+    const panel = get(panels).find((entry) => String(entry.id) === String(document?.panelId));
+    if (panel) savePanelById(panel.id, saveAs);
+    else if (saveAs) saveActiveScriptWorkspaceAs();
+    else saveActiveScriptWorkspace();
+    return;
+  }
+  if (saveAs) saveActivePanelAs();
+  else saveActivePanel();
 }
 
 // --- In-app VST3 build (Build menu → "Build VST3") -------------------------------------------
@@ -1277,8 +1311,9 @@ export function applyPanelSavedPayload(payload) {
   if (payload.name) updates.name = payload.name;
 
   panels.update(list =>
-    list.map(p => p.id === panelId ? { ...p, ...updates } : p)
+    list.map(p => p.id === panelId ? { ...panelWithBoundScripts(p), ...updates } : p)
   );
+  markPanelBoundScriptWorkspaceSaved(panelId);
 
   // No markContextSaved() call here on purpose: history.js imports this module, so importing it
   // back would close a cycle for something it does not need. Its noteCleanState() adopts this

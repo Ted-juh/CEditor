@@ -28,7 +28,7 @@
   function openScripts() {
     // Open the script editor bound to THIS component's panel — so Paths shows that panel's controls.
     const panel = get(activePanel);
-    const doc = getOrCreateScriptDocForPanel(panel?.id, panel?.name);
+    const doc = getOrCreateScriptDocForPanel(panel?.id, panel?.name, panel?.scripts);
     if (!doc?.id) return;
     setActiveEditorTab({ type: 'script', id: doc.id });
   }

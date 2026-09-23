@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { closeActiveEditorTab, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
+  import { closeActiveEditorTab, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActiveEditorDocument, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
   import { undoAvailable, redoAvailable } from '../stores/history.js';
   import { hasClipboardContent } from '../stores/clipboard.js';
   import { styleClipboard, copyControlStyle, applyStyleToSelection } from '../stores/styleClipboard.js';
@@ -14,7 +14,7 @@
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { requestFitToWindow, requestZoomStep, requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument } from '../stores/componentWorkspace.js';
-  import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
+  import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
   import { buildInfo, buildLabel } from '../buildInfo.js';
@@ -95,7 +95,7 @@
 
   function newScriptWorkspace() {
     const panel = get(activePanel);
-    const document = getOrCreateScriptDocForPanel(panel?.id, panel?.name);
+    const document = getOrCreateScriptDocForPanel(panel?.id, panel?.name, panel?.scripts);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
@@ -168,14 +168,10 @@
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
       { type: 'separator' },
       { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => {
-        const tab = get(activeEditorTab);
-        if (tab?.type === 'script') saveActiveScriptWorkspace();
-        else saveActivePanel();
+        saveActiveEditorDocument();
       } },
       { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => {
-        const tab = get(activeEditorTab);
-        if (tab?.type === 'script') saveActiveScriptWorkspaceAs();
-        else saveActivePanelAs();
+        saveActiveEditorDocument({ saveAs: true });
       } },
       { type: 'separator' },
       // Sharing is a separate command from Save, and has to be: a .cepanel points at its images

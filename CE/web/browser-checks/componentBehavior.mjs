@@ -358,6 +358,25 @@ try {
       assert.equal(await node(id).locator('.meter-peak').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 0, 0)');
     };await verify();await reopen(id);await verify();
   });
+  await check('Route into Meter moves its visible reading in the configured range',async()=>{
+    const id=await fixture('Meter',{Meter:{value:10,valueMin:0,valueMax:100,showValue:true,valuePrecision:0}},[],[
+      {type:'Slider',sections:{Core:{id:'route_meter_source'},Transform:{x:50,y:300,width:300,height:60},Behavior:{min:0,max:1,defaultValue:0}}},
+    ]);
+    const added=await page.evaluate(async ({id})=>{
+      const {addRoute}=await import('/src/CE_Application/stores/routes.js');
+      return addRoute({from:{controlId:'route_meter_source',port:'value'},to:{controlId:id,port:'value'},mode:'set'});
+    },{id});
+    assert.equal(added.ok,true);
+    await props.getByTitle('Enter Preview',{exact:true}).click();
+    const source=node('route_meter_source');
+    await source.focus();await page.keyboard.press('End');await settle();
+    assert.equal(await node(id).locator('.meter-readout').innerText(),'100');
+    await page.keyboard.press('Home');await settle();
+    assert.equal(await node(id).locator('.meter-readout').innerText(),'0');
+    await reopen(id);await props.getByTitle('Enter Preview',{exact:true}).click();
+    await node('route_meter_source').focus();await page.keyboard.press('End');await settle();
+    assert.equal(await node(id).locator('.meter-readout').innerText(),'100');
+  });
   await check('Crossfader laws gains bipolar output labels detent and persisted pointer geometry agree',async()=>{
     const id=await fixture('Crossfader',{Crossfader:{showGains:true,labelA:'Dry',labelB:'Wet',detent:0.04},DeviceBindings:{enabled:true,bindings:['a','b','mix'].map(port=>({kind:'deviceParameter',port,deviceRole:'mainSynth',parameterId:port,dryRun:true}))}});
     const handle=()=>node(id).locator('svg.xfader > rect').last();

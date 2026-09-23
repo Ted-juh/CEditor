@@ -91,15 +91,28 @@ export function createScriptWorkspaceDocument(options = {}) {
 /** Open (or create) the script editor bound to a specific panel — one editor per panel.
  *  Binds via `panelId` so the Paths picker / controls come from THAT panel (not the ambiguous
  *  "active panel"). */
-export function getOrCreateScriptDocForPanel(panelId, panelName = '') {
+export function getOrCreateScriptDocForPanel(panelId, panelName = '', panelScripts = undefined) {
   const id = String(panelId ?? '').trim();
   const existing = id ? get(scriptDocuments).find((doc) => doc.panelId === id) : null;
   if (existing) {
     activeScriptDocumentId.set(existing.id);
+    // A saved panel can be reopened or replaced while a clean editor workspace
+    // with the same panel id is still in local storage. The file is authoritative.
+    if (Array.isArray(panelScripts) && !existing.modified
+        && JSON.stringify(existing.scripts) !== JSON.stringify(panelScripts)) {
+      const refreshed = sanitizeDocument({ ...existing, scripts: panelScripts, modified: false });
+      scriptDocuments.update((documents) => documents.map((doc) => doc.id === existing.id ? refreshed : doc));
+      return refreshed;
+    }
     return existing;
   }
   const base = createScriptDocument({ name: panelName ? `${panelName} · Scripts` : 'Scripts' });
-  const document = sanitizeDocument({ ...base, panelId: id });
+  const document = sanitizeDocument({
+    ...base,
+    panelId: id,
+    scripts: Array.isArray(panelScripts) ? panelScripts : [],
+    modified: false,
+  });
   scriptDocuments.update((documents) => [...documents, document]);
   activeScriptDocumentId.set(document.id);
   return document;
@@ -171,6 +184,14 @@ export function markScriptWorkspaceSaved(documentId, { filePath = '', name = '' 
   // omission about half the documents the app can open.
   if (filePath) rememberRecentFile({ kind: 'script', path: filePath, name });
   persistOpenScriptWorkspacePaths();
+}
+
+/** A panel-bound workspace is saved with its .cepanel, not as a second required file. */
+export function markPanelBoundScriptWorkspaceSaved(panelId) {
+  const id = String(panelId ?? '');
+  scriptDocuments.update((documents) => documents.map((document) =>
+    document.panelId === id ? { ...document, modified: false } : document
+  ));
 }
 
 export function updateScriptInDocument(documentId, scriptId, updater) {
