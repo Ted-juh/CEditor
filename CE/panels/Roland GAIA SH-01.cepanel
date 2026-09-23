@@ -191130,8 +191130,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -191168,8 +191179,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -191186,7 +191208,7 @@
                         "Transform": {
                           "x": 271.9617224880383,
                           "y": 142.89406671759613,
-                          "width": 123.78947368421052,
+                          "width": 140.66985645933013,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -191207,8 +191229,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -191222,9 +191255,9 @@
                           "controlType": "Label"
                         },
                         "Transform": {
-                          "x": 407.00478468899524,
+                          "x": 423.88516746411483,
                           "y": 142.89406671759613,
-                          "width": 1044.7081339712918,
+                          "width": 1027.8277511961724,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -194878,8 +194911,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -194916,8 +194960,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -194934,7 +194989,7 @@
                         "Transform": {
                           "x": 271.9617224880383,
                           "y": 142.89406671759613,
-                          "width": 123.78947368421052,
+                          "width": 140.66985645933013,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -194955,8 +195010,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -194970,9 +195036,9 @@
                           "controlType": "Label"
                         },
                         "Transform": {
-                          "x": 407.00478468899524,
+                          "x": 423.88516746411483,
                           "y": 142.89406671759613,
-                          "width": 1044.7081339712918,
+                          "width": 1027.8277511961724,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -198626,8 +198692,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -198664,8 +198741,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -198682,7 +198770,7 @@
                         "Transform": {
                           "x": 271.9617224880383,
                           "y": 142.89406671759613,
-                          "width": 123.78947368421052,
+                          "width": 140.66985645933013,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -198703,8 +198791,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -198718,9 +198817,9 @@
                           "controlType": "Label"
                         },
                         "Transform": {
-                          "x": 407.00478468899524,
+                          "x": 423.88516746411483,
                           "y": 142.89406671759613,
-                          "width": 1044.7081339712918,
+                          "width": 1027.8277511961724,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -199302,8 +199401,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -199340,8 +199450,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -199358,7 +199479,7 @@
                         "Transform": {
                           "x": 271.9617224880383,
                           "y": 142.89406671759613,
-                          "width": 123.78947368421052,
+                          "width": 140.66985645933013,
                           "height": 15.45238095238095
                         },
                         "Background": {
@@ -199379,8 +199500,19 @@
                           "_children": {
                             "Font": {
                               "size": 10
+                            },
+                            "Multiline": {
+                              "overflowMode": "shrink",
+                              "maxLines": 1,
+                              "fitMode": "shrink"
                             }
                           }
+                        },
+                        "ContentLayout": {
+                          "paddingLeft": 4,
+                          "paddingRight": 4,
+                          "paddingTop": 1,
+                          "paddingBottom": 1
                         }
                       },
                       "_type": "Control"
@@ -199394,9 +199526,9 @@
                           "controlType": "Label"
                         },
                         "Transform": {
-                          "x": 407.00478468899524,
+                          "x": 423.88516746411483,
                           "y": 142.89406671759613,
-                          "width": 1044.7081339712918,
+                          "width": 1027.8277511961724,
                           "height": 15.45238095238095
                         },
                         "Background": {

@@ -67,6 +67,16 @@ const DEVICE_NAME = 'Roland GAIA SH-01';
  */
 const CONTENT_TOP = 16;
 
+/**
+ * A button label that stays on one line and shrinks to fit rather than wrapping. The layout squeezes
+ * these buttons to 15px tall, where a second line has nowhere to go: CHECK SELECTION wrapped and
+ * spilled out of its button onto the PATCH section below.
+ */
+const ONE_LINE = { wrapMode: 'word', maxLines: 1, overflowMode: 'shrink', fitMode: 'shrink' };
+// And room to do it in: a Button's default padding is taller than the 15px these end up, which
+// left the text no height at all.
+const ONE_LINE_PADDING = { paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1 };
+
 const PORT_FOR = {
   Knob: 'value', Slider: 'value', Number: 'value',
   ToggleButton: 'state', RadioButtonGroup: 'selectedChoice', Combobox: 'selectedChoice',
@@ -672,7 +682,8 @@ function patchBanks(profile, scripts) {
       controls.push(createControl('Button', {
         Core: { id: nextId(name), name },
         Transform: { x, y: 178, width, height: 22 },
-        Text: { content: title, _children: { Font: { size: 10 } } },
+        Text: { content: title, _children: { Font: { size: 10 }, Multiline: ONE_LINE } },
+        ContentLayout: ONE_LINE_PADDING,
         Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
       }));
       scripts.push(createScript({ id: name, name: title, scope: 'panel', target: name, language: 'javascript', event: 'onClick',
@@ -683,14 +694,15 @@ function patchBanks(profile, scripts) {
     const checkName = `names_check_${bankId.replace(/-/g, '_')}`;
     controls.push(createControl('Button', {
       Core: { id: `gaia_${checkName}`, name: checkName, tooltip: 'Read current bank/program without changing sounds or writing memory.' },
-      Transform: { x: 290, y: 178, width: 132, height: 22 },
-      Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 } } },
+      Transform: { x: 290, y: 178, width: 150, height: 22 },
+      Text: { content: 'CHECK SELECTION', _children: { Font: { size: 10 }, Multiline: ONE_LINE } },
+        ContentLayout: ONE_LINE_PADDING,
       Background: { _children: { Fill: { colour: 'FF333D46' }, Border: { thickness: 1, colour: 'FF65717C' }, Corners: { radius: 3 } } },
     }));
     scripts.push(createScript({ id: checkName, name: 'Check current patch', scope: 'panel', target: checkName, language: 'javascript', event: 'onClick',
       source: 'function onClick() { run("gaiaNamesCheck"); }' }));
-    info._children.Transform.x = 434;
-    info._children.Transform.width = 1114;
+    info._children.Transform.x = 452;
+    info._children.Transform.width = 1096;
     info._children.Text._children.Font.size = 9;
     info._children.Core.name = `names_status_${bankId.replace(/-/g, '_')}`;
     controls.push(info);
