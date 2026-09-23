@@ -259,23 +259,27 @@
 <svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 <div class="viewer-editor">
-  <div class="image-tabs">
+  <div class="image-tabs" role="tablist" aria-label="Open images">
     {#each images as img, i}
-      <button
+      <div
         class="image-tab"
         class:active={i === activeImageIndex}
-        onclick={() => switchTab(i)}
-        ondblclick={() => handleTabDblClick(i)}
-        title="Double-click to rename"
       >
-        <span class="image-tab-label">{img.name}</span>
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <span class="image-tab-close" role="button" tabindex="-1" onclick={(e) => closeImage(i, e)} title="Close image">
+        <button
+          type="button"
+          class="image-tab-select"
+          role="tab"
+          aria-selected={i === activeImageIndex}
+          onclick={() => switchTab(i)}
+          ondblclick={() => handleTabDblClick(i)}
+          title="Double-click to rename"
+        ><span class="image-tab-label">{img.name}</span></button>
+        <button type="button" class="image-tab-close" onclick={(e) => closeImage(i, e)} aria-label={`Close ${img.name}`} title="Close image">
           <X size={10} />
-        </span>
-      </button>
+        </button>
+      </div>
     {/each}
-    <button class="image-tab-add" onclick={addImage} title="Load image">
+    <button type="button" class="image-tab-add" onclick={addImage} aria-label="Load image" title="Load image">
       <Plus size={12} />
     </button>
   </div>
@@ -364,6 +368,16 @@
     max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .image-tab-select {
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: default;
   }
 
   .image-tab-close {

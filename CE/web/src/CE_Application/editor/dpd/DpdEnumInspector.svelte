@@ -82,12 +82,12 @@
           <span class="idx">{i}</span>
           <input class="lbl" bind:value={entry.label} onfocus={(e) => e.target.select()} />
           <span class="valwrap"><input value={hex(entry.wire)} oninput={(e) => setWire(entry, e.target.value)} onfocus={(e) => e.target.select()} /></span>
-          <span class="arrows"><span class="up" role="button" tabindex="-1" onclick={() => move(i, -1)} onkeydown={() => {}}>▲</span><span class="dn" role="button" tabindex="-1" onclick={() => move(i, 1)} onkeydown={() => {}}>▼</span></span>
-          <span class="del" role="button" tabindex="-1" onclick={() => remove(i)} onkeydown={() => {}}>✕</span>
+          <span class="arrows"><button type="button" class="up" onclick={() => move(i, -1)} aria-label={`Move ${entry.label} up`} disabled={i === 0}>▲</button><button type="button" class="dn" onclick={() => move(i, 1)} aria-label={`Move ${entry.label} down`} disabled={i === entries.length - 1}>▼</button></span>
+          <button type="button" class="del" onclick={() => remove(i)} aria-label={`Delete ${entry.label}`}>✕</button>
         </div>
       {/each}
     </div>
-    <div class="enumadd" role="button" tabindex="0" onclick={() => add()} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && add()}>＋ Add value</div>
+    <button type="button" class="enumadd" onclick={() => add()}>＋ Add value</button>
     <div class="pasteline">Each option keeps its own <b>wire byte</b> — handy when a device skips a value (e.g. uses 04, not 03). Turn off custom values for a plain 0,1,2,3 list.</div>
 
     <div class="previewstrip">
@@ -97,15 +97,15 @@
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Combobox / dropdown</div>
           <div class="w-combo">{selLabel} <span class="car">▾</span></div></div>
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Radio group</div>
-          <div class="w-radio">
+          <div class="w-radio" role="radiogroup" aria-label="Radio group preview">
             {#each entries as entry, i (entry.id ?? i)}
-              <div class={['ritem', i === previewSel && 'on']} role="button" tabindex="-1" onclick={() => previewSel = i} onkeydown={() => {}}><span class="rb"></span>{entry.label}</div>
+              <button type="button" class={['ritem', i === previewSel && 'on']} role="radio" aria-checked={i === previewSel} onclick={() => previewSel = i}><span class="rb"></span>{entry.label}</button>
             {/each}
           </div></div>
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Segmented control</div>
           <div class="w-seg">
             {#each entries as entry, i (entry.id ?? i)}
-              <div class={[i === previewSel && 'on']} role="button" tabindex="-1" onclick={() => previewSel = i} onkeydown={() => {}}>{entry.label}</div>
+              <button type="button" class={[i === previewSel && 'on']} aria-pressed={i === previewSel} onclick={() => previewSel = i}>{entry.label}</button>
             {/each}
           </div></div>
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Multi-stage button</div>

@@ -148,9 +148,10 @@
 .dpd-app .enumrow .valwrap{width:54px;flex-shrink:0;display:flex;align-items:center;gap:3px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:3px 6px}
 .dpd-app .enumrow .valwrap input{width:100%;background:none;border:none;outline:none;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:center}
 .dpd-app .enumrow .arrows{display:flex;flex-direction:column;width:16px;flex-shrink:0;gap:1px}
-.dpd-app .enumrow .arrows span{cursor:pointer;color:var(--txt-faint);font-size:8px;line-height:1;text-align:center}
-.dpd-app .enumrow .arrows span:hover{color:var(--violet)}
-.dpd-app .enumrow .del{color:var(--txt-faint);cursor:pointer;font-size:13px;opacity:0;transition:.12s;width:14px;flex-shrink:0;text-align:center}
+.dpd-app .enumrow .arrows button{cursor:pointer;color:var(--txt-faint);font:inherit;font-size:8px;line-height:1;text-align:center;background:none;border:0;padding:0}
+.dpd-app .enumrow .arrows button:hover:not(:disabled){color:var(--violet)}
+.dpd-app .enumrow .arrows button:disabled{opacity:.3;cursor:default}
+.dpd-app .enumrow .del{color:var(--txt-faint);cursor:pointer;font:inherit;font-size:13px;opacity:0;transition:.12s;width:14px;flex-shrink:0;text-align:center;background:none;border:0;padding:0}
 .dpd-app .enumrow:hover .del{opacity:1}
 .dpd-app .enumrow .del:hover{color:var(--red)}
 .dpd-app .enumadd{display:flex;align-items:center;gap:10px;background:none;border:1px dashed var(--line-2);border-radius:8px;padding:7px 10px;color:var(--txt-faint);cursor:pointer;font-size:12.5px;width:100%}
@@ -169,15 +170,15 @@
 .dpd-app .w-combo{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--line-2);border-radius:7px;padding:8px 11px;font-size:12.5px}
 .dpd-app .w-combo .car{color:var(--txt-faint)}
 .dpd-app .w-radio{display:flex;flex-direction:column;gap:6px}
-.dpd-app .w-radio .ritem{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt-dim);cursor:default}
+.dpd-app .w-radio .ritem{display:flex;align-items:center;gap:8px;font:inherit;font-size:12.5px;color:var(--txt-dim);cursor:pointer;background:none;border:0;padding:0;text-align:left}
 .dpd-app .w-radio .rb{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line-2);flex-shrink:0;position:relative}
 .dpd-app .w-radio .ritem.on .rb{border-color:var(--violet)}
 .dpd-app .w-radio .ritem.on .rb::after{content:'';position:absolute;inset:2.5px;border-radius:50%;background:var(--violet)}
 .dpd-app .w-radio .ritem.on{color:var(--txt)}
 .dpd-app .w-seg{display:flex;border:1px solid var(--line-2);border-radius:7px;overflow:hidden}
-.dpd-app .w-seg div{flex:1;text-align:center;font-size:11px;padding:7px 4px;color:var(--txt-faint);border-right:1px solid var(--line-2);white-space:nowrap}
-.dpd-app .w-seg div:last-child{border-right:none}
-.dpd-app .w-seg div.on{background:var(--violet);color:#0c0e12;font-weight:600}
+.dpd-app .w-seg button{flex:1;text-align:center;font:inherit;font-size:11px;padding:7px 4px;color:var(--txt-faint);border:0;border-right:1px solid var(--line-2);white-space:nowrap;background:none;cursor:pointer}
+.dpd-app .w-seg button:last-child{border-right:none}
+.dpd-app .w-seg button.on{background:var(--violet);color:#0c0e12;font-weight:600}
 .dpd-app .w-steps{display:flex;align-items:center;gap:9px}
 .dpd-app .w-steps .btn-step{width:38px;height:38px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg);display:grid;place-items:center;font-size:13px;color:var(--txt-dim);flex-shrink:0}
 .dpd-app .w-steps .stepdots{display:flex;gap:5px}
