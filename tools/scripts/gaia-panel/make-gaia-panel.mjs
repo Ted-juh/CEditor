@@ -35,6 +35,7 @@ import { applyPerformanceLayout } from './performance-layout.mjs';
 import { applyGaiaTabStyle } from './tab-style.mjs';
 import { applyCompactHeader } from './compact-header.mjs';
 import { applyWidescreenLayout } from './widescreen-layout.mjs';
+import { applySectionTree } from './section-tree.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -84,6 +85,15 @@ function setPath(control, dotted, value) {
   node[keys[keys.length - 1]] = value;
 }
 
+/**
+ * A caption is named after the control it captions, so the component tree says what it is: `label`
+ * a hundred and seventy times said nothing. Underscores, not dots — a script path ends the control
+ * name at its first dot.
+ */
+function captionName(control, parameter) {
+  return `${String(control?._children?.Core?.name ?? parameter.id).replace(/[^A-Za-z0-9]+/g, '_')}_label`;
+}
+
 function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bold = false, align = 'center', name = 'label' } = {}) {
   // maxLines follows the text, rather than always allowing two. Reserving a second line in a
   // single-line box pushed the block past the box height and clipped the glyph bottoms — "NAME"
@@ -91,8 +101,9 @@ function label(text, { x, y, w, h = 16 }, { size = 9, colour = SKIN.labelDim, bo
   // failure; it just does not look like a word.
   const lines = String(text).includes('\n') ? 2 : 1;
   return createControl('Label', {
-    // Captions are all called 'label' unless a caller needs to find one again — the effect
-    // parameter captions do, because a generated script renames them when the TYPE selector moves.
+    // A caption under a control is named for it (captionName); the effect parameter captions keep
+    // the names their generated script finds them by. 'label' is left only on loose text, which
+    // the section pass names for the section it lands in.
     Core: { id: nextId('lbl'), name },
     Transform: { x, y, width: w, height: h },
     Text: {
@@ -499,7 +510,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
       controls.push(placeStatic(gaiaEnvelope({ stages: env.stages, width: env.w, height: env.h }),
         `env_${env.bind.replace(/\W+/g, '_')}`, { x, y, w: env.w, h: env.h }));
       if (env.title) {
-        controls.push(label(env.title, { x, y: y - 13, w: env.w, h: 13 }, { size: 8, colour: SKIN.labelDim }));
+        controls.push(label(env.title, { x, y: y - 13, w: env.w, h: 13 }, { size: 8, colour: SKIN.labelDim, name: `env_${env.bind.replace(/\W+/g, '_')}_title` }));
       }
     }
 
@@ -532,7 +543,7 @@ function buildStrip(strip, byId, { originX = 0, originY = 0, resolve = (p) => p 
         const caption = label(built.caption.text, {
           x: built.caption.x, y: built.caption.y, w: built.caption.w,
           h: built.caption.lines === 2 ? 26 : 16,
-        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center', name: spec.captionName ?? 'label' });
+        }, { size: 9, colour: SKIN.label, align: built.caption.align ?? 'center', name: spec.captionName ?? captionName(built.controls[0], parameter) });
         if (!spec.rulerOnly) controls.push(caption);
       }
     }
@@ -703,7 +714,7 @@ function systemPage(byId) {
       const y = 38 + i * 29;
       const inputWidth = group.title === 'CONTROLLERS' ? 130 : 112;
       const x = group.x + group.w - inputWidth - 10;
-      controls.push(label(group.labels[i], { x: group.x + 8, y, w: x - group.x - 14, h: 23 }, { size: 9, align: 'left' }));
+      controls.push(label(group.labels[i], { x: group.x + 8, y, w: x - group.x - 14, h: 23 }, { size: 9, align: 'left', name: `system_${id}_label` }));
       const input = bound(parameter, parameter.choices ? 'Combobox' : 'Number', { x, y, w: inputWidth, h: 23 });
       controls.push(input);
     });
@@ -726,7 +737,12 @@ function systemPage(byId) {
   return controls;
 }
 
-export function buildGaiaPanel() {
+/**
+ * The GAIA panel. `sections: false` stops before the section pass, at the flat layout every other
+ * pass works on — for checking that those passes are idempotent, which they can only be on the
+ * shape they were written for.
+ */
+export function buildGaiaPanel({ sections = true } = {}) {
   const profile = JSON.parse(readFileSync(PROFILE, 'utf8'));
   const byId = new Map(profile.parameters.map((p) => [p.id, p]));
   seq = 0;
@@ -875,7 +891,9 @@ export function buildGaiaPanel() {
   panel.scriptId = 'roland_gaia_sh01';
   panel.filePath = null;
 
-  return applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
+  // Sectioning is last: it works on the finished geometry, so no layout pass has to know about nesting.
+  const flat = applyWidescreenLayout(applyGaiaTabStyle(applyCompactHeader(applyPerformanceLayout(moveStatusDisplayToBottom(applyToneControls(applyEditableEnvelopes(applyStatusDisplay(applyArpeggioLabels(panel), profile))))))));
+  return sections ? applySectionTree(flat) : flat;
 }
 
 export function serializeGaiaPanel() {

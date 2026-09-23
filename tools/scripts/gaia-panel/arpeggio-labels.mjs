@@ -60,7 +60,7 @@ export function applyArpeggioLabels(panel) {
     if (!control) throw new Error(`Missing ${name}`);
     const t = control._children.Transform;
     const captionName = `${name}.caption`;
-    const caption = named(captionName) ?? controls.find(c => c._children.Text && c._children.Core.name === 'label'
+    const caption = named(captionName) ?? controls.find(c => c._children.Text && c._children.Core.controlType === 'Label'
       && Math.abs(c._children.Transform.y - (t.y + (ARP_LABELS[name] ? -13 : 44))) < 1
       && Math.abs((c._children.Transform.x + c._children.Transform.width / 2) - (t.x + t.width / 2)) < 1);
     if (!caption) throw new Error(`Missing caption for ${name}`);

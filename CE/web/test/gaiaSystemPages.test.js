@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildProfile } from '../../../tools/scripts/qa/roland-gaia/make-gaia-profile.mjs';
 import { buildGaiaPanel } from '../../../tools/scripts/gaia-panel/make-gaia-panel.mjs';
 import { localCompileParameter, localCompilePresetRecall, localParseDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
-import { flatControls, getChildControls } from '../src/CE_Application/utils/containment.js';
+import { controlPanelRect, flatControls, getChildControls } from '../src/CE_Application/utils/containment.js';
 import { tabPages, isChildOnActivePage } from '../src/CE_Application/utils/tabContainerLayout.js';
 import { mountPanel } from './support/gaiaScriptHarness.mjs';
 import { get } from 'svelte/store';
@@ -60,23 +60,30 @@ test('1920 by 1000 panel keeps a vertical effects column beside three horizontal
   assert.equal(byName('top_pages'),undefined);
   assert.deepEqual(tabPages(byName('bottom_pages')).map(p=>p.id),['status','banks','arpeggiator','system']);
   const bottom=byName('bottom_pages');
-  assert.ok(getChildControls(bottom).some(c=>c._children.Core.name==='arp_pattern_grid' && isChildOnActivePage(c,bottom)));
-  for(const name of ['box_DISTORTION','box_FLANGER','box_DELAY','box_REVERB','box_EFFECTS / OUTPUT','master.volume']) {
-    assert.ok(panel.controls.some(c=>c._children.Core.name===name),name);
-    assert.ok(byName(name)._children.Transform.x>=1594,name);
+  const pattern=byName('arp_arpeggio_pattern');
+  assert.ok(getChildControls(bottom).includes(pattern) && isChildOnActivePage(pattern,bottom));
+  assert.ok(getChildControls(pattern).some(c=>c._children.Core.name==='arp_pattern_grid'));
+  // Positions on the PANEL: the sections are containers, so a control's own x/y is relative to its
+  // section and says nothing about the column it sits in.
+  const at=name=>controlPanelRect(panel.controls,byName(name)._children.Core.id);
+  for(const name of ['effects_distortion','effects_flanger','effects_delay','effects_reverb','effects_output','master.volume']) {
+    assert.ok(byName(name),name);
+    assert.ok(at(name).x>=1594,name);
   }
-  const fx=['DISTORTION','FLANGER','DELAY','REVERB'].map(n=>byName(`box_${n}`)._children.Transform);
-  assert.ok(fx.every((r,i)=>r.x===fx[0].x && (!i || r.y>=fx[i-1].y+fx[i-1].height)));
+  const fx=['distortion','flanger','delay','reverb'].map(n=>at(`effects_${n}`));
+  assert.ok(fx.every((r,i)=>r.x===fx[0].x && (!i || r.y>=fx[i-1].y+fx[i-1].h)));
   for(const tone of [1,2,3]) {
     assert.equal(byName(`tone${tone}.signalFlow`),undefined);
     assert.equal(byName(`tone${tone}.lamp`),undefined);
-    const row=['lfo.rate','osc.pitch','filter.cutoff','amp.level','modLfo.rate'].map(n=>byName(`tone${tone}.${n}`)._children.Transform);
-    assert.ok(row.every((r,i)=>r.x+r.width<fx[0].x && (!i || r.x>row[i-1].x)));
+    const row=['lfo.rate','osc.pitch','filter.cutoff','amp.level','modLfo.rate'].map(n=>at(`tone${tone}.${n}`));
+    assert.ok(row.every((r,i)=>r.x+r.w<fx[0].x && (!i || r.x>row[i-1].x)));
     assert.ok(row.slice(1,4).every(r=>r.y===row[1].y),'the three tone faders share their baseline');
     assert.equal(row[0].y,row[4].y,'the two compact rate knobs share their higher row');
   }
-  assert.ok(!isChildOnActivePage(byName('system.masterTune'),bottom));
-  for(const tone of [1,2,3]) assert.ok(panel.controls.some(c=>c._children.Core.name===`tone${tone}.osc.wave`));
+  // The System fields live in their sections; the section is what sits on the (hidden) page.
+  assert.ok(!isChildOnActivePage(byName('system_master_clock'),bottom));
+  assert.ok(getChildControls(byName('system_master_clock')).includes(byName('system.masterTune')));
+  for(const tone of [1,2,3]) assert.ok(byName(`tone${tone}.osc.wave`));
 });
 test('all 200 patch buttons recall only on click, using the existing bank/PC compiler', () => {
   const scripts=panel.scripts.filter(s=>s.id.startsWith('recall_'));

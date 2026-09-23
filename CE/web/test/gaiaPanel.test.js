@@ -49,7 +49,8 @@ const boundIds = () => {
 test('every layout slot resolves to a real parameter', () => {
   // buildGaiaPanel throws when layout.mjs names a parameter the profile does not have, so simply
   // building it is the assertion. Stated here so the reason is on the record.
-  assert.ok(panel.controls.length > 300, `expected a full panel, got ${panel.controls.length} controls`);
+  const count = flatControls(panel.controls).length;
+  assert.ok(count > 300, `expected a full panel, got ${count} controls`);
 });
 
 test('all three tones carry the same controls', () => {

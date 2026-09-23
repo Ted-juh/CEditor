@@ -28,8 +28,11 @@ test('envelope views match the other faders inside unchanged tone sections and k
       assert.equal(fader._children.Transform.y,graph._children.Transform.y);
     }
   }
-  const before=JSON.stringify(panel);applyEnvelopeViews(panel);assert.equal(JSON.stringify(panel),before);
-  refineToneSpacing(panel);assert.equal(JSON.stringify(panel),before,'spacing migration is idempotent');
+  // Idempotence is a property of the layout passes, on the flat layout they run on; the finished
+  // panel has been sectioned since.
+  const flat=buildGaiaPanel({sections:false}),before=JSON.stringify(flat);
+  applyEnvelopeViews(flat);assert.equal(JSON.stringify(flat),before);
+  refineToneSpacing(flat);assert.equal(JSON.stringify(flat),before,'spacing migration is idempotent');
 });
 test('nine native graphs link only their own tone faders, without duplicate MIDI bindings',()=>{
   assert.equal(graphs.length,9);
