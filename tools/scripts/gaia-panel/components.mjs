@@ -246,32 +246,32 @@ export function gaiaSectionTab({ title, width, height = 20, tint }) {
 }
 
 /**
- * The section tab, mirrored: for the top-RIGHT corner of a section, where the Fader/Graph switch
- * sits. Rounded outside corner on the right, square inside corners, and the slant on the left with
- * the top edge again the longer one — the section name's tab seen in a mirror.
+ * The section name's tab, mirrored and drawn as an OUTLINE, for the top-right corner of a section
+ * where the Fader/Graph switch sits. Transparent: a filled tab in the section's colour reads as a
+ * second section name, which is what this is not.
  *
- * Shape only: the switch itself is an ordinary Button laid over it, so its click script and the
- * text it rewrites stay what they were.
+ * It sits flush in the corner, so its top and right edges ARE the section's own border and only
+ * the other two are drawn: the bottom edge, and the slant on the left whose top reaches further
+ * out than its bottom — the name tab's lean, mirrored. Same colour and thickness as the section
+ * border, so the two read as one frame with no seam.
  *
- * The slant is the library's right triangle turned half a turn. Upright, its sloping side runs from
- * the top-left corner down to the bottom-right with the fill below it; turned 180 degrees about its
- * own centre the fill is above that same line, which is exactly a left end whose top reaches
- * further out than its bottom. A half turn keeps the part's box, so it lines up without measuring.
+ * The slant is a thin bar turned to the slant's angle about its own centre (a line part only runs
+ * horizontally). Shape only: the switch is an ordinary Button laid over it.
  */
-export function gaiaCornerTab({ width, height = 20, tint }) {
-  const corner = 5;
+export function gaiaCornerTab({ width, height = 20, tint, thickness = 2 }) {
   const slant = Math.round(height * 0.6);
+  // From the top-left corner down to where the bottom edge begins, ending on that edge's centre line.
+  const run = slant;
+  const rise = height - thickness / 2;
+  const length = Math.hypot(run, rise);
+  const angle = (Math.atan2(rise, run) * 180) / Math.PI;
   return component({
     name: 'GAIA Corner Tab',
     width,
     height,
     parts: {
-      body: rect('body', { x: slant, y: 0, width: width - slant, height }, tint, { zIndex: 0, radius: corner }),
-      // Square the inner end of the top edge, keeping the outside top-right curve.
-      topLeft: rect('topLeft', { x: slant, y: 0, width: corner, height: corner }, tint, { zIndex: 1 }),
-      bottom: rect('bottom', { x: slant, y: height - corner, width: width - slant, height: corner }, tint, { zIndex: 1 }),
-      // One pixel under the body, so no hairline shows where the two meet.
-      slant: rect('slant', { x: 0, y: 0, width: slant + 1, height }, tint, { zIndex: 1, kind: 'rightTriangle', rotation: 180 }),
+      slant: rect('slant', { x: run / 2 - length / 2, y: rise / 2 - thickness / 2, width: length, height: thickness }, tint, { rotation: angle }),
+      bottom: rect('bottom', { x: slant, y: height - thickness, width: width - slant, height: thickness }, tint),
     },
     channels: {},
     published: {

@@ -27906,59 +27906,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -27981,52 +27948,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -28103,7 +28034,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -28126,7 +28057,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -40632,59 +40563,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -40707,52 +40605,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -40829,7 +40691,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -40852,7 +40714,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -49099,59 +48961,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -49174,52 +49003,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -49296,7 +49089,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -49319,7 +49112,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -79258,59 +79051,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -79333,52 +79093,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -79455,7 +79179,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -79478,7 +79202,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -91984,59 +91708,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -92059,52 +91750,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -92181,7 +91836,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -92204,7 +91859,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -100451,59 +100106,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -100526,52 +100148,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -100648,7 +100234,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -100671,7 +100257,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -130610,59 +130196,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -130685,52 +130238,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -130807,7 +130324,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.49760765550235,
+                          "x": 320.49760765550235,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -130830,7 +130347,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -143336,59 +142853,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -143411,52 +142895,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -143533,7 +142981,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 318.4976076555024,
+                          "x": 320.4976076555024,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -143556,7 +143004,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",
@@ -151803,59 +151251,26 @@
                           "controlType": "CustomComponent"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
                         },
                         "Parts": {
                           "_children": {
-                            "body": {
-                              "name": "body",
+                            "slant": {
+                              "name": "slant",
                               "_children": {
                                 "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 52,
-                                  "height": 20,
+                                  "x": -5.2361025271221155,
+                                  "y": 8.5,
+                                  "width": 22.47220505424423,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
-                                  "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true,
-                                      "radius": 5
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "topLeft": {
-                              "name": "topLeft",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 12,
-                                  "y": 0,
-                                  "width": 5,
-                                  "height": 5,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top"
+                                  "anchorY": "top",
+                                  "rotation": 57.724355685422374
                                 },
                                 "Background": {
                                   "_children": {
@@ -151878,52 +151293,16 @@
                             },
                             "bottom": {
                               "name": "bottom",
-                              "zIndex": 1,
                               "_children": {
                                 "Layout": {
                                   "x": 12,
-                                  "y": 15,
+                                  "y": 18,
                                   "width": 52,
-                                  "height": 5,
+                                  "height": 2,
                                   "xUnit": "px",
                                   "yUnit": "px",
                                   "anchorX": "left",
                                   "anchorY": "top"
-                                },
-                                "Background": {
-                                  "_children": {
-                                    "Fill": {
-                                      "colour": "FFE0A030"
-                                    },
-                                    "Border": {
-                                      "enabled": false,
-                                      "thickness": 0,
-                                      "colour": "00000000"
-                                    },
-                                    "Corners": {
-                                      "linked": true
-                                    }
-                                  },
-                                  "_type": "Background"
-                                }
-                              },
-                              "_type": "Part"
-                            },
-                            "slant": {
-                              "name": "slant",
-                              "kind": "rightTriangle",
-                              "zIndex": 1,
-                              "_children": {
-                                "Layout": {
-                                  "x": 0,
-                                  "y": 0,
-                                  "width": 13,
-                                  "height": 20,
-                                  "xUnit": "px",
-                                  "yUnit": "px",
-                                  "anchorX": "left",
-                                  "anchorY": "top",
-                                  "rotation": 180
                                 },
                                 "Background": {
                                   "_children": {
@@ -152000,7 +151379,7 @@
                           "controlType": "Button"
                         },
                         "Transform": {
-                          "x": 144.06698564593307,
+                          "x": 146.06698564593307,
                           "y": 2,
                           "width": 64,
                           "height": 20
@@ -152023,7 +151402,7 @@
                           "content": "FADER",
                           "_children": {
                             "Fill": {
-                              "colour": "FF13161A"
+                              "colour": "FFFFE1A0"
                             },
                             "Font": {
                               "weight": "Bold",

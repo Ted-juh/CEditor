@@ -21,10 +21,11 @@ function boxAround(panel, view) {
 // Use an ordinary panel button, so a saved panel never relies on a special tab
 // renderer to turn two page tabs into one alternating control.
 //
-// It sits in the section's top-RIGHT corner, in the section name's tab mirrored (gaiaCornerTab),
-// so the two ends of the section's top edge read as a pair: what the section is on the left,
-// which view it is showing on the right. The Button stays the click target and keeps its script;
-// it is transparent, drawn over the tab shape, with the section title's dark capitals.
+// It sits flush in the section's top-RIGHT corner, in the section name's tab mirrored and drawn as
+// an outline (gaiaCornerTab), so the two ends of the section's top edge read as a pair: what the
+// section is on the left, which view it shows on the right. The Button stays the click target and
+// keeps its script; it is transparent, over the outline, with the section title's bold capitals in
+// the pale yellow the switch always had, so it is not mistaken for a second section name.
 export function applyEnvelopeButtons(panel) {
   for (const tone of [1, 2, 3]) for (const kind of ['osc.pitchEnv', 'filter.env', 'amp.env']) {
     const view = panel.controls.find(c => c._children.Core.name === `tone${tone}.${kind}.view`);
@@ -40,11 +41,13 @@ export function applyEnvelopeButtons(panel) {
     const box = boxAround(panel, view);
     if (!box) throw new Error(`envelope-buttons: no section box around ${s.Core.name}`);
     const b = box._children.Transform;
-    const tint = box._children.Background?._children?.Border?.colour ?? 'FFE2A52C';
-    // The same 2px inset from the box edge the section name's tab keeps on the left.
-    const at = { x: b.x + b.width - 2 - TAB_WIDTH, y: b.y + 2, width: TAB_WIDTH, height: TAB_HEIGHT };
+    const border = box._children.Background?._children?.Border ?? {};
+    const tint = border.colour ?? 'FFE2A52C';
+    // Flush with the box's right edge, so the outline's right side is the section border itself;
+    // at the same height as the section name's tab.
+    const at = { x: b.x + b.width - TAB_WIDTH, y: b.y + 2, width: TAB_WIDTH, height: TAB_HEIGHT };
 
-    const shape = gaiaCornerTab({ width: TAB_WIDTH, height: TAB_HEIGHT, tint });
+    const shape = gaiaCornerTab({ width: TAB_WIDTH, height: TAB_HEIGHT, tint, thickness: Number(border.thickness) || 2 });
     Object.assign(shape._children.Core, { id: `${s.Core.id}_button_tab`, name: `${s.Core.name}ButtonTab` });
     Object.assign(shape._children.Transform, at);
     panel.controls.push(shape);
@@ -54,7 +57,7 @@ export function applyEnvelopeButtons(panel) {
       Transform: { ...at },
       Text: {
         content: cfg.pageIndex === 1 ? 'GRAPH' : 'FADER',
-        _children: { Font: { size: 10, bold: true, weight: 'Bold', weightValue: 700, letterSpacing: 1 }, Fill: { colour: 'FF13161A' } },
+        _children: { Font: { size: 10, bold: true, weight: 'Bold', weightValue: 700, letterSpacing: 1 }, Fill: { colour: 'FFFFE1A0' } },
       },
       // Text centred on the tab's body, clear of the slant at its left end.
       ContentLayout: { paddingLeft: Math.round(TAB_HEIGHT * 0.6), paddingRight: 2, paddingTop: 0, paddingBottom: 0 },
