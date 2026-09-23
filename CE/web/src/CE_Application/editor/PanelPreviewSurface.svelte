@@ -404,16 +404,30 @@
   // Use the same ordered-prefix strategy as the editor surface: paint a useful first slice, then
   // append the remainder immediately after successive paints. Sessions and script state are built
   // for the whole panel before this point, so a control mounted in a later slice sees current state.
-  let mountedCount = $state(0);
   let panelIdentity = $derived(panel?.id ?? null);
-  $effect(() => {
-    panelIdentity;
-    mountedCount = initialMountCount(allRenderItems.length);
+  // Effects do not run during server rendering, and they run after the first client render. Tie the
+  // saved progress to the panel it belongs to so SSR and panel switches synchronously use a first
+  // slice. A same-panel document update keeps already-mounted controls instead of tearing them down.
+  let mountProgress = $state({
+    panelId: untrack(() => panelIdentity),
+    count: untrack(() => initialMountCount(allRenderItems.length)),
   });
+  let mountedCount = $derived(
+    mountProgress.panelId === panelIdentity
+      ? mountProgress.count
+      : initialMountCount(allRenderItems.length)
+  );
   $effect(() => {
+    const panelId = panelIdentity;
     const total = allRenderItems.length;
-    if (!mountIncomplete(mountedCount, total)) return;
-    return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
+    const current = mountedCount;
+    if (mountProgress.panelId !== panelId || mountProgress.count > total) {
+      mountProgress = { panelId, count: Math.min(current, total) };
+    }
+    if (!mountIncomplete(current, total)) return;
+    return scheduleNextSlice(() => {
+      mountProgress = { panelId, count: nextMountCount(current, total) };
+    });
   });
   let renderItems = $derived(
     mountedCount >= allRenderItems.length ? allRenderItems : allRenderItems.slice(0, mountedCount)

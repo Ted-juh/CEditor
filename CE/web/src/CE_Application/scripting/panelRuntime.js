@@ -19,11 +19,14 @@
 
 import { get } from 'svelte/store';
 import { panels, scriptRuntimePanelId, updatePanel } from '../stores/panels.js';
-import { updateControlProperty, removeControlNode } from '../stores/controls.js';
+import {
+  applyControlPatchesById, applyResolvedValue, updateControlProperty, removeControlNode,
+} from '../stores/controls.js';
 import { presetSlotInfo } from '../stores/deviceProfileLocalEngine.js';
 import { recallPreset as recallPresetAction } from '../stores/presetLibrarian.js';
-import { noteScriptTouchedControl } from '../stores/scriptTouchedControls.js';
+import { noteScriptTouchedControl, noteScriptTouchedControls } from '../stores/scriptTouchedControls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
+import { deepClone } from '../utils/deepClone.js';
 import { controlSetForPanel, isTokenReference, resolveColourValue } from '../models/controlSets.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts, storedIcons } from '../stores/appSettings.js';
@@ -142,7 +145,7 @@ import {
 } from '../stores/scriptUi.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
-  insertControlIntoTree, removeControlFromTree, remintControlIds, controlPanelOffset,
+  insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
 } from '../utils/containment.js';
 
 /* --------------------------------------------------------------- path resolution */
@@ -151,6 +154,110 @@ import {
 // its scripts, and control value I/O from here instead of the editor stores — so the SAME runtime
 // runs scripts in the shipped plugin. null = editor mode (resolve from panels / scriptDocuments).
 let host = null;
+
+// A script callback often paints many document fields as one logical operation. Publishing every
+// field separately makes every panels-store subscriber repeat its work, even though Svelte cannot
+// paint until the callback returns. Keep a private document snapshot for synchronous read-after-
+// write semantics, then publish the accumulated control patches once at the callback or explicit
+// ce.panel.batch boundary. Live values still use panelPreviewSessions immediately, and player
+// hosts retain their own mutable document semantics.
+let documentWriteBatchDepth = 0;
+let documentWriteBatch = null;
+
+function storedActivePanel() {
+  return get(panels).find((p) => p.id === get(scriptRuntimePanelId)) ?? null;
+}
+
+function beginDocumentWriteBatch() {
+  documentWriteBatchDepth += 1;
+  if (host || documentWriteBatchDepth !== 1) return;
+  const panel = storedActivePanel();
+  if (!panel) return;
+  documentWriteBatch = {
+    panelId: panel.id,
+    panel: null, // materialized lazily on the first authored write; read-only timers stay cheap
+    drafts: new Map(),
+    patches: new Map(),
+    touchedIds: new Set(),
+  };
+}
+
+function publishDocumentWriteBatch(completed) {
+  if (completed?.touchedIds.size) noteScriptTouchedControls(completed.touchedIds);
+  if (completed?.patches.size) applyControlPatchesById(completed.patches, completed.panelId);
+}
+
+function rebaseDocumentWriteBatchIfPanelChanged() {
+  if (!documentWriteBatch) return;
+  const panel = storedActivePanel();
+  if (panel?.id === documentWriteBatch.panelId) return;
+  publishDocumentWriteBatch(documentWriteBatch);
+  documentWriteBatch = panel ? {
+    panelId: panel.id, panel: null, drafts: new Map(), patches: new Map(), touchedIds: new Set(),
+  } : null;
+}
+
+function endDocumentWriteBatch() {
+  if (documentWriteBatchDepth <= 0) return;
+  documentWriteBatchDepth -= 1;
+  if (documentWriteBatchDepth !== 0) return;
+  const completed = documentWriteBatch;
+  documentWriteBatch = null;
+  publishDocumentWriteBatch(completed);
+}
+
+function withDocumentWriteBatch(fn) {
+  beginDocumentWriteBatch();
+  try { return fn(); }
+  finally { endDocumentWriteBatch(); }
+}
+
+function writeEditorControlProperty(control, path, value) {
+  rebaseDocumentWriteBatchIfPanelChanged();
+  const controlId = control?._children?.Core?.id;
+  if (!documentWriteBatch || controlId == null) {
+    updateControlProperty(controlId, path, value);
+    return;
+  }
+  let draft = documentWriteBatch.drafts.get(controlId);
+  if (!draft) {
+    const panel = documentWriteBatch.panel ?? storedActivePanel();
+    if (!panel || panel.id !== documentWriteBatch.panelId) {
+      updateControlProperty(controlId, path, value);
+      return;
+    }
+    const source = findControlById(panel.controls, controlId);
+    if (!source) {
+      updateControlProperty(controlId, path, value);
+      return;
+    }
+    draft = deepClone(source);
+    const controls = mapControlsTree(panel.controls, (candidate) =>
+      candidate?._children?.Core?.id === controlId ? draft : candidate);
+    documentWriteBatch.panel = { ...panel, controls };
+    documentWriteBatch.drafts.set(controlId, draft);
+  }
+  applyResolvedValue(draft, path, value);
+  let patch = documentWriteBatch.patches.get(controlId);
+  if (!patch) {
+    patch = {};
+    documentWriteBatch.patches.set(controlId, patch);
+  }
+  // Reinsert an existing key so Object.entries preserves the order of the LAST write. Ancestor and
+  // descendant paths can both occur in one batch, and applying them out of sequence changes which
+  // value wins (Text, then Text.content, then Text again must end with the final whole Text value).
+  if (Object.prototype.hasOwnProperty.call(patch, path)) delete patch[path];
+  patch[path] = value;
+}
+
+function noteEditorScriptTouchedControl(id) {
+  rebaseDocumentWriteBatchIfPanelChanged();
+  if (documentWriteBatch) {
+    if (id != null && String(id)) documentWriteBatch.touchedIds.add(String(id));
+    return;
+  }
+  noteScriptTouchedControl(id);
+}
 
 /**
  * Install a host (exported player) or clear it (null = editor). See scripting/playerScriptHost.js.
@@ -171,7 +278,9 @@ export function setRuntimeHost(h) {
 
 function activePanel() {
   if (host) return host.panel ?? null;
-  return get(panels).find((p) => p.id === get(scriptRuntimePanelId)) ?? null;
+  const panelId = get(scriptRuntimePanelId);
+  if (documentWriteBatch?.panel && documentWriteBatch.panelId === panelId) return documentWriteBatch.panel;
+  return storedActivePanel();
 }
 
 // Editor document writes replace the controls array. Reuse name/id lookups
@@ -553,8 +662,8 @@ function setValue(path, value, formOrOpts = '') {
       // Continue below: an explicit device send still has its normal semantics.
       // Out of the scenery ground, for good — see stores/scriptTouchedControls.js. A folded control
       // a script writes to would otherwise re-bake the whole ground on every write.
-      noteScriptTouchedControl(control?._children?.Core?.id);
-      updateControlProperty(control?._children?.Core?.id, modelPath, value);
+      noteEditorScriptTouchedControl(control?._children?.Core?.id);
+      writeEditorControlProperty(control, modelPath, value);
     }
   }
 
@@ -3071,13 +3180,13 @@ function deliverEmit(name, target, data) {
   try {
     for (const l of [...listeners]) {
       if (l.event !== name || !listenerMatches(l, target)) continue;
-      try { l.fn(data); } catch (e) { reportScriptError(l.scriptId, e); }
+      try { withDocumentWriteBatch(() => l.fn(data)); } catch (e) { reportScriptError(l.scriptId, e); }
     }
     for (const s of activeScripts()) {
       if (s.enabled === false || s.event !== name) continue;
       const fn = handlerCache.get(s.id)?.handlers?.[name];
       if (typeof fn !== 'function') continue;
-      try { fn(data); } catch (e) { reportScriptError(s.id, e); }
+      try { withDocumentWriteBatch(() => fn(data)); } catch (e) { reportScriptError(s.id, e); }
     }
   } finally {
     emitDepth -= 1;
@@ -3100,7 +3209,7 @@ function runAction(ref, args) {
   if (!owner) {
     const registered = actions.get(action.toLowerCase());
     if (registered) {
-      try { return registered.fn(args); }
+      try { return withDocumentWriteBatch(() => registered.fn(args)); }
       catch (e) { reportScriptError(registered.scriptId, e); return undefined; }
     }
   }
@@ -3110,7 +3219,7 @@ function runAction(ref, args) {
     if (owner && String(s.target ?? '').toLowerCase() !== owner.toLowerCase()) continue;
     const fn = handlerCache.get(s.id)?.handlers?.[action];
     if (typeof fn !== 'function') continue;
-    try { return fn(args); } catch (e) { reportScriptError(s.id, e); return undefined; }
+    try { return withDocumentWriteBatch(() => fn(args)); } catch (e) { reportScriptError(s.id, e); return undefined; }
   }
   const defined = [...actions.values()].map((a) => a.name);
   addScriptTrace('error', '', `run("${text}") found no loaded script defining ${action}()`
@@ -3254,7 +3363,7 @@ const animationGroups = new Map();   // group id -> { remaining, done, scriptId,
 /** Run a script's callback and report a throw against THAT script — the same contract after()
  *  keeps, so a broken completion handler is attributed rather than swallowed. */
 function runScriptCallback(scriptId, label, fn) {
-  try { fn(); } catch (e) { reportScriptError(scriptId, e); }
+  try { withDocumentWriteBatch(fn); } catch (e) { reportScriptError(scriptId, e); }
 }
 
 // An envelope is sampled into this many SEGMENTS (so ANIM_SAMPLES + 1 values, the last landing
@@ -4572,7 +4681,18 @@ function updateControls(fn) {
   const next = fn(panel.controls ?? []);
   if (next == null) return false;
   if (host) { panel.controls = next; return true; }        // player: the host owns the document
+  // activePanel() points at the batch snapshot while a callback is running. Keep structural reads
+  // in that callback current as well, so create-then-arrange and reorder-then-read stay synchronous.
+  const foldsPendingWrites = documentWriteBatch?.panel === panel;
+  if (foldsPendingWrites) panel.controls = next;
   updatePanel(panel.id, { controls: next });
+  if (foldsPendingWrites) {
+    // The structural publication already carried the draft's pending property values. Rebase so
+    // the batch does not publish those same patches again, and later reads start from that update.
+    documentWriteBatch.patches.clear();
+    documentWriteBatch.drafts.clear();
+    documentWriteBatch.panel = null;
+  }
   return true;
 }
 
@@ -5075,9 +5195,23 @@ function panelBatchImpl(scriptId, fn) {
     addScriptTrace('error', scriptId ?? '', 'ce.panel.batch(fn) needs a function to run — nothing was done.');
     return false;
   }
-  if (host) { fn(); return true; }        // the player has no history to group
+  if (host) {                             // the player has no history to group
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      addScriptTrace('warn', scriptId ?? '',
+        'ce.panel.batch(fn) is synchronous; writes after an await are not part of the batch.');
+      result.catch((error) => reportScriptError(scriptId ?? '', error));
+    }
+    return true;
+  }
   pushSnapshot();                          // close whatever came before
-  try { fn(); } finally { pushSnapshot(); }
+  let result;
+  try { result = withDocumentWriteBatch(fn); } finally { pushSnapshot(); }
+  if (result && typeof result.then === 'function') {
+    addScriptTrace('warn', scriptId ?? '',
+      'ce.panel.batch(fn) is synchronous; writes after an await are not part of the batch.');
+    result.catch((error) => reportScriptError(scriptId ?? '', error));
+  }
   return true;
 }
 
@@ -5393,7 +5527,7 @@ function runAfterCallback(id) {
   if (!entry) return false;
   afterCallbacks.delete(id);
   stopTimer(id);
-  try { entry.fn(); } catch (e) { reportScriptError(entry.scriptId, e); }
+  runScriptCallback(entry.scriptId, 'after', entry.fn);
   return true;
 }
 
@@ -5860,8 +5994,8 @@ function deviceDefineDumpImpl(kind, spec, role) {
  */
 function writeControlProperty(control, path, value) {
   if (host) { host.writeValue(control, path, value); return; }
-  noteScriptTouchedControl(control?._children?.Core?.id);
-  updateControlProperty(control?._children?.Core?.id, path, value);
+  noteEditorScriptTouchedControl(control?._children?.Core?.id);
+  writeEditorControlProperty(control, path, value);
 }
 
 function deviceBindImpl(controlName, parameterId, opts = {}) {
@@ -7535,7 +7669,11 @@ async function invokeHandler(script, hook = null, payload = undefined) {
     return;
   }
   try {
-    const result = fn(payload !== undefined ? payload : samplePayload(fnName));
+    // Only the synchronous part belongs to this transaction. If the handler returns a promise,
+    // publish before awaiting so UI state is not held hostage by network or timer work. Writes
+    // after an await keep their existing immediate semantics unless the script explicitly batches.
+    const result = withDocumentWriteBatch(() =>
+      fn(payload !== undefined ? payload : samplePayload(fnName)));
     if (result && typeof result.then === 'function') await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
   } catch (e) {
@@ -7700,7 +7838,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       // …then the explicit on(target, event, fn) listeners for the same event.
       for (const l of [...listeners]) {
         if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
-        try { l.fn(ev.payload); } catch (e) { reportScriptError(l.scriptId, e); }
+        try { withDocumentWriteBatch(() => l.fn(ev.payload)); } catch (e) { reportScriptError(l.scriptId, e); }
       }
     }
   } finally {

@@ -8,7 +8,7 @@
    * Extracted from EditorCanvas so the parent doesn't have to manage 50
    * lines of nested template for a single draggable rectangle.
    */
-  import { setContext } from 'svelte';
+  import { setContext, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -171,18 +171,29 @@
   // see utils/progressiveMount.js. Below its threshold `mountedCount` is simply the whole list and
   // none of this runs. It slices what is LEFT after the fold, which is the list that costs anything
   // to mount — a ground is one item however many controls went into it.
-  let mountedCount = $state(0);
-  // Reset on a new panel, not on every edit: the identity that matters is which panel is open, and
-  // rebuilding from the first slice on each keystroke would be a flicker, not a speed-up.
   let panelIdentity = $derived(panel?.id ?? null);
-  $effect(() => {
-    panelIdentity;
-    mountedCount = initialMountCount(heldItems.length);
+  // Associate progress with its panel. This gives SSR and a panel switch the right first slice
+  // synchronously, while a document update with the same id keeps the controls already mounted.
+  let mountProgress = $state({
+    panelId: untrack(() => panelIdentity),
+    count: untrack(() => initialMountCount(heldItems.length)),
   });
+  let mountedCount = $derived(
+    mountProgress.panelId === panelIdentity
+      ? mountProgress.count
+      : initialMountCount(heldItems.length)
+  );
   $effect(() => {
+    const panelId = panelIdentity;
     const total = heldItems.length;
-    if (!mountIncomplete(mountedCount, total)) return;
-    return scheduleNextSlice(() => { mountedCount = nextMountCount(mountedCount, total); });
+    const current = mountedCount;
+    if (mountProgress.panelId !== panelId || mountProgress.count > total) {
+      mountProgress = { panelId, count: Math.min(current, total) };
+    }
+    if (!mountIncomplete(current, total)) return;
+    return scheduleNextSlice(() => {
+      mountProgress = { panelId, count: nextMountCount(current, total) };
+    });
   });
   let renderItems = $derived(
     mountedCount >= heldItems.length ? heldItems : heldItems.slice(0, mountedCount)

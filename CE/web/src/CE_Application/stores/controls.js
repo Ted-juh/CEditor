@@ -104,7 +104,7 @@ function applyStateScopedValue(control, stateName, path, value) {
   return true;
 }
 
-function applyResolvedValue(control, path, value) {
+export function applyResolvedValue(control, path, value) {
   const stateName = activeStateScopeNameForPath(path);
   if (stateName) {
     return applyStateScopedValue(control, stateName, path, value);
@@ -535,8 +535,8 @@ export function updateControlProperty(controlId, path, value) {
   applyControlPatchesById(new Map([[controlId, { [path]: value }]]));
 }
 
-export function applyControlPatchesById(patchesByControlId) {
-  const panelId = get(resolvedActivePanelId);
+export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId)) {
+  const panelId = targetPanelId;
   if (!patchesByControlId || patchesByControlId.size === 0) return;
 
   if (panelId == null) {

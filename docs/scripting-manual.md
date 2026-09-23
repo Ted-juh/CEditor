@@ -1840,7 +1840,7 @@ Change z-order: "front" | "forward" | "backward" | "back". Controls move within 
 
 #### `panelBatch(fn) -> boolean`
 
-Run `fn` so that everything it does is a single undo step. The history flush happens even if the callback throws. In the player there is no history and the callback simply runs.
+Run synchronous `fn` so that everything it does is a single undo step. Authored control-property writes are published atomically when the outermost batch ends; reads inside `fn` see earlier writes. The history and property flushes happen even if the callback throws. Writes after an `await` are outside the batch. In the player there is no editor document or history and the callback simply runs.
 
 ```lua
 -- Lua

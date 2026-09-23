@@ -28,6 +28,7 @@ import {
 } from '../src/CE_Application/stores/scriptTouchedControls.js';
 import { DEFAULT_GENERAL_SETTINGS } from '../src/CE_Application/stores/runtimePreferences.js';
 import { normalizeGeneralSettings } from '../src/CE_Application/stores/appSettingsSchema.js';
+import { FIRST_SLICE, MOUNT_WHOLE_BELOW } from '../src/CE_Application/utils/progressiveMount.js';
 
 const at = (control, x, y, width, height) => {
   Object.assign(control._children.Transform, { x, y, width, height });
@@ -107,6 +108,15 @@ test('every scenery control is still on the page after folding', () => {
   for (const word of ['OSCILLATOR', 'CUTOFF', 'RES', 'TONE 1']) {
     assert.ok(body.includes(word), `"${word}" is missing from the folded panel`);
   }
+});
+
+test('server rendering emits the first slice of a large preview', () => {
+  const controls = Array.from({ length: MOUNT_WHOLE_BELOW + 10 }, (_, index) =>
+    at(createControl('Knob', { Core: { id: `knob-${index}`, name: `knob-${index}` } }),
+      index * 2, 20, 20, 20));
+  const body = renderPanel({ id: 'large-ssr', name: 'large-ssr', width: 400, height: 200, controls, scripts: [] });
+  assert.equal((body.match(/data-control-id=/g) ?? []).length, FIRST_SLICE,
+    'SSR must emit the same first slice hydration expects, rather than an empty or complete panel');
 });
 
 test('a script-touched panel keeps every control live, and still paints them', () => {

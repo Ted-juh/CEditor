@@ -43,14 +43,22 @@ export const scriptTouchedControlIds = writable(new Set());
  * frame, and a store write per frame would be the churn this exists to prevent.
  */
 export function noteScriptTouchedControl(id) {
-  if (id == null) return;
-  const key = String(id);
-  if (key === '') return;
+  noteScriptTouchedControls([id]);
+}
+
+/** Remember several authored writes with one store publication. */
+export function noteScriptTouchedControls(ids) {
+  const keys = new Set(Array.from(ids ?? [], (id) => id == null ? '' : String(id)).filter(Boolean));
+  if (!keys.size) return;
   scriptTouchedControlIds.update((current) => {
-    if (current.has(key)) return current;          // same Set object: no subscriber runs
+    let changed = false;
     const next = new Set(current);
-    next.add(key);
-    return next;
+    for (const key of keys) {
+      if (next.has(key)) continue;
+      next.add(key);
+      changed = true;
+    }
+    return changed ? next : current;               // same Set object: no subscriber runs
   });
 }
 

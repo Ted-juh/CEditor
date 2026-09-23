@@ -21,7 +21,9 @@ try {
   await page.evaluate(() => window.__gaia.installFeedbackTestBackend());
   await page.evaluate(() => window.__gaia.load('/gaia-panel.json', { fullApp: true }));
   await page.evaluate(() => window.__gaia.feedbackConnect());
-  await page.waitForTimeout(500);
+  // App and the display dock are lazy imports. A fixed delay races cold dependency optimization,
+  // especially on the first run; wait for the monitor the probe is about instead.
+  await page.locator('.midi-monitor .summary').waitFor({ timeout: 30000 });
   const result = await page.evaluate(async () => {
     const g = window.__gaia, role = 'Roland GAIA SH-01';
     const emit = (name, payload) => g.feedbackEvent(name, structuredClone(payload));

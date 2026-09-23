@@ -21,11 +21,13 @@ function harness() {
   mountPanel(structuredClone(built));
   const api = scriptApiForTesting('', 'gaia_preset_names');
   const sent = [], recalled = [], timers = [], dialogs = [];
+  let setCalls = 0;
   let clock = 0;
   let route = { id: profile.id, midiInput: 'GAIA IN', midiDestination: 'GAIA OUT', connected: true };
   let recallError = '';
   const scope = {
     ...api,
+    set(...args) { setCalls++; return api.set(...args); },
     after(ms, fn) { timers.push({ at: clock + ms, fn }); },
     routeMidi(role, fn) { assert.equal(role, 'Roland GAIA SH-01'); fn(); },
     sendSysex(bytes) { sent.push(bytes); },
@@ -45,6 +47,8 @@ function harness() {
   return {
     sent, recalled, dialogs, module,
     route: patch => { route = { ...route, ...patch }; },
+    setCalls: () => setCalls,
+    resetSetCalls: () => { setCalls = 0; },
     failRecall: message => { recallError = message; },
     event: (name, payload) => api.emit(name, payload),
     control: name => controlNamed(get(panels)[0], name),
@@ -202,7 +206,10 @@ test('partial name reads distinguish fresh/cached/unknown and disconnect invalid
   h.route({connected:false}); h.advance(1000);
   assert.match(h.text('recall_user_A1'),/^○/);
   assert.match(h.text('names_status_user'),/Selection unknown.*○ 1 cached/);
+  h.resetSetCalls();
   h.route({midiInput:'OTHER IN',midiDestination:'OTHER OUT'}); h.advance(1000);
+  assert.ok(h.setCalls() >= 1000 && h.setCalls() < 1100,
+    `a route change should paint 200 slots once, not twice (saw ${h.setCalls()} set calls)`);
   assert.match(h.text('recall_user_A1'),/not read/);
   h.route({midiInput:'GAIA IN',midiDestination:'GAIA OUT',connected:true}); h.advance(1000);
   assert.match(h.text('recall_user_A1'),/^○ A-1  FRESH NAME/);

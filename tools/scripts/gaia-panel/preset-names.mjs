@@ -179,12 +179,26 @@ function installGaiaNames(config) {
     for (const b of config.banks) for (let slot = b.startSlot; slot < b.startSlot + b.slotCount; slot++) paintSlot(slot);
     status(message);
   }
+  function resetForRouteChange() {
+    if (job) finish('Connection changed · cached names are not a fresh read', false);
+    fresh = {};
+    selected = null;
+    selectionConfirmed = false;
+  }
   function monitorRoute() {
     const p = ce.device.profile(role);
     const key = p ? p.id + ':' + p.midiInput + ':' + p.midiDestination : 'unmapped';
     if (routeKey && (routeKey !== key || (wasConnected && !p?.connected))) {
-      invalidate('Connection changed · cached names are not a fresh read');
-      if (routeKey !== key) { cacheKey = ''; loadCache(); status(); }
+      if (routeKey !== key) {
+        // A new route immediately loads and paints its own cache. Painting the old route first
+        // doubled this transition to roughly 2,000 set() calls on the 200-slot GAIA panel.
+        resetForRouteChange();
+        cacheKey = '';
+        loadCache();
+        status('Connection changed · cached names are not a fresh read');
+      } else {
+        invalidate('Connection changed · cached names are not a fresh read');
+      }
     }
     routeKey = key;
     wasConnected = !!p?.connected;
